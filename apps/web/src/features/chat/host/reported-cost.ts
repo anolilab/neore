@@ -9,6 +9,6 @@ export const formatReportedCost = (cost: { amount: number; currency: string }, l
 
         return new Intl.NumberFormat(locale, { currency: cost.currency, style: "currency", ...digits }).format(cost.amount);
     } catch {
-        return `${cost.amount} ${cost.currency}`;
+        return `${new Intl.NumberFormat(locale).format(cost.amount)} ${cost.currency}`;
     }
 };

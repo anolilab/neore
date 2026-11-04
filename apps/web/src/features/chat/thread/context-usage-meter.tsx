@@ -110,7 +110,7 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
                 <div className="space-y-1.5">
                     <div className="font-medium">{t`Context Usage`}</div>
                     <div className="text-muted-foreground text-xs">
-                        {t`${formatTokenCount(usedTokens)} of ${formatTokenCount(contextWindow)} tokens used (${percent}%)`}
+                        {t`${formatTokenCount(usedTokens)} of ${formatTokenCount(contextWindow)} tokens used (${percentage.toFixed(1)}%)`}
                     </div>
                     {detail !== undefined && <div className="text-muted-foreground text-xs">{detail}</div>}
                     {isAtCapacity && (

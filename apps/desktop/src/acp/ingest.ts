@@ -28,7 +28,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { ChildEvent } from "./children";
-import type { HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver, SessionStatePatch, TurnSummary } from "./host-events";
+import type { AgentUsage, HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver, SessionStatePatch, TurnSummary } from "./host-events";
 import { capPermissionRequest, capPrompt, capRequestId, capSessionInfo, childHostEvents, endReasonOf } from "./host-events";
 import type { ImportIo } from "./import-post";
 import type { MediaOptions } from "./media";
@@ -63,11 +63,25 @@ interface PendingState extends SessionStatePatch {
  * flight at once, so the one that failed may be the older value; it must not replace the newer one.
  */
 export const newerPending = (failed: PendingState, waiting: PendingState | undefined): PendingState => {
-    if (waiting === undefined || waiting.at < failed.at) {
-        return { ...waiting, ...failed };
+    if (waiting === undefined) {
+        return failed;
     }
 
-    return { ...failed, ...waiting };
+    const [older, newer] = waiting.at < failed.at ? [waiting, failed] : [failed, waiting];
+    const usage = mergeUsage(older.usage, newer.usage);
+
+    return { ...older, ...newer, ...usage !== undefined && { usage }, at: newer.at };
+};
+
+/** A usage report's counts are the newer ones; the cost is the newer one when it has one, otherwise the older one (a running total). */
+const mergeUsage = (older: AgentUsage | undefined, newer: AgentUsage | undefined): AgentUsage | undefined => {
+    if (newer === undefined) {
+        return older;
+    }
+
+    const cost = newer.cost ?? older?.cost;
+
+    return { size: newer.size, used: newer.used, ...cost !== undefined && { cost } };
 };
 /** A run of 401s this long and this many is a device the backend no longer knows, not a clock blip. */
 const REVOKED_AFTER_MS = 60_000;

@@ -16,7 +16,8 @@ describe("formatReportedCost", () => {
         expect(formatReportedCost({ amount: 12.5, currency: "EUR" }, "de-DE")).toContain("12,50");
     });
 
-    it("falls back to the bare number and the code for a currency the platform does not know", () => {
+    it("falls back to the bare number, in the locale, and the code for a currency the platform does not know", () => {
         expect(formatReportedCost({ amount: 0.5, currency: "not money!" }, "en-US")).toBe("0.5 not money!");
+        expect(formatReportedCost({ amount: 0.5, currency: "not money!" }, "de-DE")).toBe("0,5 not money!");
     });
 });

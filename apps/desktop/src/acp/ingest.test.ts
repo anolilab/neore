@@ -1422,6 +1422,14 @@ describe("what the agent reports about itself", () => {
 });
 
 describe("a retry that finds a newer report waiting", () => {
+    it("keeps the cost of a failed send when the newer report carries only counts", () => {
+        const cost = { amount: 0.4, currency: "USD" };
+        const failed = { at: 1000, usage: { cost, size: 10, used: 1 } };
+        const waiting = { at: 2000, usage: { size: 10, used: 2 } };
+
+        expect(newerPending(failed, waiting)).toEqual({ at: 2000, usage: { cost, size: 10, used: 2 } });
+    });
+
     it("keeps the newer observation for each field when the older send failed last", () => {
         const failed = { at: 1000, usage: { size: 10, used: 1 } };
         const waiting = { at: 2000, usage: { size: 10, used: 2 } };
