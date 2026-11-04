@@ -42,7 +42,7 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { resolveLeafRow } from "../agent/branch-rows";
 import { addMessagesHandler, getMaxMessage } from "../agent/messages";
 import { isThreadStreaming } from "../agent/thread-streaming";
-import { insertThread, insertThreadRelationship, patchThread } from "../agent/table-writes";
+import { clearAwaitingInput, insertThread, insertThreadRelationship, patchThread } from "../agent/table-writes";
 import { sessionOfThread } from "../acp/lib/sessions";
 import { startFailureMessage } from "../acp/lib/start";
 import { openHostSession } from "../acp/lib/start-session";
@@ -1285,6 +1285,17 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
         ...(loopGone && { loopExitedAt: now }),
     });
 
+    if (run.childThreadId !== undefined) {
+        // A request the child still waits on can no longer be answered: it is denied, so no claim can run its tool or
+        // persist its "always" decision afterwards.
+        await closeChildApprovals(ctx, run.childThreadId, now);
+
+        // A resumed child streams on its own thread, which the cancel does not reach: the stop ends that stream too.
+        if (outcome.kind === "cancelled" && !hostRun) {
+            await ctx.scheduler.runAfter(0, internal.chat.streaming.persistent.library.stopActiveForThread, { threadId: run.childThreadId });
+        }
+    }
+
     // A run ended from this side (stopped, reaped) while its turn still runs: the computer is told to stop. A run ended by
     // its turn's own end finds the stream over already.
     if (hostRun && wasRunning) {
@@ -1361,15 +1372,26 @@ export const completeRun = internalMutation
 /** Approval rows read per child thread; resolved ones are purged a day after their answer. */
 const APPROVAL_ROWS_SCANNED = 50;
 
-/** The child thread's unanswered approval requests, as `recordPendingToolApprovals` stored them. */
-const pendingApprovalRows = async (ctx: Pick<QueryCtx, "db">, childThreadId: string): Promise<Doc<"toolApprovalRuns">[]> => {
-    const rows = await ctx.db
-        .query("toolApprovalRuns")
-        .withIndex("by_threadId", (q) => q.eq("threadId", childThreadId))
-        .take(APPROVAL_ROWS_SCANNED);
+/** Denies a child's unanswered approval requests and clears its waiting state: its run has ended, so nothing will answer them. */
+const closeChildApprovals = async (ctx: MutationCtx, childThreadId: string, now: number): Promise<void> => {
+    const pending = await pendingApprovalRows(ctx, childThreadId);
 
-    return rows.filter((row) => row.status === "pending");
+    for (const row of pending) {
+        await patchById(ctx.db, "toolApprovalRuns", row._id, { resolvedAt: now, resolvedBy: "run-ended", status: "denied" });
+    }
+
+    await clearAwaitingInput(ctx.db, childThreadId as Id<"threads">);
 };
+
+/**
+ * The child thread's unanswered approval requests, as `recordPendingToolApprovals` stored them. The status is part of the
+ * index, so resolved requests from earlier never use up the scan.
+ */
+const pendingApprovalRows = async (ctx: Pick<QueryCtx, "db">, childThreadId: string): Promise<Doc<"toolApprovalRuns">[]> =>
+    await ctx.db
+        .query("toolApprovalRuns")
+        .withIndex("by_threadId_status_createdAt", (q) => q.eq("threadId", childThreadId).eq("status", "pending"))
+        .take(APPROVAL_ROWS_SCANNED);
 
 /** A reaper for `runId` that fires just past `reapAt`, the deadline it now owns. */
 const scheduleReaperAt = async (ctx: Pick<MutationCtx, "scheduler">, runId: Id<"subAgentRuns">, reapAt: number, now: number): Promise<void> => {

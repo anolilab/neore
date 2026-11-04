@@ -954,8 +954,18 @@ export const continueAfterToolApproval = internalAction
         const { subAgentRunId } = config;
 
         try {
-            if (subAgentRunId !== undefined) {
-                await ctx.runMutation(internal.sub_agents.functions.resumeAwaitingRun, { runId: subAgentRunId });
+            if (subAgentRunId !== undefined && !(await ctx.runMutation(internal.sub_agents.functions.resumeAwaitingRun, { runId: subAgentRunId }))) {
+                // The run ended while it waited (a stop, a reap): its tool does not run for a run that is over.
+                streamLogger.warn(`[ToolApproval] Sub-agent run ${subAgentRunId} is no longer awaiting — not resumed`);
+
+                await failRun(ctx, {
+                    safeMessage: "This sub-agent has already ended.",
+                    streamId,
+                    threadId,
+                    threadStatus: "active",
+                });
+
+                return;
             }
 
             // A locked chat resumes only under a stream started after its lock (`streamRunThread`).
