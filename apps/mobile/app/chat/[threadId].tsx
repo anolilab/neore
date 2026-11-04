@@ -437,6 +437,11 @@ const Chat = () => {
                 fetch: streamingFetch,
                 gatewayUrl: config.gatewayUrl,
                 onDelta: ({ restart, text }) => {
+                    // A send stopped by a refusal of the chat writes nothing more into it.
+                    if (controller.signal.aborted) {
+                        return;
+                    }
+
                     if (restart) {
                         isSteered = true;
                         const previousId = activeId;
