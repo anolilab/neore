@@ -25,6 +25,7 @@ import { mergeRows } from "@/offline/merge";
 import { createMessageReadGate, isThreadRefusal, readOlderMessages, readThreadMessages } from "@/offline/message-read";
 import { OfflineBanner } from "@/offline/offline-banner";
 import { useOffline, useWriteControl } from "@/offline/offline-context";
+import { settleQuietly } from "@/offline/quietly";
 import type { MessageRow } from "@/offline/types";
 import { requireOnline } from "@/offline/write-gate";
 
@@ -197,8 +198,9 @@ const Chat = () => {
                         // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
                         const page = await fetchMessagePage(id, cursor);
 
-                        // The server returns each page newest first; the rows are shown oldest first.
-                        pages.unshift(page.page.map((message) => toRow(message, id, startedAt)).toReversed());
+                        // Pages come newest first, and each page is oldest first inside (`toUIMessages` sorts it ascending).
+                        // Each older page goes in front, so the rows read oldest first.
+                        pages.unshift(page.page.map((message) => toRow(message, id, startedAt)));
                         isDone = page.isDone;
                         cursor = page.continueCursor;
                     }
@@ -264,7 +266,7 @@ const Chat = () => {
 
                     return {
                         olderCursor: page.isDone ? null : page.continueCursor,
-                        rows: page.page.map((message) => toRow(message, threadId, syncedAt)).toReversed(),
+                        rows: page.page.map((message) => toRow(message, threadId, syncedAt)),
                     };
                 },
                 gate: readGate.current,
@@ -377,7 +379,8 @@ const Chat = () => {
                     const page = await fetchMessagePage(id, cursor);
 
                     seen.push(
-                        ...page.page.map((message) => {
+                        // `replyStateAfter` reads newest first; a page is oldest first inside, so it is reversed here.
+                        ...page.page.toReversed().map((message) => {
                             return { id: message.id, role: message.role, status: message.status };
                         }),
                     );
@@ -399,7 +402,15 @@ const Chat = () => {
             if (isActive && (state === "settled" || isChatRefused || reads >= CONFIRM_GIVE_UP_READS)) {
                 setConfirmation(null);
                 setError(withoutAwaitReply);
-                setConfirmTick((tick) => tick + 1);
+
+                if (isChatRefused) {
+                    // A chat the reader can no longer open is cleared now, not by a read that may not run.
+                    readGate.current.invalidate();
+                    showRefused();
+                    settleQuietly(cache?.forgetThreads([id]));
+                } else {
+                    setConfirmTick((tick) => tick + 1);
+                }
 
                 return;
             }
@@ -420,7 +431,7 @@ const Chat = () => {
             isActive = false;
             clearInterval(timer);
         };
-    }, [confirmation, isConfirming]);
+    }, [cache, confirmation, isConfirming, showRefused]);
 
     useEffect(() => {
         // Without a token (a launch with no network) the saved messages are all there is; the read waits for one.
