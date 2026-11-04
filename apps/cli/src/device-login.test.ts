@@ -156,6 +156,16 @@ describe("pollForKey", () => {
         expect(exitCodeFor(error)).toBe(EXIT.error);
     });
 
+    it("shows the server's reason when the key limit refuses the sign-in", async () => {
+        const reason = "You already have 25 API keys. Revoke one in Settings, then try again.";
+        const { deps } = harness([() => oauthError("access_denied", 403, reason)]);
+
+        const error = await pollForKey(deps, BASE, code()).catch((error_: unknown) => error_);
+
+        expect(error).toMatchObject({ code: "device_denied" });
+        expect((error as ApiError).message).toContain(reason);
+    });
+
     it("fails with device_expired (exit 1) when the server says the code expired", async () => {
         const { deps } = harness([() => oauthError("expired_token")]);
 

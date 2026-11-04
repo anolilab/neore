@@ -11,6 +11,8 @@ import { useState } from "react";
 import useAuthenticate from "@/features/auth/hooks/use-authenticate";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { authClient } from "@/lib/auth/client";
+import type { DeviceProblem as Problem } from "@/lib/auth/device-problem";
+import { problemOf } from "@/lib/auth/device-problem";
 import { seo } from "@/lib/seo";
 
 /**
@@ -32,17 +34,11 @@ interface DeviceSearch {
 
 type Decision = "approved" | "denied";
 
-type Problem = "expired" | "invalid" | "keyLimit" | "unavailable";
-
 interface Lookup {
     hostname?: string;
     /** False when another account claimed the code: its details are not shown to this one. */
     isMine: boolean;
     status: "approved" | "denied" | "pending";
-}
-
-interface FetchFailure {
-    error?: unknown;
 }
 
 const CODE_LENGTH = 8;
@@ -53,20 +49,6 @@ const normalizeCode = (value: string): string => value.replaceAll(/[^a-z0-9]/giu
 const formatCode = (code: string): string => (code.length === CODE_LENGTH ? `${code.slice(0, 4)}-${code.slice(4)}` : code);
 
 const asString = (value: unknown): string | undefined => (typeof value === "string" && value.length > 0 ? value : undefined);
-
-const problemOf = (failure: object | null | undefined): Problem => {
-    const { error } = (failure ?? {}) as FetchFailure;
-
-    if (error === "expired_token") {
-        return "expired";
-    }
-
-    if (error === "key_limit") {
-        return "keyLimit";
-    }
-
-    return error === "invalid_request" ? "invalid" : "unavailable";
-};
 
 class ProblemError extends Error {
     public readonly problem: Problem;

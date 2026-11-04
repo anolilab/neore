@@ -406,7 +406,7 @@ describe("device-code sign-in for the CLI", () => {
         expect(await errorOf(poll(harness, code.device_code))).toBe("authorization_pending");
     });
 
-    it("withdraws its own key when concurrent redemptions pushed the person past the cap, and restores the code", async () => {
+    it("withdraws its own key when concurrent redemptions pushed the person past the cap, and answers the poll with the refusal", async () => {
         const holder: { harness?: Harness } = {};
         const harness = build(async (input) => {
             const live = holder.harness as Harness;
@@ -448,8 +448,11 @@ describe("device-code sign-in for the CLI", () => {
         const refused = await poll(harness, code.device_code);
 
         expect(refused.response.status).toBe(403);
+        expect(refused.body["error"]).toBe("access_denied");
+        expect(String(refused.body["error_description"])).toContain("API keys");
         expect(await rowsOf(harness, "apikey")).toHaveLength(MAX_API_KEYS_PER_USER);
-        expect(await rowsOf(harness, "deviceCode")).toHaveLength(1);
+        // The refusal was the poll's definite answer; no spent-looking approved row is left for a CLI that has stopped.
+        expect(await rowsOf(harness, "deviceCode")).toHaveLength(0);
     });
 
     it("mints no key when the account that approved the code was deleted", async () => {

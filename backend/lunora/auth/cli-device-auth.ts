@@ -22,7 +22,7 @@
  *   A response lost in transit cannot be replayed (the key is never stored in
  *   the clear); the stranded key shows in Settings and can be revoked there.
  *   The per-person key cap is checked before the claim and again after the
- *   mint; a mint that finds the person over the cap withdraws its own key.
+ *   mint; a mint that finds the person over the cap withdraws its own key and answers with the refusal.
  *
  * The caller supplies the minting function (`mintApiKey`), so this file does
  * not import the auth instance it is installed into.
@@ -218,13 +218,14 @@ const redeemKey = (options: CliDeviceAuthOptions) =>
 
         // The cap is counted before the claim and cannot be reserved (the adapter has no transaction across
         // the count and the insert), so it is counted again once the key exists: if concurrent redemptions
-        // pushed the person past it, this key is withdrawn and the code put back. Two racing mints can both
-        // withdraw; neither can leave the person over the cap.
+        // pushed the person past it, this key is withdrawn and the poll that is waiting for it gets the
+        // definite refusal below (the CLI prints it and stops). The code stays spent, because nothing will poll
+        // it again after that answer. Two racing mints can both withdraw; neither can leave the person over
+        // the cap, and the person starts a new code once a key is revoked.
         const total = await ctx.context.adapter.count({ model: "apikey", where: [{ field: "referenceId", value: user.id }] });
 
         if (total > MAX_API_KEYS_PER_USER) {
             await ctx.context.adapter.delete({ model: "apikey", where: [{ field: "id", value: minted.id }] });
-            await restoreClaimedCode(ctx.context.adapter, claimedDeviceCode, new Error("key cap exceeded"));
 
             throw oauthError("FORBIDDEN", "access_denied", keyLimitMessage);
         }

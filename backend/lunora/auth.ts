@@ -258,9 +258,24 @@ export const API_KEY_OPTIONS = {
  *   either;
  * - the limiter itself is the expensive part: one D1 read + write per request.
  *
- * Everything a brute-force or mail-bomb would use keeps its strict rule; this
- * map names only the one path it relaxes. `auth.rate-limit.test.ts` drives
- * better-auth's real limiter to pin both halves.
+ * Everything a brute-force or mail-bomb would use keeps its strict rule. The map
+ * relaxes three paths and sets three limits of its own, all for the CLI's
+ * device-code sign-in (`auth/cli-device-auth.ts`):
+ * - `/get-session` is exempt, for the reasons above;
+ * - `/device/key` (the CLI's poll) is exempt from the per-address counter, because
+ *   a quiet-gap window cannot rate a route that is polled continuously: two people
+ *   polling behind one address would lock each other out. The limits that remain
+ *   on it are the plugin's per-CODE poll interval (`slow_down`), the 40 random
+ *   characters of a real code, and the fact that a guessed code costs one indexed
+ *   read; nothing here bounds how many invented codes one address may try;
+ * - `/device/code` (issuing a code) allows 60 per address, enough for an office
+ *   signing in together and still a stop for a loop;
+ * - `/device/approve` and `/device/deny` keep 10 per 10 s: both need a session and
+ *   a code bound to it, so they only bound a signed-in account's retries.
+ * Per address means per client address only where the app names a trusted
+ * address header; without one better-auth keys every request of a path on one
+ * shared bucket. `auth.rate-limit.test.ts` drives better-auth's real limiter to
+ * pin these rules.
  */
 // Key order is meaningful, not alphabetical: `/get-session` must stay first so it matches before the catch-all.
 /* eslint-disable perfectionist/sort-objects */
