@@ -21,9 +21,13 @@ const partText = (part: unknown): string => {
 /** What the reader shows for a message: its text, with a label where an attachment is. */
 export const displayTextOf = (parts: unknown[]): string => parts.map((part) => partText(part)).join("");
 
-/** The text parts only, which is all the share sheet receives. Attachments are never shared. */
+/**
+ * The text parts only, which is all the share sheet receives. Attachments are never shared. Parts are joined with a
+ * space and empty ones skipped, the same rule the server uses for a message's text.
+ */
 export const shareTextOf = (parts: unknown[]): string =>
     parts
         .filter((part) => partKind(part) === "text")
         .map((part) => partText(part))
-        .join("");
+        .filter(Boolean)
+        .join(" ");

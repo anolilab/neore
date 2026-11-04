@@ -32,6 +32,9 @@ const MAX_HISTORY_PAGES = 10;
 const REFUSED_MESSAGE = "This chat is locked or no longer available.";
 const SHARE_FAILED_MESSAGE = "The message could not be shared. Try again.";
 
+/** A failed share fills an empty error slot; an error already on screen is not replaced by it. */
+const withShareFailure = (current: string | null): string | null => current ?? SHARE_FAILED_MESSAGE;
+
 /** A share that works clears the share failure on screen; any other error on screen is not the share's to clear. */
 const withoutShareFailure = (current: string | null): string | null => {
     if (current === SHARE_FAILED_MESSAGE) {
@@ -385,7 +388,7 @@ const Chat = () => {
             setError(withoutShareFailure);
         } catch (shareError) {
             console.warn("Could not open the share sheet.", shareError);
-            setError(SHARE_FAILED_MESSAGE);
+            setError(withShareFailure);
         }
     };
 
@@ -404,14 +407,15 @@ const Chat = () => {
                     keyExtractor={(row) => row.id}
                     ListHeaderComponent={olderHeader}
                     renderItem={({ item }) => {
-                        const shareText = shareableMessageText({ text: item.shareText });
+                        // Only a finished message can be shared: one still streaming, or one that failed, is not the whole text.
+                        const shareText = item.status === "success" ? shareableMessageText({ text: item.shareText }) : undefined;
 
                         return (
                             <View style={{ alignSelf: item.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", padding: 12 }}>
                                 <Text selectable>{item.text || (item.role === "assistant" ? "..." : "")}</Text>
                                 {shareText !== undefined && (
                                     <Pressable
-                                        accessibilityLabel={shareLabel(item)}
+                                        accessibilityLabel={shareLabel({ role: item.role, text: shareText })}
                                         accessibilityRole="button"
                                         onPress={() => shareRow(shareText)}
                                         style={{ alignItems: "center", alignSelf: "flex-start", justifyContent: "center", minHeight: 44, minWidth: 44, paddingHorizontal: 12 }}

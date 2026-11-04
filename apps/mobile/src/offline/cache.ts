@@ -163,7 +163,15 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
 
         const [stored] = await database.getAllAsync<{ user_version: number }>("PRAGMA user_version");
 
-        if (stored?.user_version !== SCHEMA_VERSION) {
+        if (stored?.user_version === 1) {
+            // Version one has the same tables without the share text column. Add the column and keep the saved chats: their
+            // share text is empty until a read replaces them, so they offer no share button in the meantime.
+            const columns = await database.getAllAsync<{ name: string }>("PRAGMA table_info(cached_messages)");
+
+            if (columns.every((column) => column.name !== "share_text")) {
+                await database.execAsync("ALTER TABLE cached_messages ADD COLUMN share_text TEXT NOT NULL DEFAULT ''");
+            }
+        } else if (stored?.user_version !== SCHEMA_VERSION) {
             for (const table of TABLES) {
                 // eslint-disable-next-line no-await-in-loop -- one statement after the other
                 await database.execAsync(`DROP TABLE IF EXISTS ${table}`);
