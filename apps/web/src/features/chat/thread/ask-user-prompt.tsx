@@ -50,6 +50,17 @@ const IMAGE_SELECT_MAX_BYTES = 40 * 1024 * 1024;
 /** Mirrors `ASK_USER_IMAGE_MAX_BYTES` on the server: the largest image a provider takes as base64 in one call. */
 const IMAGE_MAX_BYTES = 3_932_160;
 
+/** The extension of a file name, with its dot. */
+const EXTENSION = /\.[^.]*$/;
+
+/** The name a re-encoded photo is saved under: its base name with the extension of the type it was encoded as. */
+const renamedFor = (name: string, type: string): string => {
+    const base = name.replace(EXTENSION, "");
+    const extension = type === "image/jpeg" ? "jpg" : (type.split("/", 2)[1] ?? "");
+
+    return extension ? `${base}.${extension}` : name;
+};
+
 /** The largest a selected file may be: a photo gets the wider limit, since it is re-encoded before upload. */
 const selectLimitOf = (file: File): number => (file.type.startsWith("image/") ? IMAGE_SELECT_MAX_BYTES : FILE_MAX_BYTES);
 /** Mirrors `ASK_USER_FILES_TOTAL_MAX_BYTES` on the server. */
@@ -89,6 +100,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     // Focus lands here after a send: the form (and the focused control) goes away.
     const groupRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const attachButtonRef = useRef<HTMLButtonElement>(null);
     // Stops the selection in progress when the question is answered or dismissed, so no later file is uploaded or finalized.
     const uploadAbort = useRef<AbortController | null>(null);
     const { isPending, mutate } = useMutation(crpc.chat.ask_user.answerAskUser.mutationOptions());
@@ -207,14 +219,16 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         break;
                     }
 
-                    const { fileId } = await finalizeUpload({ filename: file.name, uploadId });
+                    // A re-encoded photo has the new type's extension, so the saved name matches the bytes uploaded.
+                    const filename = prepared === file ? file.name : renamedFor(file.name, prepared.type);
+                    const { fileId } = await finalizeUpload({ filename, uploadId });
 
                     // Counted only once the upload is in, so a failed one does not use up the budget.
                     total += prepared.size;
 
                     // The server dedupes uploads by content, so the same photo can come back with an id already attached.
                     setFiles((current) =>
-                        current.some((item) => item.fileId === fileId) ? current : [...current, { fileId, name: file.name, size: prepared.size }],
+                        current.some((item) => item.fileId === fileId) ? current : [...current, { fileId, name: filename, size: prepared.size }],
                     );
                 } catch {
                     // An upload cut short by a dismissal is not a failure to report.
@@ -332,7 +346,11 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                                     <button
                                         aria-label={t`Remove ${file.name}`}
                                         className="text-muted-foreground hover:text-foreground"
-                                        onClick={() => setFiles((current) => current.filter((item) => item.fileId !== file.fileId))}
+                                        onClick={() => {
+                                            setFiles((current) => current.filter((item) => item.fileId !== file.fileId));
+                                            // Focus stays in the card: the remove button goes, so the attach button takes it.
+                                            attachButtonRef.current?.focus();
+                                        }}
                                         type="button"
                                     >
                                         <X aria-hidden="true" className="size-3" />
@@ -361,6 +379,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         <Button
                             disabled={uploading || files.length >= FILES_MAX}
                             onClick={() => fileInputRef.current?.click()}
+                            ref={attachButtonRef}
                             size="sm"
                             type="button"
                             variant="ghost"
