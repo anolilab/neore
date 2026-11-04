@@ -195,6 +195,7 @@ const applySessionState = async (
     device: Doc<"devices">,
     hostSessionId: string,
     event: Extract<Event, { kind: "session_state" }>,
+    now: number,
 ): Promise<ApplyResult> => {
     const session = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
 
@@ -202,12 +203,21 @@ const applySessionState = async (
         return REFUSED;
     }
 
-    if (session.status === "ended" || (session.agentStateAt !== undefined && event.at < session.agentStateAt)) {
+    // A desktop clock running ahead cannot park the ordering watermark in the future: a report stamped later than the server
+    // clock is ordered at the server's time. The ordering time is the observation time, so a report still arriving after
+    // the session closed is stored too: a debounced report can outlive its close, and its usage is the final one.
+    const at = Math.min(event.at, now);
+
+    if (session.agentStateAt !== undefined && at < session.agentStateAt) {
         return { ended: false, next: 0, outcome: "applied" };
     }
 
     if (event.usage !== undefined && !sameUsage(event.usage, session.agentState?.usage)) {
-        await ctx.db.patch("acpSessions", session._id, { agentState: { ...session.agentState, usage: event.usage }, agentStateAt: event.at });
+        await ctx.db.patch("acpSessions", session._id, { agentState: { ...session.agentState, usage: event.usage }, agentStateAt: at });
+    } else if (session.agentStateAt === undefined || at > session.agentStateAt) {
+        // A newer report that repeats the stored usage (or leaves it out) still moves the watermark, so an older report that
+        // arrives later cannot overwrite the newest observation.
+        await ctx.db.patch("acpSessions", session._id, { agentStateAt: at });
     }
 
     return { ended: false, next: 0, outcome: "applied" };
@@ -485,7 +495,7 @@ export const applyHostEvents = internalMutation
         }
 
         if (isStateReport && first?.kind === "session_state") {
-            return await applySessionState(ctx, device, args.sessionId, first);
+            return await applySessionState(ctx, device, args.sessionId, first, now);
         }
 
         if (args.threadId === undefined) {

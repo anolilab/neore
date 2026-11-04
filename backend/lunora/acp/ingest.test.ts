@@ -2401,14 +2401,41 @@ describe("what the agent reports about itself", () => {
         expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(30) }, agentStateAt: 3000 });
     });
 
-    it("writes nothing when the report repeats the stored values", async () => {
+    it("moves the ordering time on a newer report that repeats the stored usage, so an older report cannot overwrite the newest", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);
 
         await report(device, 1000, { usage: usage(10) });
-        await report(device, 2000, { usage: usage(10) });
+        await report(device, 3000, { usage: usage(10) });
+        await report(device, 2000, { usage: usage(7) });
 
-        expect(await rowOf(threadId)).toMatchObject({ agentStateAt: 1000 });
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(10) }, agentStateAt: 3000 });
+    });
+
+    it("stores a report that arrives after the session closed: the final usage is not lost", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { usage: usage(10) });
+        await ingest(device, { close: true, events: [] } as Body);
+        const late = await report(device, 2000, { usage: usage(12) });
+
+        expect(late.status).toBe(200);
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(12) }, agentStateAt: 2000, status: "ended" });
+    });
+
+    it("orders a report stamped ahead of the server clock at the server's time, so a current report is still applied", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, Number.MAX_SAFE_INTEGER - 1, { usage: usage(10) });
+        const current = await report(device, Date.now(), { usage: usage(11) });
+
+        expect(current.status).toBe(200);
+        const stored = await rowOf(threadId);
+
+        expect(stored?.agentStateAt).toBeLessThanOrEqual(Date.now() + 1000);
+        expect(stored).toMatchObject({ agentState: { usage: usage(11) } });
     });
 
     it("refuses a report for a session the device does not hold", async () => {
