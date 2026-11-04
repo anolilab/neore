@@ -26,8 +26,10 @@ export const routeOf = (transport: string | undefined, isThisComputer: boolean):
 };
 
 /** The messages for a row, newest last: the current reconnect reason, while one applies, is the newest. */
-export const withReconnectReason = <T extends { message: string }>(remembered: T[], reason: string | null | undefined): { clockOffset?: string; message: string; }[] =>
-    reason ? [...remembered, { message: reason }] : remembered;
+export const withReconnectReason = <T extends { message: string }>(
+    remembered: T[],
+    reason: string | null | undefined,
+): { clockOffset?: string; message: string }[] => (reason ? [...remembered, { message: reason }] : remembered);
 
 const ROUTE_TEXT: Record<DeviceRoute, string> = {
     relay: "relay (another paired computer)",
