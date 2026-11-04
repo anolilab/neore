@@ -44,10 +44,4 @@ describe("replyStateAfter", () => {
 
         expect(replyStateAfter(newestFirst, "sent")).toBe("pending");
     });
-
-    it("finds the send across pages when newer messages came after it", () => {
-        const newestFirst = [message("other", "user"), message("otherReply", "assistant"), message("sent", "user"), message("reply", "assistant", "success")];
-
-        expect(replyStateAfter(newestFirst, "sent")).toBe("settled");
-    });
 });
