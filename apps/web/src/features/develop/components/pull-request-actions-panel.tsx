@@ -154,6 +154,8 @@ const PullRequestActionsPanel = ({
         // A refusal changed nothing: the dialog stays open with its reason and the typed text. Anything else closes it.
         if (next.kind === "error" && !next.unconfirmed) {
             setEditProblem(next.text);
+            // The dialog may have been closed while the write was pending: the refusal is shown on the panel too.
+            setFeedback(next);
 
             return;
         }
@@ -188,6 +190,7 @@ const PullRequestActionsPanel = ({
         // A refusal changed nothing: the dialog stays open with its reason and the typed logins. Anything else closes it.
         if (next.kind === "error" && !next.unconfirmed) {
             setReviewProblem(next.text);
+            setFeedback(next);
 
             return;
         }
@@ -379,7 +382,10 @@ const PullRequestActionsPanel = ({
                     )}
                     <DialogFooter>
                         <DialogClose render={<Button variant="outline" />}>{t`Cancel`}</DialogClose>
-                        <Button disabled={parseLogins(reviewing ?? "").length === 0} onClick={sendReviewers}>{t`Request`}</Button>
+                        <Button
+                            disabled={parseLogins(reviewing ?? "").length === 0 || actions.requestReviewers.isPending}
+                            onClick={sendReviewers}
+                        >{t`Request`}</Button>
                     </DialogFooter>
                 </DialogPopup>
             </Dialog>

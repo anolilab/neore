@@ -10,8 +10,12 @@ import { DEVELOP_QUERY_ROOT, useDevelopUser } from "./use-develop";
 const PRE_HOST_CODES = new Set(["BAD_REQUEST", "FORBIDDEN", "TOO_MANY_REQUESTS", "UNAUTHORIZED"]);
 
 /** A thrown error the server raised before it called the host. Any other error may come after the host acted. */
-export const isPreHostRefusal = (error: unknown): boolean =>
-    typeof error === "object" && error !== null && "code" in error && typeof error.code === "string" && PRE_HOST_CODES.has(error.code);
+export const isPreHostRefusal = (error: unknown): boolean => {
+    // The client puts a server error's code at the top level or under `data`, depending on the path it came by.
+    const { code, data } = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; data?: { code?: unknown } };
+
+    return [code, data?.code].some((value) => typeof value === "string" && PRE_HOST_CODES.has(value));
+};
 
 /** Only an answer that the host may have acted on (taken, or unconfirmed) and an error after a host call change what is cached. */
 const mayHaveChanged = (outcome: { status: string } | undefined, error: unknown): boolean =>

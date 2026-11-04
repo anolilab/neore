@@ -7,6 +7,11 @@ describe("isPreHostRefusal", () => {
         expect(isPreHostRefusal({ code })).toBe(true);
     });
 
+    it("reads the code under data, where the client puts a server error's code", () => {
+        expect(isPreHostRefusal({ data: { code: "TOO_MANY_REQUESTS" } })).toBe(true);
+        expect(isPreHostRefusal({ data: { code: "INTERNAL_SERVER_ERROR" } })).toBe(false);
+    });
+
     it("does not treat a server failure as a refusal: the host may have acted before it failed", () => {
         expect(isPreHostRefusal({ code: "INTERNAL_SERVER_ERROR" })).toBe(false);
     });
