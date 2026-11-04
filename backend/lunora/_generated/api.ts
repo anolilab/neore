@@ -341,7 +341,7 @@ export interface ApiTypes {
         };
         streaming: {
             getActiveStreamForThread: FunctionReference<"query", { threadId: Id<"threads">; unlockProof?: string }, { deliveredSteerIds?: Array<string>; hostState?: "accepted" | "received" | "running" | "ended"; pause?: { provider?: string; reason: "rate_limit"; retryAt: number; status: number }; streamId: Id<"persistentStreams"> } | null>;
-            getStreamBody: FunctionReference<"query", { streamId: Id<"persistentStreams">; unlockProof?: string }, { hostState?: "accepted" | "received" | "running" | "ended"; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; text: string; toolProgress?: Array<{ message?: string; progress: number; serverName: string; toolCallId: string; toolName: string; total?: number }> }>;
+            getStreamBody: FunctionReference<"query", { streamId: Id<"persistentStreams">; unlockProof?: string }, { hostActivity?: { plan?: Array<{ content: string; priority: "high" | "medium" | "low"; status: "pending" | "in_progress" | "completed" }>; tools: Array<{ id: string; status: "pending" | "in_progress" | "completed" | "failed" | "cancelled" | "declined"; title: string; toolKind: string }> }; hostState?: "accepted" | "received" | "running" | "ended"; reasoning: string; speaker?: { name: string; skillId: string }; status: "pending" | "streaming" | "done" | "error" | "timeout"; text: string; toolProgress?: Array<{ message?: string; progress: number; serverName: string; toolCallId: string; toolName: string; total?: number }> }>;
         };
         tags: {
             functions: {
