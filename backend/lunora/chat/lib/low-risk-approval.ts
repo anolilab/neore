@@ -205,10 +205,15 @@ export const lowRiskIneligibleReason = (
     descriptor: ToolDescriptor,
     /** The user set this tool's mode themselves (an override exists), whatever it says. */
     userChose: boolean,
-    options: Pick<ToolPermissionOptions, "apiKeyOrigin" | "headless" | "lowRiskTrusted">,
+    options: Pick<ToolPermissionOptions, "apiKeyOrigin" | "headless" | "lowRiskTrusted" | "threadMode">,
 ): string | null => {
     if (options.headless) {
         return "headless";
+    }
+
+    // Supervised and auto-edit name the calls a person approves; the model's quick verdict does not stand in for that.
+    if (options.threadMode === "supervised" || options.threadMode === "auto-edit") {
+        return "thread mode";
     }
 
     // An outside agent's calls are clamped to `ask` precisely because nobody approves in the app.

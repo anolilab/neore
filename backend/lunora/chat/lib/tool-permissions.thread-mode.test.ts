@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { BUILTIN_TOOLS_FILE_EDIT, BUILTIN_TOOLS_READ_ONLY, isThreadPermissionMode } from "./thread-permission-mode";
 import type { ToolDescriptor } from "./tool-permissions";
+import { lowRiskIneligibleReason } from "./low-risk-approval";
 import { resolveToolPermission, resolveToolPermissionWithGrant, toolPermissionKey } from "./tool-permissions";
 
 const builtin = (name: string): ToolDescriptor => {
@@ -32,6 +33,7 @@ describe("thread permission mode", () => {
         expect(resolveToolPermission(builtin("somethingNew"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(WEB_SEARCH, undefined, options)).toBe("auto");
         expect(resolveToolPermission(builtin("visionAnalysis"), undefined, options)).toBe("ask");
+        expect(resolveToolPermission(builtin("retrieve"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(mcp({ readOnlyHint: true }), undefined, options)).toBe("ask");
         expect(resolveToolPermission(mcp(), undefined, options)).toBe("ask");
     });
@@ -41,6 +43,8 @@ describe("thread permission mode", () => {
 
         expect(resolveToolPermission(FILES, undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("updateDocument"), undefined, options)).toBe("auto");
+        expect(resolveToolPermission(builtin("createPresentation"), undefined, options)).toBe("ask");
+        expect(resolveToolPermission(builtin("updateSlide"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(SHELL, undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("browser"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(WEB_SEARCH, undefined, options)).toBe("auto");
@@ -104,5 +108,12 @@ describe("thread permission mode", () => {
         for (const name of BUILTIN_TOOLS_FILE_EDIT) {
             expect(BUILTIN_TOOLS_READ_ONLY.has(name)).toBe(false);
         }
+    });
+});
+
+describe("the quick check under the restrictive modes", () => {
+    it("never stands in for a person's approval under supervised or auto-edit", () => {
+        expect(lowRiskIneligibleReason(mcp(), false, { lowRiskTrusted: new Set(["srv"]), threadMode: "supervised" })).not.toBeNull();
+        expect(lowRiskIneligibleReason(SHELL, false, { threadMode: "auto-edit" })).not.toBeNull();
     });
 });

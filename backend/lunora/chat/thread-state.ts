@@ -65,7 +65,7 @@ export const unsnoozeThread = authMutation
 
 /**
  * Sets how much of a cloud thread's runs the owner leaves unasked. A host thread keeps its own approval rules, so it
- * has no mode to set. Takes effect on the next run; a run already paused keeps the tools it was built with.
+ * has no mode to set. Takes effect on the next run; a run paused for approval applies the mode it finds when it resumes.
  */
 export const setThreadPermissionMode = authMutation
     .use(rateLimit("chat/update"))
