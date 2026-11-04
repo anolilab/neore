@@ -18,6 +18,7 @@ import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
 import { getClient } from "@/lib/lunora";
 import { streamingFetch } from "@/lib/streaming-fetch";
+import { withFreshRows } from "@/offline/fresh-rows";
 import { mergeRows } from "@/offline/merge";
 import { createMessageReadGate, readOlderMessages, readThreadMessages } from "@/offline/message-read";
 import { OfflineBanner } from "@/offline/offline-banner";
@@ -31,7 +32,9 @@ type Row = MessageRow & { finished?: boolean };
 const NEW_THREAD = "new";
 const MAX_HISTORY_PAGES = 10;
 /** Follow-up reads, and how far apart, after a reply the relay could not confirm as complete. */
-const CONFIRM_READS = 6;
+const CONFIRM_REFRESH_READS = 6;
+/** Unsettled checks after which a confirmation is given up; the reply's final status is then left to the next read. */
+const CONFIRM_GIVE_UP_READS = 150;
 const CONFIRM_READ_INTERVAL_MS = 2000;
 const REFUSED_MESSAGE = "This chat is locked or no longer available.";
 const SHARE_FAILED_MESSAGE = "The message could not be shared. Try again.";
@@ -147,19 +150,6 @@ const hasSettledReplySince = (messages: MessagePage, sentAt: number): boolean =>
 
 /* eslint-enable no-underscore-dangle */
 
-/**
- * Replaces the newest rows with a fresh read and keeps the older rows already on screen, so a refresh does not drop
- * history loaded page by page. Local rows are never kept: a fresh read holds their server copies, or they are still
- * being written.
- */
-const withFreshRows = (current: Row[], fresh: Row[]): Row[] => {
-    const oldest = fresh[0]?.createdAt ?? 0;
-    const freshIds = new Set(fresh.map((row) => row.id));
-    const older = current.filter((row) => row.createdAt < oldest && !freshIds.has(row.id) && row.status !== "local" && !row.finished);
-
-    return [...older, ...fresh];
-};
-
 const Chat = () => {
     const { threadId: routeThreadId } = useLocalSearchParams<{ threadId: string }>();
     const router = useRouter();
@@ -171,6 +161,8 @@ const Chat = () => {
     const hasLiveRows = useRef(false);
     // Set when the server refused this chat (locked, gone): a late read of the cache must not paint it again.
     const isRefused = useRef(false);
+    // Whether "Load older messages" has added pages on this screen: only then does the cursor on screen continue a loaded run.
+    const hasLoadedOlder = useRef(false);
     const readGate = useRef(createMessageReadGate());
     const [threadId, setThreadId] = useState<string | undefined>(routeThreadId === NEW_THREAD ? undefined : routeThreadId);
     const [rows, setRows] = useState<Row[]>([]);
@@ -207,6 +199,7 @@ const Chat = () => {
     const showRefused = useCallback(() => {
         isRefused.current = true;
         hasLiveRows.current = false;
+        hasLoadedOlder.current = false;
         setRows([]);
         setOlderCursor(null);
         setError(REFUSED_MESSAGE);
@@ -251,9 +244,14 @@ const Chat = () => {
                 case "rows": {
                     isRefused.current = false;
                     hasLiveRows.current = true;
-                    setRows((current) => withFreshRows(current, result.rows));
-                    // Older pages already loaded keep their cursor; the fresh read only ever sets the first one.
-                    setOlderCursor((current) => current ?? result.olderCursor);
+                    const hasOlderPages = hasLoadedOlder.current;
+
+                    setRows((current) => withFreshRows(current, result.rows, hasOlderPages));
+
+                    if (!hasOlderPages) {
+                        setOlderCursor(result.olderCursor);
+                    }
+
                     setError(withoutRefusal);
                     reportRead("succeeded");
                     break;
@@ -301,7 +299,12 @@ const Chat = () => {
                     break;
                 }
                 case "page": {
-                    setRows((current) => [...result.rows, ...current]);
+                    hasLoadedOlder.current = true;
+                    setRows((current) => {
+                        const onScreen = new Set(current.map((row) => row.id));
+
+                        return [...result.rows.filter((row) => !onScreen.has(row.id)), ...current];
+                    });
                     setOlderCursor(result.olderCursor);
                     break;
                 }
@@ -358,7 +361,7 @@ const Chat = () => {
     }, [threadId]);
 
     // After a send, check the newest page on a timer until the server's copy of the reply is final. Each check reads one
-    // page, so older pages on screen are not touched; a full read happens once, when the check settles or runs out.
+    // page, so older pages on screen are not touched; the history is re-read when the check settles, and once while it is still waiting.
     // `holdsSend` is set only for a reply the relay did not finish: its server copy may still be streaming, so a new send waits.
     const [confirmation, setConfirmation] = useState<{ after: number; holdsSend: boolean; prompt: string; threadId: string } | null>(null);
     const [confirmTick, setConfirmTick] = useState(0);
@@ -400,9 +403,12 @@ const Chat = () => {
 
             isChecking = false;
 
-            if (isActive && (isConfirmed || reads >= CONFIRM_READS)) {
+            if (isActive && (isConfirmed || reads >= CONFIRM_GIVE_UP_READS)) {
                 setConfirmation(null);
                 setError(withoutAwaitReply);
+                setConfirmTick((tick) => tick + 1);
+            } else if (isActive && reads === CONFIRM_REFRESH_READS) {
+                // Still unsettled: re-read the history once so the server's copy of the reply is on screen while checks go on.
                 setConfirmTick((tick) => tick + 1);
             }
         };
