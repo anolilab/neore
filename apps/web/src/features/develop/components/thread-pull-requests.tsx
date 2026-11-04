@@ -84,6 +84,7 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
         if (parsed === null) {
             reset();
             setInputProblem(true);
+            setFailures([t`Enter pull requests as owner/name#123.`]);
 
             return;
         }
