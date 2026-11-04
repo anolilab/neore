@@ -106,6 +106,7 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
         }
 
         const { text } = await runHeadlessAgent(ctx, {
+            organizationId: claim.organizationId ?? null,
             // The parent's `delegateToSubAgent` call only ran past its permission
             // check (approved, or set to `auto`), so that consent carries into
             // this child and nesting stays reachable. At the depth cap the

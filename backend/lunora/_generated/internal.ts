@@ -289,6 +289,9 @@ export interface InternalApiTypes {
         identity: {
             getUserProfileForIdentity: FunctionReference<"query", { userId: string }, null | { email: string; image?: string; name?: string }>;
         };
+        organization_policy: {
+            getPermissionCapQuery: FunctionReference<"query", { organizationId: string }, "off" | "ask" | "auto">;
+        };
         organization_policy_erase: {
             deleteOrganizationPolicy: FunctionReference<"mutation", { organizationId: string }, null>;
             sweepOrphanedOrganizationPolicies: FunctionReference<"mutation", { cursor?: string }, null>;
@@ -1532,6 +1535,9 @@ export const internal: InternalApiTypes = {
         },
         identity: {
             getUserProfileForIdentity: { __lunoraRef: "auth_identity:getUserProfileForIdentity" },
+        },
+        organization_policy: {
+            getPermissionCapQuery: { __lunoraRef: "auth_organization_policy:getPermissionCapQuery" },
         },
         organization_policy_erase: {
             deleteOrganizationPolicy: { __lunoraRef: "auth_organization_policy_erase:deleteOrganizationPolicy" },

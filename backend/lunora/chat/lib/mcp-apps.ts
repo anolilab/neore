@@ -11,6 +11,7 @@ import type { MCPServerConfig } from "./mcp-tools";
 import { headersToRecord } from "./mcp-tools";
 import type { ToolAnnotationHints, ToolDescriptor, ToolPermissionMode, ToolPermissionOverrides } from "./tool-permissions";
 import { isToolPermissionMode, resolveToolPermission, toolPermissionKey } from "./tool-permissions";
+import { readPermissionCap } from "./run-permission-cap";
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -83,10 +84,15 @@ const descriptorFor = (config: MCPServerConfig, toolName: string): ToolDescripto
         ? { key: toolPermissionKey("connector", toolName, config.connectorSlug), source: "connector" }
         : { key: toolPermissionKey("mcp", toolName, config.name), source: "mcp" };
 
-const annotatedToolMode = async (client: SDKClient, descriptor: ToolDescriptor, toolName: string): Promise<ToolPermissionMode> => {
+const annotatedToolMode = async (
+    client: SDKClient,
+    descriptor: ToolDescriptor,
+    toolName: string,
+    permissionCap: ToolPermissionMode,
+): Promise<ToolPermissionMode> => {
     const annotations = await readToolAnnotations(client, toolName);
 
-    return resolveToolPermission({ ...descriptor, ...(annotations && { annotations }) }, undefined);
+    return resolveToolPermission({ ...descriptor, ...(annotations && { annotations }) }, undefined, { permissionCap });
 };
 
 /**
@@ -188,9 +194,9 @@ const withOperationTimeout = async <T>(promise: Promise<T>, ms: number, label: s
 };
 
 /** Authenticate the incoming request and return the user, or null. */
-const authenticate = async (context: HttpActionCtx): Promise<{ _id: string } | null> => {
+const authenticate = async (context: HttpActionCtx): Promise<{ _id: string; activeOrganization?: { id: string } | null } | null> => {
     try {
-        return (await getCurrentUserInternal(context)) as { _id: string } | null;
+        return (await getCurrentUserInternal(context)) as { _id: string; activeOrganization?: { id: string } | null } | null;
     } catch (error: unknown) {
         const message = (error as Error)?.message ?? "";
 
@@ -300,9 +306,11 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
         return Response.json({ error: `MCP server "${serverName}" not found` }, { status: 404 });
     }
 
+    // The request's active organization: this route has no thread (`org-policy.md` §6a).
+    const permissionCap = await readPermissionCap(context, user.activeOrganization?.id);
     const overrides = (await context.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId: user._id })) as ToolPermissionOverrides;
     const descriptor = descriptorFor(serverConfig, toolName);
-    const chosen = isToolPermissionMode(overrides[descriptor.key]) ? resolveToolPermission(descriptor, overrides) : undefined;
+    const chosen = isToolPermissionMode(overrides[descriptor.key]) ? resolveToolPermission(descriptor, overrides, { permissionCap }) : undefined;
     const refusedUpFront = chosen && refusalFor(chosen, toolName);
 
     if (refusedUpFront) {
@@ -311,7 +319,7 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
 
     try {
         const outcome = await withServerClient(serverConfig, async (client) => {
-            const refused = chosen ? null : refusalFor(await annotatedToolMode(client, descriptor, toolName), toolName);
+            const refused = chosen ? null : refusalFor(await annotatedToolMode(client, descriptor, toolName, permissionCap), toolName);
 
             if (refused) {
                 return { refused };

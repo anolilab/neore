@@ -269,6 +269,8 @@ const runSpeaker = async (
                   mcpProgress: toolProgressSink(ctx, turn.streamId),
                   mcpServerNames: turn.mcpServerNames,
                   model,
+                  // No threadId here, so the group's organization caps the speaker's tools (see BuildAgentToolsOptions.organizationId).
+                  organizationId: turn.organizationId ?? null,
                   ...(turn.origin === "outside_agent" && { origin: turn.origin }),
                   searchMode,
                   skillTools: speaker.config ? { additionalTools: speaker.config.additionalTools, disabledTools: speaker.config.disabledTools } : undefined,

@@ -83,7 +83,7 @@ const fakeCtx = (): ActionCtx => {
 };
 
 const toolNames = async (skillTools?: { additionalTools?: string[]; disabledTools?: string[] }): Promise<string[]> => {
-    const { tools } = await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", skillTools, userId: "user" });
+    const { tools } = await buildAgentTools(fakeCtx(), { model: "test-model", organizationId: null, searchMode: "web", skillTools, userId: "user" });
 
     return Object.keys(tools).toSorted((a, b) => a.localeCompare(b));
 };
@@ -100,13 +100,20 @@ describe("buildAgentTools MCP progress", () => {
     const sink = vi.fn();
 
     it("hands the progress sink to the MCP tools of an interactive run", async () => {
-        await buildAgentTools(fakeCtx(), { mcpProgress: sink, model: "test-model", searchMode: "web", userId: "user" });
+        await buildAgentTools(fakeCtx(), { mcpProgress: sink, model: "test-model", organizationId: null, searchMode: "web", userId: "user" });
 
         expect(requestedOptions?.progress).toBe(sink);
     });
 
     it("relays none for a run an outside agent started, whose event mapping drops progress chunks", async () => {
-        await buildAgentTools(fakeCtx(), { mcpProgress: sink, model: "test-model", origin: "outside_agent", searchMode: "web", userId: "user" });
+        await buildAgentTools(fakeCtx(), {
+            mcpProgress: sink,
+            model: "test-model",
+            organizationId: null,
+            origin: "outside_agent",
+            searchMode: "web",
+            userId: "user",
+        });
 
         expect(requestedOptions?.progress).toBeUndefined();
     });
@@ -134,6 +141,7 @@ describe("buildAgentTools with a skill", () => {
     it("rebuilds a paused skill run with its extra tool, but never wider than the snapshot", async () => {
         const { tools } = await buildAgentTools(fakeCtx(), {
             model: "test-model",
+            organizationId: null,
             searchMode: "web",
             snapshot: { mcpServerNames: [], toolNames: ["codeExecution"] },
             userId: "user",
@@ -156,7 +164,7 @@ describe("buildAgentTools MCP permission keys", () => {
         };
     });
 
-    const build = async () => await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
+    const build = async () => await buildAgentTools(fakeCtx(), { model: "test-model", organizationId: null, searchMode: "web", userId: "user" });
 
     it("keys each tool by its own server, not by a guess from the runtime name", async () => {
         const { permissionKeys } = await build();
@@ -198,19 +206,19 @@ describe("buildAgentTools connector tools", () => {
     });
 
     it("connects to connected connectors alongside the user's MCP servers", async () => {
-        await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
+        await buildAgentTools(fakeCtx(), { model: "test-model", organizationId: null, searchMode: "web", userId: "user" });
 
         expect(requestedServers.map((server) => server.connectorSlug)).toStrictEqual(["notion"]);
     });
 
     it("keys connector tools connector:<slug>:<tool>, never by the display name", async () => {
-        const { permissionKeys } = await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
+        const { permissionKeys } = await buildAgentTools(fakeCtx(), { model: "test-model", organizationId: null, searchMode: "web", userId: "user" });
 
         expect(permissionKeys).toMatchObject({ mcp_Notion__create_page: "connector:notion:create_page", mcp_Notion__search: "connector:notion:search" });
     });
 
     it("defaults connector tools to ask unless they declare readOnlyHint", async () => {
-        const { tools } = await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
+        const { tools } = await buildAgentTools(fakeCtx(), { model: "test-model", organizationId: null, searchMode: "web", userId: "user" });
 
         expect((tools["mcp_Notion__create_page"] as { needsApproval?: unknown }).needsApproval).toBe(true);
         expect((tools["mcp_Notion__search"] as { needsApproval?: unknown }).needsApproval).toBeUndefined();
@@ -219,17 +227,29 @@ describe("buildAgentTools connector tools", () => {
     it("honours an override on the connector key", async () => {
         overrides = { "connector:notion:create_page": "off" };
 
-        const { tools } = await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
+        const { tools } = await buildAgentTools(fakeCtx(), { model: "test-model", organizationId: null, searchMode: "web", userId: "user" });
 
         expect(Object.keys(tools)).not.toContain("mcp_Notion__create_page");
     });
 
     it("rebuilds a paused run with only the connectors its snapshot named", async () => {
-        await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", snapshot: { mcpServerNames: [], toolNames: [] }, userId: "user" });
+        await buildAgentTools(fakeCtx(), {
+            model: "test-model",
+            organizationId: null,
+            searchMode: "web",
+            snapshot: { mcpServerNames: [], toolNames: [] },
+            userId: "user",
+        });
 
         expect(requestedServers).toStrictEqual([]);
 
-        await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", snapshot: { mcpServerNames: ["Notion"], toolNames: [] }, userId: "user" });
+        await buildAgentTools(fakeCtx(), {
+            model: "test-model",
+            organizationId: null,
+            searchMode: "web",
+            snapshot: { mcpServerNames: ["Notion"], toolNames: [] },
+            userId: "user",
+        });
 
         expect(requestedServers.map((server) => server.name)).toStrictEqual(["Notion"]);
     });
@@ -253,10 +273,12 @@ describe("buildAgentTools quick-check trust", () => {
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
             .mockResolvedValueOnce(true)
+            .mockResolvedValueOnce({ organizationId: null })
             .mockResolvedValueOnce(trusted);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
             model: "test-model",
+            organizationId: null,
             searchMode: "web",
             threadId: "thread",
             userId: "user",
@@ -297,10 +319,12 @@ describe("buildAgentTools quick-check trust", () => {
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
             .mockResolvedValueOnce(true)
+            .mockResolvedValueOnce({ organizationId: null })
             .mockResolvedValueOnce([mcpTrustId("files", second)]);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
             model: "test-model",
+            organizationId: null,
             searchMode: "web",
             threadId: "thread",
             userId: "user",

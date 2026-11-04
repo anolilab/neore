@@ -344,3 +344,16 @@ export const effectiveSetting = (key: ManagedSettingKey, userValue: boolean | un
 
     return entry.locked ? entry.value : (userValue ?? entry.value);
 };
+
+/**
+ * The broadest tool mode an organization's runs may use (`org-policy.md` §6a). No row, or a policy that sets no
+ * `permissionCap`, allows `auto`. A stored document that no longer parses allows only `ask`: a policy that cannot be
+ * read must not lift the cap, and `ask` keeps the run usable with a person approving each tool.
+ */
+export const permissionCapOf = (state: PolicyState): PermissionCap => {
+    if (state.kind === "unreadable") {
+        return "ask";
+    }
+
+    return state.kind === "policy" ? (state.policy.permissionCap ?? "auto") : "auto";
+};

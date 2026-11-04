@@ -62,6 +62,11 @@ const DEFAULT_HEADLESS_SEARCH_MODE: SearchMode = "web";
 
 export interface HeadlessRunOptions {
     /**
+     * The organization whose policy caps this run's tools (`org-policy.md` §6a); `null` for the personal space. Required,
+     * so each caller states the space its run belongs to.
+     */
+    organizationId: string | null;
+    /**
      * Built-ins offered beyond the headless search mode's set, like a skill's
      * extra tools: still subject to the user's permissions and to
      * {@link HeadlessRunOptions.toolAllowlist}.
@@ -210,6 +215,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                   headless: true,
                   ...(options.approvedTools && { headlessApproved: options.approvedTools }),
                   model,
+                  organizationId: options.organizationId,
                   searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
                   skillTools: headlessSkillTools(skill?.config, options.additionalTools),
                   userId,

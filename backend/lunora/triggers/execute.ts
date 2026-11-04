@@ -344,6 +344,7 @@ export const executeTrigger = internalAction
                 onThread: () => {
                     threadCreated = true;
                 },
+                organizationId: trigger.organizationId ?? null,
                 origin: "trigger",
                 personalization: "full",
                 prompt: inputMessage,

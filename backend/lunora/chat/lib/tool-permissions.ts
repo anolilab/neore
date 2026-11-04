@@ -60,6 +60,11 @@ export const TOOL_PERMISSION_MODES: ReadonlyArray<ToolPermissionMode> = ["auto",
 export const isToolPermissionMode = (value: unknown): value is ToolPermissionMode =>
     typeof value === "string" && (TOOL_PERMISSION_MODES as ReadonlyArray<string>).includes(value);
 
+const MODE_RANK: Record<ToolPermissionMode, number> = { ask: 1, auto: 2, off: 0 };
+
+/** The lower of a mode and a cap, in the order `off` < `ask` < `auto`. */
+export const clampToolPermission = (mode: ToolPermissionMode, cap: ToolPermissionMode): ToolPermissionMode => (MODE_RANK[mode] <= MODE_RANK[cap] ? mode : cap);
+
 /**
  * Stable preference key for a tool.
  *
@@ -148,6 +153,12 @@ export interface ToolPermissionOptions {
     /** The instant the grants are judged at. Defaults to the clock. */
     now?: number;
     /**
+     * The broadest mode any run in this organization may give a tool (`org-policy.md` §6a). Absent: no cap (`auto`).
+     * A tool above it is held at it. Below `auto` nothing lifts an `ask` (a grant, the quick check, a headless
+     * inheritance), and device tools are removed: their approvals live on the member's computer.
+     */
+    permissionCap?: ToolPermissionMode;
+    /**
      * The user's time-boxed allows (`tool-permission-grants.ts`). They turn an `ask` into an `auto` for an interactive run only: a
      * headless run inherits nothing, and `off` stays off.
      */
@@ -175,18 +186,27 @@ export const resolveToolPermissionWithGrant = (
     overrides: ToolPermissionOverrides | null | undefined,
     options: ToolPermissionOptions = {},
 ): ResolvedToolPermission => {
+    const cap = options.permissionCap ?? "auto";
     const override = overrides?.[descriptor.key];
     const builtinName = descriptor.source === "builtin" ? descriptor.key.slice("builtin:".length) : undefined;
-    let chosen = isToolPermissionMode(override) ? override : defaultToolPermission(descriptor.source, descriptor.annotations, builtinName);
+    // The cap clamps the chosen mode first: everything below (grants, headless, the origin clamp) reads the clamped mode.
+    let chosen = clampToolPermission(
+        isToolPermissionMode(override) ? override : defaultToolPermission(descriptor.source, descriptor.annotations, builtinName),
+        cap,
+    );
     let timedUntil: number | undefined;
 
-    // Before the origin clamp below, so an outside agent's grant-lifted tool is still `ask`.
-    if (chosen === "ask" && !options.headless && descriptor.source !== "device") {
+    // Before the origin clamp below, so an outside agent's grant-lifted tool is still `ask`. A grant lifts to `auto`, so it needs `auto` under the cap.
+    if (chosen === "ask" && cap === "auto" && !options.headless && descriptor.source !== "device") {
         timedUntil = grantExpiryFor(options.timedGrants, descriptor.key, options.now ?? Date.now());
 
         if (timedUntil !== undefined) {
             chosen = "auto";
         }
+    }
+
+    if (cap !== "auto" && descriptor.source === "device") {
+        return { mode: "off" };
     }
 
     if (options.apiKeyOrigin && descriptor.source === "device") {
@@ -214,7 +234,7 @@ export const resolveToolPermissionWithGrant = (
     }
 
     if (mode === "ask") {
-        return { mode: builtinName !== undefined && options.headlessApproved?.has(builtinName) ? "auto" : "off" };
+        return { mode: cap === "auto" && builtinName !== undefined && options.headlessApproved?.has(builtinName) ? "auto" : "off" };
     }
 
     return { mode };
@@ -300,8 +320,11 @@ export const applyToolPermissions = (
         }
 
         // Only a tool the user left at its default `ask` can be put to the quick check; the rules are in `low-risk-approval.ts`.
+        // The quick check is an automatic approval, so it runs only where `auto` is allowed at all.
         const check =
-            options.lowRiskCheck && lowRiskIneligibleReason(descriptor, isToolPermissionMode(overrides?.[descriptor.key]), options) === null
+            options.lowRiskCheck &&
+            (options.permissionCap ?? "auto") === "auto" &&
+            lowRiskIneligibleReason(descriptor, isToolPermissionMode(overrides?.[descriptor.key]), options) === null
                 ? options.lowRiskCheck
                 : undefined;
 

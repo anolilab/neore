@@ -175,6 +175,7 @@ const runAgent = async (
                     .catch((error: unknown) => console.warn(`[Tasks] Could not file thread ${id} in project ${project.projectId}:`, error));
             }
         },
+        organizationId: claim.organizationId ?? null,
         origin: "trigger",
         personalization: "full",
         prompt: buildTaskPrompt({ ...claim, repair: repairFor(claim.repair, "threadId" in thread && !claim.freshContext) }),

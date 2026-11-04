@@ -29,6 +29,7 @@ import type { SearchMode } from "./tool-builder";
 import { ToolName } from "../tools";
 import { admittedKnowledgeSearchTool } from "../tools/knowledge-search";
 import { getToolsForModelAndMode, listBuiltInTools } from "./tool-builder";
+import { readRunPermissionCap } from "./run-permission-cap";
 import type { ToolDescriptor, ToolPermissionOverrides } from "./tool-permissions";
 import type { RunOrigin } from "./tool-run-config";
 import { applyToolPermissions, toolPermissionKey } from "./tool-permissions";
@@ -64,6 +65,12 @@ export interface BuildAgentToolsOptions {
     /** Restrict MCP servers to these names; empty/undefined means every enabled server. */
     mcpServerNames?: string[];
     model: LanguageModel | string;
+    /**
+     * The organization whose policy caps this run's tools (`org-policy.md` §6a). A run with a `threadId` takes its
+     * thread's organization and ignores this value, so a threaded caller passes `null`; a run without one passes the
+     * organization it runs for. `null` is the personal space (no policy).
+     */
+    organizationId: string | null;
     /** Who started the run, when not the person at the app: an API key's run gets no device tools and no `auto` tool. */
     origin?: RunOrigin;
     searchMode: SearchMode;
@@ -125,6 +132,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         mcpProgress,
         mcpServerNames,
         model,
+        organizationId,
         origin,
         searchMode,
         skillTools,
@@ -146,7 +154,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         admittedRun,
     );
 
-    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers] = await Promise.all([
+    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers, permissionCap] = await Promise.all([
         ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),
         ctx.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId }),
         // A run nobody is at inherits no time-boxed allow, so it does not even read them.
@@ -168,6 +176,8 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
             return [];
         }),
+        // The organization's cap on every tool this run may use (`org-policy.md` §6a); a failed read caps at `ask`.
+        readRunPermissionCap(ctx, { organizationId, threadId }),
     ]);
 
     // Bearer tokens for servers the user signed in to. The FULL list, so a grant
@@ -269,6 +279,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         ...(origin === "outside_agent" && { apiKeyOrigin: true }),
         headless,
         ...(headlessApproved && { headlessApproved: new Set(headlessApproved) }),
+        permissionCap,
         ...(quickCheck && { lowRiskCheck: quickCheck.check }),
         ...(trusted && { lowRiskTrusted: trusted }),
         timedGrants,

@@ -501,6 +501,8 @@ export const runStreamingAgent = internalAction
                               mcpProgress: toolProgressSink(ctx, streamId, runEpoch),
                               mcpServerNames: streamingConfig.mcpServerNames,
                               model,
+                              // Threaded: the thread's organization caps the run (see BuildAgentToolsOptions.organizationId).
+                              organizationId: null,
                               ...(origin === "outside_agent" && { origin }),
                               searchMode: effectiveSearchMode,
                               skillTools: invokedSkill?.config
