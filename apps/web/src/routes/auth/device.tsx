@@ -1,13 +1,12 @@
 import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
-import { Input } from "@neore/ui/components/input";
-import { Label } from "@neore/ui/components/label";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import type { FormEvent } from "react";
 import { useState } from "react";
 
+import { DeviceCodeDetails, DeviceCodeField } from "@/features/auth/components/device-code-parts";
 import useAuthenticate from "@/features/auth/hooks/use-authenticate";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { authClient } from "@/lib/auth/client";
@@ -77,23 +76,8 @@ const CodeForm = () => {
     return (
         <form className="flex flex-col gap-4" onSubmit={submit}>
             <h1 className="text-center text-xl font-semibold">{t`Sign in the command line`}</h1>
-            <p className="text-center text-sm text-gray-700">{t`Enter the code that \`neore login --device\` shows in your terminal.`}</p>
-            <div className="flex flex-col gap-2">
-                <Label htmlFor="device-code">{t`Code`}</Label>
-                <Input
-                    autoCapitalize="characters"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    id="device-code"
-                    maxLength={16}
-                    onChange={(event) => setTyped(event.target.value)}
-                    spellCheck={false}
-                    value={typed}
-                />
-            </div>
-            <Button disabled={normalizeCode(typed).length === 0} type="submit">
-                {t`Continue`}
-            </Button>
+            <DeviceCodeField onChange={setTyped} value={typed} />
+            <Button type="submit">{t`Continue`}</Button>
         </form>
     );
 };
@@ -191,17 +175,7 @@ const Review = ({ email, lookup, userCode }: { email: string; lookup: Lookup; us
             <p className="text-center text-sm text-gray-700">
                 {t`The command line on the computer below will be signed in as ${email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings.`}
             </p>
-            <dl className="flex flex-col gap-1 rounded-md bg-gray-100 p-3 text-sm">
-                <div className="flex justify-between gap-4">
-                    <dt className="text-gray-600">{t`Computer`}</dt>
-                    <dd className="font-medium break-all">{lookup.hostname ?? t`unknown`}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                    <dt className="text-gray-600">{t`Code`}</dt>
-                    <dd className="font-mono font-medium">{formatCode(userCode)}</dd>
-                </div>
-            </dl>
-            <p className="text-center text-sm text-gray-700">{t`Only continue if you started this just now by running \`neore login --device\`, and the code above matches the one in your terminal.`}</p>
+            <DeviceCodeDetails code={formatCode(userCode)} hostname={lookup.hostname} />
             {error && (
                 <p className="text-center text-sm text-red-600" role="alert">
                     {error}
