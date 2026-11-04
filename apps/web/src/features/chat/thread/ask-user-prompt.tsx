@@ -33,6 +33,7 @@ import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
+import { downscaleOversizedImage } from "@/lib/upload/image-downscale";
 import { uploadFile } from "@/lib/upload/upload-file";
 
 import { normalizeAskUserChoices } from "./ask-user-choices";
@@ -149,12 +150,15 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         let total = files.reduce((sum, file) => sum + file.size, 0);
 
         for (const file of typed) {
-            if (accepted.length >= room || total + file.size > FILES_TOTAL_MAX_BYTES) {
+            if (accepted.length >= room) {
                 break;
             }
 
-            accepted.push(file);
-            total += file.size;
+            // A file that does not fit the budget is skipped; a smaller one after it may still fit.
+            if (total + file.size <= FILES_TOTAL_MAX_BYTES) {
+                accepted.push(file);
+                total += file.size;
+            }
         }
 
         if (accepted.length < picked.length) {
@@ -173,10 +177,15 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         try {
             for (const file of accepted) {
                 try {
-                    const uploadId = await uploadFile(file, { contentType: file.type });
+                    // Photos are re-encoded below the provider's per-image limit, as the composer does; PDFs go as they are.
+                    const prepared = file.type.startsWith("image/") ? await downscaleOversizedImage(file) : file;
+                    const uploadId = await uploadFile(prepared, { contentType: prepared.type });
                     const { fileId } = await finalizeUpload({ filename: file.name, uploadId });
 
-                    setFiles((current) => [...current, { fileId, name: file.name, size: file.size }]);
+                    // The server dedupes uploads by content, so the same photo can come back with an id already attached.
+                    setFiles((current) =>
+                        current.some((item) => item.fileId === fileId) ? current : [...current, { fileId, name: file.name, size: prepared.size }],
+                    );
                 } catch {
                     failed.push(file.name);
                 }
