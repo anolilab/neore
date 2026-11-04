@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -272,6 +272,22 @@ describe("an npm agent", () => {
         expect(detail).toContain("without running any install script");
         expect(detail).toContain("Neore will not start the agent");
         expect(detail).toContain("never updates it on its own");
+    });
+
+    it("shows the resolved node but hands the core the path that ends in node, so a node linked to another name installs", async () => {
+        const bin = path.join(mkdtempSync(path.join(scratch, "bin-")), "bin");
+
+        mkdirSync(bin);
+        writeFileSync(path.join(bin, "nodejs"), "");
+        symlinkSync(path.join(bin, "nodejs"), path.join(bin, "node"));
+
+        const link = path.join(bin, "node");
+        const { confirm, core, installer } = await setupNpm({ tools: { node: link, npm: TOOLS.npm } });
+
+        await installer.install("thing", "1.0.0");
+
+        expect(confirm.mock.calls[0][0].detail).toContain(JSON.stringify(realpathSync(link)));
+        expect(JSON.parse(core.acpInstallNpm.mock.calls[0][0]).node).toBe(link);
     });
 
     it("looks the hash up before the dialog and downloads nothing on a no", async () => {

@@ -149,6 +149,17 @@ pub(crate) fn validate_provenance(
     Ok(())
 }
 
+/// One change to the installed agents at a time: an install's renames and settings write, a removal's settings
+/// change and file deletion, and a prune of old versions would otherwise interleave and delete each other's folders.
+/// Not held while npm runs.
+pub(crate) fn lock_installs() -> std::sync::MutexGuard<'static, ()> {
+    static COMMITTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    COMMITTING
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 impl DeviceState {
     pub(crate) fn install_root(&self) -> PathBuf {
         self.data_dir().join(INSTALL_DIR)
@@ -305,13 +316,7 @@ impl DeviceState {
             .map(|pin| pin.version.clone())
             .ok_or("an install needs a pin")?;
 
-        // One install at a time: the check for an earlier folder, the renames, the settings write and the rollback
-        // would otherwise interleave with another install of the same key and version and delete its folder.
-        static COMMITTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-        let _committing = COMMITTING
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _committing = lock_installs();
 
         validate_agent(agent)?;
         self.check_free(agent)?;
@@ -410,6 +415,9 @@ impl DeviceState {
     /// Deletes the installed versions of `key` other than the pinned one. The caller runs it after it closed any
     /// session that was started under the approvals the install dropped, so no running agent loses its files.
     pub fn acp_install_prune(&self, key: &str) {
+        // Under the commit lock, reading the pin now: an install that committed a newer version meanwhile is the
+        // pin this sees, and its folder is the one kept.
+        let _committing = lock_installs();
         let settings = self.settings();
 
         if let Some(pin) = settings

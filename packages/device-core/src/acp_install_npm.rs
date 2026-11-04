@@ -332,7 +332,11 @@ fn run_npm(
 
 /// True when `dir` holds more than [`MAX_STAGE_BYTES`] (links are not followed; a tree too large to count is over).
 fn stage_over_budget(dir: &Path) -> bool {
-    fn add(dir: &Path, bytes: &mut u64, entries: &mut usize) -> bool {
+    stage_over(dir, MAX_STAGE_BYTES)
+}
+
+fn stage_over(dir: &Path, limit: u64) -> bool {
+    fn add(limit: u64, dir: &Path, bytes: &mut u64, entries: &mut usize) -> bool {
         let Ok(read) = fs::read_dir(dir) else {
             return false;
         };
@@ -349,14 +353,14 @@ fn stage_over_budget(dir: &Path) -> bool {
             };
 
             if meta.is_dir() {
-                if add(&entry.path(), bytes, entries) {
+                if add(limit, &entry.path(), bytes, entries) {
                     return true;
                 }
             } else {
                 *bytes += meta.len();
             }
 
-            if *bytes > MAX_STAGE_BYTES {
+            if *bytes > limit {
                 return true;
             }
         }
@@ -364,7 +368,7 @@ fn stage_over_budget(dir: &Path) -> bool {
         false
     }
 
-    add(dir, &mut 0, &mut 0)
+    add(limit, dir, &mut 0, &mut 0)
 }
 
 /// A path's bytes as the file system holds them (Unix); elsewhere its text.

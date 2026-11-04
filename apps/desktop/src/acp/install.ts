@@ -204,7 +204,7 @@ export class AgentInstaller {
                         integrity: entry.integrity,
                         key: resolved.agent.id,
                         label: resolved.agent.name,
-                        node: tools.node,
+                        node: found.node,
                         npm: tools.npm,
                         package: resolved.name,
                         publisher: resolved.agent.publisher,

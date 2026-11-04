@@ -642,6 +642,24 @@ fn a_small_staging_folder_is_within_budget() {
 }
 
 #[test]
+fn a_staging_folder_past_the_limit_is_over_budget_wherever_the_bytes_are() {
+    let guard = tempfile::tempdir().unwrap();
+    let nested = guard.path().join("cache/deep");
+
+    fs::create_dir_all(&nested).unwrap();
+    fs::write(guard.path().join("a"), vec![0_u8; 600]).unwrap();
+    assert!(!stage_over(guard.path(), 1000), "600 bytes fit in 1000");
+
+    // The rest sits two folders down, as npm's cache does.
+    fs::write(nested.join("b"), vec![0_u8; 600]).unwrap();
+    assert!(stage_over(guard.path(), 1000), "1200 bytes do not");
+    assert!(
+        !stage_over(guard.path(), 1200),
+        "the limit itself is allowed"
+    );
+}
+
+#[test]
 fn a_tarball_swapped_after_the_check_is_refused() {
     let (state, guard) = state("swap");
     let dir = guard.path().to_path_buf();
@@ -758,4 +776,123 @@ fn a_pinned_agent_cannot_be_pointed_at_a_node_that_is_not_a_full_path() {
         state.acp_view().agents[0].install.is_some(),
         "the pin is untouched"
     );
+}
+
+fn request_for(state: &DeviceState, node: &Path, npm: &Path, version: &str) -> NpmInstallRequest {
+    let bytes = tarball(
+        &json!({ "name": PACKAGE, "version": version, "bin": { PACKAGE: "cli.js" } }),
+        &[],
+    );
+    let mut request = request(state, node, npm, &bytes, integrity(&bytes));
+
+    request.version = version.into();
+
+    request
+}
+
+#[test]
+fn a_removal_and_a_reinstall_that_overlap_leave_files_that_match_the_record() {
+    let (state, guard) = state("remove-race");
+    let dir = guard.path().to_path_buf();
+    let (node, npm, _) = fake_tools(&dir);
+
+    state
+        .acp_install_npm(request_for(&state, &node, &npm, "1.0.0"))
+        .unwrap();
+
+    for _ in 0..6 {
+        let again = request_for(&state, &node, &npm, "1.0.0");
+
+        std::thread::scope(|scope| {
+            scope.spawn(|| state.acp_install_npm(again).unwrap());
+            scope.spawn(|| {
+                state
+                    .acp_update(
+                        serde_json::from_value(json!({ "op": "removeAgent", "key": "fixture" }))
+                            .unwrap(),
+                    )
+                    .unwrap()
+            });
+        });
+
+        let recorded = !state.acp_view().agents.is_empty();
+
+        assert_eq!(
+            installed(&dir).exists(),
+            recorded,
+            "the files exist exactly when the agent is recorded"
+        );
+
+        if recorded {
+            assert!(
+                state.acp_spawn_plan("fixture", None).is_ok(),
+                "a recorded install starts"
+            );
+        } else {
+            state
+                .acp_install_npm(request_for(&state, &node, &npm, "1.0.0"))
+                .unwrap();
+        }
+    }
+}
+
+#[test]
+fn pruning_never_deletes_the_version_a_concurrent_install_pinned() {
+    let (state, guard) = state("prune-race");
+    let dir = guard.path().to_path_buf();
+    let (node, npm, _) = fake_tools(&dir);
+
+    state
+        .acp_install_npm(request_for(&state, &node, &npm, "1.0.0"))
+        .unwrap();
+
+    let second = request_for(&state, &node, &npm, "2.0.0");
+
+    std::thread::scope(|scope| {
+        scope.spawn(|| state.acp_install_npm(second).unwrap());
+        scope.spawn(|| {
+            for _ in 0..50 {
+                state.acp_install_prune("fixture");
+            }
+        });
+    });
+    state.acp_install_prune("fixture");
+
+    let view = state.acp_view();
+    let pinned = &view.agents[0].install.as_ref().unwrap().version;
+
+    assert_eq!(pinned, "2.0.0", "the later install is the record");
+    assert!(
+        dir.join("acp-agents/fixture").join(pinned).exists(),
+        "the pinned version is still on disk"
+    );
+    assert!(
+        !dir.join("acp-agents/fixture/1.0.0").exists(),
+        "the old version is pruned"
+    );
+    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+}
+
+#[test]
+fn a_node_reached_through_a_link_with_another_name_installs() {
+    let (state, guard) = state("node-link");
+    let dir = guard.path().to_path_buf();
+    let (real, npm, _) = fake_tools(&dir);
+    let nodejs = dir.join("nodejs");
+    let link = dir.join("bin-node/node");
+
+    fs::rename(&real, &nodejs).unwrap();
+    fs::create_dir_all(link.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(&nodejs, &link).unwrap();
+
+    let view = state
+        .acp_install_npm(request_for(&state, &link, &npm, "1.0.0"))
+        .unwrap();
+
+    assert_eq!(
+        Path::new(&view.agents[0].command),
+        fs::canonicalize(&nodejs).unwrap(),
+        "the recorded command is the file the link resolves to"
+    );
+    assert!(state.acp_spawn_plan("fixture", None).is_ok());
 }

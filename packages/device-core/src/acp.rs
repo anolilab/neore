@@ -373,6 +373,9 @@ impl DeviceState {
     pub fn acp_update(&self, update: AcpUpdate) -> Result<AcpView, String> {
         let mut uninstall = None;
         let install_root = self.install_root();
+        // Ordered against an install's commit and a prune: a removal never deletes the files of a reinstall that
+        // was recorded after it, and the reverse.
+        let committing = crate::acp_install::lock_installs();
 
         self.change_settings(|settings| {
             match update {
@@ -551,6 +554,8 @@ impl DeviceState {
         if let Some(key) = uninstall {
             self.remove_installed_files(&key);
         }
+
+        drop(committing);
 
         // The approved pairs are in the manifest: the page sends a fresh one.
         self.emit(Event::Changed);
