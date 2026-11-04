@@ -148,6 +148,10 @@
                 {
                     "binding": "SERVICE_NSFW_CHECKER",
                     "service": "nsfw-checker-preview"
+                },
+                {
+                    "binding": "ADVISOR_COMPANION",
+                    "service": "neore-backend-advisor-preview"
                 }
             ]
         }
@@ -181,14 +185,6 @@
         }
     },
     "services": [
-        {
-            "binding": "SERVICE_BROWSER_RENDERER",
-            "service": "browser-renderer"
-        },
-        {
-            "binding": "SERVICE_DOCUMENT_PARSER",
-            "service": "document-parser"
-        },
         // HAND-WRITTEN, so Lunora leaves it alone (it warns on every reconcile):
         // the gateway is public, and only its `InternalApi` NAMED entrypoint is
         // unreachable from the internet. See `lunora.config.ts` for why the
@@ -199,8 +195,20 @@
             "service": "llm-gateway"
         },
         {
+            "binding": "SERVICE_BROWSER_RENDERER",
+            "service": "browser-renderer"
+        },
+        {
+            "binding": "SERVICE_DOCUMENT_PARSER",
+            "service": "document-parser"
+        },
+        {
             "binding": "SERVICE_NSFW_CHECKER",
             "service": "nsfw-checker"
+        },
+        {
+            "binding": "ADVISOR_COMPANION",
+            "service": "neore-backend-advisor"
         }
     ],
     "upload_source_maps": true

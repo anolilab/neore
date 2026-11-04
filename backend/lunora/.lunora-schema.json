@@ -12330,7 +12330,8 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "root",
+      "refinementsRecorded": true
     },
     "payment_events": {
       "commitOrdered": false,
@@ -12371,7 +12372,8 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "root",
+      "refinementsRecorded": true
     },
     "payment_sessions": {
       "commitOrdered": false,
@@ -12380,13 +12382,15 @@
           "kind": "number",
           "nullable": false,
           "optional": false,
-          "unique": false
+          "unique": false,
+          "refined": true
         },
         "capturedMinor": {
           "kind": "number",
           "nullable": false,
           "optional": false,
-          "unique": false
+          "unique": false,
+          "refined": true
         },
         "createdAt": {
           "kind": "number",
@@ -12422,7 +12426,8 @@
           "kind": "number",
           "nullable": false,
           "optional": false,
-          "unique": false
+          "unique": false,
+          "refined": true
         },
         "revision": {
           "kind": "number",
@@ -12473,7 +12478,8 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "root",
+      "refinementsRecorded": true
     },
     "payment_subscriptions": {
       "commitOrdered": false,
@@ -12592,7 +12598,8 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "root",
+      "refinementsRecorded": true
     },
     "payment_usageEvents": {
       "commitOrdered": false,
@@ -12672,7 +12679,8 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "root",
+      "refinementsRecorded": true
     },
     "persistentChunks": {
       "commitOrdered": false,
@@ -25613,6 +25621,12 @@
         },
         "activeLeafMessageId": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "autoModel": {
+          "kind": "boolean",
           "nullable": false,
           "optional": true,
           "unique": false

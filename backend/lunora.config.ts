@@ -44,4 +44,9 @@ export default {
         llmGateway: { dir: "../services/llm-gateway" },
         nsfwChecker: { dir: "../services/nsfw-checker" },
     },
+    // Codegen emits a companion Worker (`lunora/_generated/companion/`) that serves the
+    // advisor procedure list, so a hosted Studio can show the Advisors health score
+    // without the list in this Worker's bundle. Alchemy deploys it as `AdvisorCompanion`
+    // and binds it as `ADVISOR_COMPANION`; `lunora dev` runs it next to the backend.
+    studio: { companion: true },
 };
