@@ -169,6 +169,18 @@ describe("a host answer that cannot be read after an accepted change", () => {
 });
 
 describe("revertPullRequest", () => {
+    it("sends the title and description the person gave to the revert", async () => {
+        const { request, sent } = graphql(() => {
+            return { data: { revertPullRequest: { revertPullRequest: { number: 12, url: "https://github.com/octo/hello/pull/12" } } } };
+        });
+
+        await githubDriver.revertPullRequest(request, REF, { body: "Undoes #7", title: "Revert: the change" });
+
+        const mutation = sent.find((call) => String(call.json.query).includes("revertPullRequest(input"));
+
+        expect(mutation?.json.variables).toEqual({ body: "Undoes #7", pullRequestId: "PR_node", title: "Revert: the change" });
+    });
+
     it("returns the revert pull request in the same repository", async () => {
         const { request } = graphql(() => {
             return {

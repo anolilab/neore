@@ -746,7 +746,14 @@ const pullNodeId = async (request: HostRequest, ref: PullRequestRef): Promise<st
         PULL_ID_QUERY,
         repoParts(ref),
         z.object({ repository: z.object({ pullRequest: z.object({ id: z.string() }).nullable() }).nullable() }),
-    );
+    ).catch((error: unknown) => {
+        // A lookup is a read made before any change is sent: a lost answer here leaves the host unchanged, so it is not an unconfirmed write.
+        if (error instanceof HostApiError && error.unconfirmed) {
+            throw new HostApiError(error.message, 0);
+        }
+
+        throw error;
+    });
 
     return pullRequestOf(data.repository).id;
 };
