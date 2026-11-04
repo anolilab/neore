@@ -3541,7 +3541,7 @@ msgstr ""
 #: src/features/chat/thread/tool-approval.tsx:121
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:102
-#: src/routes/auth/device.tsx:233
+#: src/routes/auth/device.tsx:239
 msgid "Approve"
 msgstr "Aprovar"
 
@@ -5677,7 +5677,7 @@ msgstr ""
 msgid "Checking image safety..."
 msgstr "Verificando a segurança da imagem..."
 
-#: src/routes/auth/device.tsx:301
+#: src/routes/auth/device.tsx:307
 msgid "Checking the code…"
 msgstr ""
 
@@ -6202,7 +6202,7 @@ msgstr "Contas de provedores de nuvem"
 #: src/features/workflow/types/index.ts:455
 #: src/routes/_shortcut/code/index.tsx:16
 #: src/routes/auth/device.tsx:96
-#: src/routes/auth/device.tsx:205
+#: src/routes/auth/device.tsx:211
 msgid "Code"
 msgstr "Código"
 
@@ -6804,7 +6804,7 @@ msgid "Compressing context..."
 msgstr "Comprimindo o contexto..."
 
 #: src/features/settings/components/chat/bots-settings.tsx:140
-#: src/routes/auth/device.tsx:201
+#: src/routes/auth/device.tsx:207
 msgid "Computer"
 msgstr ""
 
@@ -9434,7 +9434,7 @@ msgid "Density updated"
 msgstr ""
 
 #: src/features/chat/thread/tool-approval.tsx:125
-#: src/routes/auth/device.tsx:224
+#: src/routes/auth/device.tsx:230
 msgid "Deny"
 msgstr "Negar"
 
@@ -17910,7 +17910,7 @@ msgstr "Carregando..."
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
-#: src/routes/auth/device.tsx:272
+#: src/routes/auth/device.tsx:278
 #: src/routes/auth/extension.tsx:66
 msgid "Loading…"
 msgstr "Carregando…"
@@ -21502,7 +21502,7 @@ msgstr "Só é possível comparar modelos de {0}. Limpe a seleção para trocar 
 msgid "Only 3B activated per token for efficiency"
 msgstr "Apenas 3B ativados por token, para mais eficiência"
 
-#: src/routes/auth/device.tsx:209
+#: src/routes/auth/device.tsx:215
 msgid "Only continue if you started this just now by running `neore login --device`, and the code above matches the one in your terminal."
 msgstr ""
 
@@ -27877,7 +27877,7 @@ msgstr "Barra lateral à direita"
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:325
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
-#: src/routes/auth/device.tsx:284
+#: src/routes/auth/device.tsx:290
 #: src/routes/auth/extension.tsx:78
 msgid "Sign in"
 msgstr "Entrar"
@@ -27902,11 +27902,11 @@ msgid "Sign in on another site?"
 msgstr "Entrar em outro site?"
 
 #: src/routes/auth/device.tsx:93
-#: src/routes/auth/device.tsx:316
+#: src/routes/auth/device.tsx:322
 msgid "Sign in the command line"
 msgstr ""
 
-#: src/routes/auth/device.tsx:195
+#: src/routes/auth/device.tsx:201
 msgid "Sign in the command line?"
 msgstr ""
 
@@ -30482,7 +30482,7 @@ msgstr ""
 msgid "That computer is not online."
 msgstr ""
 
-#: src/routes/auth/device.tsx:185
+#: src/routes/auth/device.tsx:191
 msgid "That did not go through. Try again."
 msgstr ""
 
@@ -30647,7 +30647,7 @@ msgstr ""
 msgid "The coding agent could not start."
 msgstr "Não foi possível iniciar o agente de código."
 
-#: src/routes/auth/device.tsx:197
+#: src/routes/auth/device.tsx:203
 msgid "The command line on the computer below will be signed in as {email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings."
 msgstr ""
 
@@ -32890,7 +32890,7 @@ msgstr "Abordagem única para modelagem de linguagem"
 msgid "United States"
 msgstr "Estados Unidos"
 
-#: src/routes/auth/device.tsx:202
+#: src/routes/auth/device.tsx:208
 msgid "unknown"
 msgstr ""
 
@@ -34959,7 +34959,7 @@ msgstr ""
 #: src/features/chat/thread/streaming-placeholder.tsx:631
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
-#: src/routes/auth/device.tsx:233
+#: src/routes/auth/device.tsx:239
 msgid "Working…"
 msgstr "Trabalhando…"
 
@@ -35175,7 +35175,7 @@ msgstr "Você está adicionando documentos rápido demais. Aguarde um momento e 
 msgid "You are browsing as a guest. Sign in with your account to connect the extension."
 msgstr "Você está navegando como visitante. Entre com sua conta para conectar a extensão."
 
-#: src/routes/auth/device.tsx:282
+#: src/routes/auth/device.tsx:288
 msgid "You are browsing as a guest. Sign in with your account to sign in the command line."
 msgstr ""
 

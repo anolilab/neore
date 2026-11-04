@@ -174,7 +174,9 @@ const Review = ({ email, lookup, userCode }: { email: string; lookup: Lookup; us
         setIsBusy(true);
 
         // A request that rejects (offline, reset, aborted) is the same retryable "unavailable" as a 5xx.
-        const result = await authClient.$fetch(next === "approved" ? "/device/approve" : "/device/deny", { body: { userCode }, method: "POST" }).catch(() => null);
+        const result = await authClient
+            .$fetch(next === "approved" ? "/device/approve" : "/device/deny", { body: { userCode }, method: "POST" })
+            .catch(() => null);
 
         setIsBusy(false);
 

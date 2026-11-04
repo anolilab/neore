@@ -268,7 +268,7 @@ describe("neore login --device", () => {
             },
         ]);
 
-        expect(await run(["login", "--device", "--api-url", BASE], context)).toBe(EXIT.ok);
+        expect(await run(["login", "--device", "--api-url", BASE, "--confirm-host", "api.test"], context)).toBe(EXIT.ok);
 
         const printed = context.io.stderr.text();
 
@@ -287,7 +287,7 @@ describe("neore login --device", () => {
     it("exits 1 and saves nothing when the code is denied", async () => {
         const context = contextFor([() => Response.json(CODE_RESPONSE), () => oauthError("access_denied", 400, "Access denied")]);
 
-        expect(await run(["login", "--device", "--api-url", BASE], context)).toBe(EXIT.error);
+        expect(await run(["login", "--device", "--api-url", BASE, "--confirm-host", "api.test"], context)).toBe(EXIT.error);
         expect(context.io.stderr.text()).toContain("denied");
         expect(await readConfig(context.configFile)).toEqual({});
     });
@@ -319,7 +319,7 @@ describe("neore login --device", () => {
             () => Response.json({ error: "unavailable" }, { status: 503 }),
         ]);
 
-        expect(await run(["login", "--device", "--api-url", BASE], context)).not.toBe(EXIT.ok);
+        expect(await run(["login", "--device", "--api-url", BASE, "--confirm-host", "api.test"], context)).not.toBe(EXIT.ok);
         expect(await readConfig(context.configFile)).toEqual({ apiKey: "nk_device", apiUrl: BASE });
     });
 
@@ -333,7 +333,62 @@ describe("neore login --device", () => {
     it("accepts plain http for a server on this machine", async () => {
         const context = contextFor([() => Response.json({ error: "x" }, { status: 500 })]);
 
-        expect(await run(["login", "--device", "--api-url", "http://localhost:8788"], context)).not.toBe(EXIT.usage);
+        expect(await run(["login", "--device", "--api-url", "http://localhost:8788", "--confirm-host", "localhost:8788"], context)).not.toBe(EXIT.usage);
         expect(context.io.stderr.text()).not.toContain("https://");
+    });
+
+    describe("host confirmation", () => {
+        const requests = (script: ((url: string) => Response)[]) => {
+            const urls: string[] = [];
+            const context = contextFor(
+                script.map((answer) => (url: string) => {
+                    urls.push(url);
+
+                    return answer(url);
+                }),
+            );
+
+            return { context, urls };
+        };
+
+        it("without a terminal, refuses unless the host is passed, and sends nothing", async () => {
+            const { context, urls } = requests([() => Response.json(CODE_RESPONSE)]);
+
+            expect(await run(["login", "--device", "--api-url", BASE], context)).toBe(EXIT.usage);
+            expect(context.io.stderr.text()).toContain("--confirm-host api.test");
+            expect(urls).toEqual([]);
+        });
+
+        it("refuses a --confirm-host that is not the API host, and sends nothing", async () => {
+            const { context, urls } = requests([() => Response.json(CODE_RESPONSE)]);
+
+            expect(await run(["login", "--device", "--api-url", BASE, "--confirm-host", "evil.test"], context)).toBe(EXIT.usage);
+            expect(urls).toEqual([]);
+        });
+
+        it("on a terminal, continues when the person types the host", async () => {
+            const { context, urls } = requests([
+                () => Response.json(CODE_RESPONSE),
+                () => Response.json({ api_key: "nk_device", expires_at: null }),
+                () => Response.json({ apiKeyId: "k1", scopes: [], userId: "u1" }),
+            ]);
+
+            context.stdinIsTTY = true;
+            context.readLine = async () => " api.test ";
+
+            expect(await run(["login", "--device", "--api-url", BASE], context)).toBe(EXIT.ok);
+            expect(context.io.stderr.text()).toContain("sent to api.test");
+            expect(urls[0]).toBe("https://api.test/api/auth/device/code");
+        });
+
+        it("on a terminal, stops when what is typed is not the host", async () => {
+            const { context, urls } = requests([() => Response.json(CODE_RESPONSE)]);
+
+            context.stdinIsTTY = true;
+            context.readLine = async () => "api";
+
+            expect(await run(["login", "--device", "--api-url", BASE], context)).toBe(EXIT.usage);
+            expect(urls).toEqual([]);
+        });
     });
 });

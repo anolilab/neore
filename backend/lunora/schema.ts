@@ -676,6 +676,31 @@ export const schema = defineSchema({
         .index("by_userId_createdAt", ["userId", "createdAt"])
         .index("by_status_deadline", ["status", "deadline"])
         .index("by_createdAt", ["createdAt"]),
+    /**
+     * better-auth `deviceAuthorization` plugin: one row per CLI sign-in code
+     * (`auth/cli-device-auth.ts`). Short-lived (30 minutes) and deleted when the
+     * code is redeemed, denied, or polled after it expired; issuing a new code
+     * also clears the lapsed ones. Hand-maintained like the other auth tables,
+     * so `auth.schema.test.ts` checks it. `hostname` is our own column (what the
+     * requesting machine calls itself, reduced to host-name characters).
+     */
+    deviceCode: defineTable({
+        clientId: v.optional(v.string()),
+        deviceCode: v.string(),
+        expiresAt: v.number(),
+        hostname: v.optional(v.string()),
+        lastPolledAt: v.optional(v.number()),
+        pollingInterval: v.optional(v.number()),
+        scope: v.optional(v.string()),
+        status: v.string(),
+        userCode: v.string(),
+        userId: v.optional(v.string()),
+    })
+        .externallyManaged()
+        .global()
+        .index("deviceCode", ["deviceCode"])
+        .index("userCode", ["userCode"])
+        .index("userId", ["userId"]),
     // A paired install of the desktop shell (`devices/`, `apps/desktop`). The
     // secret signs calls and verifies results; it is removed on revoke, so a
     // revoked row can sign nothing. `manifest` is the device's verified tools.
@@ -704,6 +729,7 @@ export const schema = defineSchema({
     })
         .shardBy("userId")
         .index("by_userId", ["userId"]),
+
     // Ported 1:1 from the audit-history component schema. Read by
     // GDPR (`listUserActivity`, `getDocumentAtTime`) and the canvas version
     // history, so it is a real table rather than a write-only log.
@@ -1530,7 +1556,6 @@ export const schema = defineSchema({
         status: v.union(v.literal("pending"), v.literal("running"), v.literal("completed"), v.literal("failed"), v.literal("skipped")),
         usage: v.optional(v.object({ completionTokens: v.number(), promptTokens: v.number(), totalTokens: v.number() })),
     }).index("by_execution_and_node", ["executionId", "nodeId"]),
-
     // The notification inbox (`notifications/`): one row per event for its
     // user, written only through `notify()`. `title` is the SUBJECT (a task's
     // title); the UI words what happened from `type` + `outcome`. Pruned after
@@ -1563,6 +1588,7 @@ export const schema = defineSchema({
         .index("by_state", ["state"])
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId", ["userId"]),
+
     organization: defineTable({
         allowedModels: v.optional(v.array(v.string())),
         baseTier: v.optional(v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise"))),
@@ -1779,32 +1805,6 @@ export const schema = defineSchema({
         .index("userId", ["userId"])
         .index("credentialID", ["credentialID"])
         .triggers((t) => auditTriggersFor(t, "passkey", AUDIT_TABLES["passkey"]!)),
-
-    /**
-     * better-auth `deviceAuthorization` plugin: one row per CLI sign-in code
-     * (`auth/cli-device-auth.ts`). Short-lived (30 minutes) and deleted when the
-     * code is redeemed, denied, or polled after it expired; issuing a new code
-     * also clears the lapsed ones. Hand-maintained like the other auth tables,
-     * so `auth.schema.test.ts` checks it. `hostname` is our own column (what the
-     * requesting machine calls itself, reduced to host-name characters).
-     */
-    deviceCode: defineTable({
-        clientId: v.optional(v.string()),
-        deviceCode: v.string(),
-        expiresAt: v.number(),
-        hostname: v.optional(v.string()),
-        lastPolledAt: v.optional(v.number()),
-        pollingInterval: v.optional(v.number()),
-        scope: v.optional(v.string()),
-        status: v.string(),
-        userCode: v.string(),
-        userId: v.optional(v.string()),
-    })
-        .externallyManaged()
-        .global()
-        .index("deviceCode", ["deviceCode"])
-        .index("userCode", ["userCode"])
-        .index("userId", ["userId"]),
 
     persistentChunks: defineTable({
         // A host stream's event that carries no text (a tool call, a permission request, the end of the

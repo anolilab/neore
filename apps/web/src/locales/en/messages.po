@@ -3540,7 +3540,7 @@ msgstr "Approval"
 #: src/features/chat/thread/tool-approval.tsx:121
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:102
-#: src/routes/auth/device.tsx:233
+#: src/routes/auth/device.tsx:239
 msgid "Approve"
 msgstr "Approve"
 
@@ -5676,7 +5676,7 @@ msgstr "Checked: {0}"
 msgid "Checking image safety..."
 msgstr "Checking image safety..."
 
-#: src/routes/auth/device.tsx:301
+#: src/routes/auth/device.tsx:307
 msgid "Checking the code…"
 msgstr "Checking the code…"
 
@@ -6201,7 +6201,7 @@ msgstr "Cloud Provider Accounts"
 #: src/features/workflow/types/index.ts:455
 #: src/routes/_shortcut/code/index.tsx:16
 #: src/routes/auth/device.tsx:96
-#: src/routes/auth/device.tsx:205
+#: src/routes/auth/device.tsx:211
 msgid "Code"
 msgstr "Code"
 
@@ -6803,7 +6803,7 @@ msgid "Compressing context..."
 msgstr "Compressing context..."
 
 #: src/features/settings/components/chat/bots-settings.tsx:140
-#: src/routes/auth/device.tsx:201
+#: src/routes/auth/device.tsx:207
 msgid "Computer"
 msgstr "Computer"
 
@@ -9433,7 +9433,7 @@ msgid "Density updated"
 msgstr "Density updated"
 
 #: src/features/chat/thread/tool-approval.tsx:125
-#: src/routes/auth/device.tsx:224
+#: src/routes/auth/device.tsx:230
 msgid "Deny"
 msgstr "Deny"
 
@@ -17909,7 +17909,7 @@ msgstr "Loading..."
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
-#: src/routes/auth/device.tsx:272
+#: src/routes/auth/device.tsx:278
 #: src/routes/auth/extension.tsx:66
 msgid "Loading…"
 msgstr "Loading…"
@@ -21501,7 +21501,7 @@ msgstr "Only {0} models can be compared. Clear selection to switch types."
 msgid "Only 3B activated per token for efficiency"
 msgstr "Only 3B activated per token for efficiency"
 
-#: src/routes/auth/device.tsx:209
+#: src/routes/auth/device.tsx:215
 msgid "Only continue if you started this just now by running `neore login --device`, and the code above matches the one in your terminal."
 msgstr "Only continue if you started this just now by running `neore login --device`, and the code above matches the one in your terminal."
 
@@ -27876,7 +27876,7 @@ msgstr "Sidebar Right"
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:325
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
-#: src/routes/auth/device.tsx:284
+#: src/routes/auth/device.tsx:290
 #: src/routes/auth/extension.tsx:78
 msgid "Sign in"
 msgstr "Sign in"
@@ -27901,11 +27901,11 @@ msgid "Sign in on another site?"
 msgstr "Sign in on another site?"
 
 #: src/routes/auth/device.tsx:93
-#: src/routes/auth/device.tsx:316
+#: src/routes/auth/device.tsx:322
 msgid "Sign in the command line"
 msgstr "Sign in the command line"
 
-#: src/routes/auth/device.tsx:195
+#: src/routes/auth/device.tsx:201
 msgid "Sign in the command line?"
 msgstr "Sign in the command line?"
 
@@ -30481,7 +30481,7 @@ msgstr "That computer is busy. Try again in a moment."
 msgid "That computer is not online."
 msgstr "That computer is not online."
 
-#: src/routes/auth/device.tsx:185
+#: src/routes/auth/device.tsx:191
 msgid "That did not go through. Try again."
 msgstr "That did not go through. Try again."
 
@@ -30646,7 +30646,7 @@ msgstr "The code could not be checked right now. Try again in a moment."
 msgid "The coding agent could not start."
 msgstr "The coding agent could not start."
 
-#: src/routes/auth/device.tsx:197
+#: src/routes/auth/device.tsx:203
 msgid "The command line on the computer below will be signed in as {email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings."
 msgstr "The command line on the computer below will be signed in as {email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings."
 
@@ -32889,7 +32889,7 @@ msgstr "Unique approach to language modeling"
 msgid "United States"
 msgstr "United States"
 
-#: src/routes/auth/device.tsx:202
+#: src/routes/auth/device.tsx:208
 msgid "unknown"
 msgstr "unknown"
 
@@ -34958,7 +34958,7 @@ msgstr "Working toward the goal: round {nextRound} of {0}"
 #: src/features/chat/thread/streaming-placeholder.tsx:631
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
-#: src/routes/auth/device.tsx:233
+#: src/routes/auth/device.tsx:239
 msgid "Working…"
 msgstr "Working…"
 
@@ -35174,7 +35174,7 @@ msgstr "You are adding documents too quickly. Wait a moment and try again."
 msgid "You are browsing as a guest. Sign in with your account to connect the extension."
 msgstr "You are browsing as a guest. Sign in with your account to connect the extension."
 
-#: src/routes/auth/device.tsx:282
+#: src/routes/auth/device.tsx:288
 msgid "You are browsing as a guest. Sign in with your account to sign in the command line."
 msgstr "You are browsing as a guest. Sign in with your account to sign in the command line."
 

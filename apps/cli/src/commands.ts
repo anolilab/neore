@@ -225,6 +225,34 @@ const assertDeviceUrl = (apiUrl: string): void => {
     }
 };
 
+/**
+ * The device code goes to whatever host the URL names, so the person confirms that host first: they type it
+ * (a plain string comparison), or a script passes it as `--confirm-host`. Nothing is sent before it matches.
+ */
+const confirmDeviceHost = async (context: Context, apiUrl: string, confirmed: string | undefined): Promise<void> => {
+    const { host } = new URL(apiUrl);
+
+    if (confirmed !== undefined) {
+        if (confirmed !== host) {
+            throw new UsageError(`--confirm-host ${confirmed} does not match the API host ${host}.`);
+        }
+
+        return;
+    }
+
+    if (!context.stdinIsTTY) {
+        throw new UsageError(`--device sends a sign-in code to ${host}. Pass --confirm-host ${host} to continue without a terminal.`);
+    }
+
+    context.io.stderr.write(`The sign-in code will be sent to ${host}.\n`);
+
+    const typed = ((await context.readLine("Type that host to continue: ")) ?? "").trim();
+
+    if (typed !== host) {
+        throw new UsageError("The host did not match; nothing was sent.");
+    }
+};
+
 export const login = async (context: Context, { flags }: ParsedCommand): Promise<void> => {
     if (flags.device && flags.key !== undefined) {
         throw new UsageError("--device signs in by code; it does not take a key.");
@@ -245,6 +273,7 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
 
     if (flags.device) {
         assertDeviceUrl(apiUrl);
+        await confirmDeviceHost(context, apiUrl, flags["confirm-host"]);
     }
 
     let apiKey = flags.device ? await deviceLogin(context, apiUrl) : flags.key?.trim();

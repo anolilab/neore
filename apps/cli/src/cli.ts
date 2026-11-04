@@ -33,7 +33,9 @@ Usage: neore <command> [options]
 Account
   login [--api-url URL] [--key KEY]   Save an API key (prompted, or piped on stdin)
   login --device [--api-url URL]      Sign in by code: shows a URL and a code to approve
-                                      in the web app (works over SSH, opens no browser)
+                                      in the web app (works over SSH, opens no browser).
+                                      Type the API host to confirm it, or pass --confirm-host HOST
+                                      when there is no terminal
   logout                              Forget the saved key
   whoami                              Show the key's user and scopes
   doctor                              Check config, connectivity and the key

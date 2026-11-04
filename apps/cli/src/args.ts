@@ -10,6 +10,7 @@ export const OPTIONS = {
     all: { type: "boolean" },
     "api-key": { type: "string" },
     "api-url": { type: "string" },
+    "confirm-host": { type: "string" },
     criteria: { type: "string" },
     cron: { type: "string" },
     cursor: { type: "string" },
