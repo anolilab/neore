@@ -99,11 +99,13 @@ const PullRequestActionsPanel = ({
             : { kind: "error", text: t`Could not confirm that. Check on ${hostLabel} before you try again.`, unconfirmed: true };
 
     // A host answer that is not ok: refused, or marked unconfirmed (its answer never came back).
-    const failure = (outcome: WriteResult): Feedback => {return {
-        kind: "error",
-        text: messages.write(outcome),
-        unconfirmed: outcome.status === "unconfirmed",
-    }};
+    const failure = (outcome: WriteResult): Feedback => {
+        return {
+            kind: "error",
+            text: messages.write(outcome),
+            unconfirmed: outcome.status === "unconfirmed",
+        };
+    };
 
     const reviewerProblem = (logins: string[]): string | null => {
         if (logins.length > MAX_REVIEWERS) {

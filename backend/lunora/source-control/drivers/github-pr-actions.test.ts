@@ -140,7 +140,9 @@ describe("editPullRequest body", () => {
 
 describe("a host answer that cannot be read after an accepted change", () => {
     it("is unconfirmed for a GraphQL error with no type, such as a timeout after the host may have acted", async () => {
-        const { request } = graphql(() => {return { errors: [{ message: "Something went wrong while executing your query. This may be the result of a timeout." }] }});
+        const { request } = graphql(() => {
+            return { errors: [{ message: "Something went wrong while executing your query. This may be the result of a timeout." }] };
+        });
 
         await expect(githubDriver.revertPullRequest(request, REF, {})).rejects.toMatchObject({ unconfirmed: true });
     });
