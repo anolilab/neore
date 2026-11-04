@@ -21,10 +21,26 @@ const memoryStore = (events: string[], initial: string | null = null, isSaveFail
     return store;
 };
 
+/** The revocation record, kept in memory: it is there until removed. */
+const memoryFlag = (isInitiallySet = false) => {
+    let isSet = isInitiallySet;
+
+    return {
+        create: vi.fn((): void => {
+            isSet = true;
+        }),
+        exists: (): boolean => isSet,
+        remove: vi.fn((): void => {
+            isSet = false;
+        }),
+    };
+};
+
 /** A stand-in for the PostHog client that records the opt-in and opt-out calls in the shared event order. */
 const fakeClient = (events: string[]) => {
     return {
         captureException: vi.fn(),
+        flush: vi.fn(async (): Promise<void> => undefined),
         optIn: vi.fn(async (): Promise<void> => {
             events.push("optIn");
         }),
@@ -79,7 +95,7 @@ describe("changing the choice", () => {
         const events: string[] = [];
         const crash = await load();
 
-        crash.startCrashReporting(() => fakeClient(events));
+        crash.startCrashReporting(() => fakeClient(events), memoryFlag());
 
         await crash.changeCrashReports(memoryStore(events, null), true, returningInstall);
 
@@ -91,7 +107,7 @@ describe("changing the choice", () => {
         const events: string[] = [];
         const crash = await load();
 
-        crash.startCrashReporting(() => fakeClient(events));
+        crash.startCrashReporting(() => fakeClient(events), memoryFlag());
         await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
         events.length = 0;
 
@@ -109,7 +125,7 @@ describe("changing the choice", () => {
         client.optIn.mockImplementation(async () => {
             throw new Error("sdk refused");
         });
-        crash.startCrashReporting(() => client);
+        crash.startCrashReporting(() => client, memoryFlag());
         const store = memoryStore(events, null);
 
         await expect(crash.changeCrashReports(store, true, returningInstall)).rejects.toThrow("sdk refused");
@@ -124,7 +140,7 @@ describe("applying the saved choice at startup", () => {
         const events: string[] = [];
         const crash = await load();
 
-        crash.startCrashReporting(() => fakeClient(events));
+        crash.startCrashReporting(() => fakeClient(events), memoryFlag());
 
         await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
 
@@ -136,7 +152,7 @@ describe("applying the saved choice at startup", () => {
         const events: string[] = [];
         const crash = await load();
 
-        crash.startCrashReporting(() => fakeClient(events));
+        crash.startCrashReporting(() => fakeClient(events), memoryFlag());
 
         await crash.applyStoredCrashReportChoice(memoryStore(events, null), returningInstall);
 
@@ -152,7 +168,7 @@ describe("applying the saved choice at startup", () => {
         client.optIn.mockImplementation(async () => {
             throw new Error("sdk refused");
         });
-        crash.startCrashReporting(() => client);
+        crash.startCrashReporting(() => client, memoryFlag());
         const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
         await expect(crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall)).resolves.toBeUndefined();
@@ -162,13 +178,54 @@ describe("applying the saved choice at startup", () => {
     });
 });
 
+describe("a saved opt-out that did not persist", () => {
+    it("is recorded before the save, so a save that fails does not restore the older opt-in at the next launch", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const flag = memoryFlag();
+
+        crash.startCrashReporting(() => fakeClient(events), flag);
+        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
+        await expect(crash.changeCrashReports(memoryStore(events, "on", true), false, returningInstall)).rejects.toThrow("keychain is unavailable");
+
+        expect(flag.exists()).toBe(true);
+
+        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
+
+        expect(await crash.crashReportsOn()).toBe(false);
+    });
+
+    it("is removed once the opt-out is saved", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const flag = memoryFlag();
+
+        crash.startCrashReporting(() => fakeClient(events), flag);
+        await crash.changeCrashReports(memoryStore(events, "on"), false, returningInstall);
+
+        expect(flag.exists()).toBe(false);
+    });
+
+    it("wins over a saved opt-in at startup, and the save is tried again", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const store = memoryStore(events, "on");
+
+        crash.startCrashReporting(() => fakeClient(events), memoryFlag(true));
+        await crash.applyStoredCrashReportChoice(store, returningInstall);
+
+        expect(await crash.crashReportsOn()).toBe(false);
+        expect(store.value).toBe("off");
+    });
+});
+
 describe("a new install", () => {
     it("starts off when the install marker cannot be read", async () => {
         const events: string[] = [];
         const crash = await load();
         const create = vi.fn(() => fakeClient(events));
 
-        crash.startCrashReporting(create);
+        crash.startCrashReporting(create, memoryFlag());
         const unreadable = {
             create: (): void => undefined,
             exists: (): boolean => {
@@ -186,7 +243,7 @@ describe("a new install", () => {
         const events: string[] = [];
         const crash = await load();
 
-        crash.startCrashReporting(() => fakeClient(events));
+        crash.startCrashReporting(() => fakeClient(events), memoryFlag());
         const marker = newInstall();
 
         await crash.changeCrashReports(memoryStore(events, null), true, marker);
@@ -199,7 +256,7 @@ describe("a new install", () => {
         const crash = await load();
         const create = vi.fn(() => fakeClient(events));
 
-        crash.startCrashReporting(create);
+        crash.startCrashReporting(create, memoryFlag());
         const store = memoryStore(events, "on");
         const marker = newInstall();
 
@@ -216,7 +273,7 @@ describe("a new install", () => {
         const crash = await load();
         const create = vi.fn(() => fakeClient(events));
 
-        crash.startCrashReporting(create);
+        crash.startCrashReporting(create, memoryFlag());
         const marker = newInstall();
         const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
@@ -234,7 +291,7 @@ describe("making the client", () => {
         const crash = await load();
         const create = vi.fn(() => fakeClient(events));
 
-        crash.startCrashReporting(create);
+        crash.startCrashReporting(create, memoryFlag());
 
         await crash.applyStoredCrashReportChoice(memoryStore(events, null), returningInstall);
 
@@ -246,7 +303,7 @@ describe("making the client", () => {
         const crash = await load();
         const create = vi.fn(() => fakeClient(events));
 
-        crash.startCrashReporting(create);
+        crash.startCrashReporting(create, memoryFlag());
 
         await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
 
@@ -255,12 +312,65 @@ describe("making the client", () => {
 });
 
 describe("the global error handler", () => {
+    it("gives a fatal report a bounded moment to leave before the previous handler ends the app", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const client = fakeClient(events);
+
+        client.flush.mockImplementation(
+            () =>
+                new Promise<void>((resolve) => {
+                    setTimeout(resolve, 10);
+                }),
+        );
+        crash.startCrashReporting(() => client, memoryFlag());
+        crash.installGlobalErrorReporting();
+        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
+        const error = new Error("boom");
+
+        handlers.installed?.(error, true);
+
+        expect(handlers.previous).not.toHaveBeenCalled();
+
+        await vi.waitFor(() => {
+            expect(handlers.previous).toHaveBeenCalledWith(error, true);
+        });
+    });
+
+    it("runs the previous handler when a fatal flush hangs, once the bound has passed", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const events: string[] = [];
+            const crash = await load();
+            const client = fakeClient(events);
+
+            client.flush.mockImplementation(
+                () =>
+                    new Promise<void>(() => {
+                        // A flush that never settles.
+                    }),
+            );
+            crash.startCrashReporting(() => client, memoryFlag());
+            crash.installGlobalErrorReporting();
+            await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
+            const error = new Error("boom");
+
+            handlers.installed?.(error, true);
+            await vi.advanceTimersByTimeAsync(crash.FATAL_FLUSH_MS);
+
+            expect(handlers.previous).toHaveBeenCalledWith(error, true);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("holds a crash until the saved choice is known, then sends it when the choice is on", async () => {
         const events: string[] = [];
         const crash = await load();
         const client = fakeClient(events);
 
-        crash.startCrashReporting(() => client);
+        crash.startCrashReporting(() => client, memoryFlag());
         crash.installGlobalErrorReporting();
 
         handlers.installed?.(new Error("during startup"), true);
@@ -278,7 +388,7 @@ describe("the global error handler", () => {
         const crash = await load();
         const client = fakeClient(events);
 
-        crash.startCrashReporting(() => client);
+        crash.startCrashReporting(() => client, memoryFlag());
         crash.installGlobalErrorReporting();
 
         handlers.installed?.(new Error("during startup"), false);
@@ -292,7 +402,7 @@ describe("the global error handler", () => {
         const crash = await load();
         const client = fakeClient(events);
 
-        crash.startCrashReporting(() => client);
+        crash.startCrashReporting(() => client, memoryFlag());
         crash.installGlobalErrorReporting();
         const error = new TypeError("the reply said: buy milk");
 
@@ -307,7 +417,7 @@ describe("the global error handler", () => {
         const crash = await load();
         const client = fakeClient(events);
 
-        crash.startCrashReporting(() => client);
+        crash.startCrashReporting(() => client, memoryFlag());
         crash.installGlobalErrorReporting();
         await crash.changeCrashReports(memoryStore(events, null), true, returningInstall);
         const error = new TypeError("the reply said: buy milk");
@@ -331,7 +441,7 @@ describe("the global error handler", () => {
         const crash = await load();
         const client = fakeClient(events);
 
-        crash.startCrashReporting(() => client);
+        crash.startCrashReporting(() => client, memoryFlag());
         crash.installGlobalErrorReporting();
         await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
         const release: { finish?: () => void } = {};
@@ -366,7 +476,7 @@ describe("the global error handler", () => {
         client.captureException.mockImplementation(() => {
             throw new Error("sdk failed");
         });
-        crash.startCrashReporting(() => client);
+        crash.startCrashReporting(() => client, memoryFlag());
         crash.installGlobalErrorReporting();
         await crash.changeCrashReports(memoryStore(events, null), true, returningInstall);
         const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -376,7 +486,9 @@ describe("the global error handler", () => {
             handlers.installed?.(error, true);
         }).not.toThrow();
 
-        expect(handlers.previous).toHaveBeenCalledWith(error, true);
+        await vi.waitFor(() => {
+            expect(handlers.previous).toHaveBeenCalledWith(error, true);
+        });
         expect(warn).toHaveBeenCalledWith("A crash report could not be sent.");
     });
 

@@ -6,7 +6,13 @@ import { toCrashReport } from "./crash-report-scrub";
 import { createSerialQueue } from "./serial-queue";
 
 /** The part of the SDK this module uses. A test can supply its own. */
-export type CrashReportClient = Pick<PostHog, "captureException" | "optIn" | "optOut">;
+export type CrashReportClient = Pick<PostHog, "captureException" | "flush" | "optIn" | "optOut">;
+
+/** The handler React Native calls for an error that reaches the global handler. */
+type ErrorHandler = (error: unknown, isFatal?: boolean) => void;
+
+/** How long a fatal report may take to leave before the previous handler ends the app. */
+export const FATAL_FLUSH_MS = 2000;
 
 /** A scrubbed report, and whether it was a fatal error. */
 interface HeldReport {
@@ -17,6 +23,16 @@ interface HeldReport {
 /** How many reports are kept while the saved choice is not yet known. The newest are kept. */
 const MAX_HELD_REPORTS = 5;
 
+/**
+ * A record that an opt-out was made. It is written before the saved choice, which can fail, and removed once the saved
+ * choice is off. A record that is still there at launch means the saved "on" is not trusted.
+ */
+export interface RevocationFlag {
+    create: () => void;
+    exists: () => boolean;
+    remove: () => void;
+}
+
 const state: {
     client?: CrashReportClient;
     create?: () => CrashReportClient;
@@ -24,6 +40,7 @@ const state: {
     isChoiceKnown: boolean;
     isHandlerInstalled: boolean;
     isOn: boolean;
+    revocation?: RevocationFlag;
 } = {
     held: [],
     isChoiceKnown: false,
@@ -38,11 +55,12 @@ const state: {
 const runChoice = createSerialQueue();
 
 /**
- * Records how to make the client. Nothing is made here: the client is made only when reporting is
- * first turned on, so a user who never opted in never loads the SDK.
+ * Records how to make the client, and where an opt-out is recorded. Nothing is made here: the client is made only when
+ * reporting is first turned on, so a user who never opted in never loads the SDK.
  */
-export const startCrashReporting = (create: () => CrashReportClient): void => {
+export const startCrashReporting = (create: () => CrashReportClient, revocation: RevocationFlag): void => {
     state.create = create;
+    state.revocation = revocation;
 };
 
 /** The client, made the first time it is needed. `undefined` when reporting is not configured. */
@@ -110,6 +128,18 @@ const settleChoice = (): void => {
 export const crashReportsOn = (): Promise<boolean> => runChoice(async () => state.isOn);
 
 /**
+ * Records an opt-out before the saved choice is written. If that write fails, the record still tells the next launch
+ * that the saved "on" is out of date. A record that cannot be written is reported, and the save is still tried.
+ */
+const recordRevocation = (): void => {
+    try {
+        state.revocation?.create();
+    } catch {
+        console.warn("Could not record the crash-report opt-out.");
+    }
+};
+
+/**
  * Changes the choice. The client is switched first, so an opt-out takes effect even
  * if saving the choice then fails.
  */
@@ -117,7 +147,13 @@ export const changeCrashReports = (store: PreferenceStore, isOn: boolean, marker
     runChoice(async () => {
         await applyToClient(isOn);
         settleChoice();
+
+        if (!isOn) {
+            recordRevocation();
+        }
+
         await writeCrashReportsEnabled(store, isOn);
+        state.revocation?.remove();
         // A choice made on this install is trusted, so the install counts as started from here on.
         marker.create();
     });
@@ -154,6 +190,27 @@ const startupChoice = async (store: PreferenceStore, marker: InstallMarker): Pro
         return false;
     }
 
+    let isRevoked: boolean;
+
+    try {
+        isRevoked = state.revocation?.exists() === true;
+    } catch {
+        // Without the record it cannot be told whether an opt-out was made, so the choice is not trusted this launch.
+        return false;
+    }
+
+    if (isRevoked) {
+        // An opt-out was made but its save did not persist: the choice is off, and the save is tried again.
+        try {
+            await writeCrashReportsEnabled(store, false);
+            state.revocation?.remove();
+        } catch {
+            console.warn("Could not record the saved crash-report opt-out.");
+        }
+
+        return false;
+    }
+
     try {
         return await readCrashReportsEnabled(store);
     } catch {
@@ -180,6 +237,36 @@ export const applyStoredCrashReportChoice = (store: PreferenceStore, marker: Ins
     });
 
 /**
+ * Gives a fatal report a bounded moment to leave: the handler below ends the app, and the SDK sends from memory.
+ * A flush that fails or hangs does not keep the previous handler from running.
+ */
+const flushBeforeCrash = async (client: CrashReportClient): Promise<void> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, FATAL_FLUSH_MS);
+    });
+
+    try {
+        await Promise.race([client.flush(), timeout]);
+    } catch {
+        // A failed flush is not a reason to hide the crash.
+    } finally {
+        clearTimeout(timer);
+    }
+};
+
+/** Hands a fatal error to the previous handler once the report has had its bounded moment to leave. */
+const endAfterFlush = async (
+    previous: ErrorHandler,
+    client: CrashReportClient,
+    error: unknown,
+    isFatal: boolean | undefined,
+): Promise<void> => {
+    await flushBeforeCrash(client);
+    previous(error, isFatal);
+};
+
+/**
  * Sends errors that reach React Native's global handler, scrubbed, then calls the
  * handler that was there before (the red box in development, the crash in release).
  * Installed once, however many times the root mounts.
@@ -191,7 +278,7 @@ export const installGlobalErrorReporting = (): void => {
 
     state.isHandlerInstalled = true;
 
-    const previous = ErrorUtils.getGlobalHandler();
+    const previous: ErrorHandler = ErrorUtils.getGlobalHandler();
 
     ErrorUtils.setGlobalHandler((error, isFatal) => {
         try {
@@ -206,6 +293,15 @@ export const installGlobalErrorReporting = (): void => {
         } catch {
             // A reporting failure must not hide the crash, so the original handler still runs below.
             console.warn("A crash report could not be sent.");
+        }
+
+        const { client } = state;
+
+        // The app ends after a fatal error, so its report gets a bounded moment to leave first.
+        if (isFatal === true && client && state.isOn) {
+            endAfterFlush(previous, client, error, isFatal);
+
+            return;
         }
 
         previous(error, isFatal);

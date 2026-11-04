@@ -8,6 +8,7 @@ import { Pressable, Text, View } from "react-native";
 import { AuthProvider } from "@/auth/auth-context";
 import { useAuth } from "@/auth/auth-state";
 import { loadConfig } from "@/lib/config";
+import { revocationFlag } from "@/lib/crash-report-revocation";
 import { crashReportStore } from "@/lib/crash-report-store";
 import { applyStoredCrashReportChoice, startCrashReporting } from "@/lib/crash-reporting";
 import { installMarker } from "@/lib/install-marker";
@@ -23,7 +24,7 @@ const CrashReportingStartup = () => {
             return;
         }
 
-        startCrashReporting(() => createPostHogClient(posthog));
+        startCrashReporting(() => createPostHogClient(posthog), revocationFlag);
         applyStoredCrashReportChoice(crashReportStore, installMarker);
     }, []);
 
