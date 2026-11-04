@@ -332,6 +332,11 @@ impl Drop for Job {
     }
 }
 
+// SAFETY: the handle names a kernel object, not memory of this thread. The value is moved once, into the thread that
+// waits on the run, and that thread alone closes it, so it is never used from two threads at once.
+#[cfg(windows)]
+unsafe impl Send for Job {}
+
 /// The runs in flight (their process groups), so a host that is told to stop can end them: only the thread that
 /// started a run enforces its timeout, and that thread dies with the host. Once stopping, a run that registers late
 /// is killed on the spot.
