@@ -151,7 +151,10 @@ export const descendantsOf = (table: ReadonlyArray<ProcessInfo>, rootPid: number
     const children = new Map<number, ProcessInfo[]>();
 
     for (const row of table) {
-        children.set(row.ppid, [...children.get(row.ppid) ?? [], row]);
+        const siblings = children.get(row.ppid) ?? [];
+
+        siblings.push(row);
+        children.set(row.ppid, siblings);
     }
 
     const seen = new Set<number>([rootPid]);

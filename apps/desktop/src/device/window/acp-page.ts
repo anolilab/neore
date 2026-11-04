@@ -722,7 +722,7 @@ const PORTS_POLL_MS = 5000;
 const MAX_QUIET_SKIPS = 5;
 
 /** The newest port read. A read that finishes after a newer one is dropped, so a stopped server cannot reappear from an older answer. */
-const portsRead = { busy: false, latest: 0, quiet: 0, skip: 0 };
+const portsRead = { busy: false, latest: 0, quiet: 0, shown: undefined as string | undefined, skip: 0 };
 
 /**
  * The one place the open session changes. The previous session's ports must not stay on screen, where Stop would still
@@ -732,6 +732,7 @@ const selectSession = (id: string | undefined): void => {
     state.selected = id;
     portsRead.latest += 1;
     portsRead.quiet = 0;
+    portsRead.shown = undefined;
     portsRead.skip = 0;
     $("acp-ports-status").textContent = id === undefined ? "" : "Loading ports…";
     $("acp-ports-list").replaceChildren(...id === undefined ? [item("None.")] : []);
@@ -761,6 +762,7 @@ const refreshPorts = async (): Promise<void> => {
         // A read that fails (a tool missing, a timeout) is said where the list is; it never stops the session from refreshing.
         if (read === portsRead.latest && state.selected === selected) {
             $("acp-ports-status").textContent = `Ports cannot be read: ${error instanceof Error ? error.message : String(error)}`;
+            portsRead.shown = undefined;
             $("acp-ports-list").replaceChildren();
         }
 
@@ -779,7 +781,17 @@ const refreshPorts = async (): Promise<void> => {
     // A session with no servers is read less and less often (up to every 30 s); the first server, an Open or a Stop starts over.
     portsRead.quiet = ports.length === 0 ? portsRead.quiet + 1 : 0;
     portsRead.skip = Math.min(portsRead.quiet, MAX_QUIET_SKIPS);
+
+    // The same ports for the same session are already on screen: leave the rows alone, so a focused Stop keeps its focus.
+    const shownKey = JSON.stringify([selected, ports]);
+
     $("acp-ports-status").textContent = "";
+
+    if (shownKey === portsRead.shown) {
+        return;
+    }
+
+    portsRead.shown = shownKey;
     $("acp-ports-list").replaceChildren(
         ...ports.length === 0
             ? [item("None.")]
