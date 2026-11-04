@@ -57,6 +57,8 @@ const LOGIN = /^[A-Za-z0-9](?:\w|-\b){0,38}$/u;
 const MAX_REVIEWERS = 15;
 /** The most characters a host title holds; the backend refuses a longer one with the same bound. */
 const MAX_TITLE = 256;
+/** The most characters a description holds, the bound the backend's edit input checks. */
+const MAX_BODY = 65_536;
 const SEPARATORS = /[\s,]+/u;
 const LEADING_AT = /^@/u;
 
@@ -119,6 +121,7 @@ const PullRequestActionsPanel = ({
     const titleTooLong = (editing?.title ?? "").trim().length > MAX_TITLE;
     const titleProblem = titleEmpty || titleTooLong;
     const bodyLocked = editing?.truncated === true;
+    const bodyTooLong = !bodyLocked && (editing?.body ?? "").length > MAX_BODY;
     const busy = actions.edit.isPending || actions.requestReviewers.isPending || actions.revert.isPending;
 
     // Only an error the server raised before any host call says nothing changed; any other thrown error may have reached the host.
@@ -345,7 +348,8 @@ const PullRequestActionsPanel = ({
                         <div className="space-y-1">
                             <Label htmlFor={`${titleId}-body`}>{t`Description`}</Label>
                             <Textarea
-                                aria-describedby={bodyLocked ? `${titleId}-body-note` : undefined}
+                                aria-describedby={bodyLocked || bodyTooLong ? `${titleId}-body-note` : undefined}
+                                aria-invalid={bodyTooLong || undefined}
                                 disabled={bodyLocked}
                                 id={`${titleId}-body`}
                                 onChange={(event) => setEditing((current) => (current === null ? current : { ...current, body: event.target.value }))}
@@ -355,6 +359,11 @@ const PullRequestActionsPanel = ({
                             {bodyLocked && (
                                 <p className="text-muted-foreground text-xs" id={`${titleId}-body-note`}>
                                     {t`${hostLabel} shortened this description, so it cannot be edited here. The title can still change.`}
+                                </p>
+                            )}
+                            {bodyTooLong && (
+                                <p className="text-muted-foreground text-xs" id={`${titleId}-body-note`}>
+                                    {t`A description is at most ${MAX_BODY} characters.`}
                                 </p>
                             )}
                         </div>
@@ -367,7 +376,7 @@ const PullRequestActionsPanel = ({
                     )}
                     <DialogFooter>
                         <DialogClose render={<Button variant="outline" />}>{t`Cancel`}</DialogClose>
-                        <Button disabled={titleProblem || actions.edit.isPending} onClick={saveEdit}>{t`Save`}</Button>
+                        <Button disabled={titleProblem || bodyTooLong || actions.edit.isPending} onClick={saveEdit}>{t`Save`}</Button>
                     </DialogFooter>
                 </DialogPopup>
             </Dialog>
