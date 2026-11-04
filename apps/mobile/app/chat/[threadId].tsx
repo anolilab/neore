@@ -139,8 +139,8 @@ const hasSettledReplySince = (messages: MessagePage, sentAt: number): boolean =>
 
 /**
  * Replaces the newest rows with a fresh read and keeps the older rows already on screen, so a refresh does not drop
- * history loaded page by page. Local rows are never kept: the read either has their server copy or they are still
- * being written, and the read is newer than either.
+ * history loaded page by page. Local rows are never kept: a fresh read holds their server copies, or they are still
+ * being written.
  */
 const withFreshRows = (current: Row[], fresh: Row[]): Row[] => {
     const oldest = fresh[0]?.createdAt ?? 0;
