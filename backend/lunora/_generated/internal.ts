@@ -1099,7 +1099,7 @@ export interface InternalApiTypes {
         };
         pr_thread_attach: {
             checkThreadForAttach: FunctionReference<"query", { threadId: string; userId: string }, { ok: true }>;
-            recordAttachedPullRequests: FunctionReference<"mutation", { links: Array<{ baseBranch?: string; headBranch?: string; number: number; repository: string; title: string }>; threadId: string; userId: string }, Array<{ number: number; repository: string; status: "attached" | "already_linked" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" | "thread_full" }>>;
+            recordAttachedPullRequests: FunctionReference<"mutation", { links: Array<{ baseBranch?: string; headBranch?: string; number: number; repository: string; title: string }>; threadId: string; userId: string }, Array<{ number: number; repository: string; status: "attached" | "already_linked" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" | "pull_request_full" | "thread_full" }>>;
         };
         pr_threads: {
             recordOpenedPullRequest: FunctionReference<"mutation", { prUrl: string; threadId: string; userId: string }, { created: boolean; threadId: string }>;

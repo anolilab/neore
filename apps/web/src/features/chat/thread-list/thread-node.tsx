@@ -535,7 +535,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             )}
                             {linkedPullRequests !== null && linkedPullRequests > 0 && (
                                 <span
-                                    aria-label={t`${linkedPullRequests} linked pull requests`}
+                                    aria-label={linkedPullRequests === 1 ? t`1 linked pull request` : t`${linkedPullRequests} linked pull requests`}
                                     className="text-muted-foreground inline-flex shrink-0 items-center gap-0.5 text-xs"
                                 >
                                     <GitPullRequestArrow aria-hidden className="size-3" />

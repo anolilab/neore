@@ -20,7 +20,16 @@ import { MAX_PULL_REQUESTS_PER_ATTACH, parsePullRequestAddresses } from "../lib/
 import { useAttachPullRequests, useThreadPullRequests } from "../lib/use-develop";
 
 type AttachStatus =
-    "already_linked" | "attached" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" | "thread_full";
+    | "already_linked"
+    | "attached"
+    | "forbidden"
+    | "host_error"
+    | "needs_reconnect"
+    | "not_connected"
+    | "not_found"
+    | "pull_request_full"
+    | "rate_limited"
+    | "thread_full";
 
 /**
  * The pull requests a thread is linked to, in the chat header: each opens the pull request in Develop, and a dialog
@@ -58,6 +67,7 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
         needs_reconnect: t`Reconnect your Git host in settings to link a pull request.`,
         not_connected: t`Connect your Git host in settings to link a pull request.`,
         not_found: t`The host has no pull request at that address.`,
+        pull_request_full: t`This pull request already has as many threads linked as it can keep.`,
         rate_limited: t`The host is limiting requests. Try again shortly.`,
         thread_full: t`This thread already has as many pull requests linked as it can keep.`,
     };

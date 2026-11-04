@@ -724,7 +724,7 @@ export interface ApiTypes {
             setAutoMerge: FunctionReference<"action", { number: number; repository: string; enabled: boolean; headSha: string; method: "merge" | "rebase" | "squash" }, { status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
         };
         pr_thread_attach: {
-            attachPullRequests: FunctionReference<"action", { pullRequests: Array<{ number: number; repository: string }>; threadId: string }, { results: Array<{ number: number; repository: string; status: "attached" | "already_linked" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" | "thread_full" }> }>;
+            attachPullRequests: FunctionReference<"action", { pullRequests: Array<{ number: number; repository: string }>; threadId: string }, { results: Array<{ number: number; repository: string; status: "attached" | "already_linked" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" | "pull_request_full" | "thread_full" }> }>;
             countsForUser: FunctionReference<"query", {}, { counts: Array<{ count: number; threadId: string }>; truncated: boolean }>;
             listForThread: FunctionReference<"query", { threadId: string }, Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "linked" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }>>;
         };

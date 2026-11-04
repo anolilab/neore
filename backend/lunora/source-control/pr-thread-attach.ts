@@ -38,10 +38,13 @@ const vAttachStatus = v.union(
     v.literal("not_connected"),
     v.literal("not_found"),
     v.literal("rate_limited"),
+    v.literal("pull_request_full"),
     v.literal("thread_full"),
 );
 
 const vAttachResult = v.object({ number: v.number(), repository: v.string(), status: vAttachStatus });
+
+const fitText = (value: string | undefined): string | undefined => value?.slice(0, MAX_LENGTH.short);
 
 const vVerifiedLink = v.object({
     baseBranch: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -66,7 +69,7 @@ export const recordAttachedPullRequests = internalMutation
             throw new LunoraError("FORBIDDEN", "That thread belongs to someone else");
         }
 
-        const results: { number: number; repository: string; status: "already_linked" | "attached" | "thread_full" }[] = [];
+        const results: { number: number; repository: string; status: "already_linked" | "attached" | "pull_request_full" | "thread_full" }[] = [];
 
         // Sequential on purpose: a pull request named twice in one call sees the row its first copy wrote.
         for (const link of args.links) {
@@ -80,7 +83,7 @@ export const recordAttachedPullRequests = internalMutation
             }
 
             if (live.length >= MAX_THREADS_PER_PULL_REQUEST) {
-                results.push({ number: address.number, repository: address.repository, status: "thread_full" });
+                results.push({ number: address.number, repository: address.repository, status: "pull_request_full" });
 
                 continue;
             }
@@ -161,11 +164,12 @@ export const attachPullRequests = authAction
             outcome.status === "ok"
                 ? [
                       {
-                          baseBranch: outcome.baseBranch,
-                          headBranch: outcome.headBranch,
+                          // A name longer than the stored shape is cut short, rather than failing the batch.
+                          baseBranch: fitText(outcome.baseBranch),
+                          headBranch: fitText(outcome.headBranch),
                           number: address.number,
                           repository: address.repository,
-                          title: outcome.title,
+                          title: fitText(outcome.title) ?? address.repository,
                       },
                   ]
                 : [],
@@ -209,7 +213,20 @@ export const listForThread = authQuery
             .take(MAX_LINKS_READ_PER_THREAD);
         const { live } = await partitionLinks(ctx, rows);
 
-        return live.toSorted((left, right) => right.createdAt - left.createdAt || right._id.localeCompare(left._id)).map((row) => toOutput(row));
+        // A pull request that is linked twice to one thread (an agent's link and a hand link) is one entry, the newest.
+        const seen = new Set<string>();
+        const newestFirst = live.toSorted((left, right) => right.createdAt - left.createdAt || right._id.localeCompare(left._id));
+
+        return newestFirst
+            .filter((row) => {
+                const key = `${row.repository}#${String(row.number)}`;
+                const duplicate = seen.has(key);
+
+                seen.add(key);
+
+                return !duplicate;
+            })
+            .map((row) => toOutput(row));
     });
 
 /** How many live pull requests each of your threads is linked to, for the sidebar's badges. Asked after first paint. */
@@ -223,9 +240,16 @@ export const countsForUser = authQuery
             .take(MAX_COUNT_ROWS);
         const { live } = await partitionLinks(ctx, rows);
         const counts = new Map<string, number>();
+        // A pull request counts once per thread, however many links name it.
+        const seen = new Set<string>();
 
         for (const row of live) {
-            counts.set(row.threadId, (counts.get(row.threadId) ?? 0) + 1);
+            const key = `${row.threadId}|${row.repository}#${String(row.number)}`;
+
+            if (!seen.has(key)) {
+                seen.add(key);
+                counts.set(row.threadId, (counts.get(row.threadId) ?? 0) + 1);
+            }
         }
 
         return {

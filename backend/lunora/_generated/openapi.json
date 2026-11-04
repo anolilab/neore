@@ -49534,6 +49534,10 @@
                                 "type": "string"
                               },
                               {
+                                "const": "pull_request_full",
+                                "type": "string"
+                              },
+                              {
                                 "const": "thread_full",
                                 "type": "string"
                               }
