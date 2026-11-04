@@ -39,9 +39,23 @@ describe("replyStateAfter", () => {
         expect(replyStateAfter(newestFirst, "sent")).toBe("pending");
     });
 
-    it("judges the newest reply, so a settled earlier step does not end a reply still running", () => {
+    it("judges the newest step of the reply, so a settled earlier step does not end a reply still running", () => {
         const newestFirst = [message("step2", "assistant", "pending"), message("step1", "assistant", "success"), message("sent", "user")];
 
         expect(replyStateAfter(newestFirst, "sent")).toBe("pending");
+    });
+
+    it("does not take another session's completed reply to a newer turn as this send's reply", () => {
+        const newestFirst = [message("otherReply", "assistant", "success"), message("otherUser", "user"), message("sent", "user")];
+
+        expect(replyStateAfter(newestFirst, "sent")).toBe("pending");
+    });
+
+    it("reads this send's reply when another session's turn sits above it", () => {
+        const pending = [message("otherReply", "assistant", "success"), message("otherUser", "user"), message("ours", "assistant", "pending"), message("sent", "user")];
+        const settled = [message("otherReply", "assistant", "success"), message("otherUser", "user"), message("ours", "assistant", "success"), message("sent", "user")];
+
+        expect(replyStateAfter(pending, "sent")).toBe("pending");
+        expect(replyStateAfter(settled, "sent")).toBe("settled");
     });
 });

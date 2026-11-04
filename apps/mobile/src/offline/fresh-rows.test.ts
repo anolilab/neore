@@ -28,6 +28,13 @@ describe("withFreshRows", () => {
         expect(withFreshRows(current, fresh, true).map((item) => item.id)).toEqual(["a", "b", "c", "d"]);
     });
 
+    it("places older rows by list position, not by creation time", () => {
+        const current = [row("a", 9), row("b", 1), row("c", 3)];
+        const fresh = [row("c", 3), row("d", 4)];
+
+        expect(withFreshRows(current, fresh, true).map((item) => item.id)).toEqual(["a", "b", "c", "d"]);
+    });
+
     it("keeps distinct messages that share the oldest fresh row's millisecond", () => {
         const current = [row("sameMs-1", 5), row("sameMs-2", 5), row("newer", 6)];
         const fresh = [row("sameMs-2", 5), row("newer", 6)];
@@ -43,9 +50,16 @@ describe("withFreshRows", () => {
     });
 
     it("drops local and finished rows, which the fresh read replaces", () => {
-        const current = [row("pending", 1, { status: "local" }), row("finished", 2, { finished: true }), row("kept", 3)];
+        const current = [row("kept", 1), row("pending", 2, { status: "local" }), row("finished", 3, { finished: true }), row("server", 4)];
         const fresh = [row("server", 4)];
 
         expect(withFreshRows(current, fresh, true).map((item) => item.id)).toEqual(["kept", "server"]);
+    });
+
+    it("drops older rows when the fresh read's oldest row is not on screen, so nothing is shown twice", () => {
+        const current = [row("a", 1), row("b", 2)];
+        const fresh = [row("x", 3), row("y", 4)];
+
+        expect(withFreshRows(current, fresh, true)).toEqual(fresh);
     });
 });

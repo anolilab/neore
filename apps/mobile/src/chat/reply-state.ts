@@ -14,26 +14,33 @@ export type ReplyState = "pending" | "settled" | "unknown";
 const isFinal = (status: string): boolean => status === "success" || status === "failed";
 
 /**
- * Reads the send's state from messages listed newest first, the order the server pages them in. Replies are placed by
- * that order, not by their creation times: messages can share a millisecond, and the clock is not the turn order. Only
- * a reply newer than the send counts: the list is walked from the newest message down to the send's own message.
+ * Reads the send's state from messages listed newest first, the order the server pages them in. The send's reply is
+ * the assistant messages between the send and the next user message above it: a newer turn, from this session or
+ * another, starts a new group. Within that group the newest step decides the state. Creation times play no part.
  */
 export const replyStateAfter = (newestFirst: ReadonlyArray<SeenMessage>, sentId: string): ReplyState => {
-    let newestReply: SeenMessage | undefined;
+    const sentIndex = newestFirst.findIndex((message) => message.id === sentId);
 
-    for (const message of newestFirst) {
-        if (message.id === sentId) {
-            if (newestReply === undefined) {
-                return "pending";
-            }
+    if (sentIndex === -1) {
+        return "unknown";
+    }
 
-            return isFinal(newestReply.status) ? "settled" : "pending";
+    let newestStep: SeenMessage | undefined;
+
+    // Walked from the send upward, so each assistant message read later is a newer step.
+    for (const message of newestFirst.slice(0, sentIndex).toReversed()) {
+        if (message.role === "user") {
+            break;
         }
 
-        if (newestReply === undefined && message.role === "assistant") {
-            newestReply = message;
+        if (message.role === "assistant") {
+            newestStep = message;
         }
     }
 
-    return "unknown";
+    if (newestStep === undefined) {
+        return "pending";
+    }
+
+    return isFinal(newestStep.status) ? "settled" : "pending";
 };

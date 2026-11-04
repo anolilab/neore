@@ -7,20 +7,22 @@ export interface FreshRow {
 }
 
 /**
- * Replaces the newest rows with a fresh read. Rows older than the read's oldest row are kept only when older pages were
- * loaded on screen: the cursor on screen then continues after them. Otherwise the cursor comes from the fresh read, and
- * keeping them would show the same messages twice. A row created in the same millisecond as the oldest fresh row is
- * on the older side of the boundary, so it is kept too. Local rows are never kept: a fresh read holds their server
- * copies, or they are still being written.
+ * Replaces the newest rows with a fresh read. Rows loaded before the read's oldest row are kept when older pages were
+ * loaded on screen: the cursor on screen then continues after them. They are placed by their position in the list,
+ * which is the server's pagination order, not by creation time: messages can share a millisecond and the clock is not
+ * the order the pages come in. If the read's oldest row is not on screen, nothing can be placed before it, so the
+ * older rows are dropped and the cursor from the fresh read takes over. Local rows are never kept: a fresh read holds
+ * their server copies, or they are still being written.
  */
 export const withFreshRows = <T extends FreshRow>(current: ReadonlyArray<T>, fresh: ReadonlyArray<T>, hasOlderPages: boolean): T[] => {
-    if (!hasOlderPages) {
+    const boundary = current.findIndex((row) => row.id === fresh[0]?.id);
+
+    if (!hasOlderPages || boundary === -1) {
         return [...fresh];
     }
 
-    const oldest = fresh[0]?.createdAt ?? 0;
     const freshIds = new Set(fresh.map((row) => row.id));
-    const older = current.filter((row) => row.createdAt <= oldest && !freshIds.has(row.id) && row.status !== "local" && !row.finished);
+    const older = current.slice(0, boundary).filter((row) => !freshIds.has(row.id) && row.status !== "local" && !row.finished);
 
     return [...older, ...fresh];
 };
