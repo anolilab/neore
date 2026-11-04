@@ -372,7 +372,7 @@ const Chat = () => {
                 throw new ChatError("The reply did not finish. Try again.");
             }
 
-            // A 205 means the server has finished the reply, even though this client may not hold all of it.
+            // Only a reply relayed through its end marker is complete here; a 205 ("unconfirmed") waits for the next read to supply the server's copy.
             if (outcome === "finished") {
                 setRows((current) => finishRow(current, assistantId));
             }
