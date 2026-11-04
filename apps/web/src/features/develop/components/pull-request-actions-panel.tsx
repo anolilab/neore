@@ -276,6 +276,8 @@ const PullRequestActionsPanel = ({
                     <div className="space-y-1 px-6">
                         <Label htmlFor={`${titleId}-logins`}>{t`Logins`}</Label>
                         <Input
+                            aria-describedby={reviewProblem === null ? undefined : `${titleId}-reviewer-problem`}
+                            aria-invalid={reviewProblem === null ? undefined : true}
                             id={`${titleId}-logins`}
                             onChange={(event) => {
                                 setReviewing(event.target.value);
@@ -285,7 +287,7 @@ const PullRequestActionsPanel = ({
                         />
                     </div>
                     {reviewProblem !== null && (
-                        <p className="text-destructive px-6 text-sm" role="alert">
+                        <p className="text-destructive px-6 text-sm" id={`${titleId}-reviewer-problem`} role="alert">
                             {reviewProblem}
                         </p>
                     )}

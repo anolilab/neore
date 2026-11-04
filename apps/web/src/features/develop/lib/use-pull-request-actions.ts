@@ -22,14 +22,20 @@ export const usePullRequestActions = (address: PullRequestAddress) => {
 
     return {
         edit: useMutation({
+            networkMode: "always",
+            retry: 0,
             mutationFn: async (input: { body?: string; title?: string }) => await edit({ ...address, ...input }),
             onSettled: refresh,
         }),
         requestReviewers: useMutation({
+            networkMode: "always",
+            retry: 0,
             mutationFn: async (logins: string[]) => await requestReviewers({ ...address, logins }),
             onSettled: refresh,
         }),
         revert: useMutation({
+            networkMode: "always",
+            retry: 0,
             mutationFn: async () => await revert({ ...address }),
             // A revert is a new pull request: the page of this one changes only when the host says so, so refresh it too.
             onSettled: refresh,

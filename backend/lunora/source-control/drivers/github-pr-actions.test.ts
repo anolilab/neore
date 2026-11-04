@@ -79,7 +79,9 @@ describe("editPullRequest", () => {
 
 describe("requestReviewers", () => {
     it("accepts a managed-user login with an underscore", async () => {
-        const { request, sent } = graphql(() => ({ data: { requestReviewsByLogin: { pullRequest: { id: "PR_node" } } } }));
+        const { request, sent } = graphql(() => {
+            return { data: { requestReviewsByLogin: { pullRequest: { id: "PR_node" } } } };
+        });
 
         await githubDriver.requestReviewers(request, REF, ["octo_shortcode"]);
 
@@ -120,13 +122,17 @@ describe("requestReviewers", () => {
 
 describe("editPullRequest body", () => {
     it("counts a description the host kept differently as unconfirmed", async () => {
-        const { request } = graphql(() => ({ data: { updatePullRequest: { pullRequest: { body: "kept", id: "PR_node", title: "New" } } } }));
+        const { request } = graphql(() => {
+            return { data: { updatePullRequest: { pullRequest: { body: "kept", id: "PR_node", title: "New" } } } };
+        });
 
         await expect(githubDriver.editPullRequest(request, REF, { body: "asked" })).rejects.toMatchObject({ unconfirmed: true });
     });
 
     it("accepts a description that differs only in line endings", async () => {
-        const { request } = graphql(() => ({ data: { updatePullRequest: { pullRequest: { body: "one\r\ntwo", id: "PR_node", title: "New" } } } }));
+        const { request } = graphql(() => {
+            return { data: { updatePullRequest: { pullRequest: { body: "one\r\ntwo", id: "PR_node", title: "New" } } } };
+        });
 
         await expect(githubDriver.editPullRequest(request, REF, { body: "one\ntwo" })).resolves.toBeUndefined();
     });
