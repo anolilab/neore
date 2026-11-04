@@ -48,6 +48,12 @@ const HEX_SECRET = /^[0-9a-f]{64}$/u;
 const NOT_FOUND_ERROR = /not found/u;
 const REQUIRES_AN_ACCOUNT_ERROR = /requires an account/u;
 const SIGNATURE_ERROR = /signature/u;
+/** The app version the listing reports for one device, or undefined. */
+const appVersionOf = async (userId: string, deviceId: string): Promise<string | undefined> =>
+    ((await as(userId).query(functions.listDevices as never, {} as never)) as { _id: string; appVersion?: string }[]).find(
+        (device) => device._id === deviceId,
+    )?.appVersion;
+
 const STALE_ERROR = /stale/u;
 const MALFORMED_ERROR = /malformed/u;
 const AHEAD_ERROR = /clock is about 1[89]\d minutes ahead of the server/u;
@@ -215,30 +221,22 @@ describe("updateDeviceManifest", () => {
 
     it("stores the reported app version, keeps it when a later manifest reports none, and ignores one that is not a version", async () => {
         const { deviceId, secret } = await register(ownerId);
-        const versionOf = async () =>
-            ((await as(ownerId).query(functions.listDevices as never, {} as never)) as { _id: string; appVersion?: string }[]).find(
-                (device) => device._id === deviceId,
-            )?.appVersion;
 
         await as(ownerId).mutation(functions.updateDeviceManifest as never, { ...(await signManifest(deviceId, secret)), appVersion: "1.4.0" } as never);
-        expect(await versionOf()).toBe("1.4.0");
+        expect(await appVersionOf(ownerId, deviceId)).toBe("1.4.0");
 
         await as(ownerId).mutation(functions.updateDeviceManifest as never, (await signManifest(deviceId, secret, Date.now() + 1)) as never);
-        expect(await versionOf()).toBe("1.4.0");
+        expect(await appVersionOf(ownerId, deviceId)).toBe("1.4.0");
 
         await as(ownerId).mutation(
             functions.updateDeviceManifest as never,
             { ...(await signManifest(deviceId, secret, Date.now() + 2)), appVersion: "<script>" } as never,
         );
-        expect(await versionOf()).toBe("1.4.0");
+        expect(await appVersionOf(ownerId, deviceId)).toBe("1.4.0");
     });
 
     it("updates the manifest and keeps the stored version when the reported one is too long", async () => {
         const { deviceId, secret } = await register(ownerId);
-        const versionOf = async () =>
-            ((await as(ownerId).query(functions.listDevices as never, {} as never)) as { _id: string; appVersion?: string }[]).find(
-                (device) => device._id === deviceId,
-            )?.appVersion;
 
         await as(ownerId).mutation(functions.updateDeviceManifest as never, { ...(await signManifest(deviceId, secret)), appVersion: "1.4.0" } as never);
         await expect(
@@ -247,7 +245,7 @@ describe("updateDeviceManifest", () => {
                 { ...(await signManifest(deviceId, secret, Date.now() + 1)), appVersion: `1.${"2".repeat(100)}` } as never,
             ),
         ).resolves.toEqual({ toolCount: expect.any(Number) });
-        expect(await versionOf()).toBe("1.4.0");
+        expect(await appVersionOf(ownerId, deviceId)).toBe("1.4.0");
     });
 
     it("still processes a call to a computer whose reported version is old", async () => {

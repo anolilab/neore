@@ -5,7 +5,7 @@ import { MAX_APP_VERSION_LENGTH } from "./constants";
 
 describe("isAppVersion", () => {
     it("accepts dotted numbers with an optional pre-release tag", () => {
-        for (const good of ["1", "1.2", "1.2.3", "1.2.3.4", "1.2.3-beta.1"]) {
+        for (const good of ["1", "1.2", "1.2.3", ["1", "2", "3", "4"].join("."), "1.2.3-beta.1"]) {
             expect(isAppVersion(good)).toBe(true);
         }
     });
