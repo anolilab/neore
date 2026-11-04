@@ -176,30 +176,70 @@ describe("CLI device sign-in rate limits", () => {
         expect(result.filter((status) => status === 429)).toHaveLength(0);
     }, 120_000);
 
-    it("limits a client that hammers the poll route", async () => {
+    it("does not lock out several people polling at once from one shared address", async () => {
         vi.useFakeTimers({ toFake: ["Date"] });
         vi.setSystemTime(new Date("2026-11-03T15:00:00Z"));
 
         const auth = buildDeviceAuth();
         const ip = nextIp();
-        const result = await statuses(auth, 14, () => poll(ip));
+        const result: number[] = [];
 
-        expect(result.slice(0, 10)).not.toContain(429);
-        expect(result.slice(10)).toStrictEqual([429, 429, 429, 429]);
-    });
+        // Five people behind one office address, each polling every 5 s, so a request arrives about every second.
+        for (let index = 0; index < 360; index += 1) {
+            const response = await auth.handler(poll(ip));
 
-    it("limits issuing codes to 10 a minute per address", async () => {
+            result.push(response.status);
+            await response.body?.cancel();
+            vi.setSystemTime(Date.now() + 1000);
+        }
+
+        expect(result.filter((status) => status === 429)).toHaveLength(0);
+    }, 120_000);
+
+    it("lets two people behind one address both get a code and be answered on their polls", async () => {
         const auth = buildDeviceAuth();
         const ip = nextIp();
-        const result = await statuses(auth, 12, () =>
+        const codes = [];
+
+        for (const hostname of ["alice-laptop", "bob-laptop"]) {
+            const response = await auth.handler(request("/device/code", ip, { body: JSON.stringify({ client_id: "neore-cli", hostname }), method: "POST" }));
+
+            expect(response.status).toBe(200);
+            codes.push((await response.json()) as { device_code: string });
+        }
+
+        for (const { device_code: deviceCode } of codes) {
+            const response = await auth.handler(
+                request("/device/key", ip, { body: JSON.stringify({ client_id: "neore-cli", device_code: deviceCode }), method: "POST" }),
+            );
+
+            expect(response.status).toBe(400);
+            expect(((await response.json()) as { error: string }).error).toBe("authorization_pending");
+        }
+    });
+
+    it("limits issuing codes to 60 a minute per address", async () => {
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const result = await statuses(auth, 70, () =>
             request("/device/code", ip, { body: JSON.stringify({ client_id: "neore-cli", hostname: "devbox" }), method: "POST" }),
         );
 
-        expect(result.slice(0, 10).every((status) => status === 200)).toBe(true);
-        expect(result.slice(10)).toStrictEqual([429, 429]);
+        // Plenty for a shared address, yet a loop is still stopped.
+        expect(result.slice(0, 50).every((status) => status === 200)).toBe(true);
+        expect(result.at(-1)).toBe(429);
     });
 
-    it("limits approve and deny retries", async () => {
+    it("limits deny retries", async () => {
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const deny = await statuses(auth, 12, () => request("/device/deny", ip, { body: JSON.stringify({ userCode: "ABCDEFGH" }), method: "POST" }));
+
+        expect(deny.slice(10)).toStrictEqual([429, 429]);
+        expect(deny.slice(0, 10)).not.toContain(429);
+    });
+
+    it("limits approve retries", async () => {
         const auth = buildDeviceAuth();
         const ip = nextIp();
         const approve = await statuses(auth, 12, () => request("/device/approve", ip, { body: JSON.stringify({ userCode: "ABCDEFGH" }), method: "POST" }));

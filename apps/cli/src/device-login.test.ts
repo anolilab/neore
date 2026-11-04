@@ -393,7 +393,7 @@ describe("neore login --device", () => {
             const { context, urls } = requests([() => Response.json(CODE_RESPONSE)]);
 
             expect(await run(["login", "--device", "--api-url", BASE], context)).toBe(EXIT.usage);
-            expect(context.io.stderr.text()).toContain("--confirm-host api.test");
+            expect(context.io.stderr.text()).toContain("run: neore login --device --api-url https://api.test --confirm-host api.test");
             expect(urls).toEqual([]);
         });
 

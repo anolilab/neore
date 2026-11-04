@@ -241,7 +241,9 @@ const confirmDeviceHost = async (context: Context, apiUrl: string, confirmed: st
     }
 
     if (!context.stdinIsTTY) {
-        throw new UsageError(`--device sends a sign-in code to ${host}. Pass --confirm-host ${host} to continue without a terminal.`);
+        throw new UsageError(
+            `--device sends a sign-in code to ${host} and needs you to confirm that host, which takes a terminal. Without one, run: neore login --device --api-url ${apiUrl} --confirm-host ${host}`,
+        );
     }
 
     context.io.stderr.write(`The sign-in code will be sent to ${host}.\n`);

@@ -266,15 +266,15 @@ export const API_KEY_OPTIONS = {
 /* eslint-disable perfectionist/sort-objects */
 export const AUTH_RATE_LIMIT_CUSTOM_RULES: Record<string, false | { max: number; window: number }> = {
     "/get-session": false,
-    // CLI device-code sign-in (`auth/cli-device-auth.ts`). The window is a QUIET gap, as above.
-    // Polling: the plugin already refuses a code polled faster than its 5 s interval
-    // (`slow_down`). This is the per-address ceiling for everything else. A 3 s window sits
-    // under that interval, so a well-behaved poll (one every 5 s) never accumulates a count,
-    // however long the 30-minute code lives, while a client hammering the route (more than
-    // 10 requests with gaps under 3 s) is answered 429 until it pauses.
-    "/device/key": { max: 10, window: 3 },
-    // Issuing a code: a person runs `login` rarely; ten in a minute is a script.
-    "/device/code": { max: 10, window: 60 },
+    // CLI device-code sign-in (`auth/cli-device-auth.ts`). The limiter counts per ADDRESS and its window is
+    // a QUIET gap, so any ceiling on the poll route is crossed by two people polling behind one office
+    // address (their requests are never 3 s apart for long) and then locks them all out. The poll route
+    // therefore has no per-address rule: the plugin refuses a code polled faster than its 5 s interval
+    // (`slow_down`), which is keyed on the CODE, and a guessed code costs one indexed read.
+    "/device/key": false,
+    // Issuing a code: a person runs `login` rarely. The ceiling is high enough for a shared address to
+    // sign in a whole office (the table is cleaned of lapsed codes on every issue), and low enough to stop a loop.
+    "/device/code": { max: 60, window: 60 },
     // Approve and deny need a session and a code bound to it, so these only bound a signed-in
     // account's retries.
     "/device/approve": { max: 10, window: 10 },
