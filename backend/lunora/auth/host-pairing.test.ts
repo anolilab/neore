@@ -291,6 +291,25 @@ describe("pairing a headless machine by code", () => {
         expect(await statusOf(harness, code.device_code)).toBe(200);
     });
 
+    it("does not let a guest's lookup bind a code, so the owner can still approve it", async () => {
+        const harness = build();
+        const cookie = await guest(harness);
+        const code = await requestHostCode(harness);
+        const lookup = await call(harness, `/device?user_code=${code.user_code}`, { cookie });
+
+        expect(lookup.response.status).toBe(403);
+
+        const owner = await signUp(harness);
+        const seen = await call(harness, `/device?user_code=${code.user_code}`, { cookie: owner.cookie });
+
+        expect(seen.response.status).toBe(200);
+
+        await approve(harness, owner.cookie, code.user_code);
+        vi.setSystemTime(Date.now() + 6000);
+
+        expect(await statusOf(harness, code.device_code)).toBe(200);
+    });
+
     it("leaves the code unspent when the account cannot take another device", async () => {
         let full = true;
         const harness = build({

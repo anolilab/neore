@@ -66,6 +66,8 @@ pub enum PairError {
     PossiblyRegistered,
     /// The pairing succeeded on the backend but this machine could not keep the secret.
     NotStored { device_id: String, reason: String },
+    /// The code could not be shown, so nobody could approve it.
+    Output(String),
     /// The backend could not be reached, or kept failing.
     Unreachable(String),
 }
@@ -83,6 +85,10 @@ impl fmt::Display for PairError {
             PairError::NotStored { device_id, reason } => write!(
                 formatter,
                 "the machine was registered (device {device_id}) but its secret could not be stored: {reason}. Remove that device in the web app (Settings, Devices) and pair again."
+            ),
+            PairError::Output(reason) => write!(
+                formatter,
+                "the pairing code could not be shown ({reason}); nothing was paired"
             ),
             PairError::Unreachable(reason) => write!(formatter, "the backend could not be reached: {reason}"),
         }
@@ -207,21 +213,17 @@ fn request_code(
         Duration::from_secs(number(&reply.body, "interval").unwrap_or(5)).max(MIN_INTERVAL);
     let complete = text(&reply.body, "verification_uri_complete").unwrap_or(uri);
 
-    let _ = writeln!(out, "To pair this machine, open:  {uri}");
-    let _ = writeln!(out, "and enter the code:          {}", spaced(user_code));
-    let _ = writeln!(out, "(or open {complete} directly)");
-    let _ = writeln!(out);
-    let _ = writeln!(
-        out,
-        "Signed in as the owner, check that the machine is \"{}\" and the code matches, then approve.",
-        identity.hostname
-    );
-    let _ = writeln!(
-        out,
-        "The device secret will be kept in {}.",
+    // One write, flushed: if the person cannot be shown the code, no approval can come, so do not wait for one.
+    let shown = format!(
+        "To pair this machine, open:  {uri}\nand enter the code:          {}\n(or open {complete} directly)\n\nSigned in as the owner, check that the machine is \"{}\" and the code matches, then approve.\nThe device secret will be kept in {}.\nWaiting for approval...\n",
+        spaced(user_code),
+        identity.hostname,
         storage.describe()
     );
-    let _ = writeln!(out, "Waiting for approval...");
+
+    out.write_all(shown.as_bytes())
+        .and_then(|()| out.flush())
+        .map_err(|error| PairError::Output(error.to_string()))?;
 
     Ok(Code {
         device_code: device_code.to_owned(),
@@ -667,6 +669,46 @@ mod tests {
 
         assert_eq!(outcome, Err(PairError::Expired));
         assert_eq!(total, Duration::from_secs(1800));
+    }
+
+    #[test]
+    fn does_not_wait_for_approval_when_the_code_cannot_be_shown() {
+        struct Closed;
+
+        impl Write for Closed {
+            fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+                Err(std::io::Error::other("broken pipe"))
+            }
+
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let backend = FakeBackend::new(vec![approved()]);
+        let timer = FakeTimer::default();
+        let keychain = FakeKeychain::default();
+        let vault = Vault::new(temp_dir("closed"), &keychain);
+        let outcome = pair(
+            &backend,
+            &timer,
+            &vault,
+            "https://neore.ai",
+            &Identity {
+                hostname: "x",
+                platform: "linux",
+            },
+            &mut Closed,
+        );
+
+        assert!(matches!(outcome, Err(PairError::Output(_))));
+        assert!(timer.slept.borrow().is_empty());
+        assert!(backend
+            .requests
+            .borrow()
+            .iter()
+            .all(|(url, _)| url.ends_with(CODE_PATH)));
+        assert!(keychain.entries.borrow().is_empty());
     }
 
     #[test]

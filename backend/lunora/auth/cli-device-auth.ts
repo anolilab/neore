@@ -205,11 +205,11 @@ const refuseGuestApproval = {
         const session = await getSessionFromCtx(ctx);
 
         if ((session?.user as { isAnonymous?: boolean } | undefined)?.isAnonymous === true) {
-            throw oauthError("FORBIDDEN", "access_denied", "Create an account to approve this code.");
+            throw oauthError("FORBIDDEN", "access_denied", "Create an account to use this code.");
         }
 
         if ((session?.session as { impersonatedBy?: string | null } | undefined)?.impersonatedBy) {
-            throw oauthError("FORBIDDEN", "access_denied", "A code cannot be approved while impersonating.");
+            throw oauthError("FORBIDDEN", "access_denied", "A code cannot be used while impersonating.");
         }
 
         if (ctx.path === "/device/approve" && session?.user.id && (await isCliCode(ctx))) {

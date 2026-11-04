@@ -61,7 +61,8 @@ pub trait Keychain {
     fn set(&self, account: &str, secret: &str) -> Result<(), String>;
     /// `Ok(None)` when there is no entry.
     fn get(&self, account: &str) -> Result<Option<String>, String>;
-    fn delete(&self, account: &str);
+    /// `Ok` when the entry is gone, including when there was none.
+    fn delete(&self, account: &str) -> Result<(), String>;
 }
 
 pub struct OsKeychain;
@@ -81,9 +82,10 @@ impl Keychain for OsKeychain {
         }
     }
 
-    fn delete(&self, account: &str) {
-        if let Ok(entry) = keyring::Entry::new(SERVICE, account) {
-            let _ = entry.delete_credential();
+    fn delete(&self, account: &str) -> Result<(), String> {
+        match keyring::Entry::new(SERVICE, account).and_then(|entry| entry.delete_credential()) {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(error) => Err(error.to_string()),
         }
     }
 }
@@ -168,7 +170,7 @@ impl<'a> Vault<'a> {
         let works = self.keychain.set(PROBE_ACCOUNT, value).is_ok()
             && self.keychain.get(PROBE_ACCOUNT).ok().flatten().as_deref() == Some(value);
 
-        self.keychain.delete(PROBE_ACCOUNT);
+        let _ = self.keychain.delete(PROBE_ACCOUNT);
 
         if works {
             Storage::Keychain
@@ -199,7 +201,7 @@ impl<'a> Vault<'a> {
                     .map_err(|reason| format!("the keychain refused the secret ({reason})"))?;
 
                 write_private(&self.dir, &self.file(), &record).inspect_err(|_| {
-                    self.keychain.delete(&account);
+                    let _ = self.keychain.delete(&account);
                 })
             }
             Storage::File => {
@@ -214,6 +216,10 @@ impl<'a> Vault<'a> {
     /// The pairing and its secret. `Ok(None)` when this machine is not paired.
     pub fn load(&self) -> Result<Option<Loaded>, String> {
         let path = self.file();
+
+        refuse_untrusted_dir(&self.dir)?;
+        refuse_untrusted_record(&path)?;
+
         let text = match fs::read_to_string(&path) {
             Ok(text) => text,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -247,13 +253,38 @@ impl<'a> Vault<'a> {
         Ok(Some(Loaded { record, secret }))
     }
 
-    /// Forgets the pairing on this machine (the owner removes the device in the web app).
+    /// The record alone, without the secret: what `unpair` needs to name and remove a pairing even when the keychain
+    /// cannot be read. `Ok(None)` when this machine is not paired.
+    pub fn record(&self) -> Result<Option<Record>, String> {
+        let path = self.file();
+
+        refuse_untrusted_dir(&self.dir)?;
+        refuse_untrusted_record(&path)?;
+
+        match fs::read_to_string(&path) {
+            Ok(text) => serde_json::from_str(&text).map(Some).map_err(|_| {
+                format!(
+                    "{} is not a pairing record; remove it by hand",
+                    path.display()
+                )
+            }),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(format!("{} could not be read: {error}", path.display())),
+        }
+    }
+
+    /// Forgets the pairing on this machine (the owner removes the device in the web app). The keychain entry goes
+    /// first, and the record only once it is gone: a keychain that cannot be reached (locked) is an error that keeps
+    /// the record, so `unpair` can be run again, instead of leaving a secret nothing on disk points to.
     pub fn forget(&self) -> Result<(), String> {
-        if let Some(loaded) = self.load().ok().flatten() {
-            self.keychain.delete(&account_of(
-                &loaded.record.backend,
-                &loaded.record.device_id,
-            ));
+        if let Some(record) = self.record()? {
+            if record.storage == Storage::Keychain {
+                self.keychain
+                    .delete(&account_of(&record.backend, &record.device_id))
+                    .map_err(|reason| {
+                        format!("the keychain would not give up the secret ({reason}); unlock it and run unpair again")
+                    })?;
+            }
         }
 
         match fs::remove_file(self.file()) {
@@ -262,6 +293,75 @@ impl<'a> Vault<'a> {
             Err(error) => Err(error.to_string()),
         }
     }
+}
+
+/// The folder holds the record that says which secret to trust, so another user able to write in it could swap that
+/// record. A folder that exists must be a real directory of this user that no one else can enter. (A missing one
+/// is made 0700 when the record is written.)
+#[cfg(unix)]
+fn refuse_untrusted_dir(dir: &Path) -> Result<(), String> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    let metadata = match fs::symlink_metadata(dir) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(format!("{} could not be read: {error}", dir.display())),
+    };
+
+    // SAFETY: `geteuid` takes no arguments and cannot fail.
+    let me = unsafe { libc::geteuid() };
+
+    if !metadata.is_dir() || metadata.uid() != me {
+        return Err(format!(
+            "{} must be a folder of yours (not a link, not another user's)",
+            dir.display()
+        ));
+    }
+
+    let mode = metadata.permissions().mode();
+
+    if mode & 0o077 != 0 {
+        return Err(format!(
+            "{} holds the pairing and others can enter it (mode {:o}); run chmod 700 on it",
+            dir.display(),
+            mode & 0o777
+        ));
+    }
+
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn refuse_untrusted_dir(_dir: &Path) -> Result<(), String> {
+    Ok(())
+}
+
+/// The record is a file of this user, not a link to somewhere else.
+#[cfg(unix)]
+fn refuse_untrusted_record(path: &Path) -> Result<(), String> {
+    use std::os::unix::fs::MetadataExt;
+
+    match fs::symlink_metadata(path) {
+        Ok(metadata) => {
+            // SAFETY: `geteuid` takes no arguments and cannot fail.
+            let me = unsafe { libc::geteuid() };
+
+            if !metadata.is_file() || metadata.uid() != me {
+                return Err(format!(
+                    "{} must be a plain file of yours (not a link, not another user's)",
+                    path.display()
+                ));
+            }
+
+            Ok(())
+        }
+        Err(_) => Ok(()),
+    }
+}
+
+#[cfg(not(unix))]
+fn refuse_untrusted_record(_path: &Path) -> Result<(), String> {
+    Ok(())
 }
 
 /// A secret file that others can read is not a secret any more.
@@ -292,29 +392,61 @@ fn refuse_shared_file(_path: &Path) -> Result<(), String> {
 
 /// Writes `record` atomically into `dir`, owner-only. The folder is created 0700. Without Unix permissions there is
 /// no way to keep a file private, so a secret is not written to one.
-#[cfg(unix)]
 fn write_private(dir: &Path, path: &Path, record: &Record) -> Result<(), String> {
-    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
 
-    fs::DirBuilder::new()
-        .recursive(true)
-        .mode(0o700)
-        .create(dir)
-        .map_err(|error| error.to_string())?;
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(dir)
+            .map_err(|error| error.to_string())?;
 
+        // `create` only sets the mode of a folder it makes: one that was already there keeps what it had.
+        refuse_untrusted_dir(dir)?;
+    }
+
+    #[cfg(not(unix))]
+    {
+        if record.storage == Storage::File {
+            return Err("this system cannot keep a file private".into());
+        }
+
+        // The keychain holds the secret; the record has none.
+        fs::create_dir_all(dir).map_err(|error| error.to_string())?;
+    }
+
+    let bytes = serde_json::to_vec_pretty(record).map_err(|error| error.to_string())?;
+
+    replace_file(path, &bytes)
+}
+
+/// A temporary file beside `path`, written and synced, then renamed over it: an interrupted write leaves the old
+/// record whole (and no half-written one), on every platform.
+fn replace_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let temporary = path.with_extension("json.tmp");
     let _ = fs::remove_file(&temporary);
-    let mut file = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
+    let mut options = fs::OpenOptions::new();
+
+    options.write(true).create_new(true);
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+
+        options.mode(0o600);
+    }
+
+    let mut file = options
         .open(&temporary)
         .map_err(|error| error.to_string())?;
+    let written = file
+        .write_all(bytes)
+        .and_then(|()| file.sync_all())
+        .map_err(|error| error.to_string());
 
-    let written = serde_json::to_vec_pretty(record)
-        .map_err(|error| error.to_string())
-        .and_then(|bytes| file.write_all(&bytes).map_err(|error| error.to_string()))
-        .and_then(|()| file.sync_all().map_err(|error| error.to_string()));
+    drop(file);
 
     if let Err(error) = written {
         let _ = fs::remove_file(&temporary);
@@ -329,21 +461,6 @@ fn write_private(dir: &Path, path: &Path, record: &Record) -> Result<(), String>
     })
 }
 
-#[cfg(not(unix))]
-fn write_private(dir: &Path, path: &Path, record: &Record) -> Result<(), String> {
-    if record.storage == Storage::File {
-        return Err("this system cannot keep a file private".into());
-    }
-
-    // The keychain holds the secret; the record has none.
-    fs::create_dir_all(dir).map_err(|error| error.to_string())?;
-
-    let mut file = fs::File::create(path).map_err(|error| error.to_string())?;
-
-    file.write_all(&serde_json::to_vec_pretty(record).map_err(|error| error.to_string())?)
-        .map_err(|error| error.to_string())
-}
-
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -355,6 +472,8 @@ pub(crate) mod tests {
     pub struct FakeKeychain {
         pub entries: RefCell<HashMap<String, String>>,
         pub broken: bool,
+        /// Deleting fails (a locked secret service) while reading and writing work.
+        pub stuck_delete: bool,
     }
 
     impl Keychain for FakeKeychain {
@@ -378,8 +497,14 @@ pub(crate) mod tests {
             Ok(self.entries.borrow().get(account).cloned())
         }
 
-        fn delete(&self, account: &str) {
+        fn delete(&self, account: &str) -> Result<(), String> {
+            if self.stuck_delete {
+                return Err("the secret service is locked".into());
+            }
+
             self.entries.borrow_mut().remove(account);
+
+            Ok(())
         }
     }
 
@@ -532,6 +657,49 @@ pub(crate) mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn a_folder_others_can_enter_or_a_linked_record_is_refused() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let keychain = FakeKeychain::default();
+        let dir = temp_dir("open-folder");
+
+        fs::create_dir_all(&dir).unwrap();
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
+
+        let vault = Vault::new(dir.clone(), &keychain);
+        let error = vault
+            .save(&pairing("device-1"), Storage::Keychain)
+            .unwrap_err();
+
+        assert!(error.contains("others can enter"), "{error}");
+        assert!(keychain.entries.borrow().is_empty());
+        assert!(vault.load().unwrap_err().contains("others can enter"));
+
+        // Owner-only, it works; and a link standing in for the record is refused.
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
+        vault.save(&pairing("device-1"), Storage::Keychain).unwrap();
+        assert!(vault.load().unwrap().is_some());
+
+        let elsewhere = dir.join("other.json");
+
+        fs::rename(dir.join("host.json"), &elsewhere).unwrap();
+        std::os::unix::fs::symlink(&elsewhere, dir.join("host.json")).unwrap();
+
+        assert!(vault.load().unwrap_err().contains("plain file"));
+
+        // A link in place of the folder is refused too.
+        let link = temp_dir("folder-link");
+
+        std::os::unix::fs::symlink(&dir, &link).unwrap();
+
+        assert!(Vault::new(link, &keychain)
+            .load()
+            .unwrap_err()
+            .contains("must be a folder of yours"));
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn a_file_pairing_is_a_0600_file_in_a_0700_folder() {
         use std::os::unix::fs::PermissionsExt;
 
@@ -597,6 +765,73 @@ pub(crate) mod tests {
             .load()
             .unwrap_err()
             .contains("no longer holds its secret"));
+    }
+
+    #[test]
+    fn forget_keeps_the_record_when_the_keychain_will_not_let_go() {
+        let keychain = FakeKeychain {
+            stuck_delete: true,
+            ..FakeKeychain::default()
+        };
+        let dir = temp_dir("stuck");
+        let vault = Vault::new(dir.clone(), &keychain);
+
+        vault.save(&pairing("device-1"), Storage::Keychain).unwrap();
+
+        let error = vault.forget().unwrap_err();
+
+        assert!(error.contains("unlock it and run unpair again"), "{error}");
+        // The record that says where the secret is stays, and so does the secret.
+        assert!(dir.join("host.json").exists());
+        assert_eq!(keychain.entries.borrow().len(), 1);
+    }
+
+    #[test]
+    fn forget_removes_the_keychain_secret_even_when_it_cannot_be_read() {
+        let keychain = FakeKeychain::default();
+        let vault = Vault::new(temp_dir("unreadable"), &keychain);
+
+        vault.save(&pairing("device-1"), Storage::Keychain).unwrap();
+
+        // `load` needs the secret; `forget` must not.
+        let broken = FakeKeychain {
+            broken: true,
+            entries: keychain.entries.clone(),
+            ..FakeKeychain::default()
+        };
+
+        assert!(Vault::new(vault.dir().to_owned(), &broken).load().is_err());
+        assert!(vault.forget().is_ok());
+        assert!(keychain.entries.borrow().is_empty());
+        assert_eq!(vault.load().unwrap(), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_write_that_cannot_start_leaves_the_existing_record_whole() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let keychain = FakeKeychain::default();
+        let dir = temp_dir("interrupted");
+        let vault = Vault::new(dir.clone(), &keychain);
+
+        vault.save(&pairing("device-1"), Storage::Keychain).unwrap();
+
+        let before = fs::read(dir.join("host.json")).unwrap();
+
+        // A folder nothing can be created in stands for a write that dies before the rename.
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o500)).unwrap();
+
+        let result = replace_file(&dir.join("host.json"), b"{ half");
+
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
+
+        // (A superuser ignores the mode; then the write succeeded and there is nothing to preserve.)
+        if result.is_err() {
+            assert_eq!(fs::read(dir.join("host.json")).unwrap(), before);
+        }
+
+        assert!(!dir.join("host.json.tmp").exists());
     }
 
     #[test]

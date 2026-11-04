@@ -126,7 +126,9 @@ export const registerDevice = authMutation
         if (args.viaDeviceId !== undefined) {
             const desktop = await requireOwnDevice(ctx, args.viaDeviceId, userId);
 
-            if (desktop.encryptedSecret === undefined) {
+            // A headless machine (or another server) is paired directly too, but speaks for itself: no relay of ours
+            // claims calls for what hangs off it, so a server under it could never answer.
+            if (desktop.encryptedSecret === undefined || desktop.transport !== undefined) {
                 throw new LunoraError("FORBIDDEN", "The desktop is not paired");
             }
         }

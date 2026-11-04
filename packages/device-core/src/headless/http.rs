@@ -57,9 +57,17 @@ fn validate_backend_with(raw: &str, dev_loopback: bool) -> Result<String, String
     };
     let loopback = matches!(host, "localhost" | "127.0.0.1" | "::1");
 
+    // A loopback address is a development backend: refused whatever the scheme, unless the debug-only flag is set.
+    if loopback && !dev_loopback {
+        return Err(
+            "the backend address is this machine itself; that is only for development builds"
+                .into(),
+        );
+    }
+
     match scheme {
         "https" => Ok(url.to_owned()),
-        "http" if loopback && dev_loopback => Ok(url.to_owned()),
+        "http" if loopback => Ok(url.to_owned()),
         _ => Err("the device secret is sent over this connection, so the backend address must be https://".into()),
     }
 }
@@ -118,14 +126,11 @@ mod tests {
     use super::validate_backend_with;
 
     #[test]
-    fn takes_https_only_and_plain_http_loopback_only_with_the_dev_flag() {
+    fn takes_https_only_and_loopback_only_with_the_dev_flag() {
         assert_eq!(
             validate_backend_with("https://neore.ai/", false).as_deref(),
             Ok("https://neore.ai")
         );
-        // https to a loopback address is encrypted, so it needs no flag.
-        assert!(validate_backend_with("https://localhost:8788", false).is_ok());
-
         for local in [
             "http://localhost:8788",
             "http://127.0.0.1:8788",
@@ -137,6 +142,9 @@ mod tests {
             );
             assert_eq!(validate_backend_with(local, true).as_deref(), Ok(local));
         }
+
+        assert!(validate_backend_with("https://localhost:8788", false).is_err());
+        assert!(validate_backend_with("https://localhost:8788", true).is_ok());
 
         for bad in [
             "http://neore.ai",

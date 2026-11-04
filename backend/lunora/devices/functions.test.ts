@@ -1241,6 +1241,18 @@ describe("a headless machine paired by code", () => {
         expect(list[0]).not.toHaveProperty("viaDeviceId");
     });
 
+    it("cannot be the relay of an SSH server", async () => {
+        const headless = await pairHeadless(ownerId);
+
+        await expect(
+            as(ownerId).mutation(functions.registerDevice as never, { name: "Box", platform: "linux", viaDeviceId: headless.deviceId } as never),
+        ).rejects.toThrow("The desktop is not paired");
+
+        const list = (await as(ownerId).query(functions.listDevices as never, {} as never)) as { _id: string }[];
+
+        expect(list.map((device) => device._id)).toEqual([headless.deviceId]);
+    });
+
     it("accepts what is signed with its secret and refuses what a foreign device signed", async () => {
         const headless = await pairHeadless(ownerId);
         const foreign = await register(ownerId);

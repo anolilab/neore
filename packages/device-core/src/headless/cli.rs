@@ -12,7 +12,7 @@ use super::vault::{default_dir, OsKeychain, Vault};
 pub const USAGE: &str = "usage:
   neore-host pair --backend <https-origin> [--name <machine name>]   show a code to approve in the web app
   neore-host run                                                     decide which signed calls are for this machine
-  neore-host unpair                                                  forget the pairing on this machine
+  neore-host unpair [--dry-run | --yes]                              forget the pairing on this machine (asks first; --yes skips the question, --dry-run only shows it)
   neore-host --stdio [--launch <id> [--desktop <tag>]]               the pipe a desktop drives (built without `headless`)
 
 The backend can also be given as NEORE_BACKEND_URL. Files live in NEORE_HOST_DIR when set.";
@@ -62,7 +62,16 @@ fn flag(args: &mut impl Iterator<Item = String>, name: &str, into: &mut Option<S
 }
 
 /// Runs a headless command; `command` is the first argument.
-pub fn main(command: &str, mut args: impl Iterator<Item = String>) -> ExitCode {
+pub fn main(command: &str, args: impl Iterator<Item = String>) -> ExitCode {
+    let mut args = args.collect::<Vec<_>>().into_iter();
+
+    // Asking for help is not an error, and it must not do the command's work.
+    if matches!(command, "pair" | "run" | "unpair") && asks_for_help(args.as_slice()) {
+        println!("{USAGE}");
+
+        return ExitCode::SUCCESS;
+    }
+
     let Some(dir) = default_dir() else {
         eprintln!("neore-host: no folder to keep the pairing in; set NEORE_HOST_DIR");
 
@@ -164,6 +173,15 @@ pub fn main(command: &str, mut args: impl Iterator<Item = String>) -> ExitCode {
                 return ExitCode::from(2);
             }
 
+            let _lock = match RunLock::acquire(vault.dir()) {
+                Ok(lock) => lock,
+                Err(error) => {
+                    eprintln!("neore-host: {error}");
+
+                    return ExitCode::FAILURE;
+                }
+            };
+
             let loaded = match vault.load() {
                 Ok(Some(loaded)) => loaded,
                 Ok(None) => {
@@ -173,15 +191,6 @@ pub fn main(command: &str, mut args: impl Iterator<Item = String>) -> ExitCode {
 
                     return ExitCode::FAILURE;
                 }
-                Err(error) => {
-                    eprintln!("neore-host: {error}");
-
-                    return ExitCode::FAILURE;
-                }
-            };
-
-            let _lock = match RunLock::acquire(vault.dir()) {
-                Ok(lock) => lock,
                 Err(error) => {
                     eprintln!("neore-host: {error}");
 
@@ -225,18 +234,14 @@ pub fn main(command: &str, mut args: impl Iterator<Item = String>) -> ExitCode {
                 }
             }
         }
-        "unpair" => match unpair_request(args.next().as_deref(), args.next().is_none()) {
-            UnpairRequest::Forget => unpair(&vault),
-            UnpairRequest::Help => {
-                println!("{USAGE}");
-
-                ExitCode::SUCCESS
-            }
+        "unpair" => match unpair_request(args.as_slice()) {
             UnpairRequest::Usage => {
                 eprintln!("{USAGE}");
 
                 ExitCode::from(2)
             }
+            UnpairRequest::DryRun => unpair_dry_run(&vault),
+            UnpairRequest::Forget { confirmed } => unpair(&vault, confirmed),
         },
         _ => {
             eprintln!("{USAGE}");
@@ -246,7 +251,70 @@ pub fn main(command: &str, mut args: impl Iterator<Item = String>) -> ExitCode {
     }
 }
 
-fn unpair(vault: &Vault<'_>) -> ExitCode {
+#[derive(Debug, PartialEq, Eq)]
+enum UnpairRequest {
+    DryRun,
+    Forget { confirmed: bool },
+    Usage,
+}
+
+/// `unpair` takes `--yes` (do not ask) or `--dry-run` (only say what would go), never both and nothing else: a
+/// typo must not delete the pairing.
+fn unpair_request(args: &[String]) -> UnpairRequest {
+    match args {
+        [] => UnpairRequest::Forget { confirmed: false },
+        [one] if one == "--yes" => UnpairRequest::Forget { confirmed: true },
+        [one] if one == "--dry-run" => UnpairRequest::DryRun,
+        _ => UnpairRequest::Usage,
+    }
+}
+
+fn unpair_dry_run(vault: &Vault<'_>) -> ExitCode {
+    match vault.record() {
+        Ok(Some(record)) => {
+            println!(
+                "Would forget \"{}\" (device {}) on {}, and remove its secret from {}. Nothing was changed.",
+                record.name,
+                record.device_id,
+                record.backend,
+                record.storage.describe()
+            );
+
+            ExitCode::SUCCESS
+        }
+        Ok(None) => {
+            println!("This machine holds no pairing. Nothing to remove.");
+
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("neore-host: {error}");
+
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// Erases the local credential only after a yes: `--yes`, or an answer at a terminal. Refused while `run` holds the
+/// pairing, whose copy of the secret would go on accepting calls.
+fn unpair(vault: &Vault<'_>, confirmed: bool) -> ExitCode {
+    let _lock = match RunLock::acquire(vault.dir()) {
+        Ok(lock) => lock,
+        Err(_) => {
+            eprintln!(
+                "neore-host: `neore-host run` is using this pairing; stop it first, then unpair"
+            );
+
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if !confirmed && !confirmed_at_terminal(vault) {
+        eprintln!("neore-host: nothing was removed. Run `neore-host unpair --yes` to confirm, or `--dry-run` to see what it would remove.");
+
+        return ExitCode::FAILURE;
+    }
+
     match vault.forget() {
         Ok(()) => {
             println!("This machine no longer holds a pairing. Remove the device in the web app (Settings, Devices) to end it there.");
@@ -261,32 +329,117 @@ fn unpair(vault: &Vault<'_>) -> ExitCode {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-enum UnpairRequest {
-    Forget,
-    Help,
-    Usage,
+fn confirmed_at_terminal(vault: &Vault<'_>) -> bool {
+    use std::io::{BufRead, IsTerminal, Write};
+
+    if !io::stdin().is_terminal() {
+        return false;
+    }
+
+    let what = match vault.record() {
+        Ok(Some(record)) => format!("\"{}\" (device {})", record.name, record.device_id),
+        _ => "the pairing on this machine".to_owned(),
+    };
+
+    eprint!("Forget {what} and erase its secret from this machine? [y/N] ");
+
+    let _ = io::stderr().flush();
+    let mut answer = String::new();
+
+    io::stdin().lock().read_line(&mut answer).is_ok()
+        && matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
 }
 
-/// `unpair` takes no argument: asking for help must not delete the pairing, and a typo must not either.
-fn unpair_request(first: Option<&str>, nothing_after: bool) -> UnpairRequest {
-    match first {
-        None => UnpairRequest::Forget,
-        Some("--help" | "-h") if nothing_after => UnpairRequest::Help,
-        Some(_) => UnpairRequest::Usage,
-    }
+/// `--help` or `-h` anywhere among a command's arguments. (`--name` values never start with `-`.)
+fn asks_for_help(args: &[String]) -> bool {
+    args.iter()
+        .any(|argument| matches!(argument.as_str(), "--help" | "-h"))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn words(list: &[&str]) -> Vec<String> {
+        list.iter().map(|word| (*word).to_owned()).collect()
+    }
+
     #[test]
-    fn unpair_forgets_only_when_given_nothing() {
-        assert_eq!(unpair_request(None, true), UnpairRequest::Forget);
-        assert_eq!(unpair_request(Some("--help"), true), UnpairRequest::Help);
-        assert_eq!(unpair_request(Some("-h"), true), UnpairRequest::Help);
-        assert_eq!(unpair_request(Some("--hlep"), true), UnpairRequest::Usage);
-        assert_eq!(unpair_request(Some("--help"), false), UnpairRequest::Usage);
+    fn help_is_asked_for_by_either_spelling_in_any_position() {
+        assert!(asks_for_help(&words(&["--help"])));
+        assert!(asks_for_help(&words(&["-h"])));
+        assert!(asks_for_help(&words(&[
+            "--backend",
+            "https://neore.ai",
+            "--help"
+        ])));
+        assert!(!asks_for_help(&words(&[])));
+        assert!(!asks_for_help(&words(&["--hlep"])));
+        assert!(!asks_for_help(&words(&["--backend", "https://neore.ai"])));
+    }
+
+    #[test]
+    fn unpair_erases_only_when_asked_plainly() {
+        assert_eq!(
+            unpair_request(&words(&[])),
+            UnpairRequest::Forget { confirmed: false }
+        );
+        assert_eq!(
+            unpair_request(&words(&["--yes"])),
+            UnpairRequest::Forget { confirmed: true }
+        );
+        assert_eq!(
+            unpair_request(&words(&["--dry-run"])),
+            UnpairRequest::DryRun
+        );
+        assert_eq!(
+            unpair_request(&words(&["--yes", "--dry-run"])),
+            UnpairRequest::Usage
+        );
+        assert_eq!(unpair_request(&words(&["--yse"])), UnpairRequest::Usage);
+    }
+
+    #[test]
+    fn unpair_is_refused_while_a_run_holds_the_pairing_and_nothing_is_asked() {
+        use super::super::vault::tests::{temp_dir, FakeKeychain};
+        use super::super::vault::{NewPairing, Storage};
+
+        let failure = format!("{:?}", ExitCode::FAILURE);
+        let success = format!("{:?}", ExitCode::SUCCESS);
+
+        let keychain = FakeKeychain::default();
+        let dir = temp_dir("unpair-locked");
+        let vault = Vault::new(dir.clone(), &keychain);
+
+        vault
+            .save(
+                &NewPairing {
+                    account: "",
+                    backend: "https://neore.ai",
+                    device_id: "d1",
+                    name: "box",
+                    secret: "x",
+                },
+                Storage::Keychain,
+            )
+            .unwrap();
+
+        let running = RunLock::acquire(&dir).unwrap();
+
+        assert_eq!(format!("{:?}", unpair(&vault, true)), failure);
+        assert!(dir.join("host.json").exists());
+        assert_eq!(keychain.entries.borrow().len(), 1);
+
+        drop(running);
+
+        assert_eq!(
+            format!("{:?}", unpair(&vault, false)),
+            failure,
+            "no terminal, no yes"
+        );
+        assert!(dir.join("host.json").exists());
+        assert_eq!(format!("{:?}", unpair(&vault, true)), success);
+        assert!(!dir.join("host.json").exists());
+        assert!(keychain.entries.borrow().is_empty());
     }
 }
