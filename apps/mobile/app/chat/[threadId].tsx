@@ -30,8 +30,18 @@ type Row = MessageRow & { finished?: boolean };
 
 const NEW_THREAD = "new";
 const MAX_HISTORY_PAGES = 10;
+/** Follow-up reads, and how far apart, after a reply the relay could not confirm as complete. */
+const CONFIRM_READS = 6;
+const CONFIRM_READ_INTERVAL_MS = 2000;
 const REFUSED_MESSAGE = "This chat is locked or no longer available.";
 const SHARE_FAILED_MESSAGE = "The message could not be shared. Try again.";
+
+/** Whether the newest assistant row has a final server status, so a follow-up read has nothing left to wait for. */
+const isReplySettled = (rows: Row[]): boolean => {
+    const latest = rows.findLast((row) => row.role === "assistant");
+
+    return latest !== undefined && (latest.status === "success" || latest.status === "failed");
+};
 
 /** A failed share fills an empty error slot; an error already on screen is not replaced by it. */
 const withShareFailure = (current: string | null): string | null => current ?? SHARE_FAILED_MESSAGE;
@@ -301,12 +311,38 @@ const Chat = () => {
         return () => gate.invalidate();
     }, [threadId]);
 
+    // After a reply the relay could not confirm, re-read on a timer until the server reports it settled. The thread
+    // is recorded, so leaving the chat stops the reads without a clean-up step, and unmounting clears the timer.
+    const [confirmingThreadId, setConfirmingThreadId] = useState<string | null>(null);
+    const [confirmTick, setConfirmTick] = useState(0);
+    const isAwaitingReply = confirmingThreadId === threadId && !isReplySettled(rows);
+
+    useEffect(() => {
+        if (!isAwaitingReply) {
+            return undefined;
+        }
+
+        let reads = 0;
+        const timer = setInterval(() => {
+            reads += 1;
+            setConfirmTick((tick) => tick + 1);
+
+            if (reads >= CONFIRM_READS) {
+                setConfirmingThreadId(null);
+            }
+        }, CONFIRM_READ_INTERVAL_MS);
+
+        return () => {
+            clearInterval(timer);
+        };
+    }, [isAwaitingReply]);
+
     useEffect(() => {
         // Without a token (a launch with no network) the saved messages are all there is; the read waits for one.
         if (status === "signed-in" && hasToken && threadId && !sending) {
             loadMessages(threadId);
         }
-    }, [hasToken, loadMessages, refreshTick, sending, status, threadId]);
+    }, [confirmTick, hasToken, loadMessages, refreshTick, sending, status, threadId]);
 
     const send = async () => {
         const prompt = draft.trim();
@@ -375,6 +411,8 @@ const Chat = () => {
             // Only a reply relayed through its end marker is complete here; a 205 ("unconfirmed") waits for the next read to supply the server's copy.
             if (outcome === "finished") {
                 setRows((current) => finishRow(current, assistantId));
+            } else {
+                setConfirmingThreadId(started.threadId);
             }
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
