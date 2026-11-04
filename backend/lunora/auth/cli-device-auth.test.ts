@@ -13,7 +13,8 @@ import { API_KEY_OPTIONS } from "../auth";
 import type { ApiKeyAuthApi } from "../public-api/identity";
 import { DEFAULT_API_SCOPES } from "../public-api/scopes";
 import type { MintedCliKey } from "./cli-device-auth";
-import { CLI_CLIENT_ID, cleanHostname, cliDeviceAuth, cliKeyName, MAX_CLI_KEYS_PER_USER } from "./cli-device-auth";
+import { MAX_API_KEYS_PER_USER } from "./api-key-limits";
+import { CLI_CLIENT_ID, cleanHostname, cliDeviceAuth, cliKeyName } from "./cli-device-auth";
 
 const BASE_URL = "http://localhost:3000";
 
@@ -21,7 +22,7 @@ const KEY_PATTERN = /^nk_/;
 
 const USER_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{8}$/;
 
-const build = () => {
+const build = (mint?: (input: { expiresInSeconds: number; name: string; userId: string }) => Promise<MintedCliKey>) => {
     const database = memoryAdapter({ account: [], apikey: [], deviceCode: [], rateLimit: [], session: [], user: [], verification: [] });
     const auth = betterAuth({
         baseURL: BASE_URL,
@@ -31,10 +32,17 @@ const build = () => {
             apiKey(API_KEY_OPTIONS),
             anonymous(),
             ...cliDeviceAuth({
-                mintApiKey: async ({ expiresInSeconds, name, userId }): Promise<MintedCliKey> =>
-                    await (auth.api as unknown as ApiKeyAuthApi).createApiKey({
+                mintApiKey: async (input): Promise<MintedCliKey> => {
+                    if (mint) {
+                        return await mint(input);
+                    }
+
+                    const { expiresInSeconds, name, userId } = input;
+
+                    return await (auth.api as unknown as ApiKeyAuthApi).createApiKey({
                         body: { expiresIn: expiresInSeconds, name, permissions: DEFAULT_API_SCOPES as Record<string, string[]>, userId },
-                    }),
+                    });
+                },
             }),
         ],
         rateLimit: { enabled: false },
@@ -382,7 +390,7 @@ describe("device-code sign-in for the CLI", () => {
         const person = await signUp(harness);
         const context = await harness.auth.$context;
 
-        for (let index = 0; index < MAX_CLI_KEYS_PER_USER; index += 1) {
+        for (let index = 0; index < MAX_API_KEYS_PER_USER; index += 1) {
             await context.adapter.create({
                 data: { createdAt: new Date(), enabled: true, key: `hash${String(index)}`, referenceId: person.userId, updatedAt: new Date() },
                 model: "apikey",
@@ -398,6 +406,39 @@ describe("device-code sign-in for the CLI", () => {
 
         expect(refused.response.status).toBe(403);
         expect(refused.body["error"]).toBe("access_denied");
+    });
+});
+
+describe("a failed key mint", () => {
+    it("puts the code back so the next poll finishes the sign-in", async () => {
+        let failures = 1;
+        const harness = build(async () => {
+            if (failures > 0) {
+                failures -= 1;
+
+                throw new Error("key store unavailable");
+            }
+
+            return { expiresAt: null, id: "key-1", key: "nk_retry" };
+        });
+        const person = await signUp(harness);
+        const code = await requestCode(harness);
+
+        await approve(harness, person.cookie, code.user_code);
+        vi.setSystemTime(Date.now() + 6000);
+
+        const failed = await poll(harness, code.device_code);
+
+        expect(failed.response.status).toBeGreaterThanOrEqual(500);
+        expect(await rowsOf(harness, "deviceCode")).toHaveLength(1);
+
+        vi.setSystemTime(Date.now() + 6000);
+
+        const retried = await poll(harness, code.device_code);
+
+        expect(retried.response.status).toBe(200);
+        expect(retried.body["api_key"]).toBe("nk_retry");
+        expect(await rowsOf(harness, "deviceCode")).toHaveLength(0);
     });
 });
 

@@ -214,7 +214,22 @@ const deviceLogin = async (context: Context, apiUrl: string): Promise<string> =>
     return key.apiKey;
 };
 
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "[::1]", "localhost"]);
+
+/** Device sign-in receives a fresh key in a response, so it is HTTPS only; plain HTTP is for a server on this machine. */
+const assertDeviceUrl = (apiUrl: string): void => {
+    const { hostname, protocol } = new URL(apiUrl);
+
+    if (protocol !== "https:" && !(protocol === "http:" && LOOPBACK_HOSTS.has(hostname))) {
+        throw new UsageError("--device needs an https:// API URL (http:// is accepted only for localhost).");
+    }
+};
+
 export const login = async (context: Context, { flags }: ParsedCommand): Promise<void> => {
+    if (flags.device && flags.key !== undefined) {
+        throw new UsageError("--device signs in by code; it does not take a key.");
+    }
+
     const existing = await readConfig(context.configFile);
     const apiUrl = (
         flags["api-url"] ??
@@ -228,8 +243,8 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
         throw new UsageError("An absolute API URL is required (--api-url).");
     }
 
-    if (flags.device && flags.key) {
-        throw new UsageError("--device signs in by code; it does not take a key.");
+    if (flags.device) {
+        assertDeviceUrl(apiUrl);
     }
 
     let apiKey = flags.device ? await deviceLogin(context, apiUrl) : flags.key?.trim();
@@ -244,11 +259,18 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
         throw new UsageError("No API key given. Create one in Settings → API keys.");
     }
 
-    // Verify BEFORE saving, so a typo never replaces a working key.
+    // A pasted key is verified BEFORE saving, so a typo never replaces a working key. A key the server just
+    // issued is saved first: the code is spent, so a failed check must not lose the only copy.
+    if (flags.device) {
+        await writeConfig({ apiKey, apiUrl }, context.configFile);
+    }
+
     const me = await new NeoreClient({ apiKey, baseUrl: apiUrl, fetch: context.fetch }).request<{ scopes: string[]; userId: string }>("GET", "/me");
     const config: CliConfig = { apiKey, apiUrl };
 
-    await writeConfig(config, context.configFile);
+    if (!flags.device) {
+        await writeConfig(config, context.configFile);
+    }
 
     if (flags.json) {
         printJson(context.io, { apiUrl, configFile: context.configFile, scopes: me.scopes });

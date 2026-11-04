@@ -17,9 +17,9 @@ import type { ApiKeyAuthApi } from "../public-api/identity";
 import { readApiKeyIdentity } from "../public-api/identity";
 import { API_RESOURCES, scopesFromStrings, scopesToStrings } from "../public-api/scopes";
 import { MAX_LENGTH } from "../lib/validators";
+import { MAX_API_KEYS_PER_USER } from "./api-key-limits";
 
-/** Enough for one key per machine/integration; a runaway script cannot fill the table. */
-export const MAX_API_KEYS_PER_USER = 25;
+export { MAX_API_KEYS_PER_USER } from "./api-key-limits";
 
 const MAX_NAME_LENGTH = 32;
 

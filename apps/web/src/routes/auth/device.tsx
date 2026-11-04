@@ -173,11 +173,17 @@ const Review = ({ email, lookup, userCode }: { email: string; lookup: Lookup; us
         setError(undefined);
         setIsBusy(true);
 
-        const { error: failure } = await authClient.$fetch(next === "approved" ? "/device/approve" : "/device/deny", { body: { userCode }, method: "POST" });
+        // A request that rejects (offline, reset, aborted) is the same retryable "unavailable" as a 5xx.
+        const result = await authClient.$fetch(next === "approved" ? "/device/approve" : "/device/deny", { body: { userCode }, method: "POST" }).catch(() => null);
 
         setIsBusy(false);
 
-        const reason = failure ? problemOf(failure) : undefined;
+        const failure = result?.error;
+        let reason: Problem | undefined = failure ? problemOf(failure) : undefined;
+
+        if (!result) {
+            reason = "unavailable";
+        }
 
         if (reason === "unavailable") {
             setError(t`That did not go through. Try again.`);

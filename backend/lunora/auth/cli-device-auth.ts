@@ -17,7 +17,13 @@
  * - `POST /device/key` redeems the code with the plugin's own `redeemDeviceCode`
  *   (same polling interval, expiry, denial and atomic claim) and then mints the
  *   key. The key is minted only AFTER the claim succeeded, so two concurrent
- *   polls cannot produce two keys; it is returned once, in that response.
+ *   polls cannot produce two keys; it is returned once, in that response. If
+ *   the mint itself fails, the claimed row is put back so the next poll retries.
+ *   A response lost in transit cannot be replayed (the key is never stored in
+ *   the clear); the stranded key shows in Settings and can be revoked there.
+ *   The per-person key cap is checked before the claim and not reserved, so
+ *   several codes approved and redeemed in the same instant can overshoot it by
+ *   the number of those codes.
  *
  * The caller supplies the minting function (`mintApiKey`), so this file does
  * not import the auth instance it is installed into.
@@ -26,6 +32,9 @@ import type { BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthEndpoint, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { deviceAuthorization, redeemDeviceCode } from "better-auth/plugins";
 import { z } from "zod";
+
+import { authLogger } from "../lib/logger";
+import { MAX_API_KEYS_PER_USER } from "./api-key-limits";
 
 /** The one client id a CLI code can carry. */
 export const CLI_CLIENT_ID = "neore-cli";
@@ -37,9 +46,6 @@ export const DEVICE_VERIFICATION_PATH = "/auth/device";
 const MAX_KEY_NAME_LENGTH = 32;
 
 const KEY_NAME_PREFIX = "Neore CLI on ";
-
-/** Same cap as `createScopedApiKey`, which this route bypasses. */
-export const MAX_CLI_KEYS_PER_USER = 25;
 
 /** A CLI key is good for a year; `neore login --device` mints a fresh one. */
 export const CLI_KEY_LIFETIME_DAYS = 365;
@@ -133,6 +139,19 @@ const keyBodySchema = z.object({
     device_code: z.string().max(256),
 });
 
+/** Best effort: if the row cannot be restored, the person starts a new code, as before. */
+const restoreClaimedCode = async (
+    adapter: { create: (input: { data: Record<string, unknown>; forceAllowId?: boolean; model: string }) => Promise<unknown> },
+    claimed: object,
+    cause: unknown,
+): Promise<void> => {
+    try {
+        await adapter.create({ data: { ...claimed }, forceAllowId: true, model: "deviceCode" });
+    } catch (error) {
+        authLogger.error("[auth] could not restore a device code after a failed key mint", { cause, error });
+    }
+};
+
 const redeemKey = (options: CliDeviceAuthOptions) =>
     createAuthEndpoint("/device/key", { body: keyBodySchema, metadata: { noStore: true }, method: "POST" }, async (ctx) => {
         const { claimedDeviceCode, user } = await redeemDeviceCode({
@@ -155,11 +174,11 @@ const redeemKey = (options: CliDeviceAuthOptions) =>
 
                 const keys = await ctx.context.adapter.count({ model: "apikey", where: [{ field: "referenceId", value: record.userId as string }] });
 
-                if (keys >= MAX_CLI_KEYS_PER_USER) {
+                if (keys >= MAX_API_KEYS_PER_USER) {
                     throw oauthError(
                         "FORBIDDEN",
                         "access_denied",
-                        `You already have ${String(MAX_CLI_KEYS_PER_USER)} API keys. Revoke one in Settings, then try again.`,
+                        `You already have ${String(MAX_API_KEYS_PER_USER)} API keys. Revoke one in Settings, then try again.`,
                     );
                 }
 
@@ -167,7 +186,19 @@ const redeemKey = (options: CliDeviceAuthOptions) =>
             },
         });
         const { hostname } = claimedDeviceCode as { hostname?: string };
-        const minted = await options.mintApiKey({ expiresInSeconds: CLI_KEY_LIFETIME_DAYS * DAY_SECONDS, name: cliKeyName(hostname ?? ""), userId: user.id });
+        let minted: MintedCliKey;
+
+        try {
+            minted = await options.mintApiKey({ expiresInSeconds: CLI_KEY_LIFETIME_DAYS * DAY_SECONDS, name: cliKeyName(hostname ?? ""), userId: user.id });
+        } catch (error) {
+            // The claim is spent and no key exists: put the code back so the CLI's next poll can finish the
+            // sign-in. Minting stays AFTER the claim, so two polls still cannot mint two keys.
+            await restoreClaimedCode(ctx.context.adapter, claimedDeviceCode, error);
+
+            throw error;
+        }
+
+        authLogger.info("[auth] api_keys.create_cli_device_key", { apiKeyId: minted.id, hostname: cleanHostname(hostname), userId: user.id });
 
         ctx.setHeader("Cache-Control", "no-store");
         ctx.setHeader("Pragma", "no-cache");

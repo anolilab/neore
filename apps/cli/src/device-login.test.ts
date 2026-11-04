@@ -297,4 +297,43 @@ describe("neore login --device", () => {
 
         expect(await run(["login", "--device", "--key", "nk_x", "--api-url", BASE], context)).toBe(EXIT.usage);
     });
+
+    it("rejects an empty --key with --device before reading config or asking for an API URL", async () => {
+        const context = contextFor([]);
+        let wasAsked = false;
+
+        context.readLine = async () => {
+            wasAsked = true;
+
+            return null;
+        };
+
+        expect(await run(["login", "--device", "--key="], context)).toBe(EXIT.usage);
+        expect(wasAsked).toBe(false);
+    });
+
+    it("keeps the key it was issued when the check afterwards fails", async () => {
+        const context = contextFor([
+            () => Response.json(CODE_RESPONSE),
+            () => Response.json({ api_key: "nk_device", expires_at: null }),
+            () => Response.json({ error: "unavailable" }, { status: 503 }),
+        ]);
+
+        expect(await run(["login", "--device", "--api-url", BASE], context)).not.toBe(EXIT.ok);
+        expect(await readConfig(context.configFile)).toEqual({ apiKey: "nk_device", apiUrl: BASE });
+    });
+
+    // eslint-disable-next-line unicorn/prefer-https -- plain http is the case under test
+    it.each(["http://api.example.com", "ftp://api.example.com", "file:///etc/passwd"])("makes no request to %s", async (url) => {
+        const context = contextFor([]);
+
+        expect(await run(["login", "--device", "--api-url", url], context)).toBe(EXIT.usage);
+    });
+
+    it("accepts plain http for a server on this machine", async () => {
+        const context = contextFor([() => Response.json({ error: "x" }, { status: 500 })]);
+
+        expect(await run(["login", "--device", "--api-url", "http://localhost:8788"], context)).not.toBe(EXIT.usage);
+        expect(context.io.stderr.text()).not.toContain("https://");
+    });
 });

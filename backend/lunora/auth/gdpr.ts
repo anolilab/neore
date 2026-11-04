@@ -101,7 +101,7 @@ export const deleteIdentityRows = async (ctx: MutationCtx, rows: IdentityRows): 
     }
 
     for (const row of rows.deviceCodes) {
-        await ctx.db.delete(row._id);
+        await ctx.db.delete("deviceCode", row._id);
     }
 
     for (const row of rows.members) {
