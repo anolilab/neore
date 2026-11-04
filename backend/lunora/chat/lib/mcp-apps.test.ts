@@ -19,6 +19,7 @@ const state = vi.hoisted(() => {
         connects: 0,
         overrides: {} as Record<string, string>,
         seenTokens: [] as string[],
+        thread: { allowed: true, mode: null } as { allowed: boolean; mode: string | null },
     };
 });
 
@@ -101,9 +102,13 @@ vi.mock("@modelcontextprotocol/sdk/client/index.js", () => {
     };
 });
 
-const context = { runQuery: async () => state.overrides } as never;
+const context = {
+    runQuery: async (ref: { __lunoraRef?: string }) =>
+        ref.__lunoraRef === "chat_tool_permissions:getThreadPermissionModeForApp" ? state.thread : state.overrides,
+} as never;
 
-const post = (body: unknown) => new Request("https://backend.example.com/mcp/x", { body: JSON.stringify(body), method: "POST" });
+const post = (body: unknown) =>
+    new Request("https://backend.example.com/mcp/x", { body: JSON.stringify({ threadId: "thread-1", ...(body as object) }), method: "POST" });
 
 const oauthConfig = (refreshTo: string | null) => {
     const oauth = { markExpired: vi.fn(async () => {}), reconnectHint: "Reconnect Notion in Settings → Connectors", refresh: vi.fn(async () => refreshTo) };
@@ -126,6 +131,7 @@ beforeEach(() => {
     state.config = null;
     state.connects = 0;
     state.overrides = {};
+    state.thread = { allowed: true, mode: null };
     state.seenTokens = [];
 });
 
@@ -210,5 +216,52 @@ describe("MCP Apps proxy with an OAuth grant", () => {
         const response = await readMCPResourceHttpAction(context, post({ serverName: "Someone else's", uri: "ui://x" }));
 
         expect(response.status).toBe(404);
+    });
+
+    it("refuses a call that names no thread, instead of running it under the automatic defaults", async () => {
+        oauthConfig("fresh");
+
+        const response = await callMCPToolFromAppHttpAction(
+            context,
+            new Request("https://backend.example.com/mcp/tool", {
+                body: JSON.stringify({ arguments: {}, serverName: "Notion", toolName: "search" }),
+                method: "POST",
+            }),
+        );
+
+        expect(response.status).toBe(400);
+        expect(state.connects).toBe(0);
+    });
+
+    it("refuses a thread the caller cannot reach", async () => {
+        oauthConfig("fresh");
+        state.thread = { allowed: false, mode: null };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(403);
+    });
+
+    it("applies a supervised thread's mode: a server's read-only hint no longer runs unasked, a tool the user allowed still does", async () => {
+        oauthConfig("fresh");
+        state.thread = { allowed: true, mode: "supervised" };
+        state.overrides = { "connector:notion:create_page": "auto" };
+
+        const lookup = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+        const allowed = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        expect(lookup.status).toBe(403);
+        expect(allowed.status).toBe(200);
+    });
+
+    it("keeps a tool that needs approval refused under full access: an iframe is not the model's turn", async () => {
+        oauthConfig("fresh");
+        state.thread = { allowed: true, mode: "full" };
+
+        // Unannotated: the default is `ask`, which `full` would lift to `auto` for the model's own calls.
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("needs your approval") });
     });
 });

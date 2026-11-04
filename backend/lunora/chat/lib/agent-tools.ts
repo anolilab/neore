@@ -70,6 +70,11 @@ export interface BuildAgentToolsOptions {
      * without a thread of their own, but the mode is the group thread's. Omitted, the mode is read for `threadId`.
      */
     permissionModeThreadId?: string;
+    /**
+     * Who started the turn, when the tools are built as someone else: an approval resumes a run as the thread's owner, so the
+     * mode is read for the person the snapshot names — `full` is the owner's to give, not a collaborator's. Omitted, `userId`.
+     */
+    permissionModeUserId?: string;
     searchMode: SearchMode;
     /**
      * An invoked skill's tool config. It only changes the CANDIDATES: extra
@@ -129,6 +134,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         model,
         origin,
         permissionModeThreadId,
+        permissionModeUserId,
         searchMode,
         skillTools,
         snapshot,
@@ -177,7 +183,10 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         headless || modeThreadId === undefined
             ? null
             : ctx
-                  .runQuery(internal.chat.tool_permissions.getThreadPermissionMode, { threadId: modeThreadId as Id<"threads">, userId })
+                  .runQuery(internal.chat.tool_permissions.getThreadPermissionMode, {
+                      threadId: modeThreadId as Id<"threads">,
+                      userId: permissionModeUserId ?? userId,
+                  })
                   .catch((error: unknown) => {
                       toolsLogger.warn("[TOOLS] Thread permission mode unavailable, using supervised:", error);
 

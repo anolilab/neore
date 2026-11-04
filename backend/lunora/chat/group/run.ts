@@ -271,6 +271,8 @@ const runSpeaker = async (
                   ...(turn.origin === "outside_agent" && { origin: turn.origin }),
                   // The group thread's mode governs every speaker's tools; a speaker has no thread of its own.
                   permissionModeThreadId: turn.threadId,
+                  // On a resumed turn `userId` is the owner; the mode is the one the starter of the turn gets.
+                  permissionModeUserId: turn.startedBy ?? "",
                   searchMode,
                   skillTools: speaker.config ? { additionalTools: speaker.config.additionalTools, disabledTools: speaker.config.disabledTools } : undefined,
                   userId: turn.userId,

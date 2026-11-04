@@ -24,9 +24,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowUpRight, Sparkles } from "lucide-react";
 import type { FC } from "react";
-import { useMemo } from "react";
+import { use, useMemo } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { ChatThreadContext } from "@/features/chat/core/context/chat-context-hooks";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import type { UIMessage } from "@/lib/agent";
 import { useUIMessages } from "@/lib/agent";
@@ -122,6 +123,13 @@ const ModelColumn: FC<{
 
     const isEmpty = turns.length === 0 && !isStreaming;
 
+    // The column's messages belong to the child thread, not to the comparison the page is on: an MCP app in one calls the backend
+    // as the child, so its mode and access are the child's.
+    const parentThreadContext = use(ChatThreadContext);
+    const columnThreadContext = useMemo(() => {
+        return { isNewThread: false, thread: null, ...parentThreadContext, model: branch.model, threadId: branch.threadId };
+    }, [parentThreadContext, branch.model, branch.threadId]);
+
     return (
         <div className={cn("flex min-w-0 flex-1 flex-col", !isLast && "border-border border-r")}>
             {/* ── Column header ─────────────────────────────────────────── */}
@@ -158,7 +166,9 @@ const ModelColumn: FC<{
                         {/* Assistant response — full markdown */}
                         {assistant && (
                             <div className="prose prose-sm dark:prose-invert max-w-none px-6 py-4">
-                                <MessageContent message={assistant} />
+                                <ChatThreadContext value={columnThreadContext}>
+                                    <MessageContent message={assistant} />
+                                </ChatThreadContext>
                             </div>
                         )}
                     </div>

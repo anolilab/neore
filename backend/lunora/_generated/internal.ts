@@ -503,6 +503,7 @@ export interface InternalApiTypes {
             getLowRiskTrustedServers: FunctionReference<"query", { userId: string }, Array<string>>;
             getPendingToolApproval: FunctionReference<"query", { approvalId: string; threadId: string; userId: string }, { toolName: string | null } | null>;
             getThreadPermissionMode: FunctionReference<"query", { threadId: Id<"threads">; userId: string }, "supervised" | "auto-edit" | "auto" | "full" | null>;
+            getThreadPermissionModeForApp: FunctionReference<"query", { threadId: string; userId: string }, { allowed: boolean; mode: "supervised" | "auto-edit" | "auto" | "full" | null }>;
             getToolPermissionGrantsQuery: FunctionReference<"query", { userId: string }, Record<string, number>>;
             getToolPermissionsQuery: FunctionReference<"query", { userId: string }, Record<string, "auto" | "ask" | "off">>;
             pruneExpiredToolPermissionGrants: FunctionReference<"mutation", {}, null>;
@@ -1722,6 +1723,7 @@ export const internal: InternalApiTypes = {
             getLowRiskTrustedServers: { __lunoraRef: "chat_tool_permissions:getLowRiskTrustedServers" },
             getPendingToolApproval: { __lunoraRef: "chat_tool_permissions:getPendingToolApproval" },
             getThreadPermissionMode: { __lunoraRef: "chat_tool_permissions:getThreadPermissionMode" },
+            getThreadPermissionModeForApp: { __lunoraRef: "chat_tool_permissions:getThreadPermissionModeForApp" },
             getToolPermissionGrantsQuery: { __lunoraRef: "chat_tool_permissions:getToolPermissionGrantsQuery" },
             getToolPermissionsQuery: { __lunoraRef: "chat_tool_permissions:getToolPermissionsQuery" },
             pruneExpiredToolPermissionGrants: { __lunoraRef: "chat_tool_permissions:pruneExpiredToolPermissionGrants" },

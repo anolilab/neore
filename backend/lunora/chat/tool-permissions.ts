@@ -29,8 +29,10 @@ import { MAX_LENGTH } from "../lib/validators";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
+import { resolveThreadReadAccess } from "../agent/thread-read-access";
+import type { ThreadPermissionMode } from "./lib/thread-permission-mode";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { AuthMutationCtx } from "../lib/crpc";
 import { saveAiUserPreferences } from "../auth/lib/preference-writes";
@@ -190,6 +192,36 @@ export const getLowRiskApprovalContext = internalQuery
             await quickCheckAllowed(ctx, threadId, userId, permissionKey === undefined ? undefined : { permissionKey, trustId }),
     );
 
+const modeFor = (thread: Doc<"threads"> | null, userId: string): ThreadPermissionMode | null => {
+    const mode = thread?.permissionMode;
+
+    if (!thread || mode === undefined || thread.runner === "host") {
+        return null;
+    }
+
+    return mode === "full" && thread.userId !== userId ? null : mode;
+};
+
+/**
+ * A comparison column is a thread of its own, but the mode is chosen once, on the comparison it belongs to: a thread with no mode of
+ * its own takes its comparison parent's. Child threads are created with none, so the parent's choice reaches the first send and every
+ * follow-up alike.
+ */
+export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null, userId: string): Promise<ThreadPermissionMode | null> => {
+    if (!thread || thread.permissionMode !== undefined) {
+        return modeFor(thread, userId);
+    }
+
+    const link = await ctx.db
+        .query("threadRelationships")
+        .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
+        .first();
+
+    const source = link?.branchType === "comparison" ? await ctx.db.get("threads", link.parentThreadId) : thread;
+
+    return modeFor(source, userId);
+};
+
 /**
  * The permission mode a run on this thread builds its tools under (`lib/thread-permission-mode.ts`), or `null` for the
  * default. A host thread has none. In a thread someone else owns only the modes that ask MORE apply: `full` is the
@@ -198,16 +230,32 @@ export const getLowRiskApprovalContext = internalQuery
 export const getThreadPermissionMode = internalQuery
     .input({ threadId: v.id("threads"), userId: v.string() })
     .output(v.union(v.literal("supervised"), v.literal("auto-edit"), v.literal("auto"), v.literal("full"), v.null()))
-    .query(async ({ args: { threadId, userId }, ctx }) => {
-        const thread = await ctx.db.get("threads", threadId);
-        const mode = thread?.permissionMode;
+    .query(async ({ args: { threadId, userId }, ctx }) => await modeOfThread(ctx, await ctx.db.get("threads", threadId), userId));
 
-        if (!thread || mode === undefined || thread.runner === "host") {
-            return null;
-        }
+export const threadModeForApp = async (ctx: QueryCtx, threadId: string, userId: string): Promise<{ allowed: boolean; mode: ThreadPermissionMode | null }> => {
+    const access = await resolveThreadReadAccess(ctx, threadId as Id<"threads">, userId);
 
-        return mode === "full" && thread.userId !== userId ? null : mode;
-    });
+    if (access?.kind !== "full" && access?.kind !== "locked") {
+        return { allowed: false, mode: null };
+    }
+
+    return { allowed: true, mode: await modeOfThread(ctx, access.thread, userId) };
+};
+
+/**
+ * The mode of the thread an MCP App is shown in, with whether the caller may reach that thread at all. The content read gate is
+ * not applied: the app was already rendered, and a passcode-locked chat's owner (no unlock proof here) is who it belongs to.
+ * `allowed` is the owner, or someone with a live grant; a locked thread is the owner's alone.
+ */
+export const getThreadPermissionModeForApp = internalQuery
+    .input({ threadId: v.string().max(MAX_LENGTH.id), userId: v.string() })
+    .output(
+        v.object({
+            allowed: v.boolean(),
+            mode: v.union(v.literal("supervised"), v.literal("auto-edit"), v.literal("auto"), v.literal("full"), v.null()),
+        }),
+    )
+    .query(async ({ args: { threadId, userId }, ctx }) => await threadModeForApp(ctx, threadId, userId));
 
 /** The servers the user trusts to have their tools put to the quick check, as the run builds its tools. */
 export const getLowRiskTrustedServers = internalQuery

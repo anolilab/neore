@@ -1,7 +1,6 @@
 import type { JSONValue } from "@ai-sdk/provider";
 import type { HttpActionCtx } from "lunorash/server";
 
-import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import { getCurrentUserInternal } from "../../auth/lib/helper";
 import { findUserMcpServer } from "../../connectors/lib/user-mcp-servers";
@@ -86,27 +85,20 @@ const descriptorFor = (config: MCPServerConfig, toolName: string): ToolDescripto
         : { key: toolPermissionKey("mcp", toolName, config.name), source: "mcp" };
 
 /**
- * The mode of the thread an app is shown in, read for the caller. No thread means no mode, as before. `denied` when the caller
- * cannot read that thread. A mode that cannot be read is `supervised`, the same fallback the agent's own calls use.
+ * The mode of the thread an app is shown in, read for the caller. `denied` when the caller cannot reach that thread. A read that
+ * fails is `denied` too: the proxy cannot tell the thread's mode, and the automatic defaults are not the safe guess.
+ *
+ * `full` is not passed on. It turns `ask` defaults into `auto`, which is the model's turn to take; an app iframe is not a turn, and
+ * the proxy cannot ask anyone, so a tool that needs approval stays refused here under `full` too.
  */
-const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: string | undefined): Promise<ThreadPermissionMode | undefined | "denied"> => {
-    if (threadId === undefined) {
-        return undefined;
-    }
+const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: string): Promise<ThreadPermissionMode | undefined | "denied"> => {
+    const found = await context.runQuery(internal.chat.tool_permissions.getThreadPermissionModeForApp, { threadId, userId }).catch(() => null);
 
-    const access = await context.runQuery(internal.chat.sharing.checkThreadAccessWithData, { requiredPermission: "read", threadId, userId }).catch(() => {
-        return { hasAccess: false as const };
-    });
-
-    if (!access.hasAccess) {
+    if (!found?.allowed) {
         return "denied";
     }
 
-    const mode = await context
-        .runQuery(internal.chat.tool_permissions.getThreadPermissionMode, { threadId: threadId as Id<"threads">, userId })
-        .catch(() => "supervised" as const);
-
-    return mode ?? undefined;
+    return found.mode === "full" ? undefined : (found.mode ?? undefined);
 };
 
 const annotatedToolMode = async (
@@ -331,7 +323,12 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
         return Response.json({ error: `MCP server "${serverName}" not found` }, { status: 404 });
     }
 
-    // The app's call runs under the thread's mode, as the model's calls do: the proxy is no way around a supervised thread.
+    // The app's call runs under the thread's mode, as the model's calls do: the proxy is no way around a supervised thread. A call
+    // that names no thread has no mode to run under, so it is refused rather than given the automatic defaults.
+    if (!threadId) {
+        return Response.json({ error: "Missing threadId" }, { status: 400 });
+    }
+
     const threadMode = await threadModeFor(context, user._id, threadId);
 
     if (threadMode === "denied") {
