@@ -133,7 +133,7 @@ const startIn = (key: string, folder: string) =>
     guarded(async () => {
         const id = await globalThis.neoreDevice.acpStart(key, folder);
 
-        state.selected = id;
+        selectSession(id);
         await refreshSessions();
     });
 
@@ -723,6 +723,21 @@ const PORTS_POLL_MS = 5000;
 /** The newest port read. A read that finishes after a newer one is dropped, so a stopped server cannot reappear from an older answer. */
 const portsRead = { latest: 0 };
 
+/**
+ * The one place the open session changes. The previous session's ports must not stay on screen, where Stop would still
+ * act on them: pending reads are dropped, the rows go, and the new session's ports are read at once.
+ */
+const selectSession = (id: string | undefined): void => {
+    state.selected = id;
+    portsRead.latest += 1;
+    $("acp-ports-status").textContent = "";
+    $("acp-ports-list").replaceChildren(item(id === undefined ? "None." : "Loading…"));
+
+    if (id !== undefined) {
+        refreshPorts();
+    }
+};
+
 const refreshPorts = async (): Promise<void> => {
     const { selected } = state;
 
@@ -765,6 +780,11 @@ const refreshPorts = async (): Promise<void> => {
 
                             const ended = await globalThis.neoreDevice.acpPortStop(selected as string, port.pid, port.startedAt);
 
+                            // Another session was opened during the stop: its panel keeps its own notice and focus.
+                            if (state.selected !== selected) {
+                                return;
+                            }
+
                             $("acp-notice").textContent = ended ? `Stopped ${port.name} on port ${String(port.port)}.` : `${port.name} on port ${String(port.port)} did not end.`;
                             await refreshPorts();
 
@@ -783,7 +803,7 @@ const refreshSessions = async (): Promise<void> => {
     state.sessions = await globalThis.neoreDevice.acpSessions();
 
     if (state.selected !== undefined && state.sessions.every((session) => session.id !== state.selected)) {
-        state.selected = undefined;
+        selectSession(undefined);
     }
 
     $("acp-sessions").replaceChildren(
@@ -795,11 +815,8 @@ const refreshSessions = async (): Promise<void> => {
                 return item(
                     label,
                     button(state.selected === session.id ? "Showing" : "Open", `Open the session with ${session.agentLabel} in ${session.folder}`, () => {
-                        state.selected = session.id;
-                        // The previous session's ports must not stay on screen, where Stop would still act on them.
-                        $("acp-ports-list").replaceChildren(item("Loading…"));
+                        selectSession(session.id);
                         refreshSessions();
-                        refreshPorts();
                     }),
                 );
             }),
