@@ -34,7 +34,7 @@ import type { Handshake } from "./protocol";
 import { initialize, loadSession, METHOD, openNewSession, promptParams, setConfigOption, setMode } from "./protocol";
 import { INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND, RpcError } from "./rpc-error";
 import type { TerminalExitStatus, TerminalHost } from "./terminals";
-import { createRequestOf, MAX_SESSION_TERMINALS, SessionTerminals, shownLine } from "./terminals";
+import { createRequestOf, MAX_SESSION_TERMINALS, SessionTerminals } from "./terminals";
 import { outputTail, terminalIdOf, toolTextOf } from "./tool-output";
 import { Turn } from "./turn";
 import type { SessionSnapshot, SessionStatus, SessionSummary, StopReason, ToolState, ToolStatus } from "./types";
@@ -679,6 +679,7 @@ export class AgentSession {
         this.cancelTimer = undefined;
         this.current = undefined;
         this.options.lifecycle?.turnEnded();
+        this.forgetToolOutput(turn);
         // A child whose spawn call never reported its end is over with the turn: it must not take output from a later one.
         this.children.endAll(reason === "cancelled" || this.cancelRequested ? "cancelled" : "completed");
         this.children.discardUnclaimed();
@@ -765,6 +766,21 @@ export class AgentSession {
         this.options.lifecycle?.ended();
         this.observe((observer) => observer.sessionEnded(this.id));
         this.options.onChange();
+    }
+
+    /**
+     * Drops what a turn's calls printed: once the turn's end is queued its channel takes nothing more, so a later report
+     * of those calls is never posted, and keeping up to 64K characters per call for the whole session would only cost memory.
+     */
+    private forgetToolOutput(turn: Turn): void {
+        for (const [toolId, owner] of this.toolOwner) {
+            if (owner !== turn) {
+                continue;
+            }
+
+            this.toolOutput.delete(toolId);
+            this.toolTerminal.delete(toolId);
+        }
     }
 
     /** What no spawn call claimed is dropped, and the session says what buffering cost it. */
@@ -1243,7 +1259,7 @@ export class AgentSession {
 
     /** Asks the person whether the command may run (allow once or decline), then has the core start it in the sandbox. */
     private async createTerminal(terminals: SessionTerminals, params: Record<string, unknown>): Promise<string> {
-        const { cwd, env, line, outputByteLimit } = createRequestOf(params);
+        const { cwd, env, line, outputByteLimit, shown } = createRequestOf(params);
 
         if (terminals.live >= MAX_SESSION_TERMINALS) {
             throw new RpcError(INVALID_PARAMS, `at most ${String(MAX_SESSION_TERMINALS)} terminals at once; release one first`);
@@ -1258,7 +1274,7 @@ export class AgentSession {
             sessionId: this.agentSessionId,
             toolCall: {
                 kind: "execute",
-                rawInput: { command: shownLine(line, env), ...cwd !== undefined && { cwd } },
+                rawInput: { command: shown, ...cwd !== undefined && { cwd } },
                 title: "Run a command in a terminal",
                 toolCallId: `terminal-${randomUUID()}`,
             },

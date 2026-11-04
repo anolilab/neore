@@ -544,6 +544,35 @@ describe("streams", () => {
         expect(viewer.toolProgress).toBeUndefined();
         expect(owner.toolProgress).toHaveLength(1);
     });
+
+    it("a public thread's viewer does not see a coding agent's plan, commands or what they printed", async () => {
+        const { streamId } = await seedStream({ isPublic: true });
+
+        await run(async (context) => {
+            await context.db.patch("persistentStreams", streamId, { producer: "host" });
+            await context.db.insert("persistentChunks", {
+                event: { entries: [{ content: "Read the private wiki", priority: "high", status: "in_progress" }], kind: "plan" },
+                seq: 0,
+                streamId,
+                text: "",
+            });
+            await context.db.insert("persistentChunks", {
+                event: { id: "c1", kind: "tool", output: "SECRET=1", status: "completed", title: "cat .env", toolKind: "execute" },
+                seq: 1,
+                streamId,
+                text: "",
+            });
+        });
+
+        const viewer = (await as(STRANGER).query(procedureAt("chat_streaming", "getStreamBody"), { streamId } as never)) as { hostActivity?: unknown };
+        const owner = (await as(OWNER).query(procedureAt("chat_streaming", "getStreamBody"), { streamId } as never)) as {
+            hostActivity?: { plan?: unknown[]; tools: unknown[] };
+        };
+
+        expect(viewer.hostActivity).toBeUndefined();
+        expect(owner.hostActivity?.plan).toHaveLength(1);
+        expect(owner.hostActivity?.tools).toHaveLength(1);
+    });
 });
 
 describe("vault", () => {

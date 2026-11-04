@@ -17,8 +17,13 @@ import { INVALID_PARAMS, RpcError } from "./rpc-error";
 /** Terminals one session may have open (made and not released) at once. */
 export const MAX_SESSION_TERMINALS = 4;
 
-/** The longest command line, in UTF-8 bytes, as `shell_run` takes it (`acp_terminal.rs`). */
-const MAX_LINE_BYTES = 8000;
+/**
+ * The longest line the person is shown, in UTF-8 bytes: the core cuts a request's command at this
+ * (`acp_permission.rs`, `MAX_TEXT * 4`), and a command allowed must be one the person read whole.
+ */
+const MAX_SHOWN_BYTES = 4000;
+/** Ended terminals whose results a session keeps after their release, for the tool rows that show them. */
+const KEPT_RESULTS = 16;
 const MAX_ENV = 64;
 const ENV_NAME = /^[A-Z_a-z]\w{0,127}$/u;
 /** A word the shell reads back unchanged without quotes. */
@@ -125,7 +130,7 @@ const envOf = (env: unknown): [string, string][] => {
 };
 
 /** A `terminal/create` request, checked: what to run, where, and with which variables. Throws `INVALID_PARAMS` otherwise. */
-export const createRequestOf = (params: Record<string, unknown>): { cwd?: string; env: [string, string][]; line: string; outputByteLimit?: number } => {
+export const createRequestOf = (params: Record<string, unknown>): { cwd?: string; env: [string, string][]; line: string; outputByteLimit?: number; shown: string } => {
     const { args, command, cwd, env, outputByteLimit } = params;
 
     if (typeof command !== "string" || command.trim() === "") {
@@ -144,13 +149,16 @@ export const createRequestOf = (params: Record<string, unknown>): { cwd?: string
 
     const line = terminalLine(command.trim(), (args as string[] | null | undefined) ?? []);
 
-    if (Buffer.byteLength(line) > MAX_LINE_BYTES || line.includes("\0")) {
+    const shown = shownLine(line, variables);
+
+    if (Buffer.byteLength(shown) > MAX_SHOWN_BYTES || line.includes("\0")) {
         throw new RpcError(INVALID_PARAMS, "the command is too long");
     }
 
     return {
         env: variables,
         line,
+        shown,
         ...typeof cwd === "string" && { cwd },
         ...typeof outputByteLimit === "number" && Number.isSafeInteger(outputByteLimit) && outputByteLimit > 0 && { outputByteLimit },
     };
@@ -239,6 +247,8 @@ export class SessionTerminals {
             terminal.released = true;
             this.host.release(terminal.handle);
         }
+
+        this.prune();
     }
 
     /** How a terminal the session made ended, and what it printed; undefined while it runs or for an id it never made. */
@@ -272,6 +282,17 @@ export class SessionTerminals {
         }
     }
 
+    /** Forgets the oldest results of terminals that ended and were released, past the last {@link KEPT_RESULTS}. */
+    private prune(): void {
+        const done = [...this.open].filter(([, terminal]) => terminal.released && terminal.ended !== undefined);
+
+        const oldest = done.slice(0, Math.max(0, done.length - KEPT_RESULTS));
+
+        for (const [terminalId] of oldest) {
+            this.open.delete(terminalId);
+        }
+    }
+
     private require(terminalId: unknown): OpenTerminal {
         const terminal = typeof terminalId === "string" ? this.open.get(terminalId) : undefined;
 
@@ -299,6 +320,7 @@ export class SessionTerminals {
             if (current !== undefined) {
                 current.ended = { exit, output };
                 this.ended(terminalId);
+                this.prune();
             }
         } catch {
             // The core no longer has it (stopped on quit): nothing will show it.

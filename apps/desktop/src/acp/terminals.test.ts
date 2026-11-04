@@ -29,6 +29,7 @@ describe(createRequestOf, () => {
             env: [["A", "1"]],
             line: "ls x",
             outputByteLimit: 500,
+            shown: "A=1 ls x",
         });
     });
 
@@ -40,7 +41,9 @@ describe(createRequestOf, () => {
             { command: "ls", cwd: "relative" },
             { command: "ls", env: [{ name: "1BAD", value: "x" }] },
             { command: "ls", env: [{ name: "A", value: "a\0b" }] },
-            { command: "x".repeat(8001) },
+            { command: "x".repeat(4001) },
+            // The line fits, but not with the variables in front of it: the person must read whole what they allow.
+            { command: "ls", env: Array.from({ length: 10 }, (_, index) => { return { name: `V${String(index)}`, value: "v".repeat(400) }; }) },
         ]) {
             expect(() => createRequestOf(params)).toThrow();
         }
