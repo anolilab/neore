@@ -65,10 +65,6 @@ export const unsnoozeThread = authMutation
     });
 
 /**
- * Sets how much of a cloud thread's runs the owner leaves unasked. A host thread keeps its own approval rules, so it
- * has no mode to set. Takes effect on the next run; a run paused for approval applies the mode it finds when it resumes.
- */
-/**
  * Carries a mode onto a thread the owner just made from one of their own (a branch). Internal: the caller has checked the owner of
  * the source thread, so this writes without a second check. A thread made from a host thread has no mode and is not sent here.
  */
@@ -89,6 +85,10 @@ export const copyThreadPermissionMode = internalMutation
         return null;
     });
 
+/**
+ * Sets how much of a cloud thread's runs the owner leaves unasked. A host thread keeps its own approval rules, so it
+ * has no mode to set. Takes effect on the next run; a run paused for approval applies the mode it finds when it resumes.
+ */
 export const setThreadPermissionMode = authMutation
     .use(rateLimit("chat/update"))
     .input({
