@@ -700,14 +700,9 @@ export const updateTask = authMutation
         const tasks = await loadUserTasks(ctx, userId);
         // The task keeps the organization it was created under, so an edit from another space cannot move its skill scope or
         // its cap. A skill is authorized against that organization only while the editor is still a member, as a run checks it.
-        const stillMember = task.organizationId ? await getMemberByOrganizationAndUser(ctx, task.organizationId, userId) : null;
-        const definition = await resolveDefinition(
-            ctx,
-            { organizationId: stillMember ? (task.organizationId ?? undefined) : undefined, userId },
-            args,
-            tasks,
-            args.taskId,
-        );
+        const membership = task.organizationId ? await getMemberByOrganizationAndUser(ctx, task.organizationId, userId) : null;
+        const skillOrganizationId = membership ? (task.organizationId ?? undefined) : undefined;
+        const definition = await resolveDefinition(ctx, { organizationId: skillOrganizationId, userId }, args, tasks, args.taskId);
         const { now } = ctx;
         let nextRunAt: number | undefined;
 
