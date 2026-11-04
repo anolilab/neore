@@ -926,17 +926,17 @@ const runChatStartOnShard = async (
         // The thread records its organization so later runs on it are capped by it. Best-effort: a failed stamp must not
         // strand the message, and the run's own organization (passed to its job below) still caps this run. Temporary
         // threads stay unstamped, as `createThread` leaves them.
-        const threadOrganizationId = await sessionOrganizationPromise;
+        try {
+            const threadOrganizationId = await sessionOrganizationPromise;
 
-        if (threadOrganizationId && body.temporary !== true) {
-            try {
+            if (threadOrganizationId && body.temporary !== true) {
                 await context.runMutation(internal.agent.threads.updateThread, {
                     patch: { organizationId: threadOrganizationId },
                     threadId: threadId as Id<"threads">,
                 });
-            } catch (error: unknown) {
-                chatLogger.warn("Failed to stamp a new chat with its organization; its run is still capped by it:", error);
             }
+        } catch (error: unknown) {
+            chatLogger.warn("Failed to stamp a new chat with its organization; its run is still capped by it:", error);
         }
 
         // Title + category generation — scheduled after the agent run below.
