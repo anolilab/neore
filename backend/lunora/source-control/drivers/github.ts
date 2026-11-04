@@ -747,8 +747,9 @@ const pullNodeId = async (request: HostRequest, ref: PullRequestRef): Promise<st
         repoParts(ref),
         z.object({ repository: z.object({ pullRequest: z.object({ id: z.string() }).nullable() }).nullable() }),
     ).catch((error: unknown) => {
-        // A lookup is a read made before any change is sent: a lost answer here leaves the host unchanged, so it is not an unconfirmed write.
-        if (error instanceof HostApiError && error.unconfirmed) {
+        // A lookup is a read made before any change is sent: a lost or failed answer here leaves the host unchanged, so it is not an
+        // unconfirmed write. A server error would otherwise read as one, because a write that fails with a 5xx may have been applied.
+        if (error instanceof HostApiError && (error.unconfirmed || error.status >= 500)) {
             throw new HostApiError(error.message, 0);
         }
 

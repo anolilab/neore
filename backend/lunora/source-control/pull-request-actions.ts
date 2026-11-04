@@ -18,7 +18,8 @@ import { writeToHost } from "./write-host";
 const vOk = v.object({ status: v.literal("ok") });
 
 const vRef = {
-    number: v.number(),
+    // GitHub numbers pull requests from 1: a fraction or zero is refused here, before a token is read or a host call is made.
+    number: v.number().check((value) => Number.isSafeInteger(value) && value >= 1, { message: "A pull request number is a whole number from 1" }),
     repository: v.string().max(MAX_LENGTH.short),
 };
 
