@@ -16,7 +16,13 @@ import { internal } from "../../_generated/internal";
 import type { ActionCtx } from "../../_generated/server";
 import { readStoredObject } from "../../lib/storage-read";
 import type { AskUserFile } from "../tools/ask-user-constants";
-import { ASK_USER_FILE_MAX_BYTES, ASK_USER_FILE_TYPES, ASK_USER_FILES_TOTAL_MAX_BYTES, ASK_USER_MAX_FILES } from "../tools/ask-user-constants";
+import {
+    ASK_USER_FILE_MAX_BYTES,
+    ASK_USER_FILE_TYPES,
+    ASK_USER_FILES_TOTAL_MAX_BYTES,
+    ASK_USER_IMAGE_MAX_BYTES,
+    ASK_USER_MAX_FILES,
+} from "../tools/ask-user-constants";
 
 /** The error codes that mean "leave this file out" rather than "the read failed". */
 const SKIP_CODES: ReadonlySet<string> = new Set(["NOT_FOUND", "PAYLOAD_TOO_LARGE"]);
@@ -62,7 +68,8 @@ export const loadAskUserFiles = async (
         }
 
         try {
-            const { bytes } = await readStoredObject(ctx.storage, file.storageId, { maxBytes: Math.min(ASK_USER_FILE_MAX_BYTES, remaining) });
+            const limit = file.mediaType.startsWith("image/") ? ASK_USER_IMAGE_MAX_BYTES : ASK_USER_FILE_MAX_BYTES;
+            const { bytes } = await readStoredObject(ctx.storage, file.storageId, { maxBytes: Math.min(limit, remaining) });
 
             total += bytes.byteLength;
             files.push({ data: toBase64(bytes), filename: file.filename ?? "file", mediaType: file.mediaType });

@@ -39,7 +39,8 @@ export const answerAskUser = authMutation
         const answerFileIds = (fileIds ?? []).filter((id) => ctx.db.normalizeId("chatFiles", id) !== null);
 
         // The run resumes later without the lock's proof, so the files could not be read there: refused now, not dropped.
-        if (answerFileIds.length > 0) {
+        // A dismissal uses no files, so it is never refused for them.
+        if (answer !== null && answerFileIds.length > 0) {
             const thread = await ctx.db.get("threads", threadId);
 
             // Only the owner learns the lock: a stranger gets the same answer as for any other thread, from the claim below.

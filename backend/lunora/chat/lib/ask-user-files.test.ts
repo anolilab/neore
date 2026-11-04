@@ -55,6 +55,18 @@ describe("loadAskUserFiles", () => {
         expect(download).not.toHaveBeenCalled();
     });
 
+    it("leaves out an image above the provider's per-image limit, though a PDF of that size is read", async () => {
+        const fourMb = new Uint8Array(4 * 1024 * 1024);
+        const { ctx } = makeCtx(
+            { doc: fileRow("doc", "application/pdf", "doc.pdf"), img: fileRow("img", "image/png") },
+            { "key/doc": objectOf(fourMb), "key/img": objectOf(fourMb) },
+        );
+
+        const files = await loadAskUserFiles(ctx, { fileIds: ["img", "doc"], threadId: "t1", userId: "u1" });
+
+        expect(files.map((file) => file.filename)).toEqual(["doc.pdf"]);
+    });
+
     it("reads an owned PDF as base64", async () => {
         const { ctx } = makeCtx({ doc: fileRow("doc", "application/pdf", "doc.pdf") }, { "key/doc": objectOf(PNG_BYTES) });
 
@@ -96,7 +108,7 @@ describe("loadAskUserFiles", () => {
         const eightMb = new Uint8Array(8 * 1024 * 1024);
         const ids = ["big1", "big2", "big3"];
         const { ctx } = makeCtx(
-            Object.fromEntries(ids.map((id) => [id, fileRow(id, "image/png")])),
+            Object.fromEntries(ids.map((id) => [id, fileRow(id, "application/pdf", `${id}.pdf`)])),
             Object.fromEntries(ids.map((id) => [`key/${id}`, objectOf(eightMb)])),
         );
 

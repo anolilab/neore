@@ -47,6 +47,8 @@ const FILE_TYPES: ReadonlyArray<string> = ["image/png", "image/jpeg", "image/web
 const FILE_MAX_BYTES = 10 * 1024 * 1024;
 /** A photo may be larger than the file limit as selected: it is re-encoded before upload. This caps what is read into memory. */
 const IMAGE_SELECT_MAX_BYTES = 40 * 1024 * 1024;
+/** Mirrors `ASK_USER_IMAGE_MAX_BYTES` on the server: the largest image a provider takes as base64 in one call. */
+const IMAGE_MAX_BYTES = 3_932_160;
 
 /** The largest a selected file may be: a photo gets the wider limit, since it is re-encoded before upload. */
 const selectLimitOf = (file: File): number => (file.type.startsWith("image/") ? IMAGE_SELECT_MAX_BYTES : FILE_MAX_BYTES);
@@ -190,15 +192,14 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                     // Photos are re-encoded below the provider's per-image limit, as the composer does; PDFs go as they are.
                     const prepared = file.type.startsWith("image/") ? await downscaleOversizedImage(file) : file;
 
-                    // A file re-encoding could not bring under the limit, or one that would exceed the total on uploaded sizes, is named
-                    // as failed and the next file is still tried.
-                    if (prepared.size > FILE_MAX_BYTES || total + prepared.size > FILES_TOTAL_MAX_BYTES) {
+                    // Some images cannot be re-encoded, so an image is checked against the provider's limit as it stands.
+                    const limit = file.type.startsWith("image/") ? IMAGE_MAX_BYTES : FILE_MAX_BYTES;
+
+                    if (prepared.size > limit || total + prepared.size > FILES_TOTAL_MAX_BYTES) {
                         failed.push(file.name);
 
                         continue;
                     }
-
-                    total += prepared.size;
 
                     const uploadId = await uploadFile(prepared, { contentType: prepared.type, signal: controller.signal });
 
@@ -207,6 +208,9 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                     }
 
                     const { fileId } = await finalizeUpload({ filename: file.name, uploadId });
+
+                    // Counted only once the upload is in, so a failed one does not use up the budget.
+                    total += prepared.size;
 
                     // The server dedupes uploads by content, so the same photo can come back with an id already attached.
                     setFiles((current) =>
