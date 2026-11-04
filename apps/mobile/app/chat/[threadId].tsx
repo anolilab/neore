@@ -31,10 +31,11 @@ type Row = MessageRow & { finished?: boolean };
 
 const NEW_THREAD = "new";
 const MAX_HISTORY_PAGES = 10;
-/** Follow-up reads, and how far apart, after a reply the relay could not confirm as complete. */
+/** Unsettled checks before the history is re-read once, so the server's copy shows while the checks go on. */
 const CONFIRM_REFRESH_READS = 6;
-/** Unsettled checks after which a confirmation is given up; the reply's final status is then left to the next read. */
+/** Unsettled checks after which a confirmation is given up; the final status is then left to the next read. */
 const CONFIRM_GIVE_UP_READS = 150;
+/** How far apart the follow-up checks are, after a reply that the relay did not confirm as complete. */
 const CONFIRM_READ_INTERVAL_MS = 2000;
 const REFUSED_MESSAGE = "This chat is locked or no longer available.";
 const SHARE_FAILED_MESSAGE = "The message could not be shared. Try again.";
@@ -161,7 +162,7 @@ const Chat = () => {
     const hasLiveRows = useRef(false);
     // Set when the server refused this chat (locked, gone): a late read of the cache must not paint it again.
     const isRefused = useRef(false);
-    // Whether "Load older messages" has added pages on this screen: only then does the cursor on screen continue a loaded run.
+    // Whether "Load older messages" has added pages here: only then does the cursor on screen continue a loaded run.
     const hasLoadedOlder = useRef(false);
     const readGate = useRef(createMessageReadGate());
     const [threadId, setThreadId] = useState<string | undefined>(routeThreadId === NEW_THREAD ? undefined : routeThreadId);
@@ -361,7 +362,7 @@ const Chat = () => {
     }, [threadId]);
 
     // After a send, check the newest page on a timer until the server's copy of the reply is final. Each check reads one
-    // page, so older pages on screen are not touched; the history is re-read when the check settles, and once while it is still waiting.
+    // page, so older pages on screen are not touched. The history is re-read once while the checks wait, and again when they settle.
     // `holdsSend` is set only for a reply the relay did not finish: its server copy may still be streaming, so a new send waits.
     const [confirmation, setConfirmation] = useState<{ after: number; holdsSend: boolean; prompt: string; threadId: string } | null>(null);
     const [confirmTick, setConfirmTick] = useState(0);
@@ -408,7 +409,7 @@ const Chat = () => {
                 setError(withoutAwaitReply);
                 setConfirmTick((tick) => tick + 1);
             } else if (isActive && reads === CONFIRM_REFRESH_READS) {
-                // Still unsettled: re-read the history once so the server's copy of the reply is on screen while checks go on.
+                // Still unsettled: re-read the history so the server's copy of the reply is on screen while the checks go on.
                 setConfirmTick((tick) => tick + 1);
             }
         };
