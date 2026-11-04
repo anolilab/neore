@@ -12,9 +12,9 @@ import { LinkIcon } from "lucide-react";
 import type { FC } from "react";
 
 import { useModelStore } from "@/features/chat/core/stores/model-store";
-import { buildPromptLink } from "@/features/chat/core/utils/prompt-link";
+import { buildPromptLink, isPromptLinkTooLong } from "@/features/chat/core/utils/prompt-link";
 import type { UIMessage } from "@/lib/agent";
-import { showError, showSuccess } from "@/lib/toast";
+import { showError, showSuccess, showWarning } from "@/lib/toast";
 
 const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
     const { t } = useLingui();
@@ -23,6 +23,13 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
         const prompt = getVisibleUserText({ parts: [...message.parts], text: message.text });
 
         if (!prompt.trim()) {
+            return;
+        }
+
+        // A link carries at most PROMPT_LINK_MAX_CHARS; copying a longer message would give the reader part of it.
+        if (isPromptLinkTooLong(prompt)) {
+            showWarning(t`This message is too long to copy as a prompt link.`);
+
             return;
         }
 

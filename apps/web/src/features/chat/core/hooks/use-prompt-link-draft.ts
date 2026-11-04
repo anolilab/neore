@@ -21,7 +21,14 @@ export const usePromptLinkDraft = ({ model, prompt }: { model?: string; prompt?:
     const appliedRef = useRef(false);
 
     useEffect(() => {
-        if (appliedRef.current || (prompt === undefined && model === undefined)) {
+        // The link's parameters are gone once it is applied, so the next link on this mounted page applies too.
+        if (prompt === undefined && model === undefined) {
+            appliedRef.current = false;
+
+            return;
+        }
+
+        if (appliedRef.current) {
             return;
         }
 
@@ -29,12 +36,14 @@ export const usePromptLinkDraft = ({ model, prompt }: { model?: string; prompt?:
 
         if (prompt !== undefined) {
             const draft = promptFromLink(prompt);
-            const { composerText, setComposerText } = useChatUIStore.getState();
+            const { attachedReferences, composerAttachments, composerText, setComposerText } = useChatUIStore.getState();
+            // Attachments and references are part of the draft too: a link's text would be sent with them.
+            const hasDraft = composerText.trim() !== "" || composerAttachments.length > 0 || attachedReferences.length > 0;
 
-            if (composerText.trim() === "") {
-                setComposerText(draft);
-            } else {
+            if (hasDraft) {
                 showWarning(t`Your draft is kept. The prompt from the link was not added.`);
+            } else {
+                setComposerText(draft);
             }
         }
 

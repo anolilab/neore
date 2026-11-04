@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPromptLink, PROMPT_LINK_MAX_CHARS, promptFromLink, readPromptLinkSearch } from "./prompt-link";
+import { buildPromptLink, isPromptLinkTooLong, PROMPT_LINK_MAX_CHARS, promptFromLink, readPromptLinkSearch } from "./prompt-link";
 
 describe(buildPromptLink, () => {
     it("builds a new-chat link whose search reads back to the same prompt and model", () => {
@@ -24,6 +24,20 @@ describe(promptFromLink, () => {
     it("trims the text and cuts it at the cap, so a link cannot carry an unbounded draft", () => {
         expect(promptFromLink("  hello  ")).toBe("hello");
         expect(promptFromLink("a".repeat(PROMPT_LINK_MAX_CHARS + 50))).toHaveLength(PROMPT_LINK_MAX_CHARS);
+    });
+
+    it("keeps the whole text at the cap, even behind leading whitespace", () => {
+        const body = "b".repeat(PROMPT_LINK_MAX_CHARS);
+
+        expect(promptFromLink(`   ${body}`)).toBe(body);
+    });
+});
+
+describe(isPromptLinkTooLong, () => {
+    it("is true only when the cleaned text would not fit the link", () => {
+        expect(isPromptLinkTooLong("a".repeat(PROMPT_LINK_MAX_CHARS))).toBe(false);
+        expect(isPromptLinkTooLong(`  ${"a".repeat(PROMPT_LINK_MAX_CHARS)}  `)).toBe(false);
+        expect(isPromptLinkTooLong("a".repeat(PROMPT_LINK_MAX_CHARS + 1))).toBe(true);
     });
 });
 

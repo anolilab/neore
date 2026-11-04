@@ -151,7 +151,7 @@ const ChatPage = () => {
     useEffect(() => {
         // Include initialMessage as allowed (though unused) to prevent warnings during navigation
         // TanStack Router may briefly carry over search params when navigating between routes
-        const supportedParams = new Set(["initialMessage", "promptId", "redirectReason", "settings", "settingsTab"]);
+        const supportedParams = new Set(["initialMessage", "model", "prompt", "promptId", "redirectReason", "settings", "settingsTab"]);
         const searchParams = new URLSearchParams(location.search);
         const unsupportedParams: string[] = [];
 
