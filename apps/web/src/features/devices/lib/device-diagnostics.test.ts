@@ -1,13 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { buildDeviceDiagnostics, routeOf, withReconnectReason } from "./device-diagnostics";
+import { buildDeviceDiagnostics, routeOf } from "./device-diagnostics";
+
+// The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
+vi.mock("@lingui/core/macro", () => {
+    return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+});
 
 describe("buildDeviceDiagnostics", () => {
     it("lists version, route, last seen, errors and the clock offset", () => {
         const text = buildDeviceDiagnostics({
-            appVersion: "Neore/1.2.3",
+            appVersion: "1.2.3",
+            clientAgent: "Mozilla/5.0 Electron",
             clockOffset: "about 12 minutes behind",
-            errors: ["Could not connect"],
+            errors: [{ kind: "service", message: "Could not connect" }],
             hostVersion: "0.4.0",
             lastSeenAt: Date.UTC(2026, 10, 3, 12, 0, 0),
             name: "build box",
@@ -15,7 +21,8 @@ describe("buildDeviceDiagnostics", () => {
             viaName: "My Mac",
         });
 
-        expect(text).toContain("App: Neore/1.2.3");
+        expect(text).toContain("App version: 1.2.3");
+        expect(text).toContain("Client: Mozilla/5.0 Electron");
         expect(text).toContain("Host version: 0.4.0");
         expect(text).toContain("Route: SSH server via a paired computer (My Mac)");
         expect(text).toContain("Last seen: 2026-11-03T12:00:00.000Z");
@@ -24,15 +31,16 @@ describe("buildDeviceDiagnostics", () => {
     });
 
     it("names each route", () => {
-        const route = (value: "relay" | "this-computer") => buildDeviceDiagnostics({ appVersion: "x", errors: [], name: "n", route: value });
+        const route = (value: "relay" | "this-computer") => buildDeviceDiagnostics({ clientAgent: "x", errors: [], name: "n", route: value });
 
         expect(route("relay")).toContain("Route: relay (another paired computer)");
         expect(route("this-computer")).toContain("Route: this computer");
     });
 
     it("says unknown where nothing is known", () => {
-        const text = buildDeviceDiagnostics({ appVersion: "x", errors: [], name: "n", route: "this-computer" });
+        const text = buildDeviceDiagnostics({ clientAgent: "x", errors: [], name: "n", route: "this-computer" });
 
+        expect(text).toContain("App version: unknown");
         expect(text).toContain("Host version: unknown");
         expect(text).toContain("Last seen: never");
         expect(text).toContain("Clock offset: unknown");
@@ -50,8 +58,8 @@ describe("buildDeviceDiagnostics", () => {
         // A caller hands over a whole device object; only the named fields may be passed on.
         const device = { ...fixture, lastSeenAt: 1, name: "box" };
         const text = buildDeviceDiagnostics({
-            appVersion: "Neore/1.0",
-            errors: ["Could not connect to the server."],
+            clientAgent: "Neore/1.0",
+            errors: [{ kind: "service", message: "Could not connect to the server." }],
             lastSeenAt: device.lastSeenAt,
             name: device.name,
             route: "this-computer",
@@ -71,12 +79,39 @@ describe("routeOf", () => {
     });
 });
 
-describe("withReconnectReason", () => {
-    it("puts the current reconnect reason after the remembered errors", () => {
-        const rows = withReconnectReason([{ message: "Older manifest failure" }], "Host went away");
+describe("an SSH server's copied report", () => {
+    const secrets = [
+        "hunter2-passphrase",
+        "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA\n-----END OPENSSH PRIVATE KEY-----",
+        "/Users/dana/.ssh/id_ed25519",
+        "SHA256:nThbg6kXUpJWGl7E1IGOCspRomTxdCARLviKw6E5SY8",
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHostKeyMaterial",
+    ];
 
-        expect(rows.map((row) => row.message)).toEqual(["Older manifest failure", "Host went away"]);
-        expect(rows.at(-1)?.message).toBe("Host went away");
-        expect(withReconnectReason([{ message: "a" }], undefined)).toEqual([{ message: "a" }]);
+    it("reduces what ssh said to a fixed phrase, whatever it contained", () => {
+        for (const secret of secrets) {
+            const text = buildDeviceDiagnostics({
+                clientAgent: "Neore/1.0",
+                errors: [{ kind: "connection", message: `Permission denied (publickey). Enter passphrase for ${secret}: password=${secret}` }],
+                name: "build box",
+                route: "ssh-via-computer",
+            });
+
+            expect(text).not.toContain(secret);
+            expect(text).not.toContain("password=");
+            expect(text).toContain("  - login refused");
+        }
+    });
+
+    it("names an unrecognised failure as a failed connection", () => {
+        const text = buildDeviceDiagnostics({
+            clientAgent: "x",
+            errors: [{ kind: "connection", message: "Banner: token=abcd1234 weird" }],
+            name: "n",
+            route: "ssh-via-computer",
+        });
+
+        expect(text).toContain("  - connection failed");
+        expect(text).not.toContain("abcd1234");
     });
 });

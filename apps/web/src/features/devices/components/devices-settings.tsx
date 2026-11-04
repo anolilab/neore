@@ -28,8 +28,8 @@ import {
     probeNativeHost,
 } from "@/lib/native/bridge";
 
-import { buildDeviceDiagnostics, routeOf, withReconnectReason } from "../lib/device-diagnostics";
-import { useDeviceErrors } from "../lib/device-errors";
+import { buildDeviceDiagnostics, routeOf } from "../lib/device-diagnostics";
+import { clearConnectionErrors, recordDeviceError, useDeviceErrors } from "../lib/device-errors";
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
 import { isDeviceOnline } from "../lib/device-relay";
 import DeviceScope from "./device-scope";
@@ -116,7 +116,7 @@ export const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ devic
     );
 };
 
-const DeviceRow: FC<{
+export const DeviceRow: FC<{
     connected?: boolean;
     device: DeviceView;
     isThisComputer: boolean;
@@ -126,14 +126,13 @@ const DeviceRow: FC<{
     viaName?: string;
 }> = ({ connected, device, isThisComputer, now, onConnectionChange, reconnect, viaName }) => {
     const { t } = useLingui();
-    const shownErrors = useDeviceErrors(device._id);
-    const errors = withReconnectReason(shownErrors, reconnect?.reason);
+    const errors = useDeviceErrors(device._id);
     const lastError = errors.at(-1);
     const copyDiagnostics = (): void => {
         const text = buildDeviceDiagnostics({
-            appVersion: navigator.userAgent,
+            clientAgent: navigator.userAgent,
             clockOffset: errors.findLast((error) => error.clockOffset !== undefined)?.clockOffset,
-            errors: errors.map((error) => error.message),
+            errors,
             lastSeenAt: device.lastSeenAt,
             name: device.name,
             route: routeOf(device.transport, isThisComputer),
@@ -159,6 +158,21 @@ const DeviceRow: FC<{
             })
             .catch(failed);
     };
+    const gaveUpReason = reconnect?.reason;
+
+    // The reason a server gave up stays on its row through "Retry" and the attempts after it, until it connects.
+    useEffect(() => {
+        if (gaveUpReason) {
+            recordDeviceError(device._id, gaveUpReason, { kind: "connection" });
+        }
+    }, [device._id, gaveUpReason]);
+
+    useEffect(() => {
+        if (connected) {
+            clearConnectionErrors(device._id);
+        }
+    }, [connected, device._id]);
+
     const crpc = useCRPC();
     const [name, setName] = useState(device.name);
     const [confirming, setConfirming] = useState(false);
@@ -181,7 +195,10 @@ const DeviceRow: FC<{
             try {
                 await action();
             } catch (error) {
-                toast.error(error instanceof Error ? error.message : t`Could not connect to the server.`);
+                const message = error instanceof Error ? error.message : t`Could not connect to the server.`;
+
+                recordDeviceError(device._id, message, { kind: "connection" });
+                toast.error(message);
             } finally {
                 onConnectionChange();
             }

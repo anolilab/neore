@@ -53,7 +53,7 @@ const rememberDeviceFailure = (id: string, error: unknown): void => {
     const isClock = data?.code === "DEVICE_CLOCK_SKEW" && typeof data.minutes === "number";
     const clock = isClock ? `about ${data.minutes} minutes ${offset}` : undefined;
 
-    recordDeviceError(id, clock ? clockSkewText(error) : error.message, clock);
+    recordDeviceError(id, clock ? clockSkewText(error) : error.message, { clockOffset: clock });
 };
 
 /** A wrong clock is the one refusal cause a person can fix, so it is said; any other failure is ignored. */
@@ -96,6 +96,8 @@ const DeviceRelay: FC = () => {
     const reportProgress = useMutation(crpc.devices.functions.reportDeviceCallProgress.mutationOptions());
 
     // The mutation functions, read at call time: the relay outlives renders.
+    // Shared by every run of the manifest effect, so a send from an earlier run is never the latest of a later one.
+    const sendGenerations = useRef(new Map<string, number>());
     const mutations = useRef({
         claim: claim.mutateAsync,
         complete: complete.mutateAsync,
@@ -190,7 +192,7 @@ const DeviceRelay: FC = () => {
 
         // Sends can overlap (the shell changes again while one is in flight). Only the newest one per device may touch the
         // remembered errors: an older send refused as stale after a newer one went through is not a failure.
-        const generations = new Map<string, number>();
+        const generations = sendGenerations.current;
         const isLatest = (id: string, generation: number): boolean => generations.get(id) === generation;
         const send = async (id: string): Promise<void> => {
             const generation = (generations.get(id) ?? 0) + 1;
@@ -219,12 +221,21 @@ const DeviceRelay: FC = () => {
             }
         };
 
-        return onNativeDeviceChanged(() => {
+        const stopListening = onNativeDeviceChanged(() => {
             // A refused manifest leaves the previous tool set in place. The reason is kept for the device's row, and a wrong clock, the one cause a person can fix, is said.
             for (const id of [deviceId, ...idsOf(hostKey)]) {
                 void send(id);
             }
         });
+
+        return () => {
+            stopListening();
+
+            // A send still in flight belongs to a run that is over: its answer must not touch the row any more.
+            for (const [id, generation] of generations) {
+                generations.set(id, generation + 1);
+            }
+        };
     }, [deviceId, hostKey, paired]);
 
     // The shell's signed "approval showing" / "running" reports, relayed as-is.

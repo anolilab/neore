@@ -5,7 +5,14 @@ const MAX_KEPT = 5;
 export interface DeviceError {
     /** The size of a clock refusal ("about 12 minutes behind"), when the error carried one. */
     clockOffset?: string;
+    /** `connection`: what ssh or the shell said about reaching a server (free text, never copied). `service`: a refusal in our own words. */
+    kind: "connection" | "service";
     message: string;
+}
+
+export interface RecordOptions {
+    clockOffset?: string;
+    kind?: DeviceError["kind"];
 }
 
 const EMPTY: DeviceError[] = [];
@@ -19,19 +26,32 @@ const emit = (): void => {
 };
 
 /** Remembers a message shown for a connection (this page load only), newest last. */
-export const recordDeviceError = (deviceId: string, message: string, clockOffset?: string): void => {
+export const recordDeviceError = (deviceId: string, message: string, options: RecordOptions = {}): void => {
     const kept = errors.get(deviceId) ?? EMPTY;
 
     if (kept.at(-1)?.message === message) {
         return;
     }
 
-    errors.set(deviceId, [...kept, { clockOffset, message }].slice(-MAX_KEPT));
+    errors.set(deviceId, [...kept, { clockOffset: options.clockOffset, kind: options.kind ?? "service", message }].slice(-MAX_KEPT));
     emit();
 };
 
 export const clearDeviceErrors = (deviceId: string): void => {
     if (errors.delete(deviceId)) {
+        emit();
+    }
+};
+
+/** A connection that is up again no longer explains anything; refusals of a tool list stay until the next one goes through. */
+export const clearConnectionErrors = (deviceId: string): void => {
+    const kept = errors.get(deviceId);
+
+    if (kept?.some((error) => error.kind === "connection")) {
+        errors.set(
+            deviceId,
+            kept.filter((error) => error.kind !== "connection"),
+        );
         emit();
     }
 };

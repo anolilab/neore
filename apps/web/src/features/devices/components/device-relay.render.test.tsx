@@ -98,6 +98,16 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 });
 
+/** A promise that stays pending until `reject` is called, so a test decides when it settles. */
+const deferred = (): { promise: Promise<unknown>; reject: (error: Error) => void } => {
+    const trigger = new EventTarget();
+    const promise = new Promise((_resolve, reject) => {
+        trigger.addEventListener("reject", (event) => reject((event as CustomEvent<Error>).detail), { once: true });
+    });
+
+    return { promise, reject: (error) => trigger.dispatchEvent(new CustomEvent("reject", { detail: error })) };
+};
+
 describe("<DeviceRelay>", () => {
     it("shows the clock-skew notice when a progress report is refused for the computer's clock", async () => {
         render(
@@ -116,34 +126,68 @@ describe("<DeviceRelay>", () => {
 
     it("keeps a stale rejection of an older overlapping send out of the row after a newer send went through", async () => {
         const stale = Object.assign(new Error("Manifest is stale or malformed"), { data: {} });
+        const older = deferred();
 
-        mutations.updateManifest.mockReset();
-        mutations.updateManifest
-            .mockImplementationOnce(
-                () =>
-                    new Promise((_resolve, reject) => {
-                        setTimeout(reject, 50, stale);
-                    }),
-            )
-            .mockImplementation(async () => null);
         clearDeviceErrors("d1");
+        mutations.updateManifest.mockReset();
+        mutations.updateManifest.mockImplementation(async () => null);
         render(
             <QueryClientProvider client={new QueryClient()}>
                 <DeviceRelay />
             </QueryClientProvider>,
         );
         await waitFor(() => expect(bridge.changedListener).toBeDefined());
+        // The listener is told once on subscribing; let that first send finish before the two that overlap.
+        await waitFor(() => expect(mutations.updateManifest).toHaveBeenCalled());
+        await act(async () => {
+            await Promise.resolve();
+        });
+        mutations.updateManifest.mockReset();
+        mutations.updateManifest.mockImplementationOnce(() => older.promise).mockImplementation(async () => null);
 
         const { result } = renderHook(() => useDeviceErrors("d1"));
 
         act(() => bridge.changedListener?.());
-        await waitFor(() => expect(mutations.updateManifest.mock.calls.length).toBeGreaterThanOrEqual(1));
+        await waitFor(() => expect(mutations.updateManifest).toHaveBeenCalledTimes(1));
         act(() => bridge.changedListener?.());
-        await waitFor(() => expect(mutations.updateManifest.mock.calls.length).toBeGreaterThanOrEqual(2));
+        await waitFor(() => expect(mutations.updateManifest).toHaveBeenCalledTimes(2));
+        // The newer send has gone through before the older one is refused.
         await act(async () => {
-            await new Promise((resolve) => {
-                setTimeout(resolve, 100);
-            });
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+        await act(async () => {
+            older.reject(stale);
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+
+        expect(result.current).toEqual([]);
+    });
+
+    it("ignores the answer of a send whose run is over", async () => {
+        const gone = Object.assign(new Error("Manifest is stale or malformed"), { data: {} });
+        const pending = deferred();
+
+        clearDeviceErrors("d1");
+        mutations.updateManifest.mockReset();
+        mutations.updateManifest.mockImplementation(() => pending.promise);
+
+        const view = render(
+            <QueryClientProvider client={new QueryClient()}>
+                <DeviceRelay />
+            </QueryClientProvider>,
+        );
+
+        await waitFor(() => expect(mutations.updateManifest).toHaveBeenCalled());
+
+        const { result } = renderHook(() => useDeviceErrors("d1"));
+
+        view.unmount();
+        await act(async () => {
+            pending.reject(gone);
+            await Promise.resolve();
+            await Promise.resolve();
         });
 
         expect(result.current).toEqual([]);
