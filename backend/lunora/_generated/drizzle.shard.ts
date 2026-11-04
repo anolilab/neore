@@ -1179,7 +1179,7 @@ export const pullRequestThreads = sqliteTable("pullRequestThreads", {
     baseBranch: text("baseBranch"),
     createdAt: real("createdAt").notNull(),
     headBranch: text("headBranch"),
-    kind: text("kind", { mode: "json" }).$type<"attached" | "opened">().notNull(),
+    kind: text("kind", { mode: "json" }).$type<"attached" | "linked" | "opened">().notNull(),
     number: real("number").notNull(),
     repository: text("repository").notNull(),
     threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),

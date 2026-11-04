@@ -115,7 +115,7 @@ describe("attaching a pull request to a thread by hand", () => {
 
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({
-            kind: "attached",
+            kind: "linked",
             number: 7,
             repository: "octo/hello",
             title: "PR 7",
@@ -172,7 +172,7 @@ describe("attaching by hand: the host read and the request limits", () => {
         expect(await attach(A, threadId, [{ number: 7, repository: "octo/hello" }])).toEqual({
             results: [{ number: 7, repository: "octo/hello", status: "attached" }],
         });
-        expect(await links()).toEqual([expect.objectContaining({ headBranch: "feature", kind: "attached", title: "Host title" })]);
+        expect(await links()).toEqual([expect.objectContaining({ headBranch: "feature", kind: "linked", title: "Host title" })]);
     });
 
     it("refuses more than ten pull requests in one call before any host read", async () => {

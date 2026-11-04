@@ -49714,6 +49714,10 @@
                             "type": "string"
                           },
                           {
+                            "const": "linked",
+                            "type": "string"
+                          },
+                          {
                             "const": "opened",
                             "type": "string"
                           }
@@ -49823,6 +49827,10 @@
                           "anyOf": [
                             {
                               "const": "attached",
+                              "type": "string"
+                            },
+                            {
+                              "const": "linked",
                               "type": "string"
                             },
                             {
@@ -49941,6 +49949,10 @@
                         "anyOf": [
                           {
                             "const": "attached",
+                            "type": "string"
+                          },
+                          {
+                            "const": "linked",
                             "type": "string"
                           },
                           {

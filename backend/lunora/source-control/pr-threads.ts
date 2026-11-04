@@ -23,6 +23,11 @@ import { GITHUB_WEB_ORIGIN, splitGithubRepo } from "./drivers/github";
 
 /** Threads kept per pull request: a list, not a history. The newest are the ones anyone is working in. */
 export const MAX_THREADS_PER_PULL_REQUEST = 50;
+/**
+ * Link rows read for one pull request. Above the live cap: links to deleted threads stay as rows, and they must not fill the
+ * read and hide a link that was just made.
+ */
+const MAX_LINKS_READ_PER_PULL_REQUEST = 200;
 
 const MAX_TITLE_CHARS = 200;
 
@@ -30,7 +35,7 @@ export const vPullRequestThread = v.object({
     baseBranch: v.optional(v.string()),
     createdAt: v.number(),
     headBranch: v.optional(v.string()),
-    kind: v.union(v.literal("attached"), v.literal("opened")),
+    kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
     number: v.number(),
     repository: v.string(),
     threadId: v.string(),
@@ -88,7 +93,7 @@ export const linksFor = async (ctx: QueryCtx | MutationCtx, userId: string, repo
     await ctx.db
         .query("pullRequestThreads")
         .withIndex("by_user_and_repository_number", (q) => q.eq("userId", userId).eq("repository", repo).eq("number", number))
-        .take(MAX_THREADS_PER_PULL_REQUEST);
+        .take(MAX_LINKS_READ_PER_PULL_REQUEST);
 
 /** The links whose thread is still there and not deleted; a link to one that is not is dead. */
 export const partitionLinks = async (

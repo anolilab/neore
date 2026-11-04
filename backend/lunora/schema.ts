@@ -2153,7 +2153,8 @@ export const schema = defineSchema({
         baseBranch: v.optional(v.string()),
         createdAt: v.number(),
         headBranch: v.optional(v.string()),
-        kind: v.union(v.literal("attached"), v.literal("opened")),
+        // `attached`: a thread started on the pull request. `linked`: an existing thread linked by hand. `opened`: a run opened it.
+        kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
         number: v.number(),
         repository: v.string(),
         threadId: v.id("threads"),

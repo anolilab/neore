@@ -100,7 +100,7 @@ export const recordAttachedPullRequests = internalMutation
                 baseBranch: link.baseBranch,
                 createdAt: ctx.now,
                 headBranch: link.headBranch,
-                kind: "attached",
+                kind: "linked",
                 number: address.number,
                 repository: address.repository,
                 threadId: thread._id,

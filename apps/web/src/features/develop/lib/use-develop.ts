@@ -144,13 +144,6 @@ export const useStartWorkOnPullRequest = () => {
     return useMutation(crpc.source_control.pr_threads.startWorkOnPullRequest.mutationOptions());
 };
 
-/** The pull request a thread was attached to or opened, for the thread's own header. */
-export const useThreadPullRequest = (threadId: string | undefined) => {
-    const crpc = useCRPC();
-
-    return useQuery(crpc.source_control.pr_threads.getForThread.queryOptions(threadId === undefined ? skipToken : { threadId }));
-};
-
 /** Every pull request a thread is linked to, for the thread's own header. Live: a link made elsewhere shows up here too. */
 export const useThreadPullRequests = (threadId: string | undefined) => {
     const crpc = useCRPC();
@@ -160,6 +153,25 @@ export const useThreadPullRequests = (threadId: string | undefined) => {
 
 /** Attaches existing pull requests to a thread by hand. The host reads each one first; a refusal is reported per pull request. */
 export const useAttachPullRequests = () => useAction(api.source_control.pr_thread_attach.attachPullRequests);
+
+interface PullRequestCounts {
+    counts: { count: number; threadId: string }[];
+    truncated: boolean;
+}
+
+// Every sidebar row reads the same query result: index it once, so a row is a lookup rather than a search of all of them.
+const indexOfCounts = new WeakMap<PullRequestCounts, Map<string, number>>();
+
+const countOf = (read: PullRequestCounts, threadId: string): number => {
+    let index = indexOfCounts.get(read);
+
+    if (index === undefined) {
+        index = new Map(read.counts.map((row) => [row.threadId, row.count]));
+        indexOfCounts.set(read, index);
+    }
+
+    return index.get(threadId) ?? 0;
+};
 
 /**
  * How many pull requests one thread is linked to, for its sidebar badge. One shared subscription for every row, and
@@ -171,12 +183,12 @@ export const useThreadPullRequestCount = (threadId: string, ready: boolean): num
         ...crpc.source_control.pr_thread_attach.countsForUser.queryOptions({}),
         enabled: ready,
         // `null` when the read hit its row cap: a thread's count may then be partial, so the sidebar shows no number.
-        select: (read: { counts: { count: number; threadId: string }[]; truncated: boolean }): number | null => {
+        select: (read: PullRequestCounts): number | null => {
             if (read.truncated) {
                 return null;
             }
 
-            return read.counts.find((row) => row.threadId === threadId)?.count ?? 0;
+            return countOf(read, threadId);
         },
     });
 

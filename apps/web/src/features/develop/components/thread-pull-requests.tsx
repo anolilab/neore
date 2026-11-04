@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Alert, AlertDescription, AlertTitle } from "@neore/ui/components/alert";
@@ -23,7 +24,8 @@ type AttachStatus =
 
 /**
  * The pull requests a thread is linked to, in the chat header: each opens the pull request in Develop, and a dialog
- * links more by hand. The list is asked for after first paint, so the header does not add to the queries that wait for it.
+ * links more by hand. Only the thread's owner sees it, and the list is asked for after first paint, so the header does
+ * not add to the queries that wait for it.
  */
 const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
     const { t } = useLingui();
@@ -37,7 +39,10 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
     const attach = useAttachPullRequests();
     const [open, setOpen] = useState(false);
     const [text, setText] = useState("");
-    const [notice, setNotice] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+    // `success` is what was linked; `failures` names each pull request that was not, with the reason.
+    const [success, setSuccess] = useState<string | null>(null);
+    const [failures, setFailures] = useState<string[]>([]);
+    const [inputProblem, setInputProblem] = useState(false);
     const [busy, setBusy] = useState(false);
 
     // Only the owner can link: the attach action refuses anyone else, so the control is not shown to them.
@@ -57,11 +62,18 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
         thread_full: t`This thread already has as many pull requests linked as it can keep.`,
     };
 
+    const reset = () => {
+        setSuccess(null);
+        setFailures([]);
+        setInputProblem(false);
+    };
+
     const submit = async () => {
         const parsed = parsePullRequestAddresses(text);
 
         if (parsed === null) {
-            setNotice({ kind: "error", text: t`Enter pull requests as owner/name#123.` });
+            reset();
+            setInputProblem(true);
 
             return;
         }
@@ -71,13 +83,15 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
         }
 
         if (parsed.length > MAX_PULL_REQUESTS_PER_ATTACH) {
-            setNotice({ kind: "error", text: t`Link at most ${MAX_PULL_REQUESTS_PER_ATTACH} pull requests at a time.` });
+            reset();
+            setInputProblem(true);
+            setFailures([t`Link at most ${MAX_PULL_REQUESTS_PER_ATTACH} pull requests at a time.`]);
 
             return;
         }
 
         setBusy(true);
-        setNotice(null);
+        reset();
 
         try {
             const outcome = await attach({ pullRequests: parsed, threadId });
@@ -85,27 +99,27 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
             const alreadyLinked = outcome.results.some((result) => result.status === "already_linked");
             const failed = outcome.results.filter((result) => result.status !== "attached" && result.status !== "already_linked");
 
-            if (failed.length > 0) {
-                // Every failure is named and the input is kept, so a retry does not mean typing the addresses again.
-                setNotice({
-                    kind: "error",
-                    text: failed.map((result) => `${result.repository}#${String(result.number)}: ${statusText[result.status]}`).join(" "),
-                });
+            // Every failure is named with its reason, and the input is kept, so a retry does not mean typing the addresses again.
+            setFailures(
+                failed.map((result) => {
+                    const address = `${result.repository}#${String(result.number)}`;
+                    const reason = statusText[result.status];
 
-                return;
-            }
+                    return t`${address}: ${reason}`;
+                }),
+            );
 
-            if (linked === 0 && alreadyLinked) {
-                setNotice({ kind: "success", text: statusText.already_linked });
+            if (linked > 0) {
+                setSuccess(plural(linked, { one: "# pull request linked.", other: "# pull requests linked." }));
             } else if (alreadyLinked) {
-                setNotice({ kind: "success", text: t`${linked} linked. ${statusText.already_linked}` });
-            } else {
-                setNotice({ kind: "success", text: t`${linked} linked.` });
+                setSuccess(statusText.already_linked);
             }
 
-            setText("");
+            if (failed.length === 0) {
+                setText("");
+            }
         } catch {
-            setNotice({ kind: "error", text: t`Could not link. Try again.` });
+            setFailures([t`Could not link. Try again.`]);
         } finally {
             setBusy(false);
         }
@@ -113,20 +127,25 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
 
     return (
         <div className="flex flex-wrap items-center gap-2">
-            {(links.data ?? []).map((link) => (
-                <Link
-                    aria-label={t`Open the pull request ${link.repository}#${link.number}`}
-                    className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs hover:underline"
-                    key={`${link.repository}#${link.number}`}
-                    search={{ number: link.number, repository: link.repository }}
-                    to="/develop"
-                >
-                    <GitPullRequestArrow aria-hidden className="size-3" />
-                    <span>
-                        {link.repository}#{link.number}
-                    </span>
-                </Link>
-            ))}
+            {(links.data ?? []).length > 0 && (
+                <ul className="flex flex-wrap items-center gap-2">
+                    {(links.data ?? []).map((link) => (
+                        <li key={`${link.repository}#${link.number}`}>
+                            <Link
+                                aria-label={t`Open the pull request ${link.repository}#${link.number}`}
+                                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs hover:underline"
+                                search={{ number: link.number, repository: link.repository }}
+                                to="/develop"
+                            >
+                                <GitPullRequestArrow aria-hidden className="size-3" />
+                                <span>
+                                    {link.repository}#{link.number}
+                                </span>
+                            </Link>
+                        </li>
+                    ))}
+                </ul>
+            )}
             <Button onClick={() => setOpen(true)} size="sm" variant="ghost">
                 {t`Link pull request`}
             </Button>
@@ -139,21 +158,33 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
                     <div className="space-y-1 px-6">
                         <Label htmlFor={`${dialogId}-input`}>{t`Pull requests`}</Label>
                         <Input
+                            aria-describedby={inputProblem ? `${dialogId}-problem` : undefined}
+                            aria-invalid={inputProblem || undefined}
                             disabled={busy}
                             id={`${dialogId}-input`}
-                            onChange={(event) => setText(event.target.value)}
+                            onChange={(event) => {
+                                setText(event.target.value);
+                                setInputProblem(false);
+                            }}
                             placeholder="owner/name#123"
                             value={text}
                         />
                     </div>
                     <div aria-live="polite" className="px-6" role="status">
-                        {notice?.kind === "success" && <p className="text-sm">{notice.text}</p>}
+                        {success !== null && <p className="text-sm">{success}</p>}
+                        {busy && <p className="text-muted-foreground text-sm">{t`Linking…`}</p>}
                     </div>
-                    {notice?.kind === "error" && (
-                        <div className="px-6">
+                    {failures.length > 0 && (
+                        <div className="px-6" id={`${dialogId}-problem`}>
                             <Alert role="alert" variant="destructive">
                                 <AlertTitle>{t`Not linked`}</AlertTitle>
-                                <AlertDescription>{notice.text}</AlertDescription>
+                                <AlertDescription>
+                                    <ul className="list-disc pl-4">
+                                        {failures.map((failure) => (
+                                            <li key={failure}>{failure}</li>
+                                        ))}
+                                    </ul>
+                                </AlertDescription>
                             </Alert>
                         </div>
                     )}

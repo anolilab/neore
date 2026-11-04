@@ -726,11 +726,11 @@ export interface ApiTypes {
         pr_thread_attach: {
             attachPullRequests: FunctionReference<"action", { pullRequests: Array<{ number: number; repository: string }>; threadId: string }, { results: Array<{ number: number; repository: string; status: "attached" | "already_linked" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" | "thread_full" }> }>;
             countsForUser: FunctionReference<"query", {}, { counts: Array<{ count: number; threadId: string }>; truncated: boolean }>;
-            listForThread: FunctionReference<"query", { threadId: string }, Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }>>;
+            listForThread: FunctionReference<"query", { threadId: string }, Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "linked" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }>>;
         };
         pr_threads: {
-            getForThread: FunctionReference<"query", { threadId: string }, { baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "opened"; number: number; repository: string; threadId: string; title: string; url: string } | null>;
-            listForPullRequest: FunctionReference<"query", { number: number; repository: string }, Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }>>;
+            getForThread: FunctionReference<"query", { threadId: string }, { baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "linked" | "opened"; number: number; repository: string; threadId: string; title: string; url: string } | null>;
+            listForPullRequest: FunctionReference<"query", { number: number; repository: string }, Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "linked" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }>>;
             startWorkOnPullRequest: FunctionReference<"mutation", { baseBranch?: string; headBranch?: string; number: number; repository: string }, { created: boolean; threadId: string }>;
         };
         review_drafts: {
