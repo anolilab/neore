@@ -4,7 +4,10 @@ import { buildDeviceDiagnostics, routeOf } from "./device-diagnostics";
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
 vi.mock("@lingui/core/macro", () => {
-    return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+    return {
+        plural: (count: number, forms: { one: string; other: string }) => (count === 1 ? forms.one : forms.other).replace("#", () => String(count)),
+        t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values),
+    };
 });
 
 describe("buildDeviceDiagnostics", () => {
@@ -88,6 +91,19 @@ describe("a name that looks like a report line", () => {
         expect(text).toContain("Last errors: none");
         expect(text).not.toMatch(FORGED_HOST_VERSION);
         expect(text).not.toMatch(BARE_LAST_ERRORS);
+    });
+});
+
+describe("the clock offset line", () => {
+    const line = (minutes: number, direction: "ahead" | "behind") =>
+        buildDeviceDiagnostics({ clientAgent: "x", clockOffset: { direction, minutes }, errors: [], name: "n", route: "this-computer" })
+            .split("\n")
+            .find((entry) => entry.startsWith("Clock offset"));
+
+    it("reads 1 minute for a single minute and minutes otherwise", () => {
+        expect(line(1, "behind")).toBe("Clock offset: about 1 minute behind");
+        expect(line(1, "ahead")).toBe("Clock offset: about 1 minute ahead");
+        expect(line(12, "behind")).toBe("Clock offset: about 12 minutes behind");
     });
 });
 

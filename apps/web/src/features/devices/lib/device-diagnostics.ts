@@ -1,4 +1,4 @@
-import { t } from "@lingui/core/macro";
+import { plural, t } from "@lingui/core/macro";
 
 import type { ClockOffset } from "./device-errors";
 
@@ -63,7 +63,9 @@ const routeText = (route: DeviceRoute): string => {
 };
 
 const clockOffsetText = ({ direction, minutes }: ClockOffset): string =>
-    direction === "ahead" ? t`about ${minutes} minutes ahead` : t`about ${minutes} minutes behind`;
+    direction === "ahead"
+        ? t`about ${plural(minutes, { one: "# minute", other: "# minutes" })} ahead`
+        : t`about ${plural(minutes, { one: "# minute", other: "# minutes" })} behind`;
 
 const MAX_ERROR_CHARS = 500;
 
