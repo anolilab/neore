@@ -119,7 +119,10 @@ export class PortsService {
             refused = !this.send(victim, "SIGTERM") || refused;
         }
 
-        for (let waited = 0; waited < this.graceMs; waited += POLL_MS) {
+        // Both the polls and the clock count: a slow process-table read spends grace time too.
+        const deadline = performance.now() + this.graceMs;
+
+        for (let waited = 0; waited < this.graceMs && performance.now() < deadline; waited += POLL_MS) {
             // eslint-disable-next-line no-await-in-loop -- each poll must wait for the previous check to finish
             const now = await this.system.processes();
             const alive = aliveOf(now, signalled);

@@ -27,7 +27,33 @@ export interface Listener {
 const LSTART = /^\w{3} \w{3} \d{1,2} \d{2}:\d{2}:\d{2} \d{4}$/u;
 const SPACES = /\s+/u;
 const DIGITS = /^\d+$/u;
-const OWNER_PID = /pid=(\d+)/gu;
+/** One owner entry of `users:((...),(...))`: the quoted process name, then its pid. The name is matched whole, so a `pid=` inside it is never read. */
+const OWNER_ENTRY = /\("(?:[^"\\]|\\.)*",pid=(\d+),fd=\d+\)(?:,|\)|$)/uy;
+const USERS = "users:(";
+
+/** The pids in the `users:` column of an `ss` row, read entry by entry from where the column starts. */
+const ssOwnerPids = (line: string): number[] => {
+    const start = line.indexOf(USERS);
+    const pids: number[] = [];
+
+    if (start === -1) {
+        return pids;
+    }
+
+    let at = start + USERS.length;
+
+    for (;;) {
+        OWNER_ENTRY.lastIndex = at;
+        const entry = OWNER_ENTRY.exec(line);
+
+        if (entry === null) {
+            return pids;
+        }
+
+        pids.push(Number(entry[1]));
+        at = OWNER_ENTRY.lastIndex;
+    }
+};
 
 const baseName = (command: string): string => {
     const slash = command.lastIndexOf("/");
@@ -112,8 +138,8 @@ export const parseSs = (output: string): Listener[] => {
             continue;
         }
 
-        for (const owner of line.matchAll(OWNER_PID)) {
-            listeners.push({ ...endpoint, pid: Number(owner[1]) });
+        for (const pid of ssOwnerPids(line)) {
+            listeners.push({ ...endpoint, pid });
         }
     }
 

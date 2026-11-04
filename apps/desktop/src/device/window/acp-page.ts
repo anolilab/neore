@@ -735,7 +735,8 @@ const refreshPorts = async (): Promise<void> => {
     } catch (error: unknown) {
         // A read that fails (a tool missing, a timeout) is said where the list is; it never stops the session from refreshing.
         if (read === portsRead.latest && state.selected === selected) {
-            $("acp-ports-list").replaceChildren(item(`Ports cannot be read: ${error instanceof Error ? error.message : String(error)}`));
+            $("acp-ports-status").textContent = `Ports cannot be read: ${error instanceof Error ? error.message : String(error)}`;
+            $("acp-ports-list").replaceChildren();
         }
 
         return;
@@ -746,6 +747,7 @@ const refreshPorts = async (): Promise<void> => {
         return;
     }
 
+    $("acp-ports-status").textContent = "";
     $("acp-ports-list").replaceChildren(
         ...ports.length === 0
             ? [item("None.")]

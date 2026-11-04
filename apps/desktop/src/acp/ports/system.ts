@@ -20,7 +20,8 @@ export const firstExisting = (paths: ReadonlyArray<string>, exists: (path: strin
 
 /**
  * Stdout of the tool. A failed run is refused even when some output arrived (a timeout, an overflow or a crash can leave a
- * partial table, and acting on it would hide processes). The one exception is `lsof` exiting 1 with no output: nothing listens.
+ * partial table, and acting on it would hide processes). The one exception is `lsof` exiting 1 on its own: a pid it was
+ * asked about is gone, and what it printed for the others is complete.
  */
 const run = async (file: string, args: string[]): Promise<string> =>
     await new Promise((resolve, reject) => {
@@ -31,8 +32,11 @@ const run = async (file: string, args: string[]): Promise<string> =>
                 return;
             }
 
-            if (stdout === "" && LSOF.includes(file) && (error as { code?: number | string }).code === 1) {
-                resolve("");
+            // lsof exits 1 when a requested pid is gone (a short-lived child) and still prints the sockets of the others.
+            const failure = error as { code?: number | string; killed?: boolean; signal?: string | null };
+
+            if (LSOF.includes(file) && failure.code === 1 && failure.killed !== true && (failure.signal ?? null) === null) {
+                resolve(stdout);
 
                 return;
             }

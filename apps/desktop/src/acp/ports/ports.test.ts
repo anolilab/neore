@@ -92,6 +92,13 @@ describe("reading the process table", () => {
         ]);
     });
 
+    it("reads owners only from the users column, never a pid= inside a process name", () => {
+        expect(parseSs("LISTEN 0 511 127.0.0.1:3000 0.0.0.0:* users:((\"pid=30,fd=1\",pid=77,fd=19))\n")).toEqual([
+            { address: "127.0.0.1", pid: 77, port: 3000 },
+        ]);
+        expect(parseSs("LISTEN 0 511 *:80 *:* users:((\"nginx\",pid=5,fd=6),(\"nginx\",pid=6,fd=6))\n").map((entry) => entry.pid)).toEqual([5, 6]);
+    });
+
     it("finds only the descendants of a process, never the process", () => {
         expect(
             descendantsOf(TABLE, 10)
@@ -293,6 +300,32 @@ describe("stopping while the process table changes", () => {
         expect(await new PortsService(system, 1).stop(10, { pid: 30, startedAt: "Mon Nov 3 10:00:00 2026" })).toBe(true);
         expect(system.signals).not.toContainEqual([31, "SIGKILL"]);
     });
+});
+
+describe("a slow process table", () => {
+    it("escalates once the grace time has passed, not after twenty slow reads", async () => {
+        const system = new FakeSystem();
+        const read = system.processes.bind(system);
+
+        system.stubborn.add(30);
+        system.processes = async () => {
+            await new Promise((resolve) => {
+                setTimeout(resolve, 60);
+            });
+
+            return await read();
+        };
+
+        const service = new PortsService(system, 1, 150);
+
+        const began = performance.now();
+
+        await service.stop(10, { pid: 30, startedAt: "Mon Nov 3 10:00:00 2026" });
+
+        // Without a deadline the 20 polls of 60 ms each would run for over a second before the kill.
+        expect(performance.now() - began).toBeLessThan(700);
+        expect(system.signals).toContainEqual([30, "SIGKILL"]);
+    }, 5000);
 });
 
 describe("a process that cannot be signalled", () => {
