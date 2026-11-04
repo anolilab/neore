@@ -75,6 +75,7 @@ const PullRequestActionsPanel = ({
     const revertInFlight = useRef(false);
     // The same for a reviewer request: the button is off only after the next render, so a second click can arrive first.
     const reviewInFlight = useRef(false);
+    const editInFlight = useRef(false);
     const canEdit = isHostCapabilityAvailable(capabilities, "pullRequest.edit");
     const canReview = isHostCapabilityAvailable(capabilities, "reviewers.request") && state === "open";
     const canRevert = isHostCapabilityAvailable(capabilities, "pullRequest.revert") && state === "merged";
@@ -130,7 +131,7 @@ const PullRequestActionsPanel = ({
             : t`Logins use letters, digits, single hyphens or underscores. A hyphen cannot start or end a login, or come twice in a row.`;
     };
 
-    const saveEdit = async () => {
+    const submitEdit = async () => {
         if (editing === null) {
             return;
         }
@@ -199,6 +200,21 @@ const PullRequestActionsPanel = ({
 
         setReviewing(null);
         setFeedback(next);
+    };
+
+    // A second Save before the first has rendered must not send a second edit over a newer change.
+    const saveEdit = async () => {
+        if (editInFlight.current) {
+            return;
+        }
+
+        editInFlight.current = true;
+
+        try {
+            await submitEdit();
+        } finally {
+            editInFlight.current = false;
+        }
     };
 
     const sendReviewers = async () => {
