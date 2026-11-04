@@ -105,6 +105,8 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const attachButtonRef = useRef<HTMLButtonElement>(null);
     // Bytes attached so far: a chip removed mid-selection gives its bytes back at once, so the next file is checked against what is left.
     const attachedBytes = useRef(0);
+    // The ids of the chips attached now: a photo the server dedupes onto one of them adds no bytes.
+    const attachedIds = useRef(new Set<string>());
     // Stops the selection in progress when the question is answered or dismissed, so no later file is uploaded or finalized.
     const uploadAbort = useRef<AbortController | null>(null);
 
@@ -185,6 +187,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
 
         // The budget counts what is uploaded, so it is checked per file after re-encoding, below.
         attachedBytes.current = files.reduce((sum, file) => sum + file.size, 0);
+        attachedIds.current = new Set(files.map((file) => file.fileId));
 
         if (accepted.length < picked.length) {
             showError(t`Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most.`);
@@ -204,6 +207,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         // named apart, since choosing it again cannot succeed.
         const failed: string[] = [];
         const tooLarge: string[] = [];
+        let attachedThisRun = 0;
 
         try {
             for (const file of accepted) {
@@ -240,13 +244,21 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                     const filename = prepared === file ? file.name : renamedFor(file.name, prepared.type);
                     const { fileId } = await finalizeUpload({ filename, uploadId });
 
-                    // Counted only once the upload is in, so a failed one does not use up the budget.
-                    attachedBytes.current += prepared.size;
+                    // Dismissed while the upload was finalizing: the answer is gone, so this file must not reach the chips.
+                    if (controller.signal.aborted) {
+                        break;
+                    }
 
-                    // The server dedupes uploads by content, so the same photo can come back with an id already attached.
-                    setFiles((current) =>
-                        current.some((item) => item.fileId === fileId) ? current : [...current, { fileId, name: filename, size: prepared.size }],
-                    );
+                    // The server dedupes uploads by content: a photo that comes back with an id already attached adds nothing.
+                    if (attachedIds.current.has(fileId)) {
+                        continue;
+                    }
+
+                    // Counted only once the upload is in, so a failed one does not use up the budget.
+                    attachedIds.current.add(fileId);
+                    attachedBytes.current += prepared.size;
+                    attachedThisRun += 1;
+                    setFiles((current) => [...current, { fileId, name: filename, size: prepared.size }]);
                 } catch {
                     // An upload cut short by a dismissal is not a failure to report.
                     if (!controller.signal.aborted) {
@@ -266,7 +278,11 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
             }
 
             if (failed.length > 0) {
-                notices.push(t`Could not attach ${failed.join(", ")}. The other files were attached; try those again.`);
+                notices.push(
+                    attachedThisRun > 0
+                        ? t`Could not attach ${failed.join(", ")}. The other files were attached; try those again.`
+                        : t`Could not attach ${failed.join(", ")}. Try those again.`,
+                );
             }
 
             const message = notices.join(" ");
@@ -378,6 +394,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                                         className="text-muted-foreground hover:text-foreground"
                                         onClick={() => {
                                             attachedBytes.current -= file.size;
+                                            attachedIds.current.delete(file.fileId);
                                             setFiles((current) => current.filter((item) => item.fileId !== file.fileId));
                                             // Focus stays in the card: the remove button goes, so the attach button takes it.
                                             attachButtonRef.current?.focus();

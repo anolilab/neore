@@ -39,13 +39,21 @@ export const answerAskUser = authMutation
         const answerFileIds = (fileIds ?? []).filter((id) => ctx.db.normalizeId("chatFiles", id) !== null);
 
         // The run resumes later without the lock's proof, so the files could not be read there: refused now, not dropped.
-        // A dismissal uses no files, so it is never refused for them.
+        // A dismissal uses no files, so it is never refused for them. An approval already answered is not a new answer:
+        // it goes to the claim below, which returns its recorded result (`alreadyResolved`).
         if (answer !== null && answerFileIds.length > 0) {
             const thread = await ctx.db.get("threads", threadId);
 
             // Only the owner learns the lock: a stranger gets the same answer as for any other thread, from the claim below.
             if (thread && thread.userId === ctx.user.userId && isThreadLocked(thread)) {
-                throw new LunoraError("FORBIDDEN", "Files cannot be attached to an answer in a locked chat.");
+                const request = await ctx.db
+                    .query("toolApprovalRuns")
+                    .withIndex("by_approvalId", (q) => q.eq("approvalId", approvalId))
+                    .first();
+
+                if (request?.status === "pending") {
+                    throw new LunoraError("FORBIDDEN", "Files cannot be attached to an answer in a locked chat.");
+                }
             }
         }
 
