@@ -216,7 +216,7 @@ export const startHostGuide = authAction
         }
 
         try {
-            return await ctx.runMutation(internal.source_control.guide_host.beginHostGuide, {
+            const begun = await ctx.runMutation(internal.source_control.guide_host.beginHostGuide, {
                 agentKey: args.agentKey,
                 deviceId: args.deviceId,
                 folderId: args.folderId,
@@ -228,6 +228,10 @@ export const startHostGuide = authAction
                 text,
                 userId,
             });
+
+            ctx.log.event("source_control.start_host_guide", { status: begun.status });
+
+            return begun;
         } catch (error) {
             const reason = unavailableReason(error);
 

@@ -126,6 +126,8 @@ export const watchRepo = authMutation
         });
         await noteShardDue(ctx, now, userId);
 
+        ctx.log.event("source_control.watch_repo", { watchedCount: held.length + 1 });
+
         return { status: "ok" as const };
     });
 
@@ -145,7 +147,11 @@ export const unwatchRepo = authMutation
             await deleteShardRoute(ctx, "watch", row._id);
         }
 
+        const hadWebhook = row.webhookSecret !== undefined;
+
         await ctx.db.delete("watchedRepositories", row._id);
+
+        ctx.log.event("source_control.unwatch_repo", { hadWebhook, removed: true });
 
         return { removed: true };
     });
@@ -175,10 +181,13 @@ export const enableWatchWebhook = authMutation
             return { status: "not_found" as const };
         }
 
+        const rotated = row.webhookSecret !== undefined;
         const secret = [...crypto.getRandomValues(new Uint8Array(32))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
         await ctx.db.patch("watchedRepositories", row._id, { webhookSecret: await encryptKey(secret, "tool-keys"), webhookSeenAt: 0 });
         await setShardRoute(ctx, "watch", row._id, ctx.user.userId);
+
+        ctx.log.event("source_control.enable_watch_webhook", { rotated });
 
         return { id: row._id, secret, status: "ok" as const };
     });
@@ -196,6 +205,8 @@ export const disableWatchWebhook = authMutation
 
         await patchRow(ctx.db, "watchedRepositories", row, { webhookSecret: undefined, webhookSeenAt: 0 });
         await deleteShardRoute(ctx, "watch", row._id);
+
+        ctx.log.event("source_control.disable_watch_webhook", { disabled: true });
 
         return { disabled: true };
     });
