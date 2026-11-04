@@ -35,7 +35,7 @@ import { initialize, loadSession, METHOD, openNewSession, promptParams, setConfi
 import { INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND, RpcError } from "./rpc-error";
 import type { TerminalExitStatus, TerminalHost } from "./terminals";
 import { createRequestOf, MAX_SESSION_TERMINALS, SessionTerminals } from "./terminals";
-import { outputTail, terminalIdOf, toolTextOf } from "./tool-output";
+import { cutTerminal, outputTail, terminalIdOf, toolTextOf } from "./tool-output";
 import { Turn } from "./turn";
 import type { SessionSnapshot, SessionStatus, SessionSummary, StopReason, ToolState, ToolStatus } from "./types";
 
@@ -872,7 +872,9 @@ export class AgentSession {
             const terminalId = this.toolTerminal.get(tool.id);
             // A call that ran in a terminal shows what the terminal printed and how it ended, once it has.
             const ended = terminalId === undefined ? undefined : this.terminals?.result(terminalId);
-            const printed = ended?.output ?? this.toolOutput.get(tool.id);
+            // A terminal that printed nothing (or was released before its output was read) keeps what the call's own content showed.
+            const fromTerminal = ended === undefined || ended.output === "" ? undefined : cutTerminal(ended, this.options.process.secretLength);
+            const printed = fromTerminal ?? this.toolOutput.get(tool.id);
             const output = printed === undefined ? undefined : outputTail(printed, scrub);
             const exit = ended === undefined ? undefined : exitReport(ended.exit);
 
@@ -882,7 +884,7 @@ export class AgentSession {
                     kind: scrub(tool.kind),
                     status: tool.status,
                     title: tool.title,
-                    ...output !== undefined && output !== "" && { output },
+                    ...output !== undefined && { output },
                     ...exit !== undefined && { exit },
                 }),
             );
@@ -1114,9 +1116,10 @@ export class AgentSession {
 
         // The content is the call's whole content each time: an update that carries it replaces what was printed, one
         // without it leaves it.
-        const printed = toolTextOf(update.content);
+        const printed = toolTextOf(update.content, this.options.process.secretLength);
 
-        if (printed !== undefined) {
+        // An empty text counts only where it clears output the call showed before.
+        if (printed !== undefined && (printed !== "" || (this.toolOutput.get(id) ?? "") !== "")) {
             this.toolOutput.set(id, printed);
         }
 
@@ -1286,7 +1289,7 @@ export class AgentSession {
         }
 
         try {
-            return await terminals.create({
+            const terminalId = await terminals.create({
                 agentKey: this.options.agentKey,
                 env,
                 folder: this.options.folder,
@@ -1294,6 +1297,15 @@ export class AgentSession {
                 ...cwd !== undefined && { cwd },
                 ...outputByteLimit !== undefined && { outputByteLimit },
             });
+
+            // The turn was cancelled while the command was starting: killAll missed it, so it ends here.
+            if (this.cancelRequested) {
+                terminals.release(terminalId);
+
+                throw new Error("the turn was cancelled");
+            }
+
+            return terminalId;
         } catch (error) {
             // The core's refusal names no value the agent did not send; it is still masked like the rest.
             throw new RpcError(INTERNAL_ERROR, this.options.process.scrub(error instanceof Error ? error.message : "the terminal could not start"));

@@ -63,9 +63,18 @@ export const HostPlan: FC<{ entries: HostPlanEntry[] }> = memo(({ entries }) => 
         return status === "in_progress" ? t`In progress` : t`To do`;
     };
 
+    const total = entries.length;
+    const done = entries.filter((entry) => entry.status === "completed").length;
+    const current = entries.find((entry) => entry.status === "in_progress");
+
     return (
         <section aria-label={t`The agent's plan`} className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/50">
             <h3 className="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">{t`Plan`}</h3>
+            {/* Only the progress is spoken, so a change is announced without reading the whole list again. */}
+            <span className="sr-only" role="status">
+                {t`${done} of ${total} tasks done`}
+                {current === undefined ? "" : `. ${t`In progress`}: ${current.content}`}
+            </span>
             {/* A styled list loses its list semantics in some browsers, so the role is said out loud. */}
             {/* eslint-disable-next-line jsx-a11y/no-redundant-roles */}
             <ul className="flex flex-col gap-1.5" role="list">

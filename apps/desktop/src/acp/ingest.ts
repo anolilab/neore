@@ -360,6 +360,11 @@ export class HostPoster implements SessionObserver {
         const key = `${turnId}\u{0}${id}`;
         const signature = JSON.stringify(printed);
 
+        // An empty output with nothing posted before it and no exit has nothing to clear.
+        if (printed.output === "" && !this.postedOutput.has(key) && tool.exit === undefined) {
+            return;
+        }
+
         if (this.postedOutput.get(key) !== signature) {
             this.postedOutput.set(key, signature);
             channel.enqueue(printed);

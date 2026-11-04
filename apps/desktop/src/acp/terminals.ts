@@ -166,7 +166,7 @@ export const createRequestOf = (params: Record<string, unknown>): { cwd?: string
 
 interface OpenTerminal {
     /** Set once the command ended: what it printed (raw) and how it ended, for the tool row that shows it. */
-    ended?: { exit: TerminalExitStatus; output: string };
+    ended?: { exit: TerminalExitStatus; output: string; truncated: boolean };
     handle: number;
     released: boolean;
 }
@@ -174,6 +174,11 @@ interface OpenTerminal {
 /** One session's terminals. Ids are minted here, never the core's handles, so an agent can name only its own. */
 export class SessionTerminals {
     private readonly open = new Map<string, OpenTerminal>();
+
+    /** Starts asked of the core and not answered yet: they hold a slot, and the session ending must catch them. */
+    private starting = 0;
+
+    private closed = false;
 
     public constructor(
         private readonly host: TerminalHost,
@@ -183,7 +188,7 @@ export class SessionTerminals {
 
     /** Terminals made and not yet released. */
     public get live(): number {
-        let count = 0;
+        let count = this.starting;
 
         for (const terminal of this.open.values()) {
             if (!terminal.released) {
@@ -200,7 +205,32 @@ export class SessionTerminals {
             throw new Error(`at most ${String(MAX_SESSION_TERMINALS)} terminals at once; release one first`);
         }
 
-        const handle = await this.host.start(request);
+        if (this.closed) {
+            throw new Error("the session ended");
+        }
+
+        // The slot is held while the core starts the command, so concurrent creates cannot pass the limit together.
+        this.starting += 1;
+
+        let handle: number;
+
+        try {
+            handle = await this.host.start(request);
+        } finally {
+            this.starting -= 1;
+        }
+
+        if (this.closed) {
+            // The session (or the turn) ended while the command was starting: nothing may be left running.
+            try {
+                this.host.release(handle);
+            } catch {
+                // The core forgot it already.
+            }
+
+            throw new Error("the session ended");
+        }
+
         const terminalId = `term_${randomUUID()}`;
         const terminal: OpenTerminal = { handle, released: false };
 
@@ -267,6 +297,8 @@ export class SessionTerminals {
 
     /** The session ended: every terminal is killed and freed. */
     public releaseAll(): void {
+        this.closed = true;
+
         for (const terminal of this.open.values()) {
             if (terminal.released) {
                 continue;
@@ -308,9 +340,10 @@ export class SessionTerminals {
         try {
             const exit = await this.host.wait(terminal.handle);
             let output = "";
+            let truncated = false;
 
             try {
-                output = this.host.output(terminal.handle).output;
+                ({ output, truncated } = this.host.output(terminal.handle));
             } catch {
                 // Released in the meantime: the row shows how it ended without what it printed.
             }
@@ -318,7 +351,7 @@ export class SessionTerminals {
             const current = this.open.get(terminalId);
 
             if (current !== undefined) {
-                current.ended = { exit, output };
+                current.ended = { exit, output, truncated };
                 this.ended(terminalId);
                 this.prune();
             }

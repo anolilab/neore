@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { createRequestOf, shellQuote, shownLine, terminalLine } from "./terminals";
+import { createRequestOf, SessionTerminals, shellQuote, shownLine, terminalLine } from "./terminals";
 
 describe(shellQuote, () => {
     it("leaves a plain word bare and quotes anything the shell would read differently", () => {
@@ -51,5 +51,53 @@ describe(createRequestOf, () => {
 
     it("ignores an output limit that is not a positive whole number", () => {
         expect(createRequestOf({ command: "ls", outputByteLimit: -1 })).not.toHaveProperty("outputByteLimit");
+    });
+});
+
+const AT_MOST = /at most/;
+const ENDED = /ended/;
+
+describe(SessionTerminals, () => {
+    const deferredHost = () => {
+        const resolvers: ((handle: number) => void)[] = [];
+        const release = vi.fn();
+        const host = {
+            kill: vi.fn(),
+            output: vi.fn(),
+            release,
+            start: vi.fn(async () => await new Promise<number>((resolve) => { resolvers.push(resolve); })),
+            wait: vi.fn(async () => await new Promise<never>(() => {})),
+        };
+
+        return { host, release, resolvers };
+    };
+    const request = { agentKey: "a", env: [], folder: "/w", line: "ls" } as never;
+
+    it("holds a slot while a command is starting", async () => {
+        const { host, resolvers } = deferredHost();
+        const terminals = new SessionTerminals(host as never, () => {});
+        const starts = Array.from({ length: 4 }, () => terminals.create(request));
+
+        await expect(terminals.create(request)).rejects.toThrow(AT_MOST);
+
+        for (const [index, resolve] of resolvers.entries()) {
+            resolve(index);
+        }
+
+        await Promise.all(starts);
+        expect(terminals.live).toBe(4);
+    });
+
+    it("frees a command that finished starting after the session ended", async () => {
+        const { host, release, resolvers } = deferredHost();
+        const terminals = new SessionTerminals(host as never, () => {});
+        const start = terminals.create(request);
+
+        terminals.releaseAll();
+        resolvers[0]?.(7);
+
+        await expect(start).rejects.toThrow(ENDED);
+        expect(release).toHaveBeenCalledWith(7);
+        expect(terminals.live).toBe(0);
     });
 });

@@ -45,3 +45,14 @@ describe(outputTail, () => {
         expect(tail).not.toContain("secret");
     });
 });
+
+describe("cutting at the edge", () => {
+    it("drops what a cut could have left of a masked value", async () => {
+        const { cutEdge, cutTerminal } = await import("./tool-output");
+
+        expect(cutEdge("abcdefgh", 5, 4)).toBe("gh");
+        expect(cutEdge("abc", 5, 4)).toBe("abc");
+        expect(cutTerminal({ output: "xyzabc", truncated: true }, 3)).toBe("zabc");
+        expect(cutTerminal({ output: "xyzabc", truncated: false }, 3)).toBe("xyzabc");
+    });
+});
