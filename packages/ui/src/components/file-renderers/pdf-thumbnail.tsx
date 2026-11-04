@@ -49,11 +49,13 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
     }, [loading, progress]);
 
     const name = filename ? t`Open ${filename}` : t`Open PDF`;
+    const pagesLabel = pages > 0 ? t`${name}, ${plural(pages, { one: "# page", other: "# pages" })}` : name;
+    const label = unavailable ? t`${name}, preview unavailable` : pagesLabel;
 
     return (
         <button
             aria-busy={loading}
-            aria-label={pages > 0 ? t`${name}, ${plural(pages, { one: "# page", other: "# pages" })}` : name}
+            aria-label={label}
             className={cn("bg-muted/40 hover:bg-muted/70 flex w-fit max-w-full flex-col items-center gap-2 rounded-lg border p-2 text-left", className)}
             onClick={onOpen}
             type="button"

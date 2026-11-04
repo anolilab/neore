@@ -84,16 +84,19 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
                     <button aria-label={t`Download PDF`} className={ICON_LINK} onClick={download} type="button">
                         <Download aria-hidden="true" className="size-4" />
                     </button>
-                    <a aria-label={t`Open PDF in a new tab to print`} className={ICON_LINK} href={file.url} rel="noopener noreferrer" target="_blank">
-                        <ExternalLink aria-hidden="true" className="size-4" />
-                    </a>
+                    {/* Offered only for a URL the page may fetch: the link would send the reader to it. */}
+                    {isFetchableUrl(file.url, PANEL_ORIGINS) && (
+                        <a aria-label={t`Open PDF in a new tab to print`} className={ICON_LINK} href={file.url} rel="noopener noreferrer" target="_blank">
+                            <ExternalLink aria-hidden="true" className="size-4" />
+                        </a>
+                    )}
                     <button aria-label={t`Close`} className={ICON_LINK} onClick={closeCanvas} type="button">
                         <X aria-hidden="true" className="size-4" />
                     </button>
                 </div>
             </div>
             <div className="flex min-h-0 flex-1 flex-col p-2">
-                <Suspense fallback={<span className="text-muted-foreground text-sm">{t`Loading preview…`}</span>}>
+                <Suspense fallback={<span className="text-muted-foreground text-sm" role="status">{t`Loading preview…`}</span>}>
                     {/* A new file is a new viewer: the page and zoom of the last one do not carry over. */}
                     <FetchableOriginsProvider origins={PANEL_ORIGINS}>
                         <PdfViewer
