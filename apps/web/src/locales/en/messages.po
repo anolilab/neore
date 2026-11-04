@@ -2072,7 +2072,7 @@ msgstr "Add an alert above to be notified when your usage crosses a threshold."
 msgid "Add an extra layer of security to your account by enabling two-factor authentication."
 msgstr "Add an extra layer of security to your account by enabling two-factor authentication."
 
-#: src/features/onboarding/components/setup-checklist.tsx:69
+#: src/features/onboarding/components/setup-checklist.tsx:70
 msgid "Add an SSH server"
 msgstr "Add an SSH server"
 
@@ -5671,7 +5671,7 @@ msgstr "Checked integrations are offered for setup after you save. Nothing conne
 msgid "Checked: {0}"
 msgstr "Checked: {0}"
 
-#: src/features/onboarding/components/setup-checklist.tsx:73
+#: src/features/onboarding/components/setup-checklist.tsx:74
 msgid "Checking"
 msgstr "Checking"
 
@@ -6306,11 +6306,11 @@ msgstr "Coding agent runs"
 msgid "Coding agents you can start on {0}"
 msgstr "Coding agents you can start on {0}"
 
-#: src/features/onboarding/components/setup-checklist.tsx:80
+#: src/features/onboarding/components/setup-checklist.tsx:77
 msgid "Coding setup"
 msgstr "Coding setup"
 
-#: src/features/onboarding/components/setup-checklist.tsx:82
+#: src/features/onboarding/components/setup-checklist.tsx:79
 msgid "Coding setup steps"
 msgstr "Coding setup steps"
 
@@ -7754,7 +7754,7 @@ msgstr "Could not change the model. Please try again."
 msgid "Could not change where this device is offered."
 msgstr "Could not change where this device is offered."
 
-#: src/features/onboarding/components/setup-checklist.tsx:76
+#: src/features/onboarding/components/setup-checklist.tsx:74
 msgid "Could not check"
 msgstr "Could not check"
 
@@ -7973,7 +7973,7 @@ msgstr "Could not resume its own session, so the conversation was handed over"
 msgid "Could not retry. Please try again."
 msgstr "Could not retry. Please try again."
 
-#: src/features/onboarding/components/setup-checklist.tsx:38
+#: src/features/onboarding/components/setup-checklist.tsx:49
 msgid "Could not save that choice. Try again."
 msgstr "Could not save that choice. Try again."
 
@@ -9705,7 +9705,7 @@ msgstr "Developers who need strong coding and general-purpose capabilities from 
 msgid "Development"
 msgstr "Development"
 
-#: src/features/devices/components/devices-settings.tsx:519
+#: src/features/devices/components/devices-settings.tsx:534
 msgid "Device activity"
 msgstr "Device activity"
 
@@ -10009,7 +10009,7 @@ msgstr "Don't have an account?"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:104
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
 #: src/features/devices/components/devices-settings.tsx:256
-#: src/features/onboarding/components/setup-checklist.tsx:72
+#: src/features/onboarding/components/setup-checklist.tsx:73
 #: src/features/skills/components/bundle-import-dialog.tsx:248
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
@@ -14557,7 +14557,8 @@ msgstr "Go to message: {snippet}"
 msgid "Go to next page"
 msgstr "Go to next page"
 
-#: src/features/onboarding/components/setup-checklist.tsx:62
+#: src/features/devices/components/devices-settings.tsx:527
+#: src/features/onboarding/components/setup-checklist.tsx:63
 msgid "Go to pairing"
 msgstr "Go to pairing"
 
@@ -14569,7 +14570,7 @@ msgstr "Go to previous page"
 msgid "Go to Prompts"
 msgstr "Go to Prompts"
 
-#: src/features/onboarding/components/setup-checklist.tsx:67
+#: src/features/onboarding/components/setup-checklist.tsx:68
 msgid "Go to servers"
 msgstr "Go to servers"
 
@@ -16268,11 +16269,11 @@ msgstr "install"
 msgid "Install"
 msgstr "Install"
 
-#: src/features/onboarding/components/setup-checklist.tsx:59
+#: src/features/onboarding/components/setup-checklist.tsx:60
 msgid "Install a coding agent"
 msgstr "Install a coding agent"
 
-#: src/features/onboarding/components/setup-checklist.tsx:58
+#: src/features/onboarding/components/setup-checklist.tsx:59
 msgid "Install a coding agent in the Neore desktop app and approve it for a folder on a paired computer. The install happens in the desktop window, not here."
 msgstr "Install a coding agent in the Neore desktop app and approve it for a folder on a paired computer. The install happens in the desktop window, not here."
 
@@ -17408,7 +17409,7 @@ msgstr "Let the agent use files, a terminal and local MCP servers on your own co
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 
-#: src/features/onboarding/components/setup-checklist.tsx:68
+#: src/features/onboarding/components/setup-checklist.tsx:69
 msgid "Let the agent work on a server you reach over SSH. Needs a paired computer."
 msgstr "Let the agent work on a server you reach over SSH. Needs a paired computer."
 
@@ -22613,11 +22614,15 @@ msgstr "Paint over the areas you want to edit. White regions will be regenerated
 msgid "Pair one in Settings"
 msgstr "Pair one in Settings"
 
-#: src/features/onboarding/components/setup-checklist.tsx:64
+#: src/features/onboarding/components/setup-checklist.tsx:65
 msgid "Pair this computer"
 msgstr "Pair this computer"
 
-#: src/features/onboarding/components/setup-checklist.tsx:63
+#: src/features/devices/components/devices-settings.tsx:525
+msgid "Pair this computer in the Neore desktop app first. The form to add a server appears here as soon as it is paired."
+msgstr "Pair this computer in the Neore desktop app first. The form to add a server appears here as soon as it is paired."
+
+#: src/features/onboarding/components/setup-checklist.tsx:64
 msgid "Pair this computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer."
 msgstr "Pair this computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer."
 
@@ -24647,7 +24652,7 @@ msgstr "Read Only"
 msgid "Read the docs"
 msgstr "Read the docs"
 
-#: src/features/onboarding/components/setup-checklist.tsx:57
+#: src/features/onboarding/components/setup-checklist.tsx:58
 msgid "Read the guide"
 msgstr "Read the guide"
 
@@ -25879,7 +25884,7 @@ msgstr "Result"
 msgid "Result not delivered"
 msgstr "Result not delivered"
 
-#: src/features/onboarding/components/setup-checklist.tsx:106
+#: src/features/onboarding/components/setup-checklist.tsx:108
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Resume"
 msgstr "Resume"
@@ -27489,7 +27494,12 @@ msgstr "Serverless Postgres database with branching"
 msgid "servers"
 msgstr "servers"
 
+#: src/features/devices/components/devices-settings.tsx:520
+msgid "Servers are added from a computer that is paired with your account, because your own SSH client and keys do the connecting."
+msgstr "Servers are added from a computer that is paired with your account, because your own SSH client and keys do the connecting."
+
 #: src/features/devices/components/devices-settings.tsx:511
+#: src/features/devices/components/devices-settings.tsx:521
 msgid "Servers over SSH"
 msgstr "Servers over SSH"
 
@@ -28174,7 +28184,7 @@ msgid "Skills views"
 msgstr "Skills views"
 
 #: src/features/onboarding/components/onboarding-dialog.tsx:405
-#: src/features/onboarding/components/setup-checklist.tsx:106
+#: src/features/onboarding/components/setup-checklist.tsx:108
 msgid "Skip"
 msgstr "Skip"
 
@@ -28196,7 +28206,7 @@ msgstr "Skip tour"
 
 #: src/features/develop/components/checks-tab.tsx:80
 #: src/features/evals/components/run-detail.tsx:36
-#: src/features/onboarding/components/setup-checklist.tsx:72
+#: src/features/onboarding/components/setup-checklist.tsx:73
 #: src/features/settings/components/chat/trigger-settings.tsx:176
 msgid "Skipped"
 msgstr "Skipped"
@@ -31896,7 +31906,7 @@ msgstr "Threads keep your full history. Branch ideas, pin important chats, and p
 msgid "Threads working on this {requestNoun}"
 msgstr "Threads working on this {requestNoun}"
 
-#: src/features/onboarding/components/setup-checklist.tsx:80
+#: src/features/onboarding/components/setup-checklist.tsx:77
 msgid "Three steps to use coding agents on your own machines. Skip any of them and come back later."
 msgstr "Three steps to use coding agents on your own machines. Skip any of them and come back later."
 
@@ -31980,7 +31990,7 @@ msgstr "To"
 msgid "to {0}"
 msgstr "to {0}"
 
-#: src/features/onboarding/components/setup-checklist.tsx:72
+#: src/features/onboarding/components/setup-checklist.tsx:73
 #: src/features/tasks/components/task-status.tsx:21
 msgid "To do"
 msgstr "To do"
@@ -34707,7 +34717,7 @@ msgstr "What should the AI call you?"
 msgid "What should the guide pay attention to?"
 msgstr "What should the guide pay attention to?"
 
-#: src/features/devices/components/devices-settings.tsx:519
+#: src/features/devices/components/devices-settings.tsx:534
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "What the agent asked your devices to do in the last 30 days."
 

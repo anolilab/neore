@@ -46,7 +46,12 @@ vi.mock("@/lib/lunora/crpc", () => {
                     functions: {
                         getUserSettings: {
                             queryOptions: () => {
-                                return { queryFn: async () => ({ setupStepsSkipped: server.skipped }), queryKey: ["getUserSettings"] };
+                                return {
+                                    queryFn: async () => {
+                                        return { setupStepsSkipped: server.skipped };
+                                    },
+                                    queryKey: ["getUserSettings"],
+                                };
                             },
                         },
                     },
@@ -84,6 +89,16 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 });
 
+const SKIP_ADD_AN_SSH_SERVER = /Skip.*Add an SSH server/;
+const RESUME_ADD_AN_SSH_SERVER = /Resume.*Add an SSH server/;
+const SKIP_INSTALL_A_CODING_AGENT = /Skip.*Install a coding agent/;
+const SKIP = /Skip/;
+const GO_TO_PAIRING = /Go to pairing/;
+const GO_TO_SERVERS = /Go to servers/;
+const READ_THE_GUIDE = /Read the guide/;
+const RESUME_INSTALL_A_CODING_AGENT = /Resume.*Install a coding agent/;
+const RESUME = /Resume/;
+
 const renderChecklist = () =>
     render(
         <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -104,12 +119,12 @@ describe("<SetupChecklist>", () => {
         renderChecklist();
 
         expect(await screen.findAllByText("(To do)")).toHaveLength(3);
-        fireEvent.click(screen.getByRole("button", { name: /Skip.*Add an SSH server/ }));
+        fireEvent.click(screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }));
 
         expect(await screen.findByText("(Skipped)")).toBeTruthy();
         expect(mutate).toHaveBeenCalledWith({ skipped: true, stepId: "ssh" });
 
-        fireEvent.click(screen.getByRole("button", { name: /Resume.*Add an SSH server/ }));
+        fireEvent.click(screen.getByRole("button", { name: RESUME_ADD_AN_SSH_SERVER }));
         await waitFor(() => expect(screen.getAllByText("(To do)")).toHaveLength(3));
         expect(mutate).toHaveBeenLastCalledWith({ skipped: false, stepId: "ssh" });
     });
@@ -117,8 +132,8 @@ describe("<SetupChecklist>", () => {
     it("keeps an earlier skip when a second step is skipped right after", async () => {
         renderChecklist();
         await screen.findAllByText("(To do)");
-        fireEvent.click(screen.getByRole("button", { name: /Skip.*Add an SSH server/ }));
-        fireEvent.click(screen.getByRole("button", { name: /Skip.*Install a coding agent/ }));
+        fireEvent.click(screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }));
+        fireEvent.click(screen.getByRole("button", { name: SKIP_INSTALL_A_CODING_AGENT }));
 
         await waitFor(() => expect(screen.getAllByText("(Skipped)")).toHaveLength(2));
         expect(mutate).toHaveBeenCalledTimes(2);
@@ -128,7 +143,7 @@ describe("<SetupChecklist>", () => {
         server.fail = true;
         renderChecklist();
         await screen.findAllByText("(To do)");
-        fireEvent.click(screen.getByRole("button", { name: /Skip.*Add an SSH server/ }));
+        fireEvent.click(screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }));
 
         await waitFor(() => expect(sonnerMock.toast).toHaveBeenCalledTimes(1));
         await waitFor(() => expect(screen.getAllByText("(To do)")).toHaveLength(3));
@@ -138,7 +153,7 @@ describe("<SetupChecklist>", () => {
         renderChecklist();
 
         expect(screen.getAllByText("(Checking)")).toHaveLength(3);
-        expect(screen.queryByRole("button", { name: /Skip/ })).toBeNull();
+        expect(screen.queryByRole("button", { name: SKIP })).toBeNull();
         expect(await screen.findAllByText("(To do)")).toHaveLength(3);
     });
 
@@ -146,21 +161,21 @@ describe("<SetupChecklist>", () => {
         renderChecklist();
         await screen.findAllByText("(To do)");
 
-        expect(screen.getByRole("link", { name: /Go to pairing/ }).getAttribute("href")).toBe("#devices-pairing");
-        expect(screen.getByRole("link", { name: /Go to servers/ }).getAttribute("href")).toBe("#devices-ssh");
-        expect(screen.getByRole("link", { name: /Read the guide/ }).getAttribute("href")).toBe("/docs/devices");
+        expect(screen.getByRole("link", { name: GO_TO_PAIRING }).getAttribute("href")).toBe("#devices-pairing");
+        expect(screen.getByRole("link", { name: GO_TO_SERVERS }).getAttribute("href")).toBe("#devices-ssh");
+        expect(screen.getByRole("link", { name: READ_THE_GUIDE }).getAttribute("href")).toBe("/docs/devices");
     });
 
     it("offers resume for a skipped step and drops it once its state appears", async () => {
         server.skipped = ["agent"];
         const { unmount } = renderChecklist();
 
-        expect(await screen.findByRole("button", { name: /Resume.*Install a coding agent/ })).toBeTruthy();
+        expect(await screen.findByRole("button", { name: RESUME_INSTALL_A_CODING_AGENT })).toBeTruthy();
         unmount();
 
         devices.current = [{ acpOffers: [{}] }];
         renderChecklist();
-        expect((await screen.findAllByText("(Done)")).length).toBe(2);
-        expect(screen.queryByRole("button", { name: /Resume/ })).toBeNull();
+        expect(await screen.findAllByText("(Done)")).toHaveLength(2);
+        expect(screen.queryByRole("button", { name: RESUME })).toBeNull();
     });
 });

@@ -446,75 +446,90 @@ const DevicesSettings: FC = () => {
         <div className="space-y-6">
             <SetupChecklist />
             <div id="devices-pairing">
-            <SettingsCard
-                description={t`Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks.`}
-                title={t`Devices`}
-            >
-                <CardContent className="space-y-4">
-                    {native === undefined && (
-                        <p className="text-muted-foreground text-sm">{t`Open Neore in the desktop app to pair this computer. Devices you paired before are listed below.`}</p>
-                    )}
-                    {native !== undefined && pairedHere === undefined && (
-                        <div className="flex flex-wrap items-center gap-3">
-                            <p className="text-sm">
-                                {native.deviceId ? t`This computer is paired with another account.` : t`This computer is not paired yet.`}
-                            </p>
-                            <Button
-                                aria-busy={pairing}
-                                disabled={pairing || session?.user?.isAnonymous === true}
-                                onClick={() => {
-                                    // `pairThisComputer` reports its own failures.
-                                    pairThisComputer().catch(() => {});
-                                }}
-                            >
-                                {t`Use this computer for agent tools`}
-                            </Button>
-                        </div>
-                    )}
-                    {pairedHere !== undefined && (
-                        <div className="flex flex-wrap items-center gap-3">
-                            <p className="text-sm">{t`This computer is paired as “${pairedHere.name}”.`}</p>
-                            <Button
-                                onClick={() => {
-                                    openNativeDeviceSettings().catch(() => {});
-                                }}
-                                variant="outline"
-                            >
-                                {t`Shared folders and local servers…`}
-                            </Button>
-                        </div>
-                    )}
-                    {devices && devices.length > 0 ? (
-                        <ul aria-label={t`Paired devices`}>
-                            {devices.map((device) => (
-                                <DeviceRow
-                                    connected={native?.hosts?.find((host) => host.deviceId === device._id)?.connected}
-                                    device={device}
-                                    isThisComputer={device._id === native?.deviceId}
-                                    key={device._id}
-                                    now={now}
-                                    onConnectionChange={refreshNative}
-                                    reconnect={native?.hosts?.find((host) => host.deviceId === device._id)?.reconnect}
-                                />
-                            ))}
-                        </ul>
-                    ) : (
-                        <p className="text-muted-foreground text-sm">{t`No devices paired.`}</p>
-                    )}
-                </CardContent>
-            </SettingsCard>
-            </div>
-            <div id="devices-ssh">
-            {pairedHere !== undefined && native?.deviceId && (
                 <SettingsCard
-                    description={t`Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours.`}
-                    title={t`Servers over SSH`}
+                    description={t`Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks.`}
+                    title={t`Devices`}
                 >
-                    <CardContent>
-                        <AddServer desktopId={native.deviceId} onAdded={refreshNative} />
+                    <CardContent className="space-y-4">
+                        {native === undefined && (
+                            <p className="text-muted-foreground text-sm">{t`Open Neore in the desktop app to pair this computer. Devices you paired before are listed below.`}</p>
+                        )}
+                        {native !== undefined && pairedHere === undefined && (
+                            <div className="flex flex-wrap items-center gap-3">
+                                <p className="text-sm">
+                                    {native.deviceId ? t`This computer is paired with another account.` : t`This computer is not paired yet.`}
+                                </p>
+                                <Button
+                                    aria-busy={pairing}
+                                    disabled={pairing || session?.user?.isAnonymous === true}
+                                    onClick={() => {
+                                        // `pairThisComputer` reports its own failures.
+                                        pairThisComputer().catch(() => {});
+                                    }}
+                                >
+                                    {t`Use this computer for agent tools`}
+                                </Button>
+                            </div>
+                        )}
+                        {pairedHere !== undefined && (
+                            <div className="flex flex-wrap items-center gap-3">
+                                <p className="text-sm">{t`This computer is paired as “${pairedHere.name}”.`}</p>
+                                <Button
+                                    onClick={() => {
+                                        openNativeDeviceSettings().catch(() => {});
+                                    }}
+                                    variant="outline"
+                                >
+                                    {t`Shared folders and local servers…`}
+                                </Button>
+                            </div>
+                        )}
+                        {devices && devices.length > 0 ? (
+                            <ul aria-label={t`Paired devices`}>
+                                {devices.map((device) => (
+                                    <DeviceRow
+                                        connected={native?.hosts?.find((host) => host.deviceId === device._id)?.connected}
+                                        device={device}
+                                        isThisComputer={device._id === native?.deviceId}
+                                        key={device._id}
+                                        now={now}
+                                        onConnectionChange={refreshNative}
+                                        reconnect={native?.hosts?.find((host) => host.deviceId === device._id)?.reconnect}
+                                    />
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-muted-foreground text-sm">{t`No devices paired.`}</p>
+                        )}
                     </CardContent>
                 </SettingsCard>
-            )}
+            </div>
+            <div id="devices-ssh">
+                {pairedHere !== undefined && native?.deviceId && (
+                    <SettingsCard
+                        description={t`Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours.`}
+                        title={t`Servers over SSH`}
+                    >
+                        <CardContent>
+                            <AddServer desktopId={native.deviceId} onAdded={refreshNative} />
+                        </CardContent>
+                    </SettingsCard>
+                )}
+                {(pairedHere === undefined || !native?.deviceId) && (
+                    <SettingsCard
+                        description={t`Servers are added from a computer that is paired with your account, because your own SSH client and keys do the connecting.`}
+                        title={t`Servers over SSH`}
+                    >
+                        <CardContent>
+                            <p className="text-muted-foreground text-sm">
+                                {t`Pair this computer in the Neore desktop app first. The form to add a server appears here as soon as it is paired.`}{" "}
+                                <a className="underline" href="#devices-pairing">
+                                    {t`Go to pairing`}
+                                </a>
+                            </p>
+                        </CardContent>
+                    </SettingsCard>
+                )}
             </div>
             <SettingsCard description={t`What the agent asked your devices to do in the last 30 days.`} title={t`Device activity`}>
                 <CardContent>

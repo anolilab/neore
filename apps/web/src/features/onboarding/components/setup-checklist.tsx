@@ -31,21 +31,22 @@ const SetupChecklist: FC = () => {
     const devicesQuery = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
     const settingsQuery = useUserSettings();
     const settingsKey = crpc.auth.functions.getUserSettings.queryOptions({}).queryKey;
-    // One step per call: the server applies it to the list it holds, so another tab's skip is never overwritten.
+    // One step per call: the server applies it to the list it holds, so another tab's skip is never overwritten. The
+    // cache is patched the same way, one step at a time and never from an earlier snapshot, and it is not refetched here:
+    // the live settings query brings in the server's row, so a write queued elsewhere is never raced by this card.
+    const showStep = (stepId: SetupStepId, skipped: boolean) => {
+        queryClient.setQueryData<{ setupStepsSkipped?: string[] } | null>(settingsKey, (row) =>
+            row ? { ...row, setupStepsSkipped: toggleSkipped(row.setupStepsSkipped, stepId, skipped) } : row,
+        );
+    };
     const setSkipped = useMutation({
         ...crpc.auth.setup_steps.setSetupStepSkipped.mutationOptions(),
         onMutate: (args: { skipped: boolean; stepId: SetupStepId }) => {
-            const previous = queryClient.getQueryData<{ setupStepsSkipped?: string[] } | null>(settingsKey);
-
-            if (previous) {
-                queryClient.setQueryData(settingsKey, { ...previous, setupStepsSkipped: toggleSkipped(previous.setupStepsSkipped, args.stepId, args.skipped) });
-            }
+            showStep(args.stepId, args.skipped);
         },
-        onError: () => {
+        onError: (_error, args: { skipped: boolean; stepId: SetupStepId }) => {
+            showStep(args.stepId, !args.skipped);
             toast.error(t`Could not save that choice. Try again.`);
-        },
-        onSettled: async () => {
-            await queryClient.invalidateQueries({ queryKey: settingsKey });
         },
     });
     // An account with no settings row answers `null`; only `undefined` means the read has not finished.
@@ -76,9 +77,12 @@ const SetupChecklist: FC = () => {
         <SettingsCard description={t`Three steps to use coding agents on your own machines. Skip any of them and come back later.`} title={t`Coding setup`}>
             <CardContent>
                 <ol aria-label={t`Coding setup steps`} className="space-y-3">
-                    {(steps ?? SETUP_STEP_IDS.map((id) => {
-                        return { id, status: undefined };
-                    })).map(({ id, status }) => (
+                    {(
+                        steps ??
+                        SETUP_STEP_IDS.map((id) => {
+                            return { id, status: undefined };
+                        })
+                    ).map(({ id, status }) => (
                         <li className="flex flex-wrap items-center gap-3" key={id}>
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium">

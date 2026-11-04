@@ -26,7 +26,13 @@ export const setSetupStepSkipped = authMutation
         const { userId } = ctx.user;
         const settings = await ctx.db.userSettings.findFirst({ where: { userId } });
 
-        await saveUserSettings(ctx.db, settings, userId, { setupStepsSkipped: applyStepSkip(settings?.setupStepsSkipped, stepId, skipped) }, ctx.user.activeOrganization?.id ?? null);
+        await saveUserSettings(
+            ctx.db,
+            settings,
+            userId,
+            { setupStepsSkipped: applyStepSkip(settings?.setupStepsSkipped, stepId, skipped) },
+            ctx.user.activeOrganization?.id ?? null,
+        );
 
         ctx.log.event("auth.set_setup_step_skipped", { skipped, stepId });
 
