@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 const appConfig = JSON.parse(readFileSync(new URL("../../app.json", import.meta.url), "utf8")) as {
