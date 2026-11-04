@@ -130,7 +130,7 @@ type MessagePage = Awaited<ReturnType<typeof fetchMessagePage>>["page"];
 
 /**
  * The creation time of the send's own user message: the newest user message on the page that reads `prompt` and was
- * created after `after`, the newest reply on screen when the send began. Null while the page does not hold it yet.
+ * created at or after `after`, the newest reply on screen when the send began. Null while the page does not hold it yet.
  */
 const sentAtOf = (messages: MessagePage, prompt: string, after: number): number | null => {
     const sent = messages.find((message) => message.role === "user" && displayTextOf(message.parts) === prompt && message._creationTime >= after);
@@ -363,7 +363,7 @@ const Chat = () => {
     const [confirmation, setConfirmation] = useState<{ after: number; holdsSend: boolean; prompt: string; threadId: string } | null>(null);
     const [confirmTick, setConfirmTick] = useState(0);
     const isConfirming = confirmation !== null && confirmation.threadId === threadId;
-    const isAwaitingReply = confirmation !== null && confirmation.threadId === threadId && confirmation.holdsSend;
+    const isAwaitingReply = isConfirming && confirmation.holdsSend;
 
     useEffect(() => {
         if (!isConfirming || confirmation === null) {
