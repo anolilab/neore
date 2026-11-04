@@ -199,6 +199,41 @@ fn a_denied_code_stores_nothing() {
 }
 
 #[test]
+fn a_full_account_is_waited_on_and_told_once_until_a_slot_is_freed() {
+    let full = || {
+        Ok(reply(
+            403,
+            json!({ "error": "device_limit", "error_description": "At most 10 devices can be paired. Remove one first." }),
+        ))
+    };
+    let backend = FakeBackend::new(vec![full(), full(), full(), approved()]);
+    let (outcome, shown, _) = run(&backend, &FakeKeychain::default(), "full-wait");
+
+    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(shown.matches("At most 10 devices").count(), 1, "{shown}");
+    assert!(shown.contains("Settings, Devices"));
+}
+
+#[test]
+fn a_full_account_that_never_frees_a_slot_ends_when_the_code_lapses() {
+    let backend = FakeBackend::new(
+        (0..400)
+            .map(|_| {
+                Ok(reply(
+                    403,
+                    json!({ "error": "device_limit", "error_description": "full" }),
+                ))
+            })
+            .collect(),
+    );
+
+    assert_eq!(
+        run(&backend, &FakeKeychain::default(), "full-lapse").0,
+        Err(PairError::Expired)
+    );
+}
+
+#[test]
 fn an_account_refusal_is_reported_with_its_reason() {
     let backend = FakeBackend::new(vec![Ok(reply(
         403,

@@ -12,6 +12,7 @@ import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { authClient } from "@/lib/auth/client";
 import type { DeviceProblem as Problem } from "@/lib/auth/device-problem";
 import { problemOf } from "@/lib/auth/device-problem";
+import { DEVICE_PROBLEM_MESSAGES } from "@/lib/auth/device-problem-messages";
 import { seo } from "@/lib/seo";
 
 /**
@@ -91,18 +92,12 @@ const CodeForm = () => {
 };
 
 const ProblemMessage = ({ problem }: { problem: Problem }) => {
-    const { t } = useLingui();
-    const messages: Record<Problem, string> = {
-        expired: t`This code has expired. Run \`neore login --device\` again to get a new one.`,
-        invalid: t`This code is not valid, or it was already used. Run \`neore login --device\` again to get a new one.`,
-        keyLimit: t`Your account already has the maximum number of API keys, so the command line was not signed in. Revoke one in Settings, then run \`neore login --device\` again.`,
-        unavailable: t`The code could not be checked right now. Try again in a moment.`,
-    };
+    const { i18n, t } = useLingui();
 
     return (
         <div className="flex flex-col gap-4 text-center">
             <p className="text-sm text-red-600" role="alert">
-                {messages[problem]}
+                {i18n._(DEVICE_PROBLEM_MESSAGES[problem])}
             </p>
             <a className="text-sm font-medium underline underline-offset-4" href="/auth/device">
                 {t`Enter a different code`}

@@ -276,6 +276,7 @@ pub fn pair(
     let mut failures = 0;
     // The last poll got no answer. The backend may still have acted on it.
     let mut lost_answer = false;
+    let mut told_full = false;
 
     loop {
         // Never wait past the code's life: a long interval (grown by `slow_down`) must not outlast it.
@@ -331,6 +332,18 @@ pub fn pair(
 
         match text(&reply.body, "error") {
             Some("authorization_pending") => {}
+            // The account is at its device limit. The code stays valid, so say what to do once and keep waiting:
+            // removing a device in the web app lets this very command finish.
+            Some("device_limit") => {
+                if !std::mem::replace(&mut told_full, true) {
+                    let _ = writeln!(
+                        out,
+                        "{} Remove a device in the web app (Settings, Devices); this command keeps waiting for the code's remaining life.",
+                        describe(&reply)
+                    );
+                    let _ = out.flush();
+                }
+            }
             Some("slow_down") => {
                 interval = interval.saturating_add(SLOW_DOWN_STEP).min(MAX_INTERVAL)
             }

@@ -241,6 +241,29 @@ const restoreClaimedCode = async (
     }
 };
 
+/**
+ * Only a refusal the pairing check MEANT (FORBIDDEN or BAD_REQUEST) is the person's to read: a full account is
+ * `device_limit` (the machine waits and says so, the code stays valid), anything else `access_denied`. Any other
+ * failure is ours, and the machine retries a 5xx.
+ */
+const refusalCode = (error: unknown): "BAD_REQUEST" | "FORBIDDEN" | undefined => {
+    const code = (error as { code?: unknown } | null)?.code;
+
+    return (code === "FORBIDDEN" || code === "BAD_REQUEST") && error instanceof Error ? code : undefined;
+};
+
+const refusalOrRetryable = (error: unknown): APIError => {
+    const code = refusalCode(error);
+
+    if (code && error instanceof Error) {
+        return oauthError("FORBIDDEN", code === "BAD_REQUEST" ? "device_limit" : "access_denied", error.message);
+    }
+
+    authLogger.error("[auth] pairing a machine failed", { error });
+
+    return oauthError("INTERNAL_SERVER_ERROR", "server_error", "The pairing could not be completed. Try again.");
+};
+
 const redeemKey = (options: CliDeviceAuthOptions) =>
     createAuthEndpoint("/device/key", { body: keyBodySchema, metadata: { noStore: true }, method: "POST" }, async (ctx) => {
         const { claimedDeviceCode, user } = await redeemDeviceCode({
@@ -359,16 +382,7 @@ const redeemHost = (options: HostPairingOptions) =>
                 try {
                     await options.precheck(record.userId as string);
                 } catch (error) {
-                    // Only a refusal the precheck MEANT (a full account, a deletion underway: FORBIDDEN or BAD_REQUEST) is
-                    // the person's to read. Anything else is a failure of ours, and the machine retries a 5xx with the
-                    // code still unspent, where a 403 would end its pairing.
-                    const code = (error as { code?: unknown } | null)?.code;
-
-                    if ((code === "FORBIDDEN" || code === "BAD_REQUEST") && error instanceof Error) {
-                        throw oauthError("FORBIDDEN", "access_denied", error.message);
-                    }
-
-                    throw oauthError("INTERNAL_SERVER_ERROR", "server_error", "The pairing could not be checked. Try again.");
+                    throw refusalOrRetryable(error);
                 }
 
                 return {};
@@ -381,9 +395,16 @@ const redeemHost = (options: HostPairingOptions) =>
 
         try {
             device = await options.register({ name, platform, userId: user.id });
-        } catch {
-            // The code is spent; the person runs `pair` again for a new one.
-            throw oauthError("FORBIDDEN", "access_denied", "The machine could not be registered. Run the pairing again.");
+        } catch (error) {
+            const refusal = refusalOrRetryable(error);
+
+            // A failure of ours (not a refusal): nothing was registered, so put the code back and the machine's next
+            // poll finishes the pairing, as with a failed key mint. A refusal leaves it spent, as before.
+            if (refusalCode(error) === undefined) {
+                await restoreClaimedCode(ctx.context.adapter, claimedDeviceCode, error);
+            }
+
+            throw refusal;
         }
 
         ctx.setHeader("Cache-Control", "no-store");

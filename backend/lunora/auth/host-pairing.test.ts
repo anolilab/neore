@@ -26,7 +26,7 @@ interface Registration {
     userId: string;
 }
 
-const build = (options: { precheck?: (userId: string) => Promise<void>; withHostPairing?: boolean } = {}) => {
+const build = (options: { precheck?: (userId: string) => Promise<void>; register?: () => Promise<void>; withHostPairing?: boolean } = {}) => {
     const registrations: Registration[] = [];
     const database = memoryAdapter({ account: [], apikey: [], deviceCode: [], rateLimit: [], session: [], user: [], verification: [] });
     const auth = betterAuth({
@@ -41,6 +41,7 @@ const build = (options: { precheck?: (userId: string) => Promise<void>; withHost
                     hostPairing: {
                         precheck: options.precheck ?? (async () => undefined),
                         register: async (input) => {
+                            await options.register?.();
                             registrations.push(input);
 
                             return { deviceId: `device-${String(registrations.length)}`, secret: SECRET };
@@ -328,6 +329,7 @@ describe("pairing a headless machine by code", () => {
         const refused = await redeem(harness, code.device_code);
 
         expect(refused.response.status).toBe(403);
+        expect(refused.body["error"]).toBe("device_limit");
         expect(refused.body["error_description"]).toContain("At most 10 devices");
         expect(harness.registrations).toHaveLength(0);
 
@@ -378,6 +380,58 @@ describe("pairing a headless machine by code", () => {
         const { body } = await redeem(harness, code.device_code);
 
         expect(body["account"]).toBe("o***@example.test");
+    });
+
+    it("puts the code back when registering fails for a reason of ours, so the next poll can finish", async () => {
+        let flaky = true;
+        const harness = build({
+            register: async () => {
+                if (flaky) {
+                    throw new Error("durable object reset at internal-host:9229");
+                }
+            },
+        });
+        const owner = await signUp(harness);
+        const code = await requestHostCode(harness);
+
+        await approve(harness, owner.cookie, code.user_code);
+        vi.setSystemTime(Date.now() + 6000);
+
+        const failed = await redeem(harness, code.device_code);
+
+        expect(failed.response.status).toBe(500);
+        expect(failed.body["error"]).toBe("server_error");
+        expect(JSON.stringify(failed.body)).not.toContain("internal-host");
+        expect(harness.registrations).toHaveLength(0);
+
+        flaky = false;
+        vi.setSystemTime(Date.now() + 6000);
+
+        expect(await statusOf(harness, code.device_code)).toBe(200);
+        expect(harness.registrations).toHaveLength(1);
+    });
+
+    it("keeps a deliberate refusal at registration final", async () => {
+        const harness = build({
+            register: async () => {
+                throw Object.assign(new Error("This account is being deleted"), { code: "FORBIDDEN" });
+            },
+        });
+        const owner = await signUp(harness);
+        const code = await requestHostCode(harness);
+
+        await approve(harness, owner.cookie, code.user_code);
+        vi.setSystemTime(Date.now() + 6000);
+
+        const refused = await redeem(harness, code.device_code);
+
+        expect(refused.response.status).toBe(403);
+        expect(refused.body["error"]).toBe("access_denied");
+
+        vi.setSystemTime(Date.now() + 6000);
+        const again = await redeem(harness, code.device_code);
+
+        expect(again.body["error"]).toBe("invalid_grant");
     });
 
     it("refuses a code that expired", async () => {
