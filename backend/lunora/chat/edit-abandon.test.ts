@@ -91,7 +91,9 @@ describe("failAbandonedEditReply", () => {
         });
 
         await expect(lapse(threadId, promptId)).resolves.toStrictEqual({ added: false, failed: rows });
-        expect((await rowsOf(threadId)).filter((row) => row.status === "pending")).toHaveLength(0);
+        const after = await rowsOf(threadId);
+
+        expect(after.filter((row) => row.status === "pending")).toHaveLength(0);
     });
 
     it("adds a failed reply under the prompt when the delivery died before writing one, and only once", async () => {

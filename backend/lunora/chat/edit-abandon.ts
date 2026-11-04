@@ -59,7 +59,12 @@ export const failAbandonedEditReply = internalMutation
                 )
                 .paginate({ cursor, numItems: PENDING_REPLY_PAGE });
 
-            for (const row of page.page.filter((candidate) => candidate._creationTime >= prompt._creationTime)) {
+            for (const row of page.page) {
+                // A row from before the prompt shares the range but belongs to an earlier reply.
+                if (row._creationTime < prompt._creationTime) {
+                    continue;
+                }
+
                 await patchRow(ctx.db, "messages", row, {
                     error: ABANDONED_REPLY_ERROR,
                     message: { content: [{ text: ABANDONED_REPLY_TEXT, type: "text" }], role: "assistant" },
