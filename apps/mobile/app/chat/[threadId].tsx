@@ -35,6 +35,7 @@ const CONFIRM_READS = 6;
 const CONFIRM_READ_INTERVAL_MS = 2000;
 const REFUSED_MESSAGE = "This chat is locked or no longer available.";
 const SHARE_FAILED_MESSAGE = "The message could not be shared. Try again.";
+const AWAIT_REPLY_MESSAGE = "Wait for the last reply to finish before sending another.";
 
 /** The server's replies on screen: every assistant row that is not a local one. */
 const serverReplies = (rows: Row[]): Row[] => rows.filter((row) => row.role === "assistant" && row.status !== "local");
@@ -48,6 +49,15 @@ const withShareFailure = (current: string | null): string | null => current ?? S
 /** A share that works clears the share failure on screen; any other error on screen is not the share's to clear. */
 const withoutShareFailure = (current: string | null): string | null => {
     if (current === SHARE_FAILED_MESSAGE) {
+        return null;
+    }
+
+    return current;
+};
+
+/** A confirmation that ends clears the wait message; any other message on screen is not the confirmation's to clear. */
+const withoutAwaitReply = (current: string | null): string | null => {
+    if (current === AWAIT_REPLY_MESSAGE) {
         return null;
     }
 
@@ -123,17 +133,17 @@ type MessagePage = Awaited<ReturnType<typeof fetchMessagePage>>["page"];
  * created after `after`, the newest reply on screen when the send began. Null while the page does not hold it yet.
  */
 const sentAtOf = (messages: MessagePage, prompt: string, after: number): number | null => {
-    const sent = messages.find((message) => message.role === "user" && displayTextOf(message.parts) === prompt && message._creationTime > after);
+    const sent = messages.find((message) => message.role === "user" && displayTextOf(message.parts) === prompt && message._creationTime >= after);
 
     return sent ? sent._creationTime : null;
 };
 
 /**
- * Whether the page holds a reply to the send created after its user message, with a final status. A reply made before
- * the send cannot satisfy it, however settled it is.
+ * Whether the page holds a reply to the send with a final status. A reply made before the send cannot satisfy it, however
+ * settled it is. A reply can share its user message's creation time, so the comparison includes it.
  */
 const hasSettledReplySince = (messages: MessagePage, sentAt: number): boolean =>
-    messages.some((message) => message.role === "assistant" && message._creationTime > sentAt && (message.status === "success" || message.status === "failed"));
+    messages.some((message) => message.role === "assistant" && message._creationTime >= sentAt && (message.status === "success" || message.status === "failed"));
 
 /* eslint-enable no-underscore-dangle */
 
@@ -349,12 +359,14 @@ const Chat = () => {
 
     // After a send, check the newest page on a timer until the server's copy of the reply is final. Each check reads one
     // page, so older pages on screen are not touched; a full read happens once, when the check settles or runs out.
-    const [confirmation, setConfirmation] = useState<{ after: number; prompt: string; threadId: string } | null>(null);
+    // `holdsSend` is set only for a reply the relay did not finish: its server copy may still be streaming, so a new send waits.
+    const [confirmation, setConfirmation] = useState<{ after: number; holdsSend: boolean; prompt: string; threadId: string } | null>(null);
     const [confirmTick, setConfirmTick] = useState(0);
-    const isAwaitingReply = confirmation !== null && confirmation.threadId === threadId;
+    const isConfirming = confirmation !== null && confirmation.threadId === threadId;
+    const isAwaitingReply = confirmation !== null && confirmation.threadId === threadId && confirmation.holdsSend;
 
     useEffect(() => {
-        if (!isAwaitingReply || confirmation === null) {
+        if (!isConfirming || confirmation === null) {
             return undefined;
         }
 
@@ -390,6 +402,7 @@ const Chat = () => {
 
             if (isActive && (isConfirmed || reads >= CONFIRM_READS)) {
                 setConfirmation(null);
+                setError(withoutAwaitReply);
                 setConfirmTick((tick) => tick + 1);
             }
         };
@@ -400,7 +413,7 @@ const Chat = () => {
             isActive = false;
             clearInterval(timer);
         };
-    }, [confirmation, isAwaitingReply]);
+    }, [confirmation, isConfirming]);
 
     useEffect(() => {
         // Without a token (a launch with no network) the saved messages are all there is; the read waits for one.
@@ -417,7 +430,7 @@ const Chat = () => {
         }
 
         if (isAwaitingReply) {
-            setError("Wait for the last reply to finish before sending another.");
+            setError(AWAIT_REPLY_MESSAGE);
 
             return;
         }
@@ -489,7 +502,7 @@ const Chat = () => {
                 setRows((current) => finishRow(current, assistantId));
             }
 
-            setConfirmation({ after, prompt, threadId: started.threadId });
+            setConfirmation({ after, holdsSend: outcome === "unconfirmed", prompt, threadId: started.threadId });
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
