@@ -926,6 +926,16 @@ const runChatStartOnShard = async (
         threadId = result.threadId;
         messageId = result.messageId;
 
+        // The run's tools are capped by the thread's organization, so a chat started in one carries it from its first turn.
+        const threadOrganizationId = await activeOrganizationPromise;
+
+        if (threadOrganizationId) {
+            await context.runMutation(internal.agent.threads.updateThread, {
+                patch: { organizationId: threadOrganizationId },
+                threadId: threadId as Id<"threads">,
+            });
+        }
+
         // Title + category generation — scheduled after the agent run below.
         scheduleTitleJobs(threadId, true);
     }
