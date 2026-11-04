@@ -61,9 +61,11 @@ describe("editPullRequest", () => {
 
         await githubDriver.editPullRequest(request, REF, { title: "New" });
 
-        const mutation = sent.find((call) => String(call.json.query).includes("updatePullRequest"));
+        // One write, not one per call: a duplicate edit must fail here, not pass by finding the first request.
+        const mutations = sent.filter((call) => String(call.json.query).includes("updatePullRequest"));
 
-        expect(mutation?.json.variables).toEqual({ input: { pullRequestId: "PR_node", title: "New" } });
+        expect(mutations).toHaveLength(1);
+        expect(mutations[0]?.json.variables).toEqual({ input: { pullRequestId: "PR_node", title: "New" } });
     });
 
     it("counts an answer without the pull request as unconfirmed", async () => {

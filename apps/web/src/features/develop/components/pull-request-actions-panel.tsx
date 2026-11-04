@@ -55,6 +55,8 @@ type Feedback = { kind: "error"; text: string; unconfirmed: boolean } | { href?:
 /** The same login rule the backend applies, so a bad name is refused here with its reason. */
 const LOGIN = /^[A-Za-z0-9](?:\w|-\b){0,38}$/u;
 const MAX_REVIEWERS = 15;
+/** The most characters a host title holds; the backend refuses a longer one with the same bound. */
+const MAX_TITLE = 256;
 const SEPARATORS = /[\s,]+/u;
 const LEADING_AT = /^@/u;
 
@@ -113,6 +115,9 @@ const PullRequestActionsPanel = ({
     }
 
     const titleEmpty = (editing?.title ?? "").trim() === "";
+    // The host's limit on a title, the same bound the server enforces: a longer one is said here, before the write.
+    const titleTooLong = (editing?.title ?? "").trim().length > MAX_TITLE;
+    const titleProblem = titleEmpty || titleTooLong;
     const bodyLocked = editing?.truncated === true;
     const busy = actions.edit.isPending || actions.requestReviewers.isPending || actions.revert.isPending;
 
@@ -322,16 +327,18 @@ const PullRequestActionsPanel = ({
                         <div className="space-y-1">
                             <Label htmlFor={`${titleId}-title`}>{t`Title`}</Label>
                             <Input
-                                aria-describedby={titleEmpty ? `${titleId}-title-note` : undefined}
-                                aria-invalid={titleEmpty || undefined}
+                                aria-describedby={titleProblem ? `${titleId}-title-note` : undefined}
+                                aria-invalid={titleProblem || undefined}
                                 id={`${titleId}-title`}
                                 onChange={(event) => setEditing((current) => (current === null ? current : { ...current, title: event.target.value }))}
                                 required
                                 value={editing?.title ?? ""}
                             />
-                            {titleEmpty && (
+                            {titleProblem && (
                                 <p className="text-muted-foreground text-xs" id={`${titleId}-title-note`}>
-                                    {t`A pull request needs a title. Enter one to save.`}
+                                    {titleTooLong
+                                        ? t`A pull request title is at most ${MAX_TITLE} characters.`
+                                        : t`A pull request needs a title. Enter one to save.`}
                                 </p>
                             )}
                         </div>
@@ -360,7 +367,7 @@ const PullRequestActionsPanel = ({
                     )}
                     <DialogFooter>
                         <DialogClose render={<Button variant="outline" />}>{t`Cancel`}</DialogClose>
-                        <Button disabled={(editing?.title ?? "").trim() === "" || actions.edit.isPending} onClick={saveEdit}>{t`Save`}</Button>
+                        <Button disabled={titleProblem || actions.edit.isPending} onClick={saveEdit}>{t`Save`}</Button>
                     </DialogFooter>
                 </DialogPopup>
             </Dialog>
