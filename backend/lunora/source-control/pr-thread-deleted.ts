@@ -1,7 +1,7 @@
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 
-/** Far above the links one thread holds: the read is bounded, so a thread with more is marked up to this many. */
+/** Bounds the read: a thread past this many links would be only partly marked, which no real thread reaches. */
 const MAX_LINKS_OF_THREAD = 200;
 
 /**
