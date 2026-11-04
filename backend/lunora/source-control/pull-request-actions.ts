@@ -22,8 +22,8 @@ const vRef = {
     repository: v.string().max(MAX_LENGTH.short),
 };
 
-/** A title the host accepts is at most 256 characters; the validator only bounds what one request can store. */
-const vTitle = v.string().max(MAX_LENGTH.short);
+/** A title the host accepts is at most 256 characters, so a longer one is refused here, before any token is read or host call is made. */
+const vTitle = v.string().max(256);
 // GitHub's limit on a description (65,536 characters); the host refuses a longer one, so the check is here too.
 const vBody = v.string().max(65_536);
 
