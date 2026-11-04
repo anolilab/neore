@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { isPreHostRefusal } from "./use-pull-request-actions";
 
 describe("isPreHostRefusal", () => {
-    it.each(["BAD_REQUEST", "FORBIDDEN", "TOO_MANY_REQUESTS", "UNAUTHORIZED"])("treats %s as thrown before any host call", (code) => {
+    it.each(["BAD_REQUEST", "FORBIDDEN", "TOO_MANY_REQUESTS", "UNAUTHORIZED", "VALIDATION_ERROR"])("treats %s as thrown before any host call", (code) => {
         expect(isPreHostRefusal({ code })).toBe(true);
     });
 

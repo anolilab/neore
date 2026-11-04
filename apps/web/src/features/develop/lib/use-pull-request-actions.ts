@@ -7,7 +7,7 @@ import type { PullRequestAddress } from "./use-develop";
 import { DEVELOP_QUERY_ROOT, useDevelopUser } from "./use-develop";
 
 /** Codes a server action throws before any host call: nothing reached the host, so nothing changed. */
-const PRE_HOST_CODES = new Set(["BAD_REQUEST", "FORBIDDEN", "TOO_MANY_REQUESTS", "UNAUTHORIZED"]);
+const PRE_HOST_CODES = new Set(["BAD_REQUEST", "FORBIDDEN", "TOO_MANY_REQUESTS", "UNAUTHORIZED", "VALIDATION_ERROR"]);
 
 /** A thrown error the server raised before it called the host. Any other error may come after the host acted. */
 export const isPreHostRefusal = (error: unknown): boolean => {
