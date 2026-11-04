@@ -9,6 +9,7 @@ import RouteErrorBoundary from "@/components/error-boundaries/route-error-bounda
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import Assistant from "@/features/chat/assistant";
+import { usePromptLinkDraft } from "@/features/chat/core/hooks/use-prompt-link-draft";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
@@ -26,6 +27,8 @@ const ChatPage = () => {
     const promptId = Route.useSearch({ select: ({ promptId: selected }) => selected });
     const redirectReason = Route.useSearch({ select: ({ redirectReason: selected }) => selected });
     const hasInitialMessage = Route.useSearch({ select: ({ initialMessage }) => initialMessage });
+    const linkPrompt = Route.useSearch({ select: ({ prompt }) => prompt });
+    const linkModel = Route.useSearch({ select: ({ model }) => model });
     const location = useLocation();
     // TanStack keys each history entry; a new navigation gets a new key.
     const navigationKey = location.state.__TSR_key;
@@ -40,8 +43,18 @@ const ChatPage = () => {
     const { data: sessionData, isPending: isSessionPending } = hooks.useSession();
     const activeTeamId = (sessionData?.session as { activeTeamId?: string | null } | undefined)?.activeTeamId ?? undefined;
     const resumeScopeReady = !isOrgPending && !isSessionPending;
+    // A prompt link is a draft on this page: resuming the last chat would navigate it away before it is applied.
     const resumeLastChat =
-        BOOTED_ON_CHAT_INDEX && userSettings?.resumeLastChat === true && !promptId && !redirectReason && !hasInitialMessage && resumeScopeReady;
+        BOOTED_ON_CHAT_INDEX &&
+        userSettings?.resumeLastChat === true &&
+        !promptId &&
+        !redirectReason &&
+        !hasInitialMessage &&
+        linkPrompt === undefined &&
+        linkModel === undefined &&
+        resumeScopeReady;
+
+    usePromptLinkDraft({ model: linkModel, prompt: linkPrompt });
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.
         crpc.chat.resume.latestResumableThread.queryOptions(
@@ -165,7 +178,10 @@ const ChatPage = () => {
 export const Route = createFileRoute("/(chat)/chat/")({
     validateSearch: (search: Record<string, unknown>) => {
         return {
+            model: typeof search.model === "string" ? search.model : undefined,
             promptId: search.promptId as string | undefined,
+            // A prompt link's draft: applied once, never sent (`core/hooks/use-prompt-link-draft.ts`).
+            prompt: typeof search.prompt === "string" ? search.prompt : undefined,
             redirectReason: search.redirectReason as string | undefined,
             // `|| undefined`, not `false`: a default written into the search is put into the URL, and the
             // router then redirects a bare `/chat` to `/chat?initialMessage=false` before it renders.
