@@ -154,20 +154,10 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
 
         const room = FILES_MAX - files.length;
         const typed = picked.filter((file) => FILE_TYPES.includes(file.type) && file.size <= selectLimitOf(file));
-        const accepted: File[] = [];
+        const accepted = typed.slice(0, Math.max(room, 0));
+
+        // The budget counts what is uploaded, so it is checked per file after re-encoding, below.
         let total = files.reduce((sum, file) => sum + file.size, 0);
-
-        for (const file of typed) {
-            if (accepted.length >= room) {
-                break;
-            }
-
-            // A file that does not fit the budget is skipped; a smaller one after it may still fit.
-            if (total + file.size <= FILES_TOTAL_MAX_BYTES) {
-                accepted.push(file);
-                total += file.size;
-            }
-        }
 
         if (accepted.length < picked.length) {
             showError(t`Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most.`);
@@ -196,12 +186,15 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                     // Photos are re-encoded below the provider's per-image limit, as the composer does; PDFs go as they are.
                     const prepared = file.type.startsWith("image/") ? await downscaleOversizedImage(file) : file;
 
-                    // A photo that re-encoding could not bring under the file limit is named as failed, like any other.
-                    if (prepared.size > FILE_MAX_BYTES) {
+                    // A file re-encoding could not bring under the limit, or one that would exceed the total on uploaded sizes, is named
+                    // as failed and the next file is still tried.
+                    if (prepared.size > FILE_MAX_BYTES || total + prepared.size > FILES_TOTAL_MAX_BYTES) {
                         failed.push(file.name);
 
                         continue;
                     }
+
+                    total += prepared.size;
 
                     const uploadId = await uploadFile(prepared, { contentType: prepared.type, signal: controller.signal });
 
