@@ -5,8 +5,9 @@ import { heicToJpegBlob } from "./heic-decode";
 /**
  * HEIC and HEIF photos are re-encoded as JPEG before upload, because the upload route takes JPEG, not HEIC. Only Safari
  * decodes HEIC in the browser, so only Safari converts: any other browser keeps the file as it is, and the server refuses it.
+ * A sequence (several frames in one file) is not a photo to convert: one JPEG would keep one frame, so it keeps its type too.
  */
-const HEIC_TYPES: ReadonlySet<string> = new Set(["image/heic", "image/heic-sequence", "image/heif", "image/heif-sequence"]);
+const HEIC_TYPES: ReadonlySet<string> = new Set(["image/heic", "image/heif"]);
 const HEIC_NAME_RE = /\.(?:heic|heif)$/iu;
 const JPEG_QUALITY = 0.92;
 

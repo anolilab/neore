@@ -20,12 +20,16 @@ vi.mock("@/features/local-models/lib/local-errors", () => {
 describe("isHeicFile", () => {
     it("recognises HEIC and HEIF by declared type, and by name when the browser gives no type", () => {
         expect(isHeicFile({ name: "IMG_0001.HEIC", type: "image/heic" })).toBe(true);
-        expect(isHeicFile({ name: "scan.heif", type: "image/heif-sequence" })).toBe(true);
         expect(isHeicFile({ name: "IMG_0002.heic", type: "" })).toBe(true);
     });
 
     it("trusts a declared type over the name, so a renamed text file is not a photo", () => {
         expect(isHeicFile({ name: "notes.heic", type: "text/plain" })).toBe(false);
+    });
+
+    it("leaves a multi-frame sequence alone, since one JPEG would keep only one of its frames", () => {
+        expect(isHeicFile({ name: "burst.heic", type: "image/heic-sequence" })).toBe(false);
+        expect(isHeicFile({ name: "scan.heif", type: "image/heif-sequence" })).toBe(false);
     });
 
     it("leaves every other file alone", () => {

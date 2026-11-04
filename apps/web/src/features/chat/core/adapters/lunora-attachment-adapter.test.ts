@@ -178,6 +178,7 @@ describe(createLunoraAttachmentAdapter, () => {
 
         expect(heicToJpegBlob).toHaveBeenCalledWith(file, 0.92);
         expect(downscaleOversizedImage).toHaveBeenCalledWith(expect.objectContaining({ name: "IMG_9.jpg", type: "image/jpeg" }));
+        expect(uploadFile).toHaveBeenCalledWith(expect.objectContaining({ name: "IMG_9.jpg", type: "image/jpeg" }), expect.anything());
     });
 
     it("sends a HEIC photo unchanged in a browser that cannot decode it, and does not decode it", async () => {
@@ -186,9 +187,10 @@ describe(createLunoraAttachmentAdapter, () => {
         const adapter = createLunoraAttachmentAdapter(client().lunora);
         const file = new File(["heic"], "IMG_10.HEIC", { type: "image/heic" });
 
-        await adapter.upload({ file }).catch(() => undefined);
+        await adapter.upload({ file });
 
         expect(heicToJpegBlob).not.toHaveBeenCalled();
+        expect(uploadFile).toHaveBeenCalledWith(file, expect.anything());
         isSafariUserAgent.mockReturnValue(true);
     });
 
