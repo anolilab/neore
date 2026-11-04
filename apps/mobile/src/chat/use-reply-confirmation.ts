@@ -43,7 +43,8 @@ export const useReplyConfirmation = ({ fetchPage, onEnded, onRefused, threadId }
             }
 
             isChecking = true;
-            const outcomes = await readAllReplyStates(fetchPage, threadId, own);
+            // A check that outlives its effect stops between pages, rather than fetching the rest of its walk.
+            const outcomes = await readAllReplyStates(fetchPage, threadId, own, () => isActive);
 
             isChecking = false;
 

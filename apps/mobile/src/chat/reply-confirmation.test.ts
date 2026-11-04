@@ -39,14 +39,21 @@ describe("readReplyState", () => {
             );
         });
 
-        expect(await readReplyState(fetchPage, "t1", "sent", 0)).toBe("settled");
+        expect(await readReplyState(fetchPage, "t1", "sent", 0, () => true)).toBe("settled");
         expect(fetchPage.mock.calls.map((call) => call[1])).toEqual([null, "older"]);
+    });
+
+    it("stops fetching once its check is no longer current", async () => {
+        const fetchPage = vi.fn(async (): Promise<ConfirmPage> => page([["other", "user"]], { continueCursor: "older", isDone: false }));
+
+        expect(await readReplyState(fetchPage, "t1", "sent", 0, () => false)).toBe("unknown");
+        expect(fetchPage).not.toHaveBeenCalled();
     });
 
     it("is unknown when the send is on no page", async () => {
         const fetchPage = vi.fn(async (): Promise<ConfirmPage> => page([["other", "user"]], { continueCursor: null, isDone: true }));
 
-        expect(await readReplyState(fetchPage, "t1", "sent", 0)).toBe("unknown");
+        expect(await readReplyState(fetchPage, "t1", "sent", 0, () => true)).toBe("unknown");
     });
 });
 
@@ -54,7 +61,7 @@ describe("readAllReplyStates", () => {
     it("requests each page once for all the confirmations of a round", async () => {
         const fetchPage = vi.fn(async (_threadId: string, _cursor: string | null): Promise<ConfirmPage> => page([["other", "user"]], { continueCursor: "older", isDone: false }));
 
-        const outcomes = await readAllReplyStates(fetchPage, "t1", [confirmation("a"), confirmation("b")]);
+        const outcomes = await readAllReplyStates(fetchPage, "t1", [confirmation("a"), confirmation("b")], () => true);
 
         expect(outcomes.map((outcome) => outcome.state)).toEqual(["unknown", "unknown"]);
         expect(fetchPage.mock.calls.map((call) => call[1])).toEqual([null, "older"]);
@@ -65,7 +72,7 @@ describe("readAllReplyStates", () => {
             throw Object.assign(new Error("Access denied to this thread"), { code: "UNAUTHORIZED" });
         });
 
-        const [outcome] = await readAllReplyStates(fetchPage, "t1", [confirmation("a")]);
+        const [outcome] = await readAllReplyStates(fetchPage, "t1", [confirmation("a")], () => true);
 
         expect(outcome?.isChatRefused).toBe(true);
     });

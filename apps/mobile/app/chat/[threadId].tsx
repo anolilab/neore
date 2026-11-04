@@ -343,7 +343,9 @@ const Chat = () => {
     // The reply checks run in a hook; the screen decides what a refusal or a settled check means for the chat.
     const onConfirmationRefused = useCallback(
         (refusedThreadId: string) => {
-            // A chat the reader can no longer open is cleared now, not by a read that may not run.
+            // A chat the reader can no longer open is cleared now, not by a read that may not run. A send still streaming
+            // into it is stopped, so no row is written into the chat after the refusal.
+            sendAbort.current?.abort();
             readGate.current.invalidate();
             showRefused();
             settleQuietly(cache?.forgetThreads([refusedThreadId]));

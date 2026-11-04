@@ -64,13 +64,19 @@ export const tallyChecks = (outcomes: ReadonlyArray<{ confirmation: Confirmation
 };
 
 /** Reads the state of one send's reply: walks the pages from the newest until the send is found, up to `CONFIRM_MAX_PAGES`. */
-export const readReplyState = async (fetchPage: ConfirmPageFetch, threadId: string, messageId: string, steers: number): Promise<ReplyState> => {
+export const readReplyState = async (
+    fetchPage: ConfirmPageFetch,
+    threadId: string,
+    messageId: string,
+    steers: number,
+    isCurrent: () => boolean,
+): Promise<ReplyState> => {
     const seen: SeenMessage[] = [];
     // eslint-disable-next-line unicorn/no-null -- the query takes null for its first page
     let cursor: string | null = null;
     let state: ReplyState = "unknown";
 
-    for (let index = 0; index < CONFIRM_MAX_PAGES; index += 1) {
+    for (let index = 0; index < CONFIRM_MAX_PAGES && isCurrent(); index += 1) {
         // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
         const page = await fetchPage(threadId, cursor);
 
@@ -103,7 +109,12 @@ export interface ConfirmOutcome {
  * Checks every pending confirmation of a thread in one round. Each walk starts from the newest page, so a page is
  * requested once per round, however many confirmations need it.
  */
-export const readAllReplyStates = async (fetchPage: ConfirmPageFetch, threadId: string, confirmations: ReadonlyArray<Confirmation>): Promise<ConfirmOutcome[]> => {
+export const readAllReplyStates = async (
+    fetchPage: ConfirmPageFetch,
+    threadId: string,
+    confirmations: ReadonlyArray<Confirmation>,
+    isCurrent: () => boolean,
+): Promise<ConfirmOutcome[]> => {
     const pages = new Map<string, Promise<ConfirmPage>>();
     const sharedFetch: ConfirmPageFetch = (id, cursor) => {
         const key = `${id}:${cursor ?? ""}`;
@@ -117,7 +128,7 @@ export const readAllReplyStates = async (fetchPage: ConfirmPageFetch, threadId: 
     return await Promise.all(
         confirmations.map(async (confirmation) => {
             try {
-                return { confirmation, isChatRefused: false, state: await readReplyState(sharedFetch, threadId, confirmation.messageId, confirmation.steers) };
+                return { confirmation, isChatRefused: false, state: await readReplyState(sharedFetch, threadId, confirmation.messageId, confirmation.steers, isCurrent) };
             } catch (error) {
                 // A chat the reader can no longer open ends the checks; any other failure is tried again on the next tick.
                 return { confirmation, isChatRefused: isThreadRefusal(error), state: "unknown" as ReplyState };
