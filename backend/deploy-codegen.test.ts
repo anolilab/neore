@@ -32,11 +32,15 @@ describe("backend codegen before Alchemy", () => {
         expect(codegen).toBeLessThan(alchemy);
     });
 
-    it("runs outside the parallel block, which would race it against build:packages", () => {
+    it("runs in the same parallel branch as build:packages, after it, so the two never race", () => {
+        // A branch is one step: it ends where the next sibling step of the block begins.
+        const branchEnd = deploy.indexOf("\n                  - name:", packages);
+
         expect(parallelStart).toBeGreaterThan(-1);
         expect(packages).toBeGreaterThan(parallelStart);
         expect(packages).toBeLessThan(parallelEnd);
-        expect(codegen).toBeGreaterThan(parallelEnd);
+        expect(codegen).toBeGreaterThan(packages);
+        expect(codegen).toBeLessThan(branchEnd === -1 ? parallelEnd : Math.min(branchEnd, parallelEnd));
     });
 
     it("covers the preview deploy, which calls deploy.yml rather than running Alchemy itself", () => {
