@@ -32,7 +32,8 @@ export const toCrashReport = (error: unknown): CrashReport => {
     const name = KNOWN_ERROR_NAMES.has(error.name) ? error.name : "Error";
     // The stack opens with the header, which runs over several lines when the message does. Frames can only follow it;
     // a stack that does not open with the header yields no frames at all, so message text cannot pass as one.
-    const header = error.message ? `${error.name}: ${error.message}` : error.name;
+    const headline = error.name ? `${error.name}: ${error.message}` : error.message;
+    const header = error.message ? headline : error.name;
     const stack = error.stack ?? "";
     const body = stack.startsWith(header) ? stack.slice(header.length) : "";
     const frames = body

@@ -32,6 +32,16 @@ describe("toCrashReport", () => {
         expect(JSON.stringify(report)).not.toContain("fake");
     });
 
+    it("keeps the frames of an error with no name whose stack opens with the message alone", () => {
+        // eslint-disable-next-line unicorn/no-error-property-assignment -- an error whose app cleared its name
+        const error = withStack(Object.assign(new TypeError("the reply said: buy milk"), { name: "" }), "the reply said: buy milk\n    at renderRow (app/chat.tsx:10:4)");
+
+        const report = toCrashReport(error);
+
+        expect(report).toEqual({ name: "Error", stack: "    at renderRow (app/chat.tsx:10:4)" });
+        expect(JSON.stringify(report)).not.toContain("buy milk");
+    });
+
     it("omits the stack when the error has no frames", () => {
         const error = withStack(new RangeError("secret"), "RangeError: secret");
 

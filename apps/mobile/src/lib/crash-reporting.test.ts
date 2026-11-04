@@ -212,6 +212,38 @@ describe("the global error handler", () => {
         expect(handlers.previous).toHaveBeenCalledWith(error, false);
     });
 
+    it("hands no error to the SDK while an opt-out is still pending", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const client = fakeClient(events);
+
+        crash.startCrashReporting(() => client);
+        crash.installGlobalErrorReporting();
+        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"));
+        const release: { finish?: () => void } = {};
+
+        client.optOut.mockImplementation(async () => {
+            await new Promise<void>((resolve) => {
+                release.finish = resolve;
+            });
+        });
+
+        const pending = crash.changeCrashReports(memoryStore(events, "on"), false);
+
+        // Let the queued change start, so the opt-out is in progress when the error arrives.
+        await new Promise((resolve) => {
+            setTimeout(resolve, 0);
+        });
+        const error = new Error("during the opt-out");
+
+        handlers.installed?.(error, false);
+        release.finish?.();
+        await pending;
+
+        expect(client.captureException).not.toHaveBeenCalled();
+        expect(handlers.previous).toHaveBeenCalledWith(error, false);
+    });
+
     it("still runs the previous handler when the SDK throws", async () => {
         const events: string[] = [];
         const crash = await load();

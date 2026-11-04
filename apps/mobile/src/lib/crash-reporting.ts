@@ -36,12 +36,13 @@ const clientForOn = (): CrashReportClient | undefined => {
 
 /**
  * Turns the client on or off. An off change makes no client: one that was never made has nothing to opt out.
- * The state is recorded only once the client has accepted the change, so it always matches what the client does.
+ * Turning off closes the capture gate first, so no error reaches the SDK while its opt-out is still pending.
+ * Turning on records the state only once the client has accepted the change.
  */
 const applyToClient = async (isOn: boolean): Promise<void> => {
     if (!isOn) {
-        await state.client?.optOut();
         state.isOn = false;
+        await state.client?.optOut();
 
         return;
     }
