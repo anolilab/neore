@@ -94,7 +94,8 @@ const ComposerThreadPermissionMode: FC = () => {
     const [pending, setPending] = useState<ThreadPermissionMode>();
     const latestSave = useRef(0);
 
-    if (!threadId || thread?.runner === "host" || access?.isOwner !== true) {
+    // Until the thread has loaded, the menu is hidden: a host thread must never show an enabled control while its runner is unknown.
+    if (!threadId || !thread || thread.runner === "host" || access?.isOwner !== true) {
         return null;
     }
 
