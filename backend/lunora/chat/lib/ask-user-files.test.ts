@@ -6,7 +6,7 @@
 import { LunoraError } from "lunorash/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { ASK_USER_MAX_FILES } from "../tools/ask-user-constants";
+import { ASK_USER_IMAGE_MAX_BYTES, ASK_USER_MAX_FILES } from "../tools/ask-user-constants";
 import { answerFilesMessage, filesTheModelReads, loadAskUserFiles, withAnswerFiles } from "./ask-user-files";
 
 const PNG_BYTES = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -149,17 +149,28 @@ describe("loadAskUserFiles", () => {
 });
 
 describe("loadAskUserFiles with a model that cannot read a file", () => {
-    it("names an unreadable file without downloading its bytes or spending the budget", async () => {
-        const { ctx, download } = makeCtx({ a: fileRow("a", "image/png"), p: fileRow("p", "application/pdf", "spec.pdf") }, { "key/a": objectOf(PNG_BYTES) });
+    it("names an unreadable file without reading its bytes or spending the budget", async () => {
+        const { ctx, download } = makeCtx(
+            { a: fileRow("a", "image/png"), p: fileRow("p", "application/pdf", "spec.pdf") },
+            { "key/a": objectOf(PNG_BYTES), "key/p": objectOf(PDF_BYTES) },
+        );
 
         const files = await loadAskUserFiles(ctx, { fileIds: ["p", "a"], threadId: "t1", userId: "u1" }, (mediaType) => mediaType.startsWith("image/"));
 
-        expect(download).toHaveBeenCalledTimes(1);
-        expect(download.mock.calls[0]?.[0]).toBe("key/a");
+        expect(download.mock.calls.map((call) => call[0])).toEqual(["key/p", "key/a"]);
         expect(files).toEqual([
             { data: "", filename: "spec.pdf", mediaType: "application/pdf" },
             { data: Buffer.from(PNG_BYTES).toString("base64"), filename: "a.png", mediaType: "image/png" },
         ]);
+    });
+
+    it("leaves out an unreadable file over its type's cap, so the answer does not name it", async () => {
+        const oversized = sized(PNG_BYTES, ASK_USER_IMAGE_MAX_BYTES + 1);
+        const { ctx } = makeCtx({ a: fileRow("a", "image/png") }, { "key/a": objectOf(oversized) });
+
+        const files = await loadAskUserFiles(ctx, { fileIds: ["a"], threadId: "t1", userId: "u1" }, () => false);
+
+        expect(files).toEqual([]);
     });
 });
 

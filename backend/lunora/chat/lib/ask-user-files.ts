@@ -17,7 +17,7 @@ import { internal } from "../../_generated/internal";
 import type { ActionCtx } from "../../_generated/server";
 import { contentMatchesType, SNIFF_BYTES } from "../../lib/content-sniff";
 import { streamLogger } from "../../lib/logger";
-import { readStoredObject } from "../../lib/storage-read";
+import { readStoredObject, storedObjectSize } from "../../lib/storage-read";
 import type { AskUserFile } from "../tools/ask-user-constants";
 import type { BackupCapabilities } from "./backup-model";
 import {
@@ -98,6 +98,37 @@ export const modelReads = (readable: BackupCapabilities | undefined, mediaType: 
 export const filesTheModelReads = (files: ReadonlyArray<AskUserFile>, readable: BackupCapabilities | undefined): AskUserFile[] =>
     files.filter((file) => modelReads(readable, file.mediaType));
 
+/**
+ * Whether a file the model cannot read is still named in the answer. Only its size is looked at, never its bytes: one the
+ * answer could not carry (over its own cap) is left out here as well.
+ */
+const namesUnreadableFile = async (
+    ctx: Pick<ActionCtx, "storage">,
+    args: { threadId: string },
+    fileId: string,
+    storageId: string,
+    limit: number,
+): Promise<boolean> => {
+    let size: number | null;
+
+    try {
+        size = await storedObjectSize(ctx.storage, storageId);
+    } catch (error) {
+        streamLogger.error(`[AskUser] Answer file ${fileId} could not be checked in thread ${args.threadId}`, error);
+        skipped({ threadId: args.threadId }, fileId, "read-failed");
+
+        return false;
+    }
+
+    if (size === null || size > limit) {
+        skipped({ threadId: args.threadId }, fileId, size === null ? "missing" : "too-large");
+
+        return false;
+    }
+
+    return true;
+};
+
 export const loadAskUserFiles = async (
     ctx: Pick<ActionCtx, "runQuery" | "storage">,
     args: { fileIds: ReadonlyArray<string>; threadId: string; userId: string },
@@ -120,8 +151,13 @@ export const loadAskUserFiles = async (
             continue;
         }
 
+        const limit = file.mediaType.startsWith("image/") ? ASK_USER_IMAGE_MAX_BYTES : ASK_USER_FILE_MAX_BYTES;
+
         if (reads?.(file.mediaType) === false) {
-            files.push({ data: "", filename: file.filename ?? "file", mediaType: file.mediaType });
+            if (await namesUnreadableFile(ctx, args, fileId, file.storageId, limit)) {
+                files.push({ data: "", filename: file.filename ?? "file", mediaType: file.mediaType });
+            }
+
             continue;
         }
 
@@ -132,8 +168,6 @@ export const loadAskUserFiles = async (
             skipped(args, fileId, "budget");
             break;
         }
-
-        const limit = file.mediaType.startsWith("image/") ? ASK_USER_IMAGE_MAX_BYTES : ASK_USER_FILE_MAX_BYTES;
 
         try {
             const { bytes } = await readStoredObject(ctx.storage, file.storageId, { maxBytes: Math.min(limit, remaining) });
