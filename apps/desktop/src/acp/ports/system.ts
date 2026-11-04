@@ -23,6 +23,13 @@ export const firstExisting = (paths: ReadonlyArray<string>, exists: (path: strin
  * partial table, and acting on it would hide processes). The one exception is `lsof` exiting 1 on its own: a pid it was
  * asked about is gone, and what it printed for the others is complete.
  */
+/** True when stderr is empty or holds only lsof's own `lsof: WARNING:` notices (it prints one for a filesystem it cannot stat, with no listener missing). */
+const onlyNotices = (stderr: string): boolean =>
+    stderr
+        .split("\n")
+        .map((line) => line.trim())
+        .every((line) => line === "" || line.startsWith("lsof: WARNING:") || line === "Output information may be incomplete.");
+
 const run = async (file: string, args: string[]): Promise<string> =>
     await new Promise((resolve, reject) => {
         execFile(file, args, { encoding: "utf8", env: { LC_ALL: "C", PATH: "/usr/bin:/bin" }, maxBuffer: MAX_BUFFER, timeout: TIMEOUT_MS }, (error, stdout, stderr) => {
@@ -35,7 +42,7 @@ const run = async (file: string, args: string[]): Promise<string> =>
             // lsof exits 1 when a requested pid is gone (a short-lived child) and still prints the sockets of the others.
             const failure = error as { code?: number | string; killed?: boolean; signal?: string | null };
 
-            if (LSOF.includes(file) && failure.code === 1 && String(stderr).trim() === "" && failure.killed !== true && (failure.signal ?? null) === null) {
+            if (LSOF.includes(file) && failure.code === 1 && onlyNotices(String(stderr)) && failure.killed !== true && (failure.signal ?? null) === null) {
                 resolve(stdout);
 
                 return;

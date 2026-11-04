@@ -719,9 +719,10 @@ const renderHooks = async (snapshot: SessionSnapshot, force = false, review = fa
 
 /** How often the open session's listening ports are read again; a server can start without any session event. */
 const PORTS_POLL_MS = 5000;
+const MAX_QUIET_SKIPS = 5;
 
 /** The newest port read. A read that finishes after a newer one is dropped, so a stopped server cannot reappear from an older answer. */
-const portsRead = { busy: false, latest: 0 };
+const portsRead = { busy: false, latest: 0, quiet: 0, skip: 0 };
 
 /**
  * The one place the open session changes. The previous session's ports must not stay on screen, where Stop would still
@@ -730,6 +731,8 @@ const portsRead = { busy: false, latest: 0 };
 const selectSession = (id: string | undefined): void => {
     state.selected = id;
     portsRead.latest += 1;
+    portsRead.quiet = 0;
+    portsRead.skip = 0;
     $("acp-ports-status").textContent = id === undefined ? "" : "Loading ports…";
     $("acp-ports-list").replaceChildren(...id === undefined ? [item("None.")] : []);
 
@@ -773,6 +776,9 @@ const refreshPorts = async (): Promise<void> => {
         return;
     }
 
+    // A session with no servers is read less and less often (up to every 30 s); the first server, an Open or a Stop starts over.
+    portsRead.quiet = ports.length === 0 ? portsRead.quiet + 1 : 0;
+    portsRead.skip = Math.min(portsRead.quiet, MAX_QUIET_SKIPS);
     $("acp-ports-status").textContent = "";
     $("acp-ports-list").replaceChildren(
         ...ports.length === 0
@@ -788,6 +794,8 @@ const refreshPorts = async (): Promise<void> => {
 
                                 return;
                             }
+
+                            portsRead.quiet = 0;
 
                             const ended = await globalThis.neoreDevice.acpPortStop(selected as string, port.pid, port.startedAt);
 
@@ -956,6 +964,12 @@ export const initAcp = async (): Promise<void> => {
 
     setInterval(() => {
         // A slow read is let finish: a new one every poll would supersede it each time and nothing would ever show.
+        if (portsRead.skip > 0) {
+            portsRead.skip -= 1;
+
+            return;
+        }
+
         if (state.selected !== undefined && !document.hidden && !portsRead.busy) {
             refreshPorts();
         }
