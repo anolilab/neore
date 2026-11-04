@@ -1399,7 +1399,7 @@ export const reapRun = internalMutation
     .input({ claimedAt: v.optional(v.number()), runId: v.id("subAgentRuns") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await reapSubAgentRun(ctx, args.runId, Date.now(), args.claimedAt);
+        await reapSubAgentRun(ctx, args.runId, ctx.now, args.claimedAt);
 
         return null;
     });
@@ -1612,6 +1612,7 @@ const dispatchOrThrow = async (ctx: MutationCtx, args: WorkerRunArgs): Promise<W
  * asked and every run still builds only what the user's own permissions allow a headless run.
  */
 export const createWorker = authMutation
+    .use(rateLimit("chat/update"))
     .input({
         clientId: v.string().max(WORKER_CLIENT_ID_MAX),
         // Run the worker on a coding agent on one of the caller's computers instead of in the cloud.
@@ -1655,6 +1656,7 @@ export const createWorker = authMutation
  * id is NOT_FOUND, as an id that does not exist is.
  */
 export const dispatchToWorker = authMutation
+    .use(rateLimit("chat/update"))
     .input({
         clientId: v.string().max(WORKER_CLIENT_ID_MAX),
         message: v.string().max(SUB_AGENT_TASK_MAX),

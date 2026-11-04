@@ -19,6 +19,7 @@ import { isThreadLocked } from "../lib/thread-lock";
 
 export const ABANDONED_REPLY_TEXT = "*The reply did not finish. Please try again.*";
 const ABANDONED_REPLY_ERROR = "The reply stopped before it finished.";
+const PENDING_REPLY_ROWS = 200;
 
 export const failAbandonedEditReply = internalMutation
     .input({
@@ -43,13 +44,14 @@ export const failAbandonedEditReply = internalMutation
             return { added: false, failed: 0 };
         }
 
-        // Replies to the prompt share or follow its `order`, and were written after it.
+        // Replies to the prompt share or follow its `order`, and were written after it. One reply writes a row per
+        // step (25 at most with auto-continue), so the cap only bounds a thread that is already inconsistent.
         const pendingRows = await ctx.db
             .query("messages")
             .withIndex("threadId_status_tool_order_stepOrder", (q) =>
                 q.eq("threadId", threadId).eq("status", "pending").eq("tool", false).gte("order", prompt.order),
             )
-            .collect();
+            .take(PENDING_REPLY_ROWS);
         const pending = pendingRows.filter((row) => row._creationTime >= prompt._creationTime);
 
         for (const row of pending) {

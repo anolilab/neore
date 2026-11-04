@@ -108,7 +108,7 @@ export const beginHostGuide = internalMutation
         // The session start refuses only when the computer is busy or went offline between the check above and now.
         const started = await startHostSessionFor(ctx, userId, {
             agentKey: args.agentKey,
-            clientId: crypto.randomUUID(),
+            clientId: ctx.newId(),
             deviceId: args.deviceId,
             folderId: args.folderId,
         }).catch((error: unknown) => {
@@ -123,7 +123,7 @@ export const beginHostGuide = internalMutation
         // The prompt carries a pull request's title, body and paths: third-party text, so the turn is signed as tainted.
         const sent = await sendToHostFor(ctx, {
             plan: args.plan,
-            requestId: crypto.randomUUID(),
+            requestId: ctx.newId(),
             taintedBy: GUIDE_TAINT,
             text: args.text,
             threadId: started.threadId,

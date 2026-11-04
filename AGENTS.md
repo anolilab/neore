@@ -1468,13 +1468,12 @@ not nest, so `chat/group`, `chat/tags` etc. are all `chat`.
   into `insertThread(...)` would not draw the ERROR a direct `ctx.db.insert`
   does. Stamp ownership from `ctx.user` before calling one (every current
   public caller does; the three internal messenger inserts lost their INFO).
-- **GDPR's findings are accepted** (325 on 2026-10-06; codegen counts the
-  shared `deleteQuietly` helper once per caller) — erasure (`gdpr/steps/*`) must reach
-  every table, and its batching/ordering is pinned by the tests beside it; see
-  `gdpr/module.ts`. A NEW module puts its erasure in `<module>/gdpr.ts` (as
-  devices, evals, pages, tasks … do), wired into the deletion workflow, so it
-  draws none. Any `cross_module_table_write` outside `gdpr/steps/` is a
-  regression.
+- **GDPR draws none.** Each module erases its own tables in `<module>/gdpr.ts`, wired
+  into the deletion workflow (`gdpr/steps/*` only orchestrates). The shared helpers in
+  `gdpr/batch.ts` take the delete as a callback (`(row) => ctx.db.delete("t", row._id)`)
+  so the write names its table in the owner's file: a `TableName` parameter there read
+  to the advisor as a write to every table (272 findings until 2026-11-04). Any
+  `cross_module_table_write` is a regression.
 - **Architecture view**: codegen writes `_generated/architecture.{json,ts}`,
   which are GIT-IGNORED (they changed on nearly every backend PR and caused the
   merge conflicts). `_generated/app.ts` imports `architecture.js`, so anything

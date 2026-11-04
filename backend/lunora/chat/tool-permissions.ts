@@ -258,7 +258,7 @@ export const getToolPermissionSettings = authQuery
             builtIn: listBuiltInTools().map(({ available, category, name }) => {
                 return { available, category, defaultMode: defaultToolPermission("builtin", undefined, name), key: toolPermissionKey("builtin", name), name };
             }),
-            grants: activeGrants(prefs?.toolPermissionGrants, Date.now()),
+            grants: activeGrants(prefs?.toolPermissionGrants, ctx.now),
             lowRiskTrustedServers: liveTrustedServers(prefs?.lowRiskTrustedServers, prefs?.mcpServers),
             overrides: prefs?.toolPermissions ?? {},
         };
