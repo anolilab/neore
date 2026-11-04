@@ -32,7 +32,8 @@ pub fn validate_backend(raw: &str) -> Result<String, String> {
         .ok_or("the backend address must start with https://")?;
     let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
 
-    if authority.is_empty() || authority.contains('@') || rest.contains(['?', '#']) {
+    // Callers append `/api/auth/...`, so a path (or query) would build a wrong endpoint and be saved as the backend.
+    if authority.is_empty() || authority.contains('@') || rest != authority {
         return Err("the backend address must be an origin, such as https://neore.ai".into());
     }
 
@@ -130,6 +131,8 @@ mod tests {
             "https://",
             "https://user@neore.ai",
             "https://neore.ai/path?x=1",
+            "https://neore.ai/api/auth",
+            "https://neore.ai/app/",
             "",
         ] {
             assert!(validate_backend(bad).is_err(), "{bad} was accepted");

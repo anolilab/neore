@@ -112,6 +112,19 @@ impl NonceSet {
         }
     }
 
+    /// [`persisted`](Self::persisted) for a caller that must not run on a lost history: a stored file that cannot be
+    /// read or parsed is an error.
+    pub fn persisted_strict(path: &Path, now: u64) -> Result<Self, String> {
+        let mut entries = store::load_nonces_strict(path)?;
+
+        entries.retain(|_, expiry| *expiry > now);
+
+        Ok(NonceSet {
+            entries,
+            path: Some(path.to_owned()),
+        })
+    }
+
     /// `false` when the nonce was already used (a replay), or when it cannot be
     /// recorded: a nonce that is not on disk would not survive a restart.
     pub fn insert(&mut self, nonce: &str, expires_at: u64, now: u64) -> bool {

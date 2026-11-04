@@ -36,7 +36,7 @@ import { assertRoomForDevice, insertDevice } from "./lib/register";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
 import { filterOwnProjectIds } from "./lib/scope";
 import { claimWindowMs, expireOpenCalls, isAcpTool, isDeviceOutdated, isForwardPhase } from "./lib/state";
-import { capUtf8, clockSkewData, clockSkewMessage, generateDeviceSecret, isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "./lib/signing";
+import { capUtf8, clockSkewData, clockSkewMessage, isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "./lib/signing";
 import { vDeviceCallView, vDevicePlatform, vDeviceView, vDeviceCallStatusView } from "./validators";
 
 const vDeviceName = v.string().check((value) => value.trim().length > 0 && value.length <= 80, { message: "Name must be 1-80 characters" });

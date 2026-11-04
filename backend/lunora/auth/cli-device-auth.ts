@@ -108,7 +108,7 @@ export interface CliDeviceAuthOptions {
     mintApiKey: (input: { expiresInSeconds: number; name: string; userId: string }) => Promise<MintedCliKey>;
 }
 
-const oauthError = (status: "BAD_REQUEST" | "FORBIDDEN", error: string, description: string): APIError =>
+const oauthError = (status: "BAD_REQUEST" | "FORBIDDEN" | "INTERNAL_SERVER_ERROR", error: string, description: string): APIError =>
     new APIError(status, { error, error_description: description });
 
 /** The plugin's `grant`: see the file header. */
@@ -315,6 +315,17 @@ const redeemKey = (options: CliDeviceAuthOptions) =>
         });
     });
 
+/** `owner@example.com` as `o***@example.com`: enough to recognise one's own account, not to harvest an address. */
+const maskEmail = (email: string | undefined): string => {
+    const at = email?.lastIndexOf("@") ?? -1;
+
+    if (!email || at < 1) {
+        return "";
+    }
+
+    return `${email.slice(0, 1)}***${email.slice(at)}`;
+};
+
 const hostBodySchema = z.object({
     client_id: z.string().max(64).optional(),
     device_code: z.string().max(256),
@@ -348,7 +359,16 @@ const redeemHost = (options: HostPairingOptions) =>
                 try {
                     await options.precheck(record.userId as string);
                 } catch (error) {
-                    throw oauthError("FORBIDDEN", "access_denied", error instanceof Error ? error.message : "This account cannot pair another machine.");
+                    // Only a refusal the precheck MEANT (a full account, a deletion underway: FORBIDDEN or BAD_REQUEST) is
+                    // the person's to read. Anything else is a failure of ours, and the machine retries a 5xx with the
+                    // code still unspent, where a 403 would end its pairing.
+                    const code = (error as { code?: unknown } | null)?.code;
+
+                    if ((code === "FORBIDDEN" || code === "BAD_REQUEST") && error instanceof Error) {
+                        throw oauthError("FORBIDDEN", "access_denied", error.message);
+                    }
+
+                    throw oauthError("INTERNAL_SERVER_ERROR", "server_error", "The pairing could not be checked. Try again.");
                 }
 
                 return {};
@@ -369,7 +389,8 @@ const redeemHost = (options: HostPairingOptions) =>
         ctx.setHeader("Cache-Control", "no-store");
         ctx.setHeader("Pragma", "no-cache");
 
-        return ctx.json({ device_id: device.deviceId, name, secret: device.secret, token_type: "device_secret" });
+        // The account that approved, masked, so the person at the machine sees whose it became.
+        return ctx.json({ account: maskEmail(user.email), device_id: device.deviceId, name, secret: device.secret, token_type: "device_secret" });
     });
 
 /**

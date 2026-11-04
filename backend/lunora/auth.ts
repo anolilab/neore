@@ -658,9 +658,7 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
 
     cached = createAuth({
         ...buildAuthOptions({
-            // Queued, not run here: moving a guest's rows takes a round trip per
-            // table and page, too long to hold the sign-up request. The job runs
-            // on the NEW user's shard (`lib/account-merge.ts#runGuestMerge`).
+            // A machine that pairs itself by code is registered on its owner's shard.
             hostPairing: {
                 precheck: async (userId) => {
                     await shard.call(internal.devices.internal.checkHeadlessPairing, { userId }, { shardKey: userId });
@@ -668,6 +666,9 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
                 register: async ({ name, platform, userId }) =>
                     await shard.call(internal.devices.internal.registerHeadlessDevice, { name, platform, userId }, { shardKey: userId }),
             },
+            // Queued, not run here: moving a guest's rows takes a round trip per
+            // table and page, too long to hold the sign-up request. The job runs
+            // on the NEW user's shard (`lib/account-merge.ts#runGuestMerge`).
             onGuestConverted: async (guestId, userId) => {
                 try {
                     await enqueueJob(internal.lib.account_merge.runGuestMerge, { from: guestId, to: userId }, { shardKey: userId });

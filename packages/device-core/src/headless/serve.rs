@@ -19,6 +19,32 @@ use crate::envelope::{verify_call, NonceSet, Signed};
 /// A signed call is a few kilobytes; a line longer than this is not one.
 const MAX_LINE_BYTES: u64 = 1024 * 1024;
 
+/// Holds this pairing's run lock until dropped. The used-nonce history is one process's memory plus one file, so two
+/// `neore-host run` processes on the same pairing could each accept the same call; the second one is refused.
+pub struct RunLock {
+    _file: std::fs::File,
+}
+
+impl RunLock {
+    pub fn acquire(dir: &Path) -> Result<Self, String> {
+        std::fs::create_dir_all(dir).map_err(|error| error.to_string())?;
+
+        let path = dir.join("run.lock");
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(&path)
+            .map_err(|error| format!("{} could not be opened: {error}", path.display()))?;
+
+        file.try_lock().map_err(|_| {
+            "another `neore-host run` already holds this pairing; stop it first".to_owned()
+        })?;
+
+        Ok(RunLock { _file: file })
+    }
+}
+
 pub struct Service {
     device_id: String,
     nonces: NonceSet,
@@ -34,13 +60,18 @@ pub struct Accepted {
 
 impl Service {
     /// `nonce_file` keeps the used nonces across restarts, so a replay inside an envelope's window is refused after
-    /// the process is restarted too.
-    pub fn new(device_id: &str, secret: &str, nonce_file: &Path, now: u64) -> Self {
-        Service {
+    /// the process is restarted too. A file that exists but is unreadable or damaged is an error, not an empty
+    /// history: starting on it would accept a call again that was already accepted.
+    pub fn new(device_id: &str, secret: &str, nonce_file: &Path, now: u64) -> Result<Self, String> {
+        let nonces = NonceSet::persisted_strict(nonce_file, now).map_err(|reason| {
+            format!("{reason}; delete it to start with an empty history once every call signed before now has expired")
+        })?;
+
+        Ok(Service {
             device_id: device_id.to_owned(),
-            nonces: NonceSet::persisted(nonce_file, now),
+            nonces,
             secret: secret.to_owned(),
-        }
+        })
     }
 
     /// Whether `signed` is a call the backend signed for THIS device. The error is the refusal's reason; it never
@@ -170,7 +201,7 @@ mod tests {
 
         std::fs::create_dir_all(&dir).unwrap();
 
-        Service::new("device-1", SECRET, &dir.join("nonces.json"), NOW)
+        Service::new("device-1", SECRET, &dir.join("nonces.json"), NOW).unwrap()
     }
 
     fn answers(service: &mut Service, lines: &[String]) -> Vec<Value> {
@@ -278,19 +309,59 @@ mod tests {
 
         let file = dir.join("nonces.json");
         let accepted = line(SECRET, &call("device-1", "n1", 60_000));
-        let mut first = Service::new("device-1", SECRET, &file, NOW);
+        let mut first = Service::new("device-1", SECRET, &file, NOW).unwrap();
 
         assert_eq!(
             answers(&mut first, std::slice::from_ref(&accepted))[0]["accepted"],
             json!(true)
         );
 
-        let mut restarted = Service::new("device-1", SECRET, &file, NOW);
+        let mut restarted = Service::new("device-1", SECRET, &file, NOW).unwrap();
 
         assert_eq!(
             answers(&mut restarted, &[accepted])[0]["accepted"],
             json!(false)
         );
+    }
+
+    #[test]
+    fn a_damaged_nonce_history_stops_the_run_instead_of_forgetting_it() {
+        let dir = temp_dir("damaged");
+
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let file = dir.join("nonces.json");
+
+        std::fs::write(&file, "{ not json").unwrap();
+
+        let error = Service::new("device-1", SECRET, &file, NOW)
+            .err()
+            .expect("a damaged history must not be taken for an empty one");
+
+        assert!(error.contains("is damaged"), "{error}");
+
+        // A directory where the file should be is unreadable, which is not "no history" either.
+        std::fs::remove_file(&file).unwrap();
+        std::fs::create_dir(&file).unwrap();
+
+        assert!(Service::new("device-1", SECRET, &file, NOW).is_err());
+        // Absent is a first start.
+        assert!(Service::new("device-1", SECRET, &dir.join("none.json"), NOW).is_ok());
+    }
+
+    #[test]
+    fn a_second_run_on_the_same_pairing_is_refused_until_the_first_ends() {
+        let dir = temp_dir("lock");
+        let first = RunLock::acquire(&dir).unwrap();
+
+        assert!(RunLock::acquire(&dir)
+            .err()
+            .unwrap()
+            .contains("already holds"));
+
+        drop(first);
+
+        assert!(RunLock::acquire(&dir).is_ok());
     }
 
     #[test]

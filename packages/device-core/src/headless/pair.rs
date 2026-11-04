@@ -13,7 +13,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde_json::{json, Value};
 
 use super::http::{validate_backend, Http, Reply};
-use super::vault::{Storage, Vault};
+use super::vault::{NewPairing, Storage, Vault};
 
 /// The client id the backend accepts for a headless machine (`backend/lunora/auth/cli-device-auth.ts`).
 pub const CLIENT_ID: &str = "neore-host";
@@ -61,6 +61,9 @@ pub enum PairError {
     Invalid,
     /// The backend refused (a rate limit, a full account, no pairing offered), with its reason.
     Refused(String),
+    /// The answer to a request was lost and the code was refused as used right after: the backend may have registered
+    /// this machine, but its secret never arrived.
+    PossiblyRegistered,
     /// The pairing succeeded on the backend but this machine could not keep the secret.
     NotStored { device_id: String, reason: String },
     /// The backend could not be reached, or kept failing.
@@ -74,6 +77,9 @@ impl fmt::Display for PairError {
             PairError::Expired => formatter.write_str("the code expired before it was approved; run the command again"),
             PairError::Invalid => formatter.write_str("the code is not valid, or it was already used; run the command again"),
             PairError::Refused(reason) => write!(formatter, "the backend refused the pairing: {reason}"),
+            PairError::PossiblyRegistered => formatter.write_str(
+                "the backend's answer was lost and the code is used up. It may have registered this machine without its secret reaching it: look for it in the web app (Settings, Devices), remove it, and run the command again",
+            ),
             PairError::NotStored { device_id, reason } => write!(
                 formatter,
                 "the machine was registered (device {device_id}) but its secret could not be stored: {reason}. Remove that device in the web app (Settings, Devices) and pair again."
@@ -87,9 +93,10 @@ impl std::error::Error for PairError {}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Paired {
+    /// The approving account as the backend displayed it (a masked address); empty when it sent none.
+    pub account: String,
     pub device_id: String,
     pub name: String,
-    pub notice: Option<String>,
     pub storage: Storage,
 }
 
@@ -247,9 +254,18 @@ pub fn pair(
     let code = request_code(http, timer, &backend, identity, storage, out)?;
     let mut interval = code.interval;
     let mut failures = 0;
+    // The last poll got no answer. The backend may still have acted on it.
+    let mut lost_answer = false;
 
     loop {
-        timer.sleep(interval);
+        // Never wait past the code's life: a long interval (grown by `slow_down`) must not outlast it.
+        let remaining = code.expires_at_ms.saturating_sub(timer.now_ms());
+
+        if remaining == 0 {
+            return Err(PairError::Expired);
+        }
+
+        timer.sleep(interval.min(Duration::from_millis(remaining)));
 
         if timer.now_ms() >= code.expires_at_ms {
             return Err(PairError::Expired);
@@ -267,6 +283,7 @@ pub fn pair(
             }
             Ok(reply) => {
                 failures += 1;
+                lost_answer = true;
 
                 if failures > MAX_CONSECUTIVE_FAILURES {
                     return Err(PairError::Unreachable(describe(&reply)));
@@ -276,6 +293,7 @@ pub fn pair(
             }
             Err(reason) => {
                 failures += 1;
+                lost_answer = true;
 
                 if failures > MAX_CONSECUTIVE_FAILURES {
                     return Err(PairError::Unreachable(reason));
@@ -285,14 +303,17 @@ pub fn pair(
             }
         };
 
+        let after_lost_answer = std::mem::take(&mut lost_answer);
+
         if reply.status == 200 {
-            return store(vault, &backend, &reply);
+            return store(vault, &backend, storage, &reply);
         }
 
         match text(&reply.body, "error") {
             Some("authorization_pending") => {}
             Some("slow_down") => interval += SLOW_DOWN_STEP,
             Some("expired_token") => return Err(PairError::Expired),
+            Some("invalid_grant") if after_lost_answer => return Err(PairError::PossiblyRegistered),
             Some("invalid_grant") => return Err(PairError::Invalid),
             // The owner's "deny" is a 400; a refusal of the account itself (no room for another device) is a 403.
             Some("access_denied") if reply.status == 403 => {
@@ -304,7 +325,12 @@ pub fn pair(
     }
 }
 
-fn store(vault: &Vault<'_>, backend: &str, reply: &Reply) -> Result<Paired, PairError> {
+fn store(
+    vault: &Vault<'_>,
+    backend: &str,
+    storage: Storage,
+    reply: &Reply,
+) -> Result<Paired, PairError> {
     let (Some(device_id), Some(secret)) =
         (text(&reply.body, "device_id"), text(&reply.body, "secret"))
     else {
@@ -320,18 +346,31 @@ fn store(vault: &Vault<'_>, backend: &str, reply: &Reply) -> Result<Paired, Pair
     }
 
     let name = text(&reply.body, "name").unwrap_or("this machine");
-    let saved = vault
-        .save(backend, device_id, name, secret)
+    let account = text(&reply.body, "account").unwrap_or_default();
+
+    // Where the owner was told it would go, not wherever works now: a different place needs a new code, which
+    // shows its own choice.
+    vault
+        .save(
+            &NewPairing {
+                account,
+                backend,
+                device_id,
+                name,
+                secret,
+            },
+            storage,
+        )
         .map_err(|reason| PairError::NotStored {
             device_id: device_id.to_owned(),
             reason,
         })?;
 
     Ok(Paired {
+        account: account.to_owned(),
         device_id: device_id.to_owned(),
         name: name.to_owned(),
-        notice: saved.notice,
-        storage: saved.storage,
+        storage,
     })
 }
 
@@ -405,7 +444,7 @@ mod tests {
     fn approved() -> Result<Reply, String> {
         Ok(reply(
             200,
-            json!({ "device_id": "device-9", "name": "build-box", "secret": SECRET, "token_type": "device_secret" }),
+            json!({ "account": "o***@example.com", "device_id": "device-9", "name": "build-box", "secret": SECRET, "token_type": "device_secret" }),
         ))
     }
 
@@ -459,12 +498,12 @@ mod tests {
 
         assert_eq!(paired.device_id, "device-9");
         assert_eq!(paired.storage, Storage::Keychain);
-        assert_eq!(paired.notice, None);
+        assert_eq!(paired.account, "o***@example.com");
         assert_eq!(
             keychain
                 .entries
                 .borrow()
-                .get("device-9")
+                .get("https://neore.ai|device-9")
                 .map(String::as_str),
             Some(SECRET)
         );
@@ -597,6 +636,35 @@ mod tests {
             run(&dead, &FakeKeychain::default(), "dead").0,
             Err(PairError::Unreachable("connection refused".into()))
         );
+    }
+
+    #[test]
+    fn a_used_code_after_a_lost_answer_says_the_machine_may_be_registered() {
+        let backend = FakeBackend::new(vec![
+            Err("timed out".into()),
+            Ok(reply(400, json!({ "error": "invalid_grant" }))),
+        ]);
+        let (outcome, _, _) = run(&backend, &FakeKeychain::default(), "lost-answer");
+
+        assert_eq!(outcome, Err(PairError::PossiblyRegistered));
+        assert!(PairError::PossiblyRegistered
+            .to_string()
+            .contains("Settings, Devices"));
+    }
+
+    #[test]
+    fn never_sleeps_past_the_codes_life() {
+        // Every poll says slow_down, so the interval keeps growing; the code lives 1800 s.
+        let backend = FakeBackend::new(
+            (0..400)
+                .map(|_| Ok(reply(400, json!({ "error": "slow_down" }))))
+                .collect(),
+        );
+        let (outcome, _, timer) = run(&backend, &FakeKeychain::default(), "bound");
+        let total: Duration = timer.slept.borrow().iter().sum();
+
+        assert_eq!(outcome, Err(PairError::Expired));
+        assert_eq!(total, Duration::from_secs(1800));
     }
 
     #[test]

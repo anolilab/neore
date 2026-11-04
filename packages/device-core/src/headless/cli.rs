@@ -6,7 +6,7 @@ use std::process::ExitCode;
 
 use super::http::UreqHttp;
 use super::pair::{self, Identity, SystemTimer, Timer};
-use super::serve::Service;
+use super::serve::{RunLock, Service};
 use super::vault::{default_dir, OsKeychain, Vault};
 
 pub const USAGE: &str = "usage:
@@ -128,16 +128,21 @@ pub fn main(command: &str, mut args: impl Iterator<Item = String>) -> ExitCode {
 
             match outcome {
                 Ok(paired) => {
+                    let owner = if paired.account.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" to {}", paired.account)
+                    };
+
                     println!(
-                        "Paired as \"{}\" (device {}). The device secret is kept in {}.",
+                        "Paired{owner} as \"{}\" (device {}). The device secret is kept in {}.",
                         paired.name,
                         paired.device_id,
                         paired.storage.describe()
                     );
-
-                    if let Some(notice) = paired.notice {
-                        println!("{notice}");
-                    }
+                    println!(
+                        "If that is not your account, run `neore-host unpair` and remove the device in the web app."
+                    );
 
                     println!(
                         "Run `neore-host run` to have this machine decide which calls are for it."
@@ -175,20 +180,41 @@ pub fn main(command: &str, mut args: impl Iterator<Item = String>) -> ExitCode {
                 }
             };
 
+            let _lock = match RunLock::acquire(vault.dir()) {
+                Ok(lock) => lock,
+                Err(error) => {
+                    eprintln!("neore-host: {error}");
+
+                    return ExitCode::FAILURE;
+                }
+            };
+
             eprintln!(
-                "neore-host: \"{}\" (device {}), secret in {}. Reading signed calls on stdin.",
+                "neore-host: \"{}\" (device {}){}, secret in {}. Reading signed calls on stdin.",
                 loaded.record.name,
                 loaded.record.device_id,
+                if loaded.record.account.is_empty() {
+                    String::new()
+                } else {
+                    format!(" of {}", loaded.record.account)
+                },
                 loaded.record.storage.describe()
             );
 
             let timer = SystemTimer;
-            let mut service = Service::new(
+            let mut service = match Service::new(
                 &loaded.record.device_id,
                 &loaded.secret,
                 &vault.dir().join("nonces.json"),
                 timer.now_ms(),
-            );
+            ) {
+                Ok(service) => service,
+                Err(error) => {
+                    eprintln!("neore-host: {error}");
+
+                    return ExitCode::FAILURE;
+                }
+            };
 
             match service.run(io::stdin().lock(), io::stdout(), || timer.now_ms()) {
                 Ok(()) => ExitCode::SUCCESS,
@@ -199,16 +225,17 @@ pub fn main(command: &str, mut args: impl Iterator<Item = String>) -> ExitCode {
                 }
             }
         }
-        "unpair" => match vault.forget() {
-            Ok(()) => {
-                println!("This machine no longer holds a pairing. Remove the device in the web app (Settings, Devices) to end it there.");
+        "unpair" => match unpair_request(args.next().as_deref(), args.next().is_none()) {
+            UnpairRequest::Forget => unpair(&vault),
+            UnpairRequest::Help => {
+                println!("{USAGE}");
 
                 ExitCode::SUCCESS
             }
-            Err(error) => {
-                eprintln!("neore-host: {error}");
+            UnpairRequest::Usage => {
+                eprintln!("{USAGE}");
 
-                ExitCode::FAILURE
+                ExitCode::from(2)
             }
         },
         _ => {
@@ -216,5 +243,50 @@ pub fn main(command: &str, mut args: impl Iterator<Item = String>) -> ExitCode {
 
             ExitCode::from(2)
         }
+    }
+}
+
+fn unpair(vault: &Vault<'_>) -> ExitCode {
+    match vault.forget() {
+        Ok(()) => {
+            println!("This machine no longer holds a pairing. Remove the device in the web app (Settings, Devices) to end it there.");
+
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("neore-host: {error}");
+
+            ExitCode::FAILURE
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum UnpairRequest {
+    Forget,
+    Help,
+    Usage,
+}
+
+/// `unpair` takes no argument: asking for help must not delete the pairing, and a typo must not either.
+fn unpair_request(first: Option<&str>, nothing_after: bool) -> UnpairRequest {
+    match first {
+        None => UnpairRequest::Forget,
+        Some("--help" | "-h") if nothing_after => UnpairRequest::Help,
+        Some(_) => UnpairRequest::Usage,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unpair_forgets_only_when_given_nothing() {
+        assert_eq!(unpair_request(None, true), UnpairRequest::Forget);
+        assert_eq!(unpair_request(Some("--help"), true), UnpairRequest::Help);
+        assert_eq!(unpair_request(Some("-h"), true), UnpairRequest::Help);
+        assert_eq!(unpair_request(Some("--hlep"), true), UnpairRequest::Usage);
+        assert_eq!(unpair_request(Some("--help"), false), UnpairRequest::Usage);
     }
 }

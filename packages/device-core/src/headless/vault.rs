@@ -44,6 +44,9 @@ impl Storage {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Record {
+    /// The approving account as the backend displayed it (a masked address), so `run` can show whose machine this is.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub account: String,
     pub backend: String,
     pub device_id: String,
     pub name: String,
@@ -104,11 +107,24 @@ pub fn default_dir() -> Option<PathBuf> {
             .filter(|dir| !dir.is_empty())
             .map(|dir| PathBuf::from(dir).join("Neore Host"))
     } else {
-        std::env::var_os("XDG_CONFIG_HOME")
-            .filter(|dir| !dir.is_empty())
-            .map(|dir| PathBuf::from(dir).join("neore-host"))
-            .or_else(|| home().map(|home| home.join(".config/neore-host")))
+        xdg_dir(std::env::var_os("XDG_CONFIG_HOME"), home())
     }
+}
+
+/// `$XDG_CONFIG_HOME/neore-host`; the spec says to ignore a relative value, which would put the secret file in
+/// whatever directory the command happened to start in.
+fn xdg_dir(config_home: Option<std::ffi::OsString>, home: Option<PathBuf>) -> Option<PathBuf> {
+    config_home
+        .map(PathBuf::from)
+        .filter(|dir| dir.is_absolute())
+        .map(|dir| dir.join("neore-host"))
+        .or_else(|| home.map(|home| home.join(".config/neore-host")))
+}
+
+/// The keychain account of a pairing: the device id alone is the backend's, so the backend is part of it, and two
+/// pairings against different backends cannot overwrite each other's secret.
+fn account_of(backend: &str, device_id: &str) -> String {
+    format!("{backend}|{device_id}")
 }
 
 pub struct Vault<'a> {
@@ -116,11 +132,13 @@ pub struct Vault<'a> {
     keychain: &'a dyn Keychain,
 }
 
-/// What `save` did: where the secret went, and a notice when that was not the first choice.
-#[derive(Debug, PartialEq, Eq)]
-pub struct Saved {
-    pub notice: Option<String>,
-    pub storage: Storage,
+/// What a pairing is saved as.
+pub struct NewPairing<'a> {
+    pub account: &'a str,
+    pub backend: &'a str,
+    pub device_id: &'a str,
+    pub name: &'a str,
+    pub secret: &'a str,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -158,45 +176,36 @@ impl<'a> Vault<'a> {
         }
     }
 
-    /// Stores the pairing. The keychain first; when it refuses, the 0600 file, with a notice saying so. When neither
-    /// can hold it, an error: the secret is not kept anywhere.
-    pub fn save(
-        &self,
-        backend: &str,
-        device_id: &str,
-        name: &str,
-        secret: &str,
-    ) -> Result<Saved, String> {
+    /// Stores the pairing where `storage` says: the place [`probe`](Self::probe) announced before the owner approved.
+    /// It never switches to the other one, because the owner approved THAT choice. When it cannot hold the secret
+    /// there, an error: the secret is not kept anywhere, and nothing of it is left behind.
+    pub fn save(&self, pairing: &NewPairing<'_>, storage: Storage) -> Result<(), String> {
         let mut record = Record {
-            backend: backend.to_owned(),
-            device_id: device_id.to_owned(),
-            name: name.to_owned(),
+            account: pairing.account.to_owned(),
+            backend: pairing.backend.to_owned(),
+            device_id: pairing.device_id.to_owned(),
+            name: pairing.name.to_owned(),
             secret: String::new(),
-            storage: Storage::Keychain,
+            storage,
         };
 
-        match self.keychain.set(device_id, secret) {
-            Ok(()) => {
-                write_private(&self.dir, &self.file(), &record)?;
+        match storage {
+            Storage::Keychain => {
+                let account = account_of(pairing.backend, pairing.device_id);
 
-                Ok(Saved {
-                    notice: None,
-                    storage: Storage::Keychain,
+                self.keychain
+                    .set(&account, pairing.secret)
+                    .map_err(|reason| format!("the keychain refused the secret ({reason})"))?;
+
+                write_private(&self.dir, &self.file(), &record).inspect_err(|_| {
+                    self.keychain.delete(&account);
                 })
             }
-            Err(reason) => {
-                record.storage = Storage::File;
-                record.secret = secret.to_owned();
-                write_private(&self.dir, &self.file(), &record).map_err(|error| {
-                    format!("the keychain refused the secret ({reason}) and the file could not be written: {error}")
-                })?;
+            Storage::File => {
+                record.secret = pairing.secret.to_owned();
 
-                Ok(Saved {
-                    notice: Some(format!(
-                        "The keychain could not hold the secret ({reason}), so it is kept in {} instead.",
-                        self.file().display()
-                    )),
-                    storage: Storage::File,
+                write_private(&self.dir, &self.file(), &record).map_err(|error| {
+                    format!("the secret file could not be written: {error}")
                 })
             }
         }
@@ -223,7 +232,7 @@ impl<'a> Vault<'a> {
 
                 record.secret.clone()
             }
-            Storage::Keychain => match self.keychain.get(&record.device_id) {
+            Storage::Keychain => match self.keychain.get(&account_of(&record.backend, &record.device_id)) {
                 Ok(Some(secret)) => secret,
                 Ok(None) => {
                     return Err("this machine is paired, but the keychain no longer holds its secret; remove the device in the web app and pair again".into());
@@ -238,7 +247,8 @@ impl<'a> Vault<'a> {
     /// Forgets the pairing on this machine (the owner removes the device in the web app).
     pub fn forget(&self) -> Result<(), String> {
         if let Some(loaded) = self.load().ok().flatten() {
-            self.keychain.delete(&loaded.record.device_id);
+            self.keychain
+                .delete(&account_of(&loaded.record.backend, &loaded.record.device_id));
         }
 
         match fs::remove_file(self.file()) {
@@ -412,17 +422,24 @@ pub(crate) mod tests {
         );
     }
 
+    fn pairing<'a>(device_id: &'a str) -> NewPairing<'a> {
+        NewPairing {
+            account: "o***@example.com",
+            backend: "https://neore.ai",
+            device_id,
+            name: "build-box",
+            secret: SECRET,
+        }
+    }
+
     #[test]
     fn a_keychain_pairing_keeps_the_secret_out_of_the_file() {
         let dir = temp_dir("keychain");
         let keychain = FakeKeychain::default();
         let vault = Vault::new(dir.clone(), &keychain);
-        let saved = vault
-            .save("https://neore.ai", "device-1", "build-box", SECRET)
-            .unwrap();
 
-        assert_eq!(saved.storage, Storage::Keychain);
-        assert_eq!(saved.notice, None);
+        vault.save(&pairing("device-1"), Storage::Keychain).unwrap();
+
         assert!(!fs::read_to_string(dir.join("host.json"))
             .unwrap()
             .contains(SECRET));
@@ -431,12 +448,84 @@ pub(crate) mod tests {
 
         assert_eq!(loaded.secret, SECRET);
         assert_eq!(loaded.record.device_id, "device-1");
+        assert_eq!(loaded.record.account, "o***@example.com");
         assert_eq!(loaded.record.storage, Storage::Keychain);
+    }
+
+    #[test]
+    fn the_keychain_entry_is_per_backend_so_equal_device_ids_do_not_collide() {
+        let keychain = FakeKeychain::default();
+        let other = "0000000000000000000000000000000000000000000000000000000000000000";
+        let first = Vault::new(temp_dir("collide-a"), &keychain);
+        let second = Vault::new(temp_dir("collide-b"), &keychain);
+
+        first.save(&pairing("same-id"), Storage::Keychain).unwrap();
+        second
+            .save(
+                &NewPairing {
+                    backend: "https://staging.neore.ai",
+                    secret: other,
+                    ..pairing("same-id")
+                },
+                Storage::Keychain,
+            )
+            .unwrap();
+
+        assert_eq!(first.load().unwrap().unwrap().secret, SECRET);
+        assert_eq!(second.load().unwrap().unwrap().secret, other);
+    }
+
+    #[test]
+    fn a_keychain_that_refuses_after_the_announcement_fails_instead_of_switching_to_a_file() {
+        let dir = temp_dir("no-switch");
+        let keychain = FakeKeychain {
+            broken: true,
+            ..FakeKeychain::default()
+        };
+        let vault = Vault::new(dir.clone(), &keychain);
+        let error = vault
+            .save(&pairing("device-1"), Storage::Keychain)
+            .unwrap_err();
+
+        assert!(error.contains("keychain refused"), "{error}");
+        assert!(!dir.join("host.json").exists());
     }
 
     #[cfg(unix)]
     #[test]
-    fn a_broken_keychain_falls_back_to_a_0600_file_and_says_so() {
+    fn a_record_that_cannot_be_written_leaves_no_keychain_entry() {
+        let blocker = temp_dir("record-fail");
+
+        fs::write(&blocker, "x").unwrap();
+
+        let keychain = FakeKeychain::default();
+        let vault = Vault::new(blocker.join("inside"), &keychain);
+
+        assert!(vault.save(&pairing("device-1"), Storage::Keychain).is_err());
+        assert!(keychain.entries.borrow().is_empty());
+    }
+
+    #[test]
+    fn a_relative_config_home_is_ignored() {
+        let home = Some(PathBuf::from("/home/me"));
+
+        assert_eq!(
+            xdg_dir(Some("relative/dir".into()), home.clone()),
+            Some(PathBuf::from("/home/me/.config/neore-host"))
+        );
+        assert_eq!(
+            xdg_dir(Some("/etc/xdg".into()), home.clone()),
+            Some(PathBuf::from("/etc/xdg/neore-host"))
+        );
+        assert_eq!(
+            xdg_dir(Some("".into()), home),
+            Some(PathBuf::from("/home/me/.config/neore-host"))
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_file_pairing_is_a_0600_file_in_a_0700_folder() {
         use std::os::unix::fs::PermissionsExt;
 
         let dir = temp_dir("fallback");
@@ -445,12 +534,8 @@ pub(crate) mod tests {
             ..FakeKeychain::default()
         };
         let vault = Vault::new(dir.clone(), &keychain);
-        let saved = vault
-            .save("https://neore.ai", "device-1", "build-box", SECRET)
-            .unwrap();
 
-        assert_eq!(saved.storage, Storage::File);
-        assert!(saved.notice.unwrap().contains("keychain could not hold"));
+        vault.save(&pairing("device-1"), Storage::File).unwrap();
 
         let file = dir.join("host.json");
 
@@ -483,9 +568,7 @@ pub(crate) mod tests {
         };
         let vault = Vault::new(dir.clone(), &keychain);
 
-        vault
-            .save("https://neore.ai", "device-1", "build-box", SECRET)
-            .unwrap();
+        vault.save(&pairing("device-1"), Storage::File).unwrap();
         fs::set_permissions(dir.join("host.json"), fs::Permissions::from_mode(0o644)).unwrap();
 
         let error = vault.load().unwrap_err();
@@ -500,9 +583,7 @@ pub(crate) mod tests {
         let keychain = FakeKeychain::default();
         let vault = Vault::new(dir, &keychain);
 
-        vault
-            .save("https://neore.ai", "device-1", "build-box", SECRET)
-            .unwrap();
+        vault.save(&pairing("device-1"), Storage::Keychain).unwrap();
         keychain.entries.borrow_mut().clear();
 
         assert!(vault
@@ -519,9 +600,7 @@ pub(crate) mod tests {
 
         assert_eq!(vault.load().unwrap(), None);
 
-        vault
-            .save("https://neore.ai", "device-1", "build-box", SECRET)
-            .unwrap();
+        vault.save(&pairing("device-1"), Storage::Keychain).unwrap();
         vault.forget().unwrap();
 
         assert_eq!(vault.load().unwrap(), None);

@@ -173,7 +173,7 @@ describe("pairing a headless machine by code", () => {
 
         expect(redeemed.response.status).toBe(200);
         expect(redeemed.response.headers.get("cache-control")).toBe("no-store");
-        expect(redeemed.body).toEqual({ device_id: "device-1", name: "build-box.lan", secret: SECRET, token_type: "device_secret" });
+        expect(redeemed.body).toEqual({ account: "o***@example.test", device_id: "device-1", name: "build-box.lan", secret: SECRET, token_type: "device_secret" });
         expect(harness.registrations).toEqual([{ name: "build-box.lan", platform: "linux", userId: owner.userId }]);
     });
 
@@ -296,7 +296,7 @@ describe("pairing a headless machine by code", () => {
         const harness = build({
             precheck: async () => {
                 if (full) {
-                    throw new Error("At most 10 devices can be paired. Remove one first.");
+                    throw Object.assign(new Error("At most 10 devices can be paired. Remove one first."), { code: "BAD_REQUEST" });
                 }
             },
         });
@@ -318,6 +318,47 @@ describe("pairing a headless machine by code", () => {
 
         expect(await statusOf(harness, code.device_code)).toBe(200);
         expect(harness.registrations).toHaveLength(1);
+    });
+
+    it("answers a failed precheck as a retryable 5xx, keeping the code unspent and the cause private", async () => {
+        let down = true;
+        const harness = build({
+            precheck: async () => {
+                if (down) {
+                    throw new Error("shard stub timed out at internal-host:9229");
+                }
+            },
+        });
+        const owner = await signUp(harness);
+        const code = await requestHostCode(harness);
+
+        await approve(harness, owner.cookie, code.user_code);
+        vi.setSystemTime(Date.now() + 6000);
+
+        const failed = await redeem(harness, code.device_code);
+
+        expect(failed.response.status).toBe(500);
+        expect(failed.body["error"]).toBe("server_error");
+        expect(JSON.stringify(failed.body)).not.toContain("internal-host");
+
+        down = false;
+        vi.setSystemTime(Date.now() + 6000);
+
+        expect(await statusOf(harness, code.device_code)).toBe(200);
+        expect(harness.registrations).toHaveLength(1);
+    });
+
+    it("tells the machine which account approved it, masked", async () => {
+        const harness = build();
+        const owner = await signUp(harness);
+        const code = await requestHostCode(harness);
+
+        await approve(harness, owner.cookie, code.user_code);
+        vi.setSystemTime(Date.now() + 6000);
+
+        const { body } = await redeem(harness, code.device_code);
+
+        expect(body["account"]).toBe("o***@example.test");
     });
 
     it("refuses a code that expired", async () => {
