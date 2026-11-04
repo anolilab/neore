@@ -464,6 +464,11 @@ const Chat = () => {
                 streamToken: started.streamToken,
             });
 
+            // A send stopped on purpose has its notice on screen already, and gets no confirmation.
+            if (controller.signal.aborted) {
+                return;
+            }
+
             if (outcome === "failed") {
                 throw new ChatError("The reply did not finish. Try again.");
             }
@@ -478,7 +483,9 @@ const Chat = () => {
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
-            setError(error_ instanceof Error ? error_.message : "Could not send.");
+            if (!controller.signal.aborted) {
+                setError(error_ instanceof Error ? error_.message : "Could not send.");
+            }
         } finally {
             setSending(false);
         }
