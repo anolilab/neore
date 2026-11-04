@@ -1,6 +1,7 @@
 import type { JSONValue } from "@ai-sdk/provider";
 import type { HttpActionCtx } from "lunorash/server";
 
+import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import { getCurrentUserInternal } from "../../auth/lib/helper";
 import { findUserMcpServer } from "../../connectors/lib/user-mcp-servers";
@@ -9,6 +10,7 @@ import { isSafeUrl } from "../tools/utilities";
 import { renewBearer, retryOnUnauthorized } from "./mcp-auth-retry";
 import type { MCPServerConfig } from "./mcp-tools";
 import { headersToRecord } from "./mcp-tools";
+import type { ThreadPermissionMode } from "./thread-permission-mode";
 import type { ToolAnnotationHints, ToolDescriptor, ToolPermissionMode, ToolPermissionOverrides } from "./tool-permissions";
 import { isToolPermissionMode, resolveToolPermission, toolPermissionKey } from "./tool-permissions";
 
@@ -83,10 +85,39 @@ const descriptorFor = (config: MCPServerConfig, toolName: string): ToolDescripto
         ? { key: toolPermissionKey("connector", toolName, config.connectorSlug), source: "connector" }
         : { key: toolPermissionKey("mcp", toolName, config.name), source: "mcp" };
 
-const annotatedToolMode = async (client: SDKClient, descriptor: ToolDescriptor, toolName: string): Promise<ToolPermissionMode> => {
+/**
+ * The mode of the thread an app is shown in, read for the caller. No thread means no mode, as before. `denied` when the caller
+ * cannot read that thread. A mode that cannot be read is `supervised`, the same fallback the agent's own calls use.
+ */
+const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: string | undefined): Promise<ThreadPermissionMode | undefined | "denied"> => {
+    if (threadId === undefined) {
+        return undefined;
+    }
+
+    const access = await context.runQuery(internal.chat.sharing.checkThreadAccessWithData, { requiredPermission: "read", threadId, userId }).catch(() => {
+        return { hasAccess: false as const };
+    });
+
+    if (!access.hasAccess) {
+        return "denied";
+    }
+
+    const mode = await context
+        .runQuery(internal.chat.tool_permissions.getThreadPermissionMode, { threadId: threadId as Id<"threads">, userId })
+        .catch(() => "supervised" as const);
+
+    return mode ?? undefined;
+};
+
+const annotatedToolMode = async (
+    client: SDKClient,
+    descriptor: ToolDescriptor,
+    toolName: string,
+    threadMode: ThreadPermissionMode | undefined,
+): Promise<ToolPermissionMode> => {
     const annotations = await readToolAnnotations(client, toolName);
 
-    return resolveToolPermission({ ...descriptor, ...(annotations && { annotations }) }, undefined);
+    return resolveToolPermission({ ...descriptor, ...(annotations && { annotations }) }, undefined, { threadMode });
 };
 
 /**
@@ -280,7 +311,7 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
 
     if (rateLimited) return rateLimited;
 
-    let body: { arguments?: Record<string, JSONValue>; serverName?: string; toolName?: string };
+    let body: { arguments?: Record<string, JSONValue>; serverName?: string; threadId?: string; toolName?: string };
 
     try {
         body = (await request.json()) as typeof body;
@@ -288,7 +319,7 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
         return Response.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { arguments: toolArgs = {}, serverName, toolName } = body;
+    const { arguments: toolArgs = {}, serverName, threadId, toolName } = body;
 
     if (!serverName || !toolName) {
         return Response.json({ error: "Missing serverName or toolName" }, { status: 400 });
@@ -300,9 +331,16 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
         return Response.json({ error: `MCP server "${serverName}" not found` }, { status: 404 });
     }
 
+    // The app's call runs under the thread's mode, as the model's calls do: the proxy is no way around a supervised thread.
+    const threadMode = await threadModeFor(context, user._id, threadId);
+
+    if (threadMode === "denied") {
+        return Response.json({ error: "This chat is not available to you" }, { status: 403 });
+    }
+
     const overrides = (await context.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId: user._id })) as ToolPermissionOverrides;
     const descriptor = descriptorFor(serverConfig, toolName);
-    const chosen = isToolPermissionMode(overrides[descriptor.key]) ? resolveToolPermission(descriptor, overrides) : undefined;
+    const chosen = isToolPermissionMode(overrides[descriptor.key]) ? resolveToolPermission(descriptor, overrides, { threadMode }) : undefined;
     const refusedUpFront = chosen && refusalFor(chosen, toolName);
 
     if (refusedUpFront) {
@@ -311,7 +349,7 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
 
     try {
         const outcome = await withServerClient(serverConfig, async (client) => {
-            const refused = chosen ? null : refusalFor(await annotatedToolMode(client, descriptor, toolName), toolName);
+            const refused = chosen ? null : refusalFor(await annotatedToolMode(client, descriptor, toolName, threadMode), toolName);
 
             if (refused) {
                 return { refused };

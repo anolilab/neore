@@ -35,7 +35,6 @@ export const BUILTIN_TOOLS_READ_ONLY: ReadonlySet<string> = new Set([
     "flightTracker",
     "githubSearch",
     "imageSearch",
-    "knowledgeSearch",
     "listCurrencies",
     "listLanguages",
     "movieTvSearch",

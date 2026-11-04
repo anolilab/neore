@@ -22,7 +22,7 @@ const state = vi.hoisted(() => {
     return {
         isOwner: true,
         save: vi.fn(async (_input: unknown) => null),
-        thread: { _id: "t1", permissionMode: "full" } as { _id: string; permissionMode?: string; runner?: "host" } | null,
+        thread: { _id: "t1", permissionMode: "full" } as { _id: string; lockedAt?: number; model?: string; permissionMode?: string; runner?: "host" } | null,
     };
 });
 
@@ -129,6 +129,24 @@ describe("permission mode control", () => {
 
         // The menu is also absent while the access read is pending, so absence proves nothing until that read has answered.
         await waitFor(() => expect(client.getQueryState(["access", false])?.status).toBe("success"));
+        expect(screen.queryByRole("button")).toBeNull();
+    });
+
+    it("shows the menu for an unlocked chat that is locked and has no stored mode", async () => {
+        state.thread = { _id: "t1", lockedAt: 1, model: "m" };
+        renderControl();
+
+        expect(await screen.findByRole("button", { name: "Permission mode: Auto" })).toBeTruthy();
+    });
+
+    it("is hidden for a locked stub, which carries no model", async () => {
+        state.thread = { _id: "t1", lockedAt: 1 };
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+        renderControl(client);
+
+        // The menu is also absent while the access read is pending, so absence is checked once that read has answered.
+        await waitFor(() => expect(client.getQueryState(["access", true])?.status).toBe("success"));
         expect(screen.queryByRole("button")).toBeNull();
     });
 

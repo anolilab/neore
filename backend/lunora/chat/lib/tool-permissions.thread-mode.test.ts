@@ -34,6 +34,7 @@ describe("thread permission mode", () => {
         expect(resolveToolPermission(WEB_SEARCH, undefined, options)).toBe("auto");
         expect(resolveToolPermission(builtin("visionAnalysis"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("retrieve"), undefined, options)).toBe("ask");
+        expect(resolveToolPermission(builtin("knowledgeSearch"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(mcp({ readOnlyHint: true }), undefined, options)).toBe("ask");
         expect(resolveToolPermission(mcp(), undefined, options)).toBe("ask");
     });
