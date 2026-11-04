@@ -483,6 +483,7 @@ const Chat = () => {
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
+            // The abort error of a send stopped on purpose is not shown: its notice is.
             if (!controller.signal.aborted) {
                 setError(error_ instanceof Error ? error_.message : "Could not send.");
             }
