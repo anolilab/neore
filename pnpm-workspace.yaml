@@ -90,15 +90,15 @@ catalogs:
     "@rive-app/react-webgl2": 4.37.0
     motion: 14.4.0
   auth:
-    # `@lunora/auth` (alpha.197) depends on
-    # `@better-auth/{api-key,passkey,mcp,scim,oauth-provider}` at EXACTLY 1.7.7,
-    # whose peers pin better-call 1.4.0 / `@better-auth/utils` 0.4.2 /
-    # `@better-fetch/fetch` 1.3.1. Taking 1.7.6 here split api-key and passkey
+    # `@lunora/auth` (alpha.257) depends on
+    # `@better-auth/{api-key,passkey,mcp,scim,oauth-provider}` at EXACTLY 1.7.16,
+    # whose peers pin better-call 1.4.5 / `@better-auth/utils` 0.5.1 /
+    # `@better-fetch/fetch` 1.3.3. Taking 1.7.6 here split api-key and passkey
     # into two copies each. Move the four entries (and the `@better-auth/core`
     # override) when `@lunora/auth` does.
-    "@better-auth/api-key": 1.7.7
-    "@better-auth/passkey": 1.7.7
-    better-auth: 1.7.7
+    "@better-auth/api-key": 1.7.16
+    "@better-auth/passkey": 1.7.16
+    better-auth: 1.7.16
   build:
     # Moves WITH wrangler: each vite-plugin release peer-requires the wrangler
     # of its day (1.62.3 wants ^4.145.0) and `vite dev` refuses to start on a
@@ -170,7 +170,7 @@ catalogs:
     "@xyflow/react": 12.12.0
     recharts: 3.10.1
   cli:
-    "@visulima/vis": 6.1.3
+    "@visulima/vis": 6.5.4
     commitizen: ^4.3.2
     jiti: 2.7.0
     plop: 4.0.5
@@ -274,25 +274,25 @@ catalogs:
     tailwind-csstree: 0.4.1
     typescript-eslint: 8.72.0
   lunora:
-    "@lunora/auth": 1.0.0-alpha.255
+    "@lunora/auth": 1.0.0-alpha.257
     "@lunora/bindings": 1.0.0-alpha.151
-    "@lunora/client": 1.0.0-alpha.284
-    "@lunora/cli": 1.0.0-alpha.475
-    "@lunora/d1": 1.0.0-alpha.231
+    "@lunora/client": 1.0.0-alpha.286
+    "@lunora/cli": 1.0.0-alpha.482
+    "@lunora/d1": 1.0.0-alpha.233
     "@lunora/mail": 1.0.0-alpha.138
     "@lunora/notify": 1.0.0-alpha.110
-    "@lunora/payment": 1.0.0-alpha.268
+    "@lunora/payment": 1.0.0-alpha.269
     "@lunora/queue": 1.0.0-alpha.143
-    "@lunora/ratelimit": 1.0.0-alpha.195
-    "@lunora/react": 1.0.0-alpha.294
-    "@lunora/scheduler": 1.0.0-alpha.168
-    "@lunora/seed": 1.0.0-alpha.280
-    "@lunora/server": 1.0.0-alpha.267
+    "@lunora/ratelimit": 1.0.0-alpha.196
+    "@lunora/react": 1.0.0-alpha.296
+    "@lunora/scheduler": 1.0.0-alpha.169
+    "@lunora/seed": 1.0.0-alpha.282
+    "@lunora/server": 1.0.0-alpha.268
     "@lunora/storage": 1.0.0-alpha.171
-    "@lunora/studio": 1.0.0-alpha.374
-    "@lunora/testing": 1.0.0-alpha.332
-    "@lunora/workflow": 1.0.0-alpha.110
-    lunorash: 1.0.0-alpha.473
+    "@lunora/studio": 1.0.0-alpha.377
+    "@lunora/testing": 1.0.0-alpha.333
+    "@lunora/workflow": 1.0.0-alpha.111
+    lunorash: 1.0.0-alpha.478
   markdown:
     "@streamdown/cjk": 1.0.4
     "@streamdown/math": 1.0.3
@@ -506,6 +506,23 @@ minimumReleaseAgeExclude:
   - "@visulima/*"
   - "@lunora/*"
   - "lunorash"
+  # better-auth 1.7.16 (what @lunora/auth 1.0.0-alpha.257 pins), published 2026-11-03 ~21:24 UTC,
+  # better-call 1.4.5 at 20:45 UTC; drop these after 2026-11-04 21:30 UTC.
+  - "better-auth@1.7.16"
+  - "@better-auth/api-key@1.7.16"
+  - "@better-auth/cimd@1.7.16"
+  - "@better-auth/core@1.7.16"
+  - "@better-auth/drizzle-adapter@1.7.16"
+  - "@better-auth/kysely-adapter@1.7.16"
+  - "@better-auth/mcp@1.7.16"
+  - "@better-auth/memory-adapter@1.7.16"
+  - "@better-auth/mongo-adapter@1.7.16"
+  - "@better-auth/oauth-provider@1.7.16"
+  - "@better-auth/passkey@1.7.16"
+  - "@better-auth/prisma-adapter@1.7.16"
+  - "@better-auth/scim@1.7.16"
+  - "@better-auth/telemetry@1.7.16"
+  - "better-call@1.4.5"
 
 # pnpm 11 replaced onlyBuiltDependencies with this map (true = may run its
 # build scripts). `strictDepBuilds` is on by default since 11, so a NEW
@@ -574,7 +591,7 @@ overrides:
   # crashes with "Cannot destructure property ... as it is null". The data grid
   # was the visible casualty. One copy only.
   "@babel/types": 8.0.6
-  "@better-auth/core": 1.7.7
+  "@better-auth/core": 1.7.16
   "@eslint/plugin-kit@<0.3.3": ">=0.5.0"
   "@grpc/grpc-js@<1.14.5": ">=1.14.5"
   "@hono/node-server@<1.19.10": ">=1.19.10"
