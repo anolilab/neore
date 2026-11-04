@@ -20,7 +20,7 @@ import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
 import { getClient } from "@/lib/lunora";
 import { streamingFetch } from "@/lib/streaming-fetch";
-import { withFreshRows } from "@/offline/fresh-rows";
+import { isOldestFreshRowOnScreen, withFreshRows } from "@/offline/fresh-rows";
 import { mergeRows } from "@/offline/merge";
 import { createMessageReadGate, isThreadRefusal, readOlderMessages, readThreadMessages } from "@/offline/message-read";
 import { OfflineBanner } from "@/offline/offline-banner";
@@ -210,6 +210,15 @@ const Chat = () => {
     const readGate = useRef(createMessageReadGate());
     const [threadId, setThreadId] = useState<string | undefined>(routeThreadId === NEW_THREAD ? undefined : routeThreadId);
     const [rows, setRows] = useState<Row[]>([]);
+    // The rows as the last write left them. Every write goes through `writeRows`, so a read can decide against the rows on
+    // screen when it lands, not against the rows of the render it was started in.
+    const rowsRef = useRef<Row[]>([]);
+    const writeRows = useCallback((update: Row[] | ((current: Row[]) => Row[])) => {
+        const next = typeof update === "function" ? update(rowsRef.current) : update;
+
+        rowsRef.current = next;
+        setRows(next);
+    }, []);
     // Where the next older page starts; null once the whole history is loaded.
     const [olderCursor, setOlderCursor] = useState<string | null>(null);
     const [isLoadingOlder, setIsLoadingOlder] = useState(false);
@@ -244,10 +253,10 @@ const Chat = () => {
         isRefused.current = true;
         hasLiveRows.current = false;
         hasLoadedOlder.current = false;
-        setRows([]);
+        writeRows([]);
         setOlderCursor(null);
         setError(REFUSED_MESSAGE);
-    }, []);
+    }, [writeRows]);
 
     // The newest pages load when a chat opens; "Load older messages" fetches the rest one page at a time.
     const loadMessages = useCallback(
@@ -289,11 +298,13 @@ const Chat = () => {
                 case "rows": {
                     isRefused.current = false;
                     hasLiveRows.current = true;
-                    const hasOlderPages = hasLoadedOlder.current;
+                    // The older rows stay only when the read reaches them; otherwise the read's own cursor takes over.
+                    const isOlderKept = hasLoadedOlder.current && isOldestFreshRowOnScreen(rowsRef.current, result.rows);
 
-                    setRows((current) => withFreshRows(current, result.rows, hasOlderPages));
+                    writeRows(withFreshRows(rowsRef.current, result.rows, isOlderKept));
 
-                    if (!hasOlderPages) {
+                    if (!isOlderKept) {
+                        hasLoadedOlder.current = false;
                         setOlderCursor(result.olderCursor);
                     }
 
@@ -312,7 +323,7 @@ const Chat = () => {
                 }
             }
         },
-        [cache, reportRead, showRefused],
+        [cache, reportRead, showRefused, writeRows],
     );
 
     const loadOlder = async () => {
@@ -345,7 +356,7 @@ const Chat = () => {
                 }
                 case "page": {
                     hasLoadedOlder.current = true;
-                    setRows((current) => {
+                    writeRows((current) => {
                         const onScreen = new Set(current.map((row) => row.id));
 
                         return [...result.rows.filter((row) => !onScreen.has(row.id)), ...current];
@@ -384,7 +395,7 @@ const Chat = () => {
                 const cached = await cache.loadMessages(threadId);
 
                 if (!isCancelled && !hasLiveRows.current && !isRefused.current && cached.length > 0) {
-                    setRows((current) => byCreation(mergeRows(current, cached)));
+                    writeRows((current) => byCreation(mergeRows(current, cached)));
                 }
             } catch {
                 // An unreadable cache is an empty one.
@@ -396,7 +407,7 @@ const Chat = () => {
         return () => {
             isCancelled = true;
         };
-    }, [cache, status, threadId]);
+    }, [cache, status, threadId, writeRows]);
 
     useEffect(() => {
         const gate = readGate.current;
@@ -527,7 +538,7 @@ const Chat = () => {
         const assistantId = `pending-${stamp}`;
 
         readGate.current.invalidate();
-        setRows((current) => [
+        writeRows((current) => [
             ...current,
             localRow(userId, "user", threadId ?? NEW_THREAD, prompt),
             localRow(assistantId, "assistant", threadId ?? NEW_THREAD, ""),
@@ -554,7 +565,7 @@ const Chat = () => {
 
             setThreadId(started.threadId);
             // The prompt is complete once the server has accepted it, whether or not the screen's next read succeeds.
-            setRows((current) => finishRow(current, userId));
+            writeRows((current) => finishRow(current, userId));
 
             if (routeThreadId === NEW_THREAD) {
                 router.setParams({ threadId: started.threadId });
@@ -563,7 +574,7 @@ const Chat = () => {
             const outcome = await relayReply({
                 fetch: streamingFetch,
                 gatewayUrl: config.gatewayUrl,
-                onDelta: ({ text }) => setRows((current) => appendToRow(current, assistantId, text)),
+                onDelta: ({ text }) => writeRows((current) => appendToRow(current, assistantId, text)),
                 signal: controller.signal,
                 streamToken: started.streamToken,
             });
@@ -574,7 +585,7 @@ const Chat = () => {
 
             // Only a reply relayed through its end marker is complete here. Either way the server's copy is re-read until it is final.
             if (outcome === "finished") {
-                setRows((current) => finishRow(current, assistantId));
+                writeRows((current) => finishRow(current, assistantId));
             }
 
             setConfirmations((current) => [

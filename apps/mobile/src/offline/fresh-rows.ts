@@ -5,6 +5,13 @@ export interface FreshRow {
     status: string;
 }
 
+/** Whether the rows on screen reach the fresh read's oldest row, so the older rows before it can be kept. */
+export const isOldestFreshRowOnScreen = <T extends FreshRow>(current: ReadonlyArray<T>, fresh: ReadonlyArray<T>): boolean => {
+    const oldest = fresh[0];
+
+    return oldest !== undefined && current.some((row) => row.id === oldest.id);
+};
+
 /**
  * Replaces the newest rows with a fresh read. Rows loaded before the read's oldest row are kept when older pages were
  * loaded on screen: the cursor on screen then continues after them. They are placed by their position in the list,

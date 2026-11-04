@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { withFreshRows } from "./fresh-rows";
+import { isOldestFreshRowOnScreen, withFreshRows } from "./fresh-rows";
 
 interface TestRow {
     finished?: boolean;
@@ -46,5 +46,13 @@ describe("withFreshRows", () => {
         const fresh = [row("x"), row("y")];
 
         expect(withFreshRows(current, fresh, true)).toEqual(fresh);
+    });
+
+    it("reports whether the screen reaches the fresh read's oldest row", () => {
+        const current = [row("a"), row("b")];
+
+        expect(isOldestFreshRowOnScreen(current, [row("b"), row("c")])).toBe(true);
+        expect(isOldestFreshRowOnScreen(current, [row("x"), row("y")])).toBe(false);
+        expect(isOldestFreshRowOnScreen(current, [])).toBe(false);
     });
 });
