@@ -17,6 +17,10 @@ describe(buildPromptLink, () => {
 });
 
 describe(promptFromLink, () => {
+    it("takes out hidden characters, so a link cannot smuggle instructions the composer would not show", () => {
+        expect(promptFromLink("ok\u{E0041}\u{E0042} done\u{202E}")).toBe("ok done");
+    });
+
     it("trims the text and cuts it at the cap, so a link cannot carry an unbounded draft", () => {
         expect(promptFromLink("  hello  ")).toBe("hello");
         expect(promptFromLink("a".repeat(PROMPT_LINK_MAX_CHARS + 50))).toHaveLength(PROMPT_LINK_MAX_CHARS);

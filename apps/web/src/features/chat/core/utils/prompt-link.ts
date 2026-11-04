@@ -1,3 +1,5 @@
+import { stripHiddenText } from "@neore/ai/utils";
+
 /**
  * A prompt link opens a new chat with a draft in the composer. It never sends: the person reads the draft and sends
  * it themselves.
@@ -10,10 +12,10 @@
 export const PROMPT_LINK_MAX_CHARS = 8000;
 
 /**
- * The one place link text is cleaned before it reaches the composer. The hidden-character filter (plan 1.1: tag
- * characters, bidi controls and other invisible text) is not on main yet, and it plugs in here.
+ * The one place link text is cleaned before it reaches the composer: hidden characters (tag characters, bidi controls and
+ * other invisible text) come out first, as they do in the composer itself, then the text is trimmed and capped.
  */
-export const promptFromLink = (raw: string): string => raw.slice(0, PROMPT_LINK_MAX_CHARS).trim();
+export const promptFromLink = (raw: string): string => stripHiddenText(raw).text.slice(0, PROMPT_LINK_MAX_CHARS).trim();
 
 /** The search values a prompt link carries, trimmed and capped; absent or blank values are dropped. */
 export const readPromptLinkSearch = (search: { model?: unknown; prompt?: unknown }): { model?: string; prompt?: string } => {
