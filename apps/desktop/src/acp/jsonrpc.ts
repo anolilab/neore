@@ -23,9 +23,9 @@ interface Pending {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** A write to a dead child's stdin fails with EPIPE: the agent exited before it read its input. */
+/** A write to a dead child's stdin fails with EPIPE: the agent exited, so its input is closed. The session can write many frames, so this is not only a startup failure. */
 const exitedBeforeInput = (error: Error): Error =>
-    (error as NodeJS.ErrnoException).code === "EPIPE" ? new Error("the agent exited before reading its input") : error;
+    (error as NodeJS.ErrnoException).code === "EPIPE" ? new Error("the agent exited, so its input is closed") : error;
 
 export class JsonRpcConnection {
     private readonly pending = new Map<number, Pending>();
