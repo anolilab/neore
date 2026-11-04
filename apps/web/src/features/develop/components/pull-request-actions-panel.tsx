@@ -77,7 +77,8 @@ const PullRequestActionsPanel = ({
     const canReview = isHostCapabilityAvailable(capabilities, "reviewers.request") && state === "open";
     const canRevert = isHostCapabilityAvailable(capabilities, "pullRequest.revert") && state === "merged";
     // `original` is the page as it was when the dialog opened: a later refetch must not turn an untouched field into a write.
-    const [editing, setEditing] = useState<{ body: string; original: { body: string; title: string }; title: string } | null>(null);
+    // `truncated` is captured when the dialog opens: a refetch during the edit must not change what Save writes.
+    const [editing, setEditing] = useState<{ body: string; original: { body: string; title: string }; title: string; truncated: boolean } | null>(null);
     // A refused save keeps the dialog open with its reason, so the typed text is still there to correct.
     const [editProblem, setEditProblem] = useState<string | null>(null);
     const [reviewing, setReviewing] = useState<string | null>(null);
@@ -90,6 +91,7 @@ const PullRequestActionsPanel = ({
     }
 
     const titleEmpty = (editing?.title ?? "").trim() === "";
+    const bodyLocked = editing?.truncated === true;
     const busy = actions.edit.isPending || actions.requestReviewers.isPending || actions.revert.isPending;
 
     // Only an error the server raised before any host call says nothing changed; any other thrown error may have reached the host.
@@ -105,6 +107,15 @@ const PullRequestActionsPanel = ({
             text: messages.write(outcome),
             unconfirmed: outcome.status === "unconfirmed",
         };
+    };
+
+    // The feedback for a write's answer: the success text when the host took it, otherwise the refusal or the unconfirmed answer.
+    const settled = (result: { outcome: WriteResult } | { thrown: unknown }, success: Feedback): Feedback => {
+        if ("thrown" in result) {
+            return thrownFailure(result.thrown);
+        }
+
+        return result.outcome.status === "ok" ? success : failure(result.outcome);
     };
 
     const reviewerProblem = (logins: string[]): string | null => {
@@ -125,7 +136,7 @@ const PullRequestActionsPanel = ({
         // The title is compared as typed: an untouched title with surrounding spaces must not be sent trimmed in a description-only save.
         const change = {
             ...(editing.title !== editing.original.title && { title: editing.title.trim() }),
-            ...(!bodyTruncated && editing.body !== editing.original.body && { body: editing.body }),
+            ...(!editing.truncated && editing.body !== editing.original.body && { body: editing.body }),
         };
 
         setFeedback(null);
@@ -138,15 +149,7 @@ const PullRequestActionsPanel = ({
         }
 
         const result = await attempt(actions.edit.mutateAsync(change));
-        let next: Feedback;
-
-        if ("thrown" in result) {
-            next = thrownFailure(result.thrown);
-        } else if (result.outcome.status === "ok") {
-            next = { kind: "success", text: t`Saved on ${hostLabel}.` };
-        } else {
-            next = failure(result.outcome);
-        }
+        const next = settled(result, { kind: "success", text: t`Saved on ${hostLabel}.` });
 
         // A refusal changed nothing: the dialog stays open with its reason and the typed text. Anything else closes it.
         if (next.kind === "error" && !next.unconfirmed) {
@@ -170,21 +173,27 @@ const PullRequestActionsPanel = ({
             return;
         }
 
-        setReviewing(null);
         setReviewProblem(null);
         setFeedback(null);
 
         if (logins.length === 0) {
+            setReviewing(null);
+
             return;
         }
 
         const result = await attempt(actions.requestReviewers.mutateAsync(logins));
+        const next = settled(result, { kind: "success", text: t`Review requested.` });
 
-        if ("thrown" in result) {
-            setFeedback(thrownFailure(result.thrown));
-        } else {
-            setFeedback(result.outcome.status === "ok" ? { kind: "success", text: t`Review requested.` } : failure(result.outcome));
+        // A refusal changed nothing: the dialog stays open with its reason and the typed logins. Anything else closes it.
+        if (next.kind === "error" && !next.unconfirmed) {
+            setReviewProblem(next.text);
+
+            return;
         }
+
+        setReviewing(null);
+        setFeedback(next);
     };
 
     const revertNow = async () => {
@@ -226,7 +235,7 @@ const PullRequestActionsPanel = ({
                     <Button
                         disabled={busy}
                         onClick={() => {
-                            setEditing({ body, original: { body, title }, title });
+                            setEditing({ body, original: { body, title }, title, truncated: bodyTruncated });
                             setEditProblem(null);
                         }}
                         variant="outline"
@@ -307,14 +316,14 @@ const PullRequestActionsPanel = ({
                         <div className="space-y-1">
                             <Label htmlFor={`${titleId}-body`}>{t`Description`}</Label>
                             <Textarea
-                                aria-describedby={bodyTruncated ? `${titleId}-body-note` : undefined}
-                                disabled={bodyTruncated}
+                                aria-describedby={bodyLocked ? `${titleId}-body-note` : undefined}
+                                disabled={bodyLocked}
                                 id={`${titleId}-body`}
                                 onChange={(event) => setEditing((current) => (current === null ? current : { ...current, body: event.target.value }))}
                                 rows={8}
                                 value={editing?.body ?? ""}
                             />
-                            {bodyTruncated && (
+                            {bodyLocked && (
                                 <p className="text-muted-foreground text-xs" id={`${titleId}-body-note`}>
                                     {t`${hostLabel} shortened this description, so it cannot be edited here. The title can still change.`}
                                 </p>
