@@ -28,7 +28,6 @@ export const replyStateAfter = (newestFirst: ReadonlyArray<SeenMessage>, sentId:
     }
 
     let newestStep: SeenMessage | undefined;
-    // The steer messages of this send, which its reply runs across. Any other user message is another turn.
     let steersLeft = options.steers ?? 0;
 
     // Walked from the send upward, so each assistant message read later is a newer step.
