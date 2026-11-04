@@ -721,7 +721,7 @@ const renderHooks = async (snapshot: SessionSnapshot, force = false, review = fa
 const PORTS_POLL_MS = 5000;
 
 /** The newest port read. A read that finishes after a newer one is dropped, so a stopped server cannot reappear from an older answer. */
-const portsRead = { latest: 0 };
+const portsRead = { busy: false, latest: 0 };
 
 /**
  * The one place the open session changes. The previous session's ports must not stay on screen, where Stop would still
@@ -730,10 +730,12 @@ const portsRead = { latest: 0 };
 const selectSession = (id: string | undefined): void => {
     state.selected = id;
     portsRead.latest += 1;
-    $("acp-ports-status").textContent = "";
-    $("acp-ports-list").replaceChildren(item(id === undefined ? "None." : "Loading…"));
+    $("acp-ports-status").textContent = id === undefined ? "" : "Loading ports…";
+    $("acp-ports-list").replaceChildren(...id === undefined ? [item("None.")] : []);
 
-    if (id !== undefined) {
+    if (id === undefined) {
+        portsRead.busy = false;
+    } else {
         refreshPorts();
     }
 };
@@ -742,12 +744,17 @@ const refreshPorts = async (): Promise<void> => {
     const { selected } = state;
 
     portsRead.latest += 1;
+    portsRead.busy = true;
     const read = portsRead.latest;
     let ports: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPorts>>;
 
     try {
         ports = selected === undefined ? [] : await globalThis.neoreDevice.acpPorts(selected);
     } catch (error: unknown) {
+        if (read === portsRead.latest) {
+            portsRead.busy = false;
+        }
+
         // A read that fails (a tool missing, a timeout) is said where the list is; it never stops the session from refreshing.
         if (read === portsRead.latest && state.selected === selected) {
             $("acp-ports-status").textContent = `Ports cannot be read: ${error instanceof Error ? error.message : String(error)}`;
@@ -755,6 +762,10 @@ const refreshPorts = async (): Promise<void> => {
         }
 
         return;
+    }
+
+    if (read === portsRead.latest) {
+        portsRead.busy = false;
     }
 
     // A newer read started, or another session was opened while this one was read.
@@ -944,7 +955,8 @@ export const initAcp = async (): Promise<void> => {
     });
 
     setInterval(() => {
-        if (state.selected !== undefined && !document.hidden) {
+        // A slow read is let finish: a new one every poll would supersede it each time and nothing would ever show.
+        if (state.selected !== undefined && !document.hidden && !portsRead.busy) {
             refreshPorts();
         }
     }, PORTS_POLL_MS);
