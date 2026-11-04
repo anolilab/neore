@@ -61,8 +61,14 @@ describe("backupCanServe", () => {
     });
 
     it("refuses a tool-result image or PDF it does not support", () => {
-        const toolImage = { content: [{ output: { type: "content", value: [{ data: "AAAA", mediaType: "image/png", type: "image-data" }] }, type: "tool-result" }], role: "tool" };
-        const toolPdf = { content: [{ output: { type: "content", value: [{ data: "AAAA", mediaType: "application/pdf", type: "file-data" }] }, type: "tool-result" }], role: "tool" };
+        const toolImage = {
+            content: [{ output: { type: "content", value: [{ data: "AAAA", mediaType: "image/png", type: "image-data" }] }, type: "tool-result" }],
+            role: "tool",
+        };
+        const toolPdf = {
+            content: [{ output: { type: "content", value: [{ data: "AAAA", mediaType: "application/pdf", type: "file-data" }] }, type: "tool-result" }],
+            role: "tool",
+        };
 
         expect(backupCanServe({ ...all, images: false }, { hasTools: false, messages: [toolImage] })).toBe(false);
         expect(backupCanServe({ ...all, files: false }, { hasTools: false, messages: [toolPdf] })).toBe(false);
