@@ -101,6 +101,15 @@ const mount = (data: Record<string, unknown>) => {
     );
 };
 
+// The text is on screen for the person: it is in the document, and no ancestor hides it with `hidden` or `aria-hidden`. jsdom does not
+// apply the stylesheet, so a class that hides it is not seen here.
+const expectShown = (element: HTMLElement) => {
+    expect(element.isConnected).toBe(true);
+    // The ancestor check needs the node itself: no query finds a hidden ancestor.
+    // eslint-disable-next-line testing-library/no-node-access -- checks the hiding attributes of the ancestors, which no query does
+    expect(element.closest("[hidden], [aria-hidden='true']")).toBeNull();
+};
+
 const session = (fields: Record<string, unknown> = {}) => {
     return { "acp.functions.getHostSession": { status: "idle", ...fields } };
 };
@@ -367,7 +376,7 @@ describe("the options the agent offers", () => {
         expect(mutations()[0]?.[1]).toEqual({ optionId: "model", threadId: "thread-1", valueId: "deep" });
         await waitFor(() => expect(model.disabled).toBe(true));
         expect((screen.getByLabelText("Reasoning effort") as unknown as HTMLSelectElement).disabled).toBe(true);
-        expect(screen.getByText("Waiting for the agent to change Model to Deep.")).toBeTruthy();
+        expectShown(screen.getByText("Waiting for the agent to change Model to Deep."));
     });
 
     it("says in words that the agent confirmed the change, and frees the controls", async () => {
@@ -387,7 +396,7 @@ describe("the options the agent offers", () => {
         };
         await client.invalidateQueries();
 
-        expect(await screen.findByText("The agent confirmed: Model is now Deep.")).toBeTruthy();
+        expectShown(await screen.findByText("The agent confirmed: Model is now Deep."));
         expect(model.disabled).toBe(false);
         expect(model.value).toBe("deep");
     });
@@ -410,7 +419,7 @@ describe("the options the agent offers", () => {
         };
         await client.invalidateQueries();
 
-        expect(await screen.findByText("The agent confirmed. Waiting for Model to show Deep.")).toBeTruthy();
+        expectShown(await screen.findByText("The agent confirmed. Waiting for Model to show Deep."));
         expect(screen.queryByText("The agent confirmed: Model is now Deep.")).toBeNull();
         expect(model.disabled).toBe(true);
 
@@ -424,7 +433,7 @@ describe("the options the agent offers", () => {
         };
         await client.invalidateQueries();
 
-        expect(await screen.findByText("The agent confirmed: Model is now Deep.")).toBeTruthy();
+        expectShown(await screen.findByText("The agent confirmed: Model is now Deep."));
         expect(model.disabled).toBe(false);
     });
 
@@ -445,7 +454,7 @@ describe("the options the agent offers", () => {
         };
         await client.invalidateQueries();
 
-        expect(await screen.findByText("The agent did not change Model: the agent did not accept the change")).toBeTruthy();
+        expectShown(await screen.findByText("The agent did not change Model: the agent did not accept the change"));
         expect(model.disabled).toBe(false);
         expect(model.value).toBe("fast");
     });

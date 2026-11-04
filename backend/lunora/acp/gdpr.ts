@@ -24,13 +24,17 @@ const SESSION_PAGE = 500;
 /** The JSON a page of sessions may take, so a page stays far under the 1 MiB a step may keep. */
 const SESSION_PAGE_BYTES = 400_000;
 
+/** The UTF-8 bytes a value takes as JSON: the budgets are bytes, so a page of multi-byte text stays under the step's limit. */
+const ENCODER = new TextEncoder();
+const jsonBytes = (value: unknown): number => ENCODER.encode(JSON.stringify(value)).length;
+
 /** The leading rows whose JSON fits the budget. Always at least one, so a page makes progress. */
 const rowsWithinBudget = <Row>(rows: ReadonlyArray<Row>, budget: number): Row[] => {
     const kept: Row[] = [];
     let used = 0;
 
     for (const row of rows) {
-        const size = JSON.stringify(row).length;
+        const size = jsonBytes(row);
 
         if (kept.length > 0 && used + size > budget) {
             break;
@@ -211,7 +215,7 @@ const collectHostEvents = async (ctx: QueryCtx, userId: string, cursor: ExportCu
                     continue;
                 }
 
-                const size = JSON.stringify(event).length;
+                const size = jsonBytes(event);
 
                 // A page always takes its first event, so one over the budget by itself still goes out.
                 if (events.length > 0 && bytes + size > EVENT_BYTES_BUDGET) {
@@ -262,7 +266,7 @@ export const collectAcpSessionPages = async (
     do {
         const page = await readPage(cursor);
 
-        bytes += JSON.stringify(page).length;
+        bytes += jsonBytes(page);
 
         if (bytes > maxBytes) {
             throw new LunoraError("PAYLOAD_TOO_LARGE", "The coding-agent history is larger than the export limit");

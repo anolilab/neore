@@ -290,9 +290,14 @@ export class AgentSession {
             throw new Error(timedOut ? "the agent did not answer" : "the agent did not accept the change");
         }
 
-        // The agent sent its own list while this was outstanding, and that list is newer than the answer: it stands.
+        // The agent sent its own list while this was outstanding, and that list is newer than the answer: it stands. It must show the
+        // value asked for, or the change was not made.
         if (this.offeredVersion !== versionAtRequest) {
             this.reportOptions();
+
+            if (!this.showsValue(optionId, valueId)) {
+                throw new Error("the agent did not apply the change");
+            }
 
             return;
         }
@@ -460,6 +465,15 @@ export class AgentSession {
         this.offered = listed === undefined ? withOptionValue(this.offered, optionId, valueId) : { ...this.offered, configOptions: listed };
 
         return listed === undefined || listed.find((option) => option.id === optionId)?.currentValue === valueId;
+    }
+
+    /** Whether what the session offers now shows the value asked for. */
+    private showsValue(optionId: string | undefined, valueId: string): boolean {
+        if (optionId === undefined) {
+            return this.offered.modes?.current === valueId;
+        }
+
+        return this.offered.configOptions?.find((option) => option.id === optionId)?.currentValue === valueId;
     }
 
     /** The agent's session: the saved one when asked for and loadable, else a new one (`reattach` says which, and why not). */

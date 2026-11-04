@@ -107,8 +107,9 @@ const collectAll = async (userId: string) => {
 describe("the export of coding-agent sessions and events", () => {
     it("cuts a page by bytes when the sessions carry heavy agent state, and loses none of them", async () => {
         const device = await insertDevice(A);
+        // Multi-byte names: three bytes a character, so the byte budget is what cuts the pages.
         const choices = Array.from({ length: 100 }, (_unused, index) => {
-            return { name: `choice ${String(index)} ${"n".repeat(40)}`, value: `v${String(index)}` };
+            return { name: `choice ${String(index)} ${"漢".repeat(40)}`, value: `v${String(index)}` };
         });
         const agentState = { configOptions: [{ category: "model", choices, currentValue: "v0", id: "model", name: "Model" }] };
 
@@ -131,7 +132,7 @@ describe("the export of coding-agent sessions and events", () => {
 
         // Each page holds the budget plus at most one more row, so no page nears the step's limit.
         for (const page of pages) {
-            expect(JSON.stringify(page.sessions).length).toBeLessThan(400_000 + 20_000);
+            expect(new TextEncoder().encode(JSON.stringify(page.sessions)).length).toBeLessThan(400_000 + 20_000);
         }
     });
 
