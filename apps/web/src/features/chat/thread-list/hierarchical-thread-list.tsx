@@ -1049,6 +1049,18 @@ const HierarchicalThreadList: FC<
     // The virtualized rendering is handled in renderThreadGroups below
 
     // Show loading state if threads are still loading
+    // The snooze dialog lives here, not in a row: a row can unmount while the dialog is open (virtualization, a filter).
+    const snoozeThreadId = useThreadListUIStore((state) => state.snoozeThreadId);
+    const setSnoozeThreadId = useThreadListUIStore((state) => state.setSnoozeThreadId);
+    const snoozeThread = snoozeThreadId === null ? undefined : flattenedThreads.find((node) => node.threadId === snoozeThreadId);
+
+    // A dialog whose thread left the list is closed, so it cannot reopen when that thread comes back.
+    useEffect(() => {
+        if (snoozeThreadId !== null && snoozeThread === undefined) {
+            setSnoozeThreadId(null);
+        }
+    }, [snoozeThread, snoozeThreadId, setSnoozeThreadId]);
+
     if (!threadsData) {
         return (
             <div className="flex h-full items-center justify-center">
@@ -1239,18 +1251,6 @@ const HierarchicalThreadList: FC<
     };
 
     // Regular rendering with groups
-    // The snooze dialog lives here, not in a row: a row can unmount while the dialog is open (virtualization, a filter).
-    const snoozeThreadId = useThreadListUIStore((state) => state.snoozeThreadId);
-    const setSnoozeThreadId = useThreadListUIStore((state) => state.setSnoozeThreadId);
-    const snoozeThread = snoozeThreadId === null ? undefined : flattenedThreads.find((node) => node.threadId === snoozeThreadId);
-
-    // A dialog whose thread left the list is closed, so it cannot reopen when that thread comes back.
-    useEffect(() => {
-        if (snoozeThreadId !== null && snoozeThread === undefined) {
-            setSnoozeThreadId(null);
-        }
-    }, [snoozeThread, snoozeThreadId, setSnoozeThreadId]);
-
     return (
         <div className="relative flex flex-col gap-2">
             {isSelectionMode && (

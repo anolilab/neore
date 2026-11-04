@@ -157,7 +157,10 @@ describe("a snoozed thread wakes early", () => {
 
         await harness.run(
             async (context: any) =>
-                await context.runMutation(updateThread as never, { patch: { awaitingInput: "question", status: "active", updatedAt: 9 }, threadId: id } as never),
+                await context.runMutation(
+                    updateThread as never,
+                    { patch: { awaitingInput: "question", status: "active", updatedAt: 9 }, threadId: id } as never,
+                ),
         );
 
         const row = await readThread(id);

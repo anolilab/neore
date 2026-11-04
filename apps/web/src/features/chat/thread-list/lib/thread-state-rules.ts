@@ -43,6 +43,9 @@ export const snoozeUntil = (choice: SnoozeChoice, now: Date): number => {
     return morningAfter(now, (MONDAY + 7 - now.getDay()) % 7 || 7);
 };
 
+/** A `datetime-local` value: `YYYY-MM-DDTHH:mm`, local wall-clock time. */
+const LOCAL_DATE_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/u;
+
 /** The farthest a snooze may end, from now. Mirrors the server's limit (`chat/lib/thread-state-logic.ts`). */
 const SNOOZE_MAX_MS = 366 * 24 * 60 * 60 * 1000;
 
@@ -52,7 +55,7 @@ const SNOOZE_MAX_MS = 366 * 24 * 60 * 60 * 1000;
  * server accepts. The server checks the same range; this only keeps the picker from sending a time it refuses.
  */
 export const customSnoozeUntil = (localValue: string, now: Date): number | undefined => {
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(localValue)) {
+    if (!LOCAL_DATE_TIME_RE.test(localValue)) {
         return undefined;
     }
 
@@ -60,10 +63,15 @@ export const customSnoozeUntil = (localValue: string, now: Date): number | undef
     const until = parsed.getTime();
 
     // A time inside a daylight-saving gap does not exist, and the clock would move it: refuse the value rather than wake at another time.
-    const [datePart, timePart] = localValue.split("T");
-    const [year, month, day] = datePart!.split("-").map(Number);
-    const [hour, minute] = timePart!.split(":").map(Number);
-    const exists = parsed.getFullYear() === year && parsed.getMonth() + 1 === month && parsed.getDate() === day && parsed.getHours() === hour && parsed.getMinutes() === minute;
+    const [datePart = "", timePart = ""] = localValue.split("T", 2);
+    const [year, month, day] = datePart.split("-", 3).map(Number);
+    const [hour, minute] = timePart.split(":", 2).map(Number);
+    const exists =
+        parsed.getFullYear() === year &&
+        parsed.getMonth() + 1 === month &&
+        parsed.getDate() === day &&
+        parsed.getHours() === hour &&
+        parsed.getMinutes() === minute;
 
     if (!exists || !Number.isFinite(until) || until <= now.getTime() || until > now.getTime() + SNOOZE_MAX_MS) {
         return undefined;

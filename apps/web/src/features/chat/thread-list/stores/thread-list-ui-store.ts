@@ -38,16 +38,16 @@ interface ThreadListUIState {
     // Keyboard help
     showKeyboardHelp: boolean;
 
-    /** The thread the snooze dialog is open for, opened from its row. The list renders the dialog, so it survives the row. */
-    snoozeThreadId: string | null;
-
     // Tag manager dialog
     showManageTagsDialog: boolean;
 
     // Project form dialog
     showProjectFormDialog: boolean;
+
     // Search state
     showSearch: boolean;
+    /** The thread the snooze dialog is open for, opened from its row. The list renders the dialog, so it survives the row. */
+    snoozeThreadId: string | null;
 }
 
 interface ThreadListUIActions {
@@ -70,12 +70,12 @@ interface ThreadListUIActions {
 
     // Keyboard help actions - supports both direct values and functional updates
     setShowKeyboardHelp: Dispatch<SetStateAction<boolean>>;
-    setSnoozeThreadId: (threadId: string | null) => void;
     setShowManageTagsDialog: (show: boolean) => void;
     // Project form dialog actions
     setShowProjectFormDialog: (show: boolean) => void;
     // Search actions - supports both direct values and functional updates
     setShowSearch: Dispatch<SetStateAction<boolean>>;
+    setSnoozeThreadId: (threadId: string | null) => void;
     toggleShowKeyboardHelp: () => void;
 
     toggleShowSearch: () => void;
