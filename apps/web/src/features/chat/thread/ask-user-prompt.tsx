@@ -82,6 +82,8 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const [submitted, setSubmitted] = useState<Submitted | null>(null);
     const [files, setFiles] = useState<AttachedFile[]>([]);
     const [uploading, setUploading] = useState(false);
+    // The last attach attempt's failures, kept in the card so they stay visible after the toast has gone.
+    const [attachNotice, setAttachNotice] = useState<string | null>(null);
     // Focus lands here after a send: the form (and the focused control) goes away.
     const groupRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -147,6 +149,8 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     };
 
     const attachFiles = async (event: ChangeEvent<HTMLInputElement>) => {
+        setAttachNotice(null);
+
         const fileInput = event.target;
         const picked = [...(fileInput.files ?? [])];
 
@@ -220,7 +224,10 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         }
 
         if (failed.length > 0) {
-            showError(t`Could not attach ${failed.join(", ")}. The other files were attached; try those again.`);
+            const message = t`Could not attach ${failed.join(", ")}. The other files were attached; try those again.`;
+
+            setAttachNotice(message);
+            showError(message);
         }
     };
 
@@ -308,6 +315,11 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         size="sm"
                         value={draft}
                     />
+                    {attachNotice && (
+                        <p className="text-destructive text-xs" role="alert">
+                            {attachNotice}
+                        </p>
+                    )}
                     {files.length > 0 && (
                         <ul aria-label={t`Attached files`} className="flex flex-wrap gap-2">
                             {files.map((file) => (
