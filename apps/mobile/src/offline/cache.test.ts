@@ -535,17 +535,24 @@ describe("read-only by construction", () => {
 });
 
 describe("the version-one cache", () => {
-    it("keeps the saved chats when it is opened, and their messages have no share text until a read replaces them", async () => {
+    /** A database with the tables an installed version-one app left behind: no share text column yet. */
+    const openVersionOneDatabase = async () => {
         const database = createTestDatabase();
 
         open.push(database);
-        // The tables an installed version-one app left behind: no share text column yet.
         await database.execAsync(`
             CREATE TABLE cached_threads (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL, runner TEXT, updated_at INTEGER NOT NULL, synced_at INTEGER NOT NULL);
             CREATE TABLE cached_messages (id TEXT PRIMARY KEY NOT NULL, thread_id TEXT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, synced_at INTEGER NOT NULL);
             CREATE INDEX cached_messages_by_thread ON cached_messages (thread_id, created_at);
             PRAGMA user_version = 1;
         `);
+
+        return database;
+    };
+
+    it("keeps the saved chats when it is opened, and their messages have no share text until a read replaces them", async () => {
+        const database = await openVersionOneDatabase();
+
         await database.runAsync("INSERT INTO cached_threads (id, title, status, runner, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?)", ["t1", "Saved chat", "finish", null, 10, 10]);
         await database.runAsync("INSERT INTO cached_messages (id, thread_id, role, text, status, created_at, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", ["m1", "t1", "assistant", "Saved reply", "success", 5, 5, 10]);
 
@@ -563,15 +570,8 @@ describe("the version-one cache", () => {
     });
 
     it("takes the share text from a live read even when the device clock has moved back past the saved stamp", async () => {
-        const database = createTestDatabase();
+        const database = await openVersionOneDatabase();
 
-        open.push(database);
-        await database.execAsync(`
-            CREATE TABLE cached_threads (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL, runner TEXT, updated_at INTEGER NOT NULL, synced_at INTEGER NOT NULL);
-            CREATE TABLE cached_messages (id TEXT PRIMARY KEY NOT NULL, thread_id TEXT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, synced_at INTEGER NOT NULL);
-            CREATE INDEX cached_messages_by_thread ON cached_messages (thread_id, created_at);
-            PRAGMA user_version = 1;
-        `);
         await database.runAsync("INSERT INTO cached_threads (id, title, status, runner, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?)", ["t1", "Saved chat", "finish", null, 10, 10]);
         // Saved long after the clock was last right, so the stamp is later than any read made now.
         await database.runAsync("INSERT INTO cached_messages (id, thread_id, role, text, status, created_at, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", ["m1", "t1", "assistant", "Saved reply", "success", 5, 5, 900]);
