@@ -640,13 +640,19 @@ const loadTurnContext = async (
         ctx.runQuery(internal.auth.functions.getAgentModulePreferencesQuery, { userId }),
         ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> }),
     ]);
+
+    // Refused before any tool is built: without the thread there is no stored organization to cap the speaker's tools by.
+    if (!thread) {
+        throw new Error("The group thread no longer exists.");
+    }
+
     const runContext = await loadRunContext(ctx, {
         admittedRun: true,
         customSystemPrompt: args.customSystemPrompt,
         promptText: args.promptText,
         researchDepth: args.researchDepth,
         threadId,
-        threadLanguage: thread?.language,
+        threadLanguage: thread.language,
         userId,
     });
 
@@ -659,7 +665,7 @@ const loadTurnContext = async (
         organizationId: args.organizationId,
         origin: args.origin,
         participants: args.config.participants,
-        permissionOrganizationId: thread?.organizationId ?? null,
+        permissionOrganizationId: thread.organizationId ?? null,
         prefs: runContext.prefs,
         promptMessageId: args.promptMessageId,
         promptMessages: undefined,
