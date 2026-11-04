@@ -75,24 +75,27 @@ export const patchesWithoutAwaitingInput = (
  * Whether a write wakes a snoozed thread before its time: a run that pauses for the owner (an approval or a question),
  * or one that fails. The owner should not have to find the thread in Snoozed to answer it, or to learn that it broke.
  */
-export const patchesWakeSnooze = (row: Pick<Doc<"threads">, "snoozedUntil"> | null, fields: Pick<ThreadPatch, "awaitingInput" | "status">): boolean =>
-    row?.snoozedUntil !== undefined && (fields.awaitingInput !== undefined || fields.status === "error");
+export const patchesWakeSnooze = (
+    row: Pick<Doc<"threads">, "snoozedUntil"> | null,
+    fields: Pick<ThreadPatch, "awaitingInput" | "status">,
+    failed = false,
+): boolean => row?.snoozedUntil !== undefined && (fields.awaitingInput !== undefined || fields.status === "error" || failed);
 
 /**
  * The one writer of a thread's run state. A write that ends a pause or records a reply removes `awaitingInput`
  * (`patchesWithoutAwaitingInput`); a write that pauses for the owner or fails also removes a snooze
  * (`patchesWakeSnooze`). Both happen in the same patch, so a thread never shows as snoozed while it waits on a person.
  */
-export const patchThread = async (db: Database, threadId: Id<"threads">, fields: ThreadPatch): Promise<void> => {
+export const patchThread = async (db: Database, threadId: Id<"threads">, fields: ThreadPatch, { failed = false }: { failed?: boolean } = {}): Promise<void> => {
     const endsPause = fields.status === "running" || fields.lastReplyAt !== undefined;
-    const wakes = fields.awaitingInput !== undefined || fields.status === "error";
+    const wakes = fields.awaitingInput !== undefined || fields.status === "error" || failed;
 
     if (endsPause || wakes) {
         const row = await db.get("threads", threadId);
 
         if (row) {
             const clearsAwaiting = endsPause && patchesWithoutAwaitingInput(row, fields);
-            const clearsSnooze = patchesWakeSnooze(row, fields);
+            const clearsSnooze = patchesWakeSnooze(row, fields, failed);
 
             if (clearsAwaiting || clearsSnooze) {
                 await patchRow(db, "threads", row, {

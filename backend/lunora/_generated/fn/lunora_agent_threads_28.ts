@@ -308,10 +308,4 @@ __has2 = true;
 if (typeof source["threadId"] !== "string") return DEFER;
 return { ...(__has1 ? { "isPublic": __val1 } : {}), ...(__has2 ? { "publicAccessToken": __val2 } : {}), "threadId": source["threadId"] };
 });
-installCompiledValidatorMap(lunora_agent_threads_28.wakeSnoozedThreadOnFailure.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["threadId"] !== "string") return DEFER;
-return { "threadId": source["threadId"] };
-});
 export * from "../../agent/threads.js";

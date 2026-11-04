@@ -5,7 +5,7 @@ import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { patchThread } from "../agent/table-writes";
-import { getThread, updateThread, wakeSnoozedThreadOnFailure } from "../agent/threads";
+import { getThread, updateThread } from "../agent/threads";
 import schema from "../schema";
 import { isSnoozeInRange, SNOOZE_MAX_MS } from "./lib/thread-state-logic";
 import { markThreadViewed, snoozeThread, unsnoozeThread } from "./thread-state";
@@ -185,9 +185,10 @@ describe("a snoozed thread wakes early", () => {
     it("un-snoozes when a run fails in place, even when the thread goes back to active", async () => {
         const id = await insertSnoozed();
 
-        await harness.run(async (context: any) => {
-            await context.runMutation(wakeSnoozedThreadOnFailure as never, { threadId: id } as never);
-        });
+        await harness.run(
+            async (context: any) =>
+                await context.runMutation(updateThread as never, { failed: true, patch: { status: "active", updatedAt: 9 }, threadId: id } as never),
+        );
 
         const row = await readThread(id);
 

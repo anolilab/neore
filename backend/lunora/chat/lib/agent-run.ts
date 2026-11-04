@@ -1320,6 +1320,8 @@ export type AwaitingInput = "approval" | "question";
  */
 export interface RunOutcome {
     awaitingInput?: AwaitingInput;
+    /** The run failed in place: its thread wakes if it was snoozed (`agent/table-writes.ts#patchThread`). */
+    failed?: boolean;
     replied?: boolean;
 }
 
@@ -1332,6 +1334,7 @@ export const setThreadStatus = async (
     const now = Date.now();
 
     await ctx.runMutation(internal.agent.threads.updateThread, {
+        ...(outcome.failed === true && { failed: true }),
         patch: {
             status,
             updatedAt: now,
@@ -1426,17 +1429,11 @@ export const failRun = async (
 
     if (!replaced) {
         try {
-            await setThreadStatus(ctx, threadId, endedElsewhere ? "active" : threadStatus);
+            // A run that failed in place wakes its thread in the same write, whatever status it goes back to (an approval
+            // continuation returns to active).
+            await setThreadStatus(ctx, threadId, endedElsewhere ? "active" : threadStatus, endedElsewhere ? {} : { failed: true });
         } catch {
             // Ignore cleanup errors
-        }
-
-        if (!endedElsewhere) {
-            try {
-                await ctx.runMutation(internal.agent.threads.wakeSnoozedThreadOnFailure, { threadId: threadId as Id<"threads"> });
-            } catch {
-                // A snooze left in place until its time is the only cost of a failed wake.
-            }
         }
     }
 
