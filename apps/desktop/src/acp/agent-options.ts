@@ -5,7 +5,7 @@
  * and `models` states, which stand in only when it sends no options.
  *
  * Bounds match the backend's (`backend/lunora/acp/validators.ts`): at most 20 options with at most 100 choices each,
- * ids up to 128 characters, names up to 200. Every text goes through the caller's `scrub` (the agent's environment
+ * ids up to 128 bytes of UTF-8, names up to 200 characters. Every text goes through the caller's `scrub` (the agent's environment
  * values are removed there); an id or value the scrub would change is dropped, since it would no longer name the
  * agent's own choice.
  */
@@ -13,7 +13,8 @@ import type { AgentChoiceList, AgentOption, SessionStatePatch } from "./host-eve
 
 export const MAX_OPTIONS = 20;
 export const MAX_CHOICES = 100;
-const MAX_ID_CHARS = 128;
+/** The computer's own check counts an id in UTF-8 bytes, so the bound is bytes: a longer id is refused there, after the change is sent. */
+const MAX_ID_BYTES = 128;
 const MAX_NAME_CHARS = 200;
 const MAX_CATEGORY_CHARS = 64;
 
@@ -69,7 +70,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 
 /** An id the agent chose, kept only whole: empty, too long or changed by the scrub reads as no id. */
 const idOf = (value: unknown, scrub: Scrub): string | undefined => {
-    if (typeof value !== "string" || value === "" || value.length > MAX_ID_CHARS) {
+    if (typeof value !== "string" || value === "" || new TextEncoder().encode(value).length > MAX_ID_BYTES) {
         return undefined;
     }
 
@@ -133,7 +134,7 @@ const optionOf = (entry: unknown, scrub: Scrub): AgentOption | undefined => {
         currentValue,
         id,
         name: nameOf(entry.name, id, scrub),
-        ...(category !== "" && { category }),
+        ...category !== "" && { category },
     };
 };
 
@@ -199,7 +200,7 @@ export const optionsOf = (answer: unknown, scrub: Scrub): RawOptions => {
     const modes = listOf(answer.modes, "currentModeId", "availableModes", "id", scrub);
     const models = listOf(answer.models, "currentModelId", "availableModels", "modelId", scrub);
 
-    return { ...(configOptions !== undefined && { configOptions }), ...(modes !== undefined && { modes }), ...(models !== undefined && { models }) };
+    return { ...configOptions !== undefined && { configOptions }, ...modes !== undefined && { modes }, ...models !== undefined && { models } };
 };
 
 /** The state to send and to offer: the agent's options, or its legacy states when it sent no options. */
@@ -210,9 +211,9 @@ export const resolveOptions = (raw: RawOptions): SessionStatePatch => {
 
     // An empty list is the agent saying it has no options now: it is sent, so the options stored before are replaced.
     return {
-        ...(raw.configOptions !== undefined && { configOptions: raw.configOptions }),
-        ...(raw.modes !== undefined && { modes: raw.modes }),
-        ...(raw.models !== undefined && { models: raw.models }),
+        ...raw.configOptions !== undefined && { configOptions: raw.configOptions },
+        ...raw.modes !== undefined && { modes: raw.modes },
+        ...raw.models !== undefined && { models: raw.models },
     };
 };
 
@@ -226,12 +227,12 @@ export const withCurrentMode = (raw: RawOptions, modeId: unknown, scrub: Scrub):
 
     return {
         ...raw,
-        ...(raw.modes !== undefined && { modes: { ...raw.modes, current: id } }),
-        ...(raw.configOptions !== undefined && {
+        ...raw.modes !== undefined && { modes: { ...raw.modes, current: id } },
+        ...raw.configOptions !== undefined && {
             configOptions: raw.configOptions.map((option) =>
                 option.category === "mode" && option.choices.some((choice) => choice.value === id) ? { ...option, currentValue: id } : option,
             ),
-        }),
+        },
     };
 };
 
@@ -239,9 +240,9 @@ export const withCurrentMode = (raw: RawOptions, modeId: unknown, scrub: Scrub):
 export const withOptionValue = (raw: RawOptions, optionId: string, value: string): RawOptions => {
     return {
         ...raw,
-        ...(raw.configOptions !== undefined && {
-            configOptions: raw.configOptions.map((option) => (option.id === optionId ? { ...option, currentValue: value } : option)),
-        }),
+        ...raw.configOptions !== undefined && {
+            configOptions: raw.configOptions.map((option) => option.id === optionId ? { ...option, currentValue: value } : option),
+        },
     };
 };
 

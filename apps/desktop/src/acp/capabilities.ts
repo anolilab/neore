@@ -37,28 +37,23 @@ export const reportFromHandshake = (capabilities: AgentCapabilities, now: number
 };
 
 /** The backend stores at most this many modes in a capability report (`lib/capability-report.ts`); a longer list would refuse the whole session open. */
-const MAX_REPORTED_MODES = 50;
-
 /** The first option the agent filed under a category, if it sent any. */
 const optionIn = (options: SessionStatePatch, category: string) => options.configOptions?.find((option) => option.category === category);
 
 /**
- * What the agent offered when it opened the session (`agent-options.ts#resolveOptions`), added to its handshake report:
- * the models it can run (`identity.models`), whether it has a reasoning-effort setting (`identity.reasoningEffort`) and
- * the modes it has (`permissions.modes`). Read from the option's category, or from the legacy model and mode states when
- * the agent sent no options, never from the agent's or a model's name. An agent that opened a session and offered none
- * of them is `not_offered`, with an empty list.
+ * What the agent offered when it opened the session (`agent-options.ts#resolveOptions`), added to its handshake report: the
+ * models it can run (`identity.models`) and whether it has a reasoning-effort setting (`identity.reasoningEffort`). Only a
+ * model option counts as a selectable model, since only an option can be changed (`acp_set_config`); the legacy model list
+ * is read-only and reports none. The agent's session modes (Plan, Build ...) are not permission modes the runner enforces,
+ * so they are not reported as `permissions.modes`. Read from the option's category, never from the agent's or a model's name.
  */
 export const withOptionCapabilities = (report: CapabilityReport, options: SessionStatePatch): CapabilityReport => {
     const model = optionIn(options, "model");
-    const mode = optionIn(options, "mode");
     const models = model === undefined
-        ? options.models?.available ?? []
+        ? []
         : model.choices.map((choice) => {
             return { id: choice.value, name: choice.name };
         });
-    const allModes = mode === undefined ? options.modes?.available.map((entry) => entry.id) ?? [] : mode.choices.map((choice) => choice.value);
-    const modes = allModes.slice(0, MAX_REPORTED_MODES);
 
     return {
         ...report,
@@ -69,7 +64,6 @@ export const withOptionCapabilities = (report: CapabilityReport, options: Sessio
                 models,
                 reasoningEffort: optionIn(options, "thought_level") === undefined ? NOT_OFFERED : NATIVE,
             },
-            permissions: { ...report.groups.permissions, modes },
         },
     };
 };

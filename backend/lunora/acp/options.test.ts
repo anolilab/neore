@@ -231,6 +231,13 @@ describe("setHostOption", () => {
 
         await run(async (ctx) => await ctx.db.patch("devices", other.device.deviceId, { hostProtocol: MIN_DEVICE_PROTOCOL - 1 }));
         await expect(setOption(other.threadId, { optionId: "model", valueId: "deep" })).resolves.toEqual({ reason: "outdated", sent: false });
+
+        const offline = await readySession({ configOptions: [MODEL] });
+
+        // Last seen well outside the online window: the device is offline, so nothing is queued.
+        await run(async (ctx) => await ctx.db.patch("devices", offline.device.deviceId, { lastSeenAt: 0 }));
+        await expect(setOption(offline.threadId, { optionId: "model", valueId: "deep" })).resolves.toEqual({ reason: "offline", sent: false });
+        expect(await rows("deviceCalls", { toolName: "acp_set_config" })).toHaveLength(0);
     });
 
     it("refuses an ended session and a second change while the first is on its way", async () => {

@@ -14,7 +14,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { ACP_CLEARED } from "../acp/lib/constants";
-import { onAcpCallEnded } from "../acp/lib/calls";
+import { onAcpCallEnded, recordRemovedDeviceOptions } from "../acp/lib/calls";
 import { OUTDATED_NOTICE } from "../acp/lib/start";
 import { endHostSessionsOfDevice } from "../acp/lib/revoke";
 import { internal } from "../_generated/internal";
@@ -270,6 +270,8 @@ export const revokeDevice = authMutation
         const hosts = owned.filter((other) => other.viaDeviceId === device._id);
 
         for (const revoked of [device, ...hosts]) {
+            // An option change still waiting gets its answer first, as the session it belongs to is about to end.
+            await recordRemovedDeviceOptions(ctx, revoked._id, ctx.now);
             await expireOpenCalls(ctx, revoked._id, "The device was removed");
             await endHostSessionsOfDevice(ctx, revoked._id, ctx.now);
             await deleteShardRoute(ctx, "device", revoked._id as string);

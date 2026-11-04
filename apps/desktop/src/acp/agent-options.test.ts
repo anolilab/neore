@@ -80,6 +80,14 @@ describe("configOptionsOf", () => {
         ).toHaveLength(1);
     });
 
+    it("keeps an id of up to 128 UTF-8 bytes, and drops one the computer would refuse", () => {
+        // 64 two-byte characters are 128 bytes: kept. 65 are 130 bytes, which the computer refuses after the change is sent.
+        const offered = (id: string) => configOptionsOf([select(id)], plain);
+
+        expect(offered("é".repeat(64))).toHaveLength(1);
+        expect(offered("é".repeat(65))).toEqual([]);
+    });
+
     it("cuts the options by bytes as well as by count, so the post stays under the ingest cap", () => {
         // A name is cut at 200 characters, which is 400 bytes here: 20 options of 100 such choices would be far over the cap.
         const wide = Array.from({ length: 20 }, (_unused, index) =>
@@ -87,8 +95,7 @@ describe("configOptionsOf", () => {
                 options: Array.from({ length: 100 }, (_inner, choice) => {
                     return { name: "é".repeat(200), value: `w${String(index)}-${String(choice)}-${"x".repeat(100)}` };
                 }),
-            }),
-        );
+            }));
         const options = configOptionsOf(wide, plain) ?? [];
 
         expect(new TextEncoder().encode(JSON.stringify(options)).length).toBeLessThanOrEqual(64 * 1024);
@@ -110,8 +117,8 @@ describe("configOptionsOf", () => {
 
     it("scrubs every text, cuts names, and drops an id the scrub would change", () => {
         const scrub = (text: string) => text.replaceAll("SECRET", "");
-        const [option] =
-            configOptionsOf(
+        const [option]
+            = configOptionsOf(
                 [
                     select("m", {
                         name: `aSECRETb${"n".repeat(300)}`,

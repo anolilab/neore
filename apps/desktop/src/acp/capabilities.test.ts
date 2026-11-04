@@ -64,16 +64,16 @@ describe("withOptionCapabilities", () => {
         expect(capabilityOf(withOptionCapabilities(base, { configOptions: [effort] }), "identity.reasoningEffort")).toEqual({ degradation: "none", supported: true });
     });
 
-    it("lists the modes of a mode option", () => {
-        expect(groups({ configOptions: [mode] }).permissions?.modes).toEqual(["ask", "code"]);
+    it("does not report a mode option as a permission mode: the session's modes are not the runner's", () => {
+        expect(groups({ configOptions: [mode] }).permissions?.modes ?? []).toEqual([]);
     });
 
-    it("falls back to the legacy models state when there is no model option", () => {
-        expect(groups({ models: { available: [{ id: "m1", name: "M1" }], current: "m1" } }).identity?.models).toEqual([{ id: "m1", name: "M1" }]);
+    it("does not offer the legacy models, which the agent cannot change", () => {
+        expect(groups({ models: { available: [{ id: "m1", name: "M1" }], current: "m1" } }).identity?.models).toEqual([]);
     });
 
-    it("falls back to the legacy modes state when there is no mode option", () => {
-        expect(groups({ modes: { available: [{ id: "ask", name: "Ask" }, { id: "code", name: "Code" }], current: "ask" } }).permissions?.modes).toEqual(["ask", "code"]);
+    it("does not report the legacy modes as permission modes", () => {
+        expect(groups({ modes: { available: [{ id: "ask", name: "Ask" }, { id: "code", name: "Code" }], current: "ask" } }).permissions?.modes ?? []).toEqual([]);
     });
 
     it("takes the options over the legacy states", () => {
@@ -87,14 +87,15 @@ describe("withOptionCapabilities", () => {
             { id: "fast", name: "Fast" },
             { id: "deep", name: "Deep" },
         ]);
-        expect(both.permissions?.modes).toEqual(["ask", "code"]);
+        expect(both.permissions?.modes ?? []).toEqual([]);
     });
 
     it("reports nothing offered when the agent offered none, and keeps the handshake members", () => {
         const none = withOptionCapabilities(base, {});
 
         expect(none.groups.identity).toEqual({ models: [], reasoningEffort: { reason: "not_offered", supported: false } });
-        expect(none.groups.permissions).toEqual({ modes: [] });
+        // The permission group is the handshake's own: session modes are not reported there.
+        expect(none.groups.permissions).toBeUndefined();
         expect(isAvailable(capabilityOf(none, "sessions.load"))).toBe(true);
         expect(none.reportedAt).toBe(NOW);
     });
@@ -103,16 +104,7 @@ describe("withOptionCapabilities", () => {
         const other = groups({ configOptions: [{ ...model, category: "model_config" }] });
 
         expect(other.identity?.models).toEqual([]);
-        expect(other.permissions?.modes).toEqual([]);
-    });
-
-    it("lists at most 50 modes, the most the backend stores, so a long list cannot refuse the session open", () => {
-        const choices = Array.from({ length: 80 }, (_unused, index) => {
-            return { name: "M", value: `m${String(index)}` };
-        });
-        const many = { ...mode, choices };
-
-        expect(groups({ configOptions: [many] }).permissions?.modes).toHaveLength(50);
+        expect(other.permissions?.modes ?? []).toEqual([]);
     });
 
     it("never reads a name: an agent called anything reports the same", () => {

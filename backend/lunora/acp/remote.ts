@@ -24,7 +24,7 @@ import { isHostRunThread } from "./lib/host-thread";
 import { sessionOfThread } from "./lib/sessions";
 import { offerOf, startFailureMessage, webSessionId } from "./lib/start";
 import { openHostSession } from "./lib/start-session";
-import { vPendingPermission } from "./validators";
+import { fitsIdBytes, vPendingPermission } from "./validators";
 
 /** A double tap, or a retry after a lost answer, within this is the same start. */
 const START_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
@@ -324,7 +324,11 @@ export const answerHostPermission = authMutation
  */
 export const setHostOption = authMutation
     .use(rateLimit("hosts/answer"))
-    .input({ optionId: v.optional(v.string().max(128)), threadId: v.id("threads"), valueId: v.string().min(1).max(128) })
+    .input({
+        optionId: v.optional(v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" })),
+        threadId: v.id("threads"),
+        valueId: v.string().min(1).check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
+    })
     .output(
         v.object({
             callId: v.optional(v.string()),

@@ -165,6 +165,9 @@ export class AgentSession {
     /** What the agent offers (its model, reasoning effort, mode ...), as it last said; unset until the session is open. */
     private offered: RawOptions = {};
 
+    /** Whether the startup updates are the saved session's (while it loads) or a fresh session's (once it is opened). */
+    private startupPhase: "loading" | "opening" = "opening";
+
     /** What happened to the saved session the backend asked to load; unset when it asked for none. */
     private reattach: HostSessionInfo["reattach"];
 
@@ -438,6 +441,8 @@ export class AgentSession {
         }
 
         // No `session/load` frame goes to an agent that did not say it loads them.
+        this.startupPhase = "loading";
+
         if (isAvailable(capabilityOf(this.report, "sessions.load"))) {
             try {
                 // What the agent sent while it loaded is older than its answer: the answer's fields win.
@@ -453,6 +458,8 @@ export class AgentSession {
         } else {
             this.reattach = { loaded: false, reason: "load_unsupported" };
         }
+
+        this.startupPhase = "opening";
 
         return await this.openFresh(folder, startupTimeoutMs);
     }
@@ -841,9 +848,12 @@ export class AgentSession {
         // While the session opens its id is not known yet, and an agent may send its options before it answers. They are
         // kept, older than the answer, so the answer's own fields replace them.
         if (this.agentSessionId === "" && this.status === "starting" && method === METHOD.sessionUpdate && isRecord(params) && isRecord(params.update)) {
+            // While the saved session loads, only its updates count. Once a fresh session is opened, the saved id's late updates are
+            // the failed load's, and the fresh session's own updates are the ones that count.
             const { resumeSessionId } = this.options;
+            const counts = resumeSessionId === undefined || (this.startupPhase === "loading" ? params.sessionId === resumeSessionId : params.sessionId !== resumeSessionId);
 
-            if (resumeSessionId === undefined || params.sessionId === resumeSessionId) {
+            if (counts) {
                 this.takeStartupOptions(params.update);
             }
 

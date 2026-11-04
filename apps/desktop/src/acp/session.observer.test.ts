@@ -18,7 +18,6 @@ const OPENED = {
     capabilities: {
         groups: {
             identity: { models: [], reasoningEffort: { reason: "not_offered", supported: false } },
-            permissions: { modes: [] },
             sessions: { listNative: { reason: "not_offered", supported: false }, load: { reason: "not_offered", supported: false } },
         },
         reportedAt: expect.any(Number),

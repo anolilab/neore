@@ -34,6 +34,12 @@ export const vHostEndReason = v.union(
  * The agent's context use and cost, as it reports them (`session_state`). Counts are whole and non-negative, the cost is a
  * finite non-negative amount, and the currency is cut to 8 characters on the desktop (`apps/desktop/src/acp/agent-state.ts`).
  */
+/**
+ * An id the agent chose, as the computer checks it: at most 128 UTF-8 bytes. A character count would admit an id the computer
+ * refuses, after the change is already sent.
+ */
+export const fitsIdBytes = (text: string): boolean => new TextEncoder().encode(text).length <= 128;
+
 export const vAgentUsage = v.object({
     cost: v.optional(
         v.object({
@@ -55,10 +61,10 @@ export const vAcpAgentState = v.object({
                 v.object({
                     category: v.optional(v.string().max(64)),
                     choices: v
-                        .array(v.object({ name: v.string().max(200), value: v.string().max(128) }))
+                        .array(v.object({ name: v.string().max(200), value: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }) }))
                         .check((value) => value.length <= 100, { message: "Too many choices" }),
-                    currentValue: v.string().max(128),
-                    id: v.string().max(128),
+                    currentValue: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
+                    id: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
                     name: v.string().max(200),
                 }),
             )
@@ -68,18 +74,18 @@ export const vAcpAgentState = v.object({
     models: v.optional(
         v.object({
             available: v
-                .array(v.object({ id: v.string().max(128), name: v.string().max(200) }))
+                .array(v.object({ id: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }), name: v.string().max(200) }))
                 .check((value) => value.length <= 100, { message: "Too many models" }),
-            current: v.string().max(128),
+            current: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
         }),
     ),
     // The legacy mode state, for an agent that sends no `configOptions`.
     modes: v.optional(
         v.object({
             available: v
-                .array(v.object({ id: v.string().max(128), name: v.string().max(200) }))
+                .array(v.object({ id: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }), name: v.string().max(200) }))
                 .check((value) => value.length <= 100, { message: "Too many modes" }),
-            current: v.string().max(128),
+            current: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
         }),
     ),
     usage: v.optional(vAgentUsage),
@@ -145,10 +151,12 @@ export const vHostEvent = v.union(
                     v.object({
                         category: v.optional(v.string().min(1).max(64)),
                         choices: v
-                            .array(v.object({ name: v.string().max(200), value: v.string().min(1).max(128) }))
+                            .array(
+                                v.object({ name: v.string().max(200), value: v.string().min(1).check(fitsIdBytes, { message: "An id is at most 128 bytes" }) }),
+                            )
                             .check((value) => value.length <= 100, { message: "Too many choices" }),
-                        currentValue: v.string().max(128),
-                        id: v.string().min(1).max(128),
+                        currentValue: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
+                        id: v.string().min(1).check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
                         name: v.string().max(200),
                     }),
                 )
@@ -158,17 +166,17 @@ export const vHostEvent = v.union(
         models: v.optional(
             v.object({
                 available: v
-                    .array(v.object({ id: v.string().min(1).max(128), name: v.string().max(200) }))
+                    .array(v.object({ id: v.string().min(1).check(fitsIdBytes, { message: "An id is at most 128 bytes" }), name: v.string().max(200) }))
                     .check((value) => value.length <= 100, { message: "Too many models" }),
-                current: v.string().max(128),
+                current: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
             }),
         ),
         modes: v.optional(
             v.object({
                 available: v
-                    .array(v.object({ id: v.string().min(1).max(128), name: v.string().max(200) }))
+                    .array(v.object({ id: v.string().min(1).check(fitsIdBytes, { message: "An id is at most 128 bytes" }), name: v.string().max(200) }))
                     .check((value) => value.length <= 100, { message: "Too many modes" }),
-                current: v.string().max(128),
+                current: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
             }),
         ),
         usage: v.optional(vAgentUsage),

@@ -19,7 +19,7 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import type { MutationCtx } from "../../_generated/server";
 import { isForwardHostState, updateHostStream } from "../../chat/streaming/persistent/host";
-import { isAcpTool } from "../../devices/lib/state";
+import { isAcpTool, OPEN_CALL_STATUSES } from "../../devices/lib/state";
 import { START_GRACE_MS } from "./constants";
 import { finishHostTurn } from "./finish";
 import { markReattachFailed } from "./reattach";
@@ -84,8 +84,6 @@ export const endStartingSession = async (ctx: MutationCtx, deviceId: Id<"devices
     }
 };
 
-const OPTION_PREFIX = /^(The device refused the request|refused): ?/u;
-
 /**
  * The only reasons an option change shows: the fixed phrases the computer signs (`AgentSession.setOption`, the receipt log). What
  * else a failed call carries (a relay's exception, a device's own message) can quote the environment, so it is never shown.
@@ -97,6 +95,7 @@ const OPTION_REASONS: ReadonlySet<string> = new Set([
     "the agent did not apply the change",
     "the agent does not offer that choice",
     "the app restarted before the agent answered",
+    "the device was removed",
     "this session is not open",
 ]);
 
@@ -114,7 +113,7 @@ const recordOptionResult = async (ctx: MutationCtx, call: Call, input: Record<st
         return;
     }
 
-    const signed = (end.error ?? "").replace(OPTION_PREFIX, "").trim();
+    const signed = (end.error ?? "").replace(REFUSAL_PREFIX, "").trim();
     let reason = OPTION_REASONS.has(signed) ? signed : OTHER_REASON;
 
     if (end.status === "expired") {
@@ -131,6 +130,22 @@ const recordOptionResult = async (ctx: MutationCtx, call: Call, input: Record<st
             valueId: input.valueId,
         },
     });
+};
+
+/**
+ * A device removed while its option changes are open: each of those calls ends without a reply, so the change gets its refusal
+ * here, as it would from the computer. Other calls keep the ending they always had.
+ */
+export const recordRemovedDeviceOptions = async (ctx: MutationCtx, deviceId: Id<"devices">, now: number): Promise<void> => {
+    for (const status of OPEN_CALL_STATUSES) {
+        const { page } = await ctx.db.deviceCalls.findMany({ limit: 50, where: { deviceId, status } });
+
+        for (const call of page) {
+            if (call.toolName === "acp_set_config") {
+                await recordOptionResult(ctx, call, inputOf(call), { error: "the device was removed", status: "failed" }, now);
+            }
+        }
+    }
 };
 
 /**
