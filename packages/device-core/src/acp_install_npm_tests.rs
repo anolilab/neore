@@ -312,7 +312,7 @@ fn the_program_is_one_file_inside_the_package() {
         json!({ "name": PACKAGE, "version": "1.0.0", "bin": "../outside.js" }),
         json!({ "name": PACKAGE, "version": "1.0.0", "bin": "/bin/sh" }),
         json!({ "name": PACKAGE, "version": "1.0.0", "bin": "missing.js" }),
-        json!({ "name": PACKAGE, "version": "1.0.0", "bin": { "a": "cli.js", "b": "cli.js" } }),
+        json!({ "name": PACKAGE, "version": "1.0.0", "bin": { "a": "cli.js", "b": "other.js" } }),
         json!({ "name": PACKAGE, "version": "1.0.0" }),
     ] {
         let bytes = tarball(&manifest, &[]);
@@ -895,4 +895,129 @@ fn a_node_reached_through_a_link_with_another_name_installs() {
         "the recorded command is the file the link resolves to"
     );
     assert!(state.acp_spawn_plan("fixture", None).is_ok());
+}
+
+#[test]
+fn several_names_for_one_file_are_one_program_and_different_files_are_not() {
+    let same = json!({ "bin": { "a": "cli.js", "b": "./cli.js" } });
+    let different = json!({ "bin": { "a": "cli.js", "b": "other.js" } });
+
+    assert_eq!(pick_bin(&same, "pkg").unwrap(), "cli.js");
+    assert!(pick_bin(&different, "pkg").is_err());
+    assert_eq!(pick_bin(&different, "a").unwrap(), "cli.js");
+}
+
+#[test]
+fn removing_an_agent_whose_pin_was_cleared_still_deletes_its_folder() {
+    let (state, guard) = state("remove-unpinned");
+    let dir = guard.path().to_path_buf();
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let view = state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap();
+    let script = view.agents[0].args[0].clone();
+
+    // A different program first, with a path into the folder kept in a later argument: the pin goes, the files stay.
+    let edited = state
+        .acp_update(
+            serde_json::from_value(json!({
+                "op": "saveAgent", "key": "fixture", "label": "Fixture", "command": "/bin/sh",
+                "args": ["/elsewhere/agent.js", script],
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+    assert!(edited.agents[0].install.is_none(), "the pin is cleared");
+    assert!(installed(&dir).exists(), "the files stay");
+
+    state
+        .acp_update(
+            serde_json::from_value(json!({ "op": "removeAgent", "key": "fixture" })).unwrap(),
+        )
+        .unwrap();
+    assert!(
+        !dir.join("acp-agents/fixture").exists(),
+        "removal deletes them"
+    );
+}
+
+#[test]
+fn a_registry_entry_with_too_many_or_too_large_variables_is_refused() {
+    let many: BTreeMap<String, String> = (0..=crate::acp::MAX_ENV_VARS)
+        .map(|index| (format!("V{index}"), "x".into()))
+        .collect();
+    let large: BTreeMap<String, String> = (0..5)
+        .map(|index| (format!("V{index}"), "x".repeat(8 * 1024 - 1)))
+        .collect();
+    let fine: BTreeMap<String, String> = [("V".to_owned(), "x".to_owned())].into();
+
+    for (env, what) in [(&many, "count"), (&large, "total size")] {
+        assert!(
+            validate_provenance("1.0.0", "P", "https://x/y", env).is_err(),
+            "{what}"
+        );
+    }
+
+    assert!(validate_provenance("1.0.0", "P", "https://x/y", &fine).is_ok());
+}
+
+#[test]
+fn a_timeout_kills_what_npm_started_too() {
+    let guard = tempfile::tempdir().unwrap();
+    let dir = guard.path().to_path_buf();
+    let npm = dir.join("npm");
+    let node = dir.join("node");
+    let pid_file = dir.join("child.pid");
+    let (prefix, home) = (dir.join("prefix"), dir.join("home"));
+
+    fs::create_dir_all(&prefix).unwrap();
+    fs::create_dir_all(&home).unwrap();
+    fs::write(&node, "#!/bin/sh\n").unwrap();
+    // A helper that outlives its parent unless the whole group is signalled.
+    fs::write(
+        &npm,
+        format!(
+            "#!/bin/sh\nsleep 60 &\necho $! > '{}'\nwait\n",
+            pid_file.display()
+        ),
+    )
+    .unwrap();
+
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        for path in [&node, &npm] {
+            fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+    }
+
+    let error = run_npm(
+        &node,
+        &npm,
+        &prefix,
+        &dir.join("package.tgz"),
+        &home,
+        &dir,
+        Duration::from_millis(600),
+    )
+    .unwrap_err();
+
+    assert!(error.contains("took too long"), "{error}");
+
+    let pid: i32 = fs::read_to_string(&pid_file)
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap();
+
+    // Give the kernel a moment to reap; signal 0 only asks whether the process still exists.
+    let gone = (0..50).any(|_| {
+        std::thread::sleep(Duration::from_millis(100));
+
+        unsafe { libc::kill(pid, 0) != 0 }
+    });
+
+    assert!(gone, "the helper npm started is still running");
 }

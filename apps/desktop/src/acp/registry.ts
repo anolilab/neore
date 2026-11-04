@@ -41,6 +41,9 @@ const WINDOWS_DRIVE = /^[A-Za-z]:/u;
 const MAX_ARGS = 50;
 const MAX_ARG_BYTES = 1000;
 const MAX_ENV_VALUE_BYTES = 8 * 1024;
+/** The core's limits on all of an entry's variables together (`MAX_ENV_VARS`, `MAX_ENV_TOTAL_BYTES`). */
+const MAX_ENV_VARS = 50;
+const MAX_ENV_TOTAL_BYTES = 32 * 1024;
 const MAX_PUBLISHER = 200;
 const MAX_SOURCE = 1000;
 const RESERVED_ENV_PREFIXES = ["NEORE_", "ELECTRON_"];
@@ -297,7 +300,13 @@ const launchUnfit = (args: string[], env: Record<string, string>): string | unde
         return "Its start-up arguments are longer than Neore accepts.";
     }
 
-    const offender = Object.entries(env).find(([variable, value]) => badEnvName(variable) || Buffer.byteLength(value) > MAX_ENV_VALUE_BYTES || value.includes("\0"));
+    const entries = Object.entries(env);
+
+    if (entries.length > MAX_ENV_VARS || entries.reduce((sum, [variable, value]) => sum + Buffer.byteLength(variable) + Buffer.byteLength(value), 0) > MAX_ENV_TOTAL_BYTES) {
+        return "Its start-up variables are longer than Neore accepts.";
+    }
+
+    const offender = entries.find(([variable, value]) => badEnvName(variable) || Buffer.byteLength(value) > MAX_ENV_VALUE_BYTES || value.includes("\0"));
 
     return offender === undefined ? undefined : `It sets ${offender[0]}, which Neore does not allow an install to set.`;
 };

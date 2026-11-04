@@ -39,6 +39,9 @@ const STAGING_DIR: &str = ".staging";
 pub(crate) const UNPACKED_DIR: &str = "unpacked";
 const MAX_UNPACKED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_ENTRIES: usize = 20_000;
+/// All of a registry entry's variables together (names and values), so that starting the agent cannot fail on the
+/// size of its environment. The desktop applies the same number before the install is offered.
+pub(crate) const MAX_ENV_TOTAL_BYTES: usize = 32 * 1024;
 /// A staging folder left by a crash is removed after this long.
 const STALE_STAGING_MS: u64 = 24 * 60 * 60 * 1000;
 
@@ -138,6 +141,19 @@ pub(crate) fn validate_provenance(
 
     // Every variable goes through the same checks as one the user types, and a name that changes which code runs
     // would make this a different program than the one the approvals were given for.
+    if env.len() > crate::acp::MAX_ENV_VARS {
+        return Err(format!("at most {} variables", crate::acp::MAX_ENV_VARS));
+    }
+
+    if env
+        .iter()
+        .map(|(name, value)| name.len() + value.len())
+        .sum::<usize>()
+        > MAX_ENV_TOTAL_BYTES
+    {
+        return Err("the variables are longer than Neore accepts".into());
+    }
+
     for (name, value) in env {
         validate_env_var(name, value)?;
 

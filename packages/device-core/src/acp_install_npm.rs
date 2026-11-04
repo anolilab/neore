@@ -185,8 +185,24 @@ fn pick_bin(manifest: &Value, package: &str) -> Result<String, String> {
                 return Ok(path.clone());
             }
 
-            match (map.len(), map.values().next()) {
-                (1, Some(Value::String(path))) => Ok(path.clone()),
+            // Several names for one file are one program (`npm exec` runs it); different files are a choice
+            // this installer will not make for the person.
+            let files: Vec<&str> = map
+                .values()
+                .filter_map(|value| value.as_str().map(|path| path.trim_start_matches("./")))
+                .collect();
+
+            match files.first() {
+                Some(first)
+                    if files.len() == map.len() && files.iter().all(|file| file == first) =>
+                {
+                    Ok(map
+                        .values()
+                        .next()
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_owned())
+                }
                 _ => Err("the package starts several programs and none is named like it".into()),
             }
         }
@@ -233,6 +249,7 @@ fn run_npm(
     tarball: &Path,
     home: &Path,
     stage: &Path,
+    timeout: Duration,
 ) -> Result<(), String> {
     let log = home.join("npm.log");
     let out = fs::File::create(&log).map_err(|error| error.to_string())?;
@@ -282,6 +299,10 @@ fn run_npm(
         .stdout(out)
         .stderr(err);
 
+    // Its own process group, so what npm starts (a git checkout, a download helper) goes with it.
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(&mut command, 0);
+
     for name in PASSED_ENV {
         if let Some(value) = std::env::var_os(name) {
             command.env(name, value);
@@ -291,7 +312,7 @@ fn run_npm(
     let mut child = command
         .spawn()
         .map_err(|error| format!("npm could not be started: {error}"))?;
-    let deadline = Instant::now() + NPM_TIMEOUT;
+    let deadline = Instant::now() + timeout;
     let mut ticks = 0_u32;
 
     loop {
@@ -300,8 +321,7 @@ fn run_npm(
         // A package and its dependencies can expand far beyond the tarball that was verified: stop npm while it
         // runs, not after it has filled the disk.
         if ticks % STAGE_CHECK_EVERY == 0 && stage_over_budget(stage) {
-            let _ = child.kill();
-            let _ = child.wait();
+            stop_npm(&mut child);
 
             return Err(
                 "the package needs more disk space than an agent may use. Nothing was installed"
@@ -318,8 +338,7 @@ fn run_npm(
                 ))
             }
             None if Instant::now() >= deadline => {
-                let _ = child.kill();
-                let _ = child.wait();
+                stop_npm(&mut child);
 
                 return Err(
                     "npm took too long to install the package. Nothing was installed".into(),
@@ -328,6 +347,20 @@ fn run_npm(
             None => std::thread::sleep(Duration::from_millis(100)),
         }
     }
+}
+
+/// Kills npm and everything it started: they share the process group `run_npm` made for it.
+fn stop_npm(child: &mut std::process::Child) {
+    #[cfg(unix)]
+    {
+        // SAFETY: plain syscall with no memory arguments; the group is the one `run_npm` made for this child.
+        unsafe {
+            libc::kill(-(child.id() as libc::pid_t), libc::SIGKILL);
+        }
+    }
+
+    let _ = child.kill();
+    let _ = child.wait();
 }
 
 /// True when `dir` holds more than [`MAX_STAGE_BYTES`] (links are not followed; a tree too large to count is over).
@@ -577,7 +610,7 @@ impl DeviceState {
         fs::rename(archive, &tarball).map_err(|error| error.to_string())?;
         create_private_dir(&prefix)?;
         create_private_dir(&home)?;
-        run_npm(node, npm, &prefix, &tarball, &home, stage_dir)?;
+        run_npm(node, npm, &prefix, &tarball, &home, stage_dir, NPM_TIMEOUT)?;
 
         // npm opened the tarball by name. A copy swapped in between the check above and npm's read would have
         // been installed: what is on disk now must still be the bytes that matched the index.

@@ -124,6 +124,14 @@ describe("npm agents", () => {
         expect(withNpx({ args: "-v ".repeat(50).trim().split(" ") })).toMatch("49 arguments");
     });
 
+    it("bounds all of an entry's variables together, as the core does", () => {
+        const variables = (count: number, size: number) => Object.fromEntries(Array.from({ length: count }, (_, index) => [`V${String(index)}`, "x".repeat(size)]));
+
+        expect(withNpx({ env: variables(50, 1) })).toMatchObject({ kind: "npm" });
+        expect(withNpx({ env: variables(51, 1) })).toMatch("variables are longer");
+        expect(withNpx({ env: variables(5, 8000) })).toMatch("variables are longer");
+    });
+
     it("applies the same limits to its arguments and variables as to a download", () => {
         expect(withNpx({ env: { NODE_OPTIONS: "--require x" } })).toMatch("It sets NODE_OPTIONS");
         expect(withNpx({ args: ["x".repeat(1001)] })).toMatch("arguments");
