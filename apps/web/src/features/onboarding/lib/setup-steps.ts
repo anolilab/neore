@@ -1,3 +1,5 @@
+import { MAX_SKIPPED_SETUP_STEPS } from "@neore/backend/setup-step-limits";
+
 export const SETUP_STEP_IDS = ["pair", "ssh", "agent"] as const;
 
 export type SetupStepId = (typeof SETUP_STEP_IDS)[number];
@@ -45,5 +47,5 @@ export const deriveSetupSteps = (
 export const toggleSkipped = (skipped: ReadonlyArray<string> | undefined, id: SetupStepId, skip: boolean): string[] => {
     const rest = (skipped ?? []).filter((entry) => entry !== id);
 
-    return skip ? [...rest, id] : rest;
+    return skip ? [...rest, id].slice(-MAX_SKIPPED_SETUP_STEPS) : rest;
 };

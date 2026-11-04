@@ -95,28 +95,45 @@ const SetupChecklist: FC = () => {
                                 </p>
                                 <p className="text-muted-foreground text-xs">{copy[id].description}</p>
                             </div>
-                            {status !== undefined && status !== "done" && (
+                            {/* The links stay while the device check is pending or failed; only Skip and Resume need a known status. */}
+                            {status !== "done" && (
                                 <>
                                     <a className={buttonVariants({ size: "sm", variant: "outline" })} href={STEP_TARGET[id]}>
                                         {copy[id].action}
                                         <span className="sr-only">: {copy[id].title}</span>
                                     </a>
-                                    <Button
-                                        disabled={!settingsLoaded}
-                                        onClick={() => {
-                                            setSkipped.mutate({ skipped: status === "todo", stepId: id });
-                                        }}
-                                        size="sm"
-                                        variant="ghost"
-                                    >
-                                        {status === "todo" ? t`Skip` : t`Resume`}
-                                        <span className="sr-only">: {copy[id].title}</span>
-                                    </Button>
+                                    {status !== undefined && (
+                                        <Button
+                                            disabled={!settingsLoaded}
+                                            onClick={() => {
+                                                setSkipped.mutate({ skipped: status === "todo", stepId: id });
+                                            }}
+                                            size="sm"
+                                            variant="ghost"
+                                        >
+                                            {status === "todo" ? t`Skip` : t`Resume`}
+                                            <span className="sr-only">: {copy[id].title}</span>
+                                        </Button>
+                                    )}
                                 </>
                             )}
                         </li>
                     ))}
                 </ol>
+                {devicesQuery.isError && (
+                    <div className="mt-3 flex flex-wrap items-center gap-3" role="alert">
+                        <p className="text-destructive text-xs">{t`Could not read your devices, so the steps cannot be checked yet. The links still work.`}</p>
+                        <Button
+                            onClick={() => {
+                                devicesQuery.refetch().catch(() => {});
+                            }}
+                            size="sm"
+                            variant="outline"
+                        >
+                            {t`Retry the device check`}
+                        </Button>
+                    </div>
+                )}
                 {settingsQuery.isError && (
                     <div className="mt-3 flex flex-wrap items-center gap-3" role="alert">
                         <p className="text-destructive text-xs">{t`Could not load your saved choices, so Skip and Resume are off for now.`}</p>

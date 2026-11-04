@@ -1,3 +1,4 @@
+import { MAX_SKIPPED_SETUP_STEPS } from "@neore/backend/setup-step-limits";
 import { describe, expect, it } from "vitest";
 
 import { deriveSetupSteps, detectSetupDone, toggleSkipped } from "./setup-steps";
@@ -16,6 +17,12 @@ describe("setup steps", () => {
     it("marks skipped steps and lets done win", () => {
         expect(deriveSetupSteps([], ["ssh"]).map((s) => s.status)).toEqual(["todo", "skipped", "todo"]);
         expect(deriveSetupSteps([{}], ["pair"])[0]?.status).toBe("done");
+    });
+
+    it("keeps no more skipped entries than the server stores", () => {
+        const stored = Array.from({ length: MAX_SKIPPED_SETUP_STEPS }, (_, index) => `id${index}`);
+
+        expect(toggleSkipped(stored, "ssh", true)).toHaveLength(MAX_SKIPPED_SETUP_STEPS);
     });
 
     it("skips and resumes without duplicates", () => {

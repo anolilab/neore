@@ -4,6 +4,7 @@ import { v } from "lunorash/server";
 import { MAX_SEARCH_DOMAIN_BLOCKLIST } from "../chat/tools/search-domains";
 import { MAX_LENGTH } from "../lib/validators";
 import { MAX_MODEL_NICKNAME_LENGTH, MAX_MODEL_NICKNAMES } from "./lib/model-nicknames";
+import { MAX_SKIPPED_SETUP_STEPS } from "./lib/setup-step-limits";
 
 /**
  * Every user-writable setting. `userId` is NOT here: `updateUserSettings` takes
@@ -119,7 +120,9 @@ export const userSettingsFieldsWithoutUserId = {
         }),
     ), // Hostnames the web search tool never returns (subdomains too). Normalised server-side in `settingsUpsert`.
     sendBehavior: v.optional(v.union(v.literal("enter"), v.literal("shiftEnter"), v.literal("button"))),
-    setupStepsSkipped: v.optional(v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= 8, { message: "Too many skipped setup steps" })), // First-run setup steps the user skipped. Absent means none.
+    setupStepsSkipped: v.optional(
+        v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= MAX_SKIPPED_SETUP_STEPS, { message: "Too many skipped setup steps" }),
+    ), // First-run setup steps the user skipped. Absent means none.
     taskEmailEnabled: v.optional(v.boolean()), // Opt-in email when a task or trigger run finishes with a result. OPT-IN: absent means off.
     temporaryChatRetentionHours: v.optional(v.number()), // Default: 24 hours
     threadSummariesEnabled: v.optional(v.boolean()), // Summarise a long thread's older turns while it sits idle. OPT-IN: absent means off.

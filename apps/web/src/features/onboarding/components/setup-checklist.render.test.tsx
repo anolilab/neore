@@ -10,7 +10,7 @@ import SetupChecklist from "./setup-checklist";
 
 const { devices, mutate, server, sonnerMock } = vi.hoisted(() => {
     return {
-        devices: { current: [] as unknown[] },
+        devices: { current: [] as unknown[], fail: false },
         mutate: vi.fn(),
         server: { fail: false, readFail: false, hold: undefined as Promise<void> | undefined, noRow: false, skipped: undefined as string[] | undefined },
         sonnerMock: { toast: vi.fn() },
@@ -87,7 +87,16 @@ vi.mock("@/lib/lunora/crpc", () => {
                     functions: {
                         listDevices: {
                             queryOptions: () => {
-                                return { queryFn: async () => devices.current, queryKey: ["listDevices"] };
+                                return {
+                                    queryFn: async () => {
+                                        if (devices.fail) {
+                                            throw new Error("offline");
+                                        }
+
+                                        return devices.current;
+                                    },
+                                    queryKey: ["listDevices"],
+                                };
                             },
                         },
                     },
@@ -102,7 +111,9 @@ const RESUME_ADD_AN_SSH_SERVER = /Resume.*Add an SSH server/;
 const SKIP_INSTALL_A_CODING_AGENT = /Skip.*Install a coding agent/;
 const RESUME_PAIR_THIS_COMPUTER = /Resume.*Pair this computer/;
 const SKIP = /Skip/;
-const RETRY = /Retry/;
+const RETRY = /^Retry$/;
+const RETRY_DEVICES = /Retry the device check/;
+const COULD_NOT_READ_DEVICES = /Could not read your devices/;
 const COULD_NOT_LOAD = /Could not load your saved choices/;
 const GO_TO_PAIRING = /Go to pairing/;
 const GO_TO_SERVERS = /Go to servers/;
@@ -122,6 +133,7 @@ const renderChecklist = (client = newClient()) =>
 describe("<SetupChecklist>", () => {
     beforeEach(() => {
         devices.current = [];
+        devices.fail = false;
         server.fail = false;
         server.readFail = false;
         server.hold = undefined;
@@ -213,6 +225,22 @@ describe("<SetupChecklist>", () => {
 
         await waitFor(() => expect(screen.queryByText(COULD_NOT_LOAD)).toBeNull());
         expect((screen.getAllByRole("button", { name: SKIP })[0] as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it("keeps the pairing and server links when the device check fails, and retries it", async () => {
+        devices.fail = true;
+        renderChecklist();
+
+        expect(await screen.findByText(COULD_NOT_READ_DEVICES)).toBeTruthy();
+        expect(screen.getByRole("link", { name: GO_TO_PAIRING }).getAttribute("href")).toBe("#devices-pairing");
+        expect(screen.getByRole("link", { name: GO_TO_SERVERS }).getAttribute("href")).toBe("#devices-ssh");
+        expect(screen.queryByRole("button", { name: SKIP })).toBeNull();
+
+        devices.fail = false;
+        fireEvent.click(screen.getByRole("button", { name: RETRY_DEVICES }));
+
+        expect(await screen.findAllByText("(To do)")).toHaveLength(3);
+        expect(screen.queryByText(COULD_NOT_READ_DEVICES)).toBeNull();
     });
 
     it("keeps an earlier skip when a second step is skipped right after", async () => {

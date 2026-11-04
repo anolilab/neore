@@ -7887,7 +7887,7 @@ msgstr "Impossible de charger les outils : {error}"
 msgid "Could not load your activity."
 msgstr "Impossible de charger votre activité."
 
-#: src/features/onboarding/components/setup-checklist.tsx:122
+#: src/features/onboarding/components/setup-checklist.tsx:139
 msgid "Could not load your saved choices, so Skip and Resume are off for now."
 msgstr ""
 
@@ -7945,6 +7945,10 @@ msgstr "Impossible de lire cette discussion"
 #: src/features/chat/thread/composer-input.tsx:1329
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Impossible de lire cette discussion. Si elle est verrouillée, déverrouillez-la d'abord."
+
+#: src/features/onboarding/components/setup-checklist.tsx:125
+msgid "Could not read your devices, so the steps cannot be checked yet. The links still work."
+msgstr ""
 
 #: src/features/skills/components/skill-builder-dialog.tsx:132
 msgid "Could not refine the draft. Try again."
@@ -25889,7 +25893,7 @@ msgstr "Résultat"
 msgid "Result not delivered"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:112
+#: src/features/onboarding/components/setup-checklist.tsx:114
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Resume"
 msgstr "Reprendre"
@@ -25950,7 +25954,7 @@ msgstr ""
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:141
 #: src/features/local-models/components/ollama-model-manager.tsx:188
-#: src/features/onboarding/components/setup-checklist.tsx:130
+#: src/features/onboarding/components/setup-checklist.tsx:147
 #: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
@@ -25970,6 +25974,10 @@ msgstr "Réessayez dans {retryAfterMinutes} min"
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:108
 msgid "Retry now"
+msgstr ""
+
+#: src/features/onboarding/components/setup-checklist.tsx:133
+msgid "Retry the device check"
 msgstr ""
 
 #: src/features/chat/thread/composer-input.tsx:416
@@ -28190,7 +28198,7 @@ msgid "Skills views"
 msgstr "Vues des compétences"
 
 #: src/features/onboarding/components/onboarding-dialog.tsx:405
-#: src/features/onboarding/components/setup-checklist.tsx:112
+#: src/features/onboarding/components/setup-checklist.tsx:114
 msgid "Skip"
 msgstr "Passer"
 

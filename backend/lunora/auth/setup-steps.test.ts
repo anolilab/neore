@@ -1,12 +1,16 @@
 /**
  * Skipping and resuming a first-run setup step is applied to the list as stored, one step per call.
  */
+import { v } from "lunorash/server";
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { userSettingsFieldsWithoutUserId } from "./fields";
 import { getUserSettings, updateUserSettings } from "./functions";
-import { setSetupStepSkipped } from "./setup-steps";
+import { MAX_SKIPPED_SETUP_STEPS } from "./lib/setup-step-limits";
+import { applyStepSkip, setSetupStepSkipped } from "./setup-steps";
 import { schemaWithShardedTables } from "../lib/test-schema";
+import { validate } from "../lib/validators";
 
 const USER = "user-setup-steps";
 
@@ -92,6 +96,15 @@ describe("setSetupStepSkipped", () => {
         await toggle("ssh", true);
 
         expect(await stored()).toEqual(["b", "c", "d", "e", "f", "g", "h", "ssh"]);
+    });
+
+    it("shares one limit between the column validator and the skip", () => {
+        const settings = v.object(userSettingsFieldsWithoutUserId);
+        const ids = Array.from({ length: MAX_SKIPPED_SETUP_STEPS + 1 }, (_, index) => `id${index}`);
+
+        expect(validate(settings, { setupStepsSkipped: ids.slice(0, MAX_SKIPPED_SETUP_STEPS) })).toBe(true);
+        expect(validate(settings, { setupStepsSkipped: ids })).toBe(false);
+        expect(applyStepSkip(ids.slice(0, MAX_SKIPPED_SETUP_STEPS), "ssh", true)).toHaveLength(MAX_SKIPPED_SETUP_STEPS);
     });
 
     it("refuses an unknown step", async () => {
