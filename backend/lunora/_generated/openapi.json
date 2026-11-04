@@ -25220,7 +25220,22 @@
                         "tools": {
                           "items": {
                             "properties": {
+                              "exit": {
+                                "properties": {
+                                  "code": {
+                                    "type": "number"
+                                  },
+                                  "signal": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [],
+                                "type": "object"
+                              },
                               "id": {
+                                "type": "string"
+                              },
+                              "output": {
                                 "type": "string"
                               },
                               "status": {
