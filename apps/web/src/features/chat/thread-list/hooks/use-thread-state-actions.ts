@@ -12,7 +12,11 @@ import { isSnoozed, snoozeUntil } from "../lib/thread-state-rules";
 interface ThreadStateActions {
     /** Hides the thread until the choice's time; the toast offers an undo that restores the previous snooze, if any. */
     snooze: (threadId: string, choice: SnoozeChoice, previousUntil: number | undefined) => void;
-    /** Hides the thread until an exact time (a custom snooze); same toast and undo as `snooze`. Resolves true once saved, false (after the error toast) when not. */
+
+    /**
+     * Hides the thread until an exact time (a custom snooze); same toast and undo as `snooze`. Resolves true once saved,
+     * false (after the error toast) when not.
+     */
     snoozeAt: (threadId: string, until: number, previousUntil: number | undefined) => Promise<boolean>;
     /** Brings a snoozed thread back; the toast offers an undo that snoozes it again until the same time. */
     unsnooze: (threadId: string, previousUntil: number | undefined) => void;

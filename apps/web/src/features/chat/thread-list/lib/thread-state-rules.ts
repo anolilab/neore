@@ -75,7 +75,8 @@ const instantsOf = (year: number, month: number, day: number, hour: number, minu
  * The time a custom snooze ends, from a `datetime-local` value (local wall-clock time, `YYYY-MM-DDTHH:mm`): the earliest
  * occurrence of that time still in the future. In the hour a change repeats, the second pass is taken once the first has
  * gone by. `undefined` when the value is empty or unreadable, falls in a daylight-saving gap, or is not in the future or
- * is further than the server accepts. The server checks the same range; this only keeps the picker from sending a time it refuses.
+ * is further than the server accepts. The server checks the same range; this only keeps the picker from sending a time
+ * it refuses.
  */
 export const customSnoozeUntil = (localValue: string, now: Date): number | undefined => {
     if (!LOCAL_DATE_TIME_RE.test(localValue)) {
