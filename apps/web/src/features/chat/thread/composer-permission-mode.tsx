@@ -3,7 +3,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@neore/ui/components/dropdown-menu";
-import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
 import type { FC } from "react";
 import { useRef, useState } from "react";
@@ -89,6 +89,7 @@ const ComposerThreadPermissionMode: FC = () => {
     const crpc = useCRPC();
     const isRunning = useChatIsRunning();
     const { data: access } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions(threadId ? { threadId: threadId as never } : skipToken));
+    const queryClient = useQueryClient();
     const { mutateAsync } = useMutation(crpc.chat.thread_state.setThreadPermissionMode.mutationOptions());
     const [pending, setPending] = useState<ThreadPermissionMode>();
     const latestSave = useRef(0);
@@ -109,6 +110,8 @@ const ComposerThreadPermissionMode: FC = () => {
 
                 setPending(mode);
                 mutateAsync({ mode, threadId: threadId as never })
+                    // The menu reads the mode from the cached thread: a saved mode must show without waiting for a refresh.
+                    .then(() => queryClient.invalidateQueries({ queryKey: crpc.chat.functions.getThread.queryKey({ threadId: threadId as never }) }))
                     .catch((error: unknown) => {
                         showError(error instanceof Error ? error : t`Could not change the permission mode. Please try again.`);
                     })
