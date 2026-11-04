@@ -264,8 +264,19 @@ export class AgentSession {
 
         let answer: unknown;
 
+        // The timeout does not cancel the agent's request: an answer that arrives after it is applied here and reported, so what the
+        // person sees follows what the agent did.
+        const onLate = (late: unknown): void => {
+            if (this.status === "ended") {
+                return;
+            }
+
+            this.applyOptionAnswer(optionId, valueId, late);
+            this.reportOptions();
+        };
+
         try {
-            answer = optionId === undefined ? await setMode(this.connection, this.agentSessionId, valueId) : await setConfigOption(this.connection, this.agentSessionId, optionId, valueId);
+            answer = optionId === undefined ? await setMode(this.connection, this.agentSessionId, valueId, undefined, onLate) : await setConfigOption(this.connection, this.agentSessionId, optionId, valueId, undefined, onLate);
         } catch (error) {
             // The agent's own words can quote its environment: only a fixed phrase leaves, and the cause stays out of it.
             const timedOut = (error as Error).message === "the agent did not answer";
@@ -274,20 +285,11 @@ export class AgentSession {
             throw new Error(timedOut ? "the agent did not answer" : "the agent did not accept the change");
         }
 
-        if (optionId === undefined) {
-            this.offered = withCurrentMode(this.offered, valueId, this.options.process.scrub);
-        } else {
-            // The answer lists every option with its new value; one that is not a list means only this value moved.
-            const listed = configOptionsOf(isRecord(answer) ? answer.configOptions : undefined, this.options.process.scrub);
+        // The agent's list is what is true now; if it still shows another value, the change was not made.
+        if (!this.applyOptionAnswer(optionId, valueId, answer)) {
+            this.reportOptions();
 
-            this.offered = listed === undefined ? withOptionValue(this.offered, optionId, valueId) : { ...this.offered, configOptions: listed };
-
-            // The agent's list is what is true now; if it still shows another value, the change was not made.
-            if (listed !== undefined && listed.find((option) => option.id === optionId)?.currentValue !== valueId) {
-                this.reportOptions();
-
-                throw new Error("the agent did not apply the change");
-            }
+            throw new Error("the agent did not apply the change");
         }
 
         this.reportOptions();
@@ -433,6 +435,22 @@ export class AgentSession {
     }
 
     /** The agent's session: the saved one when asked for and loadable, else a new one (`reattach` says which, and why not). */
+    /** Applies the agent's answer to a change to what the session offers. False when the answer still shows another value. */
+    private applyOptionAnswer(optionId: string | undefined, valueId: string, answer: unknown): boolean {
+        if (optionId === undefined) {
+            this.offered = withCurrentMode(this.offered, valueId, this.options.process.scrub);
+
+            return true;
+        }
+
+        // The answer lists every option with its new value; one that is not a list means only this value moved.
+        const listed = configOptionsOf(isRecord(answer) ? answer.configOptions : undefined, this.options.process.scrub);
+
+        this.offered = listed === undefined ? withOptionValue(this.offered, optionId, valueId) : { ...this.offered, configOptions: listed };
+
+        return listed === undefined || listed.find((option) => option.id === optionId)?.currentValue === valueId;
+    }
+
     private async openAgentSession(): Promise<string> {
         const { folder, resumeSessionId, startupTimeoutMs } = this.options;
 

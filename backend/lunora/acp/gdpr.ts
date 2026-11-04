@@ -18,8 +18,30 @@ import { vAcpAgentState, vAcpSessionStatus, vHostEvent } from "./validators";
 
 const BATCH = 200;
 
-/** Sessions per export page: a row is a few hundred bytes. */
+/** Sessions read per export page. A page is also cut by bytes (`SESSION_PAGE_BYTES`): a row can hold up to 128 KiB of agent state. */
 const SESSION_PAGE = 500;
+
+/** The JSON a page of sessions may take, so a page stays far under the 1 MiB a step may keep. */
+const SESSION_PAGE_BYTES = 400_000;
+
+/** The leading rows whose JSON fits the budget. Always at least one, so a page makes progress. */
+const rowsWithinBudget = <Row>(rows: ReadonlyArray<Row>, budget: number): Row[] => {
+    const kept: Row[] = [];
+    let used = 0;
+
+    for (const row of rows) {
+        const size = JSON.stringify(row).length;
+
+        if (kept.length > 0 && used + size > budget) {
+            break;
+        }
+
+        kept.push(row);
+        used += size;
+    }
+
+    return kept;
+};
 
 /** Chunk rows read per query while scanning a stream for events. */
 const CHUNK_PAGE = 200;
@@ -52,6 +74,8 @@ const vExportCursor = v.object({
     page: v.optional(v.string()),
     phase: v.union(v.literal("sessions"), v.literal("events")),
     seq: v.optional(v.number()),
+    // Rows of this page already exported (a page can be cut short by bytes; see `SESSION_PAGE_BYTES`).
+    skip: v.optional(v.number()),
 });
 
 type ExportCursor = Infer<typeof vExportCursor>;
@@ -74,13 +98,13 @@ export const collectAcpSessionsForExport = internalQuery
     )
     .query(async ({ args: { cursor, userId }, ctx }) => {
         if (cursor === undefined || cursor.phase === "sessions") {
+            const skip = cursor?.skip ?? 0;
             const { continueCursor, isDone, page } = await ctx.db.acpSessions.findMany({ cursor: cursor?.page, limit: SESSION_PAGE, where: { userId } });
 
-            return {
-                events: [],
-                next: isDone ? { phase: "events" as const } : { page: continueCursor ?? undefined, phase: "sessions" as const },
-                // Labels and times only: no device id, no path ever reaches the backend.
-                sessions: page.map(
+            // Labels and times only: no device id, no path ever reaches the backend.
+            const rows = page
+                .slice(skip)
+                .map(
                     ({
                         agentKey,
                         agentLabel,
@@ -110,7 +134,19 @@ export const collectAcpSessionsForExport = internalQuery
                             ...(nativeSessionId !== undefined && { nativeSessionId }),
                         };
                     },
-                ),
+                );
+
+            // A row can hold up to 128 KiB of agent state, so a page is also cut by bytes. The rest of this query's rows come
+            // next, from the same cursor, past the ones taken.
+            const sessions = rowsWithinBudget(rows, SESSION_PAGE_BYTES);
+            const more = skip + sessions.length < page.length;
+
+            const afterPage = isDone ? { phase: "events" as const } : { page: continueCursor ?? undefined, phase: "sessions" as const };
+
+            return {
+                events: [],
+                next: more ? { page: cursor?.page, phase: "sessions" as const, skip: skip + sessions.length } : afterPage,
+                sessions,
             };
         }
 

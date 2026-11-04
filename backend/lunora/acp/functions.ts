@@ -148,6 +148,36 @@ export const getHostSession = authQuery
  * endpoints), never by a model name. Only the owner's endpoints are readable here, so a grantee reads the cloud
  * declaration for it; the composer that runs a local model picks `LOCAL_BROWSER_CAPABILITIES` itself.
  */
+const NATIVE_REASONING = { degradation: "none", supported: true } as const;
+const NOT_OFFERED_REASONING = { reason: "not_offered", supported: false } as const;
+
+/**
+ * The report with the model choices and the reasoning option the agent offers now. The agent can change its options after it
+ * opens, and the report it opened with would describe choices it no longer offers. Without options in the stored state, the report stands.
+ */
+const withLiveOptions = (report: Infer<typeof vCapabilityReport>, state: Infer<typeof vAcpAgentState> | undefined): Infer<typeof vCapabilityReport> => {
+    const options = state?.configOptions;
+
+    if (options === undefined) {
+        return report;
+    }
+
+    const model = options.find((option) => option.category === "model");
+    const hasReasoning = options.some((option) => option.category === "thought_level");
+
+    return {
+        ...report,
+        groups: {
+            ...report.groups,
+            identity: {
+                ...report.groups.identity,
+                models: model?.choices.map((choice) => ({ id: choice.value, name: choice.name })) ?? [],
+                reasoningEffort: hasReasoning ? NATIVE_REASONING : NOT_OFFERED_REASONING,
+            },
+        },
+    };
+};
+
 export const getThreadCapabilities = authQuery
     .input({ threadId: v.string().max(MAX_LENGTH.id) })
     .output(v.union(v.null(), vCapabilityReport))
@@ -176,5 +206,5 @@ export const getThreadCapabilities = authQuery
             where: { threadId: access.thread._id, userId: ctx.user.userId },
         });
 
-        return session?.capabilities ?? unknownCapabilityReport(0);
+        return withLiveOptions(session?.capabilities ?? unknownCapabilityReport(0), session?.agentState);
     });

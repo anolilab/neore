@@ -54,14 +54,36 @@ class AgentVersionError extends Error {}
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
-const withTimeout = async <Value>(promise: Promise<Value>, ms: number, message: string): Promise<Value> => {
+/**
+ * Hands the answer of a request that outlived its timeout to `onLate`, once `isExpired` says the timeout has passed. Nothing waits
+ * for it: the caller has already been answered.
+ */
+const deliverLate = <Value>(promise: Promise<Value>, isExpired: () => boolean, onLate: (value: Value) => void): void => {
+    // Fire and forget: nothing awaits the late answer, and the caller has already been answered.
+    /* eslint-disable unicorn/prefer-await */
+    promise
+        .then((value) => isExpired() ? onLate(value) : undefined)
+        .catch(() => {});
+    /* eslint-enable unicorn/prefer-await */
+};
+
+const withTimeout = async <Value>(promise: Promise<Value>, ms: number, message: string, onLate?: (value: Value) => void): Promise<Value> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let expired = false;
+
+    // The timeout does not cancel the request: an answer that arrives after it is handed to `onLate`, not dropped.
+    if (onLate !== undefined) {
+        deliverLate(promise, () => expired, onLate);
+    }
 
     try {
         return await Promise.race([
             promise,
             new Promise<never>((_resolve, reject) => {
-                timer = setTimeout(() => reject(new Error(message)), ms);
+                timer = setTimeout(() => {
+                    expired = true;
+                    reject(new Error(message));
+                }, ms);
             }),
         ]);
     } finally {
@@ -149,17 +171,30 @@ export const newSession = async (connection: JsonRpcConnection, cwd: string, tim
 const SET_OPTION_TIMEOUT_MS = 10_000;
 
 /** `session/set_config_option` for a list option: the answer carries every option with its new value. */
-export const setConfigOption = async (connection: JsonRpcConnection, sessionId: string, configId: string, value: string, timeoutMs = SET_OPTION_TIMEOUT_MS): Promise<unknown> => {
+export const setConfigOption = async (
+    connection: JsonRpcConnection,
+    sessionId: string,
+    configId: string,
+    value: string,
+    timeoutMs = SET_OPTION_TIMEOUT_MS,
+    onLate?: (answer: unknown) => void,
+): Promise<unknown> => {
     const params: SetSessionConfigOptionRequest = { configId, sessionId, value };
 
-    return await withTimeout(connection.request(METHOD.setConfigOption, params), timeoutMs, "the agent did not answer");
+    return await withTimeout(connection.request(METHOD.setConfigOption, params), timeoutMs, "the agent did not answer", onLate);
 };
 
 /** `session/set_mode`, for an agent that offers modes only through the legacy state. */
-export const setMode = async (connection: JsonRpcConnection, sessionId: string, modeId: string, timeoutMs = SET_OPTION_TIMEOUT_MS): Promise<unknown> => {
+export const setMode = async (
+    connection: JsonRpcConnection,
+    sessionId: string,
+    modeId: string,
+    timeoutMs = SET_OPTION_TIMEOUT_MS,
+    onLate?: (answer: unknown) => void,
+): Promise<unknown> => {
     const params: SetSessionModeRequest = { modeId, sessionId };
 
-    return await withTimeout(connection.request(METHOD.setMode, params), timeoutMs, "the agent did not answer");
+    return await withTimeout(connection.request(METHOD.setMode, params), timeoutMs, "the agent did not answer", onLate);
 };
 
 export const promptParams = (sessionId: string, text: string): PromptRequest => {

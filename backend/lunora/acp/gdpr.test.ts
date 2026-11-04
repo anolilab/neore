@@ -105,6 +105,36 @@ const collectAll = async (userId: string) => {
 };
 
 describe("the export of coding-agent sessions and events", () => {
+    it("cuts a page by bytes when the sessions carry heavy agent state, and loses none of them", async () => {
+        const device = await insertDevice(A);
+        const choices = Array.from({ length: 100 }, (_unused, index) => {
+            return { name: `choice ${String(index)} ${"n".repeat(40)}`, value: `v${String(index)}` };
+        });
+        const agentState = { configOptions: [{ category: "model", choices, currentValue: "v0", id: "model", name: "Model" }] };
+
+        for (let index = 0; index < 100; index += 1) {
+            const threadId = await insertSession(A, device, index);
+
+            await harness.run(async (ctx: any) => {
+                const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+                await ctx.db.patch("acpSessions", row._id, { agentState });
+            });
+        }
+
+        const pages = await collectAll(A);
+        const sessions = pages.flatMap((page) => page.sessions);
+
+        expect(pages.length).toBeGreaterThan(1);
+        expect(sessions).toHaveLength(100);
+        expect(new Set(sessions.map((session) => session.threadId)).size).toBe(100);
+
+        // Each page holds the budget plus at most one more row, so no page nears the step's limit.
+        for (const page of pages) {
+            expect(JSON.stringify(page.sessions).length).toBeLessThan(400_000 + 20_000);
+        }
+    });
+
     it("is complete past one page of sessions, and carries no other user's", async () => {
         const device = await insertDevice(A);
         const other = await insertDevice(B);

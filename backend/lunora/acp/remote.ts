@@ -360,7 +360,7 @@ export const setHostOption = authMutation
             (open) =>
                 open.toolName === "acp_set_config" &&
                 open.threadId === args.threadId &&
-                !(open.status === "pending" && ctx.now - open.createdAt > ACP_CLAIM_WINDOW_MS),
+                !(open.status === "pending" && open.claimedAt === undefined && ctx.now - open.createdAt > ACP_CLAIM_WINDOW_MS),
             1,
         );
 
