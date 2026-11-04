@@ -35,9 +35,9 @@ type Row = MessageRow & { finished?: boolean };
 /** A send whose reply is still being checked. `holdsSend` keeps the composer shut while the checks run. */
 interface Confirmation {
     holdsSend: boolean;
-    /** The send was steered: its reply runs across the steer messages, which are user messages. */
-    isSteered: boolean;
     messageId: string;
+    /** The steer messages this send was given: its reply runs across them, and they are user messages. */
+    steers: number;
     threadId: string;
 }
 
@@ -169,7 +169,7 @@ const tallyChecks = (outcomes: ReadonlyArray<{ confirmation: Confirmation; state
 };
 
 /** Reads the state of one send's reply: walks the pages from the newest until the send is found, up to `CONFIRM_MAX_PAGES`. */
-const readReplyState = async (threadId: string, messageId: string, isSteered: boolean): Promise<ReplyState> => {
+const readReplyState = async (threadId: string, messageId: string, steers: number): Promise<ReplyState> => {
     const seen: SeenMessage[] = [];
     let cursor: string | null = null;
     let state: ReplyState = "unknown";
@@ -184,7 +184,7 @@ const readReplyState = async (threadId: string, messageId: string, isSteered: bo
                 return { id: message.id, role: message.role, status: message.status };
             }),
         );
-        state = replyStateAfter(seen, messageId, { isSteered });
+        state = replyStateAfter(seen, messageId, { steers });
 
         if (state !== "unknown" || page.isDone) {
             break;
@@ -449,7 +449,7 @@ const Chat = () => {
             const outcomes = await Promise.all(
                 own.map(async (confirmation) => {
                     try {
-                        return { confirmation, isChatRefused: false, state: await readReplyState(threadId, confirmation.messageId, confirmation.isSteered) };
+                        return { confirmation, isChatRefused: false, state: await readReplyState(threadId, confirmation.messageId, confirmation.steers) };
                     } catch (error_) {
                         // A chat the reader can no longer open ends the checks; any other failure is tried again on the next tick.
                         return { confirmation, isChatRefused: isThreadRefusal(error_), state: "unknown" as ReplyState };
@@ -616,7 +616,7 @@ const Chat = () => {
 
             setConfirmations((current) => [
                 ...current,
-                { holdsSend: outcome === "unconfirmed", isSteered, messageId: started.messageId, threadId: started.threadId },
+                { holdsSend: outcome === "unconfirmed", messageId: started.messageId, steers: steerCount, threadId: started.threadId },
             ]);
 
             AccessibilityInfo.announceForAccessibility("Reply finished");

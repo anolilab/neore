@@ -17,9 +17,10 @@ const isFinal = (status: string): boolean => status === "success" || status === 
  * Reads the send's state from messages listed newest first, the order the server pages them in. The send's reply is
  * the assistant messages between the send and the next user message above it: a newer turn, from this session or
  * another, starts a new group. Within that group the newest step decides the state. Creation times play no part. A
- * steered send's reply is one run with its steer messages, which are user messages, so its walk goes past them.
+ * steered send's reply is one run with its steer messages, which are user messages: the walk goes past as many of them
+ * as the send was steered, and stops at any other user message.
  */
-export const replyStateAfter = (newestFirst: ReadonlyArray<SeenMessage>, sentId: string, options: { isSteered?: boolean } = {}): ReplyState => {
+export const replyStateAfter = (newestFirst: ReadonlyArray<SeenMessage>, sentId: string, options: { steers?: number } = {}): ReplyState => {
     const sentIndex = newestFirst.findIndex((message) => message.id === sentId);
 
     if (sentIndex === -1) {
@@ -27,14 +28,18 @@ export const replyStateAfter = (newestFirst: ReadonlyArray<SeenMessage>, sentId:
     }
 
     let newestStep: SeenMessage | undefined;
+    // The steer messages of this send, which its reply runs across. Any other user message is another turn.
+    let steersLeft = options.steers ?? 0;
 
     // Walked from the send upward, so each assistant message read later is a newer step.
     for (const message of newestFirst.slice(0, sentIndex).toReversed()) {
-        if (message.role === "user" && !options.isSteered) {
-            break;
-        }
+        if (message.role === "user") {
+            if (steersLeft === 0) {
+                break;
+            }
 
-        if (message.role === "assistant") {
+            steersLeft -= 1;
+        } else if (message.role === "assistant") {
             newestStep = message;
         }
     }
