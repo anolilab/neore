@@ -139,6 +139,12 @@ export interface ToolPermissionOptions {
      */
     headlessApproved?: ReadonlySet<string>;
     /**
+     * Headless only: an `ask` tool stays (with an approval request) instead of being removed, because the run pauses
+     * and its owner answers in a conversation (a sub-agent child, `sub-agents/execute.ts`). Device tools and the tools
+     * that need a person's own input are still removed.
+     */
+    headlessCanAsk?: boolean;
+    /**
      * The user's opt-in quick check (`low-risk-approval.ts`). Given, an `ask` tool that is eligible for it asks the check
      * before pausing: `true` runs the call unasked, anything else pauses as before. Omitted (the setting is off, or the
      * run is not one a person is in), every `ask` tool pauses exactly as it always did.
@@ -146,12 +152,6 @@ export interface ToolPermissionOptions {
     lowRiskCheck?: LowRiskCheck;
     /** The servers the user trusts to have their tools put to the quick check (`low-risk-trust.ts`). Absent: none. */
     lowRiskTrusted?: ReadonlySet<string>;
-    /**
-     * Headless only: an `ask` tool stays (with an approval request) instead of being removed, because the run pauses
-     * and its owner answers in a conversation (a sub-agent child, `sub-agents/execute.ts`). Device tools and the tools
-     * that need a person's own input are still removed.
-     */
-    headlessCanAsk?: boolean;
     /** The instant the grants are judged at. Defaults to the clock. */
     now?: number;
     /**
