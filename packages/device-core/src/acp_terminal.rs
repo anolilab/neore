@@ -96,12 +96,15 @@ impl DeviceState {
         }
 
         let support = sandbox::support();
+        // The terminal may write only in the folder the person approved for this agent, not in every shared folder: a sibling
+        // under the same shared root is not the agent's. The shared roots above decided only whether the folder is eligible.
+        let agent_roots = vec![folder.clone()];
         // `allow_unsandboxed` is false whatever the setting says: where there is no sandbox this refuses.
         let policy = sandbox::policy_for_call(
             &support,
             false,
             settings.shell_network_tier(),
-            &roots,
+            &agent_roots,
             sandbox::home().as_deref(),
         )?
         .ok_or("a terminal runs only in the sandbox, and there is none here")?;
@@ -227,6 +230,33 @@ mod tests {
     }
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn cannot_write_in_a_sibling_under_the_same_shared_folder() {
+        if !matches!(sandbox::support(), sandbox::Support::Available(_)) {
+            eprintln!("skipping: no sandbox here");
+            return;
+        }
+
+        let (state, project, _, shared) = setup("sibling");
+        // A folder the person shares, next to the agent's approved one, and not approved for the agent.
+        let sibling = shared.join("sibling");
+
+        fs::create_dir_all(&sibling).unwrap();
+        let sibling = fs::canonicalize(sibling).unwrap();
+        let line = format!("echo leaked > '{}/leak.txt'", sibling.display());
+        let terminal = match state.acp_terminal_start(&request(&project, &line)) {
+            Ok(terminal) => terminal,
+            Err(error) => {
+                eprintln!("skipping: {error}");
+                return;
+            }
+        };
+        let exit = terminal.wait(Duration::from_secs(20)).expect("ended");
+
+        assert_ne!(exit.exit_code, Some(0), "{}", terminal.output().output);
+        assert!(!sibling.join("leak.txt").exists());
+    }
+
     #[test]
     fn runs_an_allowed_command_in_the_sandbox_of_the_agent_folder() {
         if !matches!(sandbox::support(), sandbox::Support::Available(_)) {
