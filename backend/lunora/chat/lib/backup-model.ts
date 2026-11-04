@@ -70,11 +70,14 @@ export const backupCapabilities = (definition: ModelDefinition): BackupCapabilit
     };
 };
 
+const IMAGE_PART_TYPES: ReadonlySet<unknown> = new Set(["image", "image-data", "image-url"]);
+const FILE_PART_TYPES: ReadonlySet<unknown> = new Set(["file", "file-data", "file-url"]);
+
 /** Records one media part by its type, and by its media type when it is a file: an image file counts as an image. */
 const noteMedia = (found: { files: boolean; images: boolean }, type: unknown, mediaType: unknown): void => {
-    if (["image", "image-data", "image-url"].includes(type as string)) {
+    if (IMAGE_PART_TYPES.has(type)) {
         found.images = true;
-    } else if (["file", "file-data", "file-url"].includes(type as string)) {
+    } else if (FILE_PART_TYPES.has(type)) {
         if (typeof mediaType === "string" && mediaType.startsWith("image/")) {
             found.images = true;
         } else {
