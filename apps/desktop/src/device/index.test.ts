@@ -215,7 +215,6 @@ const makeCore = () => {
         ),
         acpInstall: vi.fn((_request: string) => JSON.stringify({ agents: [], consents: [], envNames: [] })),
         acpInstallNpm: vi.fn(async (_request: string) => JSON.stringify({ agents: [], consents: [], envNames: [] })),
-        acpPrecheckInstall: vi.fn(async (_agentKey: string) => true),
         acpInstallPrune: vi.fn(),
         acpInstallStage: vi.fn(() => mkdtempSync(path.join(fake.userData, "stage-"))),
         acpPermissionAnswer: vi.fn(),
@@ -225,6 +224,7 @@ const makeCore = () => {
         acpPermissionCancelSession: vi.fn(),
         acpPermissionDecline: vi.fn(),
         acpPermissions: vi.fn(() => "[]"),
+        acpPrecheckInstall: vi.fn(async (_agentKey: string) => true),
         acpPrepare: vi.fn((): string =>
             JSON.stringify({ callId: "c1", command: null, expiresAt: Date.now() + 60_000, refusal: "not approved on this computer" }),
         ),
