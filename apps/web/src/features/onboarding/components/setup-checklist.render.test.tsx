@@ -12,7 +12,7 @@ const { devices, mutate, server, sonnerMock } = vi.hoisted(() => {
     return {
         devices: { current: [] as unknown[] },
         mutate: vi.fn(),
-        server: { fail: false, noRow: false, skipped: undefined as string[] | undefined },
+        server: { fail: false, readFail: false, hold: undefined as Promise<void> | undefined, noRow: false, skipped: undefined as string[] | undefined },
         sonnerMock: { toast: vi.fn() },
     };
 });
@@ -47,7 +47,13 @@ vi.mock("@/lib/lunora/crpc", () => {
                         getUserSettings: {
                             queryOptions: () => {
                                 return {
-                                    queryFn: async () => (server.noRow ? null : { setupStepsSkipped: server.skipped }),
+                                    queryFn: async () => {
+                                        if (server.readFail) {
+                                            throw new Error("offline");
+                                        }
+
+                                        return server.noRow ? null : { setupStepsSkipped: server.skipped };
+                                    },
                                     queryKey: ["getUserSettings"],
                                 };
                             },
@@ -59,6 +65,8 @@ vi.mock("@/lib/lunora/crpc", () => {
                                 return {
                                     mutationFn: async (args: { skipped: boolean; stepId: string }) => {
                                         mutate(args);
+
+                                        await server.hold;
 
                                         if (server.fail) {
                                             throw new Error("down");
@@ -94,15 +102,19 @@ const RESUME_ADD_AN_SSH_SERVER = /Resume.*Add an SSH server/;
 const SKIP_INSTALL_A_CODING_AGENT = /Skip.*Install a coding agent/;
 const RESUME_PAIR_THIS_COMPUTER = /Resume.*Pair this computer/;
 const SKIP = /Skip/;
+const RETRY = /Retry/;
+const COULD_NOT_LOAD = /Could not load your saved choices/;
 const GO_TO_PAIRING = /Go to pairing/;
 const GO_TO_SERVERS = /Go to servers/;
 const READ_THE_GUIDE = /Read the guide/;
 const RESUME_INSTALL_A_CODING_AGENT = /Resume.*Install a coding agent/;
 const RESUME = /Resume/;
 
-const renderChecklist = () =>
+const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+const renderChecklist = (client = newClient()) =>
     render(
-        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <QueryClientProvider client={client}>
             <SetupChecklist />
         </QueryClientProvider>,
     );
@@ -111,6 +123,8 @@ describe("<SetupChecklist>", () => {
     beforeEach(() => {
         devices.current = [];
         server.fail = false;
+        server.readFail = false;
+        server.hold = undefined;
         server.noRow = false;
         server.skipped = undefined;
         mutate.mockClear();
@@ -155,6 +169,52 @@ describe("<SetupChecklist>", () => {
         expect(server.skipped).toEqual(["pair"]);
     });
 
+    it("shows a saved skip after a reload", async () => {
+        const view = renderChecklist();
+
+        await screen.findAllByText("(To do)");
+        fireEvent.click(screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }));
+        await screen.findByText("(Skipped)");
+        view.unmount();
+
+        renderChecklist();
+        expect(await screen.findByText("(Skipped)")).toBeTruthy();
+        expect(screen.getByRole("button", { name: RESUME_ADD_AN_SSH_SERVER })).toBeTruthy();
+    });
+
+    it("shows the skip when a settings read that began before the click lands after it", async () => {
+        let release = () => {};
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` is newer than the supported runtimes
+        server.hold = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+
+        const client = newClient();
+
+        renderChecklist(client);
+        await screen.findAllByText("(To do)");
+        fireEvent.click(screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }));
+        await client.refetchQueries({ queryKey: ["getUserSettings"] });
+        release();
+
+        expect(await screen.findByText("(Skipped)")).toBeTruthy();
+    });
+
+    it("explains a failed settings read and retries it", async () => {
+        server.readFail = true;
+        renderChecklist();
+
+        expect(await screen.findByText(COULD_NOT_LOAD)).toBeTruthy();
+        expect((screen.getAllByRole("button", { name: SKIP })[0] as HTMLButtonElement).disabled).toBe(true);
+
+        server.readFail = false;
+        fireEvent.click(screen.getByRole("button", { name: RETRY }));
+
+        await waitFor(() => expect(screen.queryByText(COULD_NOT_LOAD)).toBeNull());
+        expect((screen.getAllByRole("button", { name: SKIP })[0] as HTMLButtonElement).disabled).toBe(false);
+    });
+
     it("keeps an earlier skip when a second step is skipped right after", async () => {
         renderChecklist();
         await screen.findAllByText("(To do)");
@@ -189,7 +249,7 @@ describe("<SetupChecklist>", () => {
 
         expect(screen.getByRole("link", { name: GO_TO_PAIRING }).getAttribute("href")).toBe("#devices-pairing");
         expect(screen.getByRole("link", { name: GO_TO_SERVERS }).getAttribute("href")).toBe("#devices-ssh");
-        expect(screen.getByRole("link", { name: READ_THE_GUIDE }).getAttribute("href")).toBe("/docs/devices");
+        expect(screen.getByRole("link", { name: READ_THE_GUIDE }).getAttribute("href")).toBe("/docs/devices#coding-agents-on-a-computer");
     });
 
     it("offers resume for a skipped step and drops it once its state appears", async () => {

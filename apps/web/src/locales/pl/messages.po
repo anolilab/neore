@@ -2073,7 +2073,7 @@ msgstr "Dodaj alert powyżej, aby otrzymać powiadomienie, gdy użycie przekrocz
 msgid "Add an extra layer of security to your account by enabling two-factor authentication."
 msgstr "Dodaj dodatkową warstwę ochrony konta, włączając uwierzytelnianie dwuskładnikowe."
 
-#: src/features/onboarding/components/setup-checklist.tsx:70
+#: src/features/onboarding/components/setup-checklist.tsx:74
 msgid "Add an SSH server"
 msgstr ""
 
@@ -5672,7 +5672,7 @@ msgstr "Zaznaczone integracje zostaną zaproponowane do konfiguracji po zapisani
 msgid "Checked: {0}"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:74
+#: src/features/onboarding/components/setup-checklist.tsx:78
 msgid "Checking"
 msgstr ""
 
@@ -6307,11 +6307,11 @@ msgstr ""
 msgid "Coding agents you can start on {0}"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:77
+#: src/features/onboarding/components/setup-checklist.tsx:81
 msgid "Coding setup"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:79
+#: src/features/onboarding/components/setup-checklist.tsx:83
 msgid "Coding setup steps"
 msgstr ""
 
@@ -7755,7 +7755,7 @@ msgstr ""
 msgid "Could not change where this device is offered."
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:74
+#: src/features/onboarding/components/setup-checklist.tsx:78
 msgid "Could not check"
 msgstr ""
 
@@ -7887,6 +7887,10 @@ msgstr "Nie udało się wczytać narzędzi: {error}"
 msgid "Could not load your activity."
 msgstr "Nie udało się wczytać Twojej aktywności."
 
+#: src/features/onboarding/components/setup-checklist.tsx:122
+msgid "Could not load your saved choices, so Skip and Resume are off for now."
+msgstr ""
+
 #: src/features/pages/components/pages-sidebar.tsx:108
 msgid "Could not move the page"
 msgstr "Nie udało się przenieść strony"
@@ -7974,7 +7978,7 @@ msgstr ""
 msgid "Could not retry. Please try again."
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:49
+#: src/features/onboarding/components/setup-checklist.tsx:51
 msgid "Could not save that choice. Try again."
 msgstr ""
 
@@ -10010,7 +10014,7 @@ msgstr "Nie masz konta?"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:104
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
 #: src/features/devices/components/devices-settings.tsx:256
-#: src/features/onboarding/components/setup-checklist.tsx:73
+#: src/features/onboarding/components/setup-checklist.tsx:77
 #: src/features/skills/components/bundle-import-dialog.tsx:248
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
@@ -14559,7 +14563,7 @@ msgid "Go to next page"
 msgstr "Przejdź do następnej strony"
 
 #: src/features/devices/components/devices-settings.tsx:527
-#: src/features/onboarding/components/setup-checklist.tsx:63
+#: src/features/onboarding/components/setup-checklist.tsx:67
 msgid "Go to pairing"
 msgstr ""
 
@@ -14571,7 +14575,7 @@ msgstr "Przejdź do poprzedniej strony"
 msgid "Go to Prompts"
 msgstr "Przejdź do promptów"
 
-#: src/features/onboarding/components/setup-checklist.tsx:68
+#: src/features/onboarding/components/setup-checklist.tsx:72
 msgid "Go to servers"
 msgstr ""
 
@@ -16270,11 +16274,11 @@ msgstr ""
 msgid "Install"
 msgstr "Zainstaluj"
 
-#: src/features/onboarding/components/setup-checklist.tsx:60
+#: src/features/onboarding/components/setup-checklist.tsx:64
 msgid "Install a coding agent"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:59
+#: src/features/onboarding/components/setup-checklist.tsx:63
 msgid "Install a coding agent in the Neore desktop app and approve it for a folder on a paired computer. The install happens in the desktop window, not here."
 msgstr ""
 
@@ -17410,7 +17414,7 @@ msgstr "Pozwól agentowi korzystać z plików, terminala i lokalnych serwerów M
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:69
+#: src/features/onboarding/components/setup-checklist.tsx:73
 msgid "Let the agent work on a server you reach over SSH. Needs a paired computer."
 msgstr ""
 
@@ -22615,7 +22619,7 @@ msgstr "Zamaluj obszary, które chcesz edytować. Białe obszary zostaną wygene
 msgid "Pair one in Settings"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:65
+#: src/features/onboarding/components/setup-checklist.tsx:69
 msgid "Pair this computer"
 msgstr ""
 
@@ -22623,7 +22627,7 @@ msgstr ""
 msgid "Pair this computer in the Neore desktop app first. The form to add a server appears here as soon as it is paired."
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:64
+#: src/features/onboarding/components/setup-checklist.tsx:68
 msgid "Pair this computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer."
 msgstr ""
 
@@ -24653,7 +24657,7 @@ msgstr "Tylko odczyt"
 msgid "Read the docs"
 msgstr "Przeczytaj dokumentację"
 
-#: src/features/onboarding/components/setup-checklist.tsx:58
+#: src/features/onboarding/components/setup-checklist.tsx:62
 msgid "Read the guide"
 msgstr ""
 
@@ -25885,7 +25889,7 @@ msgstr "Wynik"
 msgid "Result not delivered"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:108
+#: src/features/onboarding/components/setup-checklist.tsx:112
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Resume"
 msgstr "Wznów"
@@ -25946,6 +25950,7 @@ msgstr ""
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:141
 #: src/features/local-models/components/ollama-model-manager.tsx:188
+#: src/features/onboarding/components/setup-checklist.tsx:130
 #: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
@@ -28185,7 +28190,7 @@ msgid "Skills views"
 msgstr "Widoki umiejętności"
 
 #: src/features/onboarding/components/onboarding-dialog.tsx:405
-#: src/features/onboarding/components/setup-checklist.tsx:108
+#: src/features/onboarding/components/setup-checklist.tsx:112
 msgid "Skip"
 msgstr "Pomiń"
 
@@ -28207,7 +28212,7 @@ msgstr "Pomiń prezentację"
 
 #: src/features/develop/components/checks-tab.tsx:80
 #: src/features/evals/components/run-detail.tsx:36
-#: src/features/onboarding/components/setup-checklist.tsx:73
+#: src/features/onboarding/components/setup-checklist.tsx:77
 #: src/features/settings/components/chat/trigger-settings.tsx:176
 msgid "Skipped"
 msgstr "Pominięto"
@@ -31907,7 +31912,7 @@ msgstr "Wątki zachowują całą historię. Rozgałęziaj pomysły, przypinaj wa
 msgid "Threads working on this {requestNoun}"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:77
+#: src/features/onboarding/components/setup-checklist.tsx:81
 msgid "Three steps to use coding agents on your own machines. Skip any of them and come back later."
 msgstr ""
 
@@ -31991,7 +31996,7 @@ msgstr ""
 msgid "to {0}"
 msgstr "do {0}"
 
-#: src/features/onboarding/components/setup-checklist.tsx:73
+#: src/features/onboarding/components/setup-checklist.tsx:77
 #: src/features/tasks/components/task-status.tsx:21
 msgid "To do"
 msgstr "Do zrobienia"

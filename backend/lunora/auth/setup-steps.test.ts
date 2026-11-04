@@ -4,7 +4,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getUserSettings } from "./functions";
+import { getUserSettings, updateUserSettings } from "./functions";
 import { setSetupStepSkipped } from "./setup-steps";
 import { schemaWithShardedTables } from "../lib/test-schema";
 
@@ -85,6 +85,13 @@ describe("setSetupStepSkipped", () => {
         await toggle("pair", false);
 
         expect(await stored()).toEqual(["ssh"]);
+    });
+
+    it("never stores more than eight entries: a ninth drops the oldest", async () => {
+        await asUser().mutation(updateUserSettings as never, { setupStepsSkipped: ["a", "b", "c", "d", "e", "f", "g", "h"] } as never);
+        await toggle("ssh", true);
+
+        expect(await stored()).toEqual(["b", "c", "d", "e", "f", "g", "h", "ssh"]);
     });
 
     it("refuses an unknown step", async () => {

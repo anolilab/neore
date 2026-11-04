@@ -15,7 +15,7 @@ import { deriveSetupSteps, SETUP_STEP_IDS, toggleSkipped } from "../lib/setup-st
 
 /** Where each step's action goes: the control on this page, or the guide for the part that happens in the desktop app. */
 const STEP_TARGET: Record<SetupStepId, string> = {
-    agent: "/docs/devices",
+    agent: "/docs/devices#coding-agents-on-a-computer",
     pair: "#devices-pairing",
     ssh: "#devices-ssh",
 };
@@ -37,24 +37,21 @@ const SetupChecklist: FC = () => {
     const reloadSettings = async () => await queryClient.invalidateQueries({ queryKey: settingsKey });
     const setSkipped = useMutation({
         ...crpc.auth.setup_steps.setSetupStepSkipped.mutationOptions(),
-        onMutate: (args: { skipped: boolean; stepId: SetupStepId }) => {
+        onMutate: async (args: { skipped: boolean; stepId: SetupStepId }) => {
+            // A read still in flight would land after the patch with the value from before the click.
+            await queryClient.cancelQueries({ queryKey: settingsKey });
+
             const row = queryClient.getQueryData<{ setupStepsSkipped?: string[] } | null>(settingsKey);
 
             if (row) {
                 queryClient.setQueryData(settingsKey, { ...row, setupStepsSkipped: toggleSkipped(row.setupStepsSkipped, args.stepId, args.skipped) });
             }
-
-            return { hadRow: Boolean(row) };
         },
-        onError: async () => {
+        onError: () => {
             toast.error(t`Could not save that choice. Try again.`);
-            await reloadSettings();
         },
-        onSuccess: async (_data, _args, context) => {
-            if (!context?.hadRow) {
-                await reloadSettings();
-            }
-        },
+        // Settled either way, the stored list is what the card shows: a read that started before the write cannot outlive it.
+        onSettled: reloadSettings,
     });
     // An account with no settings row answers `null`; only `undefined` means the read has not finished.
     const settingsLoaded = settingsQuery.data !== undefined;
@@ -120,6 +117,20 @@ const SetupChecklist: FC = () => {
                         </li>
                     ))}
                 </ol>
+                {settingsQuery.isError && (
+                    <div className="mt-3 flex flex-wrap items-center gap-3" role="alert">
+                        <p className="text-destructive text-xs">{t`Could not load your saved choices, so Skip and Resume are off for now.`}</p>
+                        <Button
+                            onClick={() => {
+                                settingsQuery.refetch().catch(() => {});
+                            }}
+                            size="sm"
+                            variant="outline"
+                        >
+                            {t`Retry`}
+                        </Button>
+                    </div>
+                )}
             </CardContent>
         </SettingsCard>
     );
