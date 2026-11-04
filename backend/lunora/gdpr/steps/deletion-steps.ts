@@ -116,7 +116,7 @@ export const deleteUserThreadCascade = internalMutation
         });
         let revisit = false;
 
-        const now = context.now;
+        const { now } = context;
 
         for (const thread of threads.page) {
             await endHostThread(context, thread, now);
