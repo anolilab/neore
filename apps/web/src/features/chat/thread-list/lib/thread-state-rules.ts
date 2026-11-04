@@ -49,33 +49,44 @@ const LOCAL_DATE_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/u;
 /** The farthest a snooze may end, from now. Mirrors the server's limit (`chat/lib/thread-state-logic.ts`). */
 const SNOOZE_MAX_MS = 366 * 24 * 60 * 60 * 1000;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The local clock's offset from UTC at an instant, in milliseconds (east of UTC is positive). */
+const offsetAt = (time: number): number => -new Date(time).getTimezoneOffset() * 60_000;
+
 /**
- * The time a custom snooze ends, from a `datetime-local` value (local wall-clock time, `YYYY-MM-DDTHH:mm`).
- * `undefined` when the value is empty or unreadable, or the time is not in the future or is further than the
- * server accepts. The server checks the same range; this only keeps the picker from sending a time it refuses.
+ * Every instant whose local wall-clock time is the given one: none inside a daylight-saving gap, two in the hour a change
+ * repeats. The offsets a day either side of the wall time cover both sides of a change.
+ */
+const instantsOf = (year: number, month: number, day: number, hour: number, minute: number): number[] => {
+    const wall = Date.UTC(year, month - 1, day, hour, minute);
+    const instants = new Set([wall - offsetAt(wall + DAY_MS), wall - offsetAt(wall - DAY_MS)]);
+
+    return [...instants].filter((instant) => {
+        const date = new Date(instant);
+
+        return (
+            date.getFullYear() === year && date.getMonth() + 1 === month && date.getDate() === day && date.getHours() === hour && date.getMinutes() === minute
+        );
+    });
+};
+
+/**
+ * The time a custom snooze ends, from a `datetime-local` value (local wall-clock time, `YYYY-MM-DDTHH:mm`): the earliest
+ * occurrence of that time still in the future. In the hour a change repeats, the second pass is taken once the first has
+ * gone by. `undefined` when the value is empty or unreadable, falls in a daylight-saving gap, or is not in the future or
+ * is further than the server accepts. The server checks the same range; this only keeps the picker from sending a time it refuses.
  */
 export const customSnoozeUntil = (localValue: string, now: Date): number | undefined => {
     if (!LOCAL_DATE_TIME_RE.test(localValue)) {
         return undefined;
     }
 
-    const parsed = new Date(localValue);
-    const until = parsed.getTime();
-
-    // A time inside a daylight-saving gap does not exist, and the clock would move it: refuse the value rather than wake at another time.
     const [datePart = "", timePart = ""] = localValue.split("T", 2);
-    const [year, month, day] = datePart.split("-", 3).map(Number);
-    const [hour, minute] = timePart.split(":", 2).map(Number);
-    const exists =
-        parsed.getFullYear() === year &&
-        parsed.getMonth() + 1 === month &&
-        parsed.getDate() === day &&
-        parsed.getHours() === hour &&
-        parsed.getMinutes() === minute;
+    const [year = 0, month = 0, day = 0] = datePart.split("-", 3).map(Number);
+    const [hour = 0, minute = 0] = timePart.split(":", 2).map(Number);
+    const nowMs = now.getTime();
+    const usable = instantsOf(year, month, day, hour, minute).filter((instant) => instant > nowMs && instant <= nowMs + SNOOZE_MAX_MS);
 
-    if (!exists || until <= now.getTime() || until > now.getTime() + SNOOZE_MAX_MS) {
-        return undefined;
-    }
-
-    return until;
+    return usable.length > 0 ? Math.min(...usable) : undefined;
 };

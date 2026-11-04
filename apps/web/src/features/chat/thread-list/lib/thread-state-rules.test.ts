@@ -89,7 +89,11 @@ describe("customSnoozeUntil across a daylight-saving change", () => {
     });
 
     afterEach(() => {
-        process.env.TZ = zone;
+        if (zone === undefined) {
+            delete process.env.TZ;
+        } else {
+            process.env.TZ = zone;
+        }
     });
 
     it("refuses a time the clock skips, instead of waking at another time", () => {
@@ -97,5 +101,17 @@ describe("customSnoozeUntil across a daylight-saving change", () => {
 
         expect(customSnoozeUntil("2027-03-14T02:30", now)).toBeUndefined();
         expect(customSnoozeUntil("2027-03-14T03:30", now)).toBe(new Date(2027, 2, 14, 3, 30).getTime());
+    });
+
+    it("takes the first pass of a repeated hour while it is still ahead", () => {
+        const now = new Date(2027, 10, 7, 0, 30, 0);
+
+        expect(customSnoozeUntil("2027-11-07T01:30", now)).toBe(Date.UTC(2027, 10, 7, 5, 30));
+    });
+
+    it("takes the second pass of a repeated hour once the first has gone by", () => {
+        const now = new Date(Date.UTC(2027, 10, 7, 5, 45));
+
+        expect(customSnoozeUntil("2027-11-07T01:30", now)).toBe(Date.UTC(2027, 10, 7, 6, 30));
     });
 });

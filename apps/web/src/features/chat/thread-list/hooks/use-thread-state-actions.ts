@@ -12,8 +12,8 @@ import { isSnoozed, snoozeUntil } from "../lib/thread-state-rules";
 interface ThreadStateActions {
     /** Hides the thread until the choice's time; the toast offers an undo that restores the previous snooze, if any. */
     snooze: (threadId: string, choice: SnoozeChoice, previousUntil: number | undefined) => void;
-    /** Hides the thread until an exact time (a custom snooze); same toast and undo as `snooze`. */
-    snoozeAt: (threadId: string, until: number, previousUntil: number | undefined) => void;
+    /** Hides the thread until an exact time (a custom snooze); same toast and undo as `snooze`. Resolves true once saved, false (after the error toast) when not. */
+    snoozeAt: (threadId: string, until: number, previousUntil: number | undefined) => Promise<boolean>;
     /** Brings a snoozed thread back; the toast offers an undo that snoozes it again until the same time. */
     unsnooze: (threadId: string, previousUntil: number | undefined) => void;
 }
@@ -40,26 +40,27 @@ export const useThreadStateActions = (): ThreadStateActions => {
     );
 
     const snoozeAt = useCallback(
-        (threadId: string, until: number, previousUntil: number | undefined) => {
+        (threadId: string, until: number, previousUntil: number | undefined): Promise<boolean> =>
             snoozeMutation({ threadId: threadId as Id<"threads">, until })
                 .then(() => {
                     const when = new Date(until).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
                     showSuccess(t`Snoozed until ${when}`, { action: { label: t`Undo`, onClick: () => restore(threadId, previousUntil) } });
 
-                    return undefined;
+                    return true;
                 })
                 .catch((error) => {
                     console.error("Failed to snooze thread:", error);
                     showError(t`Could not snooze the thread. Please try again.`);
-                });
-        },
+
+                    return false;
+                }),
         [snoozeMutation, restore, t],
     );
 
     const snooze = useCallback(
         (threadId: string, choice: SnoozeChoice, previousUntil: number | undefined) => {
-            snoozeAt(threadId, snoozeUntil(choice, new Date()), previousUntil);
+            void snoozeAt(threadId, snoozeUntil(choice, new Date()), previousUntil);
         },
         [snoozeAt],
     );

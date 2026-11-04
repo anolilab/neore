@@ -35,9 +35,15 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, threadId }: Snoo
     const errorId = useId();
     const [value, setValue] = useState(() => toLocalInputValue(Date.now() + HOUR_MS));
     const [error, setError] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);
 
-    const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    // The dialog closes only once the snooze is saved. A failure keeps the chosen time here, with the error, so it can be retried.
+    const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+
+        if (saving) {
+            return;
+        }
 
         const until = customSnoozeUntil(value, new Date());
 
@@ -47,22 +53,21 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, threadId }: Snoo
             return;
         }
 
-        snoozeAt(threadId, until, previousUntil);
-        onOpenChange(false);
+        setSaving(true);
+
+        if (await snoozeAt(threadId, until, previousUntil)) {
+            onOpenChange(false);
+
+            return;
+        }
+
+        setSaving(false);
+        setError(t`Could not snooze the thread. Please try again.`);
     };
 
+    // The dialog is mounted only while it is open, so each opening starts from a fresh default time.
     return (
-        <Dialog
-            onOpenChange={(next) => {
-                if (next) {
-                    setValue(toLocalInputValue(Date.now() + HOUR_MS));
-                    setError(null);
-                }
-
-                onOpenChange(next);
-            }}
-            open={open}
-        >
+        <Dialog onOpenChange={onOpenChange} open={open}>
             <DialogContent className="sm:max-w-sm">
                 <DialogHeader>
                     <DialogTitle>{t`Snooze until`}</DialogTitle>
@@ -92,7 +97,9 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, threadId }: Snoo
                         <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
                             {t`Cancel`}
                         </Button>
-                        <Button type="submit">{t`Snooze`}</Button>
+                        <Button disabled={saving} type="submit">
+                            {t`Snooze`}
+                        </Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
