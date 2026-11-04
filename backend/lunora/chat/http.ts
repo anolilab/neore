@@ -923,8 +923,8 @@ const runChatStartOnShard = async (
         threadId = result.threadId;
         messageId = result.messageId;
 
-        // The thread records its organization so later runs on it are capped by it. Best-effort: a failed stamp must not
-        // strand the message, and the run's own organization (passed to its job below) still caps this run. Temporary
+        // The thread records its organization so later runs on it are capped by it. Best-effort: a failed lookup or stamp must
+        // not strand the message, and the run's own organization (passed to its job below) still caps this run. Temporary
         // threads stay unstamped, as `createThread` leaves them.
         try {
             const threadOrganizationId = await sessionOrganizationPromise;
