@@ -202,6 +202,19 @@ describe("setThreadPermissionMode", () => {
         expect(asGrantee.permissionMode).toBeUndefined();
     });
 
+    it("records a change in the thread's history, attributed to the owner, and nothing for a repeat of the same mode", async () => {
+        await as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never);
+        await as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never);
+
+        const history: any[] = await harness.run(async (context: any) => await context.db.query("documentHistory").collect());
+        const rows = history.filter((row) => row.documentId === threadId);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ attribution: { action: "update", source: "manual" }, isDeleted: false, tableName: "threads", userId: OWNER });
+        expect(rows[0].doc.permissionMode).toBe("full");
+        expect(rows[0].oldDoc.permissionMode).toBeUndefined();
+    });
+
     it("refuses a stranger, an unknown mode and a host thread", async () => {
         await expect(as(STRANGER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never)).rejects.toThrow(NOT_FOUND_PATTERN);
         await expect(as(OWNER).mutation(setThreadPermissionMode as never, { mode: "yolo", threadId } as never)).rejects.toThrow();

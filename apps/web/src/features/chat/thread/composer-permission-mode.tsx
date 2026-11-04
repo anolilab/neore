@@ -3,7 +3,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@neore/ui/components/dropdown-menu";
-import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { skipToken, useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
 import type { FC } from "react";
 import { useRef, useState } from "react";
@@ -79,6 +79,13 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
     );
 };
 
+/** The mutation key of a thread's mode save. The composer waits on it: a turn sent before the save lands would run under the old mode. */
+export const permissionModeSaveKey = (threadId: string) => ["thread-permission-mode-save", threadId] as const;
+
+/** Whether a mode save for this thread is in flight. */
+export const usePermissionModeSaving = (threadId: string | undefined): boolean =>
+    useIsMutating({ exact: true, mutationKey: permissionModeSaveKey(threadId ?? "") }) > 0;
+
 /**
  * The control for the open cloud thread: shows the stored mode and writes it. Nothing for a thread that does not exist yet,
  * one the viewer does not own, or a host thread (its approvals keep their own rules).
@@ -90,7 +97,10 @@ const ComposerThreadPermissionMode: FC = () => {
     const isRunning = useChatIsRunning();
     const { data: access } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions(threadId ? { threadId: threadId as never } : skipToken));
     const queryClient = useQueryClient();
-    const { mutateAsync } = useMutation(crpc.chat.thread_state.setThreadPermissionMode.mutationOptions());
+    const { mutateAsync } = useMutation({
+        ...crpc.chat.thread_state.setThreadPermissionMode.mutationOptions(),
+        mutationKey: permissionModeSaveKey(threadId ?? ""),
+    });
     const [pending, setPending] = useState<ThreadPermissionMode>();
     const latestSave = useRef(0);
 

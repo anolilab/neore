@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { showError } from "@/lib/toast";
 
-import ComposerThreadPermissionMode from "./composer-permission-mode";
+import ComposerThreadPermissionMode, { usePermissionModeSaving } from "./composer-permission-mode";
 
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -148,6 +148,28 @@ describe("permission mode control", () => {
         // The menu is also absent while the access read is pending, so absence is checked once that read has answered.
         await waitFor(() => expect(client.getQueryState(["access", true])?.status).toBe("success"));
         expect(screen.queryByRole("button")).toBeNull();
+    });
+
+    it("reports a save in flight, so the composer can wait before it sends", async () => {
+        state.save.mockImplementationOnce(() => new Promise<null>(() => {}));
+        const SavingProbe = () => {
+            const saving = usePermissionModeSaving("t1");
+
+            return <span>{saving ? "saving" : "idle"}</span>;
+        };
+
+        render(
+            <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+                <ComposerThreadPermissionMode />
+                <SavingProbe />
+            </QueryClientProvider>,
+        );
+
+        expect(await screen.findByText("idle")).toBeTruthy();
+        fireEvent.click(await screen.findByRole("button", { name: "Permission mode: Full access" }));
+        fireEvent.click(screen.getByRole("menuitemradio", { name: SUPERVISED_PATTERN }));
+
+        expect(await screen.findByText("saving")).toBeTruthy();
     });
 
     it("offers the four modes with a description and writes the chosen one", async () => {

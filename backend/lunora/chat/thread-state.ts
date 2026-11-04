@@ -11,6 +11,7 @@ import { requireOwnedThreadIgnoringLock } from "../agent/thread-read-access";
 import { internalMutation } from "../_generated/server";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { throwBadRequest } from "../lib/error-helpers";
+import { appendDocumentHistory } from "../lib/document-history";
 import { isSnoozeInRange } from "./lib/thread-state-logic";
 
 /** Marks the thread's latest reply as seen. A no-op unless a reply is newer than the last view. */
@@ -105,6 +106,17 @@ export const setThreadPermissionMode = authMutation
 
         if (thread.permissionMode !== mode) {
             await patchThread(context.db, thread._id, { permissionMode: mode });
+            // Access changes are audited: the mode decides whether the thread's tools ask, so the owner'"'"'s history records it.
+            await appendDocumentHistory(context.db, context.now, {
+                attribution: { action: "update", source: "manual" },
+                doc: { ...thread, permissionMode: mode },
+                documentId: thread._id,
+                isDeleted: false,
+                oldDoc: thread,
+                organizationId: thread.organizationId ?? undefined,
+                tableName: "threads",
+                userId: context.user.userId,
+            });
         }
 
         return null;

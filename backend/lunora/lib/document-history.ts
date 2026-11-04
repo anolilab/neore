@@ -19,7 +19,29 @@
  */
 import { v } from "lunorash/server";
 
+import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
+
+/** One change to a document, as the history stores it. `doc` is empty for a deletion (see {@link appendDocumentHistory}). */
+export interface DocumentChange {
+    attribution?: unknown;
+    doc?: unknown;
+    documentId: string;
+    isDeleted: boolean;
+    oldDoc?: unknown;
+    organizationId?: string;
+    tableName: string;
+    userId?: string;
+}
+
+/**
+ * Appends one change to the history. A plain function, not a mutation: a mutation that makes a change writes its history row in
+ * the same transaction, so a change and its record cannot disagree.
+ */
+export const appendDocumentHistory = async (db: MutationCtx["db"], now: number, change: DocumentChange): Promise<void> => {
+    // A deletion passes `doc: null`, but `doc` is a NOT NULL column (see the note in `recordHistory`).
+    await db.insert("documentHistory", { ...change, doc: change.doc ?? {}, ts: now });
+};
 
 /**
  * Rows per batch. Exported because `crons.ts` compares `vacuumHistory`'s return
@@ -47,7 +69,7 @@ export const recordHistory = internalMutation
         // `NOT NULL constraint failed: documentHistory.doc`, rolling the delete
         // back. `isDeleted` is what readers check (`getDocumentAtTime` answers
         // null for it), so the stored value for a deletion is an empty object.
-        await ctx.db.insert("documentHistory", { ...args, doc: args.doc ?? {}, ts: ctx.now });
+        await appendDocumentHistory(ctx.db, ctx.now, args);
 
         return null;
     });
