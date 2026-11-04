@@ -9,7 +9,7 @@ on: # yamllint disable-line rule:truthy
     workflow_dispatch:
         inputs:
             environment:
-                description: "Target environment: the GitHub environment and Cloudflare account (production only runs from a v* tag: pick the tag under \"Use workflow from\")"
+                description: 'Target environment: the GitHub environment and Cloudflare account (production only runs from a v* tag: pick the tag under "Use workflow from")'
                 required: true
                 default: "production"
                 type: "choice"
@@ -40,6 +40,11 @@ on: # yamllint disable-line rule:truthy
                 required: false
                 default: false
                 type: "boolean"
+            force:
+                description: "Reconcile every resource even when its props did not change (recreates a database or bucket deleted outside Alchemy)"
+                required: false
+                default: false
+                type: "boolean"
     workflow_call:
         inputs:
             environment:
@@ -58,6 +63,10 @@ on: # yamllint disable-line rule:truthy
                 default: "info"
                 type: "string"
             dry_run:
+                required: false
+                default: false
+                type: "boolean"
+            force:
                 required: false
                 default: false
                 type: "boolean"
@@ -208,10 +217,14 @@ jobs:
 
             # The web app and the Rust Worker share nothing, so they build side by side
             # (`parallel:` runs each in the background with an implicit wait-all at the
-            # end, and the job fails if either does) instead of one after the other: the
-            # Rust release build is the long pole (~6 minutes cold) and the web build is
-            # the other. The packages build stays INSIDE the web step because the app
-            # needs it first; nothing in the Rust build does.
+            # end, and the job fails if either does) instead of one after the other. The
+            # Rust release build is the long pole (~7.5 minutes cold), so the web branch
+            # carries everything else that must happen before the deploy, in order: the
+            # packages (the app needs them first), the app, its source maps (they need the
+            # build), then the backend's codegen (it needs the packages). Those ran after
+            # the group and added ~4 minutes; inside the web branch they finish about when
+            # the Rust build does. Codegen peaks at ~3.7 GB, so it must not overlap the web
+            # build's 4 GB heap on this 7 GB runner: in this order it never does.
             #
             # The packages are built here rather than carried between jobs as an artifact.
             # `upload-artifact` strips the least common ancestor of the matched
@@ -223,8 +236,13 @@ jobs:
             # emitting packages, which makes the artifact path silently wrong
             # again on the next package that gains or loses a `dist`. The build
             # is ~20s and nx-cached; that is cheaper than the trap.
+            #
+            # Codegen writes the untracked `_generated/architecture.js`, which
+            # `_generated/app.ts` imports, so a clean checkout cannot bundle the backend
+            # without it. Without the packages' `dist/`, a return type imported from
+            # `@neore/service-sdk` degrades to `unknown` with codegen still exiting 0.
             - parallel:
-                  - name: "Build the web app"
+                  - name: "Build the web app, ship its source maps, generate the backend"
                     env:
                         # Node sizes the default old-space from available RAM: this is
                         # the standard runner (2-core/7GB), where Node picked
@@ -272,73 +290,21 @@ jobs:
                         # secret alone kills every credential flow, the site key alone
                         # shows a challenge nothing checks.
                         VITE_TURNSTILE_SITE_KEY: "${{ secrets.VITE_TURNSTILE_SITE_KEY }}"
+                        # The source-map upload (scripts/upload-web-sourcemaps.sh).
+                        POSTHOG_CLI_API_KEY: "${{ secrets.POSTHOG_CLI_API_KEY }}"
+                        POSTHOG_CLI_PROJECT_ID: "${{ vars.POSTHOG_PROJECT_ID }}"
+                        RELEASE_VERSION: "${{ github.sha }}"
+                        RELEASE_BUILD: "${{ github.run_number }}"
+                    # The source-map upload key is in this step's environment for the script alone: the
+                    # builds and codegen run third-party code and get it removed with `env -u`.
                     run: |
-                        pnpm --workspace-root run build:packages
-                        pnpm --dir apps/web build
+                        env -u POSTHOG_CLI_API_KEY pnpm --workspace-root run build:packages
+                        env -u POSTHOG_CLI_API_KEY pnpm --dir apps/web build
+                        bash scripts/upload-web-sourcemaps.sh
+                        env -u POSTHOG_CLI_API_KEY pnpm --filter @neore/backend run codegen
 
                   - name: "Build the document-parser Worker"
                     run: "pnpm --filter document-parser run build:worker"
-
-            # Alchemy bundles `backend/src/server.ts` -> `_generated/app.ts`, which imports
-            # the untracked `_generated/architecture.js`. Codegen writes it, and nothing
-            # above does (`apps/web build` is vite + tsc, not the backend's codegen), so a
-            # clean checkout would fail to bundle the backend. It runs AFTER the parallel
-            # block, which ends with the packages built: without their `dist/`, a return
-            # type imported from `@neore/service-sdk` degrades to `unknown` with codegen
-            # still exiting 0.
-            - name: "Generate the backend"
-              run: "pnpm --filter @neore/backend run codegen"
-
-            # `vite build` writes a source map for every client and server chunk
-            # (`sourcemap: "hidden"`): 2,700 files and ~118 MiB in dist/client alone, about
-            # two thirds of what the Worker uploads as static assets, all of it publicly
-            # served. They belong in PostHog, which maps a browser stack trace back to the
-            # source through the `//# chunkId=` comment `inject` adds to each chunk, so:
-            # inject + upload (client only; a Worker stack trace has no chunk to look up),
-            # then delete every map before Alchemy uploads the directory. One build makes
-            # both the chunks and the maps, so they cannot disagree. The CLI is pinned with
-            # its checksum rather than installed from npm, whose installer runs a download
-            # script and does not verify it. Without a key the maps are still deleted, and
-            # a failed upload warns instead of failing a deploy over an error-tracking nicety.
-            - name: "Upload the web source maps to PostHog, then delete them"
-              env:
-                  POSTHOG_CLI_API_KEY: "${{ secrets.POSTHOG_CLI_API_KEY }}"
-                  POSTHOG_CLI_PROJECT_ID: "${{ vars.POSTHOG_PROJECT_ID }}"
-                  VITE_POSTHOG_HOST: "${{ secrets.VITE_POSTHOG_HOST }}"
-                  RELEASE_VERSION: "${{ github.sha }}"
-                  RELEASE_BUILD: "${{ github.run_number }}"
-              run: |
-                  if [[ -z "$POSTHOG_CLI_API_KEY" || -z "$POSTHOG_CLI_PROJECT_ID" ]]; then
-                      echo "::notice::POSTHOG_CLI_API_KEY / POSTHOG_PROJECT_ID are not set on this environment: the source maps are deleted without being uploaded."
-                  else
-                      # The CLI talks to the app host (eu.posthog.com), events go to eu.i.posthog.com.
-                      export POSTHOG_CLI_HOST="${VITE_POSTHOG_HOST/.i./.}"
-
-                      version="0.18.10"
-                      sha256="29f2d4409f08205bab7d52f9cc919e964ea2c867ec568b3acdd9ee3eb4149c3d"
-                      archive="posthog-cli-x86_64-unknown-linux-gnu.tar.gz"
-
-                      # Only the checksum is fail-closed: a CLI we cannot trust must not run. A failed
-                      # download or extraction, like a failed upload, must not skip the cleanup below.
-                      if ! curl --fail --silent --show-error --location --output "$RUNNER_TEMP/$archive" \
-                          "https://github.com/PostHog/posthog/releases/download/posthog-cli/v${version}/${archive}"; then
-                          echo "::warning::Downloading the PostHog CLI failed: the source maps are deleted without being uploaded."
-                      elif ! echo "${sha256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict -; then
-                          echo "::error::The PostHog CLI checksum did not match."
-                          exit 1
-                      elif ! tar --extract --gzip --file "$RUNNER_TEMP/$archive" --directory "$RUNNER_TEMP"; then
-                          echo "::warning::Extracting the PostHog CLI failed: the source maps are deleted without being uploaded."
-                      elif ! "$RUNNER_TEMP/posthog-cli-x86_64-unknown-linux-gnu/posthog-cli" sourcemap process \
-                          --directory apps/web/dist/client \
-                          --release-name "neore-web" \
-                          --release-version "$RELEASE_VERSION" \
-                          --build "$RELEASE_BUILD" \
-                          --delete-after; then
-                          echo "::warning::Uploading the source maps to PostHog failed: browser errors from this deploy will not be un-minified."
-                      fi
-                  fi
-
-                  find apps/web/dist -name '*.map' -delete
 
             # The upload takes minutes to hit Cloudflare's 64 MiB module cap; this takes a
             # second and names the largest modules when the web build crosses its budget.
@@ -406,6 +372,7 @@ jobs:
                   ADOPT: "${{ inputs.adopt }}"
                   LOG_LEVEL: "${{ inputs.log_level }}"
                   DRY_RUN: "${{ inputs.dry_run }}"
+                  FORCE: "${{ inputs.force }}"
                   #
                   # ---------------------------------------------------------
                   # Everything below is passed through to the backend Worker by
@@ -567,6 +534,7 @@ jobs:
                   args=(deploy --stage "$DEPLOY_ENV" --yes --log-level "${LOG_LEVEL:-info}")
                   if [[ "$ADOPT" == "true" ]]; then args+=(--adopt); fi
                   if [[ "$DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
+                  if [[ "$FORCE" == "true" ]]; then args+=(--force); fi
 
                   pnpm exec alchemy provider check-env --provider Cloudflare
                   output=$(pnpm exec alchemy "${args[@]}" 2>&1) || { echo "$output"; exit 1; }
@@ -622,37 +590,55 @@ jobs:
                   CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"
                   CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
               run: |
-                  failed=0
                   rpc='{"functionPath":"changelog_functions:getChangelogs","args":{}}'
 
                   # check <label> <expected status regex> <curl arguments...>
+                  # The five checks hit different Workers and share nothing, so they run at
+                  # once; each keeps its own output and leaves a `.failed` marker on failure.
                   check() {
-                      local label=$1 expected=$2 attempt code=""
+                      local label=$1 expected=$2 code="" out
+                      out="$RUNNER_TEMP/smoke-$(echo "$label" | tr -c 'a-z0-9' '-')"
                       shift 2
 
-                      for attempt in 1 2 3; do
-                          code="$(curl --silent --show-error --output "$RUNNER_TEMP/smoke.out" --write-out '%{http_code}' --max-time 150 "$@" || true)"
+                      for _ in 1 2 3; do
+                          code="$(curl --silent --show-error --output "${out}.body" --write-out '%{http_code}' --max-time 150 "$@" || true)"
 
                           if [[ "$code" =~ $expected ]]; then
-                              echo "ok     ${label}: ${code}"
+                              echo "ok     ${label}: ${code}" > "${out}.log"
                               return 0
                           fi
 
-                          echo "retry  ${label}: ${code:-no answer} (attempt ${attempt})"
                           sleep 15
                       done
 
-                      echo "::error::${label} answered ${code:-nothing}, expected ${expected}"
-                      head -c 600 "$RUNNER_TEMP/smoke.out"
-                      echo
-                      failed=1
+                      touch "${out}.failed"
+                      {
+                          echo "::error::${label} answered ${code:-nothing}, expected ${expected} (after 3 attempts)"
+                          # A transport failure leaves no body.
+                          head -c 600 "${out}.body" 2> /dev/null || true
+                          echo
+                      } > "${out}.log"
                   }
 
-                  check "backend status" '^200$' "${BACKEND}/_lunora/status"
-                  check "backend health" '^200$' "${BACKEND}/api/health"
-                  check "backend rpc (reads a global table)" '^200$' --request POST --header 'content-type: application/json' --data "$rpc" "${BACKEND}/_lunora/rpc"
-                  check "gateway health" '^200$' "${GATEWAY}/health"
-                  check "web app" '^(200|302)$' "${SITE}/"
+                  pids=()
+                  check "backend status" '^200$' "${BACKEND}/_lunora/status" &
+                  pids+=($!)
+                  check "backend health" '^200$' "${BACKEND}/api/health" &
+                  pids+=($!)
+                  check "backend rpc (reads a global table)" '^200$' --request POST --header 'content-type: application/json' --data "$rpc" "${BACKEND}/_lunora/rpc" &
+                  pids+=($!)
+                  check "gateway health" '^200$' "${GATEWAY}/health" &
+                  pids+=($!)
+                  check "web app" '^(200|302)$' "${SITE}/" &
+                  pids+=($!)
+
+                  # Each check's own exit status counts too: one that dies before writing its
+                  # marker still fails the step.
+                  failed=0
+                  for pid in "${pids[@]}"; do wait "$pid" || failed=1; done
+
+                  cat "$RUNNER_TEMP"/smoke-*.log 2> /dev/null || true
+                  if compgen -G "$RUNNER_TEMP/smoke-*.failed" > /dev/null; then failed=1; fi
 
                   if [[ "$failed" -ne 0 && "$STAGE" != "production" ]]; then
                       echo "---- replaying the RPC while tailing the Worker's logs"
