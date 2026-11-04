@@ -31,6 +31,12 @@ import { requireOnline } from "@/offline/write-gate";
 
 /** A row on this screen; `finished` marks a local row whose send completed, which no server read has confirmed yet. */
 type Row = MessageRow & { finished?: boolean };
+/** A send whose reply is still being checked. `holdsSend` keeps the composer shut while the checks run. */
+interface Confirmation {
+    holdsSend: boolean;
+    messageId: string;
+    threadId: string;
+}
 
 const NEW_THREAD = "new";
 const MAX_HISTORY_PAGES = 10;
@@ -128,6 +134,64 @@ const fetchMessagePage = (threadId: string, cursor: string | null) =>
         paginationOpts: { cursor, numItems: 100 },
         threadId: threadId as Id<"threads">,
     });
+
+/** What one round of checks decides: the replies that end, the ones that stop holding the composer, and whether to re-read. */
+interface CheckRound {
+    ended: Set<string>;
+    holdEnds: Set<string>;
+    isRefreshDue: boolean;
+}
+
+/** Counts a reply's checks and sorts each reply by what this round of checks says. */
+const tallyChecks = (outcomes: ReadonlyArray<{ confirmation: Confirmation; state: ReplyState }>, reads: Map<string, number>): CheckRound => {
+    const round: CheckRound = { ended: new Set(), holdEnds: new Set(), isRefreshDue: false };
+
+    for (const { confirmation, state } of outcomes) {
+        const count = (reads.get(confirmation.messageId) ?? 0) + 1;
+
+        reads.set(confirmation.messageId, count);
+
+        if (state === "settled" || count >= CONFIRM_GIVE_UP_READS) {
+            round.ended.add(confirmation.messageId);
+            reads.delete(confirmation.messageId);
+            round.isRefreshDue = true;
+        } else if (count === CONFIRM_HOLD_READS) {
+            round.holdEnds.add(confirmation.messageId);
+        } else if (count === CONFIRM_REFRESH_READS) {
+            round.isRefreshDue = true;
+        }
+    }
+
+    return round;
+};
+
+/** Reads the state of one send's reply: walks the pages from the newest until the send is found, up to `CONFIRM_MAX_PAGES`. */
+const readReplyState = async (threadId: string, messageId: string): Promise<ReplyState> => {
+    const seen: SeenMessage[] = [];
+    let cursor: string | null = null;
+    let state: ReplyState = "unknown";
+
+    for (let index = 0; index < CONFIRM_MAX_PAGES; index += 1) {
+        // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
+        const page = await fetchMessagePage(threadId, cursor);
+
+        // `replyStateAfter` reads newest first; a page is oldest first inside, so it is reversed here.
+        seen.push(
+            ...page.page.toReversed().map((message) => {
+                return { id: message.id, role: message.role, status: message.status };
+            }),
+        );
+        state = replyStateAfter(seen, messageId);
+
+        if (state !== "unknown" || page.isDone) {
+            break;
+        }
+
+        cursor = page.continueCursor;
+    }
+
+    return state;
+};
 
 const Chat = () => {
     const { threadId: routeThreadId } = useLocalSearchParams<{ threadId: string }>();
@@ -340,23 +404,25 @@ const Chat = () => {
         return () => gate.invalidate();
     }, [threadId]);
 
-    // After a send, check the newest page on a timer until the server's copy of the reply is final. Each check reads one
-    // page, so older pages on screen are not touched. The history is re-read once while the checks wait, and again when they settle.
-    // `holdsSend` is set only for a reply the relay did not finish: its server copy may still be streaming, so a new send waits.
-    const [confirmation, setConfirmation] = useState<{ holdsSend: boolean; messageId: string; threadId: string } | null>(null);
-    // Set once the hold has lasted its checks: the composer opens, and the checks go on without holding it.
-    const [isHoldExpired, setIsHoldExpired] = useState(false);
+    // Each send's reply is checked on a timer until its server copy is final. A later send does not end an earlier one's
+    // checks. The history is re-read once while a reply's checks wait, and again when they settle.
+    const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
     const [confirmTick, setConfirmTick] = useState(0);
-    const isConfirming = confirmation !== null && confirmation.threadId === threadId;
-    const isAwaitingReply = isConfirming && confirmation.holdsSend && !isHoldExpired;
+    // Checks made so far for each reply, by message id: kept here so a new send does not restart an earlier reply's count.
+    const confirmReads = useRef(new Map<string, number>());
+    const isAwaitingReply = confirmations.some((confirmation) => confirmation.threadId === threadId && confirmation.holdsSend);
 
     useEffect(() => {
-        if (!isConfirming || confirmation === null) {
+        if (threadId === undefined) {
             return undefined;
         }
 
-        const { messageId, threadId: id } = confirmation;
-        let reads = 0;
+        const own = confirmations.filter((confirmation) => confirmation.threadId === threadId);
+
+        if (own.length === 0) {
+            return undefined;
+        }
+
         let isActive = true;
         let isChecking = false;
 
@@ -366,61 +432,55 @@ const Chat = () => {
             }
 
             isChecking = true;
-            reads += 1;
-            let state: ReplyState = "unknown";
-            let isChatRefused = false;
-
-            try {
-                const seen: SeenMessage[] = [];
-                let cursor: string | null = null;
-
-                for (let index = 0; index < CONFIRM_MAX_PAGES; index += 1) {
-                    // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
-                    const page = await fetchMessagePage(id, cursor);
-
-                    // `replyStateAfter` reads newest first; a page is oldest first inside, so it is reversed here.
-                    seen.push(
-                        ...page.page.toReversed().map((message) => {
-                            return { id: message.id, role: message.role, status: message.status };
-                        }),
-                    );
-                    state = replyStateAfter(seen, messageId);
-
-                    if (state !== "unknown" || page.isDone) {
-                        break;
+            const outcomes = await Promise.all(
+                own.map(async (confirmation) => {
+                    try {
+                        return { confirmation, isChatRefused: false, state: await readReplyState(threadId, confirmation.messageId) };
+                    } catch (error_) {
+                        // A chat the reader can no longer open ends the checks; any other failure is tried again on the next tick.
+                        return { confirmation, isChatRefused: isThreadRefusal(error_), state: "unknown" as ReplyState };
                     }
-
-                    cursor = page.continueCursor;
-                }
-            } catch (error_) {
-                // A chat the reader can no longer open ends the checks; any other failure is tried again on the next tick.
-                isChatRefused = isThreadRefusal(error_);
-            }
+                }),
+            );
 
             isChecking = false;
 
-            if (isActive && (state === "settled" || isChatRefused || reads >= CONFIRM_GIVE_UP_READS)) {
-                setConfirmation(null);
-                setError(withoutAwaitReply);
+            if (!isActive) {
+                return;
+            }
 
-                if (isChatRefused) {
-                    // A chat the reader can no longer open is cleared now, not by a read that may not run.
-                    readGate.current.invalidate();
-                    showRefused();
-                    settleQuietly(cache?.forgetThreads([id]));
-                } else {
-                    setConfirmTick((tick) => tick + 1);
-                }
+            if (outcomes.some((outcome) => outcome.isChatRefused)) {
+                // A chat the reader can no longer open is cleared now, not by a read that may not run.
+                readGate.current.invalidate();
+                showRefused();
+                settleQuietly(cache?.forgetThreads([threadId]));
+                setConfirmations((current) => current.filter((confirmation) => confirmation.threadId !== threadId));
 
                 return;
             }
 
-            if (isActive && reads === CONFIRM_HOLD_READS) {
-                setIsHoldExpired(true);
+            const { ended, holdEnds, isRefreshDue } = tallyChecks(outcomes, confirmReads.current);
+
+            if (ended.size > 0) {
+                setError(withoutAwaitReply);
             }
 
-            if (isActive && reads === CONFIRM_REFRESH_READS) {
-                // Still unsettled: re-read the history so the server's copy of the reply is on screen while the checks go on.
+            if (ended.size > 0 || holdEnds.size > 0) {
+                setConfirmations((current) =>
+                    current
+                        .filter((confirmation) => !ended.has(confirmation.messageId))
+                        .map((confirmation) => {
+                            if (!holdEnds.has(confirmation.messageId)) {
+                                return confirmation;
+                            }
+
+                            return { ...confirmation, holdsSend: false };
+                        }),
+                );
+            }
+
+            if (isRefreshDue) {
+                // Re-reads the history: the server's copy of a settled reply, or of one still waiting, is shown.
                 setConfirmTick((tick) => tick + 1);
             }
         };
@@ -431,7 +491,7 @@ const Chat = () => {
             isActive = false;
             clearInterval(timer);
         };
-    }, [cache, confirmation, isConfirming, showRefused]);
+    }, [cache, confirmations, showRefused, threadId]);
 
     useEffect(() => {
         // Without a token (a launch with no network) the saved messages are all there is; the read waits for one.
@@ -464,9 +524,6 @@ const Chat = () => {
         const stamp = Date.now();
         const userId = `user-${stamp}`;
         const assistantId = `pending-${stamp}`;
-
-        setConfirmation(null);
-        setIsHoldExpired(false);
 
         readGate.current.invalidate();
         setRows((current) => [
@@ -519,7 +576,10 @@ const Chat = () => {
                 setRows((current) => finishRow(current, assistantId));
             }
 
-            setConfirmation({ holdsSend: outcome === "unconfirmed", messageId: started.messageId, threadId: started.threadId });
+            setConfirmations((current) => [
+                ...current,
+                { holdsSend: outcome === "unconfirmed", messageId: started.messageId, threadId: started.threadId },
+            ]);
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
