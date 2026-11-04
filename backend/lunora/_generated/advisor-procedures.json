@@ -302,7 +302,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -327,7 +327,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -1202,7 +1202,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -3652,7 +3652,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -3677,7 +3677,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -3702,7 +3702,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -3727,7 +3727,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -3752,7 +3752,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -5282,7 +5282,7 @@
       "handlesErrors": false,
       "reachesOutbound": false,
       "runsAiGeneration": false,
-      "throwsBareError": true,
+      "throwsBareError": false,
       "unboundedAiGeneration": false,
       "usesInsertManyUnsafe": false,
       "writesUserTable": false,
@@ -6157,7 +6157,7 @@
       "handlesErrors": false,
       "reachesOutbound": false,
       "runsAiGeneration": false,
-      "throwsBareError": true,
+      "throwsBareError": false,
       "unboundedAiGeneration": false,
       "usesInsertManyUnsafe": false,
       "writesUserTable": false,
@@ -8377,7 +8377,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -13677,7 +13677,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -13702,7 +13702,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -13727,7 +13727,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -14529,7 +14529,7 @@
       "callsMail": false,
       "emitsEvent": false,
       "fanOut": false,
-      "handlesErrors": false,
+      "handlesErrors": true,
       "reachesOutbound": true,
       "runsAiGeneration": false,
       "throwsBareError": false,
@@ -24052,7 +24052,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -28152,7 +28152,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -28177,7 +28177,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -28202,7 +28202,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -28227,7 +28227,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -28702,7 +28702,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -28752,7 +28752,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -29127,7 +29127,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -29252,7 +29252,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -29277,7 +29277,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -29302,7 +29302,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -29327,7 +29327,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -29852,7 +29852,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -29877,7 +29877,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -29891,7 +29891,7 @@
       "usesCaptcha": false,
       "usesEmailGate": false,
       "usesMask": false,
-      "usesRateLimit": false,
+      "usesRateLimit": true,
       "usesRls": false,
       "analyzableBody": true,
       "exportName": "createWorker",
@@ -29902,7 +29902,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -29916,7 +29916,7 @@
       "usesCaptcha": false,
       "usesEmailGate": false,
       "usesMask": false,
-      "usesRateLimit": false,
+      "usesRateLimit": true,
       "usesRls": false,
       "analyzableBody": true,
       "exportName": "dispatchToWorker",
@@ -29952,7 +29952,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
@@ -29977,7 +29977,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": false,
+      "emitsEvent": true,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,

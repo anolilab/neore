@@ -228,7 +228,7 @@ export const readAsideSnapshot = internalQuery
 
         const newestFirst = await readPathRows(ctx, thread, unlockProof);
         const rows = fitAsideRows(newestFirst.slice(0, ASIDE_CONTEXT_ROWS).toReversed());
-        const live = await findLiveStream(ctx, threadId, Date.now());
+        const live = await findLiveStream(ctx, threadId, ctx.now);
         const liveReply = live ? await readLiveReply(ctx, live) : undefined;
 
         return { ...(liveReply !== undefined && { liveReply }), rows, running: live !== undefined };

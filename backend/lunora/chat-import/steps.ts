@@ -307,15 +307,24 @@ export const keepImportFile = internalAction
 
         const stored = await readStoredObject(context.storage, args.r2Key, { maxBytes: IMPORT_FILE_MAX_BYTES });
 
-        await context.storage.store(key, stored.bytes, {
-            allowedContentTypes: ["application/json"],
-            contentType: "application/json",
-            maxSize: IMPORT_FILE_MAX_BYTES,
-        });
+        // A storage failure fails the step with its cause attached, so the workflow's retry and the job's error say what broke.
+        try {
+            await context.storage.store(key, stored.bytes, {
+                allowedContentTypes: ["application/json"],
+                contentType: "application/json",
+                maxSize: IMPORT_FILE_MAX_BYTES,
+            });
+        } catch (error) {
+            throw new LunoraError("SERVICE_UNAVAILABLE", "Could not keep the import file", { cause: error });
+        }
 
         // Erasure may have run while the copy was written; the copy is then ours to delete.
         if (!(await context.runQuery(internal.chat_import.steps.importJobExists, { jobId: args.jobId }))) {
-            await context.storage.delete(key);
+            try {
+                await context.storage.delete(key);
+            } catch (error) {
+                throw new LunoraError("SERVICE_UNAVAILABLE", "Could not delete the copy of an erased import's file", { cause: error });
+            }
 
             throw new LunoraError("NOT_FOUND", "Import job not found");
         }

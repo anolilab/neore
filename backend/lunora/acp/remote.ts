@@ -135,8 +135,6 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
         throw new LunoraError("BAD_REQUEST", startFailureMessage(call.error));
     }
 
-    ctx.log.event("acp.start_host_session", { started: true });
-
     return { started: true, threadId: threadId as string };
 };
 
@@ -154,7 +152,13 @@ export const startHostSession = authMutation
         folderId: v.string().max(128),
     })
     .output(v.object({ started: v.boolean(), threadId: v.optional(v.string()) }))
-    .mutation(async ({ args, ctx }) => await startHostSessionFor(ctx, ctx.user.userId, args));
+    .mutation(async ({ args, ctx }) => {
+        const result = await startHostSessionFor(ctx, ctx.user.userId, args);
+
+        ctx.log.event("acp.start_host_session", { started: result.started });
+
+        return result;
+    });
 
 /**
  * Stops the turn a host thread is running: what the host wrote is kept, the stream ends, and the computer is told
@@ -172,6 +176,8 @@ export const cancelHostTurn = authMutation
         const stream = await liveHostStream(ctx, args.threadId);
 
         if (!stream) {
+            ctx.log.event("acp.cancel_host_turn", { cancelled: false, withdrewPrompt: false });
+
             return { cancelled: false };
         }
 
@@ -179,7 +185,11 @@ export const cancelHostTurn = authMutation
             await withdrawSend(ctx, stream, ctx.now);
         }
 
+        const withdrewPrompt = stream.hostState === "accepted";
+
         await stopHostTurn(ctx, stream, ctx.now);
+
+        ctx.log.event("acp.cancel_host_turn", { cancelled: true, withdrewPrompt });
 
         return { cancelled: true };
     });

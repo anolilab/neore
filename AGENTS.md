@@ -1468,13 +1468,12 @@ not nest, so `chat/group`, `chat/tags` etc. are all `chat`.
   into `insertThread(...)` would not draw the ERROR a direct `ctx.db.insert`
   does. Stamp ownership from `ctx.user` before calling one (every current
   public caller does; the three internal messenger inserts lost their INFO).
-- **GDPR's findings are accepted** (325 on 2026-10-06; codegen counts the
-  shared `deleteQuietly` helper once per caller) — erasure (`gdpr/steps/*`) must reach
-  every table, and its batching/ordering is pinned by the tests beside it; see
-  `gdpr/module.ts`. A NEW module puts its erasure in `<module>/gdpr.ts` (as
-  devices, evals, pages, tasks … do), wired into the deletion workflow, so it
-  draws none. Any `cross_module_table_write` outside `gdpr/steps/` is a
-  regression.
+- **GDPR draws none.** Each module erases its own tables in `<module>/gdpr.ts`, wired
+  into the deletion workflow (`gdpr/steps/*` only orchestrates). The shared helpers in
+  `gdpr/batch.ts` take the delete as a callback (`(row) => ctx.db.delete("t", row._id)`)
+  so the write names its table in the owner's file: a `TableName` parameter there read
+  to the advisor as a write to every table (272 findings until 2026-11-04). Any
+  `cross_module_table_write` is a regression.
 - **Architecture view**: codegen writes `_generated/architecture.{json,ts}`,
   which are GIT-IGNORED (they changed on nearly every backend PR and caused the
   merge conflicts). `_generated/app.ts` imports `architecture.js`, so anything
@@ -1495,8 +1494,14 @@ not nest, so `chat/group`, `chat/tags` etc. are all `chat`.
 
 ### Reading advisories
 
-The tree draws **0 ERROR, 284 WARN, 101 INFO** (2026-11-01, codegen alpha.384) — the
-accepted GDPR `cross_module_table_write` findings are most of the WARNs. Until
+The tree draws **0 ERROR, 4 WARN, 64 INFO** (2026-11-04, codegen alpha.399), and every one
+left is by design: the `user` counts (better-auth writes that table outside `ctx.db`, so an
+aggregate counter would drift), `addTeamMember`'s captcha (an authenticated admin action), the
+usage backfill's re-arm (its cursor is the `usageBackfill` row), internal `owner_field` inserts,
+tables written by the vector API / better-auth / the payment component, ordered reads the
+"redundant" indexes serve (and the schema-drift gate cannot drop an index while
+`agent/vector/index.ts` and `lib/rls/scope.ts` pass index names as variables), and secrets and
+tokens that must stay `crypto`-random. Until
 alpha.384 there were six `owner_field_from_args_not_auth` ERRORs on guarded inserts
 the lint could not see through (platform-admin `setMemberCreditOverride`, org-admin
 `addMember`/`addTeamMember`, the active-org equality checks in
@@ -1512,8 +1517,12 @@ sed -i 's/\x1b\[[0-9;]*m//g' /tmp/cg.log
 grep -oP "\[(ERROR|WARN|INFO)\] \K[a-z_]+(?= —)" /tmp/cg.log | sort | uniq -c | sort -rn
 ```
 
-Most of it is noise by design (`procedure_without_structured_event` 289,
-`nondeterministic_query_mutation` 293).
+Conventions that keep new code clear of the advisor:
+
+- **Every public procedure logs one `ctx.log.event`** on each success return, written in the
+  procedure itself: one in a helper does not count.
+- **Time comes from `ctx.now`**, never `Date.now()`, in a query or mutation.
+- **Plain ids come from `ctx.newId()`**; only a token or secret takes `crypto`.
 
 `unbounded_string_arg` (was 418, now 26) is purely SYNTACTIC: it flags an
 inline `v.string()` in `.input({...})` with no `.max`/`.check`/`.length` chained

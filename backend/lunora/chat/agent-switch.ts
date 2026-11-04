@@ -716,7 +716,11 @@ export const switchThreadAgent = authAction
             runQuery: async (reference, runArgs) => await ctx.runQuery(reference as never, runArgs as never),
         };
 
-        return await runAgentSwitch(runner, { ...args, userId }, summariseWith(ctx, { threadId: args.threadId, userId }));
+        const result = await runAgentSwitch(runner, { ...args, userId }, summariseWith(ctx, { threadId: args.threadId, userId }));
+
+        ctx.log.event("chat.switch_thread_agent", { forked: result.forkedThreadId !== undefined, switched: result.switched, targetKind: args.target.kind });
+
+        return result;
     });
 
 interface SwitchPreview {

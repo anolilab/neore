@@ -19,8 +19,11 @@ export const markThreadViewed = authMutation
     .output(v.object({ updated: v.boolean() }))
     .mutation(async ({ args: { threadId }, ctx: context }) => {
         const thread = await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
+        const updated = await markThreadViewedAt(context.db, thread, context.now);
 
-        return { updated: await markThreadViewedAt(context.db, thread, context.now) };
+        context.log.event("chat.mark_thread_viewed", { updated });
+
+        return { updated };
     });
 
 /** Hides the thread from the owner's active list until `until`. */
@@ -40,6 +43,8 @@ export const snoozeThread = authMutation
 
         await setThreadSnooze(context.db, thread, until);
 
+        context.log.event("chat.snooze_thread", { snoozedForMs: until - context.now });
+
         return null;
     });
 
@@ -52,6 +57,8 @@ export const unsnoozeThread = authMutation
         const thread = await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
 
         await setThreadSnooze(context.db, thread, undefined);
+
+        context.log.event("chat.unsnooze_thread", { wasSnoozed: thread.snoozedUntil !== undefined });
 
         return null;
     });

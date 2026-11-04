@@ -133,6 +133,8 @@ export const startWorkOnPullRequest = authMutation
         }
 
         if (attached) {
+            ctx.log.event("source_control.start_work_on_pull_request", { clearedDeadLinks: deadAttached.length, created: false });
+
             return { created: false, threadId: attached.threadId };
         }
 
@@ -183,6 +185,8 @@ export const startWorkOnPullRequest = authMutation
             url,
             userId,
         });
+
+        ctx.log.event("source_control.start_work_on_pull_request", { clearedDeadLinks: deadAttached.length, created: true });
 
         return { created: true, threadId };
     });

@@ -745,6 +745,8 @@ export const schema = defineSchema({
         .index("by_messageId", ["messageId"])
         .index("by_userId", ["userId"])
         .index("by_threadId_and_kind", ["threadId", "kind"])
+        // The image library across all of one user's threads (`media/functions.ts`).
+        .index("by_userId_and_kind", ["userId", "kind"])
         .relations((r) => {
             return {
                 thread: r.one("threads", { field: "threadId" }),

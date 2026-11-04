@@ -2,7 +2,7 @@
  * Vector operations for embeddings.
  * Migrated from `@neore/backend-agent` component.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
 import { type ActionCtx as ActionContext, internalMutation, internalQuery, type MutationCtx as MutationContext } from "../../_generated/server";
@@ -194,7 +194,7 @@ export const updateBatch = internalMutation
                 }
 
                 if (table !== getVectorTableName(embedding.vector.length)) {
-                    throw new Error(`Cannot update ${embedding.id}: a ${embedding.vector.length}-dimension vector does not fit ${table}`);
+                    throw new LunoraError("BAD_REQUEST", `Cannot update ${embedding.id}: a ${embedding.vector.length}-dimension vector does not fit ${table}`);
                 }
 
                 await ctx.db.patch(table, embedding.id as Id<VectorTableName>, { model: embedding.model, vector: embedding.vector });

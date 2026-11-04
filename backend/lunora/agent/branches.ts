@@ -366,7 +366,13 @@ export const editAssistantReply = authMutation
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.null())
-    .mutation(async ({ args, ctx }) => await editAssistantReplyHandler(ctx, { ...args, userId: ctx.user.userId }));
+    .mutation(async ({ args, ctx }) => {
+        await editAssistantReplyHandler(ctx, { ...args, userId: ctx.user.userId });
+
+        ctx.log.event("agent.edit_assistant_reply", { threadId: args.threadId });
+
+        return null;
+    });
 
 /** `editAssistantReply`'s body, with the caller passed in so the harness can drive it. */
 export const editAssistantReplyHandler = async (
