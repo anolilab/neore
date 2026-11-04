@@ -2,7 +2,7 @@
  * The per-thread permission mode of a cloud thread: how much of the run the owner leaves unasked.
  *
  * - `supervised` — every tool that is not read-only asks.
- * - `auto-edit`  — as supervised, but the file-edit tools run.
+ * - `auto-edit`  — as supervised, plus whatever is in `BUILTIN_TOOLS_FILE_EDIT` (empty for now).
  * - `auto`       — today's behaviour: each tool keeps its own default. This is also what an absent value means.
  * - `full`       — every tool that would ask runs, except the ones that wait for a person.
  *
@@ -56,11 +56,10 @@ export const BUILTIN_TOOLS_READ_ONLY: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Built-ins that write files or artifacts inside the thread's own sandbox or document space, with no outward
- * reach: the document tools. Design canvases are not here: their JSON can name remote images that load when the owner opens the
- * editor. `fileOperations` is not here: a bot with its own computer shares that filesystem across
- * threads, so its writes ask. Slides are not here either: their HTML can load remote images when viewed, so creating or editing one
- * asks. `retrieve` is not a lookup: it fetches model-chosen URLs, which can carry thread data and spend quota. `auto-edit` lets the listed tools run; shell, code execution, browser, network,
- * generation and delegation tools keep asking.
+ * Built-ins that write files or artifacts with no outward reach, which `auto-edit` may let run. Empty for now: the document
+ * tools are not here because their HTML can load remote images when the owner views them. Design canvases and slides are not
+ * here either: their JSON or HTML can name remote images that load when opened. `fileOperations` is not here: a bot with its own
+ * computer shares that filesystem across threads, so its writes ask. `retrieve` is not a lookup: it fetches model-chosen URLs,
+ * which can carry thread data and spend quota. Shell, code execution, browser, network, generation and delegation tools keep asking.
  */
-export const BUILTIN_TOOLS_FILE_EDIT: ReadonlySet<string> = new Set(["createDocument", "updateDocument"]);
+export const BUILTIN_TOOLS_FILE_EDIT: ReadonlySet<string> = new Set<string>();

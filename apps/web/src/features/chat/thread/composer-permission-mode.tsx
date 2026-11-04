@@ -37,7 +37,7 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
 
     const descriptions: Record<ThreadPermissionMode, string> = {
         auto: t`Tools run on their own settings; a quick check can clear low-risk calls`,
-        "auto-edit": t`Document edits run; file, slide, design and other changes ask`,
+        "auto-edit": t`For now, every change asks`,
         full: t`Every tool runs without asking, except those that need your answer`,
         supervised: t`Anything that is not a plain lookup asks first`,
     };

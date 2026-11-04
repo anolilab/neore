@@ -72,9 +72,9 @@ vi.mock("@/lib/toast", () => {
     return { showError: vi.fn() };
 });
 
-const renderControl = () =>
+const renderControl = (client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) =>
     render(
-        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <QueryClientProvider client={client}>
             <ComposerThreadPermissionMode />
         </QueryClientProvider>,
     );
@@ -123,9 +123,13 @@ describe("permission mode control", () => {
 
         state.thread = { _id: "t1", permissionMode: "supervised" };
         state.isOwner = false;
-        renderControl();
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-        await waitFor(() => expect(screen.queryByRole("button")).toBeNull());
+        renderControl(client);
+
+        // The menu is also absent while the access read is pending, so absence proves nothing until that read has answered.
+        await waitFor(() => expect(client.getQueryState(["access", false])?.status).toBe("success"));
+        expect(screen.queryByRole("button")).toBeNull();
     });
 
     it("offers the four modes with a description and writes the chosen one", async () => {

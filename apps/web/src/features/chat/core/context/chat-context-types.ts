@@ -41,7 +41,7 @@ export interface ThreadData extends ThreadOwnerState {
     customSystemPrompt?: string;
     enabledFeatures?: string[];
     language?: string;
-    /** Set while the chat has a passcode (`thread-lock.ts`); a locked chat takes no file attachments. */
+    /** Set while the chat has a passcode. A locked read without its proof is a stub that carries no mode. */
     lockedAt?: number | null;
     mode?: "text" | "image" | "video";
     model: string;

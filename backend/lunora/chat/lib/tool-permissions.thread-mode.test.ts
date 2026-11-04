@@ -38,11 +38,12 @@ describe("thread permission mode", () => {
         expect(resolveToolPermission(mcp(), undefined, options)).toBe("ask");
     });
 
-    it("auto-edit lets the file-edit built-ins run and asks for the rest", () => {
+    it("auto-edit asks for document edits too, since its file-edit list is empty", () => {
         const options = { threadMode: "auto-edit" } as const;
 
         expect(resolveToolPermission(FILES, undefined, options)).toBe("ask");
-        expect(resolveToolPermission(builtin("updateDocument"), undefined, options)).toBe("auto");
+        expect(resolveToolPermission(builtin("updateDocument"), undefined, options)).toBe("ask");
+        expect(resolveToolPermission(builtin("createDocument"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("updateDesign"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("createDesign"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("createPresentation"), undefined, options)).toBe("ask");
