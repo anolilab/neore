@@ -7888,7 +7888,11 @@ msgid "Could not load your activity."
 msgstr "Não foi possível carregar sua atividade."
 
 #: src/features/onboarding/components/setup-checklist.tsx:145
-msgid "Could not load your saved choices, so Skip and Resume are off for now."
+#~ msgid "Could not load your saved choices, so Skip and Resume are off for now."
+#~ msgstr ""
+
+#: src/features/onboarding/components/setup-checklist.tsx:145
+msgid "Could not load your saved choices, so Skip and Resume are off until it is read again. The steps show what was last saved."
 msgstr ""
 
 #: src/features/pages/components/pages-sidebar.tsx:108
@@ -14566,7 +14570,7 @@ msgstr "Ir para a mensagem: {snippet}"
 msgid "Go to next page"
 msgstr "Ir para a próxima página"
 
-#: src/features/devices/components/devices-settings.tsx:402
+#: src/features/devices/components/devices-settings.tsx:396
 #: src/features/onboarding/components/setup-checklist.tsx:73
 msgid "Go to pairing"
 msgstr ""
@@ -22627,7 +22631,7 @@ msgstr ""
 msgid "Pair this computer"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:399
+#: src/features/devices/components/devices-settings.tsx:393
 msgid "Pair this computer in the Neore desktop app first. The form to add a server appears here as soon as it is paired."
 msgstr ""
 
@@ -27508,11 +27512,11 @@ msgstr "Banco de dados Postgres serverless com branching"
 msgid "servers"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:393
+#: src/features/devices/components/devices-settings.tsx:387
 msgid "Servers are added from a computer that is paired with your account, because your own SSH client and keys do the connecting."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:394
+#: src/features/devices/components/devices-settings.tsx:388
 #: src/features/devices/components/devices-settings.tsx:534
 msgid "Servers over SSH"
 msgstr ""
@@ -30800,7 +30804,7 @@ msgstr "Os dois primeiros outros participantes, na ordem da lista, debatem a fav
 msgid "The folder has no supported documents."
 msgstr "A pasta não contém documentos suportados."
 
-#: src/features/devices/components/devices-settings.tsx:400
+#: src/features/devices/components/devices-settings.tsx:394
 msgid "The form to add a server is in the Neore desktop app, on a computer paired with your account. Open this page there; the browser does not show it."
 msgstr ""
 

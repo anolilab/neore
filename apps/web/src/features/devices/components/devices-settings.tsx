@@ -378,12 +378,6 @@ const AddServer: FC<{ desktopId: string; onAdded: () => void }> = ({ desktopId, 
     );
 };
 
-/**
- * Settings → Chat → Devices: computers the agent may use through the desktop
- * app. Pairing happens here; approving calls,
- * shared folders and local MCP servers are managed in the desktop app's own
- * window, which the web page cannot reach.
- */
 /** Where a server is added before this computer is paired: the form is in the desktop app, so a browser is told so. */
 export const ServerSetupNote: FC<{ inDesktop: boolean }> = ({ inDesktop }) => {
     const { t } = useLingui();
@@ -407,6 +401,12 @@ export const ServerSetupNote: FC<{ inDesktop: boolean }> = ({ inDesktop }) => {
     );
 };
 
+/**
+ * Settings → Chat → Devices: computers the agent may use through the desktop
+ * app. Pairing happens here; approving calls,
+ * shared folders and local MCP servers are managed in the desktop app's own
+ * window, which the web page cannot reach.
+ */
 const DevicesSettings: FC = () => {
     const { t } = useLingui();
     const crpc = useCRPC();

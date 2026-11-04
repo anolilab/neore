@@ -281,6 +281,27 @@ describe("<SetupChecklist>", () => {
         expect(server.skipped ?? []).toEqual([]);
     });
 
+    it("keeps showing the last saved state with the error, and turns Skip off, when a refresh fails", async () => {
+        server.skipped = ["pair"];
+        const client = newClient();
+
+        renderChecklist(client);
+        await screen.findByText("(Skipped)");
+
+        server.readFail = true;
+        await client.refetchQueries({ queryKey: ["getUserSettings"] });
+
+        expect(await screen.findByText(COULD_NOT_LOAD)).toBeTruthy();
+        expect(screen.getByText("(Skipped)")).toBeTruthy();
+        expect((screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }) as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: RESUME_PAIR_THIS_COMPUTER }) as HTMLButtonElement).disabled).toBe(true);
+
+        server.readFail = false;
+        fireEvent.click(screen.getByRole("button", { name: RETRY }));
+
+        await waitFor(() => expect((screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }) as HTMLButtonElement).disabled).toBe(false));
+    });
+
     it("keeps an earlier skip when a second step is skipped right after", async () => {
         renderChecklist();
         await screen.findAllByText("(To do)");

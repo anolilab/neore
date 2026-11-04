@@ -110,7 +110,7 @@ const SetupChecklist: FC = () => {
                                     </a>
                                     {status !== undefined && (
                                         <Button
-                                            disabled={!settingsLoaded}
+                                            disabled={!settingsLoaded || settingsQuery.isError}
                                             onClick={() => {
                                                 setSkipped.mutate({ skipped: status === "todo", stepId: id });
                                             }}
@@ -142,7 +142,7 @@ const SetupChecklist: FC = () => {
                 )}
                 {settingsQuery.isError && (
                     <div className="mt-3 flex flex-wrap items-center gap-3" role="alert">
-                        <p className="text-destructive text-xs">{t`Could not load your saved choices, so Skip and Resume are off for now.`}</p>
+                        <p className="text-destructive text-xs">{t`Could not load your saved choices, so Skip and Resume are off until it is read again. The steps show what was last saved.`}</p>
                         <Button
                             onClick={() => {
                                 settingsQuery.refetch().catch(() => {});
