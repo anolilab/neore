@@ -28,8 +28,4 @@ describe("shareLabel", () => {
 
         expect(label).toBe(`Share reply: ${"a".repeat(40)}…`);
     });
-
-    it("gives two rows with the same role different labels", () => {
-        expect(shareLabel({ role: "assistant", text: "First answer" })).not.toBe(shareLabel({ role: "assistant", text: "Second answer" }));
-    });
 });

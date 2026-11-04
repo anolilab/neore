@@ -11,6 +11,7 @@ import { useAuth } from "@/auth/auth-state";
 import { fetchAccessToken } from "@/auth/grant";
 import { secureGrantStore } from "@/auth/secure-store";
 import { ChatError, startChat } from "@/chat/chat-api";
+import { displayTextOf, shareTextOf } from "@/chat/message-parts";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import { relayReply } from "@/chat/stream";
 import { loadConfig } from "@/lib/config";
@@ -29,15 +30,7 @@ type Row = MessageRow;
 const NEW_THREAD = "new";
 const MAX_HISTORY_PAGES = 10;
 const REFUSED_MESSAGE = "This chat is locked or no longer available.";
-
-/** Opens the system share sheet with the given text. */
-const shareMessage = async (text: string): Promise<void> => {
-    try {
-        await Share.share({ message: text });
-    } catch {
-        // The share sheet has no screen to report to; it simply stays closed.
-    }
-};
+const SHARE_FAILED_MESSAGE = "The message could not be shared. Try again.";
 
 /** A chat that reads again is no longer refused; any other message on screen is not this read's to clear. */
 const withoutRefusal = (current: string | null): string | null => {
@@ -48,26 +41,16 @@ const withoutRefusal = (current: string | null): string | null => {
     return current;
 };
 
-/** What one stored message part shows: its text, or a label for an attachment (the preview is not in this slice yet). */
-const partText = (part: unknown): string => {
-    const kind = typeof part === "object" && part !== null ? (part as { type?: unknown }).type : undefined;
-
-    if (kind === "text") {
-        return String((part as { text?: unknown }).text ?? "");
-    }
-
-    return kind === "image" || kind === "file" ? "[Attachment]" : "";
-};
-
 /* eslint-disable no-underscore-dangle -- `_creationTime` is the Lunora document field, not a private one */
 const toRow = (message: { _creationTime: number; id: string; parts: unknown[]; role: string; status: string }, threadId: string, syncedAt: number): Row => {
     return {
         createdAt: message._creationTime,
         id: message.id,
         role: message.role,
+        shareText: shareTextOf(message.parts),
         status: message.status,
         syncedAt,
-        text: message.parts.map((part) => partText(part)).join(""),
+        text: displayTextOf(message.parts),
         threadId,
         updatedAt: message._creationTime,
     };
@@ -78,7 +61,7 @@ const toRow = (message: { _creationTime: number; id: string; parts: unknown[]; r
 const localRow = (id: string, role: string, threadId: string, text: string): Row => {
     const now = Date.now();
 
-    return { createdAt: now, id, role, status: "local", syncedAt: now, text, threadId, updatedAt: now };
+    return { createdAt: now, id, role, shareText: text, status: "local", syncedAt: now, text, threadId, updatedAt: now };
 };
 
 const byCreation = (rows: Row[]): Row[] => rows.toSorted((a, b) => a.createdAt - b.createdAt);
@@ -90,7 +73,7 @@ const appendToRow = (rows: Row[], id: string, text: string): Row[] =>
             return row;
         }
 
-        return { ...row, text: row.text + text };
+        return { ...row, shareText: row.shareText + text, text: row.text + text };
     });
 
 const fetchMessagePage = (threadId: string, cursor: string | null) =>
@@ -386,6 +369,16 @@ const Chat = () => {
             </Pressable>
             );
 
+    /** Opens the system share sheet. Cancelling resolves normally, so a rejection is a failure to open it. */
+    const shareRow = async (text: string): Promise<void> => {
+        try {
+            await Share.share({ message: text });
+        } catch (shareError) {
+            console.warn("Could not open the share sheet.", shareError);
+            setError(SHARE_FAILED_MESSAGE);
+        }
+    };
+
     // The home indicator's inset, which the open keyboard already covers.
     const safeBottom = keyboardShown ? 0 : insets.bottom;
     const syncedTimes = rows.filter((row) => row.status !== "local").map((row) => row.syncedAt);
@@ -401,7 +394,7 @@ const Chat = () => {
                     keyExtractor={(row) => row.id}
                     ListHeaderComponent={olderHeader}
                     renderItem={({ item }) => {
-                        const shareText = shareableMessageText(item);
+                        const shareText = shareableMessageText({ text: item.shareText });
 
                         return (
                             <View style={{ alignSelf: item.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", padding: 12 }}>
@@ -410,7 +403,7 @@ const Chat = () => {
                                     <Pressable
                                         accessibilityLabel={shareLabel(item)}
                                         accessibilityRole="button"
-                                        onPress={() => shareMessage(shareText)}
+                                        onPress={() => shareRow(shareText)}
                                         style={{ alignSelf: "flex-start", paddingVertical: 4 }}
                                     >
                                         <Text style={{ fontSize: 12 }}>Share</Text>

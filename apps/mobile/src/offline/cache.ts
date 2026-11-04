@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS cached_messages (
     thread_id TEXT NOT NULL,
     role TEXT NOT NULL,
     text TEXT NOT NULL,
+    share_text TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
@@ -50,7 +51,7 @@ const TABLES = ["cached_messages", "cached_statuses", "cached_threads", "cache_m
  * Stored in the file (`PRAGMA user_version`). A file written under another version is only a cache: its tables are
  * dropped and recreated, never migrated. Bump it whenever SCHEMA changes.
  */
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 /** The version guard of every upsert: a row is replaced only by a copy that is at least as new. */
 const newerThan = (table: string) =>
@@ -71,6 +72,7 @@ interface MessageSql {
     created_at: number;
     id: string;
     role: string;
+    share_text: string;
     status: string;
     synced_at: number;
     text: string;
@@ -261,6 +263,7 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                             createdAt: row.created_at,
                             id: row.id,
                             role: row.role,
+                            shareText: row.share_text,
                             status: row.status,
                             syncedAt: row.synced_at,
                             text: row.text,
@@ -331,6 +334,7 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                                 threadId,
                                 message.role,
                                 message.text,
+                                message.shareText,
                                 message.status,
                                 message.createdAt,
                                 message.updatedAt ?? message.createdAt,
@@ -339,8 +343,8 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
 
                             // eslint-disable-next-line no-await-in-loop -- statements of one transaction run in order
                             await database.runAsync(
-                                `INSERT INTO cached_messages (id, thread_id, role, text, status, created_at, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                                 ON CONFLICT(id) DO UPDATE SET role = excluded.role, text = excluded.text, status = excluded.status, created_at = excluded.created_at,
+                                `INSERT INTO cached_messages (id, thread_id, role, text, share_text, status, created_at, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                 ON CONFLICT(id) DO UPDATE SET role = excluded.role, text = excluded.text, share_text = excluded.share_text, status = excluded.status, created_at = excluded.created_at,
                                      updated_at = excluded.updated_at, synced_at = excluded.synced_at
                                  ${newerThan("cached_messages")}`,
                                 params,

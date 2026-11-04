@@ -29,7 +29,7 @@ const thread = (id: string, updatedAt: number, overrides: Partial<CachedThread> 
 };
 
 const message = (id: string, threadId: string, createdAt: number, overrides: Partial<CachedMessage> = {}): CachedMessage => {
-    return { createdAt, id, role: "assistant", status: "success", text: `text ${id}`, threadId, ...overrides };
+    return { createdAt, id, role: "assistant", shareText: `text ${id}`, status: "success", text: `text ${id}`, threadId, ...overrides };
 };
 
 const status = (id: string, updatedAt: number, overrides: Partial<CachedStatus> = {}): CachedStatus => {
