@@ -584,9 +584,16 @@ const Chat = () => {
                 onDelta: ({ restart, text }) => {
                     if (restart) {
                         isSteered = true;
+                        const previousId = activeId;
+
                         steerCount += 1;
                         activeId = `${assistantId}-${steerCount}`;
-                        writeRows((current) => [...current, localRow(activeId, "assistant", threadId ?? NEW_THREAD, text)]);
+                        writeRows((current) => {
+                            // A row that has no text yet is not part of the reply; the steered text takes its place.
+                            const kept = current.filter((row) => row.id !== previousId || row.text !== "");
+
+                            return [...kept, localRow(activeId, "assistant", threadId ?? NEW_THREAD, text)];
+                        });
 
                         return;
                     }
