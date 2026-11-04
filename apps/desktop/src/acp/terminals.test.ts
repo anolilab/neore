@@ -18,7 +18,10 @@ describe("the line a terminal runs", () => {
     });
 
     it("shows the variables the agent sets in front of it", () => {
-        expect(shownLine("make", [["CI", "1"], ["MSG", "a b"]])).toBe("CI=1 MSG='a b' make");
+        expect(shownLine("make", [["CI", "1"], ["MSG", "a b"]])).toBe("env CI=1 MSG='a b' sh -c make");
+        expect(shownLine("make", [])).toBe("make");
+        // Set for the whole run: a compound line shows the variables on the shell, not on its first command alone.
+        expect(shownLine("true; git push", [["PATH", "/shared/bin"]])).toBe("env PATH=/shared/bin sh -c 'true; git push'");
     });
 });
 
@@ -29,7 +32,7 @@ describe(createRequestOf, () => {
             env: [["A", "1"]],
             line: "ls x",
             outputByteLimit: 500,
-            shown: "A=1 ls x",
+            shown: "env A=1 sh -c 'ls x'",
         });
     });
 

@@ -106,9 +106,14 @@ export const shellQuote = (word: string): string => PLAIN_WORD.test(word) ? word
  */
 export const terminalLine = (command: string, args: ReadonlyArray<string>): string => [command, ...args.map((argument) => shellQuote(argument))].join(" ");
 
-/** The line as the person is shown it: the variables the agent sets first, as the shell would read them. */
+/**
+ * The line as the person is shown it. The variables are set for the whole run, not for the first command in the line, so they
+ * are shown as `env` sets them for the shell that runs the line: they reach every command in it.
+ */
 export const shownLine = (line: string, env: ReadonlyArray<[string, string]>): string =>
-    [...env.map(([name, value]) => `${name}=${shellQuote(value)}`), line].join(" ");
+    env.length === 0
+        ? line
+        : ["env", ...env.map(([name, value]) => `${name}=${shellQuote(value)}`), "sh", "-c", shellQuote(line)].join(" ");
 
 /** The variables a `terminal/create` sets, checked. Throws `INVALID_PARAMS` for one the shell could not take as named. */
 const envOf = (env: unknown): [string, string][] => {
