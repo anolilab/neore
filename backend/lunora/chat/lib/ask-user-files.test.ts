@@ -4,10 +4,11 @@
  * other read failure is the run's and is raised, not swallowed.
  */
 import { LunoraError } from "lunorash/server";
+import type { ModelDefinition } from "@neore/ai/models";
 import { describe, expect, it, vi } from "vitest";
 
 import { ASK_USER_MAX_FILES } from "../tools/ask-user-constants";
-import { loadAskUserFiles } from "./ask-user-files";
+import { filesTheModelReads, loadAskUserFiles } from "./ask-user-files";
 
 const PNG_BYTES = new Uint8Array([137, 80, 78, 71]);
 
@@ -128,5 +129,21 @@ describe("loadAskUserFiles", () => {
         } as never;
 
         await expect(loadAskUserFiles(ctx, { fileIds: ["a"], threadId: "t1", userId: "u1" })).rejects.toThrow("bucket unavailable");
+    });
+});
+
+describe("filesTheModelReads", () => {
+    const image = { data: "AAAA", filename: "shot.png", mediaType: "image/png" };
+    const pdf = { data: "AAAA", filename: "doc.pdf", mediaType: "application/pdf" };
+    const textOnly = { supportsFileInput: false, supportsImages: false } as unknown as ModelDefinition;
+    const reads = { supportsFileInput: true, supportsImages: true } as unknown as ModelDefinition;
+
+    it("keeps only the kinds the run's model reads", () => {
+        expect(filesTheModelReads([image, pdf], textOnly)).toEqual([]);
+        expect(filesTheModelReads([image, pdf], reads)).toEqual([image, pdf]);
+    });
+
+    it("reads none of the files when the model is not in the catalogue", () => {
+        expect(filesTheModelReads([image, pdf], undefined)).toEqual([]);
     });
 });

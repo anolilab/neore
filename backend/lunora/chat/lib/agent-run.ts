@@ -25,7 +25,7 @@ import { lastRowOf, SUMMARY_IDLE_MS, SUMMARY_MIN_ORDER } from "../../agent/threa
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
-import { loadAskUserFiles } from "./ask-user-files";
+import { filesTheModelReads, loadAskUserFiles } from "./ask-user-files";
 import { loadModelFilterRules } from "./model-filter-rules";
 import { backupCanServe, backupCapabilities, backupFilterRejection, eligibleBackupModel, supportsBackupFallback } from "./backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "./paid-model";
@@ -1125,7 +1125,8 @@ export const resumeApprovedRun = async (
 
             // Loaded here, not at the top: the tool module pulls in the agent client.
             const { createAnsweredAskUserTool } = await import("../tools/ask-user");
-            const files = answerFileIds?.length ? await loadAskUserFiles(ctx, { fileIds: answerFileIds, threadId, userId }) : [];
+            const loaded = answerFileIds?.length ? await loadAskUserFiles(ctx, { fileIds: answerFileIds, threadId, userId }) : [];
+            const files = filesTheModelReads(loaded, MODEL_LOOKUP.get(config.model));
 
             toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer, files) as (typeof toolResult.tools)[string];
         }

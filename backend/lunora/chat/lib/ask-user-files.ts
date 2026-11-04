@@ -15,7 +15,10 @@ import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import type { ActionCtx } from "../../_generated/server";
 import { readStoredObject } from "../../lib/storage-read";
+import type { ModelDefinition } from "@neore/ai/models";
+
 import type { AskUserFile } from "../tools/ask-user-constants";
+import { backupCapabilities } from "./backup-model";
 import {
     ASK_USER_FILE_MAX_BYTES,
     ASK_USER_FILE_TYPES,
@@ -39,6 +42,17 @@ const toBase64 = (bytes: ArrayBuffer): string => {
     }
 
     return btoa(binary);
+};
+
+/**
+ * The answer's files the run's model can read. The run keeps the model it started with, which Auto may have picked for a
+ * turn without attachments, so a file the model cannot read is left out (its name still reaches the answer) rather than
+ * failing the resumed call. A model the catalogue does not know reads none of them.
+ */
+export const filesTheModelReads = (files: ReadonlyArray<AskUserFile>, definition: ModelDefinition | undefined): AskUserFile[] => {
+    const readable = definition ? backupCapabilities(definition) : { files: false, images: false };
+
+    return files.filter((file) => (file.mediaType.startsWith("image/") ? readable.images : readable.files));
 };
 
 export const loadAskUserFiles = async (
