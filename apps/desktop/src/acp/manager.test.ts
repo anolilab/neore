@@ -4,6 +4,7 @@
  * asserting there were none.
  */
 import { existsSync, mkdirSync } from "node:fs";
+import { mkdtemp } from "node:fs/promises";
 import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -473,5 +474,26 @@ describe("starts that wait for their plan", () => {
 
         await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow(MISSING_COMMAND);
         expect(calls).toHaveLength(2);
+    });
+
+    it("removes the scratch folder of a probe plan it drops, on a retry and at the retry limit", async () => {
+        const made: string[] = [];
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    const cwd = await mkdtemp(path.join(scratch.dir, "probe-"));
+
+                    made.push(cwd);
+                    await target.closeUnapproved({ agents: [], consents: [] });
+
+                    return { args: [], command: "neore-no-such-agent", cwd, env: { PATH: "/nonexistent" }, scratch: true, secretNames: [] };
+                },
+            },
+        );
+
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow("approvals changed");
+        expect(made).toHaveLength(4);
+        expect(made.every((folder) => !existsSync(folder))).toBe(true);
     });
 });

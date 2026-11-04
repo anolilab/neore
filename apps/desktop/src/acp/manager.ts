@@ -371,12 +371,18 @@ export class AcpManager {
             // eslint-disable-next-line no-await-in-loop -- each plan depends on the approvals as they are now
             const plan = await this.options.plan(agentKey, folder);
 
-            if (before === this.revocations || attempt >= 3) {
-                if (before !== this.revocations) {
-                    throw new Error("The agent's approvals changed while it started. Try again.");
-                }
-
+            if (before === this.revocations) {
                 return plan;
+            }
+
+            // The plan is dropped, and with it the scratch folder a probe plan made for itself.
+            if (plan.scratch) {
+                // eslint-disable-next-line no-await-in-loop -- the folder goes before the next plan makes another
+                await removeQuietly(plan.cwd);
+            }
+
+            if (attempt >= 3) {
+                throw new Error("The agent's approvals changed while it started. Try again.");
             }
         }
     }

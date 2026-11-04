@@ -683,7 +683,7 @@ impl DeviceState {
         // manager removed it, say so rather than letting the start fail with an operating-system error.
         if !fs::metadata(&agent.command).is_ok_and(|meta| meta.is_file()) {
             return Err(format!(
-                "{} {} was installed to run with {}, which is gone. Reinstall it from the registry, or edit its command, to use the Node.js that is here now.",
+                "{} {} was installed to run with {}, which is gone. Reinstall it from the registry, or edit its command to the full path of the Node.js that is here now.",
                 agent.label, pin.version, agent.command
             ));
         }

@@ -386,6 +386,25 @@ impl DeviceState {
                         .acp_agents
                         .iter()
                         .position(|agent| agent.key == key);
+
+                    // The interpreter of an installed npm agent may be changed (a Node upgrade moved it), but the
+                    // start-up check looks for the file itself, so it must be named by its full path.
+                    if let Some(i) = existing {
+                        let before = &settings.acp_agents[i];
+
+                        if before.command != command
+                            && !Path::new(&command).is_absolute()
+                            && before
+                                .install
+                                .as_ref()
+                                .is_some_and(|pin| pin.tree_sha256.is_some())
+                            && !args.is_empty()
+                            && before.args.first() == args.first()
+                        {
+                            return Err("the interpreter of an installed npm agent must be the full path of Node.js (for example /usr/local/bin/node)".into());
+                        }
+                    }
+
                     let agent = AcpAgent {
                         // The pin describes the installed command: a different one is no longer that.
                         install: existing

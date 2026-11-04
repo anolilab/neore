@@ -305,6 +305,14 @@ impl DeviceState {
             .map(|pin| pin.version.clone())
             .ok_or("an install needs a pin")?;
 
+        // One install at a time: the check for an earlier folder, the renames, the settings write and the rollback
+        // would otherwise interleave with another install of the same key and version and delete its folder.
+        static COMMITTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+        let _committing = COMMITTING
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+
         validate_agent(agent)?;
         self.check_free(agent)?;
 

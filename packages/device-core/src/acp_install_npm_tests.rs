@@ -706,3 +706,56 @@ fn names_that_differ_only_in_bytes_no_text_keeps_hash_differently() {
         tree_hash(second.path()).unwrap()
     );
 }
+
+#[test]
+fn installs_of_one_version_that_overlap_leave_one_working_install() {
+    let (state, guard) = state("overlap");
+    let dir = guard.path().to_path_buf();
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let requests: Vec<_> = (0..4)
+        .map(|_| request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .collect();
+
+    let results: Vec<_> = std::thread::scope(|scope| {
+        let handles: Vec<_> = requests
+            .into_iter()
+            .map(|request| scope.spawn(|| state.acp_install_npm(request)))
+            .collect();
+
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
+    });
+
+    assert!(results.iter().all(Result::is_ok), "{results:?}");
+    assert_eq!(state.acp_view().agents.len(), 1, "one agent is recorded");
+    assert!(
+        state.acp_spawn_plan("fixture", None).is_ok(),
+        "the recorded install still starts"
+    );
+}
+
+#[test]
+fn a_pinned_agent_cannot_be_pointed_at_a_node_that_is_not_a_full_path() {
+    let (state, guard) = state("bare-node");
+    let dir = guard.path().to_path_buf();
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let view = state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap();
+    let script = view.agents[0].args[0].clone();
+    let error = state
+        .acp_update(
+            serde_json::from_value(json!({
+                "op": "saveAgent", "key": "fixture", "label": "Fixture", "command": "node", "args": [script],
+            }))
+            .unwrap(),
+        )
+        .unwrap_err();
+
+    assert!(error.contains("full path of Node.js"), "{error}");
+    assert!(
+        state.acp_view().agents[0].install.is_some(),
+        "the pin is untouched"
+    );
+}
