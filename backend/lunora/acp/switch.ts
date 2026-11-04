@@ -667,6 +667,8 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
             : await insertThread(ctx.db, {
                   activeAgent: { kind: "model", model: target.model },
                   createdBy: userId,
+                  // A handoff to a cloud agent keeps the mode of the thread it takes over from (a host thread has none).
+                  ...(thread.permissionMode && { permissionMode: thread.permissionMode }),
                   // A thread that took over from a coding agent is marked even when the agent said nothing in words: what it read
                   // and ran is in none of this thread's rows (`threadHandoffTaint`).
                   ...((handoff || current.agent.kind === "host") && { hasHandoff: true }),

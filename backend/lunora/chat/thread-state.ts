@@ -8,6 +8,7 @@ import { v } from "lunorash/server";
 
 import { markThreadViewedAt, patchThread, setThreadSnooze } from "../agent/table-writes";
 import { requireOwnedThreadIgnoringLock } from "../agent/thread-read-access";
+import { internalMutation } from "../_generated/server";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { throwBadRequest } from "../lib/error-helpers";
 import { isSnoozeInRange } from "./lib/thread-state-logic";
@@ -67,6 +68,27 @@ export const unsnoozeThread = authMutation
  * Sets how much of a cloud thread's runs the owner leaves unasked. A host thread keeps its own approval rules, so it
  * has no mode to set. Takes effect on the next run; a run paused for approval applies the mode it finds when it resumes.
  */
+/**
+ * Carries a mode onto a thread the owner just made from one of their own (a branch). Internal: the caller has checked the owner of
+ * the source thread, so this writes without a second check. A thread made from a host thread has no mode and is not sent here.
+ */
+export const copyThreadPermissionMode = internalMutation
+    .input({
+        mode: v.union(v.literal("supervised"), v.literal("auto-edit"), v.literal("auto"), v.literal("full")),
+        threadId: v.string(),
+    })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const threadId = ctx.db.normalizeId("threads", args.threadId);
+        const thread = threadId ? await ctx.db.threads.findFirst({ where: { _id: threadId } }) : null;
+
+        if (thread && thread.permissionMode !== args.mode) {
+            await patchThread(ctx.db, thread._id, { permissionMode: args.mode });
+        }
+
+        return null;
+    });
+
 export const setThreadPermissionMode = authMutation
     .use(rateLimit("chat/update"))
     .input({

@@ -95,7 +95,10 @@ const ComposerThreadPermissionMode: FC = () => {
     const latestSave = useRef(0);
 
     // Until the thread has loaded, the menu is hidden: a host thread must never show an enabled control while its runner is unknown.
-    if (!threadId || !thread || thread.runner === "host" || access?.isOwner !== true) {
+    // A locked thread read without its proof is a stub that carries no mode: the menu waits for the unlocked thread.
+    const lockedStub = Boolean(thread?.lockedAt) && thread?.permissionMode === undefined;
+
+    if (!threadId || !thread || lockedStub || thread.runner === "host" || access?.isOwner !== true) {
         return null;
     }
 

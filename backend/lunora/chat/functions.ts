@@ -2984,6 +2984,14 @@ export const branchThread = authAction
         });
         const newThreadId: string = newThread._id;
 
+        // A branch keeps the mode of the thread it came from: a stricter mode must not drop to the defaults on a copy.
+        if (parentThread.permissionMode) {
+            await context.runMutation(internal.chat.thread_state.copyThreadPermissionMode, {
+                mode: parentThread.permissionMode,
+                threadId: newThreadId,
+            });
+        }
+
         // A fork of a bot chat stays that bot's chat: its runs need the bot's persona and scoped memory.
         if (branchName || parentThread.botId) {
             await context.runMutation(internal.agent.threads.updateThread, {
