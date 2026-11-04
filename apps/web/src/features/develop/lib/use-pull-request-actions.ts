@@ -63,3 +63,6 @@ export const usePullRequestActions = (address: PullRequestAddress) => {
         }),
     };
 };
+
+/** The writes of the pull request actions, as the panel's flows use them. */
+export type PullRequestActions = ReturnType<typeof usePullRequestActions>;

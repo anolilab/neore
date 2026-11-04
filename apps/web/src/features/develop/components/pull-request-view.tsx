@@ -119,14 +119,8 @@ const PullRequestView = ({
                 <MergePanel address={address} capabilities={host.capabilities} headSha={detail.headSha} hostLabel={host.label} requestNoun={requestNoun} />
             )}
             <PullRequestActionsPanel
-                address={address}
-                body={detail.body}
-                bodyTruncated={detail.bodyTruncated}
-                capabilities={host.capabilities}
-                hostLabel={host.label}
-                requestNoun={requestNoun}
-                state={detail.state}
-                title={detail.title}
+                host={{ capabilities: host.capabilities, label: host.label, noun: requestNoun }}
+                pull={{ address, body: detail.body, bodyTruncated: detail.bodyTruncated, state: detail.state, title: detail.title }}
             />
             <ReviewPanel address={address} capabilities={host.capabilities} headSha={detail.headSha} hostLabel={host.label} />
             {current === undefined ? (

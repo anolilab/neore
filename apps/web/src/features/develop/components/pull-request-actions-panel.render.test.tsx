@@ -54,14 +54,8 @@ const ADDRESS = { number: 7, repository: "octo/hello" } as const;
 const renderPanel = (state: "merged" | "open" = "open") =>
     render(
         <PullRequestActionsPanel
-            address={ADDRESS as never}
-            body="The description"
-            bodyTruncated={false}
-            capabilities={{} as never}
-            hostLabel="GitHub"
-            requestNoun="pull request"
-            state={state}
-            title="Old title"
+            host={{ capabilities: {} as never, label: "GitHub", noun: "pull request" }}
+            pull={{ address: ADDRESS as never, body: "The description", bodyTruncated: false, state, title: "Old title" }}
         />,
     );
 
