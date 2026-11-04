@@ -1127,9 +1127,9 @@ export const resumeApprovedRun = async (
             const { createAnsweredAskUserTool } = await import("../tools/ask-user");
             const loaded = answerFileIds?.length ? await loadAskUserFiles(ctx, { fileIds: answerFileIds, threadId, userId }) : [];
             const definition = MODEL_LOOKUP.get(config.model);
-            const files = filesTheModelReads(loaded, definition ? backupCapabilities(definition) : undefined);
+            const readable = filesTheModelReads(loaded, definition ? backupCapabilities(definition) : undefined);
 
-            toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer, files) as (typeof toolResult.tools)[string];
+            toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer, loaded, readable) as (typeof toolResult.tools)[string];
         }
 
         // An answered secret request: the call's result is the stored value's reference, never the value.

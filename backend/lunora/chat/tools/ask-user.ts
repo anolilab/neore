@@ -58,30 +58,36 @@ const askUserTool = createTool<AskUserInput, AskUserOutput, ToolContext>({
 });
 
 /**
- * The same tool for one resumed run, answering with `answer`. Attached files
- * go to the model as content parts of this call's result (images as image data,
- * PDFs as file data); the stored output names them and nothing more.
+ * The same tool for one resumed run, answering with `answer`. Every attached file is named in the stored output; only
+ * `readable` ones go to the model, as content parts of this call's result (images as image data, PDFs as file data).
+ * A file the model cannot read is listed in `unreadFiles`, so the answer says it was not shown.
  */
-export const createAnsweredAskUserTool = (answer: string, files: ReadonlyArray<AskUserFile> = []) => {
+export const createAnsweredAskUserTool = (answer: string, files: ReadonlyArray<AskUserFile> = [], readable: ReadonlyArray<AskUserFile> = files) => {
     const attachedFiles = files.map(({ filename, mediaType }) => {
         return { filename, mediaType };
     });
+    const unreadFiles = files.filter((file) => !readable.includes(file)).map((file) => file.filename);
 
     return createTool<AskUserInput, AskUserOutput, ToolContext>({
         description: DESCRIPTION,
         execute: async () => {
-            return { answer, answered: true, ...(attachedFiles.length > 0 && { attachedFiles }) };
+            return {
+                answer,
+                answered: true,
+                ...(attachedFiles.length > 0 && { attachedFiles }),
+                ...(unreadFiles.length > 0 && { unreadFiles }),
+            };
         },
         inputSchema,
         needsApproval: true,
         title: "Ask User",
-        ...(files.length > 0 && {
+        ...(readable.length > 0 && {
             toModelOutput: (_context, { output }) => {
                 return {
                     type: "content" as const,
                     value: [
                         { text: JSON.stringify(output), type: "text" as const },
-                        ...files.map((file) =>
+                        ...readable.map((file) =>
                             file.mediaType === "application/pdf"
                                 ? { data: file.data, filename: file.filename, mediaType: file.mediaType, type: "file-data" as const }
                                 : { data: file.data, mediaType: file.mediaType as `image/${string}`, type: "image-data" as const },

@@ -51,4 +51,5 @@ export interface AskUserAttachedFile {
     mediaType: string;
 }
 
-export type AskUserOutput = { answer: string; answered: true; attachedFiles?: AskUserAttachedFile[] } | { answered: false; message: string };
+export type AskUserOutput =
+    { answer: string; answered: true; attachedFiles?: AskUserAttachedFile[]; unreadFiles?: string[] } | { answered: false; message: string };
