@@ -1312,6 +1312,8 @@ const editPullRequest = async (request: HostRequest, ref: PullRequestRef, edit: 
                 PULL_EDIT_MUTATION,
                 { body: edit.body, pullRequestId, title: edit.title },
                 z.object({ updatePullRequest: editedSchema.optional() }),
+                "/graphql",
+                { untypedMayHaveRun: true },
             ),
     );
     const pull = data.updatePullRequest?.pullRequest;
@@ -1340,6 +1342,8 @@ const requestReviewers = async (request: HostRequest, ref: PullRequestRef, revie
                 REQUEST_REVIEWERS_MUTATION,
                 { logins: reviewerLogins, pullRequestId },
                 z.object({ requestReviewsByLogin: z.object({ pullRequest: z.object({ id: z.string() }).nullable() }).optional() }),
+                "/graphql",
+                { untypedMayHaveRun: true },
             ),
     );
 
@@ -1359,7 +1363,10 @@ const revertedSchema = z.object({
 const revertPullRequest = async (request: HostRequest, ref: PullRequestRef, revert: PullRequestEdit): Promise<RevertPullRequestResult> => {
     const pullRequestId = await pullNodeId(request, ref);
     const data = await confirmedOrUnknown(
-        async () => await graphqlRequest(request, REVERT_MUTATION, { body: revert.body, pullRequestId, title: revert.title }, revertedSchema),
+        async () =>
+            await graphqlRequest(request, REVERT_MUTATION, { body: revert.body, pullRequestId, title: revert.title }, revertedSchema, "/graphql", {
+                untypedMayHaveRun: true,
+            }),
     );
     const created = data.revertPullRequest?.revertPullRequest;
 

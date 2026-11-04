@@ -28,6 +28,9 @@ export const graphqlRequest = async <T>(
     variables: Record<string, unknown>,
     dataSchema: z.ZodType<T>,
     path = "/graphql",
+    // A write that may already have run: an error with no type (a timeout comes that way) is then a failure the host may have
+    // acted on, status 0, so the caller reads it as unconfirmed. Every other caller keeps the refusal it was given.
+    options: { untypedMayHaveRun?: boolean } = {},
 ): Promise<T> => {
     const body = (await readJson(await request(path, { json: { query, variables }, method: "POST" }))) as {
         data?: unknown;
@@ -37,9 +40,8 @@ export const graphqlRequest = async <T>(
     const [first] = body?.errors ?? [];
 
     if (first !== undefined) {
-        // An error with no type is not a refusal we can name, and a timeout comes that way after the host may have acted:
-        // status 0 lets a write read it as unconfirmed.
-        const status = typeof first.type === "string" ? statusOfGraphqlError(first.type) : 0;
+        const type = typeof first.type === "string" ? first.type : undefined;
+        const status = type === undefined && options.untypedMayHaveRun === true ? 0 : statusOfGraphqlError(type);
         const detail = typeof first.message === "string" ? first.message.slice(0, DETAIL_MAX_CHARS) : undefined;
 
         throw new HostApiError("The host refused the GraphQL request", status, status === 429, { detail });
