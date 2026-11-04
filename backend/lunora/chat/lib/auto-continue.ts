@@ -133,12 +133,16 @@ const toolResultChars = (part: { content?: unknown; output?: unknown; result?: u
     return parts.reduce<number>((total, item) => total + (mediaPartChars((item as { type?: unknown } | undefined)?.type) ?? contentPartText(item).length), 0);
 };
 
+/** The most an inline file is estimated at: a long PDF costs more than the flat amount, but not without limit. */
+const INLINE_FILE_MAX_CHARS = 200_000;
+
 /**
  * A file part sent inline as base64 or bytes: its flat estimate, or its size when that is larger, since a long PDF costs
- * far more than the flat amount. A reference (a storage key, a URL) has no bytes here and keeps the flat amount.
+ * more than the flat amount. Capped, so one attachment never reads as the whole window and pushes the history away. A
+ * reference (a storage key, a URL) has no bytes here and keeps the flat amount.
  */
 const inlineFileChars = (data: unknown): number => {
-    // Base64 carries three bytes in four characters; about four bytes make one token-sized character.
+    // Base64 carries three bytes in four characters; a sixteenth of the bytes is a rough token-sized character count.
     let bytes = 0;
 
     if (data instanceof Uint8Array) {
@@ -147,7 +151,7 @@ const inlineFileChars = (data: unknown): number => {
         bytes = (data.length * 3) / 4;
     }
 
-    return Math.max(FILE_TOKEN_ESTIMATE_CHARS, Math.ceil(bytes / 4));
+    return Math.min(INLINE_FILE_MAX_CHARS, Math.max(FILE_TOKEN_ESTIMATE_CHARS, Math.ceil(bytes / 16)));
 };
 
 /** Tokens for a character count, with the safety margin. */

@@ -30,6 +30,8 @@ export type ThreadRow = NonNullable<ReturnOf<typeof api.chat.functions.getThread
 
 export interface ThreadData extends ThreadOwnerState {
     _id: string;
+    /** Set while the chat has a passcode (`thread-lock.ts`); a locked chat takes no file attachments. */
+    lockedAt?: number | null;
     /** The agent the thread's active path runs on, once it has been switched (`agent/agent-switch.ts`). */
     activeAgent?: { kind: "model"; model: string };
     /** Each send runs on the model the gateway routes it to; the thread's own `model` is the fallback. */

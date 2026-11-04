@@ -120,6 +120,8 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
     const isWaiting = part.state === "approval-requested" && submitted === null;
     const canAnswer = isOwner && isWaiting && !!approvalId && !!threadId && !isPending;
+    // The server refuses files in a locked chat, so the attach control is not offered there.
+    const isLocked = thread?.lockedAt !== undefined && thread?.lockedAt !== null;
 
     const send = (reply: Submitted) => {
         if (!approvalId || !threadId) {
@@ -405,8 +407,9 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         <span className="sr-only" role="status">
                             {uploading ? t`Attaching files…` : ""}
                         </span>
+                        {isLocked && <p className="text-muted-foreground text-xs">{t`Files cannot be attached in a locked chat.`}</p>}
                         <Button
-                            disabled={uploading || files.length >= FILES_MAX}
+                            disabled={uploading || files.length >= FILES_MAX || isLocked}
                             onClick={() => fileInputRef.current?.click()}
                             ref={attachButtonRef}
                             size="sm"
