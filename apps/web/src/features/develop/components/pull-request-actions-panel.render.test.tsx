@@ -5,8 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import PullRequestActionsPanel from "./pull-request-actions-panel";
 
-const { edit } = vi.hoisted(() => {
-    return { edit: vi.fn() };
+const { edit, requestReviewers, revert } = vi.hoisted(() => {
+    return { edit: vi.fn(), requestReviewers: vi.fn(), revert: vi.fn() };
 });
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
@@ -34,8 +34,8 @@ vi.mock("../lib/use-pull-request-actions", async (importOriginal) => {
         usePullRequestActions: () => {
             return {
                 edit: { isPending: false, mutateAsync: edit },
-                requestReviewers: { isPending: false, mutateAsync: vi.fn() },
-                revert: { isPending: false, mutateAsync: vi.fn() },
+                requestReviewers: { isPending: false, mutateAsync: requestReviewers },
+                revert: { isPending: false, mutateAsync: revert },
             };
         },
     };
@@ -51,7 +51,7 @@ vi.mock("../lib/use-review-messages", () => {
 
 const ADDRESS = { number: 7, repository: "octo/hello" } as const;
 
-const renderPanel = () =>
+const renderPanel = (state: "merged" | "open" = "open") =>
     render(
         <PullRequestActionsPanel
             address={ADDRESS as never}
@@ -60,7 +60,7 @@ const renderPanel = () =>
             capabilities={{} as never}
             hostLabel="GitHub"
             requestNoun="pull request"
-            state="open"
+            state={state}
             title="Old title"
         />,
     );
@@ -122,5 +122,56 @@ describe("PullRequestActionsPanel edit dialog", () => {
         await waitFor(() => {
             expect(screen.queryByLabelText("Title")).toBeNull();
         });
+    });
+});
+
+describe("PullRequestActionsPanel reviewer dialog", () => {
+    it("keeps the logins typed when the host refuses the request", async () => {
+        requestReviewers.mockResolvedValueOnce({ reason: "Not a reviewer", status: "rejected" });
+        renderPanel();
+
+        fireEvent.click(screen.getByRole("button", { name: "Request reviewers" }));
+        fireEvent.change(await screen.findByLabelText("Logins"), { target: { value: "alice" } });
+        fireEvent.click(screen.getByRole("button", { name: "Request" }));
+
+        expect(await screen.findAllByText("The host answered rejected")).not.toHaveLength(0);
+        expect((screen.getByLabelText("Logins") as HTMLInputElement).value).toBe("alice");
+    });
+
+    it("closes the dialog and says it is not confirmed when the answer never came back", async () => {
+        requestReviewers.mockResolvedValueOnce({ status: "unconfirmed" });
+        renderPanel();
+
+        fireEvent.click(screen.getByRole("button", { name: "Request reviewers" }));
+        fireEvent.change(await screen.findByLabelText("Logins"), { target: { value: "alice" } });
+        fireEvent.click(screen.getByRole("button", { name: "Request" }));
+
+        expect(await screen.findByText("Not confirmed")).toBeTruthy();
+        await waitFor(() => {
+            expect(screen.queryByLabelText("Logins")).toBeNull();
+        });
+    });
+});
+
+describe("PullRequestActionsPanel revert", () => {
+    it("shows a link to the revert pull request the host opened", async () => {
+        revert.mockResolvedValueOnce({ status: "ok", url: "https://github.com/octo/hello/pull/9" });
+        renderPanel("merged");
+
+        fireEvent.click(screen.getByRole("button", { name: "Revert" }));
+        fireEvent.click(await screen.findByRole("button", { name: "Open revert" }));
+
+        expect(await screen.findByText("Opened a revert pull request on GitHub.")).toBeTruthy();
+        expect(screen.getByRole("link", { name: "Open the revert pull request on GitHub" }).getAttribute("href")).toBe("https://github.com/octo/hello/pull/9");
+    });
+
+    it("says nothing changed when the server refused the revert before any host call", async () => {
+        revert.mockRejectedValueOnce(Object.assign(new Error("slow down"), { code: "TOO_MANY_REQUESTS" }));
+        renderPanel("merged");
+
+        fireEvent.click(screen.getByRole("button", { name: "Revert" }));
+        fireEvent.click(await screen.findByRole("button", { name: "Open revert" }));
+
+        expect(await screen.findAllByText("Not changed")).not.toHaveLength(0);
     });
 });
