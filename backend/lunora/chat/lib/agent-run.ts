@@ -1081,7 +1081,8 @@ export const resumeApprovedRun = async (
         steerable?: boolean;
     } = {},
 ): Promise<{ awaitingInput?: AwaitingInput; lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
-    const { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
+    const { answer, answerFileIds, answers, approvalId, config, streamId, threadId, userId } = args;
+    let { approved, denyReason } = args;
     const { customProvider } = await resolveRunModel(ctx, config.model, userId);
     const [toolResult, userProviderKeys, preferences] = await Promise.all([
         buildAgentTools(ctx, {
@@ -1091,8 +1092,9 @@ export const resumeApprovedRun = async (
             deviceThreadId: threadId,
             mcpProgress: toolProgressSink(ctx, streamId),
             model: config.model,
-            // The paused run's organization, for a thread that has no stored one (see BuildAgentToolsOptions.organizationId).
-            organizationId: config.organizationId ?? null,
+            // The approval snapshot does not record the organization, so a continuation on a thread with none stored runs in the
+            // personal space.
+            organizationId: null,
             origin: config.dispatchOrigin,
             searchMode: config.searchMode as SearchMode,
             snapshot: { mcpServerNames: config.mcpServerNames, toolNames: config.toolNames },
@@ -1121,8 +1123,11 @@ export const resumeApprovedRun = async (
             throw new AgentRunError("stale-approval", "Approval is no longer pending on the latest turn");
         }
 
+        // A tool that left the rebuilt set after the pause (its organization's cap, or the member's own setting) is denied,
+        // not refused: the approval is already claimed, so a refusal here would leave the request unanswerable.
         if (approved && pending.toolName !== null && !Object.hasOwn(toolResult.tools, pending.toolName)) {
-            throw new AgentRunError("stale-approval", `Tool ${pending.toolName} is no longer available`);
+            approved = false;
+            denyReason = `Tool ${pending.toolName} is no longer available`;
         }
 
         // An answered question: the approved call executes a copy of the tool

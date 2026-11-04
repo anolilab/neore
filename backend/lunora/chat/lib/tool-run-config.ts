@@ -34,8 +34,6 @@ export const vToolRunConfig = v.object({
      */
     memory: v.optional(v.object({ botId: v.optional(v.string()) })),
     model: v.string(),
-    /** The organization the paused run was started from, which caps its continuation when its thread has no stored one. */
-    organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
     /**
      * The prompt row the paused run answered. The continuation's stream is keyed on the approval id, so this is
      * how a goal recognises the resumed run as its own round (`chat/goals/internal.ts#runPromptId`).
