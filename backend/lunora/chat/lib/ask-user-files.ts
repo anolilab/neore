@@ -48,6 +48,12 @@ export const answerFilesMessage = (files: ReadonlyArray<AskUserFile>): ModelMess
     };
 };
 
+/**
+ * The model input of one step with the answer's files at its end. A copy carried from an earlier step is taken out
+ * first, so the carried messages never hold two; everything else (compression, steering) is kept as it is.
+ */
+export const withAnswerFiles = <T>(messages: ReadonlyArray<T>, files: T): T[] => [...messages.filter((message) => message !== files), files];
+
 /** The error codes that mean "leave this file out" rather than "the read failed". */
 const SKIP_CODES: ReadonlySet<string> = new Set(["NOT_FOUND", "PAYLOAD_TOO_LARGE"]);
 

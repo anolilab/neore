@@ -71,7 +71,9 @@ interface AskUserInput {
     question?: string;
 }
 
-type AskUserOutput = { answer: string; answered: true; attachedFiles?: { filename: string; mediaType: string }[] } | { answered: false; message: string };
+type AskUserOutput =
+    | { answer: string; answered: true; attachedFiles?: { filename: string; mediaType: string }[]; unreadFiles?: string[] }
+    | { answered: false; message: string };
 
 type Submitted = { answer: string; kind: "answer" } | { kind: "dismiss" };
 
@@ -294,6 +296,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     }
 
     const answeredFiles = output?.answered ? (output.attachedFiles ?? []) : [];
+    const unreadFiles = output?.answered ? (output.unreadFiles ?? []) : [];
 
     return (
         <div aria-labelledby={headingId} className="bg-muted/40 mb-4 rounded-lg border p-3 outline-none" ref={groupRef} role="group" tabIndex={-1}>
@@ -321,6 +324,8 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                     {t`Attached:`} {answeredFiles.map((file) => file.filename).join(", ")}
                 </p>
             )}
+
+            {unreadFiles.length > 0 && <p className="text-muted-foreground mt-1 text-xs">{t`Not shown to this model: ${unreadFiles.join(", ")}`}</p>}
 
             {canAnswer && (
                 <form className="mt-3 flex flex-col gap-2" onSubmit={onSubmit}>

@@ -7,7 +7,7 @@ import { LunoraError } from "lunorash/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { ASK_USER_MAX_FILES } from "../tools/ask-user-constants";
-import { answerFilesMessage, filesTheModelReads, loadAskUserFiles } from "./ask-user-files";
+import { answerFilesMessage, filesTheModelReads, loadAskUserFiles, withAnswerFiles } from "./ask-user-files";
 
 const PNG_BYTES = new Uint8Array([137, 80, 78, 71]);
 
@@ -162,5 +162,15 @@ describe(answerFilesMessage, () => {
             { image: "aW1n", mediaType: "image/png", type: "image" },
             { data: "cGRm", filename: "spec.pdf", mediaType: "application/pdf", type: "file" },
         ]);
+    });
+});
+
+describe(withAnswerFiles, () => {
+    it("puts the files at the end of a step's messages, once", () => {
+        expect(withAnswerFiles(["prompt", "tool-result"], "files")).toEqual(["prompt", "tool-result", "files"]);
+    });
+
+    it("replaces the copy a step carried from an earlier one, and keeps the other messages in order", () => {
+        expect(withAnswerFiles(["prompt", "files", "steering", "tool-call"], "files")).toEqual(["prompt", "steering", "tool-call", "files"]);
     });
 });

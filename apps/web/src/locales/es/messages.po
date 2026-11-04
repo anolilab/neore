@@ -3316,7 +3316,7 @@ msgstr "Responde mensajes de una cuenta oficial de WeChat (modo seguro). Beta: a
 msgid "Answer ready"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:275
+#: src/features/chat/thread/ask-user-prompt.tsx:283
 msgid "Answer sent — continuing"
 msgstr "Respuesta enviada — continuando"
 
@@ -3324,7 +3324,7 @@ msgstr "Respuesta enviada — continuando"
 msgid "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 msgstr "Responde mensajes de WhatsApp con tu número de WhatsApp Business (Meta Cloud API). Las respuestas siguen la regla de 24 horas de WhatsApp."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:271
+#: src/features/chat/thread/ask-user-prompt.tsx:279
 msgid "Answered"
 msgstr "Respondida"
 
@@ -3843,33 +3843,33 @@ msgstr ""
 msgid "Attach as file"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:403
+#: src/features/chat/thread/ask-user-prompt.tsx:416
 msgid "Attach file"
-msgstr ""
+msgstr "Adjuntar archivo"
 
 #: src/features/chat/header/kb-attachment-button.tsx:187
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "Adjunta archivos o colecciones completas para que la IA los consulte y cite en esta conversación."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:357
+#: src/features/chat/thread/ask-user-prompt.tsx:370
 msgid "Attached files"
-msgstr ""
+msgstr "Archivos adjuntos"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:121
 msgid "Attached image"
 msgstr "Imagen adjunta"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:315
+#: src/features/chat/thread/ask-user-prompt.tsx:324
 msgid "Attached:"
-msgstr ""
+msgstr "Adjunto:"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:392
+#: src/features/chat/thread/ask-user-prompt.tsx:405
 msgid "Attaching files…"
-msgstr ""
+msgstr "Adjuntando archivos…"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:403
+#: src/features/chat/thread/ask-user-prompt.tsx:416
 msgid "Attaching…"
-msgstr ""
+msgstr "Adjuntando…"
 
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 msgid "Attachment"
@@ -7727,9 +7727,9 @@ msgid "Could not apply the changes"
 msgstr "No se pudieron aplicar los cambios"
 
 #. placeholder {0}: failed.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:258
+#: src/features/chat/thread/ask-user-prompt.tsx:265
 msgid "Could not attach {0}. The other files were attached; try those again."
-msgstr ""
+msgstr "No se pudo adjuntar {0}. Los demás archivos se adjuntaron; inténtalo de nuevo con esos."
 
 #: src/features/chat/thread/composer-input.tsx:1325
 msgid "Could not attach the chat"
@@ -7749,7 +7749,7 @@ msgstr "No se pudo cancelar la ejecución."
 
 #: src/features/chat/thread/composer-model-selector.tsx:127
 msgid "Could not change Auto. Please try again."
-msgstr ""
+msgstr "No se pudo cambiar Auto. Inténtalo de nuevo."
 
 #: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
@@ -7758,7 +7758,7 @@ msgstr "No se pudieron cambiar las notificaciones push. Inténtalo de nuevo."
 #: src/features/chat/model-settings/use-model-combobox.ts:283
 #: src/features/chat/model-settings/use-model-combobox.ts:307
 msgid "Could not change the model. Please try again."
-msgstr ""
+msgstr "No se pudo cambiar el modelo. Inténtalo de nuevo."
 
 #: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
@@ -8013,7 +8013,7 @@ msgstr ""
 msgid "Could not send your answer."
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:139
+#: src/features/chat/thread/ask-user-prompt.tsx:141
 #: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "No se pudo enviar tu respuesta. Inténtalo de nuevo."
@@ -9860,7 +9860,7 @@ msgstr "Clave pública de Discord"
 
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:54
 #: src/features/changelog/components/changelog-card.tsx:59
-#: src/features/chat/thread/ask-user-prompt.tsx:411
+#: src/features/chat/thread/ask-user-prompt.tsx:424
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:202
@@ -9896,7 +9896,7 @@ msgstr "Descartar secreto del webhook"
 msgid "Dismissed"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:273
+#: src/features/chat/thread/ask-user-prompt.tsx:281
 msgid "Dismissed — continuing without an answer"
 msgstr "Descartada — continuando sin respuesta"
 
@@ -11205,7 +11205,7 @@ msgstr "Introduce la clave de API"
 msgid "Enter the endpoint URL first"
 msgstr "Introduce primero la URL del endpoint"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:378
+#: src/features/chat/thread/ask-user-prompt.tsx:391
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "Intro para enviar, Mayús+Intro para una nueva línea."
 
@@ -21111,6 +21111,11 @@ msgstr ""
 msgid "Not set"
 msgstr "Sin asignar"
 
+#. placeholder {0}: unreadFiles.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:329
+msgid "Not shown to this model: {0}"
+msgstr "Este modelo no las vio: {0}"
+
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:75
 msgid "Not started"
 msgstr "No iniciado"
@@ -21512,9 +21517,9 @@ msgstr "Solo los propietarios de la organización pueden gestionar la facturaci�
 msgid "Only participants you @mention answer."
 msgstr "Solo responden los participantes que @menciones."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:184
+#: src/features/chat/thread/ask-user-prompt.tsx:186
 msgid "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
-msgstr ""
+msgstr "Solo imágenes PNG, JPEG, WEBP o GIF, y PDF de hasta 10 MB; 20 MB en total y cuatro como máximo."
 
 #: src/features/settings/components/chat/trigger-settings.tsx:263
 msgid "Only post when there is something to report"
@@ -22278,7 +22283,7 @@ msgstr ""
 msgid "Or from a terminal:"
 msgstr "O desde una terminal:"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:346
+#: src/features/chat/thread/ask-user-prompt.tsx:359
 msgid "Or type your own answer…"
 msgstr "O escribe tu propia respuesta…"
 
@@ -23519,7 +23524,7 @@ msgstr "Razonamiento y seguimiento de instrucciones de nivel premium"
 msgid "Premium-tier reasoning transparency"
 msgstr "Transparencia de razonamiento de nivel premium"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:277
+#: src/features/chat/thread/ask-user-prompt.tsx:285
 msgid "Preparing a question…"
 msgstr "Preparando una pregunta…"
 
@@ -25259,7 +25264,7 @@ msgstr "¿Eliminar «{0}»?"
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
 #: src/features/chat/group/group-participant-bar.tsx:210
-#: src/features/chat/thread/ask-user-prompt.tsx:362
+#: src/features/chat/thread/ask-user-prompt.tsx:375
 #: src/features/prompts/components/thread-variables-config.tsx:232
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
@@ -27290,7 +27295,7 @@ msgstr "Envía un mensaje abajo para empezar"
 msgid "Send a message to begin"
 msgstr "Envía un mensaje para empezar"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:407
+#: src/features/chat/thread/ask-user-prompt.tsx:420
 msgid "Send answer"
 msgstr "Enviar respuesta"
 
@@ -29621,7 +29626,7 @@ msgstr "Sugiere ideas de videos para un canal de tecnología en YouTube"
 msgid "Suggested"
 msgstr "Sugeridos"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:322
+#: src/features/chat/thread/ask-user-prompt.tsx:335
 #: src/features/skills/components/skill-builder-dialog.tsx:235
 msgid "Suggested answers"
 msgstr "Respuestas sugeridas"
@@ -30576,7 +30581,7 @@ msgstr "El archivo contiene una ruta de archivo no segura."
 msgid "The archive holds too many files."
 msgstr "El archivo contiene demasiados archivos."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:298
+#: src/features/chat/thread/ask-user-prompt.tsx:307
 msgid "The assistant has a question"
 msgstr "El asistente tiene una pregunta"
 
@@ -32076,9 +32081,9 @@ msgid "too large"
 msgstr "demasiado grande"
 
 #. placeholder {0}: tooLarge.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:257
+#: src/features/chat/thread/ask-user-prompt.tsx:261
 msgid "Too large to attach: {0}. Reduce the file and attach it again."
-msgstr ""
+msgstr "Demasiado grande para adjuntar: {0}. Reduce el archivo y adjúntalo de nuevo."
 
 #: src/features/workflow/components/nodes/text-node.tsx:78
 msgid "Too long to check as JSON"
@@ -32628,7 +32633,7 @@ msgstr ""
 msgid "Type to search"
 msgstr "Escribe para buscar"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:346
+#: src/features/chat/thread/ask-user-prompt.tsx:359
 msgid "Type your answer…"
 msgstr "Escribe tu respuesta…"
 
@@ -34376,7 +34381,7 @@ msgstr ""
 msgid "Waiting for the owner"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:279
+#: src/features/chat/thread/ask-user-prompt.tsx:287
 msgid "Waiting for the owner to answer"
 msgstr "Esperando la respuesta del propietario"
 
@@ -34397,7 +34402,7 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
-#: src/features/chat/thread/ask-user-prompt.tsx:279
+#: src/features/chat/thread/ask-user-prompt.tsx:287
 msgid "Waiting for your answer"
 msgstr "Esperando tu respuesta"
 
@@ -35343,7 +35348,7 @@ msgstr "Tu cuenta y todos los datos asociados se están eliminando. No se puede 
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "Tu espacio de trabajo de IA <0>empieza aquí.</0>"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:338
+#: src/features/chat/thread/ask-user-prompt.tsx:351
 msgid "Your answer"
 msgstr "Tu respuesta"
 
@@ -35351,7 +35356,7 @@ msgstr "Tu respuesta"
 msgid "Your answer in Neore has finished."
 msgstr "Tu respuesta en Neore ha terminado."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:308
+#: src/features/chat/thread/ask-user-prompt.tsx:317
 msgid "Your answer:"
 msgstr "Tu respuesta:"
 

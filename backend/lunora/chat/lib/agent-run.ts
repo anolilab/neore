@@ -25,7 +25,7 @@ import { lastRowOf, SUMMARY_IDLE_MS, SUMMARY_MIN_ORDER } from "../../agent/threa
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
-import { answerFilesMessage, filesTheModelReads, loadAskUserFiles } from "./ask-user-files";
+import { answerFilesMessage, filesTheModelReads, loadAskUserFiles, withAnswerFiles } from "./ask-user-files";
 import { loadModelFilterRules } from "./model-filter-rules";
 import { backupCanServe, backupCapabilities, backupFilterRejection, eligibleBackupModel, supportsBackupFallback } from "./backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "./paid-model";
@@ -1102,7 +1102,7 @@ export const resumeApprovedRun = async (
     // Set once the continuation has a result: a run that fails after it still leaves the record of its auto-approved calls.
     let started: { savedMessages?: SavedToolCallStamp["savedMessages"] } | undefined;
 
-    // The answered files the model reads, for its first step only (`answerFilesMessage`); never saved.
+    // The answered files the model reads, on every step of the continuation (`answerFilesMessage`); never saved.
     let answerFiles: ReturnType<typeof answerFilesMessage>;
 
     try {
@@ -1193,19 +1193,15 @@ export const resumeApprovedRun = async (
         streamTextArgs.stopWhen = stopWhenStopped(ctx, streamId, getMaxSteps(config.shouldAutoContinue));
 
         if (answerFiles) {
-            // The files follow the answer's tool result on the first step only, so every later step (and the saved
-            // history) carries the answer alone.
+            // Every step of the continuation reads the files, so a tool call inside it does not cost the model the
+            // images. The saved history never holds them: this shapes only the model's input.
             const compressStep = streamTextArgs.prepareStep as ((options: unknown) => unknown) | undefined;
             const attached = answerFiles;
 
-            streamTextArgs.prepareStep = async (options: { messages: ReadonlyArray<unknown>; stepNumber: number }) => {
-                const adjusted = (await compressStep?.(options)) as { messages?: ReadonlyArray<unknown> } | undefined;
+            streamTextArgs.prepareStep = async (step: { messages: ReadonlyArray<unknown> }) => {
+                const adjusted = (await compressStep?.(step)) as { messages?: ReadonlyArray<unknown> } | undefined;
 
-                if (options.stepNumber !== 0) {
-                    return adjusted;
-                }
-
-                return { ...adjusted, messages: [...(adjusted?.messages ?? options.messages), attached] };
+                return { ...adjusted, messages: withAnswerFiles(adjusted?.messages ?? step.messages, attached) };
             };
         }
 

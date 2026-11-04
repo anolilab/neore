@@ -3316,7 +3316,7 @@ msgstr "回复 WeChat 公众号的消息（安全模式）。Beta：尚未在真
 msgid "Answer ready"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:275
+#: src/features/chat/thread/ask-user-prompt.tsx:283
 msgid "Answer sent — continuing"
 msgstr "已发送回答 — 正在继续"
 
@@ -3324,7 +3324,7 @@ msgstr "已发送回答 — 正在继续"
 msgid "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 msgstr "通过你的 WhatsApp Business 号码回复 WhatsApp 消息（Meta Cloud API）。回复遵循 WhatsApp 的 24 小时规则。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:271
+#: src/features/chat/thread/ask-user-prompt.tsx:279
 msgid "Answered"
 msgstr "已回答"
 
@@ -3843,33 +3843,33 @@ msgstr ""
 msgid "Attach as file"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:403
+#: src/features/chat/thread/ask-user-prompt.tsx:416
 msgid "Attach file"
-msgstr ""
+msgstr "附加文件"
 
 #: src/features/chat/header/kb-attachment-button.tsx:187
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "附加文件或整个集合，供 AI 在此对话中参考和引用。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:357
+#: src/features/chat/thread/ask-user-prompt.tsx:370
 msgid "Attached files"
-msgstr ""
+msgstr "已附加的文件"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:121
 msgid "Attached image"
 msgstr "附加的图片"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:315
+#: src/features/chat/thread/ask-user-prompt.tsx:324
 msgid "Attached:"
-msgstr ""
+msgstr "已附加："
 
-#: src/features/chat/thread/ask-user-prompt.tsx:392
+#: src/features/chat/thread/ask-user-prompt.tsx:405
 msgid "Attaching files…"
-msgstr ""
+msgstr "正在附加文件…"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:403
+#: src/features/chat/thread/ask-user-prompt.tsx:416
 msgid "Attaching…"
-msgstr ""
+msgstr "正在附加…"
 
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 msgid "Attachment"
@@ -7727,9 +7727,9 @@ msgid "Could not apply the changes"
 msgstr "无法应用更改"
 
 #. placeholder {0}: failed.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:258
+#: src/features/chat/thread/ask-user-prompt.tsx:265
 msgid "Could not attach {0}. The other files were attached; try those again."
-msgstr ""
+msgstr "无法附加 {0}。其他文件已附加；请重试这些文件。"
 
 #: src/features/chat/thread/composer-input.tsx:1325
 msgid "Could not attach the chat"
@@ -7749,7 +7749,7 @@ msgstr "无法取消运行。"
 
 #: src/features/chat/thread/composer-model-selector.tsx:127
 msgid "Could not change Auto. Please try again."
-msgstr ""
+msgstr "无法更改 Auto。请重试。"
 
 #: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
@@ -7758,7 +7758,7 @@ msgstr "无法更改推送通知，请重试。"
 #: src/features/chat/model-settings/use-model-combobox.ts:283
 #: src/features/chat/model-settings/use-model-combobox.ts:307
 msgid "Could not change the model. Please try again."
-msgstr ""
+msgstr "无法更改模型。请重试。"
 
 #: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
@@ -8013,7 +8013,7 @@ msgstr ""
 msgid "Could not send your answer."
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:139
+#: src/features/chat/thread/ask-user-prompt.tsx:141
 #: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "无法发送你的答复，请重试。"
@@ -9860,7 +9860,7 @@ msgstr "Discord 公钥"
 
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:54
 #: src/features/changelog/components/changelog-card.tsx:59
-#: src/features/chat/thread/ask-user-prompt.tsx:411
+#: src/features/chat/thread/ask-user-prompt.tsx:424
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:202
@@ -9896,7 +9896,7 @@ msgstr "关闭 Webhook 密钥"
 msgid "Dismissed"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:273
+#: src/features/chat/thread/ask-user-prompt.tsx:281
 msgid "Dismissed — continuing without an answer"
 msgstr "已忽略 — 在没有回答的情况下继续"
 
@@ -11205,7 +11205,7 @@ msgstr "请输入 API 密钥"
 msgid "Enter the endpoint URL first"
 msgstr "请先输入端点 URL"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:378
+#: src/features/chat/thread/ask-user-prompt.tsx:391
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "按 Enter 发送，按 Shift+Enter 换行。"
 
@@ -21111,6 +21111,11 @@ msgstr ""
 msgid "Not set"
 msgstr "未设置"
 
+#. placeholder {0}: unreadFiles.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:329
+msgid "Not shown to this model: {0}"
+msgstr "未向此模型展示：{0}"
+
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:75
 msgid "Not started"
 msgstr "未开始"
@@ -21512,9 +21517,9 @@ msgstr "只有组织所有者才能管理账单设置"
 msgid "Only participants you @mention answer."
 msgstr "只有你 @提及 的参与者才会回答。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:184
+#: src/features/chat/thread/ask-user-prompt.tsx:186
 msgid "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
-msgstr ""
+msgstr "仅支持 PNG、JPEG、WEBP 或 GIF 图片，以及不超过 10 MB 的 PDF；总计不超过 20 MB，最多 4 个。"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:263
 msgid "Only post when there is something to report"
@@ -22278,7 +22283,7 @@ msgstr ""
 msgid "Or from a terminal:"
 msgstr "或在终端中："
 
-#: src/features/chat/thread/ask-user-prompt.tsx:346
+#: src/features/chat/thread/ask-user-prompt.tsx:359
 msgid "Or type your own answer…"
 msgstr "或输入你自己的回答…"
 
@@ -23519,7 +23524,7 @@ msgstr "高端级推理与指令遵循"
 msgid "Premium-tier reasoning transparency"
 msgstr "高端级推理透明度"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:277
+#: src/features/chat/thread/ask-user-prompt.tsx:285
 msgid "Preparing a question…"
 msgstr "正在准备问题…"
 
@@ -25259,7 +25264,7 @@ msgstr "移除“{0}”？"
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
 #: src/features/chat/group/group-participant-bar.tsx:210
-#: src/features/chat/thread/ask-user-prompt.tsx:362
+#: src/features/chat/thread/ask-user-prompt.tsx:375
 #: src/features/prompts/components/thread-variables-config.tsx:232
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
@@ -27290,7 +27295,7 @@ msgstr "在下方发送消息以开始"
 msgid "Send a message to begin"
 msgstr "发送一条消息开始"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:407
+#: src/features/chat/thread/ask-user-prompt.tsx:420
 msgid "Send answer"
 msgstr "发送回答"
 
@@ -29621,7 +29626,7 @@ msgstr "为科技类 YouTube 频道提供视频创意"
 msgid "Suggested"
 msgstr "推荐"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:322
+#: src/features/chat/thread/ask-user-prompt.tsx:335
 #: src/features/skills/components/skill-builder-dialog.tsx:235
 msgid "Suggested answers"
 msgstr "建议的答案"
@@ -30576,7 +30581,7 @@ msgstr "压缩包中包含不安全的文件路径。"
 msgid "The archive holds too many files."
 msgstr "压缩包中的文件过多。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:298
+#: src/features/chat/thread/ask-user-prompt.tsx:307
 msgid "The assistant has a question"
 msgstr "助手有一个问题"
 
@@ -32076,9 +32081,9 @@ msgid "too large"
 msgstr "文件过大"
 
 #. placeholder {0}: tooLarge.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:257
+#: src/features/chat/thread/ask-user-prompt.tsx:261
 msgid "Too large to attach: {0}. Reduce the file and attach it again."
-msgstr ""
+msgstr "文件过大，无法附加：{0}。请缩小文件后重新附加。"
 
 #: src/features/workflow/components/nodes/text-node.tsx:78
 msgid "Too long to check as JSON"
@@ -32628,7 +32633,7 @@ msgstr ""
 msgid "Type to search"
 msgstr "输入以搜索"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:346
+#: src/features/chat/thread/ask-user-prompt.tsx:359
 msgid "Type your answer…"
 msgstr "输入你的回答…"
 
@@ -34376,7 +34381,7 @@ msgstr ""
 msgid "Waiting for the owner"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:279
+#: src/features/chat/thread/ask-user-prompt.tsx:287
 msgid "Waiting for the owner to answer"
 msgstr "正在等待所有者回答"
 
@@ -34397,7 +34402,7 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
-#: src/features/chat/thread/ask-user-prompt.tsx:279
+#: src/features/chat/thread/ask-user-prompt.tsx:287
 msgid "Waiting for your answer"
 msgstr "正在等待你的回答"
 
@@ -35343,7 +35348,7 @@ msgstr "你的账号及所有相关数据正在被删除，此操作无法取消
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "你的 AI 工作区<0>从这里开始。</0>"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:338
+#: src/features/chat/thread/ask-user-prompt.tsx:351
 msgid "Your answer"
 msgstr "你的回答"
 
@@ -35351,7 +35356,7 @@ msgstr "你的回答"
 msgid "Your answer in Neore has finished."
 msgstr "你在 Neore 中的回复已生成完毕。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:308
+#: src/features/chat/thread/ask-user-prompt.tsx:317
 msgid "Your answer:"
 msgstr "你的回答："
 
