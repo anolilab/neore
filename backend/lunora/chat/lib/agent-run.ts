@@ -1092,9 +1092,8 @@ export const resumeApprovedRun = async (
             deviceThreadId: threadId,
             mcpProgress: toolProgressSink(ctx, streamId),
             model: config.model,
-            // The approval snapshot does not record the organization, so a continuation on a thread with none stored runs in the
-            // personal space.
-            organizationId: null,
+            // The paused run's organization, for a thread that has no stored one (see BuildAgentToolsOptions.organizationId).
+            organizationId: config.organizationId ?? null,
             origin: config.dispatchOrigin,
             searchMode: config.searchMode as SearchMode,
             snapshot: { mcpServerNames: config.mcpServerNames, toolNames: config.toolNames },
