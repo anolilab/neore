@@ -35,10 +35,22 @@ const READER_POLL: Duration = Duration::from_millis(50);
 /// the reader sees `stop` even while a detached child still holds the pipe open.
 #[cfg(unix)]
 fn drain(
+    stream: impl Read + AsRawFd + Send + 'static,
+    buffer: Arc<Mutex<(Vec<u8>, bool)>>,
+    cap: usize,
+    stop: Arc<AtomicBool>,
+) -> thread::JoinHandle<()> {
+    drain_with(stream, buffer, cap, stop, store)
+}
+
+/// [`drain`], keeping what `keep` keeps of each chunk: the head (`store`) or the tail (`store_tail`).
+#[cfg(unix)]
+fn drain_with(
     mut stream: impl Read + AsRawFd + Send + 'static,
     buffer: Arc<Mutex<(Vec<u8>, bool)>>,
     cap: usize,
     stop: Arc<AtomicBool>,
+    keep: Keep,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         let mut chunk = [0u8; 8192];
@@ -67,7 +79,7 @@ fn drain(
 
             match stream.read(&mut chunk) {
                 Ok(0) | Err(_) => break,
-                Ok(read) => store(&buffer, &chunk[..read], cap),
+                Ok(read) => keep(&buffer, &chunk[..read], cap),
             }
         }
     })
@@ -75,10 +87,21 @@ fn drain(
 
 #[cfg(not(unix))]
 fn drain(
+    stream: impl Read + Send + 'static,
+    buffer: Arc<Mutex<(Vec<u8>, bool)>>,
+    cap: usize,
+    stop: Arc<AtomicBool>,
+) -> thread::JoinHandle<()> {
+    drain_with(stream, buffer, cap, stop, store)
+}
+
+#[cfg(not(unix))]
+fn drain_with(
     mut stream: impl Read + Send + 'static,
     buffer: Arc<Mutex<(Vec<u8>, bool)>>,
     cap: usize,
     _stop: Arc<AtomicBool>,
+    keep: Keep,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         let mut chunk = [0u8; 8192];
@@ -88,10 +111,13 @@ fn drain(
                 break;
             }
 
-            store(&buffer, &chunk[..read], cap);
+            keep(&buffer, &chunk[..read], cap);
         }
     })
 }
+
+/// How a reader keeps what it read in its capped buffer.
+type Keep = fn(&Mutex<(Vec<u8>, bool)>, &[u8], usize);
 
 /// Appends a chunk to the capped buffer, and records when some of it did not fit.
 fn store(buffer: &Mutex<(Vec<u8>, bool)>, chunk: &[u8], cap: usize) {
@@ -104,6 +130,34 @@ fn store(buffer: &Mutex<(Vec<u8>, bool)>, chunk: &[u8], cap: usize) {
 
     let keep = chunk.len().min(room);
     guard.0.extend_from_slice(&chunk[..keep]);
+}
+
+/// Appends a chunk and keeps only the last `cap` bytes, recording when some were dropped from the front.
+fn store_tail(buffer: &Mutex<(Vec<u8>, bool)>, chunk: &[u8], cap: usize) {
+    let mut guard = buffer.lock().unwrap();
+
+    guard.0.extend_from_slice(chunk);
+
+    if guard.0.len() > cap {
+        let cut = guard.0.len() - cap;
+
+        guard.0.drain(..cut);
+        guard.1 = true;
+    }
+}
+
+/// A kept tail as text: a character the cut split at the front is dropped, not shown as a replacement.
+fn tail_text(bytes: &[u8], truncated: bool) -> String {
+    let start = if truncated {
+        bytes
+            .iter()
+            .take_while(|byte| (**byte & 0xC0) == 0x80)
+            .count()
+    } else {
+        0
+    };
+
+    String::from_utf8_lossy(&bytes[start..]).into_owned()
 }
 
 /// The run's private temp folder (owner-only), removed when the run ends. A
@@ -370,15 +424,29 @@ fn kill_tree(child: &mut Child) {
 /// added on top by `run`.
 const SANDBOX_ENV: &[&str] = &["PATH", "HOME", "LANG", "TERM"];
 
-/// Runs `line` in `cwd`. With a `sandbox` policy it runs confined or not at
-/// all: a sandbox that cannot be set up fails the call.
-pub fn run(
+/// A started command and what must outlive it: its temp folder, the network filter and the sandbox guard. Each is
+/// dropped only after the command (and its process group) has ended.
+struct Spawned {
+    child: Child,
+    /// The network filter of a sandboxed `Dependencies` run; the single place such a program may connect to.
+    proxy: Option<egress::Proxy>,
+    #[cfg(unix)]
+    tracked: Option<Tracked>,
+    #[cfg(windows)]
+    _job: Option<Job>,
+    // Dropped last (fields drop in order): the Landlock ruleset and the temp folder the command may still use.
+    _guard: Guard,
+    _temp: Option<TempDir>,
+}
+
+/// Starts `line` in `cwd` with stdout and stderr piped and stdin closed. With a `sandbox` policy it starts confined or
+/// not at all. `env` is set on top of the allowlist and under the run's own temp, cache and proxy variables, which win.
+fn spawn(
     line: &str,
     cwd: &Path,
-    timeout: Duration,
-    cap: usize,
     sandbox: Option<&Policy>,
-) -> Result<ShellOutput, String> {
+    env: &[(String, String)],
+) -> Result<Spawned, String> {
     let temp = sandbox.map(|_| TempDir::new()).transpose()?;
     // Lives until the run ends. Only a sandboxed `Dependencies` run has one: it is the single place such a
     // program may connect to.
@@ -397,7 +465,7 @@ pub fn run(
         policy
     });
     // Holds the Landlock ruleset open until the child has it; closed with the run.
-    let (mut command, _guard) = command(line, policy.as_ref())?;
+    let (mut command, guard) = command(line, policy.as_ref())?;
 
     if sandbox.is_some() {
         // A sandboxed command gets an allowlist, not the user's environment: no
@@ -410,6 +478,8 @@ pub fn run(
             }
         }
     }
+
+    command.envs(env.iter().map(|(name, value)| (name, value)));
 
     if let Some((temp, sandbox)) = temp.as_ref().zip(sandbox) {
         command
@@ -432,58 +502,30 @@ pub fn run(
         .stderr(Stdio::piped())
         .spawn();
 
-    let mut child = spawned.map_err(|error| match sandbox {
+    let child = spawned.map_err(|error| match sandbox {
         Some(_) => format!("could not start the sandboxed shell: {error}"),
         None => format!("could not start the shell: {error}"),
     })?;
     #[cfg(windows)]
-    let _job = Job::attach(&child);
+    let job = Job::attach(&child);
     #[cfg(unix)]
-    let tracked = Tracked::new(child.id());
+    let tracked = Some(Tracked::new(child.id()));
 
-    let buffer = Arc::new(Mutex::new((Vec::new(), false)));
-    let stop = Arc::new(AtomicBool::new(false));
-    let readers = [
-        drain(
-            child.stdout.take().expect("piped"),
-            buffer.clone(),
-            cap,
-            stop.clone(),
-        ),
-        drain(
-            child.stderr.take().expect("piped"),
-            buffer.clone(),
-            cap,
-            stop.clone(),
-        ),
-    ];
-    let started = Instant::now();
-    let mut timed_out = false;
+    Ok(Spawned {
+        child,
+        proxy,
+        #[cfg(unix)]
+        tracked,
+        #[cfg(windows)]
+        _job: job,
+        _guard: guard,
+        _temp: temp,
+    })
+}
 
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break Some(status),
-            Ok(None) if started.elapsed() >= timeout => {
-                timed_out = true;
-                kill_tree(&mut child);
-                break child.wait().ok();
-            }
-            Ok(None) => thread::sleep(Duration::from_millis(25)),
-            Err(error) => return Err(error.to_string()),
-        }
-    };
-
-    // Whatever the command started and left running dies with it; output it already
-    // wrote stays readable in the pipe.
-    kill_tree(&mut child);
-
-    // The group is gone, so a host that stops now must not signal its number: it may be someone else's by then.
-    #[cfg(unix)]
-    drop(tracked);
-
-    // A background child can inherit stdout and hold the pipe open after the
-    // shell exits, so wait for the readers only up to a deadline. Unfinished
-    // readers are left to end on their own; they write only into the capped buffer.
+/// Waits out the readers of a command that ended: up to [`READER_GRACE`], since a background child can inherit stdout
+/// and hold the pipe open after the shell exits. Readers still open see `stop` within one poll slice and exit.
+fn finish_readers(readers: [thread::JoinHandle<()>; 2], stop: &AtomicBool) {
     let deadline = Instant::now() + READER_GRACE;
 
     for reader in readers {
@@ -496,16 +538,68 @@ pub fn run(
         }
     }
 
-    // Readers still open are held by a detached child. They see this flag within one poll slice and exit,
-    // so repeated calls do not leave threads behind.
     stop.store(true, Ordering::Relaxed);
+}
+
+/// Runs `line` in `cwd`. With a `sandbox` policy it runs confined or not at
+/// all: a sandbox that cannot be set up fails the call.
+pub fn run(
+    line: &str,
+    cwd: &Path,
+    timeout: Duration,
+    cap: usize,
+    sandbox: Option<&Policy>,
+) -> Result<ShellOutput, String> {
+    let mut spawned = spawn(line, cwd, sandbox, &[])?;
+    let buffer = Arc::new(Mutex::new((Vec::new(), false)));
+    let stop = Arc::new(AtomicBool::new(false));
+    let readers = [
+        drain(
+            spawned.child.stdout.take().expect("piped"),
+            buffer.clone(),
+            cap,
+            stop.clone(),
+        ),
+        drain(
+            spawned.child.stderr.take().expect("piped"),
+            buffer.clone(),
+            cap,
+            stop.clone(),
+        ),
+    ];
+    let started = Instant::now();
+    let mut timed_out = false;
+
+    let status = loop {
+        match spawned.child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) if started.elapsed() >= timeout => {
+                timed_out = true;
+                kill_tree(&mut spawned.child);
+                break spawned.child.wait().ok();
+            }
+            Ok(None) => thread::sleep(Duration::from_millis(25)),
+            Err(error) => return Err(error.to_string()),
+        }
+    };
+
+    // Whatever the command started and left running dies with it; output it already
+    // wrote stays readable in the pipe.
+    kill_tree(&mut spawned.child);
+
+    // The group is gone, so a host that stops now must not signal its number: it may be someone else's by then.
+    #[cfg(unix)]
+    drop(spawned.tracked.take());
+
+    // Unfinished readers are left to end on their own; they write only into the capped buffer.
+    finish_readers(readers, &stop);
 
     let (bytes, truncated) = std::mem::take(&mut *buffer.lock().unwrap());
     let exit_code = status.and_then(|status| status.code());
     let mut output = String::from_utf8_lossy(&bytes).into_owned();
 
     // A failed run that asked the filter for a host it does not list: say so, or the failure reads as a broken network.
-    if let Some(proxy) = proxy.as_ref().filter(|_| exit_code != Some(0)) {
+    if let Some(proxy) = spawned.proxy.as_ref().filter(|_| exit_code != Some(0)) {
         output.push_str(&proxy.refused_note());
     }
 
@@ -515,6 +609,196 @@ pub fn run(
         timed_out,
         truncated,
     })
+}
+
+/// How a terminal's command ended: its exit code, or the signal that ended it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminalExit {
+    pub exit_code: Option<i32>,
+    pub signal: Option<String>,
+}
+
+/// What a terminal printed so far (its tail) and, once it has ended, how.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminalOutput {
+    pub exit_status: Option<TerminalExit>,
+    pub output: String,
+    pub truncated: bool,
+}
+
+struct TerminalState {
+    exit: Option<TerminalExit>,
+    kill: bool,
+}
+
+struct TerminalShared {
+    buffer: Arc<Mutex<(Vec<u8>, bool)>>,
+    changed: std::sync::Condvar,
+    state: Mutex<TerminalState>,
+}
+
+/// A command started for a coding agent's `terminal/create` (`acp_terminal.rs`): it returns at once and is read
+/// while it runs. It always runs in the sandbox (the type takes a policy, never an absent one), keeps the tail of its
+/// output, and is killed with its whole process group when killed, dropped, past `timeout`, or once its shell ended
+/// (background children die with it, as for `shell_run`). One watcher thread owns the process.
+pub struct Terminal {
+    shared: Arc<TerminalShared>,
+}
+
+#[cfg(unix)]
+fn signal_name(signal: i32) -> String {
+    match signal {
+        libc::SIGHUP => "SIGHUP".into(),
+        libc::SIGINT => "SIGINT".into(),
+        libc::SIGQUIT => "SIGQUIT".into(),
+        libc::SIGABRT => "SIGABRT".into(),
+        libc::SIGKILL => "SIGKILL".into(),
+        libc::SIGSEGV => "SIGSEGV".into(),
+        libc::SIGPIPE => "SIGPIPE".into(),
+        libc::SIGTERM => "SIGTERM".into(),
+        other => format!("SIG{other}"),
+    }
+}
+
+fn exit_of(status: Option<std::process::ExitStatus>) -> TerminalExit {
+    let Some(status) = status else {
+        return TerminalExit::default();
+    };
+    #[cfg(unix)]
+    let signal = {
+        use std::os::unix::process::ExitStatusExt;
+
+        status.signal().map(signal_name)
+    };
+    #[cfg(not(unix))]
+    let signal = None;
+
+    TerminalExit {
+        exit_code: status.code(),
+        signal,
+    }
+}
+
+impl Terminal {
+    /// Starts `line` in `cwd` inside `sandbox`, keeping the last `cap` bytes of its output. Fails when the sandbox cannot
+    /// be set up: a terminal never runs outside it.
+    pub fn start(
+        line: &str,
+        cwd: &Path,
+        sandbox: &Policy,
+        env: &[(String, String)],
+        cap: usize,
+        timeout: Duration,
+    ) -> Result<Terminal, String> {
+        let mut spawned = spawn(line, cwd, Some(sandbox), env)?;
+        let buffer = Arc::new(Mutex::new((Vec::new(), false)));
+        let stop = Arc::new(AtomicBool::new(false));
+        let readers = [
+            drain_with(
+                spawned.child.stdout.take().expect("piped"),
+                buffer.clone(),
+                cap,
+                stop.clone(),
+                store_tail,
+            ),
+            drain_with(
+                spawned.child.stderr.take().expect("piped"),
+                buffer.clone(),
+                cap,
+                stop.clone(),
+                store_tail,
+            ),
+        ];
+        let shared = Arc::new(TerminalShared {
+            buffer,
+            changed: std::sync::Condvar::new(),
+            state: Mutex::new(TerminalState {
+                exit: None,
+                kill: false,
+            }),
+        });
+        let watched = Arc::clone(&shared);
+
+        thread::spawn(move || {
+            let started = Instant::now();
+            let status = loop {
+                let kill = watched.state.lock().unwrap().kill;
+
+                match spawned.child.try_wait() {
+                    Ok(Some(status)) => break Some(status),
+                    Ok(None) if kill || started.elapsed() >= timeout => {
+                        kill_tree(&mut spawned.child);
+                        break spawned.child.wait().ok();
+                    }
+                    Ok(None) => thread::sleep(Duration::from_millis(25)),
+                    Err(_) => {
+                        kill_tree(&mut spawned.child);
+                        break None;
+                    }
+                }
+            };
+
+            kill_tree(&mut spawned.child);
+            #[cfg(unix)]
+            drop(spawned.tracked.take());
+            finish_readers(readers, &stop);
+
+            let exit = exit_of(status);
+
+            if let Some(proxy) = spawned.proxy.as_ref().filter(|_| exit.exit_code != Some(0)) {
+                store_tail(&watched.buffer, proxy.refused_note().as_bytes(), cap);
+            }
+
+            // The temp folder, the filter and the guard go only now, after the group is gone.
+            drop(spawned);
+            watched.state.lock().unwrap().exit = Some(exit);
+            watched.changed.notify_all();
+        });
+
+        Ok(Terminal { shared })
+    }
+
+    /// The tail of the output so far and, once the command has ended, how it ended.
+    pub fn output(&self) -> TerminalOutput {
+        // Read before the exit, so an ended terminal's output is whole: the watcher sets the exit after its readers.
+        let exit_status = self.shared.state.lock().unwrap().exit.clone();
+        let (bytes, truncated) = self.shared.buffer.lock().unwrap().clone();
+
+        TerminalOutput {
+            exit_status,
+            output: tail_text(&bytes, truncated),
+            truncated,
+        }
+    }
+
+    /// Blocks until the command ended, or `limit` passed (`None` then).
+    pub fn wait(&self, limit: Duration) -> Option<TerminalExit> {
+        let state = self.shared.state.lock().unwrap();
+        let (state, _) = self
+            .shared
+            .changed
+            .wait_timeout_while(state, limit, |state| state.exit.is_none())
+            .unwrap();
+
+        state.exit.clone()
+    }
+
+    /// Ends the command and everything it started. Its output stays readable.
+    pub fn kill(&self) {
+        self.shared.state.lock().unwrap().kill = true;
+    }
+
+    pub fn exited(&self) -> bool {
+        self.shared.state.lock().unwrap().exit.is_some()
+    }
+}
+
+impl Drop for Terminal {
+    fn drop(&mut self) {
+        self.kill();
+    }
 }
 
 #[cfg(all(test, unix))]
@@ -1030,5 +1314,158 @@ mod tests {
         assert!(path.is_dir());
         drop(temp);
         assert!(!path.exists());
+    }
+
+    #[test]
+    fn a_tail_keeps_the_end_and_drops_a_character_split_at_the_front() {
+        let buffer = Mutex::new((Vec::new(), false));
+
+        store_tail(&buffer, "abé".as_bytes(), 3);
+        store_tail(&buffer, b"xy", 3);
+
+        let (bytes, truncated) = buffer.lock().unwrap().clone();
+
+        assert!(truncated);
+        // "é" is two bytes; the cut left only its second, which is not shown.
+        assert_eq!(tail_text(&bytes, truncated), "xy");
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    fn terminal_policy(name: &str) -> Option<(Policy, PathBuf, PathBuf)> {
+        if !sandbox_or_skip() {
+            return None;
+        }
+
+        let (shared, outside) = folders(name);
+
+        Some((
+            Policy::for_roots(std::slice::from_ref(&shared), None),
+            shared,
+            outside,
+        ))
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn a_terminal_returns_at_once_and_reports_its_output_and_exit_later() {
+        let Some((policy, shared, _)) = terminal_policy("term-exit") else {
+            return;
+        };
+        let started = Instant::now();
+        let terminal = Terminal::start(
+            "echo first; sleep 1; echo second 1>&2; exit 3",
+            &shared,
+            &policy,
+            &[],
+            64 * 1024,
+            Duration::from_secs(30),
+        )
+        .unwrap();
+
+        assert!(started.elapsed() < Duration::from_millis(800));
+        assert!(terminal.output().exit_status.is_none());
+
+        let exit = terminal.wait(Duration::from_secs(20)).expect("ended");
+        let output = terminal.output();
+
+        assert_eq!(exit.exit_code, Some(3));
+        assert_eq!(output.exit_status, Some(exit));
+        assert!(output.output.contains("first") && output.output.contains("second"));
+        assert!(!output.truncated);
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn a_killed_terminal_ends_with_its_group_and_says_so() {
+        let Some((policy, shared, _)) = terminal_policy("term-kill") else {
+            return;
+        };
+        let terminal = Terminal::start(
+            "sleep 30 & sleep 30",
+            &shared,
+            &policy,
+            &[],
+            1024,
+            Duration::from_secs(60),
+        )
+        .unwrap();
+
+        assert!(terminal.wait(Duration::from_millis(200)).is_none());
+        terminal.kill();
+
+        let exit = terminal.wait(Duration::from_secs(10)).expect("ended");
+
+        assert_eq!(exit.exit_code, None);
+        assert_eq!(exit.signal.as_deref(), Some("SIGKILL"));
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn a_terminal_keeps_the_tail_of_a_long_output_and_stops_at_its_timeout() {
+        let Some((policy, shared, _)) = terminal_policy("term-tail") else {
+            return;
+        };
+        let long = Terminal::start(
+            "yes | head -c 100000; echo END",
+            &shared,
+            &policy,
+            &[],
+            1000,
+            Duration::from_secs(30),
+        )
+        .unwrap();
+
+        long.wait(Duration::from_secs(20)).expect("ended");
+
+        let output = long.output();
+
+        assert!(output.truncated);
+        assert_eq!(output.output.len(), 1000);
+        assert!(output.output.ends_with("END\n"));
+
+        let slow = Terminal::start(
+            "sleep 30",
+            &shared,
+            &policy,
+            &[],
+            1024,
+            Duration::from_millis(300),
+        )
+        .unwrap();
+
+        assert_eq!(
+            slow.wait(Duration::from_secs(10))
+                .and_then(|exit| exit.signal),
+            Some("SIGKILL".to_owned())
+        );
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn a_terminal_writes_only_inside_the_shared_folder_and_sees_the_variables_it_was_given() {
+        let Some((policy, shared, outside)) = terminal_policy("term-write") else {
+            return;
+        };
+        let terminal = Terminal::start(
+            &format!(
+                "echo \"$GREETING\"; echo in > inside.txt; echo out > '{}/escaped.txt' || echo refused",
+                outside.display()
+            ),
+            &shared,
+            &policy,
+            &[("GREETING".to_owned(), "hello".to_owned())],
+            64 * 1024,
+            Duration::from_secs(30),
+        )
+        .unwrap();
+
+        terminal.wait(Duration::from_secs(20)).expect("ended");
+
+        let output = terminal.output().output;
+
+        assert!(output.contains("hello"), "{output}");
+        assert!(output.contains("refused"), "{output}");
+        assert!(shared.join("inside.txt").exists());
+        assert!(!outside.join("escaped.txt").exists());
     }
 }

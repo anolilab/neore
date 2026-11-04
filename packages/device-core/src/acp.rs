@@ -1253,6 +1253,7 @@ mod tests {
             details: "{}".into(),
             details_complete: true,
             folder: "/work".into(),
+            local_only: false,
             request_id: "r1".into(),
             options: vec![
                 OfferedOption {

@@ -11,16 +11,21 @@
 //! not libuv's four threads, and every promise settles: a panic or join error
 //! rejects it.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use device_core::acp::AcpUpdate;
 use device_core::acp_install::InstallRequest;
 use device_core::acp_permission::PermissionRequest;
+use device_core::acp_terminal::TerminalRequest;
 use device_core::engine::{HostSpec, SettingsUpdate};
 use device_core::envelope::Signed;
 use device_core::fs::MediaRead;
 use device_core::install::{Bundle, Root};
 use device_core::media::Kind;
+use device_core::shell::Terminal;
 use device_core::{DeviceState, Event};
 use napi::bindgen_prelude::{
     spawn_blocking, Buffer, Env, Error, Function, PromiseRaw, Result, ToNapiValue,
@@ -105,9 +110,20 @@ fn media_result(read: MediaRead) -> AcpMedia {
     }
 }
 
+/// Terminals the computer's coding agents run at once, across every session. The main process caps each session lower.
+const MAX_TERMINALS: usize = 32;
+
+/// The longest a `acpTerminalWait` waits: past the longest a terminal may run, so it always settles with the exit.
+const TERMINAL_WAIT: Duration = Duration::from_secs(11 * 60);
+
+/// The terminals coding agents started, by handle.
+type Terminals = Arc<Mutex<HashMap<u64, Arc<Terminal>>>>;
+
 #[napi]
 pub struct DeviceCore {
     state: Arc<DeviceState>,
+    next_terminal: AtomicU64,
+    terminals: Terminals,
 }
 
 #[napi]
@@ -150,7 +166,11 @@ impl DeviceCore {
         // Reconnects a server the user connected when its link drops, and reaps what a lost session left running.
         state.supervise();
 
-        Ok(DeviceCore { state })
+        Ok(DeviceCore {
+            next_terminal: AtomicU64::new(1),
+            state,
+            terminals: Arc::default(),
+        })
     }
 
     /// `{ accountLabel, deviceId, platform }` (JSON).
@@ -720,6 +740,82 @@ impl DeviceCore {
             .map_err(Error::from_reason)
     }
 
+    /// Starts a coding agent's terminal, which the person allowed (`terminal/create`; a `TerminalRequest`, JSON), in the
+    /// shell sandbox. Resolves its handle at once; the command runs on. Rejects, with nothing started, for an agent not
+    /// approved for the folder, a working folder outside it, too many terminals, or a computer with no sandbox.
+    #[napi]
+    pub fn acp_terminal_start<'env>(
+        &self,
+        env: &'env Env,
+        request: String,
+    ) -> Result<PromiseRaw<'env, f64>> {
+        let request: TerminalRequest = serde_json::from_str(&request)
+            .map_err(|_| Error::from_reason("invalid terminal request"))?;
+        let state = Arc::clone(&self.state);
+        let terminals = Arc::clone(&self.terminals);
+        let handle = self.next_terminal.fetch_add(1, Ordering::Relaxed);
+
+        blocking(env, move || {
+            if terminals.lock().unwrap().len() >= MAX_TERMINALS {
+                return Err("too many terminals are running".into());
+            }
+
+            let terminal = state.acp_terminal_start(&request)?;
+            let mut running = terminals.lock().unwrap();
+
+            // Checked again: another start may have filled the last place while this one was planned.
+            if running.len() >= MAX_TERMINALS {
+                return Err("too many terminals are running".into());
+            }
+
+            running.insert(handle, Arc::new(terminal));
+
+            Ok(handle as f64)
+        })
+    }
+
+    /// What a terminal printed so far (its tail) and, once it ended, how (`{ output, truncated, exitStatus }`, JSON).
+    #[napi]
+    pub fn acp_terminal_output(&self, handle: f64) -> Result<String> {
+        to_json(&self.terminal(handle)?.output())
+    }
+
+    /// Resolves how a terminal's command ended (`{ exitCode, signal }`, JSON), once it has.
+    #[napi]
+    pub fn acp_terminal_wait<'env>(
+        &self,
+        env: &'env Env,
+        handle: f64,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let terminal = self.terminal(handle)?;
+
+        blocking(env, move || {
+            let exit = terminal
+                .wait(TERMINAL_WAIT)
+                .ok_or("the terminal did not end")?;
+
+            serde_json::to_string(&exit).map_err(|error| error.to_string())
+        })
+    }
+
+    /// Ends a terminal's command and everything it started. Its output stays readable until it is released.
+    #[napi]
+    pub fn acp_terminal_kill(&self, handle: f64) -> Result<()> {
+        self.terminal(handle)?.kill();
+
+        Ok(())
+    }
+
+    /// Ends a terminal and forgets it. A handle that is already gone is not an error.
+    #[napi]
+    pub fn acp_terminal_release(&self, handle: f64) -> Result<()> {
+        if let Some(terminal) = self.terminals.lock().unwrap().remove(&request_id(handle)?) {
+            terminal.kill();
+        }
+
+        Ok(())
+    }
+
     /// The most recent audit lines, newest first (each a JSON object).
     #[napi]
     pub fn audit_tail(&self) -> Vec<String> {
@@ -739,9 +835,24 @@ impl DeviceCore {
         })
     }
 
-    /// Stops every local MCP server. Call on quit.
+    /// Stops every local MCP server and every agent's terminal. Call on quit.
     #[napi]
     pub fn stop(&self) {
         self.state.stop_servers();
+
+        for (_, terminal) in self.terminals.lock().unwrap().drain() {
+            terminal.kill();
+        }
+    }
+}
+
+impl DeviceCore {
+    fn terminal(&self, handle: f64) -> Result<Arc<Terminal>> {
+        self.terminals
+            .lock()
+            .unwrap()
+            .get(&request_id(handle)?)
+            .cloned()
+            .ok_or_else(|| Error::from_reason("that terminal is gone"))
     }
 }

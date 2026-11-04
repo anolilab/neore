@@ -23,6 +23,7 @@ import { TurnChanges } from "./changes";
 import { childEventOf, childParentOf, completionText, contentText, isRecord, text, toolIdOf } from "./child-updates";
 import type { ChildEvent } from "./children";
 import { ChildLedger } from "./children";
+import type { TerminalExit } from "./host-events";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate, PermissionOutcome } from "./permission";
@@ -31,8 +32,10 @@ import { planOf } from "./plan";
 import type { AgentProcess } from "./process";
 import type { Handshake } from "./protocol";
 import { initialize, loadSession, METHOD, openNewSession, promptParams, setConfigOption, setMode } from "./protocol";
-import { INVALID_PARAMS, METHOD_NOT_FOUND, RpcError } from "./rpc-error";
-import { outputTail, toolTextOf } from "./tool-output";
+import { INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND, RpcError } from "./rpc-error";
+import type { TerminalExitStatus, TerminalHost } from "./terminals";
+import { createRequestOf, MAX_SESSION_TERMINALS, SessionTerminals, shownLine } from "./terminals";
+import { outputTail, terminalIdOf, toolTextOf } from "./tool-output";
 import { Turn } from "./turn";
 import type { SessionSnapshot, SessionStatus, SessionSummary, StopReason, ToolState, ToolStatus } from "./types";
 
@@ -56,6 +59,11 @@ const sleep = (ms: number): Promise<void> =>
 
 /** After the agent's output closes, how long to wait for its exit status so the error can say why. */
 const EXIT_WAIT_MS = 500;
+
+/** How a terminal ended, as the tool event carries it. */
+const exitReport = (exit: TerminalExitStatus): TerminalExit => {
+    return { ...exit.exitCode !== null && { code: exit.exitCode }, ...exit.signal !== null && { signal: exit.signal } };
+};
 
 /** A call this host ended itself; whatever the agent sends later does not change it. */
 const isFinal = (tool: ToolState): boolean => tool.status === "cancelled" || tool.status === "declined";
@@ -115,6 +123,8 @@ export interface SessionOptions {
     /** The id this session goes by on the backend, when the backend started it (`acp_start`); otherwise one is minted. */
     sessionId?: string;
     startupTimeoutMs?: number;
+    /** The core's terminals (`terminals.ts`). Offered to the agent only when set and the folder is on this computer. */
+    terminals?: TerminalHost;
     /** The thread the backend made for a session it started. */
     threadId?: string;
 }
@@ -160,6 +170,12 @@ export class AgentSession {
     /** What each call printed, raw (`tool-output.ts`); masked and cut only when it is posted, and never shown in the window. */
     private readonly toolOutput = new Map<string, string>();
 
+    /** The terminal each call's content refers to, by call id (`terminals.ts`). */
+    private readonly toolTerminal = new Map<string, string>();
+
+    /** This session's terminals; unset when it offers none (its folder is not on this computer). */
+    private readonly terminals: SessionTerminals | undefined;
+
     private readonly turns: Turn[] = [];
 
     private agent: Handshake | undefined;
@@ -198,6 +214,10 @@ export class AgentSession {
             scrub: options.process.scrub,
             secretLength: options.process.secretLength,
         });
+        this.terminals
+            = options.terminals === undefined || options.folderIsRemote === true
+                ? undefined
+                : new SessionTerminals(options.terminals, (terminalId) => this.onTerminalEnded(terminalId));
         this.connection = new JsonRpcConnection(options.process.stdout, options.process.stdin, {
             notification: (method, params) => this.onNotification(method, params),
             request: (method, params) => this.onRequest(method, params),
@@ -217,7 +237,7 @@ export class AgentSession {
     /** Handshakes and opens the session; ends the process when either fails. */
     public async start(): Promise<void> {
         try {
-            this.agent = await initialize(this.connection, this.options.appVersion, this.options.startupTimeoutMs);
+            this.agent = await initialize(this.connection, this.options.appVersion, this.options.startupTimeoutMs, { terminal: this.terminals !== undefined });
             this.report = this.options.capabilityReport?.(this.agent) ?? reportFromHandshake(this.agent.capabilities, Date.now());
             this.agentSessionId = await this.openAgentSession();
 
@@ -413,6 +433,8 @@ export class AgentSession {
 
         this.cancelRequested = true;
         this.connection.notify(METHOD.cancel, { sessionId: this.agentSessionId });
+        // What the turn started in a terminal stops with it.
+        this.terminals?.killAll();
         // The spec requires pending permission requests to be answered `cancelled`.
         this.options.gate.cancelSession(this.id);
 
@@ -710,6 +732,8 @@ export class AgentSession {
         clearTimeout(this.cancelTimer);
         this.connection.close(new Error(said));
         this.options.gate.cancelSession(this.id);
+        // No terminal outlives its session.
+        this.terminals?.releaseAll();
         // An ended session never leaves its process behind, whatever ended it (an error answer, a closed
         // output, a cancel that went unanswered).
         this.stopping = this.stopProcess();
@@ -829,8 +853,12 @@ export class AgentSession {
             // Ids and kinds are the agent's own text: what is stored goes through the scrubber like the rest.
             const { scrub } = this.options.process;
 
-            const printed = this.toolOutput.get(tool.id);
+            const terminalId = this.toolTerminal.get(tool.id);
+            // A call that ran in a terminal shows what the terminal printed and how it ended, once it has.
+            const ended = terminalId === undefined ? undefined : this.terminals?.result(terminalId);
+            const printed = ended?.output ?? this.toolOutput.get(tool.id);
             const output = printed === undefined ? undefined : outputTail(printed, scrub);
+            const exit = ended === undefined ? undefined : exitReport(ended.exit);
 
             this.observe((observer) =>
                 observer.tool(this.id, turn.id, {
@@ -839,6 +867,7 @@ export class AgentSession {
                     status: tool.status,
                     title: tool.title,
                     ...output !== undefined && output !== "" && { output },
+                    ...exit !== undefined && { exit },
                 }),
             );
         }
@@ -902,7 +931,8 @@ export class AgentSession {
 
         this.observe((observer) =>
             observer.permissionRequested(this.id, turn.id, {
-                complete: described.detailsComplete,
+                // A command run on this computer is allowed only in its window: the web offers a decline alone.
+                complete: described.detailsComplete && request.localOnly !== true,
                 kind: "permission_request",
                 options: described.options
                     .filter((option) => !option.kind.includes("always"))
@@ -1074,6 +1104,12 @@ export class AgentSession {
             this.toolOutput.set(id, printed);
         }
 
+        const terminalId = terminalIdOf(update.content);
+
+        if (terminalId !== undefined) {
+            this.toolTerminal.set(id, terminalId);
+        }
+
         // A call we ended as cancelled or declined stays that way: a late `in_progress` must not bring it back.
         if (!isFinal(tool) && TOOL_STATUSES.has(update.status as ToolStatus)) {
             tool.status = update.status as ToolStatus;
@@ -1099,8 +1135,16 @@ export class AgentSession {
     }
 
     private async onRequest(method: string, params: unknown): Promise<unknown> {
+        if (method.startsWith("terminal/") && this.terminals !== undefined) {
+            if (!isRecord(params) || params.sessionId !== this.agentSessionId) {
+                throw new RpcError(INVALID_PARAMS, "invalid terminal request");
+            }
+
+            return await this.onTerminalRequest(this.terminals, method, params);
+        }
+
         if (method !== METHOD.requestPermission) {
-            // fs/*, terminal/* and anything else: this host offers none of it.
+            // fs/*, terminal/* where none is offered, and anything else: this host offers none of it.
             throw new RpcError(METHOD_NOT_FOUND, "method not found");
         }
 
@@ -1108,15 +1152,24 @@ export class AgentSession {
             throw new RpcError(INVALID_PARAMS, "invalid permission request");
         }
 
+        return { outcome: await this.decide(params) };
+    }
+
+    /**
+     * Asks the person about one request and says how it ended, to the backend too. `localOnly`: answered in this
+     * computer's window alone, never in a batch and never allowed from another device (a terminal).
+     */
+    private async decide(params: Record<string, unknown>, localOnly = false): Promise<PermissionOutcome> {
         // Only while a turn the user started is running: a request between turns has nothing to authorize.
         if (this.cancelRequested || this.status !== "busy" || this.current === undefined) {
-            return { outcome: { outcome: "cancelled" } };
+            return { outcome: "cancelled" };
         }
 
         const requestId = randomUUID();
         const request = {
             agentLabel: this.options.agentLabel,
             folder: this.options.folder,
+            localOnly,
             params,
             // The id the backend and the phone know this request by, so a remote answer can find it here.
             requestId,
@@ -1137,7 +1190,7 @@ export class AgentSession {
 
         // The turn ended while it waited and the host was told so already.
         if (!this.pendingPermissions.delete(requestId)) {
-            return { outcome: { outcome: "cancelled" } };
+            return { outcome: "cancelled" };
         }
 
         // The request reaches the core's queue a moment after it is sent, so a turn's end can slip between the two:
@@ -1146,7 +1199,7 @@ export class AgentSession {
             // The host still hears how the request ended.
             this.observe((observer) => observer.permissionResolved(this.id, turn.id, requestId, "cancelled"));
 
-            return { outcome: { outcome: "cancelled" } };
+            return { outcome: "cancelled" };
         }
 
         if (this.wasDeclined(params, outcome)) {
@@ -1155,7 +1208,91 @@ export class AgentSession {
 
         this.observe((observer) => observer.permissionResolved(this.id, turn.id, requestId, resolutionOf(params, outcome)));
 
-        return { outcome };
+        return outcome;
+    }
+
+    /** `terminal/*` (`terminals.ts`): a create is asked about first, once; the rest act on a terminal this session made. */
+    private async onTerminalRequest(terminals: SessionTerminals, method: string, params: Record<string, unknown>): Promise<unknown> {
+        switch (method) {
+            case METHOD.terminalCreate: {
+                return { terminalId: await this.createTerminal(terminals, params) };
+            }
+            case METHOD.terminalKill: {
+                terminals.kill(params.terminalId as string);
+
+                return {};
+            }
+            case METHOD.terminalOutput: {
+                const { exitStatus, output, truncated } = terminals.output(params.terminalId as string);
+
+                return { output, truncated, ...exitStatus !== null && { exitStatus } };
+            }
+            case METHOD.terminalRelease: {
+                terminals.release(params.terminalId as string);
+
+                return {};
+            }
+            case METHOD.terminalWaitForExit: {
+                return await terminals.waitForExit(params.terminalId as string);
+            }
+            default: {
+                throw new RpcError(METHOD_NOT_FOUND, "method not found");
+            }
+        }
+    }
+
+    /** Asks the person whether the command may run (allow once or decline), then has the core start it in the sandbox. */
+    private async createTerminal(terminals: SessionTerminals, params: Record<string, unknown>): Promise<string> {
+        const { cwd, env, line, outputByteLimit } = createRequestOf(params);
+
+        if (terminals.live >= MAX_SESSION_TERMINALS) {
+            throw new RpcError(INVALID_PARAMS, `at most ${String(MAX_SESSION_TERMINALS)} terminals at once; release one first`);
+        }
+
+        // The host's own options, never the agent's: only "allow once" and "decline" can be chosen.
+        const request = {
+            options: [
+                { kind: "allow_once", name: "Allow once", optionId: "allow" },
+                { kind: "reject_once", name: "Decline", optionId: "decline" },
+            ],
+            sessionId: this.agentSessionId,
+            toolCall: {
+                kind: "execute",
+                rawInput: { command: shownLine(line, env), ...cwd !== undefined && { cwd } },
+                title: "Run a command in a terminal",
+                toolCallId: `terminal-${randomUUID()}`,
+            },
+        };
+        const outcome = await this.decide(request, true);
+
+        if (outcome.outcome !== "selected" || outcome.optionId !== "allow") {
+            throw new RpcError(INVALID_PARAMS, "the command was not allowed");
+        }
+
+        try {
+            return await terminals.create({
+                agentKey: this.options.agentKey,
+                env,
+                folder: this.options.folder,
+                line,
+                ...cwd !== undefined && { cwd },
+                ...outputByteLimit !== undefined && { outputByteLimit },
+            });
+        } catch (error) {
+            // The core's refusal names no value the agent did not send; it is still masked like the rest.
+            throw new RpcError(INTERNAL_ERROR, this.options.process.scrub(error instanceof Error ? error.message : "the terminal could not start"));
+        }
+    }
+
+    /** A terminal ended: each tool call that shows it is reported again, with its output and how it ended. */
+    private onTerminalEnded(terminalId: string): void {
+        for (const [toolId, shown] of this.toolTerminal) {
+            const tool = shown === terminalId ? this.tools.get(toolId) : undefined;
+
+            if (tool !== undefined) {
+                this.observeTool(tool);
+            }
+        }
     }
 
     /** The process exiting ends the session, whatever else was going on. */

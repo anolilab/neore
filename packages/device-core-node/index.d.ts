@@ -175,6 +175,20 @@ export declare class DeviceCore {
    * `already_answered` when it is no longer waiting.
    */
   acpPermissionAnswerRemote(sessionId: string, requestId: string, optionId: string): void
+  /**
+   * Starts a coding agent's terminal, which the person allowed (`terminal/create`; a `TerminalRequest`, JSON), in the
+   * shell sandbox. Resolves its handle at once; the command runs on. Rejects, with nothing started, for an agent not
+   * approved for the folder, a working folder outside it, too many terminals, or a computer with no sandbox.
+   */
+  acpTerminalStart(request: string): Promise<number>
+  /** What a terminal printed so far (its tail) and, once it ended, how (`{ output, truncated, exitStatus }`, JSON). */
+  acpTerminalOutput(handle: number): string
+  /** Resolves how a terminal's command ended (`{ exitCode, signal }`, JSON), once it has. */
+  acpTerminalWait(handle: number): Promise<string>
+  /** Ends a terminal's command and everything it started. Its output stays readable until it is released. */
+  acpTerminalKill(handle: number): void
+  /** Ends a terminal and forgets it. A handle that is already gone is not an error. */
+  acpTerminalRelease(handle: number): void
   /** The most recent audit lines, newest first (each a JSON object). */
   auditTail(): Array<string>
   /**
@@ -182,7 +196,7 @@ export declare class DeviceCore {
    * runs on the blocking pool: a server that is mid-call holds its lock, and the main thread must not wait for it.
    */
   reapIdleServers(): Promise<boolean>
-  /** Stops every local MCP server. Call on quit. */
+  /** Stops every local MCP server and every agent's terminal. Call on quit. */
   stop(): void
 }
 

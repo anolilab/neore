@@ -49,6 +49,10 @@ pub struct PermissionRequest {
     /// Everything the agent sent is in `details`. Without it the request cannot be approved in a batch.
     pub details_complete: bool,
     pub folder: String,
+    /// Decided in this window alone, one at a time: never approved in a batch and never allowed from another device.
+    /// Set for a command the agent asks to run on this computer (a terminal), as for `shell_run`.
+    #[serde(default)]
+    pub local_only: bool,
     pub options: Vec<OfferedOption>,
     /// The id the backend and the phone know this request by (`permission_request` in the turn post). A remote
     /// answer names it; the numeric id below is this window's own.
@@ -149,7 +153,7 @@ fn decline_outcome(request: &PermissionRequest) -> Outcome {
 }
 
 fn is_batchable(request: &PermissionRequest) -> bool {
-    request.details_complete && allow_option(request).is_some()
+    request.details_complete && !request.local_only && allow_option(request).is_some()
 }
 
 fn answered(pending: &Pending, decision: &'static str) -> Answered {
@@ -168,6 +172,9 @@ pub const ALREADY_ANSWERED: &str = "already_answered";
 /// What a remote "allow" gets for a request whose details were cut or never sent whole. The person decides on what
 /// the web shows, so an allow needs all of it; a decline needs none.
 pub const DETAILS_INCOMPLETE: &str = "details_incomplete";
+
+/// What a remote "allow" gets for a request only this computer's window may allow (a terminal). A decline is accepted.
+pub const LOCAL_ONLY: &str = "local_only";
 
 /// Takes the request at `index` out of the queue and gives the agent the option, if it may be chosen.
 fn answer_at(queue: &mut Vec<Pending>, index: usize, option_id: &str) -> Result<Answered, String> {
@@ -221,6 +228,7 @@ impl AcpPermissions {
                 && request.details.len() <= MAX_DETAILS,
             details: limited(request.details, MAX_DETAILS),
             folder: limited(request.folder, MAX_TEXT),
+            local_only: request.local_only,
             // Checked on everything the agent sent, then cut: an id repeated past the cap would otherwise hide.
             options: distinct_options(request.options)
                 .into_iter()
@@ -336,6 +344,10 @@ impl AcpPermissions {
 
         if allows && !queue[index].request.details_complete {
             return Err(DETAILS_INCOMPLETE.into());
+        }
+
+        if allows && queue[index].request.local_only {
+            return Err(LOCAL_ONLY.into());
         }
 
         answer_at(&mut queue, index, option_id)
@@ -466,6 +478,7 @@ mod tests {
             details: "{}".into(),
             details_complete: true,
             folder: "/work".into(),
+            local_only: false,
             options: vec![
                 option("allow", ALLOW_ONCE),
                 option("always", "allow_always"),
@@ -634,6 +647,39 @@ mod tests {
         );
         permissions.cancel_session("s2");
         other.join().unwrap();
+    }
+
+    #[test]
+    fn a_terminal_request_is_allowed_only_here_and_never_in_a_batch() {
+        let permissions = Arc::new(AcpPermissions::default());
+        let mut terminal = request("s1", "Run in a terminal");
+
+        terminal.local_only = true;
+
+        let (id, waiting) = queue(&permissions, terminal);
+
+        assert!(!permissions.view()[0].batchable);
+        assert!(permissions.answer_batch(&[id]).is_err());
+        assert_eq!(
+            permissions
+                .answer_remote("s1", "req-Run in a terminal", "allow")
+                .unwrap_err(),
+            LOCAL_ONLY
+        );
+        assert_eq!(permissions.view().len(), 1);
+        permissions.answer(id, "allow").unwrap();
+        assert_eq!(waiting.join().unwrap(), selected("allow"));
+
+        let mut declined = request("s1", "Run again");
+
+        declined.local_only = true;
+
+        let (_, waiting) = queue(&permissions, declined);
+
+        permissions
+            .answer_remote("s1", "req-Run again", "reject")
+            .unwrap();
+        assert_eq!(waiting.join().unwrap(), selected("reject"));
     }
 
     #[test]
