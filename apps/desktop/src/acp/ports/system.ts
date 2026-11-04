@@ -47,6 +47,13 @@ const run = async (file: string, args: string[]): Promise<string> =>
 
 export const portsSupported = process.platform === "darwin" || process.platform === "linux";
 
+/** Listing needs `ps` and `lsof` or `ss`: said once, where the list is shown, instead of a missing-tool error. */
+const requireSupported = (): void => {
+    if (process.platform !== "darwin" && process.platform !== "linux") {
+        throw new Error("The ports list is not available on this computer: it needs ps and lsof or ss, which exist on macOS and Linux only.");
+    }
+};
+
 export const realPortsSystem: PortsSystem = {
     kill: (pid, signal) => {
         try {
@@ -58,6 +65,8 @@ export const realPortsSystem: PortsSystem = {
         }
     },
     listeners: async (pids): Promise<Listener[]> => {
+        requireSupported();
+
         if (pids.length === 0) {
             return [];
         }
@@ -80,6 +89,8 @@ export const realPortsSystem: PortsSystem = {
         return parseSs(await run(ss, ["-ltnpH"])).filter((listener) => wanted.has(listener.pid));
     },
     processes: async () => {
+        requireSupported();
+
         const ps = firstExisting(PS);
 
         if (ps === undefined) {

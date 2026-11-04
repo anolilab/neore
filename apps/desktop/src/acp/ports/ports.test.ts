@@ -345,3 +345,18 @@ describe("a process that cannot be signalled", () => {
         expect(system.signals).toContainEqual([30, "SIGTERM"]);
     });
 });
+
+describe("a computer without ps and lsof or ss", () => {
+    it("says the ports list is not available, instead of an empty list", async () => {
+        const original = Object.getOwnPropertyDescriptor(process, "platform");
+
+        Object.defineProperty(process, "platform", { value: "win32" });
+
+        try {
+            await expect(realPortsSystem.processes()).rejects.toThrow("not available on this computer");
+            await expect(realPortsSystem.listeners([1])).rejects.toThrow("macOS and Linux only");
+        } finally {
+            Object.defineProperty(process, "platform", original as PropertyDescriptor);
+        }
+    });
+});
