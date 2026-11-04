@@ -120,6 +120,16 @@ const finishRow = (rows: Row[], id: string): Row[] =>
         return { ...row, finished: true };
     });
 
+/** Starts the row's text again at a steered message: what came before it is saved as a message of its own. */
+const restartRow = (rows: Row[], id: string, text: string): Row[] =>
+    rows.map((row) => {
+        if (row.id !== id) {
+            return row;
+        }
+
+        return { ...row, shareText: text, text };
+    });
+
 /** Adds `text` to the end of the row with `id`, leaving every other row as it is. */
 const appendToRow = (rows: Row[], id: string, text: string): Row[] =>
     rows.map((row) => {
@@ -571,10 +581,23 @@ const Chat = () => {
                 router.setParams({ threadId: started.threadId });
             }
 
+            let isSteered = false;
             const outcome = await relayReply({
                 fetch: streamingFetch,
                 gatewayUrl: config.gatewayUrl,
-                onDelta: ({ text }) => writeRows((current) => appendToRow(current, assistantId, text)),
+                onDelta: ({ restart, text }) => {
+                    if (restart) {
+                        isSteered = true;
+                    }
+
+                    writeRows((current) => {
+                        if (restart) {
+                            return restartRow(current, assistantId, text);
+                        }
+
+                        return appendToRow(current, assistantId, text);
+                    });
+                },
                 signal: controller.signal,
                 streamToken: started.streamToken,
             });
@@ -583,8 +606,9 @@ const Chat = () => {
                 throw new ChatError("The reply did not finish. Try again.");
             }
 
-            // Only a reply relayed through its end marker is complete here. Either way the server's copy is re-read until it is final.
-            if (outcome === "finished") {
+            // Only a reply relayed through its end marker is complete here. A steered reply is not: its text is only part of it
+            // until the server's copy is read. Either way the server's copy is re-read until it is final.
+            if (outcome === "finished" && !isSteered) {
                 writeRows((current) => finishRow(current, assistantId));
             }
 

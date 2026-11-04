@@ -57,6 +57,22 @@ describe("splitLines", () => {
 });
 
 describe("relayReply", () => {
+    it("passes a restart on the chunk that begins the reply after a steered message", async () => {
+        const { fetch } = scripted([streamResponse(['{"text":"Before"}\n', '{"restart":true,"text":"After"}\n', '{"type":"end"}\n'])]);
+        const deltas: { restart?: true; text: string }[] = [];
+
+        await relayReply({
+            fetch,
+            gatewayUrl: "https://gw",
+            onDelta: (delta) => {
+                deltas.push({ ...delta.restart && { restart: delta.restart }, text: delta.text });
+            },
+            streamToken: "tok",
+        });
+
+        expect(deltas).toEqual([{ text: "Before" }, { restart: true, text: "After" }]);
+    });
+
     it("reassembles a line split across reads", async () => {
         const { fetch } = scripted([streamResponse(['{"te', 'xt":"Hel', 'lo"}\n', '{"type":"end"}\n'])]);
         const deltas: string[] = [];

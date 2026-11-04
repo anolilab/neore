@@ -11,6 +11,8 @@ import { CHAT_START_TIMEOUT_MS } from "./chat-api";
 
 export interface StreamDelta {
     reasoning: string;
+    /** Set on the first chunk after a steered message: what came before it is saved as a message of its own. */
+    restart?: true;
     text: string;
 }
 
@@ -105,7 +107,7 @@ const readAttempt = async (
         }
 
         index += 1;
-        onChunk({ reasoning: parsed.reasoning, text: parsed.text }, index);
+        onChunk({ reasoning: parsed.reasoning, ...parsed.restart && { restart: true as const }, text: parsed.text }, index);
 
         return true;
     };
