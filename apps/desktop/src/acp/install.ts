@@ -205,6 +205,7 @@ export class AgentInstaller {
                         key: resolved.agent.id,
                         label: resolved.agent.name,
                         node: found.node,
+                        nodeResolved: tools.node,
                         npm: tools.npm,
                         package: resolved.name,
                         publisher: resolved.agent.publisher,

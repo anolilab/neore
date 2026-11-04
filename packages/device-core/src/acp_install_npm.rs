@@ -72,8 +72,11 @@ pub struct NpmInstallRequest {
     pub integrity: String,
     pub key: String,
     pub label: String,
-    /// Absolute path of `node`.
+    /// Absolute path of `node`, as found (its name is `node`; it may be a link).
     pub node: String,
+    /// What `node` resolved to when the person confirmed. The install is refused if it resolves elsewhere now, so
+    /// the interpreter that is shown, the one npm runs under and the one recorded are the same file.
+    pub node_resolved: String,
     /// Absolute path of `npm`.
     pub npm: String,
     /// The package name, `name` or `@scope/name`.
@@ -168,10 +171,13 @@ fn validate(request: &NpmInstallRequest) -> Result<(PathBuf, PathBuf), String> {
         &request.env,
     )?;
 
-    Ok((
-        program_path(&request.node, "node")?,
-        program_path(&request.npm, "npm")?,
-    ))
+    let node = program_path(&request.node, "node")?;
+
+    if fs::canonicalize(&node).ok().as_deref() != Some(Path::new(&request.node_resolved)) {
+        return Err("Node.js is not the file it was when you confirmed (it was re-pointed or replaced). Nothing was installed; try again".into());
+    }
+
+    Ok((node, program_path(&request.npm, "npm")?))
 }
 
 /// The program `npx <package>` would run: the single `bin`, or the one named like the package.

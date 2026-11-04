@@ -190,8 +190,8 @@ impl DeviceState {
 
         fs::create_dir_all(&staging).map_err(|error| error.to_string())?;
         remove_stale(&staging);
-        // Deletions a crash cut short.
-        remove_stale(&self.install_root().join(TRASH_DIR));
+        // Deletions a crash cut short, on a thread: they can be whole `node_modules` trees.
+        sweep_trash(self.install_root().join(TRASH_DIR));
 
         let name = format!(
             "{}-{}-{}",
@@ -593,6 +593,23 @@ fn remove_stale(staging: &Path) {
             let _ = fs::remove_dir_all(entry.path());
         }
     }
+}
+
+/// Deletes what an earlier process left in `trash`, in the background. Entries are named `<pid>-<n>`; this
+/// process's own are being deleted by the thread that made them.
+fn sweep_trash(trash: PathBuf) {
+    std::thread::spawn(move || {
+        let own = format!("{}-", std::process::id());
+        let Ok(entries) = fs::read_dir(&trash) else {
+            return;
+        };
+
+        for entry in entries.flatten() {
+            if !entry.file_name().to_string_lossy().starts_with(&own) {
+                let _ = fs::remove_dir_all(entry.path());
+            }
+        }
+    });
 }
 
 pub(crate) fn sha256_reader(file: &mut fs::File) -> Result<String, String> {

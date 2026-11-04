@@ -314,6 +314,7 @@ describe("an npm agent", () => {
             key: "thing",
             label: "Thing",
             node: TOOLS.node,
+            nodeResolved: TOOLS.node,
             npm: TOOLS.npm,
             package: "thing",
             publisher: "unknown publisher",

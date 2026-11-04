@@ -98,6 +98,10 @@ fn request(
         key: "fixture".into(),
         label: "Fixture".into(),
         node: node.to_string_lossy().into_owned(),
+        node_resolved: fs::canonicalize(node)
+            .unwrap()
+            .to_string_lossy()
+            .into_owned(),
         npm: npm.to_string_lossy().into_owned(),
         package: PACKAGE.into(),
         publisher: "Example Inc.".into(),
@@ -1086,4 +1090,61 @@ fn removing_an_agent_frees_its_folder_at_once_and_clears_the_files_in_the_backgr
     });
 
     assert!(emptied, "the removed files are deleted in the background");
+}
+
+#[test]
+fn a_node_re_pointed_after_the_confirmation_is_refused() {
+    let (state, guard) = state("node-repoint");
+    let dir = guard.path().to_path_buf();
+    let (real, npm, _) = fake_tools(&dir);
+    let other = dir.join("other-node");
+    let link = dir.join("bin-node/node");
+
+    fs::copy(&real, &other).unwrap();
+    fs::create_dir_all(link.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(&real, &link).unwrap();
+
+    // The request carries what the link resolved to at the confirmation; the link then moves.
+    let confirmed = request_for(&state, &link, &npm, "1.0.0");
+
+    fs::remove_file(&link).unwrap();
+    std::os::unix::fs::symlink(&other, &link).unwrap();
+
+    let error = state.acp_install_npm(confirmed).unwrap_err();
+
+    assert!(
+        error.contains("not the file it was when you confirmed"),
+        "{error}"
+    );
+    assert!(state.acp_view().agents.is_empty(), "nothing is recorded");
+}
+
+#[test]
+fn starting_an_install_leaves_clearing_old_trash_to_a_thread() {
+    let (state, guard) = state("trash-sweep");
+    let dir = guard.path().to_path_buf();
+    let trash = dir.join("acp-agents/.trash");
+    let foreign = trash.join("99999999-0");
+    let own = trash.join(format!("{}-7", std::process::id()));
+
+    fs::create_dir_all(foreign.join("node_modules")).unwrap();
+    fs::create_dir_all(&own).unwrap();
+    state.acp_install_stage().unwrap();
+
+    let cleared = (0..100).any(|_| {
+        if foreign.exists() {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+
+        !foreign.exists()
+    });
+
+    assert!(
+        cleared,
+        "an earlier process's trash is deleted in the background"
+    );
+    assert!(
+        own.exists(),
+        "this process's own trash is left to its own thread"
+    );
 }
