@@ -494,6 +494,9 @@ export interface InternalApiTypes {
                 };
             };
         };
+        thread_state: {
+            copyThreadPermissionMode: FunctionReference<"mutation", { mode: "supervised" | "auto-edit" | "auto" | "full"; threadId: string }, null>;
+        };
         tool_permissions: {
             consumeLowRiskCheck: FunctionReference<"mutation", { threadId: Id<"threads">; userId: string }, boolean>;
             getLowRiskApprovalContext: FunctionReference<"query", { permissionKey?: string; threadId: Id<"threads">; trustId?: string; userId: string }, boolean>;
@@ -1709,6 +1712,9 @@ export const internal: InternalApiTypes = {
                     purgeFinishedStreams: { __lunoraRef: "chat_streaming_persistent_purge:purgeFinishedStreams" },
                 },
             },
+        },
+        thread_state: {
+            copyThreadPermissionMode: { __lunoraRef: "chat_thread_state:copyThreadPermissionMode" },
         },
         tool_permissions: {
             consumeLowRiskCheck: { __lunoraRef: "chat_tool_permissions:consumeLowRiskCheck" },

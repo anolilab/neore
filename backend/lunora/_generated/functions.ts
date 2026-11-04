@@ -640,6 +640,7 @@ export const LUNORA_FUNCTION_MANIFEST: Readonly<Record<string, FunctionManifestE
     "chat_tags_functions:reorderThreadTags": {"argumentDescriptors":[{"kind":"array","name":"tagIds","optional":false,"element":"string"}],"exportName":"reorderThreadTags","kind":"mutation","moduleId":"lunora_chat_tags_functions_91","visibility":"public"},
     "chat_tags_functions:setThreadTagAssigned": {"argumentDescriptors":[{"kind":"boolean","name":"assigned","optional":false},{"kind":"id","name":"tagId","optional":false,"table":"threadTags"},{"kind":"id","name":"threadId","optional":false,"table":"threads"}],"exportName":"setThreadTagAssigned","kind":"mutation","moduleId":"lunora_chat_tags_functions_91","visibility":"public"},
     "chat_tags_functions:updateThreadTag": {"argumentDescriptors":[{"kind":"from","name":"color","optional":true},{"kind":"string","name":"name","optional":true},{"kind":"id","name":"tagId","optional":false,"table":"threadTags"}],"exportName":"updateThreadTag","kind":"mutation","moduleId":"lunora_chat_tags_functions_91","visibility":"public"},
+    "chat_thread_state:copyThreadPermissionMode": {"argumentDescriptors":[{"kind":"union","name":"mode","optional":false},{"kind":"string","name":"threadId","optional":false}],"exportName":"copyThreadPermissionMode","kind":"mutation","moduleId":"lunora_chat_thread_state_92","visibility":"internal"},
     "chat_thread_state:markThreadViewed": {"argumentDescriptors":[{"kind":"id","name":"threadId","optional":false,"table":"threads"}],"exportName":"markThreadViewed","kind":"mutation","moduleId":"lunora_chat_thread_state_92","visibility":"public"},
     "chat_thread_state:setThreadPermissionMode": {"argumentDescriptors":[{"kind":"union","name":"mode","optional":false},{"kind":"id","name":"threadId","optional":false,"table":"threads"}],"exportName":"setThreadPermissionMode","kind":"mutation","moduleId":"lunora_chat_thread_state_92","visibility":"public"},
     "chat_thread_state:snoozeThread": {"argumentDescriptors":[{"kind":"id","name":"threadId","optional":false,"table":"threads"},{"kind":"number","name":"until","optional":false}],"exportName":"snoozeThread","kind":"mutation","moduleId":"lunora_chat_thread_state_92","visibility":"public"},
@@ -2316,6 +2317,7 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "chat_tags_functions:reorderThreadTags": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"array","name":"tagIds","optional":false,"element":"string"}],"kind":"mutation","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "chat_tags_functions:setThreadTagAssigned": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"boolean","name":"assigned","optional":false},{"kind":"id","name":"tagId","optional":false,"table":"threadTags"},{"kind":"id","name":"threadId","optional":false,"table":"threads"}],"kind":"mutation","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "chat_tags_functions:updateThreadTag": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"from","name":"color","optional":true},{"kind":"string","name":"name","optional":true},{"kind":"id","name":"tagId","optional":false,"table":"threadTags"}],"kind":"mutation","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
+    "chat_thread_state:copyThreadPermissionMode": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"union","name":"mode","optional":false},{"kind":"string","name":"threadId","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "chat_thread_state:markThreadViewed": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"id","name":"threadId","optional":false,"table":"threads"}],"kind":"mutation","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "chat_thread_state:setThreadPermissionMode": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"union","name":"mode","optional":false},{"kind":"id","name":"threadId","optional":false,"table":"threads"}],"kind":"mutation","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "chat_thread_state:snoozeThread": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"id","name":"threadId","optional":false,"table":"threads"},{"kind":"number","name":"until","optional":false}],"kind":"mutation","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
@@ -3908,6 +3910,7 @@ export interface Caller {
             };
         };
         thread_state: {
+            copyThreadPermissionMode: (args: { mode: "supervised" | "auto-edit" | "auto" | "full"; threadId: string }) => Promise<null>;
             markThreadViewed: (args: { threadId: Id<"threads"> }) => Promise<{ updated: boolean }>;
             setThreadPermissionMode: (args: { mode: "supervised" | "auto-edit" | "auto" | "full"; threadId: Id<"threads"> }) => Promise<null>;
             snoozeThread: (args: { threadId: Id<"threads">; until: number }) => Promise<null>;
@@ -5825,6 +5828,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             },
         },
         thread_state: {
+            copyThreadPermissionMode: (args) => callRegistered(context, "chat_thread_state:copyThreadPermissionMode", args),
             markThreadViewed: (args) => callRegistered(context, "chat_thread_state:markThreadViewed", args),
             setThreadPermissionMode: (args) => callRegistered(context, "chat_thread_state:setThreadPermissionMode", args),
             snoozeThread: (args) => callRegistered(context, "chat_thread_state:snoozeThread", args),
