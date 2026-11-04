@@ -57,6 +57,14 @@ describe("graphqlRequest", () => {
         });
     });
 
+    it("reads an execution error that carries a code as unconfirmed: it may have taken effect", async () => {
+        const execution = { errors: [{ extensions: { code: "INTERNAL_SERVER_ERROR" }, message: "Something went wrong" }] };
+
+        await expect(graphqlRequest(answering(execution).request, "q", {}, SCHEMA, "/graphql", { untypedMayHaveRun: true })).rejects.toMatchObject({
+            status: 0,
+        });
+    });
+
     it("refuses data of the wrong shape", async () => {
         const { request } = answering({ data: { viewer: { login: 7 } } });
 

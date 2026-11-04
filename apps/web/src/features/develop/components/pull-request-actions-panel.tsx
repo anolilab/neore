@@ -78,6 +78,8 @@ const PullRequestActionsPanel = ({
     const canRevert = isHostCapabilityAvailable(capabilities, "pullRequest.revert") && state === "merged";
     // `original` is the page as it was when the dialog opened: a later refetch must not turn an untouched field into a write.
     const [editing, setEditing] = useState<{ body: string; original: { body: string; title: string }; title: string } | null>(null);
+    // A refused save keeps the dialog open with its reason, so the typed text is still there to correct.
+    const [editProblem, setEditProblem] = useState<string | null>(null);
     const [reviewing, setReviewing] = useState<string | null>(null);
     const [reviewProblem, setReviewProblem] = useState<string | null>(null);
     const [reverting, setReverting] = useState(false);
@@ -126,20 +128,35 @@ const PullRequestActionsPanel = ({
             ...(!bodyTruncated && editing.body !== editing.original.body && { body: editing.body }),
         };
 
-        setEditing(null);
         setFeedback(null);
+        setEditProblem(null);
 
         if (Object.keys(change).length === 0) {
+            setEditing(null);
+
             return;
         }
 
         const result = await attempt(actions.edit.mutateAsync(change));
+        let next: Feedback;
 
         if ("thrown" in result) {
-            setFeedback(thrownFailure(result.thrown));
+            next = thrownFailure(result.thrown);
+        } else if (result.outcome.status === "ok") {
+            next = { kind: "success", text: t`Saved on ${hostLabel}.` };
         } else {
-            setFeedback(result.outcome.status === "ok" ? { kind: "success", text: t`Saved on ${hostLabel}.` } : failure(result.outcome));
+            next = failure(result.outcome);
         }
+
+        // A refusal changed nothing: the dialog stays open with its reason and the typed text. Anything else closes it.
+        if (next.kind === "error" && !next.unconfirmed) {
+            setEditProblem(next.text);
+
+            return;
+        }
+
+        setEditing(null);
+        setFeedback(next);
     };
 
     const sendReviewers = async () => {
@@ -206,7 +223,14 @@ const PullRequestActionsPanel = ({
             </h3>
             <div className="flex flex-wrap items-center gap-2">
                 {canEdit && (
-                    <Button disabled={busy} onClick={() => setEditing({ body, original: { body, title }, title })} variant="outline">
+                    <Button
+                        disabled={busy}
+                        onClick={() => {
+                            setEditing({ body, original: { body, title }, title });
+                            setEditProblem(null);
+                        }}
+                        variant="outline"
+                    >
                         {t`Edit title and description`}
                     </Button>
                 )}
@@ -297,9 +321,15 @@ const PullRequestActionsPanel = ({
                             )}
                         </div>
                     </div>
+                    {editProblem !== null && (
+                        <Alert className="mx-6" role="alert" variant="destructive">
+                            <AlertTitle>{t`Not changed`}</AlertTitle>
+                            <AlertDescription>{editProblem}</AlertDescription>
+                        </Alert>
+                    )}
                     <DialogFooter>
                         <DialogClose render={<Button variant="outline" />}>{t`Cancel`}</DialogClose>
-                        <Button disabled={(editing?.title ?? "").trim() === ""} onClick={saveEdit}>{t`Save`}</Button>
+                        <Button disabled={(editing?.title ?? "").trim() === "" || actions.edit.isPending} onClick={saveEdit}>{t`Save`}</Button>
                     </DialogFooter>
                 </DialogPopup>
             </Dialog>

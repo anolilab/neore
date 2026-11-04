@@ -19,9 +19,17 @@ const ERROR_STATUS: Record<string, number> = {
 
 const DETAIL_MAX_CHARS = 300;
 
-/** GitHub names a validation error (an unknown field, a bad argument) with a code in `extensions`: validation runs before anything executes. */
-const isValidationError = (error: { extensions?: unknown }): boolean =>
-    typeof error.extensions === "object" && error.extensions !== null && "code" in error.extensions;
+/**
+ * The codes GitHub gives a request that failed validation, before anything ran. Any other code is an execution error that may
+ * have taken effect, so it is not on this list: an unlisted validation code reads as unconfirmed, which is the safe side.
+ */
+const VALIDATION_CODES = new Set(["argumentLiteralsIncompatible", "missingRequiredArguments", "undefinedField"]);
+
+const isValidationError = (error: { extensions?: unknown }): boolean => {
+    const code = typeof error.extensions === "object" && error.extensions !== null && "code" in error.extensions ? error.extensions.code : undefined;
+
+    return typeof code === "string" && VALIDATION_CODES.has(code);
+};
 
 /** The status a GraphQL error type stands for; an error type this does not know is a refused request. */
 export const statusOfGraphqlError = (type: string | undefined): number => ERROR_STATUS[type ?? ""] ?? 422;
