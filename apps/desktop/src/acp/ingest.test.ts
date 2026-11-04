@@ -1469,6 +1469,26 @@ describe("what the agent reports about itself", () => {
         expect(retried?.post.issuedAt).toBeGreaterThan(first?.post.issuedAt ?? 0);
     });
 
+    it("posts the options the agent offers with the usage, keeping the newest of each", async () => {
+        const host = poster();
+        const option = (currentValue: string) => {
+            return { category: "model", choices: [{ name: "Fast", value: "fast" }, { name: "Deep", value: "deep" }], currentValue, id: "model", name: "Model" };
+        };
+        const modes = { available: [{ id: "ask", name: "Ask" }], current: "ask" };
+
+        await open(host);
+
+        const observed = clock;
+
+        host.sessionState("s1", { configOptions: [option("fast")], usage: usage(1) });
+        host.sessionState("s1", { configOptions: [option("deep")] });
+        host.sessionState("s1", { modes });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(1);
+        expect(statePosts()[0]?.post.events).toEqual([{ at: observed, configOptions: [option("deep")], kind: "session_state", modes, usage: usage(1) }]);
+    });
+
     it("drops a report the backend refuses, and the session keeps going", async () => {
         const host = poster();
 

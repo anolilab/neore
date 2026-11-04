@@ -47,7 +47,52 @@ export const vAgentUsage = v.object({
 
 /** What an agent reported about itself outside its turns, as stored on the session row (`session_state`). */
 export const vAcpAgentState = v.object({
+    // The options the agent offers (model, reasoning effort, mode, ...): at most 20, each with at most 100 choices. Each of
+    // configOptions, modes and models is present on its own and replaced whole.
+    configOptions: v.optional(
+        v
+            .array(
+                v.object({
+                    category: v.optional(v.string().max(64)),
+                    choices: v
+                        .array(v.object({ name: v.string().max(200), value: v.string().max(128) }))
+                        .check((value) => value.length <= 100, { message: "Too many choices" }),
+                    currentValue: v.string().max(128),
+                    id: v.string().max(128),
+                    name: v.string().max(200),
+                }),
+            )
+            .check((value) => value.length <= 20, { message: "Too many options" }),
+    ),
+    // The legacy model state. Shown, never changed: there is no stable call that sets it.
+    models: v.optional(
+        v.object({
+            available: v
+                .array(v.object({ id: v.string().max(128), name: v.string().max(200) }))
+                .check((value) => value.length <= 100, { message: "Too many models" }),
+            current: v.string().max(128),
+        }),
+    ),
+    // The legacy mode state, for an agent that sends no `configOptions`.
+    modes: v.optional(
+        v.object({
+            available: v
+                .array(v.object({ id: v.string().max(128), name: v.string().max(200) }))
+                .check((value) => value.length <= 100, { message: "Too many modes" }),
+            current: v.string().max(128),
+        }),
+    ),
     usage: v.optional(vAgentUsage),
+});
+
+/** How the agent answered the last change of one of its options (`acp_set_config`), shown beside the options. */
+export const vAcpOptionResult = v.object({
+    at: v.number(),
+    callId: v.string().max(128),
+    optionId: v.optional(v.string().max(128)),
+    outcome: v.union(v.literal("confirmed"), v.literal("refused")),
+    reason: v.optional(v.string().max(300)),
+    valueId: v.string().max(128),
 });
 
 export const vAcpSessionStatus = v.union(v.literal("starting"), v.literal("idle"), v.literal("busy"), v.literal("offline"), v.literal("ended"));
@@ -94,7 +139,38 @@ export const vHostEvent = v.union(
     // the reports, so an older one arriving late is dropped (`applySessionState`).
     v.object({
         at: v.number().check((at) => Number.isSafeInteger(at) && at >= 0, { message: "Invalid time" }),
+        configOptions: v.optional(
+            v
+                .array(
+                    v.object({
+                        category: v.optional(v.string().min(1).max(64)),
+                        choices: v
+                            .array(v.object({ name: v.string().max(200), value: v.string().min(1).max(128) }))
+                            .check((value) => value.length <= 100, { message: "Too many choices" }),
+                        currentValue: v.string().max(128),
+                        id: v.string().min(1).max(128),
+                        name: v.string().max(200),
+                    }),
+                )
+                .check((value) => value.length <= 20, { message: "Too many options" }),
+        ),
         kind: v.literal("session_state"),
+        models: v.optional(
+            v.object({
+                available: v
+                    .array(v.object({ id: v.string().min(1).max(128), name: v.string().max(200) }))
+                    .check((value) => value.length <= 100, { message: "Too many models" }),
+                current: v.string().max(128),
+            }),
+        ),
+        modes: v.optional(
+            v.object({
+                available: v
+                    .array(v.object({ id: v.string().min(1).max(128), name: v.string().max(200) }))
+                    .check((value) => value.length <= 100, { message: "Too many modes" }),
+                current: v.string().max(128),
+            }),
+        ),
         usage: v.optional(vAgentUsage),
     }),
     v.object({ kind: v.literal("turn_start"), text: v.string().max(100_000) }),

@@ -59,7 +59,28 @@ export interface AgentUsage {
  * (`applySessionState` in the backend). Sent as a turn-less post, not a turn event.
  */
 export interface SessionStatePatch {
+    /** The options the agent offers (model, reasoning effort, mode ...). When present the legacy `modes` and `models` are not sent. */
+    configOptions?: AgentOption[];
+    /** The legacy model state; shown, never changed. */
+    models?: AgentChoiceList;
+    /** The legacy mode state, for an agent that sends no options. */
+    modes?: AgentChoiceList;
     usage?: AgentUsage;
+}
+
+/** One option of the agent: a list to choose a value from, with the value it has now. At most 100 choices. */
+export interface AgentOption {
+    category?: string;
+    choices: { name: string; value: string }[];
+    currentValue: string;
+    id: string;
+    name: string;
+}
+
+/** The agent's legacy mode or model state: what it offers and which is current. */
+export interface AgentChoiceList {
+    available: { id: string; name: string }[];
+    current: string;
 }
 
 export interface TurnEndEvent {

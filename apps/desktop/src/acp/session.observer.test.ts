@@ -16,7 +16,11 @@ const HOST_INFO: HostSessionInfo = { agentKey: "example", agentLabel: "Example",
 const OPENED = {
     ...HOST_INFO,
     capabilities: {
-        groups: { sessions: { listNative: { reason: "not_offered", supported: false }, load: { reason: "not_offered", supported: false } } },
+        groups: {
+            identity: { models: [], reasoningEffort: { reason: "not_offered", supported: false } },
+            permissions: { modes: [] },
+            sessions: { listNative: { reason: "not_offered", supported: false }, load: { reason: "not_offered", supported: false } },
+        },
         reportedAt: expect.any(Number),
         version: 1,
     },

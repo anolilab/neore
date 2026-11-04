@@ -639,6 +639,69 @@ describe("a command held until its session opens", () => {
     });
 });
 
+describe("an option change", () => {
+    const CHANGE: AcpCommand = { kind: "setConfig", optionId: "model", sessionId: "s1", valueId: "deep" };
+    const change = (callId: string): string => JSON.stringify({ callId, command: CHANGE, refusal: null, tool: "acp_set_config" });
+
+    it("is acted on once and signed accepted, and a redelivery is acknowledged without a second change", async () => {
+        const applied: AcpCommand[] = [];
+        const commands = make(applied);
+
+        const first = await commands.execute(change("c1"), "sig");
+        const again = await commands.execute(change("c1"), "sig");
+
+        expect(outcomeOf(first)).toBe("accepted");
+        expect(outcomeOf(again)).toBe("accepted");
+        expect(applied).toEqual([CHANGE]);
+    });
+
+    it("is signed with the reason the session gave when it could not be made, and refused the same way again", async () => {
+        let attempts = 0;
+        const commands = make([], {
+            apply: () => {
+                attempts += 1;
+
+                throw new Error("the agent does not offer that choice");
+            },
+        });
+
+        const first = await commands.execute(change("c2"), "sig");
+        const again = await commands.execute(change("c2"), "sig");
+
+        expect(outcomeOf(first)).toBe("the agent does not offer that choice");
+        expect(outcomeOf(again)).toBe("the agent does not offer that choice");
+        expect(attempts).toBe(1);
+    });
+
+    it("waits for the agent's answer before it is signed", async () => {
+        let answer: (outcome: string) => void = () => {};
+        const commands = make([], {
+            apply: async () =>
+                // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- not in this package's Node range
+                await new Promise<string>((resolve) => {
+                    answer = resolve;
+                }),
+        });
+        const delivery = commands.execute(change("c3"), "sig");
+
+        await vi.waitFor(() => expect(open()).toContain("c3"), { timeout: 20_000 });
+        answer("accepted");
+        expect(outcomeOf(await delivery)).toBe("accepted");
+    });
+
+    it("is not replayed after a restart: it names the option as the person saw it", async () => {
+        const first = make([], { apply: killedInside });
+
+        first.execute(change("c4"), "sig");
+        await vi.waitFor(() => expect(open()).toContain("c4"), { timeout: 20_000 });
+
+        const applied: AcpCommand[] = [];
+
+        await make(applied).recover();
+        expect(applied).toEqual([]);
+    });
+});
+
 describe("telling a coding-agent command from a device tool", () => {
     it("reads the tool name and nothing else, and treats anything unreadable as a device call", () => {
         expect(isAcpEnvelope("{\"tool\":\"acp_send\"}")).toBe(true);

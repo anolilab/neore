@@ -13,7 +13,7 @@ import { paymentExtension } from "@lunora/payment";
 import { MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH } from "@neore/ai/constants";
 import { defineSchema, defineTable, v } from "lunorash/server";
 
-import { vAcpAgentState, vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
+import { vAcpAgentState, vAcpOptionResult, vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
 import { vAgentRef } from "./agent/agent-switch-validators";
 import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict } from "./chat/goals/validators";
 import { vGroupChat } from "./chat/group/validators";
@@ -175,6 +175,8 @@ export const schema = defineSchema({
         importState: v.optional(v.union(v.literal("importing"), v.literal("done"))),
         lastEventAt: v.optional(v.number()),
         nativeSessionId: v.optional(v.string()),
+        // How the agent answered the last change of one of its options made from the app (`acp_set_config`). Unset until one was made.
+        optionResult: v.optional(vAcpOptionResult),
         status: vAcpSessionStatus,
         // The untrusted content the agent was handed when it took over (`agent/thread-summary-taint.ts`), signed onto every
         // prompt it is sent. Unset: it was handed none.

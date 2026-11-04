@@ -259,6 +259,11 @@ export class AcpManager {
         return this.sessions.get(sessionId)?.cancelTurn(turnId, options) ?? false;
     }
 
+    /** Changes an option the session's agent offers (`acp_set_config`). Throws the reason it was not changed. */
+    public async setOption(sessionId: string, optionId: string | undefined, valueId: string): Promise<void> {
+        await this.require(sessionId).setOption(optionId, valueId);
+    }
+
     public async close(sessionId: string): Promise<void> {
         await this.require(sessionId).close();
     }

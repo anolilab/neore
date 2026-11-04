@@ -36,6 +36,7 @@ import { patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
+import { mergeAgentState, sameOptionFields } from "./lib/agent-state";
 import { MAX_EVENTS_PER_POST } from "./lib/constants";
 import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
@@ -221,11 +222,15 @@ const applySessionState = async (
 
     // A usage report that leaves the cost out keeps the cost reported before: the agent's cost is cumulative.
     const usage = event.usage === undefined ? undefined : withKeptCost(event.usage, session.agentState?.usage);
+    const usageChanged = usage !== undefined && !sameUsage(usage, session.agentState?.usage);
 
-    if (usage !== undefined && !sameUsage(usage, session.agentState?.usage)) {
-        await ctx.db.patch("acpSessions", session._id, { agentState: { ...session.agentState, usage }, agentStateAt: at });
+    if (usageChanged || !sameOptionFields(session.agentState, event)) {
+        await ctx.db.patch("acpSessions", session._id, {
+            agentState: mergeAgentState(session.agentState, { ...event, ...(usage !== undefined && { usage }) }),
+            agentStateAt: at,
+        });
     } else if (session.agentStateAt === undefined || at > session.agentStateAt) {
-        // A newer report that repeats the stored usage (or leaves it out) still moves the watermark, so an older report that
+        // A newer report that repeats the stored values (or leaves them out) still moves the watermark, so an older report that
         // arrives later cannot overwrite the newest observation.
         await ctx.db.patch("acpSessions", session._id, { agentStateAt: at });
     }

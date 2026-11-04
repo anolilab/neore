@@ -13,7 +13,7 @@ import { authQuery } from "../lib/crpc";
 import { vCapabilityReport } from "../lib/capability-report";
 import { MAX_LENGTH } from "../lib/validators";
 import { isHostRunThread } from "./lib/host-thread";
-import { vAcpAgentState, vAcpSessionStatus, vHostEndReason } from "./validators";
+import { vAcpAgentState, vAcpOptionResult, vAcpSessionStatus, vHostEndReason } from "./validators";
 
 const MAX_LISTED_SESSIONS = 50;
 
@@ -46,6 +46,7 @@ const vHostSessionDetail = v.object({
     folderLabel: v.string(),
     lastEndReason: v.optional(vHostEndReason),
     lastEventAt: v.optional(v.number()),
+    optionResult: v.optional(vAcpOptionResult),
     status: vAcpSessionStatus,
     threadId: v.string(),
 });
@@ -133,6 +134,7 @@ export const getHostSession = authQuery
             ...toView(row),
             ...(row.agentState !== undefined && { agentState: row.agentState }),
             ...(last?.hostEndReason !== undefined && { lastEndReason: last.hostEndReason }),
+            ...(row.optionResult !== undefined && { optionResult: row.optionResult }),
         };
     });
 

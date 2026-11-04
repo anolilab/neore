@@ -2515,3 +2515,95 @@ describe("what the agent reports about itself", () => {
         }
     });
 });
+
+describe("what the agent reports about its options", () => {
+    const option = (current: string, extra: Record<string, unknown> = {}) => {
+        return {
+            category: "model",
+            choices: [
+                { name: "Fast", value: "fast" },
+                { name: "Deep", value: "deep" },
+            ],
+            currentValue: current,
+            id: "model",
+            name: "Model",
+            ...extra,
+        };
+    };
+    const report = (device: Paired, at: number, body: Record<string, unknown>) => ingest(device, { events: [{ at, kind: "session_state", ...body }] });
+    const rowOf = async (threadId: string) => await harness.run(async (ctx: any) => await ctx.db.acpSessions.findFirst({ where: { threadId } }));
+
+    it("stores the options, the legacy modes and the legacy models, and the owner reads them back", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const modes = { available: [{ id: "ask", name: "Ask" }], current: "ask" };
+        const models = { available: [{ id: "m1", name: "M1" }], current: "m1" };
+
+        const posted = await report(device, 1000, { configOptions: [option("fast")], models, modes });
+
+        expect(posted.status).toBe(200);
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { configOptions: [option("fast")], models, modes }, agentStateAt: 1000 });
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({
+            agentState: { configOptions: [option("fast")], models, modes },
+        });
+    });
+
+    it("replaces a field it carries and keeps the ones it leaves out", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { configOptions: [option("fast")], usage: { size: 100, used: 1 } });
+        await report(device, 2000, { configOptions: [option("deep")] });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { configOptions: [option("deep")], usage: { size: 100, used: 1 } }, agentStateAt: 2000 });
+    });
+
+    it("writes nothing when the options repeat, whatever order the keys arrive in", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const reordered = {
+            category: "model",
+            choices: [
+                { name: "Fast", value: "fast" },
+                { name: "Deep", value: "deep" },
+            ],
+            currentValue: "fast",
+            id: "model",
+            name: "Model",
+        };
+
+        await report(device, 1000, { configOptions: [option("fast")] });
+        await report(device, 2000, { configOptions: [reordered] });
+
+        // The values are stored, so only the watermark moves.
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { configOptions: [option("fast")] }, agentStateAt: 2000 });
+
+        // A different choice list is a change, even with the same current value.
+        await report(device, 3000, { configOptions: [option("fast", { choices: [{ name: "Fast", value: "fast" }] })] });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentStateAt: 3000 });
+    });
+
+    it("refuses more than 20 options, more than 100 choices and text past the bounds", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+
+        const many = Array.from({ length: 21 }, (_unused, index) => option("fast", { id: `o${String(index)}` }));
+        const choices = Array.from({ length: 101 }, (_unused, index) => {
+            return { name: "C", value: `c${String(index)}` };
+        });
+
+        for (const body of [
+            { configOptions: many },
+            { configOptions: [option("fast", { choices })] },
+            { configOptions: [option("fast", { id: "x".repeat(129) })] },
+            { configOptions: [option("fast", { name: "x".repeat(201) })] },
+            { modes: { available: [], current: "x".repeat(129) } },
+        ]) {
+            const refused = await report(device, 1000, body);
+
+            expect(refused.status).toBe(400);
+        }
+    });
+});

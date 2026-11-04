@@ -1,5 +1,5 @@
 /**
- * The coding-agent commands the backend sends (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`;
+ * The coding-agent commands the backend sends (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`, `acp_set_config`;
  * acp-agent-host.md §4.1), from the relayed envelope to the signed result.
  *
  * The core verifies and decides what may be done (`device-core/src/acp_call.rs`); this carries it out, in an order
@@ -47,6 +47,7 @@ export type AcpCommand
     = | { keepQueue?: boolean; kind: "cancel"; sessionId: string; turnId: string }
         | { kind: "permissionAnswer"; optionId: string; requestId: string; sessionId: string }
         | { kind: "send"; sessionId: string; text: string; turnId: string }
+        | { kind: "setConfig"; optionId?: string; sessionId: string; valueId: string }
         | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; folderPath: string; kind: "start"; nativeSessionId?: string; sessionId: string; threadId: string };
 
 interface Prepared {
@@ -113,6 +114,7 @@ export const HELD: Held = { held: true };
 
 /** The commands worth running after a restart: the others (a cancel, an answer) belong to a turn or request that did not survive it. */
 const isReplayable = (command: AcpCommand): boolean => command.kind === "start" || command.kind === "send";
+// A `setConfig` is not replayed: it names the option as it stood when the person chose, and the receipt log alone stops a second run.
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 

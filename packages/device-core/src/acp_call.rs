@@ -1,5 +1,5 @@
-//! Commands the backend sends to a coding agent on this computer: `acp_start`, `acp_send`, `acp_cancel` and
-//! `acp_permission_answer` (acp-agent-host.md §4.1).
+//! Commands the backend sends to a coding agent on this computer: `acp_start`, `acp_send`, `acp_cancel`,
+//! `acp_permission_answer` and `acp_set_config` (acp-agent-host.md §4.1).
 //!
 //! They are signed device calls like any other, but they are not device tools: nothing runs here. Rust checks the
 //! signature, the device and the expiry, decides whether the command may be carried out at all (a start needs an
@@ -32,10 +32,11 @@ const TEXT_MAX: usize = 32 * 1024;
 /// `acp_start` offers at most this many pairs in the manifest.
 pub const MAX_OFFERS: usize = 50;
 
-const TOOLS: [&str; 4] = [
+const TOOLS: [&str; 5] = [
     "acp_cancel",
     "acp_permission_answer",
     "acp_send",
+    "acp_set_config",
     "acp_start",
 ];
 
@@ -69,6 +70,14 @@ pub enum AcpCommand {
         session_id: String,
         text: String,
         turn_id: String,
+    },
+    /// Changes one of the agent's options, or (with no `option_id`) a mode of its legacy mode state. The value is
+    /// checked against what the agent itself offered by whoever acts on this; nothing here says what is offered.
+    SetConfig {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        option_id: Option<String>,
+        session_id: String,
+        value_id: String,
     },
     Start {
         agent_key: String,
@@ -268,6 +277,24 @@ impl DeviceState {
                         })
                     }
                     _ => refusal("a send names a session and a turn and carries a prompt"),
+                }
+            }
+            "acp_set_config" => {
+                let option_id = match input.get("optionId") {
+                    None | Some(Value::Null) => None,
+                    Some(_) => match id_of(input, "optionId") {
+                        Some(id) => Some(id),
+                        None => return refusal("a change names its option by a valid id"),
+                    },
+                };
+
+                match (id_of(input, "sessionId"), id_of(input, "valueId")) {
+                    (Some(session_id), Some(value_id)) => Ok(AcpCommand::SetConfig {
+                        option_id,
+                        session_id,
+                        value_id,
+                    }),
+                    _ => refusal("a change names a session and a value"),
                 }
             }
             _ => self.acp_start_command(input, host),
@@ -606,12 +633,83 @@ mod tests {
                 json!({ "sessionId": "s1", "requestId": "r1" }),
             ),
             ("acp_start", json!({ "sessionId": "s1" })),
+            ("acp_set_config", json!({ "sessionId": "s1" })),
+            ("acp_set_config", json!({ "valueId": "v1" })),
+            (
+                "acp_set_config",
+                json!({ "sessionId": "s1", "valueId": "" }),
+            ),
+            (
+                "acp_set_config",
+                json!({ "sessionId": "s1", "valueId": "v".repeat(ID_MAX + 1) }),
+            ),
+            (
+                "acp_set_config",
+                json!({ "sessionId": "s1", "valueId": "v1", "optionId": 7 }),
+            ),
+            (
+                "acp_set_config",
+                json!({ "sessionId": "s1", "valueId": "v1", "optionId": "o".repeat(ID_MAX + 1) }),
+            ),
         ] {
             let prepared = state.acp_prepare(&call(tool, input)).unwrap();
 
             assert!(prepared.command.is_none(), "{tool}");
             assert!(prepared.refusal.is_some(), "{tool}");
         }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_option_change_names_a_session_a_value_and_optionally_an_option() {
+        let (state, dir, _) = state("set-config");
+
+        for (input, option) in [
+            (
+                json!({ "sessionId": "s1", "valueId": "deep", "optionId": "model" }),
+                Some("model"),
+            ),
+            (json!({ "sessionId": "s1", "valueId": "code" }), None),
+            (
+                json!({ "sessionId": "s1", "valueId": "code", "optionId": null }),
+                None,
+            ),
+        ] {
+            let prepared = state.acp_prepare(&call("acp_set_config", input)).unwrap();
+
+            assert_eq!(
+                prepared.command,
+                Some(AcpCommand::SetConfig {
+                    option_id: option.map(str::to_owned),
+                    session_id: "s1".into(),
+                    value_id: if option.is_some() { "deep" } else { "code" }.into(),
+                })
+            );
+            assert!(prepared.refusal.is_none());
+        }
+
+        // Signed like any command: the result is `accepted` and the call can be redelivered under the same envelope.
+        let signed = call(
+            "acp_set_config",
+            json!({ "sessionId": "s1", "valueId": "deep", "optionId": "model" }),
+        );
+
+        assert!(state.acp_prepare(&signed).is_ok());
+        assert_eq!(
+            result_of(&state.acp_sign(&signed, "accepted").unwrap())["status"],
+            "completed"
+        );
+        assert_eq!(
+            result_of(&state.acp_sign(&signed, "the agent does not offer that choice").unwrap())["status"],
+            "failed"
+        );
+
+        // A forged signature is no command at all.
+        let mut forged = call("acp_set_config", json!({ "sessionId": "s1", "valueId": "deep" }));
+
+        forged.signature = "0".repeat(64);
+        assert!(state.acp_prepare(&forged).is_err());
 
         let _ = std::fs::remove_dir_all(&dir);
     }

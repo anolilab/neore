@@ -1,6 +1,6 @@
 /**
  * The coding-agent commands the BACKEND creates (acp-agent-host.md §4.1): `acp_start`, `acp_send`,
- * `acp_cancel` and `acp_permission_answer`. `createDeviceCall` is for device tools: it refuses anything the
+ * `acp_cancel`, `acp_permission_answer` and `acp_set_config`. `createDeviceCall` is for device tools: it refuses anything the
  * manifest does not list. These calls are signed like any other (the desktop's Rust core verifies them), but have
  * their own open-call budget and claim window (`lib/constants.ts`), a claim that is a lease, and a prompt that is
  * cleared once the call ends (`acp/lib/calls.ts`).
@@ -24,7 +24,7 @@ import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated } from "./s
 import type { DeviceTaintSource } from "./taint";
 import { mergeTaint } from "./taint";
 
-export type AcpCallKind = "acp_cancel" | "acp_permission_answer" | "acp_send" | "acp_start";
+export type AcpCallKind = "acp_cancel" | "acp_permission_answer" | "acp_send" | "acp_set_config" | "acp_start";
 
 export type AcpCallResult = { callId: string } | { error: "busy" | "ineligible" | "input_too_large" | "offline" | "outdated" };
 
