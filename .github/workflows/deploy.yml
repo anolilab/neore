@@ -295,11 +295,13 @@ jobs:
                         POSTHOG_CLI_PROJECT_ID: "${{ vars.POSTHOG_PROJECT_ID }}"
                         RELEASE_VERSION: "${{ github.sha }}"
                         RELEASE_BUILD: "${{ github.run_number }}"
+                    # The source-map upload key is in this step's environment for the script alone: the
+                    # builds and codegen run third-party code and get it removed with `env -u`.
                     run: |
-                        pnpm --workspace-root run build:packages
-                        pnpm --dir apps/web build
+                        env -u POSTHOG_CLI_API_KEY pnpm --workspace-root run build:packages
+                        env -u POSTHOG_CLI_API_KEY pnpm --dir apps/web build
                         bash scripts/upload-web-sourcemaps.sh
-                        pnpm --filter @neore/backend run codegen
+                        env -u POSTHOG_CLI_API_KEY pnpm --filter @neore/backend run codegen
 
                   - name: "Build the document-parser Worker"
                     run: "pnpm --filter document-parser run build:worker"
