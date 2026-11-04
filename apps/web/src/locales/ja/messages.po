@@ -1347,15 +1347,15 @@ msgstr "トークン使用量で OpenRouter 第 1 位"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, other {お気に入り # 件}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:250
+#: src/features/settings/components/chat/agent-settings.tsx:240
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ データソース: 約 2,700 トークン（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:249
+#: src/features/settings/components/chat/agent-settings.tsx:239
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ ナレッジ: 約 2,600 トークン（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:248
+#: src/features/settings/components/chat/agent-settings.tsx:238
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ タスク計画: 約 2,500 トークン（+200）"
 
@@ -3316,7 +3316,7 @@ msgstr "WeChat 公式アカウント（安全モード）へのメッセージ�
 msgid "Answer ready"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:120
+#: src/features/chat/thread/ask-user-prompt.tsx:241
 msgid "Answer sent — continuing"
 msgstr "回答を送信しました — 続行中"
 
@@ -3324,7 +3324,7 @@ msgstr "回答を送信しました — 続行中"
 msgid "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 msgstr "WhatsApp Business 番号（Meta Cloud API）経由で WhatsApp メッセージに応答します。返信は WhatsApp の 24 時間ルールに従います。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:116
+#: src/features/chat/thread/ask-user-prompt.tsx:237
 msgid "Answered"
 msgstr "回答済み"
 
@@ -3843,13 +3843,33 @@ msgstr ""
 msgid "Attach as file"
 msgstr ""
 
+#: src/features/chat/thread/ask-user-prompt.tsx:359
+msgid "Attach file"
+msgstr ""
+
 #: src/features/chat/header/kb-attachment-button.tsx:187
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "この会話で AI が参照・引用できるように、ファイルまたはコレクション全体を添付します。"
 
+#: src/features/chat/thread/ask-user-prompt.tsx:318
+msgid "Attached files"
+msgstr ""
+
 #: ../../packages/chat-ui/src/chat/message-item.tsx:121
 msgid "Attached image"
 msgstr "添付画像"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:281
+msgid "Attached:"
+msgstr ""
+
+#: src/features/chat/thread/ask-user-prompt.tsx:349
+msgid "Attaching files…"
+msgstr ""
+
+#: src/features/chat/thread/ask-user-prompt.tsx:359
+msgid "Attaching…"
+msgstr ""
 
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 msgid "Attachment"
@@ -3944,6 +3964,7 @@ msgstr ""
 #: src/features/chat/thread/composer-image-settings.tsx:28
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
+#: src/features/chat/thread/composer-model-selector.tsx:120
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
@@ -4308,7 +4329,7 @@ msgstr "利用停止"
 msgid "Base"
 msgstr "ベース"
 
-#: src/features/settings/components/chat/agent-settings.tsx:247
+#: src/features/settings/components/chat/agent-settings.tsx:237
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "ベース（エージェントループのみ）: 約 2,300 トークン"
 
@@ -7705,6 +7726,11 @@ msgstr ""
 msgid "Could not apply the changes"
 msgstr "変更を適用できませんでした"
 
+#. placeholder {0}: failed.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:229
+msgid "Could not attach {0}. The other files were attached; try those again."
+msgstr ""
+
 #: src/features/chat/thread/composer-input.tsx:1325
 msgid "Could not attach the chat"
 msgstr "チャットを添付できませんでした"
@@ -7721,9 +7747,18 @@ msgstr ""
 msgid "Could not cancel the run."
 msgstr "実行をキャンセルできませんでした。"
 
+#: src/features/chat/thread/composer-model-selector.tsx:127
+msgid "Could not change Auto. Please try again."
+msgstr ""
+
 #: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
 msgstr "プッシュ通知を変更できませんでした。もう一度お試しください。"
+
+#: src/features/chat/model-settings/use-model-combobox.ts:283
+#: src/features/chat/model-settings/use-model-combobox.ts:307
+msgid "Could not change the model. Please try again."
+msgstr ""
 
 #: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
@@ -7978,7 +8013,7 @@ msgstr ""
 msgid "Could not send your answer."
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:83
+#: src/features/chat/thread/ask-user-prompt.tsx:117
 #: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "回答を送信できませんでした。もう一度お試しください。"
@@ -8026,7 +8061,7 @@ msgstr ""
 msgid "Could not stop the worker."
 msgstr ""
 
-#: src/features/chat/model-settings/use-model-combobox.ts:148
+#: src/features/chat/model-settings/use-model-combobox.ts:161
 msgid "Could not switch the model. Please try again."
 msgstr ""
 
@@ -9825,7 +9860,7 @@ msgstr "Discord 公開鍵"
 
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:54
 #: src/features/changelog/components/changelog-card.tsx:59
-#: src/features/chat/thread/ask-user-prompt.tsx:191
+#: src/features/chat/thread/ask-user-prompt.tsx:367
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:202
@@ -9861,7 +9896,7 @@ msgstr "Webhook シークレットを閉じる"
 msgid "Dismissed"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:118
+#: src/features/chat/thread/ask-user-prompt.tsx:239
 msgid "Dismissed — continuing without an answer"
 msgstr "閉じました — 回答なしで続行中"
 
@@ -11170,7 +11205,7 @@ msgstr "API キーを入力してください"
 msgid "Enter the endpoint URL first"
 msgstr "先にエンドポイント URL を入力してください"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:182
+#: src/features/chat/thread/ask-user-prompt.tsx:335
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "Enter で送信、Shift+Enter で改行。"
 
@@ -11429,7 +11464,7 @@ msgstr ""
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "推定プロバイダーコスト {display}（ご自身の API キーに課金）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:243
+#: src/features/settings/components/chat/agent-settings.tsx:233
 msgid "Estimated token cost per conversation"
 msgstr "会話あたりの推定トークンコスト"
 
@@ -21096,7 +21131,7 @@ msgstr "メモ（任意）"
 msgid "Note for the next run (optional)"
 msgstr "次回の実行へのメモ（任意）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:253
+#: src/features/settings/components/chat/agent-settings.tsx:243
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "注: モジュールはメッセージ単位ではなく会話単位で適用されます。トークン使用量を最適化するため、必要なモジュールだけを有効にしてください。"
 
@@ -21476,6 +21511,10 @@ msgstr "請求設定を管理できるのは組織のオーナーのみです"
 #: src/features/chat/group/group-mode.ts:66
 msgid "Only participants you @mention answer."
 msgstr "@メンションした参加者のみが回答します。"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:172
+msgid "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
+msgstr ""
 
 #: src/features/settings/components/chat/trigger-settings.tsx:263
 msgid "Only post when there is something to report"
@@ -22239,7 +22278,7 @@ msgstr ""
 msgid "Or from a terminal:"
 msgstr "またはターミナルから："
 
-#: src/features/chat/thread/ask-user-prompt.tsx:176
+#: src/features/chat/thread/ask-user-prompt.tsx:312
 msgid "Or type your own answer…"
 msgstr "または自分で回答を入力…"
 
@@ -23480,7 +23519,7 @@ msgstr "プレミアムクラスの推論と指示追従"
 msgid "Premium-tier reasoning transparency"
 msgstr "プレミアムクラスの推論の透明性"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:122
+#: src/features/chat/thread/ask-user-prompt.tsx:243
 msgid "Preparing a question…"
 msgstr "質問を準備中…"
 
@@ -25216,10 +25255,11 @@ msgstr "「{0}」を削除しますか？"
 msgid "Remove “{0}”?"
 msgstr "「{0}」を削除しますか？"
 
+#. placeholder {0}: file.name
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
-#. placeholder {0}: variable.name
 #: src/features/chat/group/group-participant-bar.tsx:210
+#: src/features/chat/thread/ask-user-prompt.tsx:323
 #: src/features/prompts/components/thread-variables-config.tsx:232
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
@@ -25873,7 +25913,7 @@ msgstr ""
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
-#: src/features/settings/components/chat/agent-settings.tsx:234
+#: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -27250,7 +27290,7 @@ msgstr "下にメッセージを送信して始めましょう"
 msgid "Send a message to begin"
 msgstr "メッセージを送信して始めましょう"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:187
+#: src/features/chat/thread/ask-user-prompt.tsx:363
 msgid "Send answer"
 msgstr "回答を送信"
 
@@ -28356,7 +28396,7 @@ msgstr "当社側で問題が発生しました。しばらくしてからもう
 msgid "Something went wrong. Nothing was changed. Try again."
 msgstr ""
 
-#: src/features/settings/components/chat/agent-settings.tsx:224
+#: src/features/settings/components/chat/agent-settings.tsx:220
 #: src/features/skills/components/skill-list.tsx:252
 msgid "Something went wrong. Try again."
 msgstr "問題が発生しました。もう一度お試しください。"
@@ -29581,7 +29621,7 @@ msgstr "テック系 YouTube チャンネルの動画アイデアを提案する
 msgid "Suggested"
 msgstr "おすすめ"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:159
+#: src/features/chat/thread/ask-user-prompt.tsx:288
 #: src/features/skills/components/skill-builder-dialog.tsx:235
 msgid "Suggested answers"
 msgstr "回答の候補"
@@ -30536,7 +30576,7 @@ msgstr "アーカイブに安全でないファイルパスが含まれていま
 msgid "The archive holds too many files."
 msgstr "アーカイブに含まれるファイルが多すぎます。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:141
+#: src/features/chat/thread/ask-user-prompt.tsx:264
 msgid "The assistant has a question"
 msgstr "アシスタントから質問があります"
 
@@ -30552,7 +30592,7 @@ msgstr ""
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr ""
 
-#: src/features/chat/thread/composer-model-selector.tsx:90
+#: src/features/chat/thread/composer-model-selector.tsx:135
 msgid "The bot sets the model for this chat."
 msgstr ""
 
@@ -32002,7 +32042,7 @@ msgstr ""
 msgid "Token budget"
 msgstr "トークン予算"
 
-#: src/features/settings/components/chat/agent-settings.tsx:242
+#: src/features/settings/components/chat/agent-settings.tsx:232
 msgid "Token Cost Impact"
 msgstr "トークンコストへの影響"
 
@@ -32583,7 +32623,7 @@ msgstr ""
 msgid "Type to search"
 msgstr "入力して検索"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:176
+#: src/features/chat/thread/ask-user-prompt.tsx:312
 msgid "Type your answer…"
 msgstr "回答を入力…"
 
@@ -34331,7 +34371,7 @@ msgstr ""
 msgid "Waiting for the owner"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:124
+#: src/features/chat/thread/ask-user-prompt.tsx:245
 msgid "Waiting for the owner to answer"
 msgstr "オーナーの回答を待っています"
 
@@ -34352,7 +34392,7 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
-#: src/features/chat/thread/ask-user-prompt.tsx:124
+#: src/features/chat/thread/ask-user-prompt.tsx:245
 msgid "Waiting for your answer"
 msgstr "あなたの回答を待っています"
 
@@ -35298,7 +35338,7 @@ msgstr "アカウントと関連するすべてのデータを削除していま
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "あなたの AI ワークスペースは<0>ここから始まります。</0>"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:168
+#: src/features/chat/thread/ask-user-prompt.tsx:304
 msgid "Your answer"
 msgstr "あなたの回答"
 
@@ -35306,7 +35346,7 @@ msgstr "あなたの回答"
 msgid "Your answer in Neore has finished."
 msgstr "Neore での回答が完了しました。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:151
+#: src/features/chat/thread/ask-user-prompt.tsx:274
 msgid "Your answer:"
 msgstr "あなたの回答："
 

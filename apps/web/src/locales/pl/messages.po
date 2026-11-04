@@ -1347,15 +1347,15 @@ msgstr "Nr 1 w OpenRouter pod względem zużycia tokenów"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, one {# ulubiony} few {# ulubione} many {# ulubionych} other {# ulubionego}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:250
+#: src/features/settings/components/chat/agent-settings.tsx:240
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ Źródło danych: ~2700 tokenów (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:249
+#: src/features/settings/components/chat/agent-settings.tsx:239
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ Wiedza: ~2600 tokenów (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:248
+#: src/features/settings/components/chat/agent-settings.tsx:238
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ Planowanie zadań: ~2500 tokenów (+200)"
 
@@ -3316,7 +3316,7 @@ msgstr "Odpowiadaj na wiadomości do konta WeChat Official Account (tryb bezpiec
 msgid "Answer ready"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:120
+#: src/features/chat/thread/ask-user-prompt.tsx:241
 msgid "Answer sent — continuing"
 msgstr "Odpowiedź wysłana — kontynuowanie"
 
@@ -3324,7 +3324,7 @@ msgstr "Odpowiedź wysłana — kontynuowanie"
 msgid "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 msgstr "Odpowiadaj na wiadomości WhatsApp przez swój numer WhatsApp Business (Meta Cloud API). Odpowiedzi podlegają 24-godzinnej regule WhatsApp."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:116
+#: src/features/chat/thread/ask-user-prompt.tsx:237
 msgid "Answered"
 msgstr "Odpowiedziano"
 
@@ -3843,13 +3843,33 @@ msgstr ""
 msgid "Attach as file"
 msgstr ""
 
+#: src/features/chat/thread/ask-user-prompt.tsx:359
+msgid "Attach file"
+msgstr ""
+
 #: src/features/chat/header/kb-attachment-button.tsx:187
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "Dołącz pliki lub całe kolekcje, z których AI będzie korzystać i które będzie cytować w tej rozmowie."
 
+#: src/features/chat/thread/ask-user-prompt.tsx:318
+msgid "Attached files"
+msgstr ""
+
 #: ../../packages/chat-ui/src/chat/message-item.tsx:121
 msgid "Attached image"
 msgstr "Załączony obraz"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:281
+msgid "Attached:"
+msgstr ""
+
+#: src/features/chat/thread/ask-user-prompt.tsx:349
+msgid "Attaching files…"
+msgstr ""
+
+#: src/features/chat/thread/ask-user-prompt.tsx:359
+msgid "Attaching…"
+msgstr ""
 
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 msgid "Attachment"
@@ -3944,6 +3964,7 @@ msgstr ""
 #: src/features/chat/thread/composer-image-settings.tsx:28
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
+#: src/features/chat/thread/composer-model-selector.tsx:120
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
@@ -4308,7 +4329,7 @@ msgstr "Blokady"
 msgid "Base"
 msgstr "Podstawowy"
 
-#: src/features/settings/components/chat/agent-settings.tsx:247
+#: src/features/settings/components/chat/agent-settings.tsx:237
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "Podstawa (tylko pętla agenta): ~2300 tokenów"
 
@@ -7705,6 +7726,11 @@ msgstr ""
 msgid "Could not apply the changes"
 msgstr "Nie udało się zastosować zmian"
 
+#. placeholder {0}: failed.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:229
+msgid "Could not attach {0}. The other files were attached; try those again."
+msgstr ""
+
 #: src/features/chat/thread/composer-input.tsx:1325
 msgid "Could not attach the chat"
 msgstr "Nie udało się dołączyć czatu"
@@ -7721,9 +7747,18 @@ msgstr ""
 msgid "Could not cancel the run."
 msgstr "Nie udało się anulować przebiegu."
 
+#: src/features/chat/thread/composer-model-selector.tsx:127
+msgid "Could not change Auto. Please try again."
+msgstr ""
+
 #: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
 msgstr "Nie udało się zmienić powiadomień push. Spróbuj ponownie."
+
+#: src/features/chat/model-settings/use-model-combobox.ts:283
+#: src/features/chat/model-settings/use-model-combobox.ts:307
+msgid "Could not change the model. Please try again."
+msgstr ""
 
 #: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
@@ -7978,7 +8013,7 @@ msgstr ""
 msgid "Could not send your answer."
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:83
+#: src/features/chat/thread/ask-user-prompt.tsx:117
 #: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "Nie udało się wysłać twojej odpowiedzi. Spróbuj ponownie."
@@ -8026,7 +8061,7 @@ msgstr ""
 msgid "Could not stop the worker."
 msgstr ""
 
-#: src/features/chat/model-settings/use-model-combobox.ts:148
+#: src/features/chat/model-settings/use-model-combobox.ts:161
 msgid "Could not switch the model. Please try again."
 msgstr ""
 
@@ -9825,7 +9860,7 @@ msgstr "Discord Public Key"
 
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:54
 #: src/features/changelog/components/changelog-card.tsx:59
-#: src/features/chat/thread/ask-user-prompt.tsx:191
+#: src/features/chat/thread/ask-user-prompt.tsx:367
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:202
@@ -9861,7 +9896,7 @@ msgstr "Zamknij sekret webhooka"
 msgid "Dismissed"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:118
+#: src/features/chat/thread/ask-user-prompt.tsx:239
 msgid "Dismissed — continuing without an answer"
 msgstr "Odrzucono — kontynuowanie bez odpowiedzi"
 
@@ -11170,7 +11205,7 @@ msgstr "Wpisz klucz API"
 msgid "Enter the endpoint URL first"
 msgstr "Najpierw wpisz URL endpointu"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:182
+#: src/features/chat/thread/ask-user-prompt.tsx:335
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "Enter, aby wysłać, Shift+Enter, aby dodać nowy wiersz."
 
@@ -11429,7 +11464,7 @@ msgstr ""
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "Szacowany koszt dostawcy {display}, rozliczany z twojego własnego klucza API"
 
-#: src/features/settings/components/chat/agent-settings.tsx:243
+#: src/features/settings/components/chat/agent-settings.tsx:233
 msgid "Estimated token cost per conversation"
 msgstr "Szacowany koszt tokenów na rozmowę"
 
@@ -21096,7 +21131,7 @@ msgstr "Notatka (opcjonalnie)"
 msgid "Note for the next run (optional)"
 msgstr "Uwaga do następnego przebiegu (opcjonalnie)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:253
+#: src/features/settings/components/chat/agent-settings.tsx:243
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "Uwaga: moduły są stosowane dla całej rozmowy, a nie dla pojedynczej wiadomości. Włącz tylko potrzebne moduły, aby zoptymalizować zużycie tokenów."
 
@@ -21476,6 +21511,10 @@ msgstr "Tylko właściciele organizacji mogą zarządzać ustawieniami rozlicze�
 #: src/features/chat/group/group-mode.ts:66
 msgid "Only participants you @mention answer."
 msgstr "Odpowiadają tylko uczestnicy, których @wspomnisz."
+
+#: src/features/chat/thread/ask-user-prompt.tsx:172
+msgid "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
+msgstr ""
 
 #: src/features/settings/components/chat/trigger-settings.tsx:263
 msgid "Only post when there is something to report"
@@ -22239,7 +22278,7 @@ msgstr ""
 msgid "Or from a terminal:"
 msgstr "Lub z terminala:"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:176
+#: src/features/chat/thread/ask-user-prompt.tsx:312
 msgid "Or type your own answer…"
 msgstr "Lub wpisz własną odpowiedź…"
 
@@ -23480,7 +23519,7 @@ msgstr "Rozumowanie i wykonywanie instrukcji klasy premium"
 msgid "Premium-tier reasoning transparency"
 msgstr "Przejrzystość rozumowania klasy premium"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:122
+#: src/features/chat/thread/ask-user-prompt.tsx:243
 msgid "Preparing a question…"
 msgstr "Przygotowywanie pytania…"
 
@@ -25216,10 +25255,11 @@ msgstr "Usunąć „{0}”?"
 msgid "Remove “{0}”?"
 msgstr "Usunąć „{0}”?"
 
+#. placeholder {0}: file.name
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
-#. placeholder {0}: variable.name
 #: src/features/chat/group/group-participant-bar.tsx:210
+#: src/features/chat/thread/ask-user-prompt.tsx:323
 #: src/features/prompts/components/thread-variables-config.tsx:232
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
@@ -25873,7 +25913,7 @@ msgstr ""
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
-#: src/features/settings/components/chat/agent-settings.tsx:234
+#: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -27250,7 +27290,7 @@ msgstr "Wyślij wiadomość poniżej, aby zacząć"
 msgid "Send a message to begin"
 msgstr "Wyślij wiadomość, aby zacząć"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:187
+#: src/features/chat/thread/ask-user-prompt.tsx:363
 msgid "Send answer"
 msgstr "Wyślij odpowiedź"
 
@@ -28356,7 +28396,7 @@ msgstr "Coś poszło nie tak po naszej stronie. Spróbuj ponownie za chwilę."
 msgid "Something went wrong. Nothing was changed. Try again."
 msgstr ""
 
-#: src/features/settings/components/chat/agent-settings.tsx:224
+#: src/features/settings/components/chat/agent-settings.tsx:220
 #: src/features/skills/components/skill-list.tsx:252
 msgid "Something went wrong. Try again."
 msgstr "Coś poszło nie tak. Spróbuj ponownie."
@@ -29581,7 +29621,7 @@ msgstr "Zaproponuj pomysły na filmy dla technologicznego kanału YouTube"
 msgid "Suggested"
 msgstr "Sugerowane"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:159
+#: src/features/chat/thread/ask-user-prompt.tsx:288
 #: src/features/skills/components/skill-builder-dialog.tsx:235
 msgid "Suggested answers"
 msgstr "Sugerowane odpowiedzi"
@@ -30536,7 +30576,7 @@ msgstr "Archiwum zawiera niebezpieczną ścieżkę pliku."
 msgid "The archive holds too many files."
 msgstr "Archiwum zawiera zbyt wiele plików."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:141
+#: src/features/chat/thread/ask-user-prompt.tsx:264
 msgid "The assistant has a question"
 msgstr "Asystent ma pytanie"
 
@@ -30552,7 +30592,7 @@ msgstr ""
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr ""
 
-#: src/features/chat/thread/composer-model-selector.tsx:90
+#: src/features/chat/thread/composer-model-selector.tsx:135
 msgid "The bot sets the model for this chat."
 msgstr ""
 
@@ -32002,7 +32042,7 @@ msgstr ""
 msgid "Token budget"
 msgstr "Budżet tokenów"
 
-#: src/features/settings/components/chat/agent-settings.tsx:242
+#: src/features/settings/components/chat/agent-settings.tsx:232
 msgid "Token Cost Impact"
 msgstr "Wpływ na koszt tokenów"
 
@@ -32583,7 +32623,7 @@ msgstr ""
 msgid "Type to search"
 msgstr "Pisz, aby wyszukać"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:176
+#: src/features/chat/thread/ask-user-prompt.tsx:312
 msgid "Type your answer…"
 msgstr "Wpisz odpowiedź…"
 
@@ -34331,7 +34371,7 @@ msgstr ""
 msgid "Waiting for the owner"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:124
+#: src/features/chat/thread/ask-user-prompt.tsx:245
 msgid "Waiting for the owner to answer"
 msgstr "Oczekiwanie na odpowiedź właściciela"
 
@@ -34352,7 +34392,7 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
-#: src/features/chat/thread/ask-user-prompt.tsx:124
+#: src/features/chat/thread/ask-user-prompt.tsx:245
 msgid "Waiting for your answer"
 msgstr "Oczekiwanie na twoją odpowiedź"
 
@@ -35298,7 +35338,7 @@ msgstr "Twoje konto i wszystkie powiązane dane są usuwane. Nie można tego anu
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "Twoja przestrzeń robocza AI <0>zaczyna się tutaj.</0>"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:168
+#: src/features/chat/thread/ask-user-prompt.tsx:304
 msgid "Your answer"
 msgstr "Twoja odpowiedź"
 
@@ -35306,7 +35346,7 @@ msgstr "Twoja odpowiedź"
 msgid "Your answer in Neore has finished."
 msgstr "Twoja odpowiedź w Neore jest gotowa."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:151
+#: src/features/chat/thread/ask-user-prompt.tsx:274
 msgid "Your answer:"
 msgstr "Twoja odpowiedź:"
 

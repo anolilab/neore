@@ -42,7 +42,8 @@ export const answerAskUser = authMutation
         if (answerFileIds.length > 0) {
             const thread = await ctx.db.get("threads", threadId);
 
-            if (thread && isThreadLocked(thread)) {
+            // Only the owner learns the lock: a stranger gets the same answer as for any other thread, from the claim below.
+            if (thread && thread.userId === ctx.user.userId && isThreadLocked(thread)) {
                 throw new LunoraError("FORBIDDEN", "Files cannot be attached to an answer in a locked chat.");
             }
         }

@@ -45,6 +45,11 @@ const ANSWER_MAX = 4000;
 const FILES_MAX = 4;
 const FILE_TYPES: ReadonlyArray<string> = ["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"];
 const FILE_MAX_BYTES = 10 * 1024 * 1024;
+/** A photo may be larger than the file limit as selected: it is re-encoded before upload. This caps what is read into memory. */
+const IMAGE_SELECT_MAX_BYTES = 40 * 1024 * 1024;
+
+/** The largest a selected file may be: a photo gets the wider limit, since it is re-encoded before upload. */
+const selectLimitOf = (file: File): number => (file.type.startsWith("image/") ? IMAGE_SELECT_MAX_BYTES : FILE_MAX_BYTES);
 /** Mirrors `ASK_USER_FILES_TOTAL_MAX_BYTES` on the server. */
 const FILES_TOTAL_MAX_BYTES = 20 * 1024 * 1024;
 
@@ -80,6 +85,8 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     // Focus lands here after a send: the form (and the focused control) goes away.
     const groupRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    // Stops the selection in progress when the question is answered or dismissed, so no later file is uploaded or finalized.
+    const uploadAbort = useRef<AbortController | null>(null);
     const { isPending, mutate } = useMutation(crpc.chat.ask_user.answerAskUser.mutationOptions());
 
     const input = (typeof part.input === "object" && part.input !== null ? part.input : {}) as AskUserInput;
@@ -96,6 +103,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
             return;
         }
 
+        uploadAbort.current?.abort();
         setSubmitted(reply);
         groupRef.current?.focus();
         mutate(
@@ -145,7 +153,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         fileInput.value = "";
 
         const room = FILES_MAX - files.length;
-        const typed = picked.filter((file) => FILE_TYPES.includes(file.type) && file.size <= FILE_MAX_BYTES);
+        const typed = picked.filter((file) => FILE_TYPES.includes(file.type) && file.size <= selectLimitOf(file));
         const accepted: File[] = [];
         let total = files.reduce((sum, file) => sum + file.size, 0);
 
@@ -162,7 +170,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         }
 
         if (accepted.length < picked.length) {
-            showError(t`Only PNG, JPEG, WEBP or GIF images and PDFs up to 10 MB each, 20 MB in all, four at most.`);
+            showError(t`Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most.`);
         }
 
         if (accepted.length === 0) {
@@ -171,15 +179,36 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
 
         setUploading(true);
 
+        const controller = new AbortController();
+
+        uploadAbort.current = controller;
+
         // One file's failure does not stop the others: each is attached or named as failed.
         const failed: string[] = [];
 
         try {
             for (const file of accepted) {
+                if (controller.signal.aborted) {
+                    break;
+                }
+
                 try {
                     // Photos are re-encoded below the provider's per-image limit, as the composer does; PDFs go as they are.
                     const prepared = file.type.startsWith("image/") ? await downscaleOversizedImage(file) : file;
-                    const uploadId = await uploadFile(prepared, { contentType: prepared.type });
+
+                    // A photo that re-encoding could not bring under the file limit is named as failed, like any other.
+                    if (prepared.size > FILE_MAX_BYTES) {
+                        failed.push(file.name);
+
+                        continue;
+                    }
+
+                    const uploadId = await uploadFile(prepared, { contentType: prepared.type, signal: controller.signal });
+
+                    if (controller.signal.aborted) {
+                        break;
+                    }
+
                     const { fileId } = await finalizeUpload({ filename: file.name, uploadId });
 
                     // The server dedupes uploads by content, so the same photo can come back with an id already attached.
@@ -187,7 +216,10 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         current.some((item) => item.fileId === fileId) ? current : [...current, { fileId, name: file.name, size: prepared.size }],
                     );
                 } catch {
-                    failed.push(file.name);
+                    // An upload cut short by a dismissal is not a failure to report.
+                    if (!controller.signal.aborted) {
+                        failed.push(file.name);
+                    }
                 }
             }
         } finally {
