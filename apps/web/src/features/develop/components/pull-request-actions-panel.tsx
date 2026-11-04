@@ -73,6 +73,8 @@ const PullRequestActionsPanel = ({
     const actions = usePullRequestActions(address);
     // A second click before the first revert has rendered must not open a second revert pull request.
     const revertInFlight = useRef(false);
+    // The same for a reviewer request: the button is off only after the next render, so a second click can arrive first.
+    const reviewInFlight = useRef(false);
     const canEdit = isHostCapabilityAvailable(capabilities, "pullRequest.edit");
     const canReview = isHostCapabilityAvailable(capabilities, "reviewers.request") && state === "open";
     const canRevert = isHostCapabilityAvailable(capabilities, "pullRequest.revert") && state === "merged";
@@ -164,7 +166,7 @@ const PullRequestActionsPanel = ({
         setFeedback(next);
     };
 
-    const sendReviewers = async () => {
+    const submitReviewers = async () => {
         const logins = parseLogins(reviewing ?? "");
         const problem = reviewerProblem(logins);
 
@@ -197,6 +199,20 @@ const PullRequestActionsPanel = ({
 
         setReviewing(null);
         setFeedback(next);
+    };
+
+    const sendReviewers = async () => {
+        if (reviewInFlight.current) {
+            return;
+        }
+
+        reviewInFlight.current = true;
+
+        try {
+            await submitReviewers();
+        } finally {
+            reviewInFlight.current = false;
+        }
     };
 
     const revertNow = async () => {
