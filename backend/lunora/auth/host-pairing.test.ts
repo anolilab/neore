@@ -444,6 +444,34 @@ describe("pairing a headless machine by code", () => {
         expect(harness.registrations).toHaveLength(1);
     });
 
+    it("keeps the code unspent while a full account at registration tells the machine to wait", async () => {
+        let full = true;
+        const harness = build({
+            register: async () => {
+                if (full) {
+                    throw Object.assign(new Error("At most 10 devices can be paired. Remove one first."), { code: "BAD_REQUEST" });
+                }
+            },
+        });
+        const owner = await signUp(harness);
+        const code = await requestHostCode(harness);
+
+        await approve(harness, owner.cookie, code.user_code);
+        vi.setSystemTime(Date.now() + 6000);
+
+        const waiting = await redeem(harness, code.device_code);
+
+        expect(waiting.response.status).toBe(403);
+        expect(waiting.body["error"]).toBe("device_limit");
+
+        // A slot is freed: the same code completes the pairing.
+        full = false;
+        vi.setSystemTime(Date.now() + 6000);
+
+        expect(await statusOf(harness, code.device_code)).toBe(200);
+        expect(harness.registrations).toHaveLength(1);
+    });
+
     it("keeps a deliberate refusal at registration final", async () => {
         const harness = build({
             register: async () => {

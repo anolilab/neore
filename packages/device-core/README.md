@@ -198,3 +198,29 @@ The list (`egress::DEPENDENCY_HOSTS`; `cargo test egress` fails if this table an
 `objects` entries come from the tools' documented defaults and were not exercised.
 
 SSH servers (`neore-host`) keep the on/off shell-network switch; the tiers are not offered for them yet.
+
+## Headless host (`neore-host pair | run | unpair`, feature `headless`)
+
+A machine the owner pairs by code, as a device with its own secret (unlike an SSH server, whose secret stays on the
+desktop). The `headless` feature links the keyring and an HTTPS client; the build shipped to SSH servers stays
+`--no-default-features`.
+
+- **Pairing.** `pair` asks the backend for a `neore-host` code on the device-authorization plugin the CLI sign-in
+  uses (same table, rate limits, expiry and one-time claim) and announces `storage: keychain|file`, so the approval
+  page says where the secret will live. The owner approves in the web app; the machine's next poll claims the code,
+  the device is registered, and the secret is in that one response. A full account (`device_limit`) is waited on with
+  the code unspent; a registration that fails for a reason of ours puts the code back, and registration is
+  idempotent per code, so a lost reply yields one device.
+- **Address.** https only. A loopback address over plain http is accepted by a debug build with
+  `NEORE_HOST_DEV_INSECURE_LOOPBACK=1`; a release build never reads the flag.
+- **Storage.** The OS keychain when a probe round-trips, else a 0600 file in a 0700 folder (`NEORE_HOST_DIR`; macOS
+  `~/Library/Application Support/Neore Host`, Linux `$XDG_CONFIG_HOME/neore-host` or `~/.config/neore-host`). The
+  folder must be a real folder of the user that others cannot enter, the record a plain file of the user. The record
+  is replaced through a temporary file. A group-readable secret file, or a keychain that lost its secret, is refused
+  at load. The keychain account is `<backend>|<device id>`.
+- **Commands.** `pair` opens no listener. `run` only decides which signed calls are for this device
+  (`envelope::verify_call`, nonces persisted, a damaged history refuses to start) over its own stdin. `pair`, `run`
+  and `unpair` take one lock on the folder; `unpair` asks first (`--yes`, `--dry-run`), removes the keychain entry
+  before the record, and is refused while `run` holds the pairing.
+- **Exit codes of `pair`.** 0 paired, 2 usage, 3 denied, 4 expired, 5 code invalid or used, 6 refused, 7 backend
+  unreachable (worth retrying), 8 possibly registered or not stored, 1 other.

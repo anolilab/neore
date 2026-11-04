@@ -401,9 +401,9 @@ const redeemHost = (options: HostPairingOptions) =>
         } catch (error) {
             const refusal = refusalOrRetryable(error);
 
-            // A failure of ours (not a refusal): nothing was registered, so put the code back and the machine's next
-            // poll finishes the pairing, as with a failed key mint. A refusal leaves it spent, as before.
-            if (refusalCode(error) === undefined) {
+            // A failure of ours, or a full account (`device_limit`, which tells the machine to wait): put the code back so
+            // the machine's next poll finishes the pairing, as with a failed key mint. Only a final refusal leaves it spent.
+            if (refusalCode(error) !== "FORBIDDEN") {
                 await restoreClaimedCode(ctx.context.adapter, claimedDeviceCode, error);
             }
 
