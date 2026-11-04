@@ -84,17 +84,18 @@ describe("the options an agent offers when the session opens", () => {
             { id: "deep", name: "Deep" },
         ]);
         expect(isAvailable(capabilityOf(report, "identity.reasoningEffort"))).toBe(true);
-        expect(report?.groups.permissions?.modes).toEqual(["ask", "code"]);
+        // The session's modes are not permission modes the runner enforces, so they are not reported as such.
+        expect(report?.groups.permissions?.modes ?? []).toEqual([]);
     });
 
-    it("reports the legacy states when the agent sends no options", async () => {
+    it("reports the legacy states to the host, but not as capabilities: the agent cannot change them", async () => {
         const { opened, states } = await start("legacy-modes");
 
         expect(states).toEqual([
             { models: { available: [{ id: "m1", name: "M1" }], current: "m1" }, modes: { available: [{ id: "ask", name: "Ask" }, { id: "code", name: "Code" }], current: "ask" } },
         ]);
-        expect(opened[0]?.capabilities?.groups.identity?.models).toEqual([{ id: "m1", name: "M1" }]);
-        expect(opened[0]?.capabilities?.groups.permissions?.modes).toEqual(["ask", "code"]);
+        expect(opened[0]?.capabilities?.groups.identity?.models).toEqual([]);
+        expect(opened[0]?.capabilities?.groups.permissions?.modes ?? []).toEqual([]);
     });
 
     it("reports nothing, and no capability, for an agent that offers none", async () => {
