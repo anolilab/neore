@@ -124,9 +124,9 @@ interface ChatUIStore {
     isSubmitting: boolean;
     // Composer actions
     noteComposerHiddenRemoved: (count: number) => void;
+
     // Canvas/Artifact actions
     openCanvas: (documentId: string) => void;
-
     openPreviewFile: (file: PreviewFile) => void;
     /** A chat PDF open in the side panel, instead of a document. Cleared when a document opens or the panel closes. */
     previewFile: PreviewFile | null;

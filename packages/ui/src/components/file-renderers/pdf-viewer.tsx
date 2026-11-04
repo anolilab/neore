@@ -30,7 +30,6 @@ export interface PdfViewerProps {
     url: string;
 }
 
-// A stalled signed-URL request must not leave the spinner up forever (`PDF_LOAD_TIMEOUT_MS`).
 const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, fill, url }) => {
     const { t } = useLingui();
     const [numberPages, setNumberPages] = useState<number>(0);
