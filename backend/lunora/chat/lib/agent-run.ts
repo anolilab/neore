@@ -1093,7 +1093,8 @@ export const resumeApprovedRun = async (
             mcpProgress: toolProgressSink(ctx, streamId),
             model: config.model,
             // The paused run's organization, for a thread that has no stored one (see BuildAgentToolsOptions.organizationId).
-            organizationId: config.organizationId ?? null,
+            // A group speaker's snapshot keeps it under `group`.
+            organizationId: config.organizationId ?? config.group?.organizationId ?? null,
             origin: config.dispatchOrigin,
             searchMode: config.searchMode as SearchMode,
             snapshot: { mcpServerNames: config.mcpServerNames, toolNames: config.toolNames },
