@@ -92,6 +92,19 @@ describe("loadAskUserFiles", () => {
         expect(runQuery).toHaveBeenCalledTimes(ASK_USER_MAX_FILES);
     });
 
+    it("stops at the answer's total budget: a file that would exceed what is left is left out", async () => {
+        const eightMb = new Uint8Array(8 * 1024 * 1024);
+        const ids = ["big1", "big2", "big3"];
+        const { ctx } = makeCtx(
+            Object.fromEntries(ids.map((id) => [id, fileRow(id, "image/png")])),
+            Object.fromEntries(ids.map((id) => [`key/${id}`, objectOf(eightMb)])),
+        );
+
+        const files = await loadAskUserFiles(ctx, { fileIds: ids, threadId: "t1", userId: "u1" });
+
+        expect(files).toHaveLength(2);
+    }, 30_000);
+
     it("raises a storage failure that is not a missing or oversized file", async () => {
         const ctx = {
             runQuery: vi.fn(async () => fileRow("a", "image/png")),

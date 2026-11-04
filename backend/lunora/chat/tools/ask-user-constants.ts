@@ -26,6 +26,9 @@ export const ASK_USER_FILE_TYPES: ReadonlyArray<string> = ["image/png", "image/j
 /** The largest file an answer may carry, in bytes. */
 export const ASK_USER_FILE_MAX_BYTES = 10 * 1024 * 1024;
 
+/** Every file of one answer together, in bytes: the bytes are held in memory for the one model call. */
+export const ASK_USER_FILES_TOTAL_MAX_BYTES = 20 * 1024 * 1024;
+
 export interface AskUserInput {
     choices?: string[];
     question: string;

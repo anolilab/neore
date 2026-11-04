@@ -16,7 +16,7 @@ import { internal } from "../../_generated/internal";
 import type { ActionCtx } from "../../_generated/server";
 import { readStoredObject } from "../../lib/storage-read";
 import type { AskUserFile } from "../tools/ask-user-constants";
-import { ASK_USER_FILE_MAX_BYTES, ASK_USER_FILE_TYPES, ASK_USER_MAX_FILES } from "../tools/ask-user-constants";
+import { ASK_USER_FILE_MAX_BYTES, ASK_USER_FILE_TYPES, ASK_USER_FILES_TOTAL_MAX_BYTES, ASK_USER_MAX_FILES } from "../tools/ask-user-constants";
 
 /** The error codes that mean "leave this file out" rather than "the read failed". */
 const SKIP_CODES: ReadonlySet<string> = new Set(["NOT_FOUND", "PAYLOAD_TOO_LARGE"]);
@@ -41,6 +41,7 @@ export const loadAskUserFiles = async (
 ): Promise<AskUserFile[]> => {
     const files: AskUserFile[] = [];
     const ids = [...new Set(args.fileIds)].slice(0, ASK_USER_MAX_FILES);
+    let total = 0;
 
     for (const fileId of ids) {
         const file = await ctx.runQuery(internal.agent.files.getFileForUser, {
@@ -53,9 +54,17 @@ export const loadAskUserFiles = async (
             continue;
         }
 
-        try {
-            const { bytes } = await readStoredObject(ctx.storage, file.storageId, { maxBytes: ASK_USER_FILE_MAX_BYTES });
+        // What is left of the answer's budget: a file that would exceed it is left out like an oversized one.
+        const remaining = ASK_USER_FILES_TOTAL_MAX_BYTES - total;
 
+        if (remaining <= 0) {
+            break;
+        }
+
+        try {
+            const { bytes } = await readStoredObject(ctx.storage, file.storageId, { maxBytes: Math.min(ASK_USER_FILE_MAX_BYTES, remaining) });
+
+            total += bytes.byteLength;
             files.push({ data: toBase64(bytes), filename: file.filename ?? "file", mediaType: file.mediaType });
         } catch (error) {
             // Only "gone" and "too big" are the file's fault; a failed read is the run's, and it fails as one.

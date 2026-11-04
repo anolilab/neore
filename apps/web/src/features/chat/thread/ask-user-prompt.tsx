@@ -44,6 +44,8 @@ const ANSWER_MAX = 4000;
 const FILES_MAX = 4;
 const FILE_TYPES: ReadonlyArray<string> = ["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"];
 const FILE_MAX_BYTES = 10 * 1024 * 1024;
+/** Mirrors `ASK_USER_FILES_TOTAL_MAX_BYTES` on the server. */
+const FILES_TOTAL_MAX_BYTES = 20 * 1024 * 1024;
 
 interface AskUserInput {
     choices?: string[];
@@ -57,6 +59,7 @@ type Submitted = { answer: string; kind: "answer" } | { kind: "dismiss" };
 interface AttachedFile {
     fileId: string;
     name: string;
+    size: number;
 }
 
 const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
@@ -141,10 +144,21 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         fileInput.value = "";
 
         const room = FILES_MAX - files.length;
-        const accepted = picked.filter((file) => FILE_TYPES.includes(file.type) && file.size <= FILE_MAX_BYTES).slice(0, Math.max(room, 0));
+        const typed = picked.filter((file) => FILE_TYPES.includes(file.type) && file.size <= FILE_MAX_BYTES);
+        const accepted: File[] = [];
+        let total = files.reduce((sum, file) => sum + file.size, 0);
+
+        for (const file of typed) {
+            if (accepted.length >= room || total + file.size > FILES_TOTAL_MAX_BYTES) {
+                break;
+            }
+
+            accepted.push(file);
+            total += file.size;
+        }
 
         if (accepted.length < picked.length) {
-            showError(t`Only PNG, JPEG, WEBP or GIF images and PDFs up to 10 MB, four at most.`);
+            showError(t`Only PNG, JPEG, WEBP or GIF images and PDFs up to 10 MB each, 20 MB in all, four at most.`);
         }
 
         if (accepted.length === 0) {
@@ -153,17 +167,26 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
 
         setUploading(true);
 
+        // One file's failure does not stop the others: each is attached or named as failed.
+        const failed: string[] = [];
+
         try {
             for (const file of accepted) {
-                const uploadId = await uploadFile(file, { contentType: file.type });
-                const { fileId } = await finalizeUpload({ filename: file.name, uploadId });
+                try {
+                    const uploadId = await uploadFile(file, { contentType: file.type });
+                    const { fileId } = await finalizeUpload({ filename: file.name, uploadId });
 
-                setFiles((current) => [...current, { fileId, name: file.name }]);
+                    setFiles((current) => [...current, { fileId, name: file.name, size: file.size }]);
+                } catch {
+                    failed.push(file.name);
+                }
             }
-        } catch (error) {
-            showError(error instanceof Error ? error : t`Could not attach that file. Please try again.`);
         } finally {
             setUploading(false);
+        }
+
+        if (failed.length > 0) {
+            showError(t`Could not attach ${failed.join(", ")}. The other files were attached; try those again.`);
         }
     };
 
@@ -282,6 +305,9 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         type="file"
                     />
                     <div className="flex flex-wrap gap-2">
+                        <span className="sr-only" role="status">
+                            {uploading ? t`Attaching files…` : ""}
+                        </span>
                         <Button
                             disabled={uploading || files.length >= FILES_MAX}
                             onClick={() => fileInputRef.current?.click()}

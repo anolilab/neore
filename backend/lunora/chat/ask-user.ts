@@ -11,9 +11,10 @@
  * reads. A repeat call returns the first call's stream.
  */
 import { MAX_LENGTH } from "../lib/validators";
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import { authMutation, rateLimit } from "../lib/crpc";
+import { isThreadLocked } from "../lib/thread-lock";
 import { claimAskUserAnswer } from "./lib/ask-user-claim";
 import { resumeClaimedRun } from "./lib/tool-approval-resume";
 import { ASK_USER_ANSWER_MAX, ASK_USER_DISMISSED_REASON, ASK_USER_MAX_FILES } from "./tools/ask-user-constants";
@@ -34,6 +35,18 @@ export const answerAskUser = authMutation
     })
     .output(v.object({ alreadyResolved: v.boolean(), streamId: v.union(v.string(), v.null()) }))
     .mutation(async ({ args: { answer, approvalId, fileIds, threadId, unlockProof }, ctx }) => {
+        // A malformed id is not a file: it is dropped here, so it cannot fail the run that answers the question.
+        const answerFileIds = (fileIds ?? []).filter((id) => ctx.db.normalizeId("chatFiles", id) !== null);
+
+        // The run resumes later without the lock's proof, so the files could not be read there: refused now, not dropped.
+        if (answerFileIds.length > 0) {
+            const thread = await ctx.db.get("threads", threadId);
+
+            if (thread && isThreadLocked(thread)) {
+                throw new LunoraError("FORBIDDEN", "Files cannot be attached to an answer in a locked chat.");
+            }
+        }
+
         const claim = await claimAskUserAnswer(ctx, {
             approvalId,
             callerId: ctx.user.userId,
@@ -55,7 +68,7 @@ export const answerAskUser = authMutation
             threadId,
             ...(claim.answer === undefined
                 ? { denyReason: ASK_USER_DISMISSED_REASON }
-                : { answer: claim.answer, ...(fileIds !== undefined && fileIds.length > 0 && { answerFileIds: fileIds }) }),
+                : { answer: claim.answer, ...(answerFileIds.length > 0 && { answerFileIds }) }),
         });
 
         ctx.log.event("chat.answer_ask_user", { alreadyResolved: false, dismissed: claim.answer === undefined, resumed: streamId !== null });

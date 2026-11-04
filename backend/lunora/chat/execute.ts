@@ -927,6 +927,7 @@ export const continueAfterToolApproval = internalAction
             if (config.group) {
                 await continueGroupAfterToolApproval(ctx, {
                     answer,
+                    answerFileIds,
                     approvalId,
                     approved,
                     config: { ...config, group: config.group },
