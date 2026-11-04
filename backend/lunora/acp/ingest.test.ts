@@ -968,16 +968,26 @@ describe("a host turn", () => {
         expect(JSON.stringify(saved)).not.toContain("Run the tests");
     });
 
-    it("refuses a tool's output past its tail and an exit code that is not whole", async () => {
+    it("shows a call's output and exit from its own event, and refuses an output past its tail or an exit code that is not whole", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);
         const call = { id: "c1", kind: "tool", status: "completed", title: "Run", toolKind: "execute" };
+        const printed = { id: "c1", kind: "tool_output" };
 
-        await expect(turn(device, threadId, "t1", 0, [START(), { ...call, output: "x".repeat(2001) }])).resolves.toMatchObject({ status: 400 });
-        await expect(turn(device, threadId, "t1", 0, [START(), { ...call, exit: { code: 1.5 } }])).resolves.toMatchObject({ status: 400 });
+        await expect(turn(device, threadId, "t1", 0, [START(), call, { ...printed, output: "x".repeat(2001) }])).resolves.toMatchObject({ status: 400 });
+        await expect(turn(device, threadId, "t1", 0, [START(), call, { ...printed, exit: { code: 1.5 }, output: "" }])).resolves.toMatchObject({ status: 400 });
+        // The `tool` event keeps the shape its stored chunks were written in: output never rides on it.
+        await expect(turn(device, threadId, "t1", 0, [START(), { ...call, output: "x" }])).resolves.toMatchObject({ status: 200 });
         await expect(
-            turn(device, threadId, "t1", 0, [START(), { ...call, exit: { code: 1, signal: "SIGTERM" }, output: "x".repeat(2000) }]),
+            turn(device, threadId, "t1", 1, [call, { ...printed, exit: { code: 1, signal: "SIGTERM" }, output: "x".repeat(2000) }]),
         ).resolves.toMatchObject({ status: 200 });
+
+        const stream = await streamFor("t1");
+        const body = (await as(ownerId).query(streaming.getStreamBody as never, { streamId: stream?._id } as never)) as Record<string, any>;
+
+        expect(body.hostActivity.tools).toEqual([
+            { exit: { code: 1, signal: "SIGTERM" }, id: "c1", output: "x".repeat(2000), status: "completed", title: "Run", toolKind: "execute" },
+        ]);
     });
 
     it("refuses a plan past its limits", async () => {

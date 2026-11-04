@@ -28,12 +28,16 @@ describe(hostActivityOf, () => {
         ]);
     });
 
-    it("carries the latest output tail and exit status a call reported", () => {
-        const done = { event: { ...tool("a", "completed").event, exit: { code: 0 }, output: "ok" } };
+    it("puts a call's latest output and exit on its row, and keeps them through a later status report", () => {
+        const printed = (output: string, code?: number) => {
+            return { event: { id: "a", kind: "tool_output" as const, output, ...(code !== undefined && { exit: { code } }) } };
+        };
 
-        expect(hostActivityOf([tool("a", "in_progress"), done])?.tools).toEqual([
+        expect(hostActivityOf([tool("a", "in_progress"), printed("half"), printed("ok", 0), tool("a", "completed")])?.tools).toEqual([
             { exit: { code: 0 }, id: "a", output: "ok", status: "completed", title: "Run a", toolKind: "execute" },
         ]);
+        // Output for a call never reported has no row.
+        expect(hostActivityOf([printed("orphan")])).toBeUndefined();
     });
 
     it("keeps the most recent calls of a long turn", () => {

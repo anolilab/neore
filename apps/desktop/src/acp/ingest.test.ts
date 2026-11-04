@@ -712,19 +712,27 @@ describe("a turn", () => {
         ]);
     });
 
-    it("posts a call's output tail and its terminal's exit, cut to what the backend takes", async () => {
+    it("posts a call's output tail and its terminal's exit as an event of their own, cut, and only when they changed", async () => {
         const host = poster();
+        const done = { exit: { code: 2, signal: "S".repeat(40) }, id: "c1", kind: "execute", output: `${"x".repeat(3000)}END`, status: "completed", title: "Run" };
 
         await open(host);
         host.turnStarted("s1", "t1", "go");
-        host.tool("s1", "t1", { exit: { code: 2, signal: "S".repeat(40) }, id: "c1", kind: "execute", output: `${"x".repeat(3000)}END`, status: "completed", title: "Run" });
+        host.tool("s1", "t1", { id: "c1", kind: "execute", status: "in_progress", title: "Run" });
+        host.tool("s1", "t1", done);
+        host.tool("s1", "t1", done);
         await settle(POST_INTERVAL_MS);
 
-        const [, posted] = backend.chunks.get("t1") ?? [];
+        const events = backend.chunks.get("t1") ?? [];
 
-        expect(posted).toMatchObject({ exit: { code: 2, signal: "S".repeat(32) }, id: "c1", kind: "tool", status: "completed" });
-        expect(posted && "output" in posted ? posted.output : "").toHaveLength(2000);
-        expect(posted && "output" in posted ? posted.output?.endsWith("END") : false).toBe(true);
+        expect(events.map((event) => event.kind)).toEqual(["turn_start", "tool", "tool", "tool_output", "tool"]);
+        expect(events[2]).toEqual({ id: "c1", kind: "tool", status: "completed", title: "Run", toolKind: "execute" });
+
+        const printed = events.find((event) => event.kind === "tool_output");
+
+        expect(printed).toMatchObject({ exit: { code: 2, signal: "S".repeat(32) }, id: "c1" });
+        expect(printed && "output" in printed ? printed.output : "").toHaveLength(2000);
+        expect(printed && "output" in printed ? printed.output.endsWith("END") : false).toBe(true);
     });
 
     it("never posts twice inside the interval", async () => {

@@ -155,6 +155,9 @@ export class HostPoster implements SessionObserver {
     /** Failed posts of a session's current report, reset by a fresh report or a success (`MAX_STATE_ATTEMPTS`). */
     private readonly stateAttempts = new Map<string, number>();
 
+    /** What each running turn's calls last posted as their output (`tool_output`), by turn and call id. */
+    private readonly postedOutput = new Map<string, string>();
+
     /** The text of each running turn, kept for the references its reply makes (capped). */
     private readonly texts = new Map<string, string>();
 
@@ -175,6 +178,13 @@ export class HostPoster implements SessionObserver {
             finished: (channel) => {
                 this.channels.delete(channel.turnId);
                 this.texts.delete(channel.turnId);
+
+                for (const key of this.postedOutput.keys()) {
+                    if (key.startsWith(`${channel.turnId}\u{0}`)) {
+                        this.postedOutput.delete(key);
+                    }
+                }
+
                 this.persist();
                 this.closeWhenDrained(channel.sessionId);
             },
@@ -322,16 +332,38 @@ export class HostPoster implements SessionObserver {
         this.channels.get(turnId)?.append("reasoning", delta);
     }
 
+    /**
+     * A call's state, and, in a `tool_output` event of its own, what it printed and how its terminal ended, posted only
+     * when that changed: a status update does not resend the output, and the `tool` event keeps its stored shape.
+     */
     public tool(_sessionId: string, turnId: string, tool: ToolReport): void {
-        this.channels.get(turnId)?.enqueue({
-            id: tool.id.slice(0, 128),
-            kind: "tool",
-            status: tool.status,
-            title: tool.title.slice(0, 500),
-            toolKind: tool.kind.slice(0, 64),
-            ...tool.output !== undefined && { output: tool.output.slice(-MAX_TOOL_OUTPUT_CHARS) },
+        const channel = this.channels.get(turnId);
+
+        if (channel === undefined) {
+            return;
+        }
+
+        const id = tool.id.slice(0, 128);
+
+        channel.enqueue({ id, kind: "tool", status: tool.status, title: tool.title.slice(0, 500), toolKind: tool.kind.slice(0, 64) });
+
+        if (tool.output === undefined && tool.exit === undefined) {
+            return;
+        }
+
+        const printed = {
+            id,
+            kind: "tool_output" as const,
+            output: (tool.output ?? "").slice(-MAX_TOOL_OUTPUT_CHARS),
             ...tool.exit !== undefined && { exit: capExit(tool.exit) },
-        });
+        };
+        const key = `${turnId}\u{0}${id}`;
+        const signature = JSON.stringify(printed);
+
+        if (this.postedOutput.get(key) !== signature) {
+            this.postedOutput.set(key, signature);
+            channel.enqueue(printed);
+        }
     }
 
     public child(_sessionId: string, turnId: string, spawnId: string, event: ChildEvent): void {

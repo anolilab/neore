@@ -557,11 +557,12 @@ describe("streams", () => {
                 text: "",
             });
             await context.db.insert("persistentChunks", {
-                event: { id: "c1", kind: "tool", output: "SECRET=1", status: "completed", title: "cat .env", toolKind: "execute" },
+                event: { id: "c1", kind: "tool", status: "completed", title: "cat .env", toolKind: "execute" },
                 seq: 1,
                 streamId,
                 text: "",
             });
+            await context.db.insert("persistentChunks", { event: { id: "c1", kind: "tool_output", output: "SECRET=1" }, seq: 2, streamId, text: "" });
         });
 
         const viewer = (await as(STRANGER).query(procedureAt("chat_streaming", "getStreamBody"), { streamId } as never)) as { hostActivity?: unknown };

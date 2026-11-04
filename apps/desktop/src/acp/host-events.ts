@@ -114,7 +114,7 @@ export interface PlanEvent {
 }
 
 export type HostEvent
-    = MediaEvent | PlanEvent | PermissionRequestEvent | (HostSessionInfo & { kind: "session_open" }) | TurnEndEvent | { kind: "child_end"; spawnId: string; status: "cancelled" | "completed" | "failed"; text?: string } | { id: string; kind: "child_tool"; spawnId: string; status: string; title: string; toolKind: string } | { field: "reasoning" | "text"; kind: "child_text"; spawnId: string; text: string } | { exit?: TerminalExit; id: string; kind: "tool"; output?: string; status: string; title: string; toolKind: string } | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string } | { kind: "reasoning" | "text" | "turn_start"; text: string };
+    = MediaEvent | PlanEvent | PermissionRequestEvent | (HostSessionInfo & { kind: "session_open" }) | TurnEndEvent | { kind: "child_end"; spawnId: string; status: "cancelled" | "completed" | "failed"; text?: string } | { id: string; kind: "child_tool"; spawnId: string; status: string; title: string; toolKind: string } | { field: "reasoning" | "text"; kind: "child_text"; spawnId: string; text: string } | { exit?: TerminalExit; id: string; kind: "tool_output"; output: string } | { id: string; kind: "tool"; status: string; title: string; toolKind: string } | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string } | { kind: "reasoning" | "text" | "turn_start"; text: string };
 
 export interface HostSessionInfo {
     agentKey: string;

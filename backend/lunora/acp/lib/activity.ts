@@ -9,9 +9,10 @@ import type { Doc } from "../../_generated/dataModel";
 type ChunkEvent = NonNullable<Doc<"persistentChunks">["event"]>;
 type PlanEvent = Extract<ChunkEvent, { kind: "plan" }>;
 type ToolEvent = Extract<ChunkEvent, { kind: "tool" }>;
+type OutputEvent = Extract<ChunkEvent, { kind: "tool_output" }>;
 
 export interface HostActivityTool {
-    exit?: ToolEvent["exit"];
+    exit?: OutputEvent["exit"];
     id: string;
     /** The tail of what the call printed, masked on the desktop. */
     output?: string;
@@ -36,18 +37,38 @@ export const hostActivityOf = (chunks: ReadonlyArray<Pick<Doc<"persistentChunks"
     const tools = new Map<string, HostActivityTool>();
 
     for (const { event } of chunks) {
-        if (event?.kind === "plan") {
-            plan = event.entries;
-        } else if (event?.kind === "tool") {
-            // A later report of a call replaces the earlier one in place, so a row keeps its position.
-            tools.set(event.id, {
-                id: event.id,
-                status: event.status,
-                title: event.title,
-                toolKind: event.toolKind,
-                ...(event.output !== undefined && { output: event.output }),
-                ...(event.exit !== undefined && { exit: event.exit }),
-            });
+        switch (event?.kind) {
+            case "plan": {
+                plan = event.entries;
+                break;
+            }
+            case "tool": {
+                // A later report of a call replaces the earlier one in place, so a row keeps its position and what it printed.
+                const { exit, output } = tools.get(event.id) ?? {};
+
+                tools.set(event.id, {
+                    id: event.id,
+                    status: event.status,
+                    title: event.title,
+                    toolKind: event.toolKind,
+                    ...(output !== undefined && { output }),
+                    ...(exit !== undefined && { exit }),
+                });
+                break;
+            }
+            case "tool_output": {
+                const tool = tools.get(event.id);
+
+                // Output is posted after its call's first report; one for a call never reported has no row to go on.
+                if (tool !== undefined) {
+                    tools.set(event.id, { ...tool, output: event.output, ...(event.exit !== undefined && { exit: event.exit }) });
+                }
+
+                break;
+            }
+            default: {
+                break;
+            }
         }
     }
 
