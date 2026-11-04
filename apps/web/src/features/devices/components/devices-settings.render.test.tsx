@@ -33,7 +33,7 @@ const { bridge } = vi.hoisted(() => {
     return {
         bridge: {
             connect: vi.fn(async (_id: string): Promise<void> => {}),
-            disconnect: vi.fn(async (_id: string): Promise<void> => {}),
+            disconnect: vi.fn(async (_id: string): Promise<boolean> => true),
         },
     };
 });
@@ -171,15 +171,36 @@ describe("<DeviceRow> connection errors", () => {
         bridge.disconnect.mockClear();
         recordDeviceError("s1", "this computer is not connected to that server");
 
-        const view = renderRow({ attempt: 1, maxAttempts: 5, phase: "waiting", reason: "Connection timed out" });
+        renderRow({ attempt: 1, maxAttempts: 5, phase: "waiting", reason: "Connection timed out" });
 
         expect(await screen.findByText("Connection timed out")).toBeTruthy();
-        view.rerender(rowElement({ attempt: 1, maxAttempts: 5, phase: "waiting", reason: null }, true));
         press(screen.getByRole("button", { name: "Disconnect" }));
 
         await waitFor(() => expect(bridge.disconnect).toHaveBeenCalledWith("s1"));
         await waitFor(() => expect(screen.queryByText("Connection timed out")).toBeNull());
         expect(screen.queryByText("this computer is not connected to that server")).toBeNull();
+    });
+
+    it("keeps the errors of a server whose disconnect did not happen", async () => {
+        clearDeviceErrors("s1");
+        bridge.disconnect.mockResolvedValueOnce(false);
+
+        renderRow({ attempt: 1, maxAttempts: 5, phase: "waiting", reason: "Connection timed out" });
+
+        expect(await screen.findByText("Connection timed out")).toBeTruthy();
+        press(screen.getByRole("button", { name: "Disconnect" }));
+
+        await waitFor(() => expect(bridge.disconnect).toHaveBeenCalled());
+        await Promise.resolve();
+
+        expect(screen.getByText("Connection timed out")).toBeTruthy();
+    });
+
+    it("does not record a failure that arrives for a server already connected", () => {
+        clearDeviceErrors("s1");
+        render(rowElement({ attempt: null, maxAttempts: 5, phase: "gaveUp", reason: "Connection timed out" }, true));
+
+        expect(screen.queryByText("Connection timed out")).toBeNull();
     });
 
     it("shows the failure behind a wait, with no give-up yet", async () => {

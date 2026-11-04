@@ -54,6 +54,23 @@ export const clearDeviceErrors = (deviceId: string): void => {
     }
 };
 
+/** A tool list that went through no longer needs its refusal shown; what was said about reaching the server stays until it connects. */
+export const clearServiceErrors = (deviceId: string): void => {
+    const kept = errors.get(deviceId);
+
+    if (kept?.some((error) => error.kind === "service")) {
+        const rest = kept.filter((error) => error.kind !== "service");
+
+        if (rest.length > 0) {
+            errors.set(deviceId, rest);
+        } else {
+            errors.delete(deviceId);
+        }
+
+        emit();
+    }
+};
+
 /** A connection that is up again no longer explains anything; refusals of a tool list stay until the next one goes through. */
 export const clearConnectionErrors = (deviceId: string): void => {
     const kept = errors.get(deviceId);

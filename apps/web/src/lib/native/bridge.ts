@@ -398,11 +398,21 @@ export const pairNativeHost = async (pairing: { deviceId: string; secret: string
 /** Connects a paired server again. Rejects with the reason (a changed host key, a refused login…). */
 export const connectNativeHost = async (deviceId: string): Promise<NativeHostProbe | undefined> => getDeviceBridge()?.hostConnect(deviceId);
 
-export const disconnectNativeHost = async (deviceId: string): Promise<void> => {
+/** Whether the shell let the server go; `false` when it could not be asked or refused. */
+export const disconnectNativeHost = async (deviceId: string): Promise<boolean> => {
+    const relay = getDeviceBridge();
+
+    if (relay === undefined) {
+        return false;
+    }
+
     try {
-        await getDeviceBridge()?.hostDisconnect(deviceId);
+        await relay.hostDisconnect(deviceId);
+
+        return true;
     } catch {
-        // Already gone.
+        // Already gone, or the shell could not do it: the caller reads the status again.
+        return false;
     }
 };
 

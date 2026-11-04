@@ -32,6 +32,7 @@ import { buildDeviceDiagnostics, routeOf } from "../lib/device-diagnostics";
 import { clearConnectionErrors, clearDeviceErrors, recordDeviceError, useDeviceErrors } from "../lib/device-errors";
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
 import { isDeviceOnline } from "../lib/device-relay";
+import { createLatestRead } from "../lib/latest-read";
 import DeviceScope from "./device-scope";
 
 interface DeviceView {
@@ -162,10 +163,10 @@ export const DeviceRow: FC<{
 
     // The reason a server gave up stays on its row through "Retry" and the attempts after it, until it connects.
     useEffect(() => {
-        if (failureReason) {
+        if (failureReason && !connected) {
             recordDeviceError(device._id, failureReason, { kind: "connection" });
         }
-    }, [device._id, failureReason]);
+    }, [connected, device._id, failureReason]);
 
     useEffect(() => {
         if (connected) {
@@ -193,10 +194,10 @@ export const DeviceRow: FC<{
     const connection = (action: () => Promise<unknown>, { disconnecting = false }: { disconnecting?: boolean } = {}) => {
         void (async () => {
             try {
-                await action();
+                const result = await action();
 
-                // A server let go on purpose has nothing left to explain.
-                if (disconnecting) {
+                // A server let go on purpose has nothing left to explain; a disconnect that did not happen keeps what was said.
+                if (disconnecting && result === true) {
                     clearDeviceErrors(device._id);
                 }
             } catch (error) {
@@ -463,18 +464,14 @@ const DevicesSettings: FC = () => {
     const register = useMutation(crpc.devices.functions.registerDevice.mutationOptions());
     const revoke = useMutation(crpc.devices.functions.revokeDevice.mutationOptions());
 
+    const [readStatus] = useState(() => createLatestRead(getNativeDeviceStatus, setNative));
+
     // Once, and again on each change of the shell (a reconnect in the background, say): the buttons follow it.
-    useEffect(
-        () =>
-            onNativeDeviceChanged(() => {
-                void getNativeDeviceStatus().then(setNative);
-            }),
-        [],
-    );
+    useEffect(() => onNativeDeviceChanged(readStatus), [readStatus]);
 
     const pairedHere = native?.deviceId ? devices?.find((device) => device._id === native.deviceId) : undefined;
     const refreshNative = (): void => {
-        void getNativeDeviceStatus().then(setNative);
+        readStatus();
         globalThis.dispatchEvent(new Event(DEVICE_PAIRED_EVENT));
     };
     const defaultName: Record<NativeDevicePlatform, string> = { linux: t`My Linux computer`, macos: t`My Mac`, windows: t`My Windows PC` };

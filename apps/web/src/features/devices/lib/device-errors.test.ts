@@ -1,7 +1,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { clearConnectionErrors, clearDeviceErrors, recordDeviceError, useDeviceErrors } from "./device-errors";
+import { clearConnectionErrors, clearDeviceErrors, clearServiceErrors, recordDeviceError, useDeviceErrors } from "./device-errors";
 
 const read = () => renderHook(() => useDeviceErrors("d1")).result.current;
 
@@ -26,6 +26,14 @@ describe("device errors", () => {
         clearConnectionErrors("d1");
 
         expect(read().map((error) => error.kind)).toEqual(["service"]);
+    });
+
+    it("clears a refusal of the tool list and leaves what was said about reaching the server", () => {
+        recordDeviceError("d1", "Permission denied", { kind: "connection" });
+        recordDeviceError("d1", "Manifest refused", { kind: "service" });
+        clearServiceErrors("d1");
+
+        expect(read().map((error) => error.message)).toEqual(["Permission denied"]);
     });
 
     it("keeps a newer clock refusal of another size", () => {

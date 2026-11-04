@@ -17,7 +17,7 @@ import {
 } from "@/lib/native/bridge";
 
 import type { ClockOffset } from "../lib/device-errors";
-import { clearDeviceErrors, recordDeviceError } from "../lib/device-errors";
+import { clearServiceErrors, recordDeviceError } from "../lib/device-errors";
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
 import type { DeviceRelayPorts } from "../lib/device-relay";
 import { createDeviceRelay, DEVICE_HEARTBEAT_MS, viaDeviceFor } from "../lib/device-relay";
@@ -212,7 +212,7 @@ const DeviceRelay: FC = () => {
                     });
 
                     if (isLatest(id, generation)) {
-                        clearDeviceErrors(id);
+                        clearServiceErrors(id);
                     }
                 }
             } catch (error) {
