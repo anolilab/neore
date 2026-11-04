@@ -31,7 +31,7 @@ describe("thread permission mode", () => {
         expect(resolveToolPermission(SHELL, undefined, options)).toBe("ask");
         expect(resolveToolPermission(FILES, undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("somethingNew"), undefined, options)).toBe("ask");
-        expect(resolveToolPermission(WEB_SEARCH, undefined, options)).toBe("auto");
+        expect(resolveToolPermission(WEB_SEARCH, undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("visionAnalysis"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("retrieve"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("knowledgeSearch"), undefined, options)).toBe("ask");
@@ -51,7 +51,7 @@ describe("thread permission mode", () => {
         expect(resolveToolPermission(builtin("updateSlide"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(SHELL, undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("browser"), undefined, options)).toBe("ask");
-        expect(resolveToolPermission(WEB_SEARCH, undefined, options)).toBe("auto");
+        expect(resolveToolPermission(WEB_SEARCH, undefined, options)).toBe("ask");
         expect(resolveToolPermission(mcp(), undefined, options)).toBe("ask");
     });
 

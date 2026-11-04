@@ -20,6 +20,7 @@ const SUPERVISED_PATTERN = /Supervised/;
 
 const state = vi.hoisted(() => {
     return {
+        effective: null as string | null,
         isOwner: true,
         save: vi.fn(async (_input: unknown) => null),
         thread: { _id: "t1", permissionMode: "full" } as {
@@ -64,6 +65,15 @@ vi.mock("@/lib/lunora/crpc", () => {
                         },
                     },
                     thread_state: {
+                        getEffectivePermissionMode: {
+                            queryKey: (args: unknown) => ["effective", args],
+                            queryOptions: () => {
+                                return {
+                                    queryFn: async () => state.effective,
+                                    queryKey: ["effective", state.isOwner],
+                                };
+                            },
+                        },
                         setThreadPermissionMode: {
                             mutationOptions: () => {
                                 return { mutationFn: state.save };
@@ -102,6 +112,7 @@ beforeEach(() => {
     state.isOwner = true;
     state.thread = { _id: "t1", permissionMode: "full" };
     state.save.mockClear();
+    state.effective = null;
 });
 afterEach(() => {
     vi.unstubAllGlobals();
@@ -184,6 +195,14 @@ describe("permission mode control", () => {
         fireEvent.click(screen.getByRole("menuitemradio", { name: SUPERVISED_PATTERN }));
 
         expect(await screen.findByText("saving")).toBeTruthy();
+    });
+
+    it("shows the mode a comparison column runs under, when the column has none of its own", async () => {
+        state.thread = { _id: "t1" };
+        state.effective = "supervised";
+        renderControl();
+
+        expect(await screen.findByRole("button", { name: "Permission mode: Supervised" })).toBeTruthy();
     });
 
     it("offers the four modes with a description and writes the chosen one", async () => {

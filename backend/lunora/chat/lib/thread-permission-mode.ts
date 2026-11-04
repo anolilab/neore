@@ -48,7 +48,6 @@ export const BUILTIN_TOOLS_READ_ONLY: ReadonlySet<string> = new Set([
     "trendingTv",
     "videoSearch",
     "weather",
-    "webSearch",
     "wolframAlpha",
     "xSearch",
     "youtubeSearch",

@@ -9,10 +9,11 @@ import { v } from "lunorash/server";
 import { markThreadViewedAt, patchThread, setThreadSnooze } from "../agent/table-writes";
 import { requireOwnedThreadIgnoringLock } from "../agent/thread-read-access";
 import { internalMutation } from "../_generated/server";
-import { authMutation, rateLimit } from "../lib/crpc";
+import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { throwBadRequest } from "../lib/error-helpers";
 import { appendDocumentHistory } from "../lib/document-history";
 import { isSnoozeInRange } from "./lib/thread-state-logic";
+import { modeOfThread } from "./tool-permissions";
 
 /** Marks the thread's latest reply as seen. A no-op unless a reply is newer than the last view. */
 export const markThreadViewed = authMutation
@@ -120,4 +121,17 @@ export const setThreadPermissionMode = authMutation
         }
 
         return null;
+    });
+
+/**
+ * The mode the owner's runs on this thread use: its own, or its comparison parent's when it has none (`modeOfThread`). Owner-only;
+ * the composer shows it, so an opened comparison column does not read Auto while its runs use the parent's mode.
+ */
+export const getEffectivePermissionMode = authQuery
+    .input({ threadId: v.id("threads") })
+    .output(v.union(v.literal("supervised"), v.literal("auto-edit"), v.literal("auto"), v.literal("full"), v.null()))
+    .query(async ({ args: { threadId }, ctx: context }) => {
+        const thread = await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
+
+        return await modeOfThread(context, thread, context.user.userId);
     });

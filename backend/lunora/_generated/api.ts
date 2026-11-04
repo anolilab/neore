@@ -352,6 +352,7 @@ export interface ApiTypes {
             };
         };
         thread_state: {
+            getEffectivePermissionMode: FunctionReference<"query", { threadId: Id<"threads"> }, "supervised" | "auto-edit" | "auto" | "full" | null>;
             markThreadViewed: FunctionReference<"mutation", { threadId: Id<"threads"> }, { updated: boolean }>;
             setThreadPermissionMode: FunctionReference<"mutation", { mode: "supervised" | "auto-edit" | "auto" | "full"; threadId: Id<"threads"> }, null>;
             snoozeThread: FunctionReference<"mutation", { threadId: Id<"threads">; until: number }, null>;
@@ -1216,6 +1217,7 @@ export const api: ApiTypes = {
             },
         },
         thread_state: {
+            getEffectivePermissionMode: { __lunoraRef: "chat_thread_state:getEffectivePermissionMode" },
             markThreadViewed: { __lunoraRef: "chat_thread_state:markThreadViewed" },
             setThreadPermissionMode: { __lunoraRef: "chat_thread_state:setThreadPermissionMode" },
             snoozeThread: { __lunoraRef: "chat_thread_state:snoozeThread" },

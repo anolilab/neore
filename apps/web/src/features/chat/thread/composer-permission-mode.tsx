@@ -96,6 +96,10 @@ const ComposerThreadPermissionMode: FC = () => {
     const crpc = useCRPC();
     const isRunning = useChatIsRunning();
     const { data: access } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions(threadId ? { threadId: threadId as never } : skipToken));
+    // The mode the owner's runs use here: a comparison column with no mode of its own runs under its parent's.
+    const { data: effective } = useQuery(
+        crpc.chat.thread_state.getEffectivePermissionMode.queryOptions(threadId ? { threadId: threadId as never } : skipToken),
+    );
     const queryClient = useQueryClient();
     const { mutateAsync } = useMutation({
         ...crpc.chat.thread_state.setThreadPermissionMode.mutationOptions(),
@@ -113,7 +117,8 @@ const ComposerThreadPermissionMode: FC = () => {
         return null;
     }
 
-    const stored: ThreadPermissionMode = isMode(thread?.permissionMode) ? thread.permissionMode : "auto";
+    const ownMode: ThreadPermissionMode = isMode(thread?.permissionMode) ? thread.permissionMode : "auto";
+    const stored: ThreadPermissionMode = isMode(effective) ? effective : ownMode;
 
     return (
         <ComposerPermissionMode
@@ -127,6 +132,11 @@ const ComposerThreadPermissionMode: FC = () => {
                 mutateAsync({ mode, threadId: threadId as never })
                     // The menu reads the mode from the cached thread: a saved mode must show without waiting for a refresh.
                     .then(() => queryClient.invalidateQueries({ queryKey: crpc.chat.functions.getThread.queryKey({ threadId: threadId as never }) }))
+                    .then(() =>
+                        queryClient.invalidateQueries({
+                            queryKey: crpc.chat.thread_state.getEffectivePermissionMode.queryKey({ threadId: threadId as never }),
+                        }),
+                    )
                     .catch((error: unknown) => {
                         showError(error instanceof Error ? error : t`Could not change the permission mode. Please try again.`);
                     })
