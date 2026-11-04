@@ -140,8 +140,24 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
     const changed = change === undefined ? undefined : rows.find((row) => row.id === change.rowId);
     // The agent's answer reaches the page before the options it changed (the state is posted a moment later): the controls stay
     // off until the option shows the new value, so the row never says "confirmed" over the old one. A bounded wait.
-    const catchingUp = answered?.outcome === "confirmed" && changed !== undefined && changed.current !== answered.valueId && gaveUp !== answered.callId;
+    // A confirmed change waits, once, for its value to show; a call whose value has shown is settled for good, so a later change by the
+    // agent itself does not re-enter the wait.
+    const [settled, setSettled] = useState<string | undefined>(undefined);
+    const catchingUp =
+        answered?.outcome === "confirmed" &&
+        changed !== undefined &&
+        changed.current !== answered.valueId &&
+        gaveUp !== answered.callId &&
+        settled !== answered.callId;
     const catchingUpCall = catchingUp ? answered?.callId : undefined;
+
+    const shownValue = changed?.current;
+
+    useEffect(() => {
+        if (answered?.outcome === "confirmed" && shownValue === answered.valueId) {
+            setSettled(answered.callId);
+        }
+    }, [answered, shownValue]);
 
     useEffect(() => {
         if (catchingUpCall === undefined) {
@@ -233,7 +249,7 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
         refused = true;
     } else if (catchingUp) {
         status = t`The agent confirmed. Waiting for ${changed?.name ?? ""} to show ${nameOfValue(changed, answered?.valueId ?? "")}.`;
-    } else if (answered !== undefined) {
+    } else if (answered !== undefined && (answered.outcome === "refused" || changed?.current === answered.valueId)) {
         refused = answered.outcome === "refused";
         status = refused
             ? t`The agent did not change ${changed?.name ?? ""}: ${refusalText(answered.reason)}`

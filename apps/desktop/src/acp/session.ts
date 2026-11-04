@@ -165,6 +165,9 @@ export class AgentSession {
     /** What the agent offers (its model, reasoning effort, mode ...), as it last said; unset until the session is open. */
     private offered: RawOptions = {};
 
+    /** Bumped whenever the agent sends its own options, so an answer older than that list does not replace it. */
+    private offeredVersion = 0;
+
     /** Whether the startup updates are the saved session's (while it loads) or a fresh session's (once it is opened). */
     private startupPhase: "loading" | "opening" = "opening";
 
@@ -263,11 +266,13 @@ export class AgentSession {
         }
 
         let answer: unknown;
+        const versionAtRequest = this.offeredVersion;
 
         // The timeout does not cancel the agent's request: an answer that arrives after it is applied here and reported, so what the
         // person sees follows what the agent did.
         const onLate = (late: unknown): void => {
-            if (this.status === "ended") {
+            // An answer older than a list the agent has sent since is not applied: that list is what is true now.
+            if (this.status === "ended" || this.offeredVersion !== versionAtRequest) {
                 return;
             }
 
@@ -283,6 +288,13 @@ export class AgentSession {
 
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error
             throw new Error(timedOut ? "the agent did not answer" : "the agent did not accept the change");
+        }
+
+        // The agent sent its own list while this was outstanding, and that list is newer than the answer: it stands.
+        if (this.offeredVersion !== versionAtRequest) {
+            this.reportOptions();
+
+            return;
         }
 
         // The agent's list is what is true now; if it still shows another value, the change was not made.
@@ -909,6 +921,7 @@ export class AgentSession {
 
                 if (configOptions !== undefined) {
                     this.offered = { ...this.offered, configOptions };
+                    this.offeredVersion += 1;
                     this.reportOptions();
                 }
 
@@ -916,6 +929,7 @@ export class AgentSession {
             }
             case "current_mode_update": {
                 this.offered = withCurrentMode(this.offered, update.currentModeId, this.options.process.scrub);
+                this.offeredVersion += 1;
                 this.reportOptions();
 
                 return;
