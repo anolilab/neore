@@ -277,6 +277,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // The tags go in with the insert, so a reader (a quiet routine's workspace check) never sees the thread untagged,
             // even while it runs or if the run fails.
             const created = await agent.createThread(ctx, {
+                // With the insert: a separate patch could fail after the thread is linked and leave it uncapped.
+                ...(options.organizationId && { organizationId: options.organizationId }),
                 title: (options.thread as { title: string }).title,
                 userId,
                 ...("tags" in options.thread && options.thread.tags && { tags: options.thread.tags }),
@@ -289,10 +291,10 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             await options.onThread?.(threadId);
 
             // Before the run: a tool call reads `thread.botId` to find the bot's computer, and a later threaded run reads the
-            // thread's organization for its tool cap. A thread that already exists is never moved to another organization.
-            if (options.botId || options.organizationId) {
+            // thread's organization, which went in with the insert above. A thread that already exists is never moved.
+            if (options.botId) {
                 await ctx.runMutation(internal.agent.threads.updateThread, {
-                    patch: { botId: options.botId, organizationId: options.organizationId ?? undefined },
+                    patch: { botId: options.botId },
                     threadId: threadId as Id<"threads">,
                 });
             }

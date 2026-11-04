@@ -230,6 +230,11 @@ export class Agent<
         ctx: ActionContext & CustomContext,
         args?: {
             /**
+             * The organization the thread belongs to, written with its first insert so no linked thread exists without it.
+             */
+            organizationId?: string | null;
+
+            /**
              * The summary of the thread. Not currently used for anything.
              */
             summary?: string;
@@ -265,6 +270,11 @@ export class Agent<
         ctx: MutationContext,
         args?: {
             /**
+             * The organization the thread belongs to, written with its first insert so no linked thread exists without it.
+             */
+            organizationId?: string | null;
+
+            /**
              * The summary of the thread. Not currently used for anything.
              */
             summary?: string;
@@ -288,7 +298,7 @@ export class Agent<
     ): Promise<{ threadId: string }>;
     async createThread(
         context: (ActionContext & CustomContext) | MutationContext,
-        args?: { summary?: string; tags?: string[]; title?: string; userId: string | null },
+        args?: { organizationId?: string | null; summary?: string; tags?: string[]; title?: string; userId: string | null },
     ): Promise<{ thread?: Thread<AgentTools>; threadId: string }> {
         const threadId = await createThread(context, this.component, args);
 
