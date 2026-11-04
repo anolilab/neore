@@ -338,8 +338,14 @@ const Chat = () => {
         const { boundary, threadId: id } = confirmation;
         let reads = 0;
         let isActive = true;
+        let isChecking = false;
 
         const check = async () => {
+            if (isChecking) {
+                return;
+            }
+
+            isChecking = true;
             reads += 1;
             let isConfirmed = false;
 
@@ -348,6 +354,8 @@ const Chat = () => {
             } catch {
                 // A failed check is tried again on the next tick.
             }
+
+            isChecking = false;
 
             if (isActive && (isConfirmed || reads >= CONFIRM_READS)) {
                 setConfirmation(null);
@@ -377,6 +385,12 @@ const Chat = () => {
             return;
         }
 
+        if (isAwaitingReply) {
+            setError("Wait for the last reply to finish before sending another.");
+
+            return;
+        }
+
         const controller = new AbortController();
 
         sendAbort.current = controller;
@@ -392,6 +406,7 @@ const Chat = () => {
 
         setConfirmation(null);
 
+        readGate.current.invalidate();
         setRows((current) => [
             ...current,
             localRow(userId, "user", threadId ?? NEW_THREAD, prompt),
