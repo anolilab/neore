@@ -122,16 +122,6 @@ const finishRow = (rows: Row[], id: string): Row[] =>
         return { ...row, finished: true };
     });
 
-/** Starts the row's text again at a steered message: what came before it is saved as a message of its own. */
-const restartRow = (rows: Row[], id: string, text: string): Row[] =>
-    rows.map((row) => {
-        if (row.id !== id) {
-            return row;
-        }
-
-        return { ...row, shareText: text, text };
-    });
-
 /** Adds `text` to the end of the row with `id`, leaving every other row as it is. */
 const appendToRow = (rows: Row[], id: string, text: string): Row[] =>
     rows.map((row) => {
@@ -584,21 +574,27 @@ const Chat = () => {
             }
 
             let isSteered = false;
+            // The row the text goes into. A steer starts a new row, so the text before it stays on screen; the server
+            // saves that text as a message of its own.
+            let activeId = assistantId;
+            let steerCount = 0;
             const outcome = await relayReply({
                 fetch: streamingFetch,
                 gatewayUrl: config.gatewayUrl,
                 onDelta: ({ restart, text }) => {
                     if (restart) {
                         isSteered = true;
+                        steerCount += 1;
+                        activeId = `${assistantId}-${steerCount}`;
+
+                        const continuationId = activeId;
+
+                        writeRows((current) => [...current, localRow(continuationId, "assistant", threadId ?? NEW_THREAD, text)]);
+
+                        return;
                     }
 
-                    writeRows((current) => {
-                        if (restart) {
-                            return restartRow(current, assistantId, text);
-                        }
-
-                        return appendToRow(current, assistantId, text);
-                    });
+                    writeRows((current) => appendToRow(current, activeId, text));
                 },
                 signal: controller.signal,
                 streamToken: started.streamToken,
@@ -650,6 +646,8 @@ const Chat = () => {
         } catch (shareError) {
             console.warn("Could not open the share sheet.", shareError);
             setError(withShareFailure);
+            // The message on screen can be out of view when the sheet fails: a screen reader needs the announcement.
+            AccessibilityInfo.announceForAccessibility(SHARE_FAILED_MESSAGE);
         }
     };
 
