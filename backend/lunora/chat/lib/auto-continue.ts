@@ -61,15 +61,15 @@ const contentParts = (output: unknown): unknown[] | undefined => {
 /** Characters a media part of a tool result counts for, or `undefined` for a part that is not media. */
 const mediaPartChars = (type: unknown): number | undefined => {
     switch (type) {
-        case "image":
-        case "image-data":
-        case "image-url": {
-            return IMAGE_TOKEN_ESTIMATE_CHARS;
-        }
         case "file":
         case "file-data":
         case "file-url": {
             return FILE_TOKEN_ESTIMATE_CHARS;
+        }
+        case "image":
+        case "image-data":
+        case "image-url": {
+            return IMAGE_TOKEN_ESTIMATE_CHARS;
         }
         default: {
             return undefined;

@@ -72,9 +72,9 @@ export const backupCapabilities = (definition: ModelDefinition): BackupCapabilit
 
 /** Records one media part by its type, and by its media type when it is a file: an image file counts as an image. */
 const noteMedia = (found: { files: boolean; images: boolean }, type: unknown, mediaType: unknown): void => {
-    if (type === "image" || type === "image-data" || type === "image-url") {
+    if (["image", "image-data", "image-url"].includes(type as string)) {
         found.images = true;
-    } else if (type === "file" || type === "file-data" || type === "file-url") {
+    } else if (["file", "file-data", "file-url"].includes(type as string)) {
         if (typeof mediaType === "string" && mediaType.startsWith("image/")) {
             found.images = true;
         } else {
