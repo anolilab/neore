@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { clearDeviceErrors } from "../lib/device-errors";
+import { clearDeviceErrors, recordDeviceError } from "../lib/device-errors";
 import { DeviceRow, StartAgents } from "./devices-settings";
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
@@ -30,13 +30,18 @@ vi.mock("./device-scope", () => {
 });
 
 const { bridge } = vi.hoisted(() => {
-    return { bridge: { connect: vi.fn(async (_id: string): Promise<void> => {}) } };
+    return {
+        bridge: {
+            connect: vi.fn(async (_id: string): Promise<void> => {}),
+            disconnect: vi.fn(async (_id: string): Promise<void> => {}),
+        },
+    };
 });
 
 vi.mock("@/lib/native/bridge", () => {
     return {
         connectNativeHost: bridge.connect,
-        disconnectNativeHost: vi.fn(async () => {}),
+        disconnectNativeHost: bridge.disconnect,
         probeNativeHost: vi.fn(),
     };
 });
@@ -131,6 +136,15 @@ const rowElement = (reconnect: Reconnect | undefined, connected: boolean) => (
         </ul>
     </QueryClientProvider>
 );
+/** A real press: pointer and mouse events and focus come before the click, as a person's would. */
+const press = (element: HTMLElement): void => {
+    fireEvent.pointerDown(element);
+    fireEvent.mouseDown(element);
+    element.focus();
+    fireEvent.pointerUp(element);
+    fireEvent.mouseUp(element);
+    fireEvent.click(element);
+};
 const renderRow = (reconnect?: Reconnect) => render(rowElement(reconnect, false));
 
 describe("<DeviceRow> connection errors", () => {
@@ -138,9 +152,34 @@ describe("<DeviceRow> connection errors", () => {
         clearDeviceErrors("s1");
         bridge.connect.mockRejectedValueOnce(new Error("Permission denied (publickey)."));
         renderRow();
-        fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+        press(screen.getByRole("button", { name: "Connect" }));
 
         expect(await screen.findByText("Permission denied (publickey).")).toBeTruthy();
+    });
+
+    it("calls the shell to connect when Connect is pressed", async () => {
+        clearDeviceErrors("s1");
+        bridge.connect.mockClear();
+        renderRow();
+        press(screen.getByRole("button", { name: "Connect" }));
+
+        await waitFor(() => expect(bridge.connect).toHaveBeenCalledWith("s1"));
+    });
+
+    it("clears the error of a server that is disconnected on purpose", async () => {
+        clearDeviceErrors("s1");
+        bridge.disconnect.mockClear();
+        recordDeviceError("s1", "this computer is not connected to that server");
+
+        const view = renderRow({ attempt: 1, maxAttempts: 5, phase: "waiting", reason: "Connection timed out" });
+
+        expect(await screen.findByText("Connection timed out")).toBeTruthy();
+        view.rerender(rowElement({ attempt: 1, maxAttempts: 5, phase: "waiting", reason: null }, true));
+        press(screen.getByRole("button", { name: "Disconnect" }));
+
+        await waitFor(() => expect(bridge.disconnect).toHaveBeenCalledWith("s1"));
+        await waitFor(() => expect(screen.queryByText("Connection timed out")).toBeNull());
+        expect(screen.queryByText("this computer is not connected to that server")).toBeNull();
     });
 
     it("shows the failure behind a wait, with no give-up yet", async () => {
@@ -156,7 +195,7 @@ describe("<DeviceRow> connection errors", () => {
 
         const view = renderRow();
 
-        fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+        press(screen.getByRole("button", { name: "Connect" }));
         expect(await screen.findByText("Permission denied (publickey).")).toBeTruthy();
         view.rerender(rowElement({ attempt: 1, maxAttempts: 5, phase: "waiting", reason: null }, false));
         expect(screen.getByText("Permission denied (publickey).")).toBeTruthy();

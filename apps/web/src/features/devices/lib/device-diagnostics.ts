@@ -72,7 +72,10 @@ const MAX_ERROR_CHARS = 500;
  * envelopes, tokens and cookies never reach this function, so they cannot reach the text.
  */
 export const buildDeviceDiagnostics = (input: DeviceDiagnosticsInput): string => {
-    const route = input.viaName ? `${routeText(input.route)} (${input.viaName})` : routeText(input.route);
+    // One line each: a name with a line break must not be able to add a field of its own to the report.
+    const oneLine = (value: string): string => value.replaceAll(/\s+/g, " ").trim();
+    const name = oneLine(input.name);
+    const route = input.viaName ? `${routeText(input.route)} (${oneLine(input.viaName)})` : routeText(input.route);
     const errors = input.errors.map((error) => {
         const text = error.kind === "connection" ? connectionFailureCategory(error.message) : error.message;
 
@@ -83,7 +86,7 @@ export const buildDeviceDiagnostics = (input: DeviceDiagnosticsInput): string =>
     const lastSeen = input.lastSeenAt === undefined ? t`never` : new Date(input.lastSeenAt).toISOString();
 
     return [
-        t`Connection: ${input.name}`,
+        t`Connection: ${name}`,
         t`App version: ${input.appVersion ?? unknown}`,
         t`Client: ${input.clientAgent}`,
         t`Host version: ${input.hostVersion ?? unknown}`,

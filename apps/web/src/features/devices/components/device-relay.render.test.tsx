@@ -193,6 +193,29 @@ describe("<DeviceRelay>", () => {
         expect(result.current).toEqual([]);
     });
 
+    it("does not show the shell's own refusal to read a manifest as an error", async () => {
+        const manifest = await import("@/lib/native/bridge");
+
+        vi.mocked(manifest.getNativeDeviceManifest).mockRejectedValueOnce(new Error("this computer is not connected to that server"));
+        mutations.updateManifest.mockReset();
+        clearDeviceErrors("d1");
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <DeviceRelay />
+            </QueryClientProvider>,
+        );
+        await waitFor(() => expect(bridge.changedListener).toBeDefined());
+
+        const { result } = renderHook(() => useDeviceErrors("d1"));
+
+        await act(async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+
+        expect(result.current).toEqual([]);
+    });
+
     it("remembers the refusal of the newest send, with the clock offset a clock refusal carries", async () => {
         const clock = Object.assign(new Error("Server English"), { data: { code: "DEVICE_CLOCK_SKEW", direction: "ahead", minutes: 12 } });
 

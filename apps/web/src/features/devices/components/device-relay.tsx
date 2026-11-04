@@ -201,7 +201,8 @@ const DeviceRelay: FC = () => {
             generations.set(id, generation);
 
             try {
-                const manifest = await getNativeDeviceManifest(id === deviceId ? undefined : id);
+                // The shell refusing to read a manifest (a server just disconnected, say) is not a refusal worth showing.
+                const manifest = await getNativeDeviceManifest(id === deviceId ? undefined : id).catch(() => undefined);
 
                 if (manifest) {
                     await mutations.current.updateManifest({

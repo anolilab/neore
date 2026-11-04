@@ -29,7 +29,7 @@ import {
 } from "@/lib/native/bridge";
 
 import { buildDeviceDiagnostics, routeOf } from "../lib/device-diagnostics";
-import { clearConnectionErrors, recordDeviceError, useDeviceErrors } from "../lib/device-errors";
+import { clearConnectionErrors, clearDeviceErrors, recordDeviceError, useDeviceErrors } from "../lib/device-errors";
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
 import { isDeviceOnline } from "../lib/device-relay";
 import DeviceScope from "./device-scope";
@@ -190,10 +190,15 @@ export const DeviceRow: FC<{
         buttonLabel = t`Retry`;
     }
 
-    const connection = (action: () => Promise<unknown>) => {
+    const connection = (action: () => Promise<unknown>, { disconnecting = false }: { disconnecting?: boolean } = {}) => {
         void (async () => {
             try {
                 await action();
+
+                // A server let go on purpose has nothing left to explain.
+                if (disconnecting) {
+                    clearDeviceErrors(device._id);
+                }
             } catch (error) {
                 const message = error instanceof Error ? error.message : t`Could not connect to the server.`;
 
@@ -248,7 +253,9 @@ export const DeviceRow: FC<{
                 {(reconnect?.phase === "waiting" || reconnect?.phase === "connecting") && <Badge variant="secondary">{t`Reconnecting`}</Badge>}
                 {connected !== undefined && (
                     <Button
-                        onClick={() => connection(() => (stoppable ? disconnectNativeHost(device._id) : connectNativeHost(device._id)))}
+                        onClick={() =>
+                            connection(() => (stoppable ? disconnectNativeHost(device._id) : connectNativeHost(device._id)), { disconnecting: stoppable })
+                        }
                         size="sm"
                         variant="outline"
                     >
@@ -256,7 +263,7 @@ export const DeviceRow: FC<{
                     </Button>
                 )}
                 {reconnect?.phase === "gaveUp" && (
-                    <Button onClick={() => connection(() => disconnectNativeHost(device._id))} size="sm" variant="outline">
+                    <Button onClick={() => connection(() => disconnectNativeHost(device._id), { disconnecting: true })} size="sm" variant="outline">
                         {t`Dismiss`}
                     </Button>
                 )}

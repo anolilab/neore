@@ -35,11 +35,16 @@ const emit = (): void => {
 export const recordDeviceError = (deviceId: string, message: string, options: RecordOptions = {}): void => {
     const kept = errors.get(deviceId) ?? EMPTY;
 
-    if (kept.at(-1)?.message === message) {
+    const newest = kept.at(-1);
+    const kind = options.kind ?? "service";
+    const sameClock = newest?.clockOffset?.direction === options.clockOffset?.direction && newest?.clockOffset?.minutes === options.clockOffset?.minutes;
+
+    // Only a repeat of the very same failure is dropped: another kind or clock size is a different, newer fact.
+    if (newest?.message === message && newest.kind === kind && sameClock) {
         return;
     }
 
-    errors.set(deviceId, [...kept, { clockOffset: options.clockOffset, kind: options.kind ?? "service", message }].slice(-MAX_KEPT));
+    errors.set(deviceId, [...kept, { clockOffset: options.clockOffset, kind, message }].slice(-MAX_KEPT));
     emit();
 };
 

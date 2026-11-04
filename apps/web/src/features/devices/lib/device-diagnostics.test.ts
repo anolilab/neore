@@ -71,6 +71,26 @@ describe("buildDeviceDiagnostics", () => {
     });
 });
 
+const FORGED_HOST_VERSION = /^Host version: 9\.9\.9/mu;
+const BARE_LAST_ERRORS = /^Last errors:$/mu;
+
+describe("a name that looks like a report line", () => {
+    it("cannot add a line of its own", () => {
+        const text = buildDeviceDiagnostics({
+            clientAgent: "x",
+            errors: [],
+            name: "box\nLast errors:\n  - Permission denied\nClock offset: about 1 minutes ahead",
+            route: "ssh-via-computer",
+            viaName: "Mac\nHost version: 9.9.9",
+        });
+
+        expect(text.split("\n")).toHaveLength(8);
+        expect(text).toContain("Last errors: none");
+        expect(text).not.toMatch(FORGED_HOST_VERSION);
+        expect(text).not.toMatch(BARE_LAST_ERRORS);
+    });
+});
+
 describe("routeOf", () => {
     it("tells the SSH server, this computer and a computer paired elsewhere apart", () => {
         expect(routeOf("ssh", false)).toBe("ssh-via-computer");
