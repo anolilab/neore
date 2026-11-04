@@ -32,6 +32,15 @@ const MAX_HISTORY_PAGES = 10;
 const REFUSED_MESSAGE = "This chat is locked or no longer available.";
 const SHARE_FAILED_MESSAGE = "The message could not be shared. Try again.";
 
+/** A share that works clears the share failure on screen; any other error on screen is not the share's to clear. */
+const withoutShareFailure = (current: string | null): string | null => {
+    if (current === SHARE_FAILED_MESSAGE) {
+        return null;
+    }
+
+    return current;
+};
+
 /** A chat that reads again is no longer refused; any other message on screen is not this read's to clear. */
 const withoutRefusal = (current: string | null): string | null => {
     if (current === REFUSED_MESSAGE) {
@@ -373,6 +382,7 @@ const Chat = () => {
     const shareRow = async (text: string): Promise<void> => {
         try {
             await Share.share({ message: text });
+            setError(withoutShareFailure);
         } catch (shareError) {
             console.warn("Could not open the share sheet.", shareError);
             setError(SHARE_FAILED_MESSAGE);
@@ -404,7 +414,7 @@ const Chat = () => {
                                         accessibilityLabel={shareLabel(item)}
                                         accessibilityRole="button"
                                         onPress={() => shareRow(shareText)}
-                                        style={{ alignSelf: "flex-start", paddingVertical: 4 }}
+                                        style={{ alignItems: "center", alignSelf: "flex-start", justifyContent: "center", minHeight: 44, minWidth: 44, paddingHorizontal: 12 }}
                                     >
                                         <Text style={{ fontSize: 12 }}>Share</Text>
                                     </Pressable>
