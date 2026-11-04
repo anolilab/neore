@@ -51,6 +51,13 @@ describe("replyStateAfter", () => {
         expect(replyStateAfter(newestFirst, "sent")).toBe("pending");
     });
 
+    it("judges a steered reply's newest step across its steer message, but only for that steered send", () => {
+        const newestFirst = [message("continuation", "assistant", "pending"), message("steer", "user"), message("step", "assistant", "success"), message("sent", "user")];
+
+        expect(replyStateAfter(newestFirst, "sent", { isSteered: true })).toBe("pending");
+        expect(replyStateAfter(newestFirst, "sent")).toBe("settled");
+    });
+
     it("reads this send's reply when another session's turn sits above it", () => {
         const pending = [message("otherReply", "assistant", "success"), message("otherUser", "user"), message("ours", "assistant", "pending"), message("sent", "user")];
         const settled = [message("otherReply", "assistant", "success"), message("otherUser", "user"), message("ours", "assistant", "success"), message("sent", "user")];

@@ -569,6 +569,18 @@ describe("the version-one cache", () => {
         expect(version?.user_version).toBe(2);
     });
 
+    it("keeps a newer empty share text against an older copy that has text", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        await scoped.saveMessages("t1", [message("m1", "t1", 5, { shareText: "", text: "", updatedAt: 2 })], { syncedAt: 100 });
+        await scoped.saveMessages("t1", [message("m1", "t1", 5, { shareText: "old text", text: "old text", updatedAt: 1 })], { syncedAt: 200 });
+
+        const [saved] = await scoped.loadMessages("t1");
+
+        expect(saved?.shareText).toBe("");
+    });
+
     it("takes the share text from a live read even when the device clock has moved back past the saved stamp", async () => {
         const database = await openVersionOneDatabase();
 

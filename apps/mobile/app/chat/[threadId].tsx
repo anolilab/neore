@@ -35,6 +35,8 @@ type Row = MessageRow & { finished?: boolean };
 /** A send whose reply is still being checked. `holdsSend` keeps the composer shut while the checks run. */
 interface Confirmation {
     holdsSend: boolean;
+    /** The send was steered: its reply runs across the steer messages, which are user messages. */
+    isSteered: boolean;
     messageId: string;
     threadId: string;
 }
@@ -177,7 +179,7 @@ const tallyChecks = (outcomes: ReadonlyArray<{ confirmation: Confirmation; state
 };
 
 /** Reads the state of one send's reply: walks the pages from the newest until the send is found, up to `CONFIRM_MAX_PAGES`. */
-const readReplyState = async (threadId: string, messageId: string): Promise<ReplyState> => {
+const readReplyState = async (threadId: string, messageId: string, isSteered: boolean): Promise<ReplyState> => {
     const seen: SeenMessage[] = [];
     let cursor: string | null = null;
     let state: ReplyState = "unknown";
@@ -192,7 +194,7 @@ const readReplyState = async (threadId: string, messageId: string): Promise<Repl
                 return { id: message.id, role: message.role, status: message.status };
             }),
         );
-        state = replyStateAfter(seen, messageId);
+        state = replyStateAfter(seen, messageId, { isSteered });
 
         if (state !== "unknown" || page.isDone) {
             break;
@@ -457,7 +459,7 @@ const Chat = () => {
             const outcomes = await Promise.all(
                 own.map(async (confirmation) => {
                     try {
-                        return { confirmation, isChatRefused: false, state: await readReplyState(threadId, confirmation.messageId) };
+                        return { confirmation, isChatRefused: false, state: await readReplyState(threadId, confirmation.messageId, confirmation.isSteered) };
                     } catch (error_) {
                         // A chat the reader can no longer open ends the checks; any other failure is tried again on the next tick.
                         return { confirmation, isChatRefused: isThreadRefusal(error_), state: "unknown" as ReplyState };
@@ -614,7 +616,7 @@ const Chat = () => {
 
             setConfirmations((current) => [
                 ...current,
-                { holdsSend: outcome === "unconfirmed", messageId: started.messageId, threadId: started.threadId },
+                { holdsSend: outcome === "unconfirmed", isSteered, messageId: started.messageId, threadId: started.threadId },
             ]);
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
@@ -656,6 +658,10 @@ const Chat = () => {
     const syncedTimes = rows.filter((row) => row.status !== "local" && row.finished !== true).map((row) => row.syncedAt);
     const syncedAt = syncedTimes.length === 0 ? undefined : Math.max(...syncedTimes);
 
+    // The control and its hint say why sending waits, so it is not announced as available while a reply is held.
+    const sendReason = sendControl.reason ?? (isAwaitingReply ? AWAIT_REPLY_MESSAGE : undefined);
+    const isSendBlocked = sending || sendControl.disabled || isAwaitingReply;
+
     return (
         <View onLayout={measureTopOffset} ref={rootRef} style={{ flex: 1 }}>
             <OfflineBanner syncedAt={syncedAt} />
@@ -694,7 +700,7 @@ const Chat = () => {
                     </Text>
                     )
                     : null}
-                <View style={{ flexDirection: "row", gap: 8, padding: 12, paddingBottom: sendControl.reason ? 12 : 12 + safeBottom }}>
+                <View style={{ flexDirection: "row", gap: 8, padding: 12, paddingBottom: sendReason ? 12 : 12 + safeBottom }}>
                     <TextInput
                         accessibilityHint={composer.reason}
                         accessibilityLabel="Message"
@@ -707,19 +713,19 @@ const Chat = () => {
                         value={draft}
                     />
                     <Pressable
-                        accessibilityHint={sendControl.reason}
+                        accessibilityHint={sendReason}
                         accessibilityRole="button"
-                        accessibilityState={{ disabled: sending || sendControl.disabled }}
-                        disabled={sending || sendControl.disabled}
+                        accessibilityState={{ disabled: isSendBlocked }}
+                        disabled={isSendBlocked}
                         onPress={send}
-                        style={{ justifyContent: "center", opacity: sendControl.disabled ? 0.5 : 1, padding: 12 }}
+                        style={{ justifyContent: "center", opacity: isSendBlocked ? 0.5 : 1, padding: 12 }}
                     >
                         <Text style={{ fontWeight: "600" }}>Send</Text>
                     </Pressable>
                 </View>
-                {sendControl.reason
+                {sendReason
                     ? (
-                    <Text style={{ fontSize: 12, paddingBottom: 8 + safeBottom, paddingHorizontal: 12 }}>{sendControl.reason}</Text>
+                    <Text style={{ fontSize: 12, paddingBottom: 8 + safeBottom, paddingHorizontal: 12 }}>{sendReason}</Text>
                     )
                     : null}
             </KeyboardAvoidingView>

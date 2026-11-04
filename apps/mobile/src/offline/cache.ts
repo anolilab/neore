@@ -58,10 +58,11 @@ const newerThan = (table: string) =>
     `WHERE excluded.updated_at > ${table}.updated_at OR (excluded.updated_at = ${table}.updated_at AND excluded.synced_at >= ${table}.synced_at)`;
 
 /**
- * A live copy with share text replaces a saved copy that has none, whatever their stamps say. Version-one rows were
- * saved before share text existed, and their old stamps could outrank a live read after the device clock moved back.
+ * A row saved before the share text column existed has no share text (NULL), whatever its stamps say: a live copy
+ * replaces it. Its old stamps could outrank a live read after the device clock moved back. Rows saved since always hold
+ * a string, so a current empty share text is kept by the normal stamp rule.
  */
-const FILLS_EMPTY_SHARE_TEXT = "OR (cached_messages.share_text = '' AND excluded.share_text <> '')";
+const FILLS_LEGACY_SHARE_TEXT = "OR cached_messages.share_text IS NULL";
 
 const RECENT_THREAD_IDS = `SELECT id FROM cached_threads ORDER BY updated_at DESC, id DESC LIMIT ${MAX_THREADS_WITH_MESSAGES}`;
 
@@ -78,7 +79,7 @@ interface MessageSql {
     created_at: number;
     id: string;
     role: string;
-    share_text: string;
+    share_text: string | null;
     status: string;
     synced_at: number;
     text: string;
@@ -175,7 +176,8 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
             const columns = await database.getAllAsync<{ name: string }>("PRAGMA table_info(cached_messages)");
 
             if (columns.every((column) => column.name !== "share_text")) {
-                await database.execAsync("ALTER TABLE cached_messages ADD COLUMN share_text TEXT NOT NULL DEFAULT ''");
+                // Nullable with no default: the saved rows read as NULL, which marks them as having no share text yet.
+                await database.execAsync("ALTER TABLE cached_messages ADD COLUMN share_text TEXT");
             }
         } else if (stored?.user_version !== SCHEMA_VERSION) {
             for (const table of TABLES) {
@@ -277,7 +279,7 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                             createdAt: row.created_at,
                             id: row.id,
                             role: row.role,
-                            shareText: row.share_text,
+                            shareText: row.share_text ?? "",
                             status: row.status,
                             syncedAt: row.synced_at,
                             text: row.text,
@@ -360,7 +362,7 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                                 `INSERT INTO cached_messages (id, thread_id, role, text, share_text, status, created_at, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                                  ON CONFLICT(id) DO UPDATE SET role = excluded.role, text = excluded.text, share_text = excluded.share_text, status = excluded.status, created_at = excluded.created_at,
                                      updated_at = excluded.updated_at, synced_at = excluded.synced_at
-                                 ${newerThan("cached_messages")} ${FILLS_EMPTY_SHARE_TEXT}`,
+                                 ${newerThan("cached_messages")} ${FILLS_LEGACY_SHARE_TEXT}`,
                                 params,
                             );
                         }

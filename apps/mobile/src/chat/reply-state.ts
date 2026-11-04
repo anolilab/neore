@@ -16,9 +16,10 @@ const isFinal = (status: string): boolean => status === "success" || status === 
 /**
  * Reads the send's state from messages listed newest first, the order the server pages them in. The send's reply is
  * the assistant messages between the send and the next user message above it: a newer turn, from this session or
- * another, starts a new group. Within that group the newest step decides the state. Creation times play no part.
+ * another, starts a new group. Within that group the newest step decides the state. Creation times play no part. A
+ * steered send's reply is one run with its steer messages, which are user messages, so its walk goes past them.
  */
-export const replyStateAfter = (newestFirst: ReadonlyArray<SeenMessage>, sentId: string): ReplyState => {
+export const replyStateAfter = (newestFirst: ReadonlyArray<SeenMessage>, sentId: string, options: { isSteered?: boolean } = {}): ReplyState => {
     const sentIndex = newestFirst.findIndex((message) => message.id === sentId);
 
     if (sentIndex === -1) {
@@ -29,7 +30,7 @@ export const replyStateAfter = (newestFirst: ReadonlyArray<SeenMessage>, sentId:
 
     // Walked from the send upward, so each assistant message read later is a newer step.
     for (const message of newestFirst.slice(0, sentIndex).toReversed()) {
-        if (message.role === "user") {
+        if (message.role === "user" && !options.isSteered) {
             break;
         }
 
