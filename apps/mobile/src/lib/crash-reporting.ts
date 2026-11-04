@@ -34,6 +34,8 @@ export interface RevocationFlag {
 }
 
 const state: {
+    /** Settles once the saved choice is applied at startup. */
+    choiceSettled?: Promise<void>;
     client?: CrashReportClient;
     create?: () => CrashReportClient;
     held: HeldReport[];
@@ -129,33 +131,85 @@ export const crashReportsOn = (): Promise<boolean> => runChoice(async () => stat
 
 /**
  * Records an opt-out before the saved choice is written. If that write fails, the record still tells the next launch
- * that the saved "on" is out of date. A record that cannot be written is reported, and the save is still tried.
+ * that the saved "on" is out of date. Returns whether the record was written.
  */
-const recordRevocation = (): void => {
+const isRevocationRecorded = (): boolean => {
     try {
         state.revocation?.create();
+
+        return true;
     } catch {
         console.warn("Could not record the crash-report opt-out.");
+
+        return false;
+    }
+};
+
+/** An opt-out that neither the record nor the saved choice could keep. The next launch may turn reporting back on. */
+export class UnsavedOptOutError extends Error {
+    public constructor() {
+        super("The opt-out could not be saved.");
+        this.name = "UnsavedOptOutError";
+    }
+}
+
+/**
+ * An opt-out. The client is switched off first, and the record and the saved choice are written even if the client
+ * refuses the change: the refusal is raised once they are done, so the saved choice is never left as "on" by it.
+ */
+const turnOff = async (store: PreferenceStore): Promise<void> => {
+    let clientError: { error: unknown } | undefined;
+
+    try {
+        await applyToClient(false);
+    } catch (error) {
+        clientError = { error };
+    }
+
+    settleChoice();
+
+    const isRecorded = isRevocationRecorded();
+
+    try {
+        await writeCrashReportsEnabled(store, false);
+    } catch (saveError) {
+        if (!isRecorded) {
+            throw new UnsavedOptOutError();
+        }
+
+        throw saveError;
+    }
+
+    state.revocation?.remove();
+
+    if (clientError) {
+        throw clientError.error;
     }
 };
 
 /**
- * Changes the choice. The client is switched first, so an opt-out takes effect even
- * if saving the choice then fails.
+ * An opt-in. A record of an earlier opt-out is removed first: while it remains, it would override the opt-in at the
+ * next launch. If that removal fails, nothing has changed.
  */
+const turnOn = async (store: PreferenceStore, marker: InstallMarker): Promise<void> => {
+    state.revocation?.remove();
+    await applyToClient(true);
+    settleChoice();
+    await writeCrashReportsEnabled(store, true);
+    // A choice made on this install is trusted, so the install counts as started from here on.
+    marker.create();
+};
+
+/** Changes the choice, one change at a time. */
 export const changeCrashReports = (store: PreferenceStore, isOn: boolean, marker: InstallMarker): Promise<void> =>
     runChoice(async () => {
-        await applyToClient(isOn);
-        settleChoice();
+        if (isOn) {
+            await turnOn(store, marker);
 
-        if (!isOn) {
-            recordRevocation();
+            return;
         }
 
-        await writeCrashReportsEnabled(store, isOn);
-        state.revocation?.remove();
-        // A choice made on this install is trusted, so the install counts as started from here on.
-        marker.create();
+        await turnOff(store);
     });
 
 /** Whether this install has been started before, and a way to mark that it has. */
@@ -223,8 +277,8 @@ const startupChoice = async (store: PreferenceStore, marker: InstallMarker): Pro
  * Applies the saved choice at startup, then sends or drops the crashes held until the choice was known. Errors
  * caught before this runs are held, not sent.
  */
-export const applyStoredCrashReportChoice = (store: PreferenceStore, marker: InstallMarker): Promise<void> =>
-    runChoice(async () => {
+export const applyStoredCrashReportChoice = (store: PreferenceStore, marker: InstallMarker): Promise<void> => {
+    const settled = runChoice(async () => {
         const isOn = await startupChoice(store, marker);
 
         try {
@@ -236,33 +290,45 @@ export const applyStoredCrashReportChoice = (store: PreferenceStore, marker: Ins
         settleChoice();
     });
 
+    state.choiceSettled = settled;
+
+    return settled;
+};
+
 /**
- * Gives a fatal report a bounded moment to leave: the handler below ends the app, and the SDK sends from memory.
- * A flush that fails or hangs does not keep the previous handler from running.
+ * Lets one step of a fatal error finish, for at most `FATAL_FLUSH_MS`. A step that fails or hangs is not waited for
+ * any longer: the previous handler must still run.
  */
-const flushBeforeCrash = async (client: CrashReportClient): Promise<void> => {
+const boundedWait = async (work: () => Promise<unknown>): Promise<void> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<void>((resolve) => {
         timer = setTimeout(resolve, FATAL_FLUSH_MS);
     });
 
     try {
-        await Promise.race([client.flush(), timeout]);
+        await Promise.race([work(), timeout]);
     } catch {
-        // A failed flush is not a reason to hide the crash.
+        // A failed step is not a reason to hide the crash.
     } finally {
         clearTimeout(timer);
     }
 };
 
-/** Hands a fatal error to the previous handler once the report has had its bounded moment to leave. */
-const endAfterFlush = async (
-    previous: ErrorHandler,
-    client: CrashReportClient,
-    error: unknown,
-    isFatal: boolean | undefined,
-): Promise<void> => {
-    await flushBeforeCrash(client);
+/**
+ * Hands a fatal error to the previous handler once the report has had its bounded moment to leave. A report held
+ * before the saved choice is known waits for that choice first, so it is sent when the choice is on.
+ */
+const endAfterFlush = async (previous: ErrorHandler, error: unknown, isFatal: boolean | undefined, choice?: Promise<void>): Promise<void> => {
+    if (choice) {
+        await boundedWait(() => choice);
+    }
+
+    const { client } = state;
+
+    if (client && state.isOn) {
+        await boundedWait(() => client.flush());
+    }
+
     previous(error, isFatal);
 };
 
@@ -295,11 +361,12 @@ export const installGlobalErrorReporting = (): void => {
             console.warn("A crash report could not be sent.");
         }
 
-        const { client } = state;
+        // The app ends after a fatal error, so its report gets a bounded moment to leave first. A report held before the
+        // saved choice is known waits for that choice, which sends it when the choice is on.
+        const choice = state.isChoiceKnown ? undefined : state.choiceSettled;
 
-        // The app ends after a fatal error, so its report gets a bounded moment to leave first.
-        if (isFatal === true && client && state.isOn) {
-            endAfterFlush(previous, client, error, isFatal);
+        if (isFatal === true && (choice || (state.isOn && state.client))) {
+            endAfterFlush(previous, error, isFatal, choice);
 
             return;
         }

@@ -219,6 +219,55 @@ describe("a saved opt-out that did not persist", () => {
     });
 });
 
+describe("changing the choice when a step fails", () => {
+    it("still saves the opt-out when the SDK refuses it, and raises the refusal afterwards", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const client = fakeClient(events);
+        const store = memoryStore(events, "on");
+
+        client.optOut.mockRejectedValue(new Error("sdk refused the opt-out"));
+        crash.startCrashReporting(() => client, memoryFlag());
+        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
+
+        await expect(crash.changeCrashReports(store, false, returningInstall)).rejects.toThrow("sdk refused the opt-out");
+
+        expect(store.value).toBe("off");
+        expect(await crash.crashReportsOn()).toBe(false);
+    });
+
+    it("refuses an opt-in, and leaves reporting off, when a stale opt-out record cannot be removed", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const client = fakeClient(events);
+        const flag = { ...memoryFlag(true), remove: vi.fn(() => {
+            throw new Error("file is locked");
+        }) };
+        const store = memoryStore(events, null);
+
+        crash.startCrashReporting(() => client, flag);
+
+        await expect(crash.changeCrashReports(store, true, returningInstall)).rejects.toThrow("file is locked");
+
+        expect(client.optIn).not.toHaveBeenCalled();
+        expect(store.value).toBeNull();
+        expect(await crash.crashReportsOn()).toBe(false);
+    });
+
+    it("says the opt-out was not kept when neither the record nor the saved choice could be written", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const flag = { ...memoryFlag(), create: vi.fn(() => {
+            throw new Error("disk full");
+        }) };
+
+        crash.startCrashReporting(() => fakeClient(events), flag);
+        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
+
+        await expect(crash.changeCrashReports(memoryStore(events, "on", true), false, returningInstall)).rejects.toBeInstanceOf(crash.UnsavedOptOutError);
+    });
+});
+
 describe("a new install", () => {
     it("starts off when the install marker cannot be read", async () => {
         const events: string[] = [];
@@ -312,6 +361,29 @@ describe("making the client", () => {
 });
 
 describe("the global error handler", () => {
+    it("waits for the saved choice before a fatal error ends the app, and sends the report held before it when the choice is on", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const client = fakeClient(events);
+
+        crash.startCrashReporting(() => client, memoryFlag());
+        crash.installGlobalErrorReporting();
+        // The saved choice is still being read when the error arrives.
+        const startup = crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
+        const error = new Error("boom during first render");
+
+        handlers.installed?.(error, true);
+
+        expect(handlers.previous).not.toHaveBeenCalled();
+
+        await startup;
+
+        await vi.waitFor(() => {
+            expect(handlers.previous).toHaveBeenCalledWith(error, true);
+        });
+        expect(client.captureException).toHaveBeenCalledWith(expect.anything(), { fatal: true });
+    });
+
     it("gives a fatal report a bounded moment to leave before the previous handler ends the app", async () => {
         const events: string[] = [];
         const crash = await load();
