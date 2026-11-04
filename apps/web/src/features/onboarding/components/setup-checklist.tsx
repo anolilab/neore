@@ -34,15 +34,15 @@ const SetupChecklist: FC = () => {
     // One step per call: the server applies it to the list it holds, so another tab's skip is never overwritten.
     const setSkipped = useMutation({
         ...crpc.auth.setup_steps.setSetupStepSkipped.mutationOptions(),
-        onError: () => {
-            toast.error(t`Could not save that choice. Try again.`);
-        },
         onMutate: (args: { skipped: boolean; stepId: SetupStepId }) => {
             const previous = queryClient.getQueryData<{ setupStepsSkipped?: string[] } | null>(settingsKey);
 
             if (previous) {
                 queryClient.setQueryData(settingsKey, { ...previous, setupStepsSkipped: toggleSkipped(previous.setupStepsSkipped, args.stepId, args.skipped) });
             }
+        },
+        onError: () => {
+            toast.error(t`Could not save that choice. Try again.`);
         },
         onSettled: async () => {
             await queryClient.invalidateQueries({ queryKey: settingsKey });
@@ -70,17 +70,15 @@ const SetupChecklist: FC = () => {
         },
     };
     const statusLabel = { done: t`Done`, skipped: t`Skipped`, todo: t`To do` };
-    let pendingLabel = t`Checking`;
-
-    if (devicesQuery.isError) {
-        pendingLabel = t`Could not check`;
-    }
+    const pendingLabel = devicesQuery.isError ? t`Could not check` : t`Checking`;
 
     return (
         <SettingsCard description={t`Three steps to use coding agents on your own machines. Skip any of them and come back later.`} title={t`Coding setup`}>
             <CardContent>
                 <ol aria-label={t`Coding setup steps`} className="space-y-3">
-                    {(steps ?? SETUP_STEP_IDS.map((id) => ({ id, status: undefined }))).map(({ id, status }) => (
+                    {(steps ?? SETUP_STEP_IDS.map((id) => {
+                        return { id, status: undefined };
+                    })).map(({ id, status }) => (
                         <li className="flex flex-wrap items-center gap-3" key={id}>
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium">
