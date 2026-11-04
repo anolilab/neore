@@ -309,7 +309,7 @@ export const sweepDeviceCalls = internalMutation
 
 /** Whether a machine may pair itself to this account: a real account, not being deleted, with room for one more device. */
 const assertMayPairHeadless = async (ctx: QueryCtx, userId: string): Promise<void> => {
-    const account = await ctx.db.user.findFirst({ where: { _id: ctx.db.asId("user", userId) } });
+    const account = await ctx.db.user.findFirst({ consistency: "primary", where: { _id: ctx.db.asId("user", userId) } });
 
     if (!account || account.isAnonymous === true) {
         throw new LunoraError("FORBIDDEN", "Pairing a device requires an account");
