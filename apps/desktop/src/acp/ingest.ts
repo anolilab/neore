@@ -127,6 +127,10 @@ export class HostPoster implements SessionObserver {
     /** When the pending timer fires: a sooner report moves it earlier, a later one leaves it. */
     private stateDueAt: number | undefined;
 
+    private stateFlushing = false;
+
+    private stateFlushAgain = false;
+
     /** The text of each running turn, kept for the references its reply makes (capped). */
     private readonly texts = new Map<string, string>();
 
@@ -212,11 +216,6 @@ export class HostPoster implements SessionObserver {
     }
 
     public sessionEnded(sessionId: string): void {
-        // A session that never reached the backend has nothing to deliver its last report to.
-        if (this.sessions.get(sessionId)?.threadId === null) {
-            this.pendingState.delete(sessionId);
-        }
-
         this.sessions.get(sessionId)?.close();
         this.closing.add(sessionId);
         this.closeWhenDrained(sessionId);
@@ -483,6 +482,13 @@ export class HostPoster implements SessionObserver {
         }
 
         this.closing.delete(sessionId);
+
+        // A session that never reached the backend has nothing to deliver its last report to. Checked here, once the close has
+        // drained: a session whose open was still in flight only turns unbound into local when its link closes.
+        if (this.sessions.get(sessionId)?.threadId === null) {
+            this.pendingState.delete(sessionId);
+        }
+
         this.sessions.get(sessionId)?.announceClose();
     }
 
@@ -517,8 +523,32 @@ export class HostPoster implements SessionObserver {
         this.stateTimer = setTimeout(async () => {
             this.stateTimer = undefined;
             this.stateDueAt = undefined;
-            await this.flushState();
+            await this.runStateFlush();
         }, ms);
+    }
+
+    /**
+     * One state pass at a time. A pass that comes due while another is posting waits for it and runs after it, so two state
+     * posts for a session are never in flight together: the backend then sees each session's reports in the order they were sent.
+     */
+    private async runStateFlush(): Promise<void> {
+        if (this.stateFlushing) {
+            this.stateFlushAgain = true;
+
+            return;
+        }
+
+        this.stateFlushing = true;
+
+        try {
+            do {
+                this.stateFlushAgain = false;
+                // eslint-disable-next-line no-await-in-loop -- each pass must finish before the next one starts
+                await this.flushState();
+            } while (this.stateFlushAgain && !this.stopped);
+        } finally {
+            this.stateFlushing = false;
+        }
     }
 
     /**

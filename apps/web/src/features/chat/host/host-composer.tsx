@@ -24,6 +24,7 @@ import { useCRPC } from "@/lib/lunora/crpc";
 import DiffCommentsDraft from "./diff-comments-draft";
 import { MAX_HOST_PROMPT_CHARS, sendHostMessage } from "./host-send";
 import useHostSendErrorMessages from "./host-send-errors";
+import { formatReportedCost } from "./reported-cost";
 
 /** How the last turn ended when the person should be offered a way on. */
 const CONTINUABLE: ReadonlySet<string> = new Set(["interrupted", "timeout"]);
@@ -75,21 +76,8 @@ const PermissionRequestCard: FC<{ busy: boolean; onAnswer: (optionId: string) =>
     );
 };
 
-/** A cost the agent reported, as money. An unknown currency code is shown as the bare number, never a thrown error. */
-const formatReportedCost = (cost: { amount: number; currency: string }): string => {
-    try {
-        // Agents report cumulative costs in fractions of a cent, which the currency's own digits would round to zero: below a cent,
-        // keep two significant digits.
-        const digits = cost.amount > 0 && cost.amount < 0.01 ? { maximumSignificantDigits: 2 } : {};
-
-        return new Intl.NumberFormat(undefined, { currency: cost.currency, style: "currency", ...digits }).format(cost.amount);
-    } catch {
-        return `${cost.amount} ${cost.currency}`;
-    }
-};
-
 const HostComposer: FC<{ className?: string; threadId: string }> = ({ className, threadId }) => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const id = threadId as Id<"threads">;
     const [text, setText] = useState("");
@@ -206,7 +194,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                 <div className="flex justify-end">
                     <ContextUsageMeter
                         contextWindow={usage.size}
-                        detail={usage.cost === undefined ? undefined : t`Cost reported by the agent: ${formatReportedCost(usage.cost)}`}
+                        detail={usage.cost === undefined ? undefined : t`Cost reported by the agent: ${formatReportedCost(usage.cost, i18n.locale)}`}
                         usedTokens={usage.used}
                     />
                 </div>

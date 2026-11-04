@@ -1357,6 +1357,22 @@ describe("what the agent reports about itself", () => {
         expect(statePosts()[0]?.post.events[0]).toMatchObject({ usage: usage(9) });
     });
 
+    it("never posts the report of a session that ended before it reached the backend, even once the computer is paired", async () => {
+        paired = undefined;
+        const host = poster();
+
+        host.sessionOpened("s1", INFO);
+        host.sessionState("s1", { usage: usage(9) });
+        host.sessionEnded("s1");
+        await settle(2000);
+
+        paired = "dev1";
+        host.paired();
+        await settle(4000);
+
+        expect(statePosts()).toEqual([]);
+    });
+
     it("posts a fresh report at the debounce, not after a pending retry's long backoff", async () => {
         const host = poster();
 
