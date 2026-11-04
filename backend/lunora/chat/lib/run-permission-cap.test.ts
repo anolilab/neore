@@ -43,10 +43,17 @@ describe("readRunPermissionCap", () => {
         expect(runQuery).toHaveBeenLastCalledWith(expect.anything(), { organizationId: "org_thread" });
     });
 
-    it("gives auto for a thread in the personal space", async () => {
-        const runQuery = vi.fn().mockResolvedValueOnce({ organizationId: null });
+    it("takes the run's organization for a thread that has none stored, so it is capped, not uncapped", async () => {
+        const runQuery = vi.fn().mockResolvedValueOnce({ organizationId: null }).mockResolvedValueOnce("off");
 
-        expect(await readRunPermissionCap(fakeCtx(runQuery), { organizationId: "org_other", threadId: "thread_1" })).toBe("auto");
+        expect(await readRunPermissionCap(fakeCtx(runQuery), { organizationId: "org_other", threadId: "thread_1" })).toBe("off");
+        expect(runQuery).toHaveBeenLastCalledWith(expect.anything(), { organizationId: "org_other" });
+    });
+
+    it("gives auto for a thread and a run with no organization", async () => {
+        const runQuery = vi.fn().mockResolvedValueOnce({ organizationId: undefined });
+
+        expect(await readRunPermissionCap(fakeCtx(runQuery), { organizationId: null, threadId: "thread_1" })).toBe("auto");
         expect(runQuery).toHaveBeenCalledTimes(1);
     });
 

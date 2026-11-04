@@ -66,9 +66,8 @@ export interface BuildAgentToolsOptions {
     mcpServerNames?: string[];
     model: LanguageModel | string;
     /**
-     * The organization whose policy caps this run's tools (`org-policy.md` §6a). A run with a `threadId` takes its
-     * thread's organization and ignores this value, so a threaded caller passes `null`; a run without one passes the
-     * organization it runs for. `null` is the personal space (no policy).
+     * The organization the run was started from, whose policy caps its tools (`org-policy.md` §6a). A thread's stored
+     * organization takes precedence over it when a `threadId` is given. `null` is the personal space (no policy).
      */
     organizationId: string | null;
     /** Who started the run, when not the person at the app: an API key's run gets no device tools and no `auto` tool. */
@@ -179,6 +178,11 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         // The organization's cap on every tool this run may use (`org-policy.md` §6a); a failed read caps at `ask`.
         readRunPermissionCap(ctx, { organizationId, threadId }),
     ]);
+
+    // Under `off` every tool is removed below, so there is nothing to connect to or discover.
+    if (permissionCap === "off") {
+        return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
+    }
 
     // Bearer tokens for servers the user signed in to. The FULL list, so a grant
     // whose server was removed is recognised as orphaned and revoked.

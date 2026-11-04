@@ -50,7 +50,9 @@ export const readRunPermissionCap = async (
             return "ask";
         }
 
-        return await readPermissionCap(ctx, thread.organizationId);
+        // A thread's stored organization wins. A thread that has none (created before the stamp, or by a path that
+        // does not write one) takes the organization its run was started from, so it is never uncapped by default.
+        return await readPermissionCap(ctx, thread.organizationId ?? organizationId);
     } catch (error: unknown) {
         toolsLogger.warn("[TOOLS] Run thread unavailable for its permission cap; capping at ask:", error);
 

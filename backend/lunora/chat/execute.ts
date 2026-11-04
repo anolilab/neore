@@ -501,8 +501,8 @@ export const runStreamingAgent = internalAction
                               mcpProgress: toolProgressSink(ctx, streamId, runEpoch),
                               mcpServerNames: streamingConfig.mcpServerNames,
                               model,
-                              // Threaded: the thread's organization caps the run (see BuildAgentToolsOptions.organizationId).
-                              organizationId: null,
+                              // A thread's stored organization wins; the run's own caps a thread that has none.
+                              organizationId: organizationId ?? null,
                               ...(origin === "outside_agent" && { origin }),
                               searchMode: effectiveSearchMode,
                               skillTools: invokedSkill?.config
@@ -827,6 +827,7 @@ export const runStreamingAgent = internalAction
                         snapshot: {
                             autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
                             ...(origin === "outside_agent" && { dispatchOrigin: origin }),
+                            ...(organizationId && { organizationId }),
                             instructions: streamTextArgs.system ?? agent.options.instructions,
                             mcpServerNames: toolResult.mcpServerNames,
                             // A run that pauses extracts at the pause; its continuation extracts only the steers it takes.

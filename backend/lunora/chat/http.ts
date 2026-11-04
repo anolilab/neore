@@ -929,7 +929,8 @@ const runChatStartOnShard = async (
         // The run's tools are capped by the thread's organization, so a chat started in one carries it from its first turn.
         const threadOrganizationId = await activeOrganizationPromise;
 
-        if (threadOrganizationId) {
+        // Temporary threads stay unstamped, as `createThread` leaves them; their runs take the organization they were started from.
+        if (threadOrganizationId && body.temporary !== true) {
             await context.runMutation(internal.agent.threads.updateThread, {
                 patch: { organizationId: threadOrganizationId },
                 threadId: threadId as Id<"threads">,
