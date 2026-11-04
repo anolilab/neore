@@ -25,7 +25,8 @@ import { useOffline, useWriteControl } from "@/offline/offline-context";
 import type { MessageRow } from "@/offline/types";
 import { requireOnline } from "@/offline/write-gate";
 
-type Row = MessageRow;
+/** A row on this screen; `finished` marks a local row whose send completed, which no server read has confirmed yet. */
+type Row = MessageRow & { finished?: boolean };
 
 const NEW_THREAD = "new";
 const MAX_HISTORY_PAGES = 10;
@@ -85,7 +86,7 @@ const finishRow = (rows: Row[], id: string): Row[] =>
             return row;
         }
 
-        return { ...row, status: "success" };
+        return { ...row, finished: true };
     });
 
 /** Adds `text` to the end of the row with `id`, leaving every other row as it is. */
@@ -371,9 +372,10 @@ const Chat = () => {
                 throw new ChatError("The reply did not finish. Try again.");
             }
 
-            setRows((current) => finishRow(current, assistantId));
-
-            AccessibilityInfo.announceForAccessibility("Reply finished");
+            if (outcome === "finished") {
+                setRows((current) => finishRow(current, assistantId));
+                AccessibilityInfo.announceForAccessibility("Reply finished");
+            }
         } catch (error_) {
             setError(error_ instanceof Error ? error_.message : "Could not send.");
         } finally {
@@ -409,7 +411,7 @@ const Chat = () => {
 
     // The home indicator's inset, which the open keyboard already covers.
     const safeBottom = keyboardShown ? 0 : insets.bottom;
-    const syncedTimes = rows.filter((row) => row.status !== "local").map((row) => row.syncedAt);
+    const syncedTimes = rows.filter((row) => row.status !== "local" && row.finished !== true).map((row) => row.syncedAt);
     const syncedAt = syncedTimes.length === 0 ? undefined : Math.max(...syncedTimes);
 
     return (
@@ -423,7 +425,8 @@ const Chat = () => {
                     ListHeaderComponent={olderHeader}
                     renderItem={({ item }) => {
                         // Only a finished message can be shared: one still streaming, or one that failed, is not the whole text.
-                        const shareText = item.status === "success" ? shareableMessageText({ text: item.shareText }) : undefined;
+                        const isFinished = item.status === "success" || item.finished === true;
+                        const shareText = isFinished ? shareableMessageText({ text: item.shareText }) : undefined;
 
                         return (
                             <View style={{ alignSelf: item.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", padding: 12 }}>

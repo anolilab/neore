@@ -167,10 +167,10 @@ describe("relayReply", () => {
         expect(deltas).toEqual(["Hel", "lo"]);
     });
 
-    it("a 205 means the stream already finished", async () => {
+    it("a 205 means nothing more to relay, which does not prove this client has the whole reply", async () => {
         const { fetch } = scripted([new Response(null, { status: 205 })]);
 
-        expect(await relayReply({ fetch, gatewayUrl: "https://gw", onDelta: () => undefined, streamToken: "tok" })).toBe("finished");
+        expect(await relayReply({ fetch, gatewayUrl: "https://gw", onDelta: () => undefined, streamToken: "tok" })).toBe("unconfirmed");
     });
 
     it("an error line fails the reply", async () => {
