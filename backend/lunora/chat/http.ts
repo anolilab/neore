@@ -545,16 +545,10 @@ const runChatStartOnShard = async (
         }
     }
 
-    // Scopes organization-shared skills. `user.activeOrganization` is always
-    // null here (no session read from an HTTP action), so resolve it from the
-    // session row, which also re-checks membership. It depends on nothing
-    // below, so it is read alongside the rest instead of just before enqueueing
-    // the run. Only a text run has one.
-    const activeOrganizationPromise = (async (): Promise<string | null> => {
-        if (contentType !== "text") {
-            return null;
-        }
-
+    // The caller's active organization, from the session row (`user.activeOrganization` is always null here: no session
+    // read from an HTTP action). It also re-checks membership. It depends on nothing below, so it is read alongside the
+    // rest instead of just before enqueueing the run.
+    const sessionOrganizationPromise = (async (): Promise<string | null> => {
         const identity = await context.auth.getIdentity();
         const sessionId = identity?.sessionId;
 
@@ -563,8 +557,11 @@ const runChatStartOnShard = async (
             : null;
     })();
 
+    // Scopes organization-shared skills and goals. Only a text run has one.
+    const activeOrganizationPromise = contentType === "text" ? sessionOrganizationPromise : Promise.resolve(null);
+
     // A request refused below never awaits it; it is only a read.
-    activeOrganizationPromise.catch(() => undefined);
+    sessionOrganizationPromise.catch(() => undefined);
 
     // Build message content
     const messageContent: any[] = [];
@@ -929,7 +926,7 @@ const runChatStartOnShard = async (
         // The thread records its organization so later runs on it are capped by it. Best-effort: a failed stamp must not
         // strand the message, and the run's own organization (passed to its job below) still caps this run. Temporary
         // threads stay unstamped, as `createThread` leaves them.
-        const threadOrganizationId = await activeOrganizationPromise;
+        const threadOrganizationId = await sessionOrganizationPromise;
 
         if (threadOrganizationId && body.temporary !== true) {
             try {
