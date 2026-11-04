@@ -4,11 +4,12 @@
 import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { timeoutStream } from "../agent/streams";
 import { patchThread } from "../agent/table-writes";
-import { releaseThread } from "./streaming/persistent/host";
 import { getThread, updateThread } from "../agent/threads";
 import schema from "../schema";
 import { isSnoozeInRange, SNOOZE_MAX_MS } from "./lib/thread-state-logic";
+import { releaseThread } from "./streaming/persistent/host";
 import { markThreadViewed, snoozeThread, unsnoozeThread } from "./thread-state";
 
 const OWNER = "user-owner";
@@ -223,6 +224,22 @@ describe("a snoozed thread wakes early", () => {
 
         expect(failedRow.snoozedUntil).toBeUndefined();
         expect(stoppedRow).toMatchObject({ snoozedUntil: SNOOZED_UNTIL, status: "active" });
+    });
+
+    it("un-snoozes when a stream fails while another stream of the thread still runs", async () => {
+        const id = await insertSnoozed();
+        const streaming = (order: number): Record<string, unknown> => {
+            return { order, state: { kind: "streaming", lastHeartbeat: 1 }, stateKind: "streaming", stepOrder: 0, threadId: id };
+        };
+        const failing = await harness.run(async (context: any) => await context.db.insert("streamingMessages", streaming(1)));
+
+        await harness.run(async (context: any) => await context.db.insert("streamingMessages", streaming(2)));
+        await harness.run(async (context: any) => await context.runMutation(timeoutStream as never, { streamId: failing } as never));
+
+        const row = await readThread(id);
+
+        expect(row.status).toBe("active");
+        expect(row.snoozedUntil).toBeUndefined();
     });
 
     it("stays snoozed for an ordinary write", async () => {
