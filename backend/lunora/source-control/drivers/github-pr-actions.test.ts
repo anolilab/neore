@@ -63,7 +63,7 @@ describe("editPullRequest", () => {
 
         const mutation = sent.find((call) => String(call.json.query).includes("updatePullRequest"));
 
-        expect(mutation?.json.variables).toEqual({ body: undefined, pullRequestId: "PR_node", title: "New" });
+        expect(mutation?.json.variables).toEqual({ input: { pullRequestId: "PR_node", title: "New" } });
     });
 
     it("counts an answer without the pull request as unconfirmed", async () => {

@@ -1270,7 +1270,7 @@ const setAutoMerge = async (request: HostRequest, ref: PullRequestRef, enabled: 
     }
 };
 
-const PULL_EDIT_MUTATION = `mutation ($pullRequestId: ID!, $title: String, $body: String) { updatePullRequest(input: { pullRequestId: $pullRequestId, title: $title, body: $body }) { pullRequest { id title body } } }`;
+const PULL_EDIT_MUTATION = `mutation ($input: UpdatePullRequestInput!) { updatePullRequest(input: $input) { pullRequest { id title body } } }`;
 const REQUEST_REVIEWERS_MUTATION = `mutation ($pullRequestId: ID!, $logins: [String!]!) { requestReviewsByLogin(input: { pullRequestId: $pullRequestId, userLogins: $logins, union: true }) { pullRequest { id } } }`;
 const REVERT_MUTATION = `mutation ($pullRequestId: ID!, $title: String, $body: String) { revertPullRequest(input: { pullRequestId: $pullRequestId, title: $title, body: $body }) { revertPullRequest { number url } } }`;
 
@@ -1310,7 +1310,8 @@ const editPullRequest = async (request: HostRequest, ref: PullRequestRef, edit: 
             await graphqlRequest(
                 request,
                 PULL_EDIT_MUTATION,
-                { body: edit.body, pullRequestId, title: edit.title },
+                // Only the fields the person changed go in the input: a field left out is not sent at all, so it keeps its value.
+                { input: { pullRequestId, ...(edit.title !== undefined && { title: edit.title }), ...(edit.body !== undefined && { body: edit.body }) } },
                 z.object({ updatePullRequest: editedSchema.optional() }),
                 "/graphql",
                 { untypedMayHaveRun: true },
