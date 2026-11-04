@@ -37,6 +37,8 @@ const SetupChecklist: FC = () => {
     const reloadSettings = async () => await queryClient.invalidateQueries({ queryKey: settingsKey });
     const setSkipped = useMutation({
         ...crpc.auth.setup_steps.setSetupStepSkipped.mutationOptions(),
+        // Saves run one after another in click order, so a Skip still on its way can never land after the Resume that followed it.
+        scope: { id: "setup-steps-skip" },
         onMutate: async (args: { skipped: boolean; stepId: SetupStepId }) => {
             // A read still in flight would land after the patch with the value from before the click.
             await queryClient.cancelQueries({ queryKey: settingsKey });

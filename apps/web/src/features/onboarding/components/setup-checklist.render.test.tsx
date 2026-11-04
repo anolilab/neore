@@ -243,6 +243,32 @@ describe("<SetupChecklist>", () => {
         expect(screen.queryByText(COULD_NOT_READ_DEVICES)).toBeNull();
     });
 
+    it("lets the latest click win when Resume follows a Skip that has not been saved yet", async () => {
+        let release = () => {};
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` is newer than the supported runtimes
+        server.hold = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        renderChecklist();
+        await screen.findAllByText("(To do)");
+        fireEvent.click(screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }));
+        fireEvent.click(await screen.findByRole("button", { name: RESUME_ADD_AN_SSH_SERVER }));
+
+        // The Resume waits behind the Skip instead of racing it.
+        await waitFor(() => expect(mutate).toHaveBeenCalledTimes(1));
+        server.hold = undefined;
+        release();
+
+        await waitFor(() => expect(mutate).toHaveBeenCalledTimes(2));
+        expect(mutate.mock.calls.map(([args]) => args)).toEqual([
+            { skipped: true, stepId: "ssh" },
+            { skipped: false, stepId: "ssh" },
+        ]);
+        await waitFor(() => expect(screen.getAllByText("(To do)")).toHaveLength(3));
+        expect(server.skipped ?? []).toEqual([]);
+    });
+
     it("keeps an earlier skip when a second step is skipped right after", async () => {
         renderChecklist();
         await screen.findAllByText("(To do)");
