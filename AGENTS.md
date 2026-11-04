@@ -2370,6 +2370,14 @@ error")` (any transport, including the SSRF-guarded tool
   against that state. There is no `ALCHEMY_PASSWORD` any more.
 - **`--adopt` is for the FIRST deploy of a name that already exists**, not a standing flag:
   it takes over any same-named resource. `deploy.yml` has an `adopt` input, off by default.
+- **A prop that forces a REPLACE deletes a D1 database or R2 bucket outright** (alchemy
+  2.0.0-beta.81). The replacement keeps the same name, so its reconcile finds the OLD resource
+  by name and adopts its id instead of creating one; the cleanup then deletes that id. State
+  ends up pointing at a deleted resource, the Workers' bindings with it, and the next plan
+  calls it a no-op. That is how pinning `jurisdiction` (#496) emptied staging on 2026-11-04.
+  Before changing a create-only prop (`jurisdiction`, a D1 `name`), read the plan for
+  `replace` and rename the resource in the same change. To recover, run `deploy.yml` with
+  `force`: every resource reconciles, finds nothing by id or name, and is created again.
 - **Three tiers, three accounts.** `production` (the neore account), `staging` and `preview`
   (their own Cloudflare accounts, each with a GitHub environment holding its token and
   account id). The GitHub ENVIRONMENT picks the account and secrets; the Alchemy STAGE picks
