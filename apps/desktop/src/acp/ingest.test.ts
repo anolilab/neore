@@ -1276,6 +1276,9 @@ describe("what the agent reports about itself", () => {
         expect(backend.posts).toEqual([]);
 
         await open(host);
+
+        const observedAt = clock;
+
         host.sessionState("s1", { usage: usage(20) });
         await settle(2000);
 
@@ -1283,7 +1286,8 @@ describe("what the agent reports about itself", () => {
         expect(statePosts()[0]?.post).toMatchObject({ deviceId: "dev1", kind: "turn", sessionId: "s1", v: 1 });
         expect(statePosts()[0]?.post).not.toHaveProperty("threadId");
         expect(statePosts()[0]?.post).not.toHaveProperty("turnId");
-        expect(statePosts()[0]?.post.events).toEqual([{ at: clock, kind: "session_state", usage: usage(20) }]);
+        // `at` is when the value was observed, not when it was sent: the backend orders reports by it.
+        expect(statePosts()[0]?.post.events).toEqual([{ at: observedAt, kind: "session_state", usage: usage(20) }]);
         expect(statePosts()[0]?.signature).toMatch(SIGNED);
     });
 
@@ -1334,6 +1338,23 @@ describe("what the agent reports about itself", () => {
         expect(sent).toHaveLength(2);
         expect(sent[1]?.post.events[0]).toMatchObject({ usage: usage(11) });
         expect(sent[1]?.post.issuedAt).toBeGreaterThan(sent[0]?.post.issuedAt ?? 0);
+    });
+
+    it("posts a fresh report at the debounce, not after a pending retry's long backoff", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext.push("network");
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(1);
+
+        clock += 1000;
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(2);
+        expect(statePosts()[1]?.post.events[0]).toMatchObject({ usage: usage(11) });
     });
 
     it("drops a report the backend refuses, and the session keeps going", async () => {

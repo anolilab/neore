@@ -3,9 +3,8 @@
  * output). Pure: each reader returns `undefined` for anything malformed, so a bad update is dropped, never sent.
  * Every text value is scrubbed by the caller's `scrub` (the agent's environment values are removed there).
  */
+import { isRecord } from "./child-updates";
 import type { AgentUsage } from "./host-events";
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 const isCount = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 

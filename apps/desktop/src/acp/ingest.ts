@@ -49,6 +49,14 @@ const REFUSED_STATUSES = new Set([400, 403, 413]);
 /** Agent state is coalesced to one post per session per this many ms; a failed post waits this long before its retry. */
 const STATE_DEBOUNCE_MS = 2000;
 const STATE_RETRY_MS = 30_000;
+
+/**
+ * A report waiting to be posted. `at` is when the agent's value was observed, not when it is sent: a value sent again
+ * after a newer one was posted carries its old `at`, and the backend drops it.
+ */
+interface PendingState extends SessionStatePatch {
+    at: number;
+}
 /** A run of 401s this long and this many is a device the backend no longer knows, not a clock blip. */
 const REVOKED_AFTER_MS = 60_000;
 const REVOKED_AFTER_ATTEMPTS = 5;
@@ -100,9 +108,12 @@ export class HostPoster implements SessionObserver {
     private readonly sessions = new Map<string, SessionLink>();
 
     /** The agent's own reports not yet posted, by session: the newest value of each field (`sessionState`). */
-    private readonly pendingState = new Map<string, SessionStatePatch>();
+    private readonly pendingState = new Map<string, PendingState>();
 
     private stateTimer: ReturnType<typeof setTimeout> | undefined;
+
+    /** When the pending timer fires: a sooner report moves it earlier, a later one leaves it. */
+    private stateDueAt: number | undefined;
 
     /** The text of each running turn, kept for the references its reply makes (capped). */
     private readonly texts = new Map<string, string>();
@@ -172,7 +183,7 @@ export class HostPoster implements SessionObserver {
      * usage updates (one per model step) costs one post, not one each.
      */
     public sessionState(sessionId: string, patch: SessionStatePatch): void {
-        this.pendingState.set(sessionId, { ...this.pendingState.get(sessionId), ...patch });
+        this.pendingState.set(sessionId, { ...this.pendingState.get(sessionId), ...patch, at: this.now() });
         this.scheduleState(STATE_DEBOUNCE_MS);
     }
 
@@ -468,13 +479,22 @@ export class HostPoster implements SessionObserver {
         this.persist();
     }
 
+    /**
+     * One timer for both delays: a sooner report moves it earlier, so a retry's long backoff never holds back a fresh
+     * report, and a later one never pushes a pending flush out. Nothing is scheduled once the poster is stopped.
+     */
     private scheduleState(ms: number): void {
-        if (this.stateTimer !== undefined) {
+        const dueAt = this.now() + ms;
+
+        if (this.stopped || (this.stateTimer !== undefined && this.stateDueAt !== undefined && this.stateDueAt <= dueAt)) {
             return;
         }
 
+        clearTimeout(this.stateTimer);
+        this.stateDueAt = dueAt;
         this.stateTimer = setTimeout(async () => {
             this.stateTimer = undefined;
+            this.stateDueAt = undefined;
             await this.flushState();
         }, ms);
     }
@@ -485,14 +505,18 @@ export class HostPoster implements SessionObserver {
      * no thread yet keeps its report; a local-only session drops it.
      */
     private async flushState(): Promise<void> {
+        if (this.stopped) {
+            return;
+        }
+
         const deviceId = this.options.deviceId();
         // A snapshot: a retry below writes its entry back, and this pass must not reach that entry again.
         const snapshot = new Map(this.pendingState);
 
         for (const sessionId of snapshot.keys()) {
-            const patch = this.pendingState.get(sessionId);
+            const pending = this.pendingState.get(sessionId);
 
-            if (patch === undefined) {
+            if (pending === undefined || this.stopped) {
                 continue;
             }
 
@@ -512,7 +536,8 @@ export class HostPoster implements SessionObserver {
             this.pendingState.delete(sessionId);
 
             const now = this.now();
-            const payload = JSON.stringify({ deviceId, events: [{ ...patch, at: now, kind: "session_state" }], issuedAt: now, kind: "turn", sessionId, v: 1 });
+            const { at, ...fields } = pending;
+            const payload = JSON.stringify({ deviceId, events: [{ ...fields, at, kind: "session_state" }], issuedAt: now, kind: "turn", sessionId, v: 1 });
             let result: PostResult;
 
             try {
@@ -525,7 +550,7 @@ export class HostPoster implements SessionObserver {
 
             if (result.kind === "retry") {
                 // Keep what is newer than this send, and let the next flush carry it with the rest.
-                this.pendingState.set(sessionId, { ...patch, ...this.pendingState.get(sessionId) });
+                this.pendingState.set(sessionId, { ...pending, ...this.pendingState.get(sessionId) });
                 this.scheduleState(STATE_RETRY_MS);
             }
         }

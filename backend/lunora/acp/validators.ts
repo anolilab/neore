@@ -30,15 +30,24 @@ export const vHostEndReason = v.union(
     v.literal("stopped"),
 );
 
-/** What an agent reported about itself outside its turns, as stored on the session row (`session_state`). */
-export const vAcpAgentState = v.object({
-    usage: v.optional(
+/**
+ * The agent's context use and cost, as it reports them (`session_state`). Counts are whole and non-negative, the cost is a
+ * finite non-negative amount, and the currency is cut to 8 characters on the desktop (`apps/desktop/src/acp/agent-state.ts`).
+ */
+export const vAgentUsage = v.object({
+    cost: v.optional(
         v.object({
-            cost: v.optional(v.object({ amount: v.number(), currency: v.string().max(8) })),
-            size: v.number(),
-            used: v.number(),
+            amount: v.number().check((amount) => Number.isFinite(amount) && amount >= 0, { message: "Invalid cost" }),
+            currency: v.string().min(1).max(8),
         }),
     ),
+    size: v.number().check((count) => Number.isSafeInteger(count) && count >= 0, { message: "Counts are non-negative integers" }),
+    used: v.number().check((count) => Number.isSafeInteger(count) && count >= 0, { message: "Counts are non-negative integers" }),
+});
+
+/** What an agent reported about itself outside its turns, as stored on the session row (`session_state`). */
+export const vAcpAgentState = v.object({
+    usage: v.optional(vAgentUsage),
 });
 
 export const vAcpSessionStatus = v.union(v.literal("starting"), v.literal("idle"), v.literal("busy"), v.literal("offline"), v.literal("ended"));
@@ -86,18 +95,7 @@ export const vHostEvent = v.union(
     v.object({
         at: v.number().check((at) => Number.isSafeInteger(at) && at >= 0, { message: "Invalid time" }),
         kind: v.literal("session_state"),
-        usage: v.optional(
-            v.object({
-                cost: v.optional(
-                    v.object({
-                        amount: v.number().check((amount) => Number.isFinite(amount) && amount >= 0, { message: "Invalid cost" }),
-                        currency: v.string().min(1).max(8),
-                    }),
-                ),
-                size: v.number().check((count) => Number.isSafeInteger(count) && count >= 0, { message: "Counts are non-negative integers" }),
-                used: v.number().check((count) => Number.isSafeInteger(count) && count >= 0, { message: "Counts are non-negative integers" }),
-            }),
-        ),
+        usage: v.optional(vAgentUsage),
     }),
     v.object({ kind: v.literal("turn_start"), text: v.string().max(100_000) }),
     v.object({ kind: v.literal("text"), text: v.string().max(65_536) }),

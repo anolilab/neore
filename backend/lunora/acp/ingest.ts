@@ -44,9 +44,11 @@ import { reapExpiredHostStreams } from "./lib/reap";
 import { markReattachFailed, nativeIdFits, reattachFailureOf } from "./lib/reattach";
 import { sessionOfThread, touchSession } from "./lib/sessions";
 import { verifyDeviceRequest } from "./lib/verify-device";
+import type { vAgentUsage } from "./validators";
 import { vHostEvent } from "./validators";
 
 type Event = Infer<typeof vHostEvent>;
+type Usage = Infer<typeof vAgentUsage>;
 
 /** Who owns the device whose signed post this is, or null: unknown or revoked device, bad signature, stale post. */
 export const verifyHostPost = internalQuery
@@ -179,11 +181,10 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
     return { ended: false, next: 0, outcome: "applied", threadId: threadId as string };
 };
 
-/**
- * The desktop's session ended: the session ends now instead of waiting to be read as stale. A turn still live on it
- * lost its host's end (the desktop sends the close only after delivering its turns), so it ends as interrupted.
- * Answers success for a session it does not know or has already ended: the desktop has nothing more to try.
- */
+/** The same reported usage, field by field: stored values come back in whatever order the store keeps them. */
+const sameUsage = (a: Usage | undefined, b: Usage | undefined): boolean =>
+    a?.used === b?.used && a?.size === b?.size && a?.cost?.amount === b?.cost?.amount && a?.cost?.currency === b?.cost?.currency;
+
 /**
  * A `session_state` report: each field present replaces the stored one, an absent field keeps it. A report older than the
  * one applied is dropped, and one whose values are already stored writes nothing. Answered "applied" either way, so the
@@ -205,15 +206,18 @@ const applySessionState = async (
         return { ended: false, next: 0, outcome: "applied" };
     }
 
-    const next = { ...session.agentState, ...(event.usage !== undefined && { usage: event.usage }) };
-
-    if (JSON.stringify(next) !== JSON.stringify(session.agentState ?? {})) {
-        await ctx.db.patch("acpSessions", session._id, { agentState: next, agentStateAt: event.at });
+    if (event.usage !== undefined && !sameUsage(event.usage, session.agentState?.usage)) {
+        await ctx.db.patch("acpSessions", session._id, { agentState: { ...session.agentState, usage: event.usage }, agentStateAt: event.at });
     }
 
     return { ended: false, next: 0, outcome: "applied" };
 };
 
+/**
+ * The desktop's session ended: the session ends now instead of waiting to be read as stale. A turn still live on it
+ * lost its host's end (the desktop sends the close only after delivering its turns), so it ends as interrupted.
+ * Answers success for a session it does not know or has already ended: the desktop has nothing more to try.
+ */
 const closeSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSessionId: string, now: number): Promise<ApplyResult> => {
     const session = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
 

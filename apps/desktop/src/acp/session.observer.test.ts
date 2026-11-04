@@ -85,7 +85,7 @@ const refuse: PermissionGate = {
 
 describe("a session's observer", () => {
     it("is told what the agent reports about its usage, and only that", async () => {
-        const { calls, observer } = recorder();
+        const { observer } = recorder();
         const reported: unknown[] = [];
         const watched: SessionObserver = {
             ...observer,
@@ -100,7 +100,6 @@ describe("a session's observer", () => {
         await expect.poll(() => session.snapshot().status).toBe("idle");
 
         expect(reported).toEqual([{ usage: { cost: { amount: 0.42, currency: "USD" }, size: 200_000, used: 12_345 } }]);
-        expect(calls.map((call) => call[0])).not.toContain("sessionState");
     });
 
     it("is told the session opened, the turn, its text and its end, in order", async () => {

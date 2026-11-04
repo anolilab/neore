@@ -257,7 +257,7 @@ describe("a permission request from the agent", () => {
     });
 });
 
-const NO_METER_TEXT = /\/200K/u;
+const WINDOW_TEXT = /\/200K/u;
 
 describe("what the agent reports about itself", () => {
     it("shows the context the agent reported, against its window", async () => {
@@ -270,7 +270,7 @@ describe("what the agent reports about itself", () => {
         mount(session());
 
         await screen.findByLabelText("Message to the coding agent");
-        expect(screen.queryByText(NO_METER_TEXT)).toBeNull();
+        expect(screen.queryByText(WINDOW_TEXT)).toBeNull();
     });
 
     it("renders a reported cost whose currency code is not valid, without failing the composer", async () => {

@@ -25,7 +25,7 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
     const { t } = useLingui();
 
     const { isAtCapacity, isCriticalUsage, isHighUsage, percentage } = useMemo(() => {
-        const rawPct = (usedTokens / contextWindow) * 100;
+        const rawPct = contextWindow > 0 ? (usedTokens / contextWindow) * 100 : 0;
         const pct = Math.min(rawPct, 100);
 
         return {
@@ -55,6 +55,11 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
 
         return "var(--primary)";
     }, [isHighUsage, isCriticalUsage]);
+
+    // Nothing is drawn for a window that is not known: a ring against zero tokens of no window says nothing.
+    if (contextWindow <= 0) {
+        return null;
+    }
 
     return (
         <Tooltip>
