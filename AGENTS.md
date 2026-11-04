@@ -1494,8 +1494,14 @@ not nest, so `chat/group`, `chat/tags` etc. are all `chat`.
 
 ### Reading advisories
 
-The tree draws **0 ERROR, 284 WARN, 101 INFO** (2026-11-01, codegen alpha.384) — the
-accepted GDPR `cross_module_table_write` findings are most of the WARNs. Until
+The tree draws **0 ERROR, 4 WARN, 64 INFO** (2026-11-04, codegen alpha.399), and every one
+left is by design: the `user` counts (better-auth writes that table outside `ctx.db`, so an
+aggregate counter would drift), `addTeamMember`'s captcha (an authenticated admin action), the
+usage backfill's re-arm (its cursor is the `usageBackfill` row), internal `owner_field` inserts,
+tables written by the vector API / better-auth / the payment component, ordered reads the
+"redundant" indexes serve (and the schema-drift gate cannot drop an index while
+`agent/vector/index.ts` and `lib/rls/scope.ts` pass index names as variables), and secrets and
+tokens that must stay `crypto`-random. Until
 alpha.384 there were six `owner_field_from_args_not_auth` ERRORs on guarded inserts
 the lint could not see through (platform-admin `setMemberCreditOverride`, org-admin
 `addMember`/`addTeamMember`, the active-org equality checks in
@@ -1511,8 +1517,9 @@ sed -i 's/\x1b\[[0-9;]*m//g' /tmp/cg.log
 grep -oP "\[(ERROR|WARN|INFO)\] \K[a-z_]+(?= —)" /tmp/cg.log | sort | uniq -c | sort -rn
 ```
 
-Most of it is noise by design (`procedure_without_structured_event` 289,
-`nondeterministic_query_mutation` 293).
+A public procedure logs one `ctx.log.event` on its success path, written in the procedure
+itself (one in a helper does not count), and handlers read time from `ctx.now` and plain ids
+from `ctx.newId()`; only a token or secret takes `crypto`.
 
 `unbounded_string_arg` (was 418, now 26) is purely SYNTACTIC: it flags an
 inline `v.string()` in `.input({...})` with no `.max`/`.check`/`.length` chained
