@@ -378,6 +378,7 @@ for a schema table that is neither policed nor listed:
 | `chat_thread_state.markThreadViewed` | mutation | authMutation + RL | threads | owner helper (`requireOwnedThreadIgnoringLock`) | ok |
 | `chat_thread_state.snoozeThread` | mutation | authMutation + RL | threads | owner helper (`requireOwnedThreadIgnoringLock`) | ok |
 | `chat_thread_state.unsnoozeThread` | mutation | authMutation + RL | threads | owner helper (`requireOwnedThreadIgnoringLock`) | ok |
+| `chat_thread_state.setThreadPermissionMode` | mutation | authMutation + RL | threads | owner helper (`requireOwnedThreadIgnoringLock`); refuses a host thread | ok |
 | `chat_tool_permissions.getToolPermissionSettings` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_tool_permissions.listMcpToolPermissions` | action | authAction + RL | aiUserPreferences | caller-scoped (ctx.user) | **fixed** (medium) — SSRF guard on saved server URLs |
 | `chat_tool_permissions.respondToToolApproval` | mutation | authMutation + RL | threads | thread access (owner/grant) | ok |

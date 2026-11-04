@@ -8,7 +8,7 @@ import { patchThread } from "../agent/table-writes";
 import { getThread, updateThread } from "../agent/threads";
 import schema from "../schema";
 import { isSnoozeInRange, SNOOZE_MAX_MS } from "./lib/thread-state-logic";
-import { markThreadViewed, snoozeThread, unsnoozeThread } from "./thread-state";
+import { markThreadViewed, setThreadPermissionMode, snoozeThread, unsnoozeThread } from "./thread-state";
 
 const OWNER = "user-owner";
 const GRANTEE = "user-grantee";
@@ -182,6 +182,36 @@ describe("snooze and unsnooze", () => {
         const rowAfter169 = await read();
 
         expect(rowAfter169.snoozedUntil).toBeUndefined();
+    });
+});
+
+describe("setThreadPermissionMode", () => {
+    it("stores the mode for the owner, shows it to the owner only, and leaves updatedAt alone", async () => {
+        await as(OWNER).mutation(setThreadPermissionMode as never, { mode: "supervised", threadId } as never);
+        expect(await read()).toMatchObject({ permissionMode: "supervised", updatedAt: 111 });
+
+        await as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never);
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "read", threadId, userId: GRANTEE });
+        });
+
+        const asOwner: any = await as(OWNER).query(getThread as never, { threadId } as never);
+        const asGrantee: any = await as(GRANTEE).query(getThread as never, { threadId } as never);
+
+        expect(asOwner.permissionMode).toBe("full");
+        expect(asGrantee.permissionMode).toBeUndefined();
+    });
+
+    it("refuses a stranger, an unknown mode and a host thread", async () => {
+        await expect(as(STRANGER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never)).rejects.toThrow(NOT_FOUND_PATTERN);
+        await expect(as(OWNER).mutation(setThreadPermissionMode as never, { mode: "yolo", threadId } as never)).rejects.toThrow();
+        await harness.run(async (context: any) => {
+            await context.db.patch("threads", threadId, { runner: "host" });
+        });
+        await expect(as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never)).rejects.toThrow();
+        const row = await read();
+
+        expect(row.permissionMode).toBeUndefined();
     });
 });
 

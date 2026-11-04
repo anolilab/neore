@@ -143,7 +143,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         admittedRun,
     );
 
-    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers] = await Promise.all([
+    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers, threadMode] = await Promise.all([
         ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),
         ctx.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId }),
         // A run nobody is at inherits no time-boxed allow, so it does not even read them.
@@ -165,6 +165,14 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
             return [];
         }),
+        // A headless run ignores the thread's mode, so it does not read it. A failed read leaves the default.
+        headless || threadId === undefined
+            ? null
+            : ctx.runQuery(internal.chat.tool_permissions.getThreadPermissionMode, { threadId: threadId as Id<"threads">, userId }).catch((error: unknown) => {
+                  toolsLogger.warn("[TOOLS] Thread permission mode unavailable:", error);
+
+                  return null;
+              }),
     ]);
 
     // Bearer tokens for servers the user signed in to. The FULL list, so a grant
@@ -268,6 +276,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         ...(headlessApproved && { headlessApproved: new Set(headlessApproved) }),
         ...(quickCheck && { lowRiskCheck: quickCheck.check }),
         ...(trusted && { lowRiskTrusted: trusted }),
+        ...(threadMode && { threadMode }),
         timedGrants,
     });
 

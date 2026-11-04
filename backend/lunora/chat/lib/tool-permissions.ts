@@ -31,6 +31,8 @@ import type { LowRiskCheck } from "./low-risk-approval";
 import { lowRiskIneligibleReason } from "./low-risk-approval";
 import type { ToolPermissionGrants } from "./tool-permission-grants";
 import { BUILTIN_TOOLS_NEEDING_A_PERSON } from "./person-tools";
+import type { ThreadPermissionMode } from "./thread-permission-mode";
+import { BUILTIN_TOOLS_FILE_EDIT, BUILTIN_TOOLS_READ_ONLY } from "./thread-permission-mode";
 import { grantExpiryFor } from "./tool-permission-grants";
 
 export type ToolPermissionMode = "auto" | "ask" | "off";
@@ -148,6 +150,11 @@ export interface ToolPermissionOptions {
     /** The instant the grants are judged at. Defaults to the clock. */
     now?: number;
     /**
+     * The thread's permission mode (`thread-permission-mode.ts`). Absent is `auto`, today's behaviour. Ignored by a headless run.
+     * See {@link threadModeDefault} for what each value does.
+     */
+    threadMode?: ThreadPermissionMode;
+    /**
      * The user's time-boxed allows (`tool-permission-grants.ts`). They turn an `ask` into an `auto` for an interactive run only: a
      * headless run inherits nothing, and `off` stays off.
      */
@@ -161,7 +168,41 @@ export interface ResolvedToolPermission {
 }
 
 /**
- * Effective mode for one tool: override, else default, then the headless clamp.
+ * The tool's default as the thread's mode moves it. Applied to the DEFAULT only (see {@link resolveToolPermissionWithGrant}).
+ *
+ * - `supervised`: a tool that would run asks, unless it is read-only. `auto-edit` is the same, except the file-edit built-ins run.
+ * - `full`: a tool that would ask runs, unless it waits for a person.
+ * - `auto` / absent: the default unchanged.
+ * Device tools are approved on the device itself and keep their default in every mode. Only built-ins are classed read-only
+ * or file-edit by name; a third-party tool that defaults to `auto` already declared itself read-only.
+ */
+const threadModeDefault = (
+    chosen: ToolPermissionMode,
+    descriptor: ToolDescriptor,
+    builtinName: string | undefined,
+    threadMode: ThreadPermissionMode | undefined,
+): ToolPermissionMode => {
+    if (descriptor.source === "device" || threadMode === undefined || threadMode === "auto") {
+        return chosen;
+    }
+
+    if (threadMode === "full") {
+        const needsPerson = builtinName !== undefined && BUILTIN_TOOLS_NEEDING_A_PERSON.has(builtinName);
+
+        return chosen === "ask" && !needsPerson ? "auto" : chosen;
+    }
+
+    if (chosen !== "auto" || builtinName === undefined) {
+        return chosen;
+    }
+
+    const stays = BUILTIN_TOOLS_READ_ONLY.has(builtinName) || (threadMode === "auto-edit" && BUILTIN_TOOLS_FILE_EDIT.has(builtinName));
+
+    return stays ? chosen : "ask";
+};
+
+/**
+ * Effective mode for one tool: override, else default (moved by the thread's mode), then the headless clamp.
  */
 export const resolveToolPermission = (
     descriptor: ToolDescriptor,
@@ -177,7 +218,13 @@ export const resolveToolPermissionWithGrant = (
 ): ResolvedToolPermission => {
     const override = overrides?.[descriptor.key];
     const builtinName = descriptor.source === "builtin" ? descriptor.key.slice("builtin:".length) : undefined;
-    let chosen = isToolPermissionMode(override) ? override : defaultToolPermission(descriptor.source, descriptor.annotations, builtinName);
+    // Precedence: a mode the user set for THIS tool wins over the thread's mode in both directions ("Always allow" is not
+    // taken back by `supervised`, a chosen `ask` is not lifted by `full`); the thread's mode moves only the default. A
+    // headless run ignores it: nobody is there, and its own clamp below decides.
+    const modeForDefault = options.headless ? undefined : options.threadMode;
+    let chosen = isToolPermissionMode(override)
+        ? override
+        : threadModeDefault(defaultToolPermission(descriptor.source, descriptor.annotations, builtinName), descriptor, builtinName, modeForDefault);
     let timedUntil: number | undefined;
 
     // Before the origin clamp below, so an outside agent's grant-lifted tool is still `ask`.

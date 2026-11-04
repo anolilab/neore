@@ -65,6 +65,7 @@ import ComposerInput from "./composer-input";
 import ComposerLanguageSelector from "./composer-language-selector";
 import ComposerMCPSelector from "./composer-mcp-selector";
 import ComposerModelSelector from "./composer-model-selector";
+import ComposerThreadPermissionMode from "./composer-permission-mode";
 import ComposerReferencesButton from "./composer-references-button";
 import ComposerResearchDepth from "./composer-research-depth";
 import ComposerSearchMode from "./composer-search-mode";
@@ -716,6 +717,7 @@ const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessag
                     bottomToolbar={
                         <>
                             <ComposerModelSelector />
+                            {composerMode === "text" && <ComposerThreadPermissionMode />}
 
                             {/* Search mode - only for text mode */}
                             <AnimatePresence mode="popLayout">

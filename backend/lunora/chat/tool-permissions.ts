@@ -190,6 +190,25 @@ export const getLowRiskApprovalContext = internalQuery
             await quickCheckAllowed(ctx, threadId, userId, permissionKey === undefined ? undefined : { permissionKey, trustId }),
     );
 
+/**
+ * The permission mode a run on this thread builds its tools under (`lib/thread-permission-mode.ts`), or `null` for the
+ * default. A host thread has none. In a thread someone else owns only the modes that ask MORE apply: `full` is the
+ * owner's to give, so a collaborator's turn is not run under it.
+ */
+export const getThreadPermissionMode = internalQuery
+    .input({ threadId: v.id("threads"), userId: v.string() })
+    .output(v.union(v.literal("supervised"), v.literal("auto-edit"), v.literal("auto"), v.literal("full"), v.null()))
+    .query(async ({ args: { threadId, userId }, ctx }) => {
+        const thread = await ctx.db.get("threads", threadId);
+        const mode = thread?.permissionMode;
+
+        if (!thread || mode === undefined || thread.runner === "host") {
+            return null;
+        }
+
+        return mode === "full" && thread.userId !== userId ? null : mode;
+    });
+
 /** The servers the user trusts to have their tools put to the quick check, as the run builds its tools. */
 export const getLowRiskTrustedServers = internalQuery
     .input({ userId: v.string() })

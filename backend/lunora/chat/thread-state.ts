@@ -6,7 +6,7 @@
  */
 import { v } from "lunorash/server";
 
-import { markThreadViewedAt, setThreadSnooze } from "../agent/table-writes";
+import { markThreadViewedAt, patchThread, setThreadSnooze } from "../agent/table-writes";
 import { requireOwnedThreadIgnoringLock } from "../agent/thread-read-access";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { throwBadRequest } from "../lib/error-helpers";
@@ -59,6 +59,31 @@ export const unsnoozeThread = authMutation
         await setThreadSnooze(context.db, thread, undefined);
 
         context.log.event("chat.unsnooze_thread", { wasSnoozed: thread.snoozedUntil !== undefined });
+
+        return null;
+    });
+
+/**
+ * Sets how much of a cloud thread's runs the owner leaves unasked. A host thread keeps its own approval rules, so it
+ * has no mode to set. Takes effect on the next run; a run already paused keeps the tools it was built with.
+ */
+export const setThreadPermissionMode = authMutation
+    .use(rateLimit("chat/update"))
+    .input({
+        mode: v.union(v.literal("supervised"), v.literal("auto-edit"), v.literal("auto"), v.literal("full")),
+        threadId: v.id("threads"),
+    })
+    .output(v.null())
+    .mutation(async ({ args: { mode, threadId }, ctx: context }) => {
+        const thread = await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
+
+        if (thread.runner === "host") {
+            return throwBadRequest("A host thread has no permission mode");
+        }
+
+        if (thread.permissionMode !== mode) {
+            await patchThread(context.db, thread._id, { permissionMode: mode });
+        }
 
         return null;
     });
