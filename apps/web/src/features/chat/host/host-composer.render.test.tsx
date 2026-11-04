@@ -278,7 +278,7 @@ describe("what the agent reports about itself", () => {
         mount(session({ agentState: { usage: { cost: { amount: 0.5, currency: "not money!" }, size: 200_000, used: 12_345 } } }));
 
         // The tooltip positions itself with ResizeObserver, which the shared stub (a function, not a class) cannot be constructed as.
-                // The stub only has to be constructible; its methods do nothing and need no receiver.
+        // The stub only has to be constructible; its methods do nothing and need no receiver.
         /* eslint-disable class-methods-use-this */
         vi.stubGlobal(
             "ResizeObserver",
