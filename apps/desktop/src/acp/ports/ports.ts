@@ -33,6 +33,18 @@ export interface PortsSystem {
     sleep: (ms: number) => Promise<void>;
 }
 
+/** How a stop ended: `reason` says why it did not, in words for the person. */
+export interface StopResult {
+    ended: boolean;
+    reason?: string;
+}
+
+export const STOP_REASON = {
+    refused: "a process could not be signalled (not permitted)",
+    survived: "a process was still running after it was force-killed",
+    unreadable: "the process list could not be read to confirm it, so nothing was force-killed",
+} as const;
+
 export interface StopTarget {
     pid: number;
     startedAt: string;
@@ -97,6 +109,58 @@ export class PortsService {
      * the agent that still listens. Resolves true once every one of them is gone.
      */
     public async stop(agentPid: number | undefined, target: StopTarget): Promise<boolean> {
+        const result = await this.stopWithReason(agentPid, target);
+
+        return result.ended;
+    }
+
+    /** `stop`, with the reason it did not end when it did not. */
+    public async stopWithReason(agentPid: number | undefined, target: StopTarget): Promise<StopResult> {
+        const { agent, current, fresh } = await this.locate(agentPid, target);
+        const signalled: ProcessInfo[] = [current, ...this.newDescendants(fresh, [current], [current], agent)];
+        let refused = false;
+
+        for (const victim of signalled) {
+            refused = !this.send(victim, "SIGTERM") || refused;
+        }
+
+        // Both the polls and the clock count: a slow process-table read spends grace time too.
+        const deadline = this.now() + this.graceMs;
+
+        for (let waited = 0; waited < this.graceMs && this.now() < deadline; waited += POLL_MS) {
+            // eslint-disable-next-line no-await-in-loop -- each poll must wait for the previous check to finish
+            const now = await this.tryProcesses();
+
+            // A read that failed says nothing about the victims: wait and ask again, the deadline still runs.
+            if (now === undefined) {
+                // eslint-disable-next-line no-await-in-loop -- waiting between polls is the point
+                await this.system.sleep(POLL_MS);
+
+                continue;
+            }
+
+            const alive = aliveOf(now, signalled);
+
+            // A child a victim started while it was still running is ended the same way, before the victim goes.
+            for (const newcomer of this.newDescendants(now, alive, signalled, agent)) {
+                refused = !this.send(newcomer, "SIGTERM") || refused;
+                signalled.push(newcomer);
+            }
+
+            if (alive.length === 0) {
+                // A signal that was refused earlier is still a stop that did not fully happen.
+                return refused ? { ended: false, reason: STOP_REASON.refused } : { ended: true };
+            }
+
+            // eslint-disable-next-line no-await-in-loop -- waiting between polls is the point
+            await this.system.sleep(POLL_MS);
+        }
+
+        return await this.escalate(signalled, refused, agent);
+    }
+
+    /** The target as it is right now, below the agent and still listening; throws when it is not. `fresh` is the table it was found in. */
+    private async locate(agentPid: number | undefined, target: StopTarget): Promise<{ agent: number; current: ProcessInfo; fresh: ProcessInfo[] }> {
         if (agentPid === undefined) {
             throw new Error("this session has no process on this computer");
         }
@@ -122,56 +186,17 @@ export class PortsService {
             throw new Error("that server is no longer running in this session");
         }
 
-        const signalled: ProcessInfo[] = [current, ...this.newDescendants(fresh, [current], [current], agentPid)];
-        let refused = false;
-
-        for (const victim of signalled) {
-            refused = !this.send(victim, "SIGTERM") || refused;
-        }
-
-        // Both the polls and the clock count: a slow process-table read spends grace time too.
-        const deadline = this.now() + this.graceMs;
-
-        for (let waited = 0; waited < this.graceMs && this.now() < deadline; waited += POLL_MS) {
-            // eslint-disable-next-line no-await-in-loop -- each poll must wait for the previous check to finish
-            const now = await this.tryProcesses();
-
-            // A read that failed says nothing about the victims: wait and ask again, the deadline still runs.
-            if (now === undefined) {
-                // eslint-disable-next-line no-await-in-loop -- waiting between polls is the point
-                await this.system.sleep(POLL_MS);
-
-                continue;
-            }
-
-            const alive = aliveOf(now, signalled);
-
-            // A child a victim started while it was still running is ended the same way, before the victim goes.
-            for (const newcomer of this.newDescendants(now, alive, signalled, agentPid)) {
-                refused = !this.send(newcomer, "SIGTERM") || refused;
-                signalled.push(newcomer);
-            }
-
-            if (alive.length === 0) {
-                // A signal that was refused earlier is still a stop that did not fully happen.
-                return !refused;
-            }
-
-            // eslint-disable-next-line no-await-in-loop -- waiting between polls is the point
-            await this.system.sleep(POLL_MS);
-        }
-
-        return await this.escalate(signalled, refused, agentPid);
+        return { agent: agentPid, current, fresh };
     }
 
     /** SIGKILL for the victims still running, matched by pid AND start time in a fresh read; true once every one is gone. */
-    private async escalate(signalled: ProcessInfo[], alreadyRefused: boolean, agentPid: number): Promise<boolean> {
+    private async escalate(signalled: ProcessInfo[], alreadyRefused: boolean, agentPid: number): Promise<StopResult> {
         let refused = alreadyRefused;
         const last = await this.readProcesses();
 
         // Never a blind kill: without a fresh pid + start time match nothing is signalled, and the stop reports failure.
         if (last === undefined) {
-            return false;
+            return { ended: false, reason: STOP_REASON.unreadable };
         }
 
         // A child a survivor started since the last poll is in the same fresh read: it goes down with its parent.
@@ -186,7 +211,15 @@ export class PortsService {
 
         const after = await this.readProcesses();
 
-        return !refused && after !== undefined && aliveOf(after, signalled).length === 0;
+        if (after === undefined) {
+            return { ended: false, reason: STOP_REASON.unreadable };
+        }
+
+        if (refused) {
+            return { ended: false, reason: STOP_REASON.refused };
+        }
+
+        return aliveOf(after, signalled).length > 0 ? { ended: false, reason: STOP_REASON.survived } : { ended: true };
     }
 
     /** One process-table read, or undefined when it failed (a slow or failing `ps`). */

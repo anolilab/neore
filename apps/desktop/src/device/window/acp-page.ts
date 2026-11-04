@@ -797,14 +797,14 @@ const refreshPorts = async (): Promise<void> => {
 
                             portsRead.quiet = 0;
 
-                            const ended = await globalThis.neoreDevice.acpPortStop(selected as string, port.pid, port.startedAt);
+                            const result = await globalThis.neoreDevice.acpPortStop(selected as string, port.pid, port.startedAt);
 
                             // Another session was opened during the stop: its panel keeps its own notice and focus.
                             if (state.selected !== selected) {
                                 return;
                             }
 
-                            $("acp-notice").textContent = ended ? `Stopped ${port.name} on port ${String(port.port)}.` : `${port.name} on port ${String(port.port)} did not end.`;
+                            $("acp-notice").textContent = result.ended ? `Stopped ${port.name} on port ${String(port.port)}.` : `${port.name} on port ${String(port.port)} did not end: ${result.reason ?? "unknown reason"}.`;
                             await refreshPorts();
 
                             // The button that was pressed is gone with its row: keyboard focus moves to the result, not the top of the page.

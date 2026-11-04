@@ -18,7 +18,7 @@ import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate } from "./permission";
 import { declineGate } from "./permission";
-import type { PortView, StopTarget } from "./ports/ports";
+import type { PortView, StopResult, StopTarget } from "./ports/ports";
 import { PortsService } from "./ports/ports";
 import { realPortsSystem } from "./ports/system";
 import type { AgentProcess, Spawner } from "./process";
@@ -296,8 +296,8 @@ export class AcpManager {
     }
 
     /** Ends one listening server of the session, and its own descendants. Never the agent. */
-    public async stopPort(sessionId: string, target: StopTarget): Promise<boolean> {
-        return await this.portsService.stop(this.require(sessionId).agentPid, target);
+    public async stopPort(sessionId: string, target: StopTarget): Promise<StopResult> {
+        return await this.portsService.stopWithReason(this.require(sessionId).agentPid, target);
     }
 
     /** Forgets an ended session. */

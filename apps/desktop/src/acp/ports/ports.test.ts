@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { PortsSystem } from "./ports";
-import { PortsService } from "./ports";
+import { PortsService, STOP_REASON } from "./ports";
 import type { Listener, ProcessInfo } from "./process-table";
 import { descendantsOf, parseLsof, parsePs, parseSs } from "./process-table";
 import { firstExisting, portsSupported, realPortsSystem } from "./system";
@@ -426,7 +426,7 @@ describe("a stop with a refused signal", () => {
 });
 
 describe("a child that appears just before the forced kill", () => {
-    it("is ended with its parent", async () => {
+    it("is signalled, gone from the table, and the stop reports success", async () => {
         const system = new FakeSystem();
         let reads = 0;
         const read = system.processes.bind(system);
@@ -434,15 +434,73 @@ describe("a child that appears just before the forced kill", () => {
         system.stubborn.add(30);
         system.processes = async () => {
             reads += 1;
-            const table = await read();
 
-            // Only the very last read, taken for the kill, shows a new child of the stubborn server.
-            return reads === 4 ? [...table, row(80, 30, "late")] : table;
+            // Only the read taken for the kill shows a new child of the stubborn server.
+            if (reads === 4) {
+                system.table.push(row(80, 30, "late"));
+            }
+
+            return await read();
         };
 
-        await new PortsService(system, 1, 100).stop(10, { pid: 30, startedAt: "Mon Nov 3 10:00:00 2026" });
+        const result = await new PortsService(system, 1, 100).stopWithReason(10, { pid: 30, startedAt: "Mon Nov 3 10:00:00 2026" });
 
         expect(system.signals).toContainEqual([80, "SIGKILL"]);
+        expect(system.table.some((entry) => entry.pid === 80)).toBe(false);
+        expect(result).toEqual({ ended: true });
+    });
+});
+
+describe("why a stop did not end", () => {
+    const started = "Mon Nov 3 10:00:00 2026";
+
+    it("says a signal was refused", async () => {
+        const system = new FakeSystem();
+        const kill = system.kill.bind(system);
+
+        system.kill = (pid, signal) => {
+            if (pid === 31) {
+                throw Object.assign(new Error("not permitted"), { code: "EPERM" });
+            }
+
+            kill(pid, signal);
+        };
+
+        const result = await new PortsService(system, 1).stopWithReason(10, { pid: 30, startedAt: started });
+
+        expect(result.ended).toBe(false);
+        expect(result.reason).toBe(STOP_REASON.refused);
+    });
+
+    it("says the list could not be read", async () => {
+        const system = new FakeSystem();
+        const read = system.processes.bind(system);
+        let calls = 0;
+
+        system.stubborn.add(30);
+        system.processes = async () => {
+            calls += 1;
+
+            if (calls > 2) {
+                throw new Error("ps timed out");
+            }
+
+            return await read();
+        };
+
+        expect(await new PortsService(system, 1, 300).stopWithReason(10, { pid: 30, startedAt: started })).toEqual({ ended: false, reason: STOP_REASON.unreadable });
+    });
+
+    it("says a process survived SIGKILL", async () => {
+        const system = new FakeSystem();
+
+        system.stubborn.add(30);
+        // Not even SIGKILL removes it from the table.
+        system.kill = (pid, signal) => {
+            system.signals.push([pid, signal]);
+        };
+
+        expect(await new PortsService(system, 1, 100).stopWithReason(10, { pid: 30, startedAt: started })).toEqual({ ended: false, reason: STOP_REASON.survived });
     });
 });
 
