@@ -67,7 +67,17 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, threadId }: Snoo
 
     // The dialog is mounted only while it is open, so each opening starts from a fresh default time.
     return (
-        <Dialog onOpenChange={onOpenChange} open={open}>
+        <Dialog
+            onOpenChange={(next) => {
+                // A save in flight cannot be abandoned: it closes the dialog itself when it succeeds.
+                if (!next && saving) {
+                    return;
+                }
+
+                onOpenChange(next);
+            }}
+            open={open}
+        >
             <DialogContent className="sm:max-w-sm">
                 <DialogHeader>
                     <DialogTitle>{t`Snooze until`}</DialogTitle>
@@ -95,7 +105,7 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, threadId }: Snoo
                         )}
                     </div>
                     <DialogFooter>
-                        <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
+                        <Button disabled={saving} onClick={() => onOpenChange(false)} type="button" variant="outline">
                             {t`Cancel`}
                         </Button>
                         <Button disabled={saving} type="submit">
