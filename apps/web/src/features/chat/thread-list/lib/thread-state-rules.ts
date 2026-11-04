@@ -73,7 +73,7 @@ export const customSnoozeUntil = (localValue: string, now: Date): number | undef
         parsed.getHours() === hour &&
         parsed.getMinutes() === minute;
 
-    if (!exists || !Number.isFinite(until) || until <= now.getTime() || until > now.getTime() + SNOOZE_MAX_MS) {
+    if (!exists || until <= now.getTime() || until > now.getTime() + SNOOZE_MAX_MS) {
         return undefined;
     }
 

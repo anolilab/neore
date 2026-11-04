@@ -43,7 +43,6 @@ interface ThreadListUIState {
 
     // Project form dialog
     showProjectFormDialog: boolean;
-
     // Search state
     showSearch: boolean;
     /** The thread the snooze dialog is open for, opened from its row. The list renders the dialog, so it survives the row. */

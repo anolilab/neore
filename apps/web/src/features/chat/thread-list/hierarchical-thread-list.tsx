@@ -1048,7 +1048,6 @@ const HierarchicalThreadList: FC<
     // Note: useVirtualizer is incompatible with React Compiler
     // The virtualized rendering is handled in renderThreadGroups below
 
-    // Show loading state if threads are still loading
     // The snooze dialog lives here, not in a row: a row can unmount while the dialog is open (virtualization, a filter).
     const snoozeThreadId = useThreadListUIStore((state) => state.snoozeThreadId);
     const setSnoozeThreadId = useThreadListUIStore((state) => state.setSnoozeThreadId);
@@ -1064,6 +1063,7 @@ const HierarchicalThreadList: FC<
     // The target lives in the store, which outlives the list: leaving the list clears it, so it does not reopen on return.
     useEffect(() => () => setSnoozeThreadId(null), [setSnoozeThreadId]);
 
+    // Show loading state if threads are still loading
     if (!threadsData) {
         return (
             <div className="flex h-full items-center justify-center">
