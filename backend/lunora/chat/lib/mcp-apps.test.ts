@@ -17,8 +17,10 @@ const state = vi.hoisted(() => {
         acceptedToken: "fresh",
         config: null as MCPServerConfig | null,
         connects: 0,
+        crossed: [] as string[],
         overrides: {} as Record<string, string>,
         seenTokens: [] as string[],
+        shard: "alice",
         thread: { allowed: true, mode: null } as { allowed: boolean; mode: string | null },
     };
 });
@@ -27,6 +29,20 @@ vi.mock("../../auth/lib/helper", () => {
     return {
         getCurrentUserInternal: async () => {
             return { _id: "alice" };
+        },
+    };
+});
+
+vi.mock("../../lib/thread-shard", () => {
+    return { threadShardFor: async () => state.shard };
+});
+
+vi.mock("../../lib/cross-shard", () => {
+    return {
+        callOnShard: async (_ref: unknown, _args: unknown, options: { shardKey: string }) => {
+            state.crossed.push(options.shardKey);
+
+            return state.thread;
         },
     };
 });
@@ -130,7 +146,9 @@ beforeEach(() => {
     state.acceptedToken = "fresh";
     state.config = null;
     state.connects = 0;
+    state.crossed = [];
     state.overrides = {};
+    state.shard = "alice";
     state.thread = { allowed: true, mode: null };
     state.seenTokens = [];
 });
@@ -208,6 +226,27 @@ describe("MCP Apps proxy with an OAuth grant", () => {
         const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
 
         expect(response.status).toBe(200);
+    });
+
+    it("reads a shared thread's mode on its owner's shard and keeps the caller's server", async () => {
+        oauthConfig("fresh");
+        state.shard = "owner";
+        state.overrides = { "connector:notion:search": "auto" };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(200);
+        expect(state.crossed).toStrictEqual(["owner"]);
+    });
+
+    it("refuses a collaborator the owner's shard does not admit", async () => {
+        oauthConfig("fresh");
+        state.shard = "owner";
+        state.thread = { allowed: false, mode: null };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(403);
     });
 
     it("finds only the caller's own servers", async () => {

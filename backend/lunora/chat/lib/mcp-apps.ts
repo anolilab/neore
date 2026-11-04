@@ -4,7 +4,9 @@ import type { HttpActionCtx } from "lunorash/server";
 import { internal } from "../../_generated/internal";
 import { getCurrentUserInternal } from "../../auth/lib/helper";
 import { findUserMcpServer } from "../../connectors/lib/user-mcp-servers";
+import { callOnShard } from "../../lib/cross-shard";
 import { checkRateLimit } from "../../lib/rate-limiter";
+import { threadShardFor } from "../../lib/thread-shard";
 import { isSafeUrl } from "../tools/utilities";
 import { renewBearer, retryOnUnauthorized } from "./mcp-auth-retry";
 import type { MCPServerConfig } from "./mcp-tools";
@@ -92,7 +94,16 @@ const descriptorFor = (config: MCPServerConfig, toolName: string): ToolDescripto
  * the proxy cannot ask anyone, so a tool that needs approval stays refused here under `full` too.
  */
 const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: string): Promise<ThreadPermissionMode | undefined | "denied"> => {
-    const found = await context.runQuery(internal.chat.tool_permissions.getThreadPermissionModeForApp, { threadId, userId }).catch(() => null);
+    // A shared thread's row lives on its OWNER's shard, not the caller's (the servers and credentials stay on the caller's). The
+    // query re-checks the caller's grant there, so crossing only moves where the thread is read.
+    const found = await (async () => {
+        const args = { threadId, userId };
+        const shardKey = await threadShardFor(context, userId, threadId);
+
+        return shardKey === userId
+            ? await context.runQuery(internal.chat.tool_permissions.getThreadPermissionModeForApp, args)
+            : await callOnShard(internal.chat.tool_permissions.getThreadPermissionModeForApp, args, { shardKey });
+    })().catch(() => null);
 
     if (!found?.allowed) {
         return "denied";
