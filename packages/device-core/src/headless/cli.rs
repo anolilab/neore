@@ -67,7 +67,7 @@ pub fn main(command: &str, args: impl Iterator<Item = String>) -> ExitCode {
 
     // Asking for help is not an error, and it must not do the command's work.
     if matches!(command, "pair" | "run" | "unpair") && asks_for_help(args.as_slice()) {
-        println!("{USAGE}");
+        println!("{}", help_for(command));
 
         return ExitCode::SUCCESS;
     }
@@ -103,6 +103,17 @@ pub fn main(command: &str, args: impl Iterator<Item = String>) -> ExitCode {
                 eprintln!("neore-host: pair needs --backend or NEORE_BACKEND_URL\n{USAGE}");
 
                 return ExitCode::from(2);
+            };
+
+            // Held until the pairing is stored: two `pair` commands could both find the vault empty, both be approved,
+            // and the later record would replace the first, leaving a registered device nothing here points to.
+            let _lock = match RunLock::acquire(vault.dir()) {
+                Ok(lock) => lock,
+                Err(error) => {
+                    eprintln!("neore-host: {error}");
+
+                    return ExitCode::FAILURE;
+                }
             };
 
             match vault.load() {
@@ -350,6 +361,40 @@ fn confirmed_at_terminal(vault: &Vault<'_>) -> bool {
         && matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
 }
 
+/// What `neore-host <command> --help` prints: the command, its arguments, what it prints, and a command to copy.
+fn help_for(command: &str) -> String {
+    match command {
+        "pair" => "neore-host pair --backend <https-origin> [--name <machine name>]
+
+Shows a short code and a link, then waits until the signed-in owner approves the code in the web app.
+Prints the code, where the device secret will be kept, and on success the device name, id and approving
+account. The backend can also be given as NEORE_BACKEND_URL; the name defaults to this machine's host name.
+Exits 0 when paired, 1 when denied, expired or failed, 2 for a bad command line.
+
+Example:
+  neore-host pair --backend https://neore.ai --name build-box"
+            .to_owned(),
+        "run" => "neore-host run
+
+Reads one signed call per line on stdin and answers one JSON line each on stdout: {\"accepted\":true,\"callId\":...,\"tool\":...}
+or {\"accepted\":false,\"reason\":...}. Takes no arguments. Needs a pairing and holds it until it ends, so
+`unpair` is refused meanwhile.
+
+Example:
+  echo '{\"payload\":\"...\",\"signature\":\"...\"}' | neore-host run"
+            .to_owned(),
+        _ => "neore-host unpair [--dry-run | --yes]
+
+Forgets the pairing on this machine and erases its device secret. Asks first at a terminal; --yes skips the
+question (needed without one), --dry-run prints what would be removed and changes nothing. The device stays
+listed in the web app until it is removed there (Settings, Devices).
+
+Example:
+  neore-host unpair --dry-run"
+            .to_owned(),
+    }
+}
+
 /// `--help` or `-h` anywhere among a command's arguments. (`--name` values never start with `-`.)
 fn asks_for_help(args: &[String]) -> bool {
     args.iter()
@@ -376,6 +421,23 @@ mod tests {
         assert!(!asks_for_help(&words(&[])));
         assert!(!asks_for_help(&words(&["--hlep"])));
         assert!(!asks_for_help(&words(&["--backend", "https://neore.ai"])));
+    }
+
+    #[test]
+    fn each_command_has_its_own_help_with_a_command_to_copy() {
+        for (command, example) in [
+            ("pair", "neore-host pair --backend https://neore.ai"),
+            ("run", "| neore-host run"),
+            ("unpair", "neore-host unpair --dry-run"),
+        ] {
+            let help = help_for(command);
+
+            assert!(help.starts_with(&format!("neore-host {command}")), "{help}");
+            assert!(
+                help.contains("Example:") && help.contains(example),
+                "{help}"
+            );
+        }
     }
 
     #[test]

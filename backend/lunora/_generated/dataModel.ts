@@ -398,9 +398,11 @@ export interface Doc_deviceCode {
     expiresAt: number;
     hostname?: string;
     lastPolledAt?: number;
+    platform?: string;
     pollingInterval?: number;
     scope?: string;
     status: string;
+    storage?: string;
     userCode: string;
     userId?: string;
 }
@@ -1178,26 +1180,6 @@ export interface Doc_passkey {
     userId: string;
 }
 
-<<<<<<< HEAD
-=======
-export interface Doc_deviceCode {
-    _id: Id<"deviceCode">;
-    _creationTime: number;
-    clientId?: string;
-    deviceCode: string;
-    expiresAt: number;
-    hostname?: string;
-    lastPolledAt?: number;
-    platform?: string;
-    pollingInterval?: number;
-    scope?: string;
-    status: string;
-    storage?: string;
-    userCode: string;
-    userId?: string;
-}
-
->>>>>>> 230f90e40 (feat(devices): pair a headless machine by code)
 export interface Doc_persistentChunks {
     _id: Id<"persistentChunks">;
     _creationTime: number;
@@ -2476,7 +2458,7 @@ export interface IndexNamesByTable {
     cronRuns: "by_name";
     dailyBriefState: "by_userId";
     deviceCalls: "by_deviceId_status" | "by_userId_toolCallId" | "by_userId_createdAt" | "by_status_deadline" | "by_createdAt";
-    deviceCode: "deviceCode" | "userCode" | "userId";
+    deviceCode: "deviceCode" | "expiresAt" | "userCode" | "userId";
     devices: "by_userId";
     documentHistory: "by_table_ts" | "by_table_doc_ts" | "by_user_ts" | "by_org_ts" | "by_ts";
     documents: "by_messageId" | "by_userId" | "by_threadId_and_kind";
@@ -3443,9 +3425,11 @@ export interface Insert_deviceCode {
     expiresAt: number;
     hostname?: string;
     lastPolledAt?: number;
+    platform?: string;
     pollingInterval?: number;
     scope?: string;
     status: string;
+    storage?: string;
     userCode: string;
     userId?: string;
 }
@@ -4223,26 +4207,6 @@ export interface Insert_passkey {
     userId: string;
 }
 
-<<<<<<< HEAD
-=======
-export interface Insert_deviceCode {
-    _id?: Id<"deviceCode">;
-    _creationTime?: number;
-    clientId?: string;
-    deviceCode: string;
-    expiresAt: number;
-    hostname?: string;
-    lastPolledAt?: number;
-    platform?: string;
-    pollingInterval?: number;
-    scope?: string;
-    status: string;
-    storage?: string;
-    userCode: string;
-    userId?: string;
-}
-
->>>>>>> 230f90e40 (feat(devices): pair a headless machine by code)
 export interface Insert_persistentChunks {
     _id?: Id<"persistentChunks">;
     _creationTime?: number;

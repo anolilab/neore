@@ -19415,7 +19415,7 @@
       "file": "auth/gdpr",
       "kind": "write",
       "line": 104,
-      "reason": "the written table is not a string literal"
+      "reason": "\"deleteIdentityRows\" is not a registered function"
     },
     {
       "file": "auth/gdpr",

@@ -27,7 +27,8 @@ pub struct RunLock {
 
 impl RunLock {
     pub fn acquire(dir: &Path) -> Result<Self, String> {
-        std::fs::create_dir_all(dir).map_err(|error| error.to_string())?;
+        // The vault refuses a folder others can enter, so a missing one is made owner-only here too.
+        super::vault::ensure_private_dir(dir)?;
 
         let path = dir.join("run.lock");
         let file = std::fs::OpenOptions::new()
@@ -347,6 +348,42 @@ mod tests {
         assert!(Service::new("device-1", SECRET, &file, NOW).is_err());
         // Absent is a first start.
         assert!(Service::new("device-1", SECRET, &dir.join("none.json"), NOW).is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_lock_taken_before_any_pairing_leaves_a_folder_the_vault_accepts() {
+        use std::os::unix::fs::PermissionsExt;
+
+        use super::super::vault::tests::FakeKeychain;
+        use super::super::vault::{NewPairing, Storage, Vault};
+
+        let dir = temp_dir("lock-first").join("nested");
+        let lock = RunLock::acquire(&dir).unwrap();
+
+        assert_eq!(
+            std::fs::metadata(&dir).unwrap().permissions().mode() & 0o077,
+            0
+        );
+
+        let keychain = FakeKeychain::default();
+        let vault = Vault::new(dir, &keychain);
+
+        assert_eq!(vault.load().unwrap(), None);
+        vault
+            .save(
+                &NewPairing {
+                    account: "",
+                    backend: "https://neore.ai",
+                    device_id: "d",
+                    name: "n",
+                    secret: "s",
+                },
+                Storage::Keychain,
+            )
+            .unwrap();
+
+        drop(lock);
     }
 
     #[test]

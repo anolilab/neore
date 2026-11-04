@@ -390,9 +390,9 @@ fn refuse_shared_file(_path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Writes `record` atomically into `dir`, owner-only. The folder is created 0700. Without Unix permissions there is
-/// no way to keep a file private, so a secret is not written to one.
-fn write_private(dir: &Path, path: &Path, record: &Record) -> Result<(), String> {
+/// The folder, made owner-only if it is missing, and refused if it is there and others can enter it. Everything
+/// that creates the vault folder goes through this, so no command leaves one the vault would then refuse.
+pub(super) fn ensure_private_dir(dir: &Path) -> Result<(), String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
@@ -402,19 +402,24 @@ fn write_private(dir: &Path, path: &Path, record: &Record) -> Result<(), String>
             .mode(0o700)
             .create(dir)
             .map_err(|error| error.to_string())?;
-
-        // `create` only sets the mode of a folder it makes: one that was already there keeps what it had.
-        refuse_untrusted_dir(dir)?;
     }
+
+    #[cfg(not(unix))]
+    fs::create_dir_all(dir).map_err(|error| error.to_string())?;
+
+    refuse_untrusted_dir(dir)
+}
+
+/// Writes `record` atomically into `dir`, owner-only. The folder is created 0700. Without Unix permissions there is
+/// no way to keep a file private, so a secret is not written to one.
+fn write_private(dir: &Path, path: &Path, record: &Record) -> Result<(), String> {
+    ensure_private_dir(dir)?;
 
     #[cfg(not(unix))]
     {
         if record.storage == Storage::File {
             return Err("this system cannot keep a file private".into());
         }
-
-        // The keychain holds the secret; the record has none.
-        fs::create_dir_all(dir).map_err(|error| error.to_string())?;
     }
 
     let bytes = serde_json::to_vec_pretty(record).map_err(|error| error.to_string())?;

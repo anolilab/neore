@@ -24,8 +24,10 @@ const HOST_PATH: &str = "/api/auth/device/host";
 /// RFC 8628 3.5: on `slow_down`, wait this much longer from then on.
 const SLOW_DOWN_STEP: Duration = Duration::from_secs(5);
 
-/// The lower bound on the poll interval, whatever the server says.
+/// The bounds on the poll interval, whatever the server says: a huge one would only stall the person, and `slow_down`
+/// growing it must never overflow.
 const MIN_INTERVAL: Duration = Duration::from_secs(1);
+const MAX_INTERVAL: Duration = Duration::from_secs(60);
 
 /// Consecutive transport, 429 and 5xx answers tolerated while polling before giving up.
 const MAX_CONSECUTIVE_FAILURES: u32 = 5;
@@ -209,8 +211,8 @@ fn request_code(
         ));
     };
     let expires_in = number(&reply.body, "expires_in").unwrap_or(600).min(3600);
-    let interval =
-        Duration::from_secs(number(&reply.body, "interval").unwrap_or(5)).max(MIN_INTERVAL);
+    let interval = Duration::from_secs(number(&reply.body, "interval").unwrap_or(5))
+        .clamp(MIN_INTERVAL, MAX_INTERVAL);
     let complete = text(&reply.body, "verification_uri_complete").unwrap_or(uri);
 
     // One write, flushed: if the person cannot be shown the code, no approval can come, so do not wait for one.
@@ -227,7 +229,7 @@ fn request_code(
 
     Ok(Code {
         device_code: device_code.to_owned(),
-        expires_at_ms: timer.now_ms() + expires_in * 1000,
+        expires_at_ms: timer.now_ms().saturating_add(expires_in * 1000),
         interval,
     })
 }
@@ -313,7 +315,9 @@ pub fn pair(
 
         match text(&reply.body, "error") {
             Some("authorization_pending") => {}
-            Some("slow_down") => interval += SLOW_DOWN_STEP,
+            Some("slow_down") => {
+                interval = interval.saturating_add(SLOW_DOWN_STEP).min(MAX_INTERVAL)
+            }
             Some("expired_token") => return Err(PairError::Expired),
             Some("invalid_grant") if after_lost_answer => {
                 return Err(PairError::PossiblyRegistered)
@@ -654,6 +658,35 @@ mod tests {
         assert!(PairError::PossiblyRegistered
             .to_string()
             .contains("Settings, Devices"));
+    }
+
+    #[test]
+    fn an_absurd_interval_from_the_backend_is_bounded_not_a_panic() {
+        let mut backend = FakeBackend::new(vec![
+            Ok(reply(400, json!({ "error": "slow_down" }))),
+            Ok(reply(400, json!({ "error": "slow_down" }))),
+            approved(),
+        ]);
+
+        backend.code = reply(
+            200,
+            json!({
+                "device_code": "dc-1",
+                "expires_in": u64::MAX,
+                "interval": u64::MAX,
+                "user_code": "ABCD2345",
+                "verification_uri": "https://neore.ai/auth/device",
+            }),
+        );
+
+        let (outcome, _, timer) = run(&backend, &FakeKeychain::default(), "absurd");
+
+        assert!(outcome.is_ok(), "{outcome:?}");
+        assert!(timer
+            .slept
+            .borrow()
+            .iter()
+            .all(|wait| *wait <= MAX_INTERVAL));
     }
 
     #[test]

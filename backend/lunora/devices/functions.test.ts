@@ -1314,8 +1314,8 @@ describe("a headless machine paired by code", () => {
             await pairHeadless(ownerId, `box-${String(index)}`);
         }
 
-        await expect(run(ownerId)).rejects.toThrow(/At most/u);
-        await expect(pairHeadless(ownerId)).rejects.toThrow(/At most/u);
+        await expect(run(ownerId)).rejects.toThrow("At most");
+        await expect(pairHeadless(ownerId)).rejects.toThrow("At most");
     });
 
     it("can be revoked from the web, which ends its secret", async () => {

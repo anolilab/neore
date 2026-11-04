@@ -184,13 +184,16 @@ export const deviceCode = sqliteTable("deviceCode", {
     expiresAt: real("expiresAt").notNull(),
     hostname: text("hostname"),
     lastPolledAt: real("lastPolledAt"),
+    platform: text("platform"),
     pollingInterval: real("pollingInterval"),
     scope: text("scope"),
     status: text("status").notNull(),
+    storage: text("storage"),
     userCode: text("userCode").notNull(),
     userId: text("userId"),
 }, (t) => ({
     deviceCode: index("deviceCode").on(t.deviceCode),
+    expiresAt: index("expiresAt").on(t.expiresAt),
     userCode: index("userCode").on(t.userCode),
     userId: index("userId").on(t.userId),
 }));

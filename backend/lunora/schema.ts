@@ -702,6 +702,8 @@ export const schema = defineSchema({
         .externallyManaged()
         .global()
         .index("deviceCode", ["deviceCode"])
+        // The cleanup at every issue deletes the lapsed codes by this column.
+        .index("expiresAt", ["expiresAt"])
         .index("userCode", ["userCode"])
         .index("userId", ["userId"]),
     // A paired install of the desktop shell (`devices/`, `apps/desktop`). The
