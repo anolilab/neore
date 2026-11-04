@@ -319,7 +319,8 @@ const updateThreadStatusAfterStreamEnd = async (context: MutationContext, thread
         const thread = await context.db.get("threads", threadId);
 
         if (thread) {
-            await context.db.patch("threads", threadId, { status: endStatus, updatedAt: Date.now() });
+            // Through the shared writer: a stream that ends in error wakes a snoozed thread (`patchesWakeSnooze`).
+            await patchThread(context.db, threadId, { status: endStatus, updatedAt: Date.now() });
             await context.scheduler.runAfter(1000, internal.agent.streams.resetThreadStatusToActive, { threadId });
         }
     }

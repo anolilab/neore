@@ -1061,6 +1061,9 @@ const HierarchicalThreadList: FC<
         }
     }, [snoozeThread, snoozeThreadId, setSnoozeThreadId]);
 
+    // The target lives in the store, which outlives the list: leaving the list clears it, so it does not reopen on return.
+    useEffect(() => () => setSnoozeThreadId(null), [setSnoozeThreadId]);
+
     if (!threadsData) {
         return (
             <div className="flex h-full items-center justify-center">

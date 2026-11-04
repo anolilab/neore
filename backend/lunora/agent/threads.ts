@@ -262,6 +262,23 @@ export const threadFieldsSupportingPatch = [
 
 export type ThreadFieldsSupportingPatch = (typeof threadFieldsSupportingPatch)[number];
 
+/**
+ * A run failed in place: its thread wakes if it was snoozed. The run's own status write may go back to `active` (an
+ * approval continuation does), which the status rule alone does not count as a failure.
+ */
+export const wakeSnoozedThreadOnFailure = internalMutation
+    .input({ threadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const thread = await ctx.db.get("threads", args.threadId);
+
+        if (thread?.snoozedUntil !== undefined) {
+            await patchRow(ctx.db, "threads", thread, { snoozedUntil: undefined });
+        }
+
+        return null;
+    });
+
 export const updateThread = internalMutation
     .input({
         patch: v.object({ ...vThreadPatchFields }),

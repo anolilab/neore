@@ -1430,6 +1430,14 @@ export const failRun = async (
         } catch {
             // Ignore cleanup errors
         }
+
+        if (!endedElsewhere) {
+            try {
+                await ctx.runMutation(internal.agent.threads.wakeSnoozedThreadOnFailure, { threadId: threadId as Id<"threads"> });
+            } catch {
+                // A snooze left in place until its time is the only cost of a failed wake.
+            }
+        }
     }
 
     // A failed run ends the goal it belonged to, and only that one: no review follows a run that never finished.

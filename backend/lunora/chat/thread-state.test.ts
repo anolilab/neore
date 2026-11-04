@@ -5,7 +5,7 @@ import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { patchThread } from "../agent/table-writes";
-import { getThread, updateThread } from "../agent/threads";
+import { getThread, updateThread, wakeSnoozedThreadOnFailure } from "../agent/threads";
 import schema from "../schema";
 import { isSnoozeInRange, SNOOZE_MAX_MS } from "./lib/thread-state-logic";
 import { markThreadViewed, snoozeThread, unsnoozeThread } from "./thread-state";
@@ -182,6 +182,18 @@ describe("a snoozed thread wakes early", () => {
         expect(row.snoozedUntil).toBeUndefined();
     });
 
+    it("un-snoozes when a run fails in place, even when the thread goes back to active", async () => {
+        const id = await insertSnoozed();
+
+        await harness.run(async (context: any) => {
+            await context.runMutation(wakeSnoozedThreadOnFailure as never, { threadId: id } as never);
+        });
+
+        const row = await readThread(id);
+
+        expect(row.snoozedUntil).toBeUndefined();
+    });
+
     it("stays snoozed for an ordinary write", async () => {
         const id = await insertSnoozed();
 
@@ -189,7 +201,9 @@ describe("a snoozed thread wakes early", () => {
             await patchThread(context.db, id as never, { updatedAt: 9 });
         });
 
-        expect((await readThread(id)).snoozedUntil).toBe(SNOOZED_UNTIL);
+        const row = await readThread(id);
+
+        expect(row.snoozedUntil).toBe(SNOOZED_UNTIL);
     });
 
     it("stays snoozed for a finished reply", async () => {
@@ -199,7 +213,9 @@ describe("a snoozed thread wakes early", () => {
             await patchThread(context.db, id as never, { lastReplyAt: 3000, status: "active", updatedAt: 9 });
         });
 
-        expect((await readThread(id)).snoozedUntil).toBe(SNOOZED_UNTIL);
+        const row = await readThread(id);
+
+        expect(row.snoozedUntil).toBe(SNOOZED_UNTIL);
     });
 });
 
