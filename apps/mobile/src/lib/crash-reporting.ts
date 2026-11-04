@@ -2,10 +2,17 @@ import { PostHog } from "posthog-react-native";
 
 import type { PostHogConfig } from "./config";
 import type { PreferenceStore } from "./crash-report-preference";
-import { readCrashReportsEnabled } from "./crash-report-preference";
+import { readCrashReportsEnabled, writeCrashReportsEnabled } from "./crash-report-preference";
 import { toCrashReport } from "./crash-report-scrub";
+import { createSerialQueue } from "./serial-queue";
 
 const state: { client?: PostHog; isHandlerInstalled: boolean } = { isHandlerInstalled: false };
+
+/**
+ * Reads the saved choice and changes it. Both run one at a time, so a startup read
+ * cannot apply an older choice after a newer one has been made.
+ */
+const runChoice = createSerialQueue();
 
 /**
  * Creates the SDK once. The client starts opted out, and it is built with no
@@ -25,8 +32,8 @@ export const startCrashReporting = ({ apiKey, host }: PostHogConfig): void => {
     });
 };
 
-/** Applies the user's choice to the running client. Does nothing before `startCrashReporting`. */
-export const setCrashReportsOn = async (isOn: boolean): Promise<void> => {
+/** Turns the running client on or off. Does nothing before `startCrashReporting`. */
+const applyToClient = async (isOn: boolean): Promise<void> => {
     if (!state.client) {
         return;
     }
@@ -40,14 +47,25 @@ export const setCrashReportsOn = async (isOn: boolean): Promise<void> => {
     await state.client.optOut();
 };
 
-/** Applies the stored choice at startup. A store that cannot be read leaves reports off. */
-export const applyStoredCrashReportChoice = async (store: PreferenceStore): Promise<void> => {
-    try {
-        await setCrashReportsOn(await readCrashReportsEnabled(store));
-    } catch {
-        // Nothing was sent: the client starts opted out.
-    }
-};
+/**
+ * Changes the choice. The client is switched first, so an opt-out takes effect even
+ * if saving the choice then fails.
+ */
+export const changeCrashReports = (store: PreferenceStore, isOn: boolean): Promise<void> =>
+    runChoice(async () => {
+        await applyToClient(isOn);
+        await writeCrashReportsEnabled(store, isOn);
+    });
+
+/** Applies the saved choice at startup. A store that cannot be read leaves reports off. */
+export const applyStoredCrashReportChoice = (store: PreferenceStore): Promise<void> =>
+    runChoice(async () => {
+        try {
+            await applyToClient(await readCrashReportsEnabled(store));
+        } catch {
+            // Nothing was sent: the client starts opted out.
+        }
+    });
 
 /**
  * Sends errors that reach React Native's global handler, scrubbed, then calls the
@@ -64,12 +82,17 @@ export const installGlobalErrorReporting = (): void => {
     const previous = ErrorUtils.getGlobalHandler();
 
     ErrorUtils.setGlobalHandler((error, isFatal) => {
-        const report = toCrashReport(error);
-        // The SDK reads `name` and `stack` from the error. The message stays empty, so no user text is sent.
-        // eslint-disable-next-line unicorn/no-error-property-assignment, unicorn/error-message -- the fields are the scrubbed report
-        const sendable = Object.assign(new Error(""), { name: report.name, stack: report.stack });
+        try {
+            const report = toCrashReport(error);
+            // The SDK reads `name` and `stack` from the error. The message stays empty, so no user text is sent.
+            // eslint-disable-next-line unicorn/no-error-property-assignment, unicorn/error-message -- the fields are the scrubbed report
+            const sendable = Object.assign(new Error(""), { name: report.name, stack: report.stack });
 
-        state.client?.captureException(sendable, { fatal: isFatal === true });
+            state.client?.captureException(sendable, { fatal: isFatal === true });
+        } catch {
+            // A reporting failure must not hide the crash, so the original handler still runs below.
+        }
+
         previous(error, isFatal);
     });
 };

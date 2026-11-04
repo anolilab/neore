@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { Switch, Text, View } from "react-native";
 
 import { loadConfig } from "@/lib/config";
-import { readCrashReportsEnabled, writeCrashReportsEnabled } from "@/lib/crash-report-preference";
+import { readCrashReportsEnabled } from "@/lib/crash-report-preference";
 import { crashReportStore } from "@/lib/crash-report-store";
-import { setCrashReportsOn } from "@/lib/crash-reporting";
+import { changeCrashReports } from "@/lib/crash-reporting";
 
 const SettingsScreen = () => {
     const [isEnabled, setIsEnabled] = useState(false);
@@ -38,9 +38,8 @@ const SettingsScreen = () => {
     }, []);
 
     const change = async (isOn: boolean) => {
-        await writeCrashReportsEnabled(crashReportStore, isOn);
-        await setCrashReportsOn(isOn);
         setIsEnabled(isOn);
+        await changeCrashReports(crashReportStore, isOn);
     };
 
     return (

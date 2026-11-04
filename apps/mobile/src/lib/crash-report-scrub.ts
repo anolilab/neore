@@ -5,6 +5,21 @@ interface CrashReport {
 }
 
 /**
+ * The built-in error names. `name` is plain text an app can set to anything, so only
+ * these are sent as they are; any other name becomes `Error`.
+ */
+const KNOWN_ERROR_NAMES: ReadonlySet<string> = new Set([
+    "AggregateError",
+    "Error",
+    "EvalError",
+    "RangeError",
+    "ReferenceError",
+    "SyntaxError",
+    "TypeError",
+    "URIError",
+]);
+
+/**
  * Reduces a thrown value to the fields a crash report may send. The message is
  * left out because it can quote thread text, and the first stack line repeats
  * it, so only the `at` frames are kept.
@@ -14,7 +29,7 @@ export const toCrashReport = (error: unknown): CrashReport => {
         return { name: "NonError" };
     }
 
-    const name = error.name || "Error";
+    const name = KNOWN_ERROR_NAMES.has(error.name) ? error.name : "Error";
     const frames = (error.stack ?? "")
         .split("\n")
         .filter((line) => line.trimStart().startsWith("at "))

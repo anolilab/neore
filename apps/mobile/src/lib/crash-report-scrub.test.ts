@@ -32,7 +32,15 @@ describe("toCrashReport", () => {
         expect(toCrashReport(undefined)).toEqual({ name: "NonError" });
     });
 
+    it("sends a name the built-ins do not define as Error, so text set as a name is not reported", () => {
+        // eslint-disable-next-line unicorn/no-error-property-assignment -- an error whose app set its name to thread text
+        const error = withStack(Object.assign(new Error("x"), { name: "Summary of the thread with Ana" }), "Error: x\n    at f (a.ts:1:1)");
+
+        expect(toCrashReport(error)).toEqual({ name: "Error", stack: "    at f (a.ts:1:1)" });
+    });
+
     it("falls back to Error when the name is empty", () => {
+        // eslint-disable-next-line unicorn/no-error-property-assignment -- an error whose app set its name to an empty string
         const error = withStack(Object.assign(new Error("x"), { name: "" }), "Error: x\n    at f (a.ts:1:1)");
 
         expect(toCrashReport(error).name).toBe("Error");

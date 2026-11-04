@@ -7,7 +7,7 @@ export interface PreferenceStore {
 const ON = "on";
 const OFF = "off";
 
-export const readCrashReportsEnabled = async (store: PreferenceStore): Promise<boolean> => (await store.get()) === ON;
+export const readCrashReportsEnabled = async (store: PreferenceStore): Promise<boolean> => await store.get() === ON;
 
 export const writeCrashReportsEnabled = async (store: PreferenceStore, isEnabled: boolean): Promise<void> => {
     await store.set(isEnabled ? ON : OFF);
