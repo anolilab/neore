@@ -236,14 +236,16 @@ export const countsForUser = authQuery
     .input({})
     .output(v.object({ counts: v.array(v.object({ count: v.number(), threadId: v.string() })), truncated: v.boolean() }))
     .query(async ({ ctx }) => {
+        // Link rows only: a deleted thread's links carry `threadDeleted`, so the count reads no thread document.
         const rows = await ctx.db
             .query("pullRequestThreads")
             .withIndex("by_user_and_threadId", (q) => q.eq("userId", ctx.user.userId))
             .take(MAX_COUNT_ROWS);
-        const { live } = await partitionLinks(ctx, rows);
         const counts = new Map<string, number>();
         // A pull request counts once per thread, however many links name it.
         const seen = new Set<string>();
+
+        const live = rows.filter((link) => link.threadDeleted !== true);
 
         for (const row of live) {
             const key = `${row.threadId}|${row.repository}#${String(row.number)}`;

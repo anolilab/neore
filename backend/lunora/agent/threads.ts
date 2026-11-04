@@ -21,6 +21,7 @@ import { patchById, patchRow, withoutUndefined } from "../lib/patch";
 import { paginationOptionsValidator, MAX_LENGTH } from "../lib/validators";
 import { endHostThread, restoreHostThread } from "../acp/lib/thread-removed";
 import { deleteMessage } from "./messages";
+import { setLinksThreadDeleted } from "../source-control/pr-thread-deleted";
 import { deleteChatFileLinksForThread } from "./files";
 import { deleteStreamsPageForThreadId } from "./streams";
 import { isThreadLocked, toLockedThreadStub } from "../lib/thread-lock";
@@ -750,6 +751,7 @@ export const softDeleteThread = internalMutation
             deletedAt: ctx.now,
             updatedAt: ctx.now,
         });
+        await setLinksThreadDeleted(ctx, oldThread.userId, args.threadId, true);
         // A coding agent's turn does not outlive the thread it writes into, nor does a goal.
         await endHostThread(ctx, oldThread, ctx.now);
         await endActiveGoals(ctx, args.threadId, "user");
@@ -771,6 +773,7 @@ export const restoreThread = internalMutation
             deletedAt: undefined,
             updatedAt: ctx.now,
         });
+        await setLinksThreadDeleted(ctx, oldThread.userId, args.threadId, false);
 
         // The session the delete ended, if this is a coding agent's thread, can take turns again.
         if (oldThread.deleted) {

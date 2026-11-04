@@ -2157,6 +2157,8 @@ export const schema = defineSchema({
         kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
         number: v.number(),
         repository: v.string(),
+        // Set while the thread is soft-deleted, so the sidebar count reads these rows alone. Kept in step by the thread's delete and restore.
+        threadDeleted: v.optional(v.boolean()),
         threadId: v.id("threads"),
         title: v.string(),
         url: v.string(),

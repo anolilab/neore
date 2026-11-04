@@ -12,6 +12,7 @@ import { insertThread } from "../agent/table-writes";
 import schema from "../schema";
 import { GITHUB_WEB_ORIGIN } from "./drivers/github";
 import { attachPullRequests, countsForUser, listForThread, recordAttachedPullRequests } from "./pr-thread-attach";
+import { setLinksThreadDeleted } from "./pr-thread-deleted";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -236,6 +237,17 @@ describe("the thread list and the sidebar counts", () => {
         await record(threadId, A, [link(7)]);
         await record(deletedId, A, [link(3)]);
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", deletedId, { deleted: true, deletedAt: 1 }));
+        await harness.run(async (ctx: any) => await setLinksThreadDeleted(ctx, A, deletedId as never, true));
+
+        expect(await as(A).query(countsForUser as never, {} as never)).toEqual({ counts: [{ count: 1, threadId }], truncated: false });
+    });
+
+    it("counts a restored thread's links again", async () => {
+        const threadId = await threadOf(A);
+
+        await record(threadId, A, [link(7)]);
+        await harness.run(async (ctx: any) => await setLinksThreadDeleted(ctx, A, threadId as never, true));
+        await harness.run(async (ctx: any) => await setLinksThreadDeleted(ctx, A, threadId as never, false));
 
         expect(await as(A).query(countsForUser as never, {} as never)).toEqual({ counts: [{ count: 1, threadId }], truncated: false });
     });

@@ -1344,6 +1344,7 @@ export interface Doc_pullRequestThreads {
     kind: "attached" | "linked" | "opened";
     number: number;
     repository: string;
+    threadDeleted?: boolean;
     threadId: Id<"threads">;
     title: string;
     url: string;
@@ -4339,6 +4340,7 @@ export interface Insert_pullRequestThreads {
     kind: "attached" | "linked" | "opened";
     number: number;
     repository: string;
+    threadDeleted?: boolean;
     threadId: Id<"threads">;
     title: string;
     url: string;

@@ -1182,6 +1182,7 @@ export const pullRequestThreads = sqliteTable("pullRequestThreads", {
     kind: text("kind", { mode: "json" }).$type<"attached" | "linked" | "opened">().notNull(),
     number: real("number").notNull(),
     repository: text("repository").notNull(),
+    threadDeleted: integer("threadDeleted", { mode: "boolean" }),
     threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
     title: text("title").notNull(),
     url: text("url").notNull(),
