@@ -132,7 +132,6 @@
         "fumadocs-core": "catalog:fumadocs",
         "fumadocs-ui": "catalog:fumadocs",
         "geist": "catalog:style",
-        "heic-to": "catalog:file-renderers",
         "html2canvas": "catalog:utils",
         "jspdf": "catalog:utils",
         "jszip": "catalog:utils",
