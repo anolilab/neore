@@ -1,6 +1,5 @@
 /** The part of a message row the refresh merge reads. */
 export interface FreshRow {
-    createdAt: number;
     finished?: boolean;
     id: string;
     status: string;
