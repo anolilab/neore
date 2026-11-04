@@ -35,13 +35,13 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, fill, url }) 
     const { t } = useLingui();
     const [numberPages, setNumberPages] = useState<number>(0);
     const [loadState, setLoadState] = useState<"failed" | "loaded" | "loading">("loading");
-    // A URL the page may not fetch is refused before any request, as the thumbnail refuses it.
-    const origins = useFetchableOrigins();
-    const refused = !isFetchableUrl(url, origins);
     const [pageNumber, setPageNumber] = useState(1);
     const [scale, setScale] = useState(1);
     const [containerWidth, setContainerWidth] = useState<number | undefined>(undefined);
     const containerRef = useRef<HTMLDivElement>(null);
+    // A URL the page may not fetch is refused before any request, as the thumbnail refuses it.
+    const origins = useFetchableOrigins();
+    const refused = !isFetchableUrl(url, origins);
 
     const loadDeadlineRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
