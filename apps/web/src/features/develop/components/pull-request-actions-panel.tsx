@@ -14,7 +14,7 @@ import { useId, useRef, useState } from "react";
 
 import { safeExternalUrl } from "../lib/format";
 import type { PullRequestAddress } from "../lib/use-develop";
-import { usePullRequestActions } from "../lib/use-pull-request-actions";
+import { isPreHostRefusal, usePullRequestActions } from "../lib/use-pull-request-actions";
 import type { WriteResult } from "../lib/use-review-messages";
 import { useReviewMessages } from "../lib/use-review-messages";
 
@@ -26,8 +26,6 @@ async function attempt<T>(promise: Promise<T>): Promise<{ outcome: T } | { throw
         return { thrown: error };
     }
 }
-
-const isCodedError = (error: unknown): boolean => typeof error === "object" && error !== null && "code" in error && typeof error.code === "string";
 
 type Feedback = { kind: "error"; text: string; unconfirmed: boolean } | { href?: string; kind: "success"; text: string };
 
@@ -92,9 +90,9 @@ const PullRequestActionsPanel = ({
     const titleEmpty = (editing?.title ?? "").trim() === "";
     const busy = actions.edit.isPending || actions.requestReviewers.isPending || actions.revert.isPending;
 
-    // A thrown error without a code (a dropped connection, say) may still have reached the host: it is unconfirmed.
+    // Only an error the server raised before any host call says nothing changed; any other thrown error may have reached the host.
     const thrownFailure = (thrown: unknown): Feedback =>
-        isCodedError(thrown)
+        isPreHostRefusal(thrown)
             ? { kind: "error", text: t`The request was refused before it reached ${hostLabel}. Nothing was changed.`, unconfirmed: false }
             : { kind: "error", text: t`Could not confirm that. Check on ${hostLabel} before you try again.`, unconfirmed: true };
 
@@ -122,9 +120,9 @@ const PullRequestActionsPanel = ({
             return;
         }
 
-        const nextTitle = editing.title.trim();
+        // The title is compared as typed: an untouched title with surrounding spaces must not be sent trimmed in a description-only save.
         const change = {
-            ...(nextTitle !== editing.original.title && { title: nextTitle }),
+            ...(editing.title !== editing.original.title && { title: editing.title.trim() }),
             ...(!bodyTruncated && editing.body !== editing.original.body && { body: editing.body }),
         };
 
@@ -238,7 +236,13 @@ const PullRequestActionsPanel = ({
                         {feedback.href !== undefined && (
                             <>
                                 {" "}
-                                <a className="underline" href={feedback.href} rel="noreferrer" target="_blank">
+                                <a
+                                    aria-label={t`Open the revert pull request on ${hostLabel}`}
+                                    className="underline"
+                                    href={feedback.href}
+                                    rel="noreferrer"
+                                    target="_blank"
+                                >
                                     {t`Open`}
                                 </a>
                             </>

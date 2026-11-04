@@ -11,8 +11,14 @@ import { githubDriver } from "./github";
 
 const REF = { number: 7, repository: "octo/hello" };
 
+/** The body the driver posts to `/graphql`. */
+interface GraphqlBody {
+    query: string;
+    variables?: Record<string, unknown>;
+}
+
 interface Sent {
-    json: any;
+    json: GraphqlBody;
     method: string;
     path: string;
 }
@@ -21,7 +27,7 @@ interface Sent {
 const graphql = (answer: (sent: Sent) => unknown) => {
     const sent: Sent[] = [];
     const request: HostRequest = async (path, options: HostRequestOptions = {}) => {
-        const call: Sent = { json: options.json, method: options.method ?? "GET", path };
+        const call: Sent = { json: options.json as GraphqlBody, method: options.method ?? "GET", path };
 
         sent.push(call);
 

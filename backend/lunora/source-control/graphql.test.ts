@@ -49,6 +49,14 @@ describe("graphqlRequest", () => {
         });
     });
 
+    it("keeps a validation error a refusal even for a write that may have run: nothing executed", async () => {
+        const validation = { errors: [{ extensions: { code: "undefinedField" }, message: "Field 'x' doesn't exist on type 'Mutation'" }] };
+
+        await expect(graphqlRequest(answering(validation).request, "q", {}, SCHEMA, "/graphql", { untypedMayHaveRun: true })).rejects.toMatchObject({
+            status: 422,
+        });
+    });
+
     it("refuses data of the wrong shape", async () => {
         const { request } = answering({ data: { viewer: { login: 7 } } });
 
