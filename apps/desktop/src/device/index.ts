@@ -358,7 +358,12 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             log: (message) => console.error(message),
             observer: host,
             onChange: () => send(state.local?.webContents, LOCAL_EVENT.acp),
-            plan: (agentKey, folder) => JSON.parse(core.acpSpawnPlan(agentKey, folder)) as SpawnPlan,
+            // An installed npm agent's files are hashed on a worker thread first; the plan itself then finds the result.
+            plan: async (agentKey, folder) => {
+                await core.acpPrecheckInstall(agentKey);
+
+                return JSON.parse(core.acpSpawnPlan(agentKey, folder)) as SpawnPlan;
+            },
             spawn: spawnAgent,
         });
 

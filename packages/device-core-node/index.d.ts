@@ -119,7 +119,8 @@ export declare class DeviceCore {
    * running any lifecycle script, and registers the agent pinned, with the hash of the installed files
    * (`NpmInstallRequest`, JSON). Not reachable through `acp_update`. Validation is in Rust.
    */
-  acpInstallNpm(request: string): string
+  acpInstallNpm(request: string): Promise<string>
+  acpPrecheckInstall(agentKey: string): Promise<boolean>
   /**
    * Deletes the installed versions of an agent other than the pinned one. Run it after closing the sessions
    * the install took the approval from.

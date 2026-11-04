@@ -15,7 +15,7 @@ import type { DeviceCore } from "../device/types";
 import type { NodeTools } from "./node-tools";
 import { findNodeTools } from "./node-tools";
 import type { NpmIndexEntry } from "./npm-index";
-import { lookupNpmIntegrity } from "./npm-index";
+import { lookupNpmIntegrity, NPM_HOST } from "./npm-index";
 import type { AgentRegistry, ResolvedInstall, ResolvedNpmInstall } from "./registry";
 import { fetchHttps } from "./registry";
 import type { AcpView } from "./types";
@@ -105,8 +105,8 @@ const countBytes = (max: number): Transform => {
 };
 
 /** Downloads `url` to `file`, which must not exist. https only, also after redirects. */
-export const download = async (fetchImpl: typeof fetch, url: string, file: string): Promise<void> => {
-    const response = await fetchHttps(fetchImpl, url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
+export const download = async (fetchImpl: typeof fetch, url: string, file: string, onlyHost?: string): Promise<void> => {
+    const response = await fetchHttps(fetchImpl, url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) }, onlyHost);
 
     if (!response.ok || response.body === null) {
         await response.body?.cancel();
@@ -180,12 +180,12 @@ export class AgentInstaller {
         try {
             const archive = path.join(stage, "download");
 
-            await download(fetchImpl, entry.tarball, archive);
+            await download(fetchImpl, entry.tarball, archive, NPM_HOST);
 
             // The core checks the file against `integrity` (the index's, as confirmed); whatever it answers, the
             // staging folder goes below.
             return JSON.parse(
-                core.acpInstallNpm(
+                await core.acpInstallNpm(
                     JSON.stringify({
                         archive,
                         args: resolved.args,

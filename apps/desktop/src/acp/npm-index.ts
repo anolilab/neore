@@ -8,6 +8,8 @@
 import { fetchHttps, readCapped } from "./registry";
 
 export const NPM_REGISTRY = "https://registry.npmjs.org";
+/** The only host the index lookup and the tarball download may be served from, on any hop of a redirect. */
+export const NPM_HOST = new URL(NPM_REGISTRY).host;
 
 const LOOKUP_TIMEOUT_MS = 15_000;
 const MAX_METADATA_BYTES = 5 * 1024 * 1024;
@@ -31,7 +33,7 @@ export const npmVersionUrl = (name: string, version: string): string => `${NPM_R
  * from the index itself.
  */
 export const lookupNpmIntegrity = async (fetchImpl: typeof fetch, name: string, version: string): Promise<NpmIndexEntry> => {
-    const response = await fetchHttps(fetchImpl, npmVersionUrl(name, version), { headers: { accept: "application/json" }, signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS) });
+    const response = await fetchHttps(fetchImpl, npmVersionUrl(name, version), { headers: { accept: "application/json" }, signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS) }, NPM_HOST);
 
     if (!response.ok) {
         await response.body?.cancel();
@@ -64,7 +66,7 @@ export const lookupNpmIntegrity = async (fetchImpl: typeof fetch, name: string, 
         throw new Error("The package index gave a download address that is not a valid URL.");
     }
 
-    if (url.protocol !== "https:" || url.host !== new URL(NPM_REGISTRY).host) {
+    if (url.protocol !== "https:" || url.host !== NPM_HOST) {
         throw new Error("The package index points the download somewhere other than itself over https.");
     }
 

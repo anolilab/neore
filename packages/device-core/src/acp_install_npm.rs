@@ -24,6 +24,7 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use serde::Deserialize;
@@ -39,6 +40,11 @@ use crate::hmac::to_hex;
 
 const NPM_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 const MAX_TREE_ENTRIES: usize = 200_000;
+/// What the staging folder (the unpacked package, its dependencies and npm's cache) may occupy while npm runs.
+const MAX_STAGE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const STAGE_CHECK_EVERY: u32 = 10;
+/// How long a successful background check of an installed folder vouches for the start that follows it.
+const VERIFIED_FOR: Duration = Duration::from_secs(15);
 const TARBALL: &str = "package.tgz";
 const HOME_DIR: &str = "home";
 /// Variables the install passes on: a proxy and certificate settings decide whether the network is reachable, and
@@ -198,6 +204,30 @@ fn tail(path: &Path) -> String {
     String::from_utf8_lossy(&text[start..]).trim().to_owned()
 }
 
+/// Whether `node <script>` can run `script`: a JavaScript file by name, or one whose first line is a `node` shebang.
+/// Anything else (a shell script, a native executable) npm could run through its `.bin` link, but the recorded
+/// command is `node <script>`.
+fn runs_under_node(script: &Path) -> bool {
+    if script
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| matches!(extension, "js" | "mjs" | "cjs"))
+    {
+        return true;
+    }
+
+    let mut head = [0_u8; 128];
+    let read = fs::File::open(script)
+        .and_then(|mut file| file.read(&mut head))
+        .unwrap_or(0);
+    let first = head[..read]
+        .split(|byte| *byte == b'\n')
+        .next()
+        .unwrap_or(&[]);
+
+    first.starts_with(b"#!") && String::from_utf8_lossy(first).contains("node")
+}
+
 /// Runs `npm install --ignore-scripts` of `tarball` into `prefix`, with an environment built from nothing.
 fn run_npm(
     node: &Path,
@@ -205,6 +235,7 @@ fn run_npm(
     prefix: &Path,
     tarball: &Path,
     home: &Path,
+    stage: &Path,
 ) -> Result<(), String> {
     let log = home.join("npm.log");
     let out = fs::File::create(&log).map_err(|error| error.to_string())?;
@@ -264,8 +295,23 @@ fn run_npm(
         .spawn()
         .map_err(|error| format!("npm could not be started: {error}"))?;
     let deadline = Instant::now() + NPM_TIMEOUT;
+    let mut ticks = 0_u32;
 
     loop {
+        ticks += 1;
+
+        // A package and its dependencies can expand far beyond the tarball that was verified: stop npm while it
+        // runs, not after it has filled the disk.
+        if ticks % STAGE_CHECK_EVERY == 0 && stage_over_budget(stage) {
+            let _ = child.kill();
+            let _ = child.wait();
+
+            return Err(
+                "the package needs more disk space than an agent may use. Nothing was installed"
+                    .into(),
+            );
+        }
+
         match child.try_wait().map_err(|error| error.to_string())? {
             Some(status) if status.success() => return Ok(()),
             Some(_) => {
@@ -287,12 +333,86 @@ fn run_npm(
     }
 }
 
+/// True when `dir` holds more than [`MAX_STAGE_BYTES`] (links are not followed; a tree too large to count is over).
+fn stage_over_budget(dir: &Path) -> bool {
+    fn add(dir: &Path, bytes: &mut u64, entries: &mut usize) -> bool {
+        let Ok(read) = fs::read_dir(dir) else {
+            return false;
+        };
+
+        for entry in read.flatten() {
+            *entries += 1;
+
+            if *entries > MAX_TREE_ENTRIES {
+                return true;
+            }
+
+            let Ok(meta) = fs::symlink_metadata(entry.path()) else {
+                continue;
+            };
+
+            if meta.is_dir() {
+                if add(&entry.path(), bytes, entries) {
+                    return true;
+                }
+            } else {
+                *bytes += meta.len();
+            }
+
+            if *bytes > MAX_STAGE_BYTES {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    add(dir, &mut 0, &mut 0)
+}
+
 fn put(hasher: &mut Sha256, tag: u8, parts: &[&[u8]]) {
     hasher.update([tag]);
 
     for part in parts {
         hasher.update((part.len() as u64).to_le_bytes());
         hasher.update(part);
+    }
+}
+
+/// A link may point only at something inside `root`: its target is resolved by name first (an absolute target or
+/// one that climbs out of `root` is refused), then through the file system when it exists, which catches a path
+/// through another link.
+fn link_stays_inside(root: &Path, link: &Path, target: &Path) -> bool {
+    use std::path::Component;
+
+    let Some(parent) = link.parent().and_then(|dir| dir.strip_prefix(root).ok()) else {
+        return false;
+    };
+    let mut depth = parent.components().count() as i64;
+
+    if target.is_absolute() {
+        return false;
+    }
+
+    for component in target.components() {
+        match component {
+            Component::ParentDir => {
+                depth -= 1;
+
+                if depth < 0 {
+                    return false;
+                }
+            }
+            Component::Normal(_) => depth += 1,
+            Component::CurDir => {}
+            _ => return false,
+        }
+    }
+
+    match (fs::canonicalize(link), fs::canonicalize(root)) {
+        (Ok(resolved), Ok(root)) => resolved.starts_with(root),
+        (Err(_), _) => true,
+        (_, Err(_)) => false,
     }
 }
 
@@ -323,6 +443,12 @@ fn walk(root: &Path, dir: &Path, hasher: &mut Sha256, entries: &mut usize) -> Re
 
         if kind.is_symlink() {
             let target = fs::read_link(&path).map_err(|error| error.to_string())?;
+
+            if !link_stays_inside(root, &path, &target) {
+                return Err(format!(
+                    "{relative} is a link to somewhere outside the package"
+                ));
+            }
 
             put(
                 hasher,
@@ -392,7 +518,51 @@ fn digests(file: &mut fs::File) -> Result<(String, String), String> {
     }
 }
 
+/// Folders a background check ([`DeviceState::precheck_installed_tree`]) found unchanged, and when. A start that
+/// follows within [`VERIFIED_FOR`] uses the entry once instead of hashing the folder on the thread that starts it.
+static VERIFIED: Mutex<Vec<(PathBuf, String, Instant)>> = Mutex::new(Vec::new());
+
+fn take_verified(dir: &Path, hash: &str) -> bool {
+    let Ok(mut list) = VERIFIED.lock() else {
+        return false;
+    };
+
+    list.retain(|(_, _, at)| at.elapsed() < VERIFIED_FOR);
+
+    match list.iter().position(|(d, h, _)| d == dir && h == hash) {
+        Some(index) => {
+            list.remove(index);
+
+            true
+        }
+        None => false,
+    }
+}
+
 impl DeviceState {
+    /// Hashes the installed folder of `agent_key` and, when it matches what was recorded, remembers that for the
+    /// next start of it. For callers that run it off the thread that starts agents; a mismatch records nothing and
+    /// the start itself finds and reports it.
+    pub fn precheck_installed_tree(&self, agent_key: &str) {
+        let settings = self.settings();
+        let Some(agent) = settings.acp_agents.iter().find(|a| a.key == agent_key) else {
+            return;
+        };
+        let Some(pin) = &agent.install else { return };
+        let Some(expected) = &pin.tree_sha256 else {
+            return;
+        };
+        let dir = self.install_root().join(&agent.key).join(&pin.version);
+
+        if fs::symlink_metadata(&dir).is_ok_and(|meta| meta.is_dir())
+            && tree_hash(&dir).ok().as_ref() == Some(expected)
+        {
+            if let Ok(mut list) = VERIFIED.lock() {
+                list.push((dir, expected.clone(), Instant::now()));
+            }
+        }
+    }
+
     /// Verifies, installs and registers `request`. Any refusal leaves no file behind.
     pub fn acp_install_npm(&self, request: NpmInstallRequest) -> Result<AcpView, String> {
         let (node, npm) = validate(&request)?;
@@ -440,7 +610,7 @@ impl DeviceState {
         fs::rename(archive, &tarball).map_err(|error| error.to_string())?;
         create_private_dir(&prefix)?;
         create_private_dir(&home)?;
-        run_npm(node, npm, &prefix, &tarball, &home)?;
+        run_npm(node, npm, &prefix, &tarball, &home, stage_dir)?;
 
         let package_dir = prefix.join("node_modules").join(&request.package);
 
@@ -471,6 +641,10 @@ impl DeviceState {
             || !fs::symlink_metadata(&script).is_ok_and(|meta| meta.is_file())
         {
             return Err("the program the package starts is not a file inside it".into());
+        }
+
+        if !runs_under_node(&script) {
+            return Err("the program the package starts is not a JavaScript file Node can run, so Neore would not be able to start it".into());
         }
 
         let tree = tree_hash(&prefix)?;
@@ -525,6 +699,11 @@ impl DeviceState {
             return Ok(());
         };
         let dir = self.install_root().join(&agent.key).join(&pin.version);
+
+        if take_verified(&dir, expected) {
+            return Ok(());
+        }
+
         let actual = if fs::symlink_metadata(&dir).is_ok_and(|meta| meta.is_dir()) {
             tree_hash(&dir).ok()
         } else {
@@ -548,543 +727,5 @@ impl DeviceState {
 }
 
 #[cfg(all(test, unix))]
-mod tests {
-    use super::*;
-    use std::io::Write;
-
-    const PACKAGE: &str = "fixture-agent";
-
-    fn state(name: &str) -> (DeviceState, PathBuf) {
-        let dir = std::env::temp_dir().join(format!("neore-acp-npm-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).unwrap();
-
-        (DeviceState::new(&dir, Box::new(|_| {})), dir)
-    }
-
-    /// A package tarball as the index serves it: everything under `package/`.
-    fn tarball(manifest: &Value, extra: &[(&str, &str)]) -> Vec<u8> {
-        let mut builder = tar::Builder::new(Vec::new());
-        let manifest = manifest.to_string();
-        let mut files = vec![
-            ("package.json", manifest.as_str()),
-            ("cli.js", "console.log('hello');\n"),
-        ];
-
-        files.extend_from_slice(extra);
-
-        for (path, text) in files {
-            let mut header = tar::Header::new_gnu();
-
-            header.set_size(text.len() as u64);
-            header.set_mode(0o644);
-            header.set_cksum();
-            builder
-                .append_data(&mut header, format!("package/{path}"), text.as_bytes())
-                .unwrap();
-        }
-
-        let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
-
-        gz.write_all(&builder.into_inner().unwrap()).unwrap();
-        gz.finish().unwrap()
-    }
-
-    fn manifest() -> Value {
-        json!({ "name": PACKAGE, "version": "1.0.0", "bin": { PACKAGE: "cli.js" } })
-    }
-
-    fn integrity(bytes: &[u8]) -> String {
-        format!("sha512-{}", base64(&Sha512::digest(bytes)))
-    }
-
-    /// A stand-in `node` and an `npm` that records its arguments and unpacks the tarball like a real one would,
-    /// so the flow is tested without a network or a Node installation.
-    fn fake_tools(dir: &Path) -> (PathBuf, PathBuf, PathBuf) {
-        let node = dir.join("node");
-        let npm = dir.join("npm");
-        let log = dir.join("npm-args.log");
-
-        fs::write(&node, "#!/bin/sh\n").unwrap();
-        fs::write(
-            &npm,
-            format!(
-                "#!/bin/sh\necho \"$@\" > '{}'\nfor last; do :; done\nprefix=''\nwhile [ $# -gt 0 ]; do [ \"$1\" = --prefix ] && prefix=\"$2\"; shift; done\nmkdir -p \"$prefix/node_modules/{PACKAGE}\"\ntar xzf \"$last\" -C \"$prefix/node_modules/{PACKAGE}\" --strip-components=1\n",
-                log.display()
-            ),
-        )
-        .unwrap();
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-
-            for path in [&node, &npm] {
-                fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
-            }
-        }
-
-        (node, npm, log)
-    }
-
-    fn request(
-        state: &DeviceState,
-        node: &Path,
-        npm: &Path,
-        bytes: &[u8],
-        integrity: String,
-    ) -> NpmInstallRequest {
-        let stage = state.acp_install_stage().unwrap();
-        let archive = Path::new(&stage).join("download");
-
-        fs::write(&archive, bytes).unwrap();
-
-        NpmInstallRequest {
-            archive: archive.to_string_lossy().into_owned(),
-            args: vec!["--acp".into()],
-            env: BTreeMap::new(),
-            integrity,
-            key: "fixture".into(),
-            label: "Fixture".into(),
-            node: node.to_string_lossy().into_owned(),
-            npm: npm.to_string_lossy().into_owned(),
-            package: PACKAGE.into(),
-            publisher: "Example Inc.".into(),
-            source: "https://registry.npmjs.org/fixture-agent/-/fixture-agent-1.0.0.tgz".into(),
-            version: "1.0.0".into(),
-        }
-    }
-
-    fn installed(dir: &Path) -> PathBuf {
-        dir.join("acp-agents/fixture/1.0.0")
-    }
-
-    #[test]
-    fn the_integrity_is_the_sri_of_the_bytes() {
-        // Known vector: sha512("") in SRI form.
-        assert_eq!(
-            integrity(b""),
-            "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg=="
-        );
-        assert!(valid_integrity(&integrity(b"x")));
-        assert!(!valid_integrity("sha1-abc"));
-        assert!(!valid_integrity(
-            &integrity(b"x").replace("sha512-", "sha256-")
-        ));
-    }
-
-    #[test]
-    fn a_hash_that_is_not_the_downloads_is_refused_and_nothing_runs_or_stays() {
-        let (state, dir) = state("mismatch");
-        let (node, npm, log) = fake_tools(&dir);
-        let bytes = tarball(&manifest(), &[]);
-        let wrong = integrity(b"some other tarball");
-        let error = state
-            .acp_install_npm(request(&state, &node, &npm, &bytes, wrong))
-            .unwrap_err();
-
-        assert!(
-            error.contains("does not match the hash the package index gave"),
-            "{error}"
-        );
-        assert!(
-            !log.exists(),
-            "npm must not run on a download that fails the hash"
-        );
-        assert!(!installed(&dir).exists());
-        assert!(state.acp_view().agents.is_empty());
-        assert_eq!(
-            fs::read_dir(dir.join("acp-agents/.staging"))
-                .unwrap()
-                .count(),
-            0
-        );
-    }
-
-    #[test]
-    fn a_verified_download_is_installed_without_scripts_and_pinned_with_its_hashes() {
-        let (state, dir) = state("pin");
-        let (node, npm, log) = fake_tools(&dir);
-        let bytes = tarball(&manifest(), &[]);
-        let want = integrity(&bytes);
-        let view = state
-            .acp_install_npm(request(&state, &node, &npm, &bytes, want.clone()))
-            .unwrap();
-        let agent = &view.agents[0];
-        let pin = agent.install.as_ref().unwrap();
-        let script = installed(&dir)
-            .join("node_modules")
-            .join(PACKAGE)
-            .join("cli.js");
-
-        assert!(fs::read_to_string(&log)
-            .unwrap()
-            .contains("--ignore-scripts"));
-        assert_eq!(agent.command, node.to_string_lossy());
-        assert_eq!(
-            agent.args,
-            vec![script.to_string_lossy().into_owned(), "--acp".into()]
-        );
-        assert_eq!(pin.index_integrity.as_deref(), Some(want.as_str()));
-        assert_eq!(pin.sha256, to_hex(&Sha256::digest(&bytes)));
-        assert_eq!(
-            pin.tree_sha256.as_deref(),
-            Some(tree_hash(&installed(&dir)).unwrap().as_str())
-        );
-        assert!(script.is_file());
-        // The staging folder, npm's cache included, is gone.
-        assert_eq!(
-            fs::read_dir(dir.join("acp-agents/.staging"))
-                .unwrap()
-                .count(),
-            0
-        );
-    }
-
-    #[test]
-    fn a_changed_added_or_removed_file_refuses_the_start_and_says_so() {
-        let (state, dir) = state("recheck");
-        let (node, npm, _) = fake_tools(&dir);
-        let bytes = tarball(&manifest(), &[]);
-
-        state
-            .acp_install_npm(request(
-                &state,
-                &node,
-                &npm,
-                &bytes.clone(),
-                integrity(&bytes),
-            ))
-            .unwrap();
-
-        let script = installed(&dir)
-            .join("node_modules")
-            .join(PACKAGE)
-            .join("cli.js");
-        let untouched = state.acp_spawn_plan("fixture", None).unwrap();
-
-        assert_eq!(untouched.command, node.to_string_lossy());
-
-        fs::write(&script, "console.log('changed');\n").unwrap();
-        let changed = state.acp_spawn_plan("fixture", None).unwrap_err();
-        assert!(
-            changed.contains("no longer matches the files recorded"),
-            "{changed}"
-        );
-
-        fs::write(&script, "console.log('hello');\n").unwrap();
-        assert!(
-            state.acp_spawn_plan("fixture", None).is_ok(),
-            "restoring the bytes restores the start"
-        );
-
-        fs::write(
-            installed(&dir)
-                .join("node_modules")
-                .join(PACKAGE)
-                .join("extra.js"),
-            "x",
-        )
-        .unwrap();
-        assert!(state.acp_spawn_plan("fixture", None).is_err());
-        fs::remove_file(
-            installed(&dir)
-                .join("node_modules")
-                .join(PACKAGE)
-                .join("extra.js"),
-        )
-        .unwrap();
-
-        fs::remove_file(&script).unwrap();
-        assert!(state.acp_spawn_plan("fixture", None).is_err());
-    }
-
-    #[test]
-    fn a_missing_install_folder_refuses_the_start() {
-        let (state, dir) = state("missing");
-        let (node, npm, _) = fake_tools(&dir);
-        let bytes = tarball(&manifest(), &[]);
-
-        state
-            .acp_install_npm(request(
-                &state,
-                &node,
-                &npm,
-                &bytes.clone(),
-                integrity(&bytes),
-            ))
-            .unwrap();
-        fs::remove_dir_all(installed(&dir)).unwrap();
-
-        assert!(state.acp_spawn_plan("fixture", None).is_err());
-    }
-
-    #[test]
-    fn the_installed_package_must_be_the_one_that_was_pinned() {
-        let (state, dir) = state("identity");
-        let (node, npm, _) = fake_tools(&dir);
-        let other = tarball(
-            &json!({ "name": PACKAGE, "version": "9.9.9", "bin": "cli.js" }),
-            &[],
-        );
-        let error = state
-            .acp_install_npm(request(&state, &node, &npm, &other, integrity(&other)))
-            .unwrap_err();
-
-        assert!(
-            error.contains("not the name and version that was pinned"),
-            "{error}"
-        );
-        assert!(!installed(&dir).exists());
-        assert!(state.acp_view().agents.is_empty());
-    }
-
-    #[test]
-    fn the_program_is_one_file_inside_the_package() {
-        let (state, dir) = state("bin");
-        let (node, npm, _) = fake_tools(&dir);
-
-        for manifest in [
-            json!({ "name": PACKAGE, "version": "1.0.0", "bin": "../outside.js" }),
-            json!({ "name": PACKAGE, "version": "1.0.0", "bin": "/bin/sh" }),
-            json!({ "name": PACKAGE, "version": "1.0.0", "bin": "missing.js" }),
-            json!({ "name": PACKAGE, "version": "1.0.0", "bin": { "a": "cli.js", "b": "cli.js" } }),
-            json!({ "name": PACKAGE, "version": "1.0.0" }),
-        ] {
-            let bytes = tarball(&manifest, &[]);
-
-            assert!(
-                state
-                    .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
-                    .is_err(),
-                "{manifest}"
-            );
-            assert!(!installed(&dir).exists());
-        }
-    }
-
-    #[test]
-    fn editing_the_arguments_after_the_program_keeps_the_pin_and_the_check() {
-        let (state, dir) = state("edit-args");
-        let (node, npm, _) = fake_tools(&dir);
-        let bytes = tarball(&manifest(), &[]);
-        let view = state
-            .acp_install_npm(request(
-                &state,
-                &node,
-                &npm,
-                &bytes.clone(),
-                integrity(&bytes),
-            ))
-            .unwrap();
-        let agent = &view.agents[0];
-        let edit = |args: Vec<String>| {
-            state
-                .acp_update(
-                    serde_json::from_value(json!({
-                        "op": "saveAgent", "key": "fixture", "label": "Fixture", "command": agent.command, "args": args,
-                    }))
-                    .unwrap(),
-                )
-                .unwrap()
-        };
-        let script = agent.args[0].clone();
-
-        // A trailing argument changes: still the pinned program, still hashed at every start.
-        let edited = edit(vec![script.clone(), "--other".into()]);
-
-        assert!(edited.agents[0].install.is_some());
-        assert!(Path::new(&script).is_file());
-        assert!(state.acp_spawn_plan("fixture", None).is_ok());
-        fs::write(&script, "changed").unwrap();
-        assert!(state.acp_spawn_plan("fixture", None).is_err());
-        fs::write(&script, "console.log('hello');\n").unwrap();
-
-        // The program itself is replaced: no longer the install, and its files go with it, as for a binary.
-        let moved = edit(vec!["/elsewhere/agent.js".into()]);
-
-        assert!(moved.agents[0].install.is_none());
-        assert!(!installed(&dir).exists());
-    }
-
-    #[test]
-    fn the_program_is_picked_like_npx_would() {
-        let named = json!({ "bin": { "other": "o.js", "agent": "a.js" } });
-
-        assert_eq!(pick_bin(&named, "@scope/agent").unwrap(), "a.js");
-        assert_eq!(
-            pick_bin(&json!({ "bin": { "x": "x.js" } }), "agent").unwrap(),
-            "x.js"
-        );
-        assert_eq!(
-            pick_bin(&json!({ "bin": "x.js" }), "agent").unwrap(),
-            "x.js"
-        );
-        assert!(pick_bin(&json!({ "bin": { "a": "a.js", "b": "b.js" } }), "agent").is_err());
-        assert!(pick_bin(&json!({}), "agent").is_err());
-    }
-
-    #[test]
-    fn tools_must_be_absolute_files_and_names_plain() {
-        let (state, dir) = state("tools");
-        let (node, npm, _) = fake_tools(&dir);
-        let bytes = tarball(&manifest(), &[]);
-        let base = |state: &DeviceState| request(state, &node, &npm, &bytes, integrity(&bytes));
-
-        for change in [
-            |r: &mut NpmInstallRequest| r.node = "node".into(),
-            |r: &mut NpmInstallRequest| r.npm = "/nonexistent/npm".into(),
-            |r: &mut NpmInstallRequest| r.package = "../evil".into(),
-            |r: &mut NpmInstallRequest| r.package = "Fixture Agent".into(),
-            |r: &mut NpmInstallRequest| r.integrity = "sha1-nope".into(),
-            |r: &mut NpmInstallRequest| r.version = "latest".into(),
-            |r: &mut NpmInstallRequest| {
-                r.env.insert("NODE_OPTIONS".into(), "--require x".into());
-            },
-        ] {
-            let mut r = base(&state);
-
-            change(&mut r);
-            assert!(state.acp_install_npm(r).is_err());
-        }
-
-        assert!(valid_package_name("@scope/agent-x"));
-        assert!(!valid_package_name("@scope"));
-        assert!(!valid_package_name("a/b"));
-    }
-
-    #[test]
-    fn only_a_download_in_a_staging_folder_is_installed() {
-        let (state, dir) = state("outside");
-        let (node, npm, _) = fake_tools(&dir);
-        let bytes = tarball(&manifest(), &[]);
-        let mut r = request(&state, &node, &npm, &bytes, integrity(&bytes));
-        let elsewhere = dir.join("elsewhere.tgz");
-
-        fs::write(&elsewhere, &bytes).unwrap();
-        r.archive = elsewhere.to_string_lossy().into_owned();
-
-        assert!(state.acp_install_npm(r).is_err());
-    }
-
-    /// A real `node` and `npm` from the PATH, or `None`. `NEORE_REQUIRE_NPM=1` turns a missing one into a failure.
-    fn real_tools() -> Option<(PathBuf, PathBuf)> {
-        let find = |name: &str| {
-            std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
-                .map(|dir| dir.join(name))
-                .find(|path| path.is_file())
-        };
-
-        match (find("node"), find("npm")) {
-            (Some(node), Some(npm)) => Some((node, npm)),
-            _ => {
-                assert!(
-                    std::env::var_os("NEORE_REQUIRE_NPM").is_none(),
-                    "NEORE_REQUIRE_NPM is set but node and npm were not found on PATH"
-                );
-                eprintln!("skipped: node and npm are not on PATH");
-
-                None
-            }
-        }
-    }
-
-    fn marker_package(marker: &Path) -> Vec<u8> {
-        let script = format!(
-            "require('fs').writeFileSync({}, 'ran');\n",
-            serde_json::to_string(&marker.to_string_lossy()).unwrap()
-        );
-        let manifest = json!({
-            "name": PACKAGE, "version": "1.0.0", "bin": { PACKAGE: "cli.js" },
-            "scripts": {
-                "preinstall": "node marker.js", "install": "node marker.js",
-                "postinstall": "node marker.js", "prepare": "node marker.js"
-            }
-        });
-
-        tarball(&manifest, &[("marker.js", &script)])
-    }
-
-    #[test]
-    fn no_lifecycle_script_runs_during_an_install() {
-        let Some((node, npm)) = real_tools() else {
-            return;
-        };
-        let (state, dir) = state("scripts");
-        let marker = dir.join("script-ran");
-        let bytes = marker_package(&marker);
-
-        // The control: the same package, installed by npm without the flag, does run its script. Without this
-        // the assertion below could pass for a fixture whose scripts never run.
-        let control = dir.join("control");
-
-        fs::create_dir_all(&control).unwrap();
-        let tgz = control.join("package.tgz");
-
-        fs::write(&tgz, &bytes).unwrap();
-        let status = Command::new(&npm)
-            .args([
-                "install",
-                "--no-audit",
-                "--no-fund",
-                "--no-package-lock",
-                "--prefix",
-            ])
-            .arg(&control)
-            .arg(&tgz)
-            .env(
-                "PATH",
-                format!("{}:/usr/bin:/bin", node.parent().unwrap().display()),
-            )
-            .env("HOME", &control)
-            .env("npm_config_cache", control.join("cache"))
-            .output()
-            .unwrap();
-
-        assert!(
-            status.status.success(),
-            "{}",
-            String::from_utf8_lossy(&status.stderr)
-        );
-        assert!(
-            marker.exists(),
-            "the control install should have run the fixture's scripts"
-        );
-        fs::remove_file(&marker).unwrap();
-
-        let view = state
-            .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
-            .unwrap();
-
-        assert_eq!(view.agents.len(), 1);
-        assert!(
-            !marker.exists(),
-            "a lifecycle script ran during the install"
-        );
-        assert!(state.acp_spawn_plan("fixture", None).is_ok());
-    }
-
-    #[test]
-    fn a_real_npm_install_runs_the_package_with_the_pinned_node() {
-        let Some((node, npm)) = real_tools() else {
-            return;
-        };
-        let (state, dir) = state("real");
-        let bytes = tarball(&manifest(), &[]);
-        let view = state
-            .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
-            .unwrap();
-        let agent = &view.agents[0];
-        let output = Command::new(&agent.command)
-            .args(&agent.args[..1])
-            .output()
-            .unwrap();
-
-        assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "hello");
-        assert!(installed(&dir)
-            .join("node_modules")
-            .join(PACKAGE)
-            .join("cli.js")
-            .is_file());
-    }
-}
+#[path = "acp_install_npm_tests.rs"]
+mod tests;

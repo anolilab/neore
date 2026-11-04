@@ -62,7 +62,7 @@ export interface ManagerOptions {
     /** Told that the window should read the sessions again. */
     onChange: () => void;
     /** `device-core`'s `acpSpawnPlan`, parsed. Throws when the agent or folder is not allowed. */
-    plan: (agentKey: string, folder: string | null) => SpawnPlan;
+    plan: (agentKey: string, folder: string | null) => Promise<SpawnPlan> | SpawnPlan;
     spawn: Spawner;
     startupTimeoutMs?: number;
 }
@@ -105,7 +105,7 @@ export class AcpManager {
     ): Promise<Result> {
         requireSupported();
 
-        const plan = this.options.plan(agentKey, folder);
+        const plan = await this.options.plan(agentKey, folder);
         let child: AgentProcess;
 
         try {
@@ -179,7 +179,7 @@ export class AcpManager {
         }
 
         // The core decides: it refuses an unregistered agent and (with consent) a folder the user has not approved.
-        const plan = this.options.plan(agentKey, folder);
+        const plan = await this.options.plan(agentKey, folder);
         const child = this.spawn(plan, agentKey);
         const folderInfo = this.options.hostInfo?.(agentKey, plan.cwd);
         const { hooks } = this.options;

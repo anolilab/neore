@@ -214,7 +214,7 @@ export interface DeviceCore {
     /** What to start for an approved agent on a server (JSON): only the user's variables, the server builds the rest. */
     acpHostSpawnPlan: (deviceId: string, agentKey: string, folder: string) => string;
     acpInstall: (request: string) => string;
-    acpInstallNpm: (request: string) => string;
+    acpInstallNpm: (request: string) => Promise<string>;
     acpInstallPrune: (agentKey: string) => void;
     acpInstallStage: () => string;
     /** Coding agents (ACP): JSON strings, parsed by `acp/`. The spawn plan holds secrets and never leaves the main process. */
@@ -225,6 +225,7 @@ export interface DeviceCore {
     acpPermissionCancelSession: (sessionId: string) => void;
     acpPermissionDecline: (id: number) => void;
     acpPermissions: () => string;
+    acpPrecheckInstall: (agentKey: string) => Promise<boolean>;
     /** A relayed coding-agent command, checked but not acted on (`acp/commands.ts`). */
     acpPrepare: (envelope: string, signature: string) => string;
     /** Reads a file an agent's reply refers to, in Rust: only inside the folder the agent was approved for, only an allowed type. */

@@ -4,9 +4,11 @@
  * archives to download. Documented at https://agentclientprotocol.com/get-started/registry; the entry format is
  * `agent.schema.json` in the `agentclientprotocol/registry` repository.
  *
- * An agent is installable here only when it has a `binary` download for this platform WITH a published SHA-256:
- * without a checksum nothing can show the file is the one the publisher released, and an `npx`/`uvx` entry would
- * fetch whatever the package manager resolves at launch. Those are listed, with the reason, and not installable.
+ * An agent is installable here when it has a `binary` download for this platform WITH a published SHA-256, or an
+ * `npx` entry that names an exact npm version: that one is installed pinned and checked against the integrity the
+ * npm package index publishes for the version (trust on first use, shown before the person confirms), never
+ * resolved when it starts. Without a checksum, and for `uvx`, nothing shows the file is the one the publisher
+ * released, so those are listed, with the reason, and not installable.
  */
 
 import { isPrivateHost } from "./private-host";
@@ -325,8 +327,12 @@ const unfit = (agent: RegistryAgent, target: BinaryTarget, format: ArchiveFormat
 };
 
 /** An exact version: no range, tag (`latest`) or missing version, which npm would resolve on the day it runs. */
-const NPM_PACKAGE = /^((?:@[a-z\d~-][\w.~-]*\/)?[a-z\d~-][\w.~-]*)@(\d+\.\d+\.\d+(?:-[\dA-Za-z.-]+)?(?:\+[\dA-Za-z.-]+)?)$/u;
+const NPM_PACKAGE = /^((?:@[a-z\d~-][\d._a-z~-]*\/)?[a-z\d~-][\d._a-z~-]*)@(\d+\.\d+\.\d+(?:-[\dA-Za-z.-]+)?(?:\+[\dA-Za-z.-]+)?)$/u;
 const MAX_NPM_NAME = 214;
+/** The core's version limit (`valid_version`), in bytes. */
+const MAX_NPM_VERSION = 40;
+/** The core adds the program's path to the arguments and allows 50 in all (`validate_agent`). */
+const MAX_NPM_ARGS = 49;
 
 /** The package of an `npx` entry pinned at its exact version, or the reason it cannot be. */
 const resolveNpm = (agent: RegistryAgent, platform: string): ResolvedNpmInstall | string => {
@@ -344,8 +350,12 @@ const resolveNpm = (agent: RegistryAgent, platform: string): ResolvedNpmInstall 
     const name = match?.[1];
     const version = match?.[2];
 
-    if (name === undefined || version === undefined || name.length > MAX_NPM_NAME || version.includes("..")) {
+    if (name === undefined || version === undefined || name.length > MAX_NPM_NAME || version.length > MAX_NPM_VERSION || version.includes("..")) {
         return "The registry does not name an exact version of the npm package, so Neore would not know what it installs.";
+    }
+
+    if (npx.args.length > MAX_NPM_ARGS) {
+        return `It passes more than ${String(MAX_NPM_ARGS)} arguments, more than Neore will start an agent with.`;
     }
 
     return agentUnfit(agent) ?? launchUnfit(npx.args, npx.env) ?? { agent, args: npx.args, env: npx.env, kind: "npm", name, version };
@@ -428,12 +438,16 @@ const MAX_REDIRECTS = 5;
  * Fetches `url`, following redirects by hand: every hop must be https and not a private host BEFORE it is requested, so an http
  * detour is never contacted (a check on the final URL alone would have sent the request and read the answer first).
  */
-export const fetchHttps = async (fetchImpl: Fetch, url: string, init: RequestInit): Promise<Response> => {
+export const fetchHttps = async (fetchImpl: Fetch, url: string, init: RequestInit, onlyHost?: string): Promise<Response> => {
     let current = url;
 
     for (let hops = 0; hops <= MAX_REDIRECTS; hops += 1) {
         if (new URL(current).protocol !== "https:") {
             throw new Error("A download was redirected away from https.");
+        }
+
+        if (onlyHost !== undefined && new URL(current).host !== onlyHost) {
+            throw new Error("A download was redirected away from the address it was confirmed for.");
         }
 
         if (isPrivateHost(new URL(current).hostname)) {

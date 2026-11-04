@@ -24,13 +24,13 @@ const BYTES = Buffer.from("not really an archive");
 const makeFetch = (body: () => Response | Promise<Response> = () => new Response(BYTES)) =>
     vi.fn(async (url: string | URL | Request, _init?: RequestInit) => String(url).endsWith("registry.json") ? Response.json(REGISTRY_FIXTURE) : body());
 
-const setup = async (options: { accept?: boolean; body?: () => Response | Promise<Response>; install?: (request: string) => string; installNpm?: (request: string) => string } = {}) => {
+const setup = async (options: { accept?: boolean; body?: () => Response | Promise<Response>; install?: (request: string) => string; installNpm?: (request: string) => Promise<string> | string } = {}) => {
     const fetchSpy = makeFetch(options.body);
     const registry = new AgentRegistry({ arch: "x64", fetch: fetchSpy as unknown as typeof fetch, platform: "linux" });
     const staged: string[] = [];
     const core = {
         acpInstall: vi.fn(options.install ?? ((): string => JSON.stringify({ agents: [], consents: [], envNames: [] }))),
-        acpInstallNpm: vi.fn(options.installNpm ?? ((): string => JSON.stringify({ agents: [], consents: [], envNames: [] }))),
+        acpInstallNpm: vi.fn(async (request: string) => (options.installNpm ?? ((): string => JSON.stringify({ agents: [], consents: [], envNames: [] })))(request)),
         acpInstallStage: vi.fn(() => {
             const folder = mkdtempSync(path.join(scratch, "stage-"));
 
@@ -230,7 +230,7 @@ describe("an npm agent", () => {
         const staged: string[] = [];
         const core = {
             acpInstall: vi.fn(() => "{}"),
-            acpInstallNpm: vi.fn((_request: string) => JSON.stringify({ agents: [], consents: [], envNames: [] })),
+            acpInstallNpm: vi.fn(async (_request: string) => JSON.stringify({ agents: [], consents: [], envNames: [] })),
             acpInstallStage: vi.fn(() => {
                 const folder = mkdtempSync(path.join(scratch, "stage-"));
 
@@ -324,9 +324,7 @@ describe("an npm agent", () => {
     it("removes the staging folder when the download or the core fails", async () => {
         const failing = await setupNpm();
 
-        failing.core.acpInstallNpm.mockImplementation(() => {
-            throw new Error("The download does not match the hash the package index gave");
-        });
+        failing.core.acpInstallNpm.mockRejectedValue(new Error("The download does not match the hash the package index gave"));
         await expect(failing.installer.install("thing", "1.0.0")).rejects.toThrow("does not match the hash");
         expect(existsSync(failing.staged[0])).toBe(false);
     });

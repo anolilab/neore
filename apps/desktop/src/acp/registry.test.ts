@@ -115,6 +115,15 @@ describe("npm agents", () => {
         }
     });
 
+    it("refuses what the core would refuse after the person has confirmed", () => {
+        expect(withNpx({ package: "thing-Cli@1.0.0" })).toMatch("exact version");
+        expect(withNpx({ package: "@Acme/thing@1.0.0" })).toMatch("exact version");
+        expect(withNpx({ package: `thing@1.0.0-${"a".repeat(35)}` })).toMatch("exact version");
+        expect(withNpx({ package: `thing@1.0.0-${"a".repeat(34)}` })).toMatchObject({ kind: "npm" });
+        expect(withNpx({ args: "-v ".repeat(49).trim().split(" ") })).toMatchObject({ kind: "npm" });
+        expect(withNpx({ args: "-v ".repeat(50).trim().split(" ") })).toMatch("49 arguments");
+    });
+
     it("applies the same limits to its arguments and variables as to a download", () => {
         expect(withNpx({ env: { NODE_OPTIONS: "--require x" } })).toMatch("It sets NODE_OPTIONS");
         expect(withNpx({ args: ["x".repeat(1001)] })).toMatch("arguments");
@@ -263,6 +272,15 @@ describe("a download that points inward", () => {
         for (const host of ["cdn.agentclientprotocol.com", "github.com", "8.8.8.8", "172.32.0.1", "100.128.0.1", "[2606:4700::1]"]) {
             expect(isPrivateHost(host), host).toBe(false);
         }
+    });
+
+    it("can be held to one host on every hop, checked before the hop is requested", async () => {
+        const fetchImpl = vi.fn(async () => new Response(null, { headers: { location: "https://mirror.example.com/x" }, status: 302 }));
+
+        await expect(fetchHttps(fetchImpl, "https://registry.npmjs.org/x", {}, "registry.npmjs.org")).rejects.toThrow("redirected away");
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+        await expect(fetchHttps(fetchImpl, "https://other.example.com/x", {}, "registry.npmjs.org")).rejects.toThrow("redirected away");
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
     });
 
     it("is refused before it is requested, as the first address and as a redirect", async () => {
