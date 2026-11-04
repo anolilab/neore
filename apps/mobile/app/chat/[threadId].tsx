@@ -12,6 +12,8 @@ import { fetchAccessToken } from "@/auth/grant";
 import { secureGrantStore } from "@/auth/secure-store";
 import { ChatError, startChat } from "@/chat/chat-api";
 import { displayTextOf, shareTextOf } from "@/chat/message-parts";
+import type { ReplyState, SeenMessage } from "@/chat/reply-state";
+import { replyStateAfter } from "@/chat/reply-state";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import { relayReply } from "@/chat/stream";
 import { loadConfig } from "@/lib/config";
@@ -20,7 +22,7 @@ import { getClient } from "@/lib/lunora";
 import { streamingFetch } from "@/lib/streaming-fetch";
 import { withFreshRows } from "@/offline/fresh-rows";
 import { mergeRows } from "@/offline/merge";
-import { createMessageReadGate, readOlderMessages, readThreadMessages } from "@/offline/message-read";
+import { createMessageReadGate, isThreadRefusal, readOlderMessages, readThreadMessages } from "@/offline/message-read";
 import { OfflineBanner } from "@/offline/offline-banner";
 import { useOffline, useWriteControl } from "@/offline/offline-context";
 import type { MessageRow } from "@/offline/types";
@@ -33,19 +35,17 @@ const NEW_THREAD = "new";
 const MAX_HISTORY_PAGES = 10;
 /** Unsettled checks before the history is re-read once, so the server's copy shows while the checks go on. */
 const CONFIRM_REFRESH_READS = 6;
+/** Unsettled checks after which a send is no longer held: the composer opens while the checks go on. */
+const CONFIRM_HOLD_READS = 15;
 /** Unsettled checks after which a confirmation is given up; the final status is then left to the next read. */
 const CONFIRM_GIVE_UP_READS = 150;
+/** Pages read per check, newest first, before the send counts as not found: other sessions can push it back. */
+const CONFIRM_MAX_PAGES = 5;
 /** How far apart the follow-up checks are, after a reply that the relay did not confirm as complete. */
 const CONFIRM_READ_INTERVAL_MS = 2000;
 const REFUSED_MESSAGE = "This chat is locked or no longer available.";
 const SHARE_FAILED_MESSAGE = "The message could not be shared. Try again.";
 const AWAIT_REPLY_MESSAGE = "Wait for the last reply to finish before sending another.";
-
-/** The server's replies on screen: every assistant row that is not a local one. */
-const serverReplies = (rows: Row[]): Row[] => rows.filter((row) => row.role === "assistant" && row.status !== "local");
-
-/** The creation time of the newest server reply on screen, or 0 when there is none. */
-const latestReplyTime = (rows: Row[]): number => Math.max(0, ...serverReplies(rows).map((row) => row.createdAt));
 
 /** A failed share fills an empty error slot; an error already on screen is not replaced by it. */
 const withShareFailure = (current: string | null): string | null => current ?? SHARE_FAILED_MESSAGE;
@@ -127,29 +127,6 @@ const fetchMessagePage = (threadId: string, cursor: string | null) =>
         paginationOpts: { cursor, numItems: 100 },
         threadId: threadId as Id<"threads">,
     });
-
-type MessagePage = Awaited<ReturnType<typeof fetchMessagePage>>["page"];
-
-/* eslint-disable no-underscore-dangle -- `_creationTime` is the Lunora document field, not a private one */
-
-/**
- * The creation time of the send's own user message: the newest user message on the page that reads `prompt` and was
- * created at or after `after`, the newest reply on screen when the send began. Null while the page does not hold it yet.
- */
-const sentAtOf = (messages: MessagePage, prompt: string, after: number): number | null => {
-    const sent = messages.find((message) => message.role === "user" && displayTextOf(message.parts) === prompt && message._creationTime >= after);
-
-    return sent ? sent._creationTime : null;
-};
-
-/**
- * Whether the page holds a reply to the send with a final status. A reply made before the send cannot satisfy it, however
- * settled it is. A reply can share its user message's creation time, so the comparison includes it.
- */
-const hasSettledReplySince = (messages: MessagePage, sentAt: number): boolean =>
-    messages.some((message) => message.role === "assistant" && message._creationTime >= sentAt && (message.status === "success" || message.status === "failed"));
-
-/* eslint-enable no-underscore-dangle */
 
 const Chat = () => {
     const { threadId: routeThreadId } = useLocalSearchParams<{ threadId: string }>();
@@ -364,22 +341,22 @@ const Chat = () => {
     // After a send, check the newest page on a timer until the server's copy of the reply is final. Each check reads one
     // page, so older pages on screen are not touched. The history is re-read once while the checks wait, and again when they settle.
     // `holdsSend` is set only for a reply the relay did not finish: its server copy may still be streaming, so a new send waits.
-    const [confirmation, setConfirmation] = useState<{ after: number; holdsSend: boolean; prompt: string; threadId: string } | null>(null);
+    const [confirmation, setConfirmation] = useState<{ holdsSend: boolean; messageId: string; threadId: string } | null>(null);
+    // Set once the hold has lasted its checks: the composer opens, and the checks go on without holding it.
+    const [isHoldExpired, setIsHoldExpired] = useState(false);
     const [confirmTick, setConfirmTick] = useState(0);
     const isConfirming = confirmation !== null && confirmation.threadId === threadId;
-    const isAwaitingReply = isConfirming && confirmation.holdsSend;
+    const isAwaitingReply = isConfirming && confirmation.holdsSend && !isHoldExpired;
 
     useEffect(() => {
         if (!isConfirming || confirmation === null) {
             return undefined;
         }
 
-        const { after, prompt, threadId: id } = confirmation;
+        const { messageId, threadId: id } = confirmation;
         let reads = 0;
         let isActive = true;
         let isChecking = false;
-        // The send's user message, found once the newest page holds it. Until then no reply can be known as its reply.
-        let sentAt: number | null = null;
 
         const check = async () => {
             if (isChecking) {
@@ -388,27 +365,50 @@ const Chat = () => {
 
             isChecking = true;
             reads += 1;
-            let isConfirmed = false;
+            let state: ReplyState = "unknown";
+            let isChatRefused = false;
 
             try {
-                const { page } = await fetchMessagePage(id, null);
+                const seen: SeenMessage[] = [];
+                let cursor: string | null = null;
 
-                if (sentAt === null) {
-                    sentAt = sentAtOf(page, prompt, after);
+                for (let index = 0; index < CONFIRM_MAX_PAGES; index += 1) {
+                    // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
+                    const page = await fetchMessagePage(id, cursor);
+
+                    seen.push(
+                        ...page.page.map((message) => {
+                            return { id: message.id, role: message.role, status: message.status };
+                        }),
+                    );
+                    state = replyStateAfter(seen, messageId);
+
+                    if (state !== "unknown" || page.isDone) {
+                        break;
+                    }
+
+                    cursor = page.continueCursor;
                 }
-
-                isConfirmed = sentAt !== null && hasSettledReplySince(page, sentAt);
-            } catch {
-                // A failed check is tried again on the next tick.
+            } catch (error_) {
+                // A chat the reader can no longer open ends the checks; any other failure is tried again on the next tick.
+                isChatRefused = isThreadRefusal(error_);
             }
 
             isChecking = false;
 
-            if (isActive && (isConfirmed || reads >= CONFIRM_GIVE_UP_READS)) {
+            if (isActive && (state === "settled" || isChatRefused || reads >= CONFIRM_GIVE_UP_READS)) {
                 setConfirmation(null);
                 setError(withoutAwaitReply);
                 setConfirmTick((tick) => tick + 1);
-            } else if (isActive && reads === CONFIRM_REFRESH_READS) {
+
+                return;
+            }
+
+            if (isActive && reads === CONFIRM_HOLD_READS) {
+                setIsHoldExpired(true);
+            }
+
+            if (isActive && reads === CONFIRM_REFRESH_READS) {
                 // Still unsettled: re-read the history so the server's copy of the reply is on screen while the checks go on.
                 setConfirmTick((tick) => tick + 1);
             }
@@ -453,10 +453,9 @@ const Chat = () => {
         const stamp = Date.now();
         const userId = `user-${stamp}`;
         const assistantId = `pending-${stamp}`;
-        // The newest reply on screen when the send began; the reply to wait for is created after it and after the send's message.
-        const after = latestReplyTime(rows);
 
         setConfirmation(null);
+        setIsHoldExpired(false);
 
         readGate.current.invalidate();
         setRows((current) => [
@@ -509,7 +508,7 @@ const Chat = () => {
                 setRows((current) => finishRow(current, assistantId));
             }
 
-            setConfirmation({ after, holdsSend: outcome === "unconfirmed", prompt, threadId: started.threadId });
+            setConfirmation({ holdsSend: outcome === "unconfirmed", messageId: started.messageId, threadId: started.threadId });
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
