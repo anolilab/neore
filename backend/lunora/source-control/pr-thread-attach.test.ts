@@ -118,7 +118,7 @@ describe("attaching a pull request to a thread by hand", () => {
             kind: "linked",
             number: 7,
             repository: "octo/hello",
-            title: "PR 7",
+            title: "a thread",
             url: `${GITHUB_WEB_ORIGIN}/octo/hello/pull/7`,
             userId: A,
         });
@@ -164,7 +164,7 @@ describe("attaching by hand: the host read and the request limits", () => {
         expect(await links()).toEqual([]);
     });
 
-    it("links a pull request the host returns, with its title from the host", async () => {
+    it("links a pull request the host returns, under the thread's title", async () => {
         const threadId = await threadOf(A);
 
         host.outcome = { baseBranch: "main", headBranch: "feature", status: "ok", title: "Host title" };
@@ -172,7 +172,7 @@ describe("attaching by hand: the host read and the request limits", () => {
         expect(await attach(A, threadId, [{ number: 7, repository: "octo/hello" }])).toEqual({
             results: [{ number: 7, repository: "octo/hello", status: "attached" }],
         });
-        expect(await links()).toEqual([expect.objectContaining({ headBranch: "feature", kind: "linked", title: "Host title" })]);
+        expect(await links()).toEqual([expect.objectContaining({ headBranch: "feature", kind: "linked", title: "a thread" })]);
     });
 
     it("refuses more than ten pull requests in one call before any host read", async () => {

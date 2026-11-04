@@ -2,7 +2,7 @@
  * Develop mode: attaching pull requests that already exist to a thread, by hand, and the lists a thread shows.
  *
  * The person names pull requests; each one is read from the host with their own connector first, so only a pull
- * request they can see is linked, and its title and branches are the host's own text. The link is written by an
+ * request they can see is linked, and its branch names are the host's own text (a long one is cut short). The link is written by an
  * internal mutation, which checks the thread is the caller's own and not deleted. A pull request that is already
  * linked to the thread is named, not added twice.
  */
@@ -51,7 +51,6 @@ const vVerifiedLink = v.object({
     headBranch: v.optional(v.string().max(MAX_LENGTH.short)),
     number: v.number(),
     repository: v.string().max(MAX_LENGTH.key),
-    title: v.string().max(MAX_LENGTH.short),
 });
 
 /** The host read said yes for these; the mutation decides which of them become rows. */
@@ -107,7 +106,8 @@ export const recordAttachedPullRequests = internalMutation
                 number: address.number,
                 repository: address.repository,
                 threadId: thread._id,
-                title: link.title,
+                // The thread's title, as every other kind of link stores it: the header and the Work-on list read this field.
+                title: thread.title ?? `${address.repository}#${String(address.number)}`,
                 url: pullRequestUrl(address.repository, address.number),
                 userId: args.userId,
             });
@@ -169,7 +169,6 @@ export const attachPullRequests = authAction
                           headBranch: fitText(outcome.headBranch),
                           number: address.number,
                           repository: address.repository,
-                          title: fitText(outcome.title) ?? address.repository,
                       },
                   ]
                 : [],

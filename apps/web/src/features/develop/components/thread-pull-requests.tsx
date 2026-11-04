@@ -178,6 +178,7 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
                                 setInputProblem(false);
                             }}
                             placeholder="owner/name#123"
+                            required
                             value={text}
                         />
                     </div>
