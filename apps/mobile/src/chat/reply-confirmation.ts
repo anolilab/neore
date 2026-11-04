@@ -65,7 +65,6 @@ export const tallyChecks = (outcomes: ReadonlyArray<{ confirmation: Confirmation
 /** Reads the state of one send's reply: walks the pages from the newest until the send is found, up to `CONFIRM_MAX_PAGES`. */
 export const readReplyState = async (fetchPage: ConfirmPageFetch, threadId: string, messageId: string, steers: number): Promise<ReplyState> => {
     const seen: SeenMessage[] = [];
-    // The query's first page is a null cursor, so null is the value here.
     // eslint-disable-next-line unicorn/no-null -- the query takes null for its first page
     let cursor: string | null = null;
     let state: ReplyState = "unknown";
