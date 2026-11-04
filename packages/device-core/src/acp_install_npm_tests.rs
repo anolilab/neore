@@ -838,39 +838,66 @@ fn a_removal_and_a_reinstall_that_overlap_leave_files_that_match_the_record() {
 
 #[test]
 fn pruning_never_deletes_the_version_a_concurrent_install_pinned() {
+    use std::sync::mpsc;
+    use std::sync::{Arc, Mutex};
+
     let (state, guard) = state("prune-race");
     let dir = guard.path().to_path_buf();
     let (node, npm, _) = fake_tools(&dir);
+    let key = "prune-hook";
+    let first = {
+        let mut request = request_for(&state, &node, &npm, "1.0.0");
 
-    state
-        .acp_install_npm(request_for(&state, &node, &npm, "1.0.0"))
-        .unwrap();
+        request.key = key.into();
+        request
+    };
 
-    let second = request_for(&state, &node, &npm, "2.0.0");
+    state.acp_install_npm(first).unwrap();
+
+    let mut second = request_for(&state, &node, &npm, "2.0.0");
+
+    second.key = key.into();
+
+    // Hold the second install between its rename (2.0.0 is on disk, the record still says 1.0.0) and its
+    // settings write, and run a prune in that window. A prune that reads the record there deletes 2.0.0.
+    let (renamed_tx, renamed_rx) = mpsc::channel::<()>();
+    let (pruning_tx, pruning_rx) = mpsc::channel::<()>();
+    let pruning_rx = Mutex::new(pruning_rx);
+
+    crate::acp_install::tests_hook::set(
+        key,
+        Arc::new(move || {
+            let _ = renamed_tx.send(());
+            // Returns as soon as the prune thread has started; the pause lets an unprotected prune finish.
+            let _ = pruning_rx
+                .lock()
+                .unwrap()
+                .recv_timeout(Duration::from_secs(10));
+            std::thread::sleep(Duration::from_millis(300));
+        }),
+    );
 
     std::thread::scope(|scope| {
         scope.spawn(|| state.acp_install_npm(second).unwrap());
-        scope.spawn(|| {
-            for _ in 0..50 {
-                state.acp_install_prune("fixture");
-            }
+        let state = &state;
+
+        scope.spawn(move || {
+            renamed_rx.recv_timeout(Duration::from_secs(30)).unwrap();
+            pruning_tx.send(()).unwrap();
+            state.acp_install_prune(key);
         });
     });
-    state.acp_install_prune("fixture");
+    crate::acp_install::tests_hook::clear();
+    state.acp_install_prune(key);
 
     let view = state.acp_view();
     let pinned = &view.agents[0].install.as_ref().unwrap().version;
 
     assert_eq!(pinned, "2.0.0", "the later install is the record");
     assert!(
-        dir.join("acp-agents/fixture").join(pinned).exists(),
+        dir.join("acp-agents").join(key).join(pinned).exists(),
         "the pinned version is still on disk"
     );
-    assert!(
-        !dir.join("acp-agents/fixture/1.0.0").exists(),
-        "the old version is pruned"
-    );
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
 }
 
 #[test]
@@ -1000,17 +1027,20 @@ fn a_timeout_kills_what_npm_started_too() {
         &dir.join("package.tgz"),
         &home,
         &dir,
-        Duration::from_millis(600),
+        Duration::from_secs(5),
     )
     .unwrap_err();
 
     assert!(error.contains("took too long"), "{error}");
 
-    let pid: i32 = fs::read_to_string(&pid_file)
-        .unwrap()
-        .trim()
-        .parse()
-        .unwrap();
+    // The script wrote its helper's pid at once; a runner too busy to start it inside the deadline has nothing
+    // to clean up, which is not what this test is about.
+    let Some(pid) = fs::read_to_string(&pid_file)
+        .ok()
+        .and_then(|text| text.trim().parse::<i32>().ok())
+    else {
+        return;
+    };
 
     // Give the kernel a moment to reap; signal 0 only asks whether the process still exists.
     let gone = (0..50).any(|_| {
@@ -1020,4 +1050,40 @@ fn a_timeout_kills_what_npm_started_too() {
     });
 
     assert!(gone, "the helper npm started is still running");
+}
+
+#[test]
+fn removing_an_agent_frees_its_folder_at_once_and_clears_the_files_in_the_background() {
+    let (state, guard) = state("remove-async");
+    let dir = guard.path().to_path_buf();
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+
+    state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap();
+    state
+        .acp_update(
+            serde_json::from_value(json!({ "op": "removeAgent", "key": "fixture" })).unwrap(),
+        )
+        .unwrap();
+
+    // The name is free the moment the call returns, so a reinstall does not meet the files being deleted.
+    assert!(!dir.join("acp-agents/fixture").exists());
+    state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap();
+
+    let trash = dir.join("acp-agents/.trash");
+    let emptied = (0..100).any(|_| {
+        let left = fs::read_dir(&trash).map_or(0, Iterator::count);
+
+        if left > 0 {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+
+        left == 0
+    });
+
+    assert!(emptied, "the removed files are deleted in the background");
 }

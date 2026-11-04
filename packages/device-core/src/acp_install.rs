@@ -36,6 +36,7 @@ use crate::hmac::to_hex;
 
 const INSTALL_DIR: &str = "acp-agents";
 const STAGING_DIR: &str = ".staging";
+const TRASH_DIR: &str = ".trash";
 pub(crate) const UNPACKED_DIR: &str = "unpacked";
 const MAX_UNPACKED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_ENTRIES: usize = 20_000;
@@ -189,6 +190,8 @@ impl DeviceState {
 
         fs::create_dir_all(&staging).map_err(|error| error.to_string())?;
         remove_stale(&staging);
+        // Deletions a crash cut short.
+        remove_stale(&self.install_root().join(TRASH_DIR));
 
         let name = format!(
             "{}-{}-{}",
@@ -350,7 +353,7 @@ impl DeviceState {
         }
 
         fs::create_dir_all(&key_dir).map_err(|error| error.to_string())?;
-        let _ = fs::remove_dir_all(&aside);
+        self.discard(&aside);
 
         if replaced {
             fs::rename(&final_dir, &aside).map_err(|error| error.to_string())?;
@@ -369,6 +372,9 @@ impl DeviceState {
 
             return Err(error.to_string());
         }
+
+        #[cfg(test)]
+        tests_hook::after_rename(&agent.key);
 
         let recorded = self.change_settings(|settings| {
             let existing = settings
@@ -423,7 +429,7 @@ impl DeviceState {
             return Err(error);
         }
 
-        let _ = fs::remove_dir_all(&aside);
+        self.discard(&aside);
 
         Ok(())
     }
@@ -443,7 +449,7 @@ impl DeviceState {
             .and_then(|agent| agent.install.as_ref())
         {
             if safe_relative(Path::new(key)).is_ok_and(|clean| clean.components().count() == 1) {
-                prune_other_versions(&self.install_root().join(key), &pin.version);
+                self.prune_other_versions(&self.install_root().join(key), &pin.version);
             }
         }
     }
@@ -466,7 +472,87 @@ impl DeviceState {
     /// installed one. `key` is a validated agent key, so it is one folder name.
     pub(crate) fn remove_installed_files(&self, key: &str) {
         if safe_relative(Path::new(key)).is_ok_and(|clean| clean.components().count() == 1) {
-            let _ = fs::remove_dir_all(self.install_root().join(key));
+            self.discard(&self.install_root().join(key));
+        }
+    }
+
+    /// Takes `path` out of the install tree at once (a rename into `.trash`, which is quick whatever the size) and
+    /// deletes it on a thread of its own: an npm install is a `node_modules` tree of tens of thousands of files,
+    /// and the callers hold the install lock and may be on the app's main thread. A crash during the delete leaves
+    /// the trash for the next stage to clear.
+    fn discard(&self, path: &Path) {
+        if fs::symlink_metadata(path).is_err() {
+            return;
+        }
+
+        static TRASHED: AtomicU64 = AtomicU64::new(0);
+
+        let trash = self.install_root().join(TRASH_DIR);
+        let target = trash.join(format!(
+            "{}-{}",
+            std::process::id(),
+            TRASHED.fetch_add(1, Ordering::Relaxed)
+        ));
+        let moved = fs::create_dir_all(&trash).and_then(|()| fs::rename(path, &target));
+
+        match moved {
+            Ok(()) => {
+                std::thread::spawn(move || {
+                    let _ = fs::remove_dir_all(&target);
+                });
+            }
+            // Could not be moved: delete it where it is, as before.
+            Err(_) => {
+                let _ = fs::remove_dir_all(path);
+            }
+        }
+    }
+
+    fn prune_other_versions(&self, key_dir: &Path, keep: &str) {
+        // A symlink where the agent's folder should be is not ours to walk: removing "other versions" there would
+        // delete what it points at.
+        if fs::symlink_metadata(key_dir).map_or(true, |meta| !meta.is_dir()) {
+            return;
+        }
+
+        let Ok(entries) = fs::read_dir(key_dir) else {
+            return;
+        };
+
+        for entry in entries.flatten() {
+            if entry.file_name() != keep {
+                self.discard(&entry.path());
+            }
+        }
+    }
+}
+
+/// A hook the tests use to hold a commit between its rename and its settings write, where another change to the
+/// install tree would otherwise slip in.
+#[cfg(test)]
+pub(crate) mod tests_hook {
+    use std::sync::Mutex;
+
+    type Hook = std::sync::Arc<dyn Fn() + Send + Sync>;
+
+    static HOOK: Mutex<Option<(String, Hook)>> = Mutex::new(None);
+
+    pub(crate) fn set(key: &str, hook: Hook) {
+        *HOOK.lock().unwrap() = Some((key.to_owned(), hook));
+    }
+
+    pub(crate) fn clear() {
+        *HOOK.lock().unwrap() = None;
+    }
+
+    pub(super) fn after_rename(key: &str) {
+        let hook = match HOOK.lock().unwrap().as_ref() {
+            Some((hooked, hook)) if hooked == key => Some(std::sync::Arc::clone(hook)),
+            _ => None,
+        };
+
+        if let Some(hook) = hook {
+            hook();
         }
     }
 }
@@ -504,24 +590,6 @@ fn remove_stale(staging: &Path) {
             .and_then(|modified| modified.elapsed().ok());
 
         if age.is_some_and(|age| age.as_millis() as u64 > STALE_STAGING_MS) {
-            let _ = fs::remove_dir_all(entry.path());
-        }
-    }
-}
-
-fn prune_other_versions(key_dir: &Path, keep: &str) {
-    // A symlink where the agent's folder should be is not ours to walk: removing "other versions" there would
-    // delete what it points at.
-    if fs::symlink_metadata(key_dir).map_or(true, |meta| !meta.is_dir()) {
-        return;
-    }
-
-    let Ok(entries) = fs::read_dir(key_dir) else {
-        return;
-    };
-
-    for entry in entries.flatten() {
-        if entry.file_name() != keep {
             let _ = fs::remove_dir_all(entry.path());
         }
     }
