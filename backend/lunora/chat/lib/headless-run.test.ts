@@ -405,6 +405,26 @@ describe("runHeadlessAgent thread tags", () => {
 
         expect(patches[0]).toEqual({ botId: "bot-1" });
     });
+
+    it("stores the run's organization on a new thread, so a later threaded run caps tools by it", async () => {
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await run(ctx, { organizationId: "org-a" });
+
+        const patches = ctx.runMutation.mock.calls.map(([, args]) => (args as { patch?: object }).patch);
+
+        expect(patches[0]).toEqual({ organizationId: "org-a" });
+    });
+
+    it("never moves an existing thread into another organization", async () => {
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await run(ctx, { organizationId: "org-b", thread: { threadId: "thread-1" } });
+
+        const patches = ctx.runMutation.mock.calls.map(([, args]) => (args as { patch?: object }).patch);
+
+        expect(patches.some((patch) => patch && "organizationId" in patch)).toBe(false);
+    });
 });
 
 describe("runHeadlessAgent fresh context and reasoning effort", () => {

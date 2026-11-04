@@ -62,11 +62,6 @@ const DEFAULT_HEADLESS_SEARCH_MODE: SearchMode = "web";
 
 export interface HeadlessRunOptions {
     /**
-     * The organization whose policy caps this run's tools (`org-policy.md` §6a); `null` for the personal space. Required,
-     * so each caller states the space its run belongs to.
-     */
-    organizationId: string | null;
-    /**
      * Built-ins offered beyond the headless search mode's set, like a skill's
      * extra tools: still subject to the user's permissions and to
      * {@link HeadlessRunOptions.toolAllowlist}.
@@ -109,6 +104,11 @@ export interface HeadlessRunOptions {
     onGenerationStart?: () => Promise<void> | void;
     /** Called with the new thread's id before generation starts, so a failure can still point at it. */
     onThread?: (threadId: string) => Promise<void> | void;
+    /**
+     * The organization whose policy caps this run's tools (`org-policy.md` §6a); `null` for the personal space. Required,
+     * so each caller states the space its run belongs to.
+     */
+    organizationId: string | null;
     /**
      * What started this run. A dispatch to a worker from its tools carries it as `dispatchedBy`, and the
      * lead's policy decides on it: an unattended cause is refused unless the policy lists it.
@@ -288,10 +288,11 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // As soon as the thread exists, so a failed bot patch below cannot leave it unrecorded.
             await options.onThread?.(threadId);
 
-            // Before the run: a tool call reads `thread.botId` to find the bot's computer.
-            if (options.botId) {
+            // Before the run: a tool call reads `thread.botId` to find the bot's computer, and a later threaded run reads the
+            // thread's organization for its tool cap. A thread that already exists is never moved to another organization.
+            if (options.botId || options.organizationId) {
                 await ctx.runMutation(internal.agent.threads.updateThread, {
-                    patch: { botId: options.botId },
+                    patch: { botId: options.botId, organizationId: options.organizationId ?? undefined },
                     threadId: threadId as Id<"threads">,
                 });
             }

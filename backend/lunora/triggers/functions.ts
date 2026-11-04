@@ -477,6 +477,9 @@ export const createTrigger = authMutation
             inputTemplate: cleanPromptField(args.inputTemplate, "The input"),
             model: args.model,
             name: args.name,
+            // The creator's verified active organization caps the runs' tools. Triggers created before this column was written have
+            // none and run in the personal space.
+            organizationId: context.user.activeOrganization?.id,
             quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
             searchMode: args.searchMode,
             systemPrompt: cleanPromptField(args.systemPrompt, "The system prompt"),

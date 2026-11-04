@@ -101,7 +101,8 @@ vi.mock("@modelcontextprotocol/sdk/client/index.js", () => {
     };
 });
 
-const context = { runQuery: async () => state.overrides } as never;
+// No session: the caller is in the personal space, which the proxy caps at auto.
+const context = { auth: { getIdentity: async () => null }, runQuery: async () => state.overrides } as never;
 
 const post = (body: unknown) => new Request("https://backend.example.com/mcp/x", { body: JSON.stringify(body), method: "POST" });
 

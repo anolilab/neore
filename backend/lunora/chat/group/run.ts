@@ -158,6 +158,8 @@ interface TurnContext {
     /** What started the turn, for a speaker's dispatch to a worker to carry. */
     origin: DispatchOrigin;
     participants: GroupParticipantRun[];
+    /** The group thread's stored organization, which caps each speaker's tools (not whoever sent this message). */
+    permissionOrganizationId: string | null;
     prefs: RunContext["prefs"];
     /** The user message the turn answers. */
     promptMessageId: string;
@@ -269,8 +271,8 @@ const runSpeaker = async (
                   mcpProgress: toolProgressSink(ctx, turn.streamId),
                   mcpServerNames: turn.mcpServerNames,
                   model,
-                  // No threadId here, so the group's organization caps the speaker's tools (see BuildAgentToolsOptions.organizationId).
-                  organizationId: turn.organizationId ?? null,
+                  // No threadId here: the group thread's stored organization caps the speaker's tools (see BuildAgentToolsOptions.organizationId).
+                  organizationId: turn.permissionOrganizationId,
                   ...(turn.origin === "outside_agent" && { origin: turn.origin }),
                   searchMode,
                   skillTools: speaker.config ? { additionalTools: speaker.config.additionalTools, disabledTools: speaker.config.disabledTools } : undefined,
@@ -657,6 +659,7 @@ const loadTurnContext = async (
         organizationId: args.organizationId,
         origin: args.origin,
         participants: args.config.participants,
+        permissionOrganizationId: thread?.organizationId ?? null,
         prefs: runContext.prefs,
         promptMessageId: args.promptMessageId,
         promptMessages: undefined,

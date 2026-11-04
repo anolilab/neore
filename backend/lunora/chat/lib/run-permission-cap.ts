@@ -5,6 +5,8 @@
  * thread takes the thread's organization, so a run cannot pick a space by the caller's active organization. A policy
  * that cannot be read caps the run at `ask`; the cap is never dropped on a read error.
  */
+import type { HttpActionCtx } from "lunorash/server";
+
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
@@ -51,6 +53,28 @@ export const readRunPermissionCap = async (
         return await readPermissionCap(ctx, thread.organizationId);
     } catch (error: unknown) {
         toolsLogger.warn("[TOOLS] Run thread unavailable for its permission cap; capping at ask:", error);
+
+        return "ask";
+    }
+};
+
+/**
+ * The cap for a request with no thread (the MCP app proxy). An HTTP action does not load the session, so the active
+ * organization is read the way `/chat/start` reads it: from the caller's session. No session is the personal space;
+ * a failed read caps at `ask`.
+ */
+export const readRequestPermissionCap = async (ctx: Pick<HttpActionCtx, "auth" | "runQuery">, userId: string): Promise<ToolPermissionMode> => {
+    try {
+        const identity = await ctx.auth.getIdentity();
+        const sessionId = identity?.sessionId;
+        const organizationId =
+            typeof sessionId === "string"
+                ? await ctx.runQuery(internal.auth.session_organization.getActiveOrganizationIdForSession, { sessionId, userId })
+                : null;
+
+        return await readPermissionCap(ctx, organizationId);
+    } catch (error: unknown) {
+        toolsLogger.warn("[TOOLS] Request organization unavailable; capping at ask:", error);
 
         return "ask";
     }

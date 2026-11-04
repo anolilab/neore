@@ -218,6 +218,14 @@ describe("a quiet routine's run", () => {
         expect(state.runs[0]?.thread).toEqual({ tags: ["trigger"], title: "Trigger: Digest" });
     });
 
+    it("passes the routine's organization so its tools are capped by the space it was created in", async () => {
+        state.trigger = { ...state.trigger, organizationId: "org-a" };
+
+        await run();
+
+        expect(state.runs[0]?.organizationId).toBe("org-a");
+    });
+
     it("posts the run when the check itself fails", async () => {
         state.trigger = { ...state.trigger, quietWhenEmpty: true };
         state.snapshotError = true;

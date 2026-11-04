@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { ActionCtx } from "../../_generated/server";
-import { readPermissionCap, readRunPermissionCap } from "./run-permission-cap";
+import { readPermissionCap, readRequestPermissionCap, readRunPermissionCap } from "./run-permission-cap";
 
 const fakeCtx = (runQuery: ReturnType<typeof vi.fn>) => ({ runQuery }) as unknown as Pick<ActionCtx, "runQuery">;
 
@@ -61,5 +61,31 @@ describe("readRunPermissionCap", () => {
         const runQuery = vi.fn().mockRejectedValueOnce(new Error("thread read failed"));
 
         expect(await readRunPermissionCap(fakeCtx(runQuery), { organizationId: null, threadId: "thread_1" })).toBe("ask");
+    });
+});
+
+describe("readRequestPermissionCap", () => {
+    const requestCtx = (sessionId: string | undefined, runQuery: ReturnType<typeof vi.fn>) =>
+        ({ auth: { getIdentity: async () => (sessionId === undefined ? null : { sessionId }) }, runQuery }) as never;
+
+    it("reads the active organization from the caller's session and caps by it", async () => {
+        const runQuery = vi.fn().mockResolvedValueOnce("org_a").mockResolvedValueOnce("ask");
+
+        expect(await readRequestPermissionCap(requestCtx("session_1", runQuery), "user_1")).toBe("ask");
+        expect(runQuery).toHaveBeenNthCalledWith(1, expect.anything(), { sessionId: "session_1", userId: "user_1" });
+        expect(runQuery).toHaveBeenNthCalledWith(2, expect.anything(), { organizationId: "org_a" });
+    });
+
+    it("gives auto without a session, which is the personal space", async () => {
+        const runQuery = vi.fn();
+
+        expect(await readRequestPermissionCap(requestCtx(undefined, runQuery), "user_1")).toBe("auto");
+        expect(runQuery).not.toHaveBeenCalled();
+    });
+
+    it("caps at ask when the session lookup throws", async () => {
+        const runQuery = vi.fn().mockRejectedValueOnce(new Error("session read failed"));
+
+        expect(await readRequestPermissionCap(requestCtx("session_1", runQuery), "user_1")).toBe("ask");
     });
 });
