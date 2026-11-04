@@ -15,6 +15,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchById, patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
@@ -697,8 +698,16 @@ export const updateTask = authMutation
         }
 
         const tasks = await loadUserTasks(ctx, userId);
-        // The task keeps the organization it was created under: an edit made from another space must not move its skill scope or its cap.
-        const definition = await resolveDefinition(ctx, { organizationId: task.organizationId ?? undefined, userId }, args, tasks, args.taskId);
+        // The task keeps the organization it was created under, so an edit from another space cannot move its skill scope or
+        // its cap. A skill is authorized against that organization only while the editor is still a member, as a run checks it.
+        const stillMember = task.organizationId ? await getMemberByOrganizationAndUser(ctx, task.organizationId, userId) : null;
+        const definition = await resolveDefinition(
+            ctx,
+            { organizationId: stillMember ? (task.organizationId ?? undefined) : undefined, userId },
+            args,
+            tasks,
+            args.taskId,
+        );
         const { now } = ctx;
         let nextRunAt: number | undefined;
 
@@ -721,7 +730,7 @@ export const updateTask = authMutation
             maxRepairRounds: definition.maxRepairRounds,
             model: definition.model,
             nextRunAt,
-            organizationId: definition.organizationId,
+            organizationId: task.organizationId ?? undefined,
             parentTaskId: definition.parentTaskId,
             projectId: definition.projectId,
             reasoningEffort: definition.reasoningEffort,
