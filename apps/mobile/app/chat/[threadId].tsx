@@ -114,18 +114,40 @@ const fetchMessagePage = (threadId: string, cursor: string | null) =>
         threadId: threadId as Id<"threads">,
     });
 
-/**
- * Whether the newest page holds a reply created after the send's boundary, with a final status. Older pages cannot
- * satisfy it, because their replies were created before the send.
- */
-const hasSettledReplySince = async (threadId: string, boundary: number): Promise<boolean> => {
-    const page = await fetchMessagePage(threadId, null);
+type MessagePage = Awaited<ReturnType<typeof fetchMessagePage>>["page"];
 
-    return page.page.some(
-        (message) =>
-            // eslint-disable-next-line no-underscore-dangle -- `_creationTime` is the Lunora document field, not a private one
-            message.role === "assistant" && message._creationTime > boundary && (message.status === "success" || message.status === "failed"),
-    );
+/* eslint-disable no-underscore-dangle -- `_creationTime` is the Lunora document field, not a private one */
+
+/**
+ * The creation time of the send's own user message: the newest user message on the page that reads `prompt` and was
+ * created after `after`, the newest reply on screen when the send began. Null while the page does not hold it yet.
+ */
+const sentAtOf = (messages: MessagePage, prompt: string, after: number): number | null => {
+    const sent = messages.find((message) => message.role === "user" && displayTextOf(message.parts) === prompt && message._creationTime > after);
+
+    return sent ? sent._creationTime : null;
+};
+
+/**
+ * Whether the page holds a reply to the send created after its user message, with a final status. A reply made before
+ * the send cannot satisfy it, however settled it is.
+ */
+const hasSettledReplySince = (messages: MessagePage, sentAt: number): boolean =>
+    messages.some((message) => message.role === "assistant" && message._creationTime > sentAt && (message.status === "success" || message.status === "failed"));
+
+/* eslint-enable no-underscore-dangle */
+
+/**
+ * Replaces the newest rows with a fresh read and keeps the older rows already on screen, so a refresh does not drop
+ * history loaded page by page. Local rows are never kept: the read either has their server copy or they are still
+ * being written, and the read is newer than either.
+ */
+const withFreshRows = (current: Row[], fresh: Row[]): Row[] => {
+    const oldest = fresh[0]?.createdAt ?? 0;
+    const freshIds = new Set(fresh.map((row) => row.id));
+    const older = current.filter((row) => row.createdAt < oldest && !freshIds.has(row.id) && row.status !== "local" && !row.finished);
+
+    return [...older, ...fresh];
 };
 
 const Chat = () => {
@@ -219,8 +241,9 @@ const Chat = () => {
                 case "rows": {
                     isRefused.current = false;
                     hasLiveRows.current = true;
-                    setRows(result.rows);
-                    setOlderCursor(result.olderCursor);
+                    setRows((current) => withFreshRows(current, result.rows));
+                    // Older pages already loaded keep their cursor; the fresh read only ever sets the first one.
+                    setOlderCursor((current) => current ?? result.olderCursor);
                     setError(withoutRefusal);
                     reportRead("succeeded");
                     break;
@@ -326,7 +349,7 @@ const Chat = () => {
 
     // After a send, check the newest page on a timer until the server's copy of the reply is final. Each check reads one
     // page, so older pages on screen are not touched; a full read happens once, when the check settles or runs out.
-    const [confirmation, setConfirmation] = useState<{ boundary: number; threadId: string } | null>(null);
+    const [confirmation, setConfirmation] = useState<{ after: number; prompt: string; threadId: string } | null>(null);
     const [confirmTick, setConfirmTick] = useState(0);
     const isAwaitingReply = confirmation !== null && confirmation.threadId === threadId;
 
@@ -335,10 +358,12 @@ const Chat = () => {
             return undefined;
         }
 
-        const { boundary, threadId: id } = confirmation;
+        const { after, prompt, threadId: id } = confirmation;
         let reads = 0;
         let isActive = true;
         let isChecking = false;
+        // The send's user message, found once the newest page holds it. Until then no reply can be known as its reply.
+        let sentAt: number | null = null;
 
         const check = async () => {
             if (isChecking) {
@@ -350,7 +375,13 @@ const Chat = () => {
             let isConfirmed = false;
 
             try {
-                isConfirmed = await hasSettledReplySince(id, boundary);
+                const { page } = await fetchMessagePage(id, null);
+
+                if (sentAt === null) {
+                    sentAt = sentAtOf(page, prompt, after);
+                }
+
+                isConfirmed = sentAt !== null && hasSettledReplySince(page, sentAt);
             } catch {
                 // A failed check is tried again on the next tick.
             }
@@ -402,7 +433,8 @@ const Chat = () => {
         const stamp = Date.now();
         const userId = `user-${stamp}`;
         const assistantId = `pending-${stamp}`;
-        const boundary = latestReplyTime(rows);
+        // The newest reply on screen when the send began; the reply to wait for is created after it and after the send's message.
+        const after = latestReplyTime(rows);
 
         setConfirmation(null);
 
@@ -457,7 +489,7 @@ const Chat = () => {
                 setRows((current) => finishRow(current, assistantId));
             }
 
-            setConfirmation({ boundary, threadId: started.threadId });
+            setConfirmation({ after, prompt, threadId: started.threadId });
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
