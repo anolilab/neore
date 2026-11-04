@@ -258,6 +258,7 @@ describe("a permission request from the agent", () => {
 });
 
 const WINDOW_TEXT = /\/200K/u;
+const METER_NAME = /12K\/200K tokens used/u;
 
 describe("what the agent reports about itself", () => {
     it("shows the context the agent reported, against its window", async () => {
@@ -273,9 +274,32 @@ describe("what the agent reports about itself", () => {
         expect(screen.queryByText(WINDOW_TEXT)).toBeNull();
     });
 
-    it("renders a reported cost whose currency code is not valid, without failing the composer", async () => {
+    it("shows a reported cost whose currency code is not valid, as the bare number, in the meter's tooltip", async () => {
         mount(session({ agentState: { usage: { cost: { amount: 0.5, currency: "not money!" }, size: 200_000, used: 12_345 } } }));
 
-        expect(await screen.findByText("12K/200K")).toBeTruthy();
+        // The tooltip positions itself with ResizeObserver, which the shared stub (a function, not a class) cannot be constructed as.
+                // The stub only has to be constructible; its methods do nothing and need no receiver.
+        /* eslint-disable class-methods-use-this */
+        vi.stubGlobal(
+            "ResizeObserver",
+            class {
+                disconnect() {}
+
+                observe() {}
+
+                unobserve() {}
+            },
+        );
+        /* eslint-enable class-methods-use-this */
+
+        try {
+            const meter = await screen.findByRole("button", { name: METER_NAME });
+
+            fireEvent.focus(meter);
+
+            expect(await screen.findByText("Cost reported by the agent: 0.5 not money!")).toBeTruthy();
+        } finally {
+            vi.unstubAllGlobals();
+        }
     });
 });
