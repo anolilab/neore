@@ -113,7 +113,9 @@ describe("resolveOptions", () => {
 
     it("uses the legacy states when the agent sent no options, or an empty list", () => {
         expect(Object.keys(resolveOptions({ modes: raw.modes }))).toEqual(["modes"]);
-        expect(Object.keys(resolveOptions({ configOptions: [], modes: raw.modes }))).toEqual(["modes"]);
+        // An empty list is sent too, so the options stored before are replaced.
+        expect(Object.keys(resolveOptions({ configOptions: [], modes: raw.modes }))).toEqual(["configOptions", "modes"]);
+        expect(resolveOptions({ configOptions: [] })).toEqual({ configOptions: [] });
         expect(resolveOptions({})).toEqual({});
     });
 });

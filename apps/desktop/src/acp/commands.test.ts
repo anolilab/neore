@@ -689,6 +689,19 @@ describe("an option change", () => {
         expect(outcomeOf(await delivery)).toBe("accepted");
     });
 
+    it("is refused, not acknowledged, when it comes back after the app went down before the agent answered", async () => {
+        const first = make([], { apply: killedInside });
+
+        first.execute(change("c5"), "sig");
+        await vi.waitFor(() => expect(open()).toContain("c5"), { timeout: 20_000 });
+
+        const applied: AcpCommand[] = [];
+        const again = await make(applied).execute(change("c5"), "sig");
+
+        expect(outcomeOf(again)).toBe("the app restarted before the agent answered");
+        expect(applied).toEqual([]);
+    });
+
     it("is not replayed after a restart: it names the option as the person saw it", async () => {
         const first = make([], { apply: killedInside });
 

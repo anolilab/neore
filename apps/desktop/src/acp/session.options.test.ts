@@ -182,3 +182,30 @@ describe("setOption", () => {
         expect(states).toHaveLength(count);
     });
 });
+
+describe("what the agent sends while the session opens, and what it takes away", () => {
+    it("keeps options sent before the answer to session/new", async () => {
+        const { states } = await start("options-before-answer");
+
+        expect(states).toHaveLength(1);
+        expect(states[0]?.configOptions?.map((option) => [option.id, option.currentValue])).toEqual([["model", "fast"]]);
+    });
+
+    it("refuses a change whose answer still lists the old value, and reports what the agent says is true", async () => {
+        const { player, session, states, steps } = await start("options-mismatch");
+        const change = session.setOption("model", "deep");
+        const refused = expect(change).rejects.toThrow("the agent did not apply the change");
+
+        await player.play(steps);
+        await refused;
+        expect(states.at(-1)?.configOptions?.[0]?.currentValue).toBe("fast");
+    });
+
+    it("sends an empty list when the agent removes its last option", async () => {
+        const { player, states, steps } = await start("options-removed");
+
+        await player.play(steps);
+        await expect.poll(() => states.length).toBe(2);
+        expect(states.at(-1)).toEqual({ configOptions: [] });
+    });
+});

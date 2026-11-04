@@ -86,6 +86,22 @@ export const endStartingSession = async (ctx: MutationCtx, deviceId: Id<"devices
 
 const OPTION_PREFIX = /^(The device refused the request|refused): ?/u;
 
+/**
+ * The only reasons an option change shows: the fixed phrases the computer signs (`AgentSession.setOption`, the receipt log). What
+ * else a failed call carries (a relay's exception, a device's own message) can quote the environment, so it is never shown.
+ */
+const OPTION_REASONS: ReadonlySet<string> = new Set([
+    "that session no longer exists",
+    "the agent did not accept the change",
+    "the agent did not answer",
+    "the agent did not apply the change",
+    "the agent does not offer that choice",
+    "the app restarted before the agent answered",
+    "this session is not open",
+]);
+
+const OTHER_REASON = "The host did not change the option.";
+
 /** Records how an `acp_set_config` call ended on its session, for the options row to show. */
 const recordOptionResult = async (ctx: MutationCtx, call: Call, input: Record<string, unknown>, end: AcpCallEnd, now: number): Promise<void> => {
     if (typeof input.sessionId !== "string" || typeof input.valueId !== "string") {
@@ -98,7 +114,12 @@ const recordOptionResult = async (ctx: MutationCtx, call: Call, input: Record<st
         return;
     }
 
-    const reason = end.status === "expired" ? "The host did not answer." : (end.error ?? "").replace(OPTION_PREFIX, "").trim().slice(0, 300);
+    const signed = (end.error ?? "").replace(OPTION_PREFIX, "").trim();
+    let reason = OPTION_REASONS.has(signed) ? signed : OTHER_REASON;
+
+    if (end.status === "expired") {
+        reason = "The host did not answer.";
+    }
 
     await ctx.db.patch("acpSessions", session._id, {
         optionResult: {
@@ -106,7 +127,7 @@ const recordOptionResult = async (ctx: MutationCtx, call: Call, input: Record<st
             callId: call._id as string,
             outcome: end.status === "completed" ? "confirmed" : "refused",
             ...(typeof input.optionId === "string" && { optionId: input.optionId }),
-            ...(end.status !== "completed" && { reason: reason === "" ? "The host did not change the option." : reason }),
+            ...(end.status !== "completed" && { reason }),
             valueId: input.valueId,
         },
     });

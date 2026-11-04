@@ -13,11 +13,14 @@ import type { Id } from "@neore/backend/dataModel";
 import { useMutation } from "@tanstack/react-query";
 import { AlertTriangle, Check, Loader2 } from "lucide-react";
 import type { FC } from "react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import useHostSendErrorMessages from "./host-send-errors";
+
+/** How long the row waits for a confirmed value to show in the options before it stops waiting. */
+const CATCH_UP_MS = 15_000;
 
 const SELECT_CLASS = "border-input bg-background h-9 max-w-full min-w-0 rounded-md border px-2 py-1 text-sm disabled:opacity-60";
 
@@ -124,15 +127,31 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
     const [change, setChange] = useState<{ callId?: string; rowId: string; valueId: string } | undefined>(undefined);
     const [failure, setFailure] = useState<string | undefined>(undefined);
     const set = useMutation(crpc.acp.remote.setHostOption.mutationOptions());
+    // The call whose confirmed value never showed in the options, so the wait for it ended.
+    const [gaveUp, setGaveUp] = useState<string | undefined>(undefined);
     const rows = rowsOf(state, { mode: t`Mode`, model: t`Model` });
+    const answered = change?.callId !== undefined && optionResult?.callId === change.callId ? optionResult : undefined;
+    const changed = change === undefined ? undefined : rows.find((row) => row.id === change.rowId);
+    // The agent's answer reaches the page before the options it changed (the state is posted a moment later): the controls stay
+    // off until the option shows the new value, so the row never says "confirmed" over the old one. A bounded wait.
+    const catchingUp = answered?.outcome === "confirmed" && changed !== undefined && changed.current !== answered.valueId && gaveUp !== answered.callId;
+    const catchingUpCall = catchingUp ? answered?.callId : undefined;
+
+    useEffect(() => {
+        if (catchingUpCall === undefined) {
+            return undefined;
+        }
+
+        const timer = setTimeout(setGaveUp, CATCH_UP_MS, catchingUpCall);
+
+        return () => clearTimeout(timer);
+    }, [catchingUpCall]);
 
     if (rows.length === 0) {
         return null;
     }
 
-    const answered = change?.callId !== undefined && optionResult?.callId === change.callId ? optionResult : undefined;
-    const waiting = change !== undefined && answered === undefined && failure === undefined;
-    const changed = change === undefined ? undefined : rows.find((row) => row.id === change.rowId);
+    const waiting = (change !== undefined && answered === undefined && failure === undefined) || catchingUp;
 
     const failureText = (reason: "busy" | "ended" | "offline" | "outdated" | "unpaired" | undefined): string => {
         if (reason === "ended") {
@@ -178,13 +197,15 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
     if (failure !== undefined) {
         status = failure;
         refused = true;
+    } else if (catchingUp) {
+        status = t`The agent confirmed. Waiting for ${changed?.name ?? ""} to show ${nameOfValue(changed, answered?.valueId ?? "")}.`;
     } else if (answered !== undefined) {
         refused = answered.outcome === "refused";
         status = refused
             ? t`The agent did not change ${changed?.name ?? ""}: ${answered.reason ?? ""}`
             : t`The agent confirmed: ${changed?.name ?? ""} is now ${nameOfValue(changed, answered.valueId)}.`;
     } else if (waiting) {
-        status = t`Waiting for the agent to change ${changed?.name ?? ""} to ${nameOfValue(changed, change.valueId)}.`;
+        status = t`Waiting for the agent to change ${changed?.name ?? ""} to ${nameOfValue(changed, change?.valueId ?? "")}.`;
     }
 
     return (

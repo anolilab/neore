@@ -265,12 +265,24 @@ describe("setHostOption", () => {
         const { device, threadId } = await readySession({ configOptions: [MODEL] });
         const { callId } = (await setOption(threadId, { optionId: "model", valueId: "deep" })) as Row;
 
-        await complete(device, callId, { error: "refused: the agent does not offer that", status: "failed" });
+        await complete(device, callId, { error: "refused: the agent does not offer that choice", status: "failed" });
 
         const view = (await as(ownerId).query(getHostSession as never, { threadId } as never)) as Row;
 
-        expect(view.optionResult).toMatchObject({ callId, outcome: "refused", reason: "the agent does not offer that" });
+        expect(view.optionResult).toMatchObject({ callId, outcome: "refused", reason: "the agent does not offer that choice" });
         await expect(setOption(threadId, { optionId: "model", valueId: "fast" })).resolves.toMatchObject({ sent: true });
+    });
+
+    it("never shows text it did not sign: a relay's or a device's own error is replaced by a fixed reason", async () => {
+        const { device, threadId } = await readySession({ configOptions: [MODEL] });
+        const { callId } = (await setOption(threadId, { optionId: "model", valueId: "deep" })) as Row;
+
+        await complete(device, callId, { error: "refused: ENV_TOKEN=sk-live-123 in /Users/me/project", status: "failed" });
+
+        const view = (await as(ownerId).query(getHostSession as never, { threadId } as never)) as Row;
+
+        expect(view.optionResult).toMatchObject({ callId, outcome: "refused", reason: "The host did not change the option." });
+        expect(JSON.stringify(view)).not.toContain("sk-live");
     });
 
     it("records an unanswered change as refused when its window closes", async () => {

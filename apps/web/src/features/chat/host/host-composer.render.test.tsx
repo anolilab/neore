@@ -392,6 +392,42 @@ describe("the options the agent offers", () => {
         expect(model.value).toBe("deep");
     });
 
+    it("does not say confirmed over the old value: it waits for the option to show the new one", async () => {
+        const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        // The agent's answer is in, but the options it changed have not arrived yet.
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": {
+                agentState: { configOptions: [MODEL] },
+                optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+                status: "idle",
+            },
+        };
+        await client.invalidateQueries();
+
+        expect(await screen.findByText("The agent confirmed. Waiting for Model to show Deep.")).toBeTruthy();
+        expect(screen.queryByText("The agent confirmed: Model is now Deep.")).toBeNull();
+        expect(model.disabled).toBe(true);
+
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": {
+                agentState: { configOptions: [{ ...MODEL, currentValue: "deep" }] },
+                optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+                status: "idle",
+            },
+        };
+        await client.invalidateQueries();
+
+        expect(await screen.findByText("The agent confirmed: Model is now Deep.")).toBeTruthy();
+        expect(model.disabled).toBe(false);
+    });
+
     it("says why the agent refused, and leaves the value as it was", async () => {
         const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;

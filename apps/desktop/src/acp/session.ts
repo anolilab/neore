@@ -278,6 +278,13 @@ export class AgentSession {
             const listed = configOptionsOf(isRecord(answer) ? answer.configOptions : undefined, this.options.process.scrub);
 
             this.offered = listed === undefined ? withOptionValue(this.offered, optionId, valueId) : { ...this.offered, configOptions: listed };
+
+            // The agent's list is what is true now; if it still shows another value, the change was not made.
+            if (listed !== undefined && listed.find((option) => option.id === optionId)?.currentValue !== valueId) {
+                this.reportOptions();
+
+                throw new Error("the agent did not apply the change");
+            }
         }
 
         this.reportOptions();
@@ -433,13 +440,15 @@ export class AgentSession {
         // No `session/load` frame goes to an agent that did not say it loads them.
         if (isAvailable(capabilityOf(this.report, "sessions.load"))) {
             try {
-                this.offered = optionsOf(await loadSession(this.connection, resumeSessionId, folder), this.options.process.scrub);
+                // What the agent sent while it loaded is older than its answer: the answer's fields win.
+                this.offered = { ...this.offered, ...optionsOf(await loadSession(this.connection, resumeSessionId, folder), this.options.process.scrub) };
                 this.reattach = { loaded: true };
 
                 return resumeSessionId;
             } catch {
                 // The agent's own error can quote its environment: the backend is told that it failed (a code), not its text.
                 this.reattach = { loaded: false, reason: "load_failed" };
+                this.offered = {};
             }
         } else {
             this.reattach = { loaded: false, reason: "load_unsupported" };
@@ -451,9 +460,23 @@ export class AgentSession {
     private async openFresh(folder: string, timeoutMs?: number): Promise<string> {
         const { response, sessionId } = await openNewSession(this.connection, folder, timeoutMs);
 
-        this.offered = optionsOf(response, this.options.process.scrub);
+        this.offered = { ...this.offered, ...optionsOf(response, this.options.process.scrub) };
 
         return sessionId;
+    }
+
+    private takeStartupOptions(update: Record<string, unknown>): void {
+        const { scrub } = this.options.process;
+
+        if (update.sessionUpdate === "config_option_update") {
+            const configOptions = configOptionsOf(update.configOptions, scrub);
+
+            if (configOptions !== undefined) {
+                this.offered = { ...this.offered, configOptions };
+            }
+        } else if (update.sessionUpdate === "current_mode_update") {
+            this.offered = withCurrentMode(this.offered, update.currentModeId, scrub);
+        }
     }
 
     /** Tells the backend what the agent offers now (it keeps the newest of each field and sends them in one post). */
@@ -815,6 +838,18 @@ export class AgentSession {
     // ─── From the agent ────────────────────────────────────────────────────
 
     private onNotification(method: string, params: unknown): void {
+        // While the session opens its id is not known yet, and an agent may send its options before it answers. They are
+        // kept, older than the answer, so the answer's own fields replace them.
+        if (this.agentSessionId === "" && this.status === "starting" && method === METHOD.sessionUpdate && isRecord(params) && isRecord(params.update)) {
+            const { resumeSessionId } = this.options;
+
+            if (resumeSessionId === undefined || params.sessionId === resumeSessionId) {
+                this.takeStartupOptions(params.update);
+            }
+
+            return;
+        }
+
         if (method !== METHOD.sessionUpdate || !isRecord(params) || params.sessionId !== this.agentSessionId || !isRecord(params.update)) {
             return;
         }

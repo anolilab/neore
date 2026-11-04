@@ -110,6 +110,9 @@ export interface CommandOptions {
 }
 
 export const ACCEPTED = "accepted";
+/** What a redelivered option change is refused with when the app went down before the agent answered it. */
+const INTERRUPTED = "the app restarted before the agent answered";
+
 export const HELD: Held = { held: true };
 
 /** The commands worth running after a restart: the others (a cancel, an answer) belong to a turn or request that did not survive it. */
@@ -315,7 +318,13 @@ export class HostCommands {
      */
     private async receive(command: AcpCommand, call: AppliedCall, signed: { envelope: string; signature: string }): Promise<string> {
         const { callId } = call;
-        const receipt: Receipt = { expiresAt: call.expiresAt, ...isReplayable(command) && { held: signed } };
+        // An option change is never replayed, so a restart between this receipt and the agent's answer must not read as done:
+        // the receipt says it was cut off until `act` has the answer, and a redelivery is refused with that.
+        const receipt: Receipt = {
+            expiresAt: call.expiresAt,
+            ...isReplayable(command) && { held: signed },
+            ...command.kind === "setConfig" && { refusal: INTERRUPTED },
+        };
 
         this.receipts.set(callId, receipt);
 
@@ -348,7 +357,9 @@ export class HostCommands {
 
         delete receipt.held;
 
-        if (outcome !== ACCEPTED) {
+        if (outcome === ACCEPTED) {
+            delete receipt.refusal;
+        } else {
             receipt.refusal = outcome;
         }
 

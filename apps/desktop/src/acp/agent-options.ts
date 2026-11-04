@@ -161,7 +161,8 @@ export const resolveOptions = (raw: RawOptions): SessionStatePatch => {
         return { configOptions: raw.configOptions };
     }
 
-    return { ...raw.modes !== undefined && { modes: raw.modes }, ...raw.models !== undefined && { models: raw.models } };
+    // An empty list is the agent saying it has no options now: it is sent, so the options stored before are replaced.
+    return { ...raw.configOptions !== undefined && { configOptions: raw.configOptions }, ...raw.modes !== undefined && { modes: raw.modes }, ...raw.models !== undefined && { models: raw.models } };
 };
 
 /** `current_mode_update`: the mode the agent is in now. The legacy state, and the mode option when the agent has one, follow. */
