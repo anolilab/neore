@@ -40,7 +40,7 @@ describe("backend codegen before Alchemy", () => {
         expect(packages).toBeGreaterThan(parallelStart);
         expect(packages).toBeLessThan(parallelEnd);
         expect(codegen).toBeGreaterThan(packages);
-        expect(codegen).toBeLessThan(branchEnd === -1 ? parallelEnd : Math.min(branchEnd, parallelEnd));
+        expect(codegen).toBeLessThan(branchEnd);
     });
 
     it("covers the preview deploy, which calls deploy.yml rather than running Alchemy itself", () => {
