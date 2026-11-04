@@ -47,12 +47,68 @@ export type AutoContinueStreamEvent =
 
 // ─── Token Estimation ───────────────────────────────────────────────────────
 
+/** The `value` of an AI SDK `content` tool output (`type: "content"`), or `undefined` for any other output. */
+const contentParts = (output: unknown): unknown[] | undefined => {
+    if (!output || typeof output !== "object") {
+        return undefined;
+    }
+
+    const { type, value } = output as { type?: unknown; value?: unknown };
+
+    return type === "content" && Array.isArray(value) ? value : undefined;
+};
+
+/** Characters a media part of a tool result counts for, or `undefined` for a part that is not media. */
+const mediaPartChars = (type: unknown): number | undefined => {
+    switch (type) {
+        case "image":
+        case "image-data":
+        case "image-url": {
+            return IMAGE_TOKEN_ESTIMATE_CHARS;
+        }
+        case "file":
+        case "file-data":
+        case "file-url": {
+            return FILE_TOKEN_ESTIMATE_CHARS;
+        }
+        default: {
+            return undefined;
+        }
+    }
+};
+
+/** A content part of a tool result as text: its text, a placeholder for media, or its JSON for anything else. */
+const contentPartText = (item: unknown): string => {
+    const part = item as { text?: unknown; type?: unknown } | undefined;
+
+    if (part?.type === "text" && typeof part.text === "string") {
+        return part.text;
+    }
+
+    if (mediaPartChars(part?.type) !== undefined) {
+        return `[${String(part?.type)}]`;
+    }
+
+    try {
+        return JSON.stringify(item) ?? "";
+    } catch {
+        return "[unserialisable tool output]";
+    }
+};
+
 /**
  * Text of a tool result. AI SDK 5+ stores `output: { type, value }`; `content`
  * and `result` are the pre-v5 names, kept for history rebuilt from old rows.
  */
 export const toolResultText = (part: { content?: unknown; output?: unknown; result?: unknown }): string => {
     const output = part.output ?? part.content ?? part.result;
+    const parts = contentParts(output);
+
+    if (parts) {
+        // Media is named, never serialised: its bytes are not text the model reads as text.
+        return parts.map((item) => contentPartText(item)).join("\n");
+    }
+
     const value = output && typeof output === "object" && "value" in output ? (output as { value: unknown }).value : output;
 
     if (typeof value === "string") {
@@ -64,6 +120,17 @@ export const toolResultText = (part: { content?: unknown; output?: unknown; resu
     } catch {
         return "[unserialisable tool output]"; // Circular refs never reach stored history
     }
+};
+
+/** Characters a tool result counts for in the prompt estimate: media is its fixed estimate, never its bytes. */
+const toolResultChars = (part: { content?: unknown; output?: unknown; result?: unknown }): number => {
+    const parts = contentParts(part.output ?? part.content ?? part.result);
+
+    if (!parts) {
+        return toolResultText(part).length;
+    }
+
+    return parts.reduce<number>((total, item) => total + (mediaPartChars((item as { type?: unknown } | undefined)?.type) ?? contentPartText(item).length), 0);
 };
 
 /** Tokens for a character count, with the safety margin. */
@@ -122,7 +189,7 @@ const estimateChars = (messages: ModelMessage[]): number => {
                                 break;
                             }
                             case "tool-result": {
-                                totalChars += toolResultText(p).length;
+                                totalChars += toolResultChars(p);
 
                                 break;
                             }
@@ -307,7 +374,7 @@ const elideToolOutputs = (messages: ModelMessage[], threshold: number): ModelMes
                 return part;
             }
 
-            const { length } = toolResultText(part);
+            const length = toolResultChars(part);
 
             if (length <= ELIDED_TOOL_OUTPUT.length) {
                 return part;
