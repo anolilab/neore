@@ -133,6 +133,23 @@ const toolResultChars = (part: { content?: unknown; output?: unknown; result?: u
     return parts.reduce<number>((total, item) => total + (mediaPartChars((item as { type?: unknown } | undefined)?.type) ?? contentPartText(item).length), 0);
 };
 
+/**
+ * A file part sent inline as base64 or bytes: its flat estimate, or its size when that is larger, since a long PDF costs
+ * far more than the flat amount. A reference (a storage key, a URL) has no bytes here and keeps the flat amount.
+ */
+const inlineFileChars = (data: unknown): number => {
+    // Base64 carries three bytes in four characters; about four bytes make one token-sized character.
+    let bytes = 0;
+
+    if (data instanceof Uint8Array) {
+        bytes = data.byteLength;
+    } else if (typeof data === "string") {
+        bytes = (data.length * 3) / 4;
+    }
+
+    return Math.max(FILE_TOKEN_ESTIMATE_CHARS, Math.ceil(bytes / 4));
+};
+
 /** Tokens for a character count, with the safety margin. */
 const charsToTokens = (chars: number): number => Math.ceil((chars / CHARS_PER_TOKEN) * ESTIMATION_SAFETY_MARGIN);
 
@@ -158,6 +175,7 @@ const estimateChars = (messages: ModelMessage[]): number => {
                     const p = part as {
                         args?: unknown;
                         content?: unknown;
+                        data?: unknown;
                         input?: unknown;
                         output?: unknown;
                         result?: unknown;
@@ -170,7 +188,7 @@ const estimateChars = (messages: ModelMessage[]): number => {
                     } else {
                         switch (p.type) {
                             case "file": {
-                                totalChars += FILE_TOKEN_ESTIMATE_CHARS;
+                                totalChars += inlineFileChars(p.data);
 
                                 break;
                             }

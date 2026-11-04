@@ -39,10 +39,11 @@ const makeCtx = (files: Record<string, ReturnType<typeof fileRow> | null>, objec
 
 describe("loadAskUserFiles", () => {
     it("reads an owned image as base64 with its name and type", async () => {
-        const { ctx } = makeCtx({ a: fileRow("a", "image/png") }, { "key/a": objectOf(PNG_BYTES) });
+        const { ctx, runQuery } = makeCtx({ a: fileRow("a", "image/png") }, { "key/a": objectOf(PNG_BYTES) });
 
         const files = await loadAskUserFiles(ctx, { fileIds: ["a"], threadId: "t1", userId: "u1" });
 
+        expect(runQuery).toHaveBeenCalledWith(expect.anything(), { fileId: "a", threadId: "t1", userId: "u1" });
         expect(files).toEqual([{ data: Buffer.from(PNG_BYTES).toString("base64"), filename: "a.png", mediaType: "image/png" }]);
     });
 

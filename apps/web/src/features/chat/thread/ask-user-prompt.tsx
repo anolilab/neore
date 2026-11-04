@@ -103,6 +103,8 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const groupRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const attachButtonRef = useRef<HTMLButtonElement>(null);
+    // Bytes attached so far: a chip removed mid-selection gives its bytes back at once, so the next file is checked against what is left.
+    const attachedBytes = useRef(0);
     // Stops the selection in progress when the question is answered or dismissed, so no later file is uploaded or finalized.
     const uploadAbort = useRef<AbortController | null>(null);
 
@@ -180,7 +182,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         const accepted = typed.slice(0, Math.max(room, 0));
 
         // The budget counts what is uploaded, so it is checked per file after re-encoding, below.
-        let total = files.reduce((sum, file) => sum + file.size, 0);
+        attachedBytes.current = files.reduce((sum, file) => sum + file.size, 0);
 
         if (accepted.length < picked.length) {
             showError(t`Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most.`);
@@ -220,7 +222,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         continue;
                     }
 
-                    if (total + prepared.size > FILES_TOTAL_MAX_BYTES) {
+                    if (attachedBytes.current + prepared.size > FILES_TOTAL_MAX_BYTES) {
                         failed.push(file.name);
 
                         continue;
@@ -237,7 +239,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                     const { fileId } = await finalizeUpload({ filename, uploadId });
 
                     // Counted only once the upload is in, so a failed one does not use up the budget.
-                    total += prepared.size;
+                    attachedBytes.current += prepared.size;
 
                     // The server dedupes uploads by content, so the same photo can come back with an id already attached.
                     setFiles((current) =>
@@ -373,6 +375,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                                         aria-label={t`Remove ${file.name}`}
                                         className="text-muted-foreground hover:text-foreground"
                                         onClick={() => {
+                                            attachedBytes.current -= file.size;
                                             setFiles((current) => current.filter((item) => item.fileId !== file.fileId));
                                             // Focus stays in the card: the remove button goes, so the attach button takes it.
                                             attachButtonRef.current?.focus();

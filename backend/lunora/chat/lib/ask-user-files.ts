@@ -15,6 +15,7 @@ import type { ModelMessage } from "ai";
 import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import type { ActionCtx } from "../../_generated/server";
+import { streamLogger } from "../../lib/logger";
 import { readStoredObject } from "../../lib/storage-read";
 import type { AskUserFile } from "../tools/ask-user-constants";
 import type { BackupCapabilities } from "./backup-model";
@@ -46,6 +47,11 @@ export const answerFilesMessage = (files: ReadonlyArray<AskUserFile>): ModelMess
         ],
         role: "user",
     };
+};
+
+/** A file the answer does not carry, logged with its reason and no name or content, so a missing attachment can be traced. */
+const skipped = (args: { threadId: string }, fileId: string, reason: string): void => {
+    streamLogger.warn(`[AskUser] Answer file ${fileId} left out (${reason}) in thread ${args.threadId}`);
 };
 
 /**
@@ -95,6 +101,7 @@ export const loadAskUserFiles = async (
         });
 
         if (!file || !ASK_USER_FILE_TYPES.includes(file.mediaType)) {
+            skipped(args, fileId, file ? "type" : "unavailable");
             continue;
         }
 
@@ -102,6 +109,7 @@ export const loadAskUserFiles = async (
         const remaining = ASK_USER_FILES_TOTAL_MAX_BYTES - total;
 
         if (remaining <= 0) {
+            skipped(args, fileId, "budget");
             break;
         }
 
@@ -114,6 +122,7 @@ export const loadAskUserFiles = async (
         } catch (error) {
             // Only "gone" and "too big" are the file's fault; a failed read is the run's, and it fails as one.
             if (error instanceof LunoraError && SKIP_CODES.has(error.code)) {
+                skipped(args, fileId, error.code === "PAYLOAD_TOO_LARGE" ? "too-large" : "missing");
                 continue;
             }
 

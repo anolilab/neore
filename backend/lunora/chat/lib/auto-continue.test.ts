@@ -115,6 +115,20 @@ describe("estimateTokens", () => {
             role: "tool",
         } as unknown as ModelMessage;
 
+        const withoutImage = {
+            content: [
+                {
+                    output: { type: "content", value: [{ text: "Answered", type: "text" }] },
+                    toolCallId: "c1",
+                    toolName: "askUser",
+                    type: "tool-result",
+                },
+            ],
+            role: "tool",
+        } as unknown as ModelMessage;
+
+        // The image adds a fixed amount (more than zero), and nothing close to its bytes.
+        expect(estimateTokens([withImage]) - estimateTokens([withoutImage])).toBeGreaterThan(0);
         expect(estimateTokens([withImage])).toBeLessThan(2000);
     });
 

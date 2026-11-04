@@ -1199,9 +1199,11 @@ export const resumeApprovedRun = async (
             const attached = answerFiles;
 
             streamTextArgs.prepareStep = async (step: { messages: ReadonlyArray<unknown> }) => {
-                const adjusted = (await compressStep?.(step)) as { messages?: ReadonlyArray<unknown> } | undefined;
+                // Sized with the files in it: the step's context check counts what the model is sent.
+                const sized = withAnswerFiles(step.messages, attached);
+                const adjusted = (await compressStep?.({ ...step, messages: sized })) as { messages?: ReadonlyArray<unknown> } | undefined;
 
-                return { ...adjusted, messages: withAnswerFiles(adjusted?.messages ?? step.messages, attached) };
+                return { ...adjusted, messages: adjusted?.messages ?? sized };
             };
         }
 
