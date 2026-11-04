@@ -1,12 +1,14 @@
 /**
- * The text the system share sheet receives for one message. `undefined` when the
- * message has no text (a reply that has not started yet), so there is nothing
- * to offer.
+ * The text the system share sheet receives for one message, exactly as written, so the
+ * indentation of a code block survives. `undefined` when the message has no text (a reply
+ * that has not started yet), so there is nothing to offer.
  */
 export const shareableMessageText = (message: { text: string }): string | undefined => {
-    const text = message.text.trim();
+    if (message.text.trim().length === 0) {
+        return undefined;
+    }
 
-    return text.length > 0 ? text : undefined;
+    return message.text;
 };
 
 const PREVIEW_LENGTH = 40;

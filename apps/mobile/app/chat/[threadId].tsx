@@ -372,10 +372,12 @@ const Chat = () => {
                 throw new ChatError("The reply did not finish. Try again.");
             }
 
+            // A 205 means the server has finished the reply, even though this client may not hold all of it.
             if (outcome === "finished") {
                 setRows((current) => finishRow(current, assistantId));
-                AccessibilityInfo.announceForAccessibility("Reply finished");
             }
+
+            AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
             setError(error_ instanceof Error ? error_.message : "Could not send.");
         } finally {

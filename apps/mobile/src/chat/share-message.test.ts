@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { shareableMessageText, shareLabel } from "./share-message";
 
 describe("shareableMessageText", () => {
-    it("returns the message text without surrounding whitespace", () => {
-        expect(shareableMessageText({ text: "  Hello there.\n" })).toBe("Hello there.");
+    it("returns the message text as written, indentation included", () => {
+        expect(shareableMessageText({ text: "  Hello there.\n" })).toBe("  Hello there.\n");
     });
 
     it("keeps the inner line breaks of a multi-line reply", () => {
