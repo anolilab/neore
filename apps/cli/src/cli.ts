@@ -76,6 +76,13 @@ Global options
 Prefer the prompt or stdin over --key: flags end up in shell history.
 
 Exit codes: 0 ok, 1 error, 2 usage, 3 auth/scope, 4 not found, 5 rate/daily limit, 6 network.
+
+Sign in by code (no browser needed on this machine):
+  neore login --device --api-url https://api.example.com
+      asks you to type the API host, then shows a URL and a code to approve
+  neore login --device --api-url https://api.example.com --confirm-host api.example.com
+      the same without a terminal (CI, scripts): the host must equal the URL's host
+
 "login --device" exits 1 when the code is denied, expired or already used (the message
 says which), 5 when the server limits the polling, 6 when it cannot be reached.
 `;

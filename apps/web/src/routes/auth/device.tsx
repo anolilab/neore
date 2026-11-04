@@ -139,7 +139,9 @@ const ProblemMessage = ({ problem }: { problem: Problem }) => {
 
 const Review = ({ email, lookup, userCode }: { email: string; lookup: Lookup; userCode: string }) => {
     const { t } = useLingui();
-    const [isBusy, setIsBusy] = useState(false);
+    const [pending, setPending] = useState<Decision>();
+    const isBusy = pending !== undefined;
+    const busyMessages: Record<Decision, string> = { approved: t`Approving…`, denied: t`Denying…` };
     const [error, setError] = useState<string>();
     const [problem, setProblem] = useState<Problem>();
     const [decision, setDecision] = useState<Decision>();
@@ -176,14 +178,14 @@ const Review = ({ email, lookup, userCode }: { email: string; lookup: Lookup; us
 
     const decide = async (next: Decision) => {
         setError(undefined);
-        setIsBusy(true);
+        setPending(next);
 
         // A request that rejects (offline, reset, aborted) is the same retryable "unavailable" as a 5xx.
         const result = await authClient
             .$fetch(next === "approved" ? "/device/approve" : "/device/deny", { body: { userCode }, method: "POST" })
             .catch(() => null);
 
-        setIsBusy(false);
+        setPending(undefined);
 
         const failure = result?.error;
         let reason: Problem | undefined = failure ? problemOf(failure) : undefined;
@@ -223,6 +225,9 @@ const Review = ({ email, lookup, userCode }: { email: string; lookup: Lookup; us
                     {error}
                 </p>
             )}
+            <p className="sr-only" role="status">
+                {pending ? busyMessages[pending] : ""}
+            </p>
             <div className="flex justify-center gap-2">
                 <Button
                     disabled={isBusy}
@@ -252,7 +257,7 @@ const DeviceApproval = () => {
     const { t } = useLingui();
     const { user_code: rawCode } = Route.useSearch();
     const userCode = rawCode ? normalizeCode(rawCode) : undefined;
-    const { data, isPending } = useAuthenticate();
+    const { data, error: sessionError, isPending, refetch } = useAuthenticate();
     const { isAnonymous } = useIsAnonymous();
     const userId = data?.user?.id;
 
@@ -276,6 +281,26 @@ const DeviceApproval = () => {
         retry: false,
         staleTime: Infinity,
     });
+
+    // A failed session read is not "still loading": say so and offer a retry (the hook does not redirect on it).
+    if (sessionError && !data?.user) {
+        return (
+            <div className="flex flex-col gap-4 text-center">
+                <p className="text-sm text-red-600" role="alert">
+                    {t`We could not check that you are signed in. Try again in a moment.`}
+                </p>
+                <Button
+                    onClick={() => {
+                        refetch();
+                    }}
+                    type="button"
+                    variant="outline"
+                >
+                    {t`Try again`}
+                </Button>
+            </div>
+        );
+    }
 
     if (isPending || !data?.user) {
         return (

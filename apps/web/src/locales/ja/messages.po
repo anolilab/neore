@@ -3541,7 +3541,7 @@ msgstr ""
 #: src/features/chat/thread/tool-approval.tsx:121
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:102
-#: src/routes/auth/device.tsx:244
+#: src/routes/auth/device.tsx:249
 msgid "Approve"
 msgstr "承認"
 
@@ -3561,8 +3561,12 @@ msgstr ""
 msgid "Approved automatically — low risk"
 msgstr ""
 
-#: src/routes/auth/device.tsx:155
+#: src/routes/auth/device.tsx:157
 msgid "Approved. Return to your terminal: the command line is signed in. You can close this tab."
+msgstr ""
+
+#: src/routes/auth/device.tsx:144
+msgid "Approving…"
 msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:246
@@ -5677,7 +5681,7 @@ msgstr ""
 msgid "Checking image safety..."
 msgstr "画像の安全性を確認しています..."
 
-#: src/routes/auth/device.tsx:312
+#: src/routes/auth/device.tsx:337
 msgid "Checking the code…"
 msgstr ""
 
@@ -6202,7 +6206,7 @@ msgstr "クラウドプロバイダーアカウント"
 #: src/features/workflow/types/index.ts:455
 #: src/routes/_shortcut/code/index.tsx:16
 #: src/routes/auth/device.tsx:100
-#: src/routes/auth/device.tsx:216
+#: src/routes/auth/device.tsx:218
 msgid "Code"
 msgstr "コード"
 
@@ -6804,7 +6808,7 @@ msgid "Compressing context..."
 msgstr "コンテキストを圧縮しています..."
 
 #: src/features/settings/components/chat/bots-settings.tsx:140
-#: src/routes/auth/device.tsx:212
+#: src/routes/auth/device.tsx:214
 msgid "Computer"
 msgstr ""
 
@@ -9417,7 +9421,7 @@ msgstr "拒否されました — ツールなしで続行します"
 msgid "Denied on {device}"
 msgstr "{device} で拒否されました"
 
-#: src/routes/auth/device.tsx:156
+#: src/routes/auth/device.tsx:158
 msgid "Denied. The command line was not signed in. You can close this tab."
 msgstr ""
 
@@ -9434,7 +9438,7 @@ msgid "Density updated"
 msgstr ""
 
 #: src/features/chat/thread/tool-approval.tsx:125
-#: src/routes/auth/device.tsx:235
+#: src/routes/auth/device.tsx:240
 msgid "Deny"
 msgstr "拒否"
 
@@ -9446,6 +9450,10 @@ msgstr "{tool} を拒否"
 #: src/features/settings/components/chat/model-filter-settings.tsx:394
 msgid "Deny Data Collection"
 msgstr "データ収集を拒否"
+
+#: src/routes/auth/device.tsx:144
+msgid "Denying…"
+msgstr ""
 
 #: src/features/chat/thread/widgets/flight-widget.tsx:142
 msgid "Depart:"
@@ -17910,7 +17918,7 @@ msgstr "読み込んでいます..."
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
-#: src/routes/auth/device.tsx:283
+#: src/routes/auth/device.tsx:308
 #: src/routes/auth/extension.tsx:66
 msgid "Loading…"
 msgstr "読み込んでいます…"
@@ -21502,7 +21510,7 @@ msgstr "比較できるのは{0}モデルのみです。種類を切り替える
 msgid "Only 3B activated per token for efficiency"
 msgstr "効率のためトークンあたりのアクティブパラメータはわずか 3B"
 
-#: src/routes/auth/device.tsx:220
+#: src/routes/auth/device.tsx:222
 msgid "Only continue if you started this just now by running `neore login --device`, and the code above matches the one in your terminal."
 msgstr ""
 
@@ -27877,7 +27885,7 @@ msgstr "サイドバーを右に"
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:325
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
-#: src/routes/auth/device.tsx:295
+#: src/routes/auth/device.tsx:320
 #: src/routes/auth/extension.tsx:78
 msgid "Sign in"
 msgstr "サインイン"
@@ -27902,11 +27910,11 @@ msgid "Sign in on another site?"
 msgstr "別のサイトでサインインしますか？"
 
 #: src/routes/auth/device.tsx:97
-#: src/routes/auth/device.tsx:327
+#: src/routes/auth/device.tsx:352
 msgid "Sign in the command line"
 msgstr ""
 
-#: src/routes/auth/device.tsx:206
+#: src/routes/auth/device.tsx:208
 msgid "Sign in the command line?"
 msgstr ""
 
@@ -30482,7 +30490,7 @@ msgstr ""
 msgid "That computer is not online."
 msgstr ""
 
-#: src/routes/auth/device.tsx:196
+#: src/routes/auth/device.tsx:198
 msgid "That did not go through. Try again."
 msgstr ""
 
@@ -30647,7 +30655,7 @@ msgstr ""
 msgid "The coding agent could not start."
 msgstr "コーディングエージェントを起動できませんでした。"
 
-#: src/routes/auth/device.tsx:208
+#: src/routes/auth/device.tsx:210
 msgid "The command line on the computer below will be signed in as {email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings."
 msgstr ""
 
@@ -31320,7 +31328,7 @@ msgstr ""
 #~ msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
 #~ msgstr ""
 
-#: src/routes/auth/device.tsx:172
+#: src/routes/auth/device.tsx:174
 msgid "This code has already been answered."
 msgstr ""
 
@@ -31332,7 +31340,7 @@ msgstr ""
 msgid "This code is not valid, or it was already used. Run `neore login --device` again to get a new one."
 msgstr ""
 
-#: src/routes/auth/device.tsx:164
+#: src/routes/auth/device.tsx:166
 msgid "This code was opened with a different account. Sign in with that account, or run `neore login --device` again."
 msgstr ""
 
@@ -32487,6 +32495,7 @@ msgstr "検索キーワードを変えてみてください。"
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/home/components/home-page.tsx:144
+#: src/routes/auth/device.tsx:299
 msgid "Try again"
 msgstr "再試行"
 
@@ -32890,7 +32899,7 @@ msgstr "言語モデリングへの独自のアプローチ"
 msgid "United States"
 msgstr "米国"
 
-#: src/routes/auth/device.tsx:213
+#: src/routes/auth/device.tsx:215
 msgid "unknown"
 msgstr ""
 
@@ -34472,6 +34481,10 @@ msgstr ""
 msgid "Watched repositories"
 msgstr ""
 
+#: src/routes/auth/device.tsx:290
+msgid "We could not check that you are signed in. Try again in a moment."
+msgstr ""
+
 #: src/features/chat/core/context/chat-context.tsx:693
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "時間内にセッションを確認できませんでした。メッセージは入力欄に残っています。もう一度送信してください。"
@@ -34959,7 +34972,7 @@ msgstr ""
 #: src/features/chat/thread/streaming-placeholder.tsx:631
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
-#: src/routes/auth/device.tsx:244
+#: src/routes/auth/device.tsx:249
 msgid "Working…"
 msgstr "処理しています…"
 
@@ -35175,7 +35188,7 @@ msgstr "ドキュメントの追加が速すぎます。しばらく待ってか
 msgid "You are browsing as a guest. Sign in with your account to connect the extension."
 msgstr "ゲストとして閲覧中です。拡張機能を接続するには、アカウントでサインインしてください。"
 
-#: src/routes/auth/device.tsx:293
+#: src/routes/auth/device.tsx:318
 msgid "You are browsing as a guest. Sign in with your account to sign in the command line."
 msgstr ""
 

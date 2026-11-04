@@ -118,7 +118,15 @@ export const requestDeviceCode = async (dependencies: DeviceFlowDependencies, ba
 
     const { device_code: deviceCode, expires_in: expiresIn, interval, user_code: userCode, verification_uri: uri, verification_uri_complete: complete } = body;
 
-    if (typeof deviceCode !== "string" || typeof userCode !== "string" || typeof uri !== "string" || typeof expiresIn !== "number") {
+    const isTiming = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value * 1000) && value > 0;
+
+    if (
+        typeof deviceCode !== "string" ||
+        typeof userCode !== "string" ||
+        typeof uri !== "string" ||
+        !isTiming(expiresIn) ||
+        (interval !== undefined && !isTiming(interval))
+    ) {
         throw new ApiError({
             code: "invalid_response",
             message: "The server answered the sign-in request in a form this CLI does not understand.",
@@ -129,7 +137,7 @@ export const requestDeviceCode = async (dependencies: DeviceFlowDependencies, ba
     return {
         deviceCode,
         expiresAtMs: dependencies.now() + expiresIn * 1000,
-        intervalMs: Math.max(MIN_INTERVAL_MS, (typeof interval === "number" ? interval : 5) * 1000),
+        intervalMs: Math.max(MIN_INTERVAL_MS, (isTiming(interval) ? interval : 5) * 1000),
         userCode,
         verificationUri: uri,
         verificationUriComplete: typeof complete === "string" ? complete : uri,

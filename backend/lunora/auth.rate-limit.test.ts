@@ -23,6 +23,13 @@ import { cliDeviceAuth } from "./auth/cli-device-auth";
 
 const BASE_URL = "http://localhost:3000";
 
+/**
+ * `@lunora/auth` resolves NO trusted client-IP header unless the app sets one, and better-auth then keys every
+ * request of a path on one shared bucket (127.0.0.1 under test, "no-trusted-ip" otherwise). These tests need the
+ * per-address behaviour they describe, so they name the header the requests carry.
+ */
+const IP_OPTIONS = { advanced: { ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] } } };
+
 const buildLimitedAuth = (customRules: typeof AUTH_RATE_LIMIT_CUSTOM_RULES = AUTH_RATE_LIMIT_CUSTOM_RULES) => {
     const resolved = resolveAuthOptions({
         baseURL: BASE_URL,
@@ -31,6 +38,7 @@ const buildLimitedAuth = (customRules: typeof AUTH_RATE_LIMIT_CUSTOM_RULES = AUT
         plugins: [anonymous()],
         rateLimit: { customRules },
         secret: "a-test-secret-that-is-long-enough-for-lunora-auth",
+        ...IP_OPTIONS,
     });
 
     return betterAuth({
@@ -149,6 +157,7 @@ describe("CLI device sign-in rate limits", () => {
             ],
             rateLimit: { customRules: AUTH_RATE_LIMIT_CUSTOM_RULES },
             secret: "a-test-secret-that-is-long-enough-for-lunora-auth",
+            ...IP_OPTIONS,
         });
 
         return betterAuth({ ...resolved, rateLimit: { ...resolved.rateLimit, enabled: true, storage: "memory" } });
@@ -221,13 +230,12 @@ describe("CLI device sign-in rate limits", () => {
     it("limits issuing codes to 60 a minute per address", async () => {
         const auth = buildDeviceAuth();
         const ip = nextIp();
-        const result = await statuses(auth, 70, () =>
+        const result = await statuses(auth, 62, () =>
             request("/device/code", ip, { body: JSON.stringify({ client_id: "neore-cli", hostname: "devbox" }), method: "POST" }),
         );
 
-        // Plenty for a shared address, yet a loop is still stopped.
-        expect(result.slice(0, 50).every((status) => status === 200)).toBe(true);
-        expect(result.at(-1)).toBe(429);
+        expect(result.slice(0, 60).every((status) => status === 200)).toBe(true);
+        expect(result.slice(60)).toStrictEqual([429, 429]);
     });
 
     it("limits deny retries", async () => {

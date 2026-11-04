@@ -79,6 +79,28 @@ describe("requestDeviceCode", () => {
         expect(result).toMatchObject({ deviceCode: "dev-code", expiresAtMs: 1_800_000, intervalMs: 5000, userCode: "ABCDEFGH" });
     });
 
+    it.each([
+        ["an infinite expires_in", '{"device_code":"d","user_code":"U","verification_uri":"https://a.test/x","expires_in":1e999,"interval":5}'],
+        ["a zero expires_in", '{"device_code":"d","user_code":"U","verification_uri":"https://a.test/x","expires_in":0,"interval":5}'],
+        ["an infinite interval", '{"device_code":"d","user_code":"U","verification_uri":"https://a.test/x","expires_in":1800,"interval":1e999}'],
+        ["a negative interval", '{"device_code":"d","user_code":"U","verification_uri":"https://a.test/x","expires_in":1800,"interval":-5}'],
+        ["a string interval", '{"device_code":"d","user_code":"U","verification_uri":"https://a.test/x","expires_in":1800,"interval":"5"}'],
+    ])("ends with invalid_response, before any poll, for %s", async (_name, raw) => {
+        const { deps, log } = harness([() => new Response(raw, { headers: { "Content-Type": "application/json" }, status: 200 })]);
+
+        const error = await requestDeviceCode(deps, BASE, "devbox").catch((error_: unknown) => error_);
+
+        expect(error).toMatchObject({ code: "invalid_response" });
+        expect(exitCodeFor(error)).toBe(EXIT.error);
+        expect(log).toHaveLength(1);
+    });
+
+    it("defaults the interval when the server sends none", async () => {
+        const { deps } = harness([() => Response.json({ ...CODE_RESPONSE, interval: undefined })]);
+
+        expect(await requestDeviceCode(deps, BASE, "devbox")).toMatchObject({ intervalMs: 5000 });
+    });
+
     it("names an old server that has no device sign-in", async () => {
         const { deps } = harness([() => new Response("not found", { status: 404 })]);
 
@@ -428,5 +450,15 @@ describe("neore login --device", () => {
             expect(await run(["login", "--device", "--api-url", BASE], context)).toBe(EXIT.usage);
             expect(urls).toEqual([]);
         });
+    });
+
+    it("shows a copy-pasteable non-interactive sign-in command in the help", async () => {
+        const context = contextFor([]);
+
+        await run(["--help"], context);
+
+        expect(context.io.stdout.text() + context.io.stderr.text()).toContain(
+            "neore login --device --api-url https://api.example.com --confirm-host api.example.com",
+        );
     });
 });
