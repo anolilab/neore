@@ -37,7 +37,7 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
 
     const descriptions: Record<ThreadPermissionMode, string> = {
         auto: t`Tools run on their own settings; a quick check can clear low-risk calls`,
-        "auto-edit": t`File and document edits run; everything else that changes something asks`,
+        "auto-edit": t`Document edits run; file, slide, design and other changes ask`,
         full: t`Every tool runs without asking, except those that need your answer`,
         supervised: t`Anything that is not a plain lookup asks first`,
     };
@@ -48,7 +48,7 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
                 render={
                     <Button
                         aria-label={t`Permission mode: ${labels[mode]}`}
-                        className="bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 text-foreground h-7 gap-1 px-2 dark:text-white"
+                        className="bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 text-foreground h-11 gap-1 px-2 sm:h-7 dark:text-white"
                         disabled={disabled}
                         variant="outline"
                     >

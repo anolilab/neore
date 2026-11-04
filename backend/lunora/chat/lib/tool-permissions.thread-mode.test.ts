@@ -43,6 +43,8 @@ describe("thread permission mode", () => {
 
         expect(resolveToolPermission(FILES, undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("updateDocument"), undefined, options)).toBe("auto");
+        expect(resolveToolPermission(builtin("updateDesign"), undefined, options)).toBe("ask");
+        expect(resolveToolPermission(builtin("createDesign"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("createPresentation"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(builtin("updateSlide"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(SHELL, undefined, options)).toBe("ask");

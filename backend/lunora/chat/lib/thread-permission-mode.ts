@@ -57,14 +57,13 @@ export const BUILTIN_TOOLS_READ_ONLY: ReadonlySet<string> = new Set([
 
 /**
  * Built-ins that write files or artifacts inside the thread's own sandbox or document space, with no outward
- * reach: the document and design tools. `fileOperations` is not here: a bot with its own computer shares that filesystem across
+ * reach: the document tools. Design canvases are not here: their JSON can name remote images that load when the owner opens the
+ * editor. `fileOperations` is not here: a bot with its own computer shares that filesystem across
  * threads, so its writes ask. Slides are not here either: their HTML can load remote images when viewed, so creating or editing one
  * asks. `retrieve` is not a lookup: it fetches model-chosen URLs, which can carry thread data and spend quota. `auto-edit` lets the listed tools run; shell, code execution, browser, network,
  * generation and delegation tools keep asking.
  */
 export const BUILTIN_TOOLS_FILE_EDIT: ReadonlySet<string> = new Set([
-    "createDesign",
     "createDocument",
-    "updateDesign",
     "updateDocument",
 ]);
