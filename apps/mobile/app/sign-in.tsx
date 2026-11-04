@@ -42,7 +42,11 @@ const SignInScreen = () => {
                 </Text>
                 )
                 : null}
-            <Link href="/settings">Settings</Link>
+            <Link asChild href="/settings">
+                <Pressable accessibilityRole="link" style={{ alignItems: "center", justifyContent: "center", minHeight: 44, paddingHorizontal: 12 }}>
+                    <Text style={{ textDecorationLine: "underline" }}>Settings</Text>
+                </Pressable>
+            </Link>
         </View>
     );
 };

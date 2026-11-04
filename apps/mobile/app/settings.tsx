@@ -65,7 +65,7 @@ const SettingsScreen = () => {
                 text of a chat or the message of the error.
             </Text>
             {isConfigured ? null : <Text style={{ fontSize: 13 }}>Crash reports are not set up in this build.</Text>}
-            {failure ? <Text accessibilityRole="alert" style={{ color: "#b00020", fontSize: 13 }}>{failure}</Text> : null}
+            {failure ? <Text accessibilityLiveRegion="polite" accessibilityRole="alert" style={{ color: "#b00020", fontSize: 13 }}>{failure}</Text> : null}
         </View>
     );
 };
