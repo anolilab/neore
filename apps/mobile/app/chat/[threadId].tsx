@@ -378,8 +378,8 @@ const Chat = () => {
                     // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
                     const page = await fetchMessagePage(id, cursor);
 
+                    // `replyStateAfter` reads newest first; a page is oldest first inside, so it is reversed here.
                     seen.push(
-                        // `replyStateAfter` reads newest first; a page is oldest first inside, so it is reversed here.
                         ...page.page.toReversed().map((message) => {
                             return { id: message.id, role: message.role, status: message.status };
                         }),
