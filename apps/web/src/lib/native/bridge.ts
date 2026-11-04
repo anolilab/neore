@@ -370,7 +370,8 @@ export const pairNativeDevice = async (pairing: { accountLabel: string; deviceId
 };
 
 /** `undefined` until the shell advertises `device`. With a device id: that server's manifest, signed with its own secret. */
-export const getNativeDeviceManifest = async (deviceId?: string): Promise<(NativeSigned & { appVersion?: string }) | undefined> => getDeviceBridge()?.manifest(deviceId);
+export const getNativeDeviceManifest = async (deviceId?: string): Promise<(NativeSigned & { appVersion?: string }) | undefined> =>
+    getDeviceBridge()?.manifest(deviceId);
 
 /**
  * Connects a server that is not paired yet. The shell asks the user to trust its key on first use and for a key
