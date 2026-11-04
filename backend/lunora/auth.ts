@@ -262,6 +262,8 @@ export const API_KEY_OPTIONS = {
  * map names only the one path it relaxes. `auth.rate-limit.test.ts` drives
  * better-auth's real limiter to pin both halves.
  */
+// Key order is meaningful, not alphabetical: `/get-session` must stay first so it matches before the catch-all.
+/* eslint-disable perfectionist/sort-objects */
 export const AUTH_RATE_LIMIT_CUSTOM_RULES: Record<string, false | { max: number; window: number }> = {
     "/get-session": false,
     // CLI device-code sign-in (`auth/cli-device-auth.ts`). The window is a QUIET gap, as above.
@@ -278,6 +280,7 @@ export const AUTH_RATE_LIMIT_CUSTOM_RULES: Record<string, false | { max: number;
     "/device/approve": { max: 10, window: 10 },
     "/device/deny": { max: 10, window: 10 },
 };
+/* eslint-enable perfectionist/sort-objects */
 
 export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions => {
     const oidcDiscovery = resolveOidcDiscoveryUrl();

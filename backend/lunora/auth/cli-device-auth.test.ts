@@ -359,6 +359,118 @@ describe("device-code sign-in for the CLI", () => {
         expect(await errorOf(poll(harness, code.device_code))).toBe("authorization_pending");
     });
 
+    it("keeps a guest from opening or denying a code, so the intended account can still approve it", async () => {
+        const harness = build();
+        const guest = await call(harness, "/sign-in/anonymous", { body: {} });
+        const guestCookie = cookieOf(guest.response);
+        const code = await requestCode(harness);
+
+        const opened = await call(harness, `/device?user_code=${code.user_code}`, { cookie: guestCookie });
+        const denied = await call(harness, "/device/deny", { body: { userCode: code.user_code }, cookie: guestCookie });
+
+        expect(opened.response.status).toBe(403);
+        expect(denied.response.status).toBe(403);
+
+        const person = await signUp(harness);
+        const { approved } = await approve(harness, person.cookie, code.user_code);
+
+        expect(approved.response.status).toBe(200);
+
+        vi.setSystemTime(Date.now() + 6000);
+
+        const redeemed = await poll(harness, code.device_code);
+
+        expect(redeemed.response.status).toBe(200);
+    });
+
+    it("refuses an approval from an account at the key cap, so the page does not report a sign-in that cannot finish", async () => {
+        const harness = build();
+        const person = await signUp(harness);
+        const context = await harness.auth.$context;
+
+        for (let index = 0; index < MAX_API_KEYS_PER_USER; index += 1) {
+            await context.adapter.create({
+                data: { createdAt: new Date(), enabled: true, key: `cap${String(index)}`, referenceId: person.userId, updatedAt: new Date() },
+                model: "apikey",
+            });
+        }
+
+        const code = await requestCode(harness);
+
+        await call(harness, `/device?user_code=${code.user_code}`, { cookie: person.cookie });
+
+        const attempt = await call(harness, "/device/approve", { body: { userCode: code.user_code }, cookie: person.cookie });
+
+        expect(attempt.response.status).toBe(403);
+        expect(attempt.body["error"]).toBe("key_limit");
+        expect(await errorOf(poll(harness, code.device_code))).toBe("authorization_pending");
+    });
+
+    it("withdraws its own key when concurrent redemptions pushed the person past the cap, and restores the code", async () => {
+        const holder: { harness?: Harness } = {};
+        const harness = build(async (input) => {
+            const live = holder.harness as Harness;
+            const context = await live.auth.$context;
+
+            // A second redemption of the same person lands its key while this one is minting.
+            await context.adapter.create({
+                data: { createdAt: new Date(), enabled: true, key: "concurrent", referenceId: input.userId, updatedAt: new Date() },
+                model: "apikey",
+            });
+
+            return await (live.auth.api as unknown as ApiKeyAuthApi).createApiKey({
+                body: {
+                    expiresIn: input.expiresInSeconds,
+                    name: input.name,
+                    permissions: DEFAULT_API_SCOPES as Record<string, string[]>,
+                    userId: input.userId,
+                },
+            });
+        });
+
+        holder.harness = harness;
+
+        const person = await signUp(harness);
+        const context = await harness.auth.$context;
+
+        for (let index = 0; index < MAX_API_KEYS_PER_USER - 1; index += 1) {
+            await context.adapter.create({
+                data: { createdAt: new Date(), enabled: true, key: `held${String(index)}`, referenceId: person.userId, updatedAt: new Date() },
+                model: "apikey",
+            });
+        }
+
+        const code = await requestCode(harness);
+
+        await approve(harness, person.cookie, code.user_code);
+        vi.setSystemTime(Date.now() + 6000);
+
+        const refused = await poll(harness, code.device_code);
+
+        expect(refused.response.status).toBe(403);
+        expect(await rowsOf(harness, "apikey")).toHaveLength(MAX_API_KEYS_PER_USER);
+        expect(await rowsOf(harness, "deviceCode")).toHaveLength(1);
+    });
+
+    it("mints no key when the account that approved the code was deleted", async () => {
+        const harness = build();
+        const person = await signUp(harness);
+        const code = await requestCode(harness);
+
+        await approve(harness, person.cookie, code.user_code);
+
+        const context = await harness.auth.$context;
+
+        await context.adapter.delete({ model: "user", where: [{ field: "id", value: person.userId }] });
+        vi.setSystemTime(Date.now() + 6000);
+
+        const refused = await poll(harness, code.device_code);
+
+        expect(refused.response.status).toBe(400);
+        expect(refused.body["error"]).toBe("invalid_grant");
+        expect(await rowsOf(harness, "apikey")).toHaveLength(0);
+    });
+
     it("accepts only the CLI client and refuses a pre-bound user or a scope", async () => {
         const harness = build();
 
@@ -390,6 +502,11 @@ describe("device-code sign-in for the CLI", () => {
         const person = await signUp(harness);
         const context = await harness.auth.$context;
 
+        const code = await requestCode(harness);
+
+        await approve(harness, person.cookie, code.user_code);
+
+        // The keys arrive after the approval (it refuses an account already at the cap), so redemption is the backstop.
         for (let index = 0; index < MAX_API_KEYS_PER_USER; index += 1) {
             await context.adapter.create({
                 data: { createdAt: new Date(), enabled: true, key: `hash${String(index)}`, referenceId: person.userId, updatedAt: new Date() },
@@ -397,9 +514,6 @@ describe("device-code sign-in for the CLI", () => {
             });
         }
 
-        const code = await requestCode(harness);
-
-        await approve(harness, person.cookie, code.user_code);
         vi.setSystemTime(Date.now() + 6000);
 
         const refused = await poll(harness, code.device_code);

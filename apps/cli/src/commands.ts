@@ -288,17 +288,35 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
         throw new UsageError("No API key given. Create one in Settings → API keys.");
     }
 
-    // A pasted key is verified BEFORE saving, so a typo never replaces a working key. A key the server just
-    // issued is saved first: the code is spent, so a failed check must not lose the only copy.
-    if (flags.device) {
+    // The key is verified BEFORE it replaces a saved one, so a failed check never costs a working key. The one
+    // exception is a device sign-in with nothing saved: its code is spent, so the issued key is kept rather than lost.
+    const replaced = existing.apiKey;
+    const isDevice = Boolean(flags.device);
+
+    if (isDevice && !replaced) {
         await writeConfig({ apiKey, apiUrl }, context.configFile);
     }
 
-    const me = await new NeoreClient({ apiKey, baseUrl: apiUrl, fetch: context.fetch }).request<{ scopes: string[]; userId: string }>("GET", "/me");
+    let me: { scopes: string[]; userId: string };
+
+    try {
+        me = await new NeoreClient({ apiKey, baseUrl: apiUrl, fetch: context.fetch }).request<{ scopes: string[]; userId: string }>("GET", "/me");
+    } catch (error) {
+        if (isDevice && replaced) {
+            context.io.stderr.write(
+                "The new key could not be checked, so the saved key was left as it was. The new key is active: revoke it in Settings -> API keys, then run `neore login --device` again.\n",
+            );
+        }
+
+        throw error;
+    }
+
     const config: CliConfig = { apiKey, apiUrl };
 
-    if (!flags.device) {
-        await writeConfig(config, context.configFile);
+    await writeConfig(config, context.configFile);
+
+    if (isDevice && replaced && replaced !== apiKey && existing.apiUrl === apiUrl) {
+        context.io.stderr.write("The key this replaces is still valid; revoke it in Settings -> API keys if nothing else uses it.\n");
     }
 
     if (flags.json) {

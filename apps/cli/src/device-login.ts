@@ -194,6 +194,11 @@ export const pollForKey = async (dependencies: DeviceFlowDependencies, baseUrl: 
 
         await dependencies.sleep(intervalMs);
 
+        // The wait itself may have crossed the deadline: report that, not whatever the next request meets.
+        if (dependencies.now() >= code.expiresAtMs) {
+            throw expired();
+        }
+
         let response: Response;
 
         try {

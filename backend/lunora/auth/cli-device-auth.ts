@@ -21,9 +21,8 @@
  *   the mint itself fails, the claimed row is put back so the next poll retries.
  *   A response lost in transit cannot be replayed (the key is never stored in
  *   the clear); the stranded key shows in Settings and can be revoked there.
- *   The per-person key cap is checked before the claim and not reserved, so
- *   several codes approved and redeemed in the same instant can overshoot it by
- *   the number of those codes.
+ *   The per-person key cap is checked before the claim and again after the
+ *   mint; a mint that finds the person over the cap withdraws its own key.
  *
  * The caller supplies the minting function (`mintApiKey`), so this file does
  * not import the auth instance it is installed into.
@@ -122,7 +121,17 @@ const cliGrant = {
     verificationOpenAPIProperties: { hostname: { description: "What the requesting machine calls itself (untrusted)", type: "string" } },
 };
 
-/** Guests are disposable and uninvited; a long-lived credential for one outlives both properties. */
+const keyLimitMessage = `You already have ${String(MAX_API_KEYS_PER_USER)} API keys. Revoke one in Settings, then try again.`;
+
+/** The routes a signed-in person uses on a code: open it (which claims it), approve it, deny it. */
+const GUARDED_PATHS = new Set(["/device", "/device/approve", "/device/deny"]);
+
+/**
+ * Guests are disposable and uninvited; a long-lived credential for one outlives both properties. A guest also
+ * must not be able to open (claim) or deny a code, which would keep the intended account from approving it.
+ * Approval also refuses an account that is already at the key cap, so the page does not report a sign-in that
+ * the redemption would refuse; the redemption-time check stays as the backstop.
+ */
 const refuseGuestApproval = {
     handler: createAuthMiddleware(async (ctx) => {
         const session = await getSessionFromCtx(ctx);
@@ -130,8 +139,16 @@ const refuseGuestApproval = {
         if ((session?.user as { isAnonymous?: boolean } | undefined)?.isAnonymous === true) {
             throw oauthError("FORBIDDEN", "access_denied", "Create an account to sign in the CLI.");
         }
+
+        if (ctx.path === "/device/approve" && session?.user.id) {
+            const keys = await ctx.context.adapter.count({ model: "apikey", where: [{ field: "referenceId", value: session.user.id }] });
+
+            if (keys >= MAX_API_KEYS_PER_USER) {
+                throw oauthError("FORBIDDEN", "key_limit", keyLimitMessage);
+            }
+        }
     }),
-    matcher: (context: { path?: string }) => context.path === "/device/approve",
+    matcher: (context: { path?: string }) => GUARDED_PATHS.has(context.path ?? ""),
 };
 
 const keyBodySchema = z.object({
@@ -168,6 +185,11 @@ const redeemKey = (options: CliDeviceAuthOptions) =>
             prepareRedemption: async (record) => {
                 const account = await ctx.context.internalAdapter.findUserById(record.userId as string);
 
+                // The account was deleted after it approved the code: no key for a user that no longer exists.
+                if (!account) {
+                    throw oauthError("BAD_REQUEST", "invalid_grant", "Invalid device code");
+                }
+
                 if ((account as { isAnonymous?: boolean } | null)?.isAnonymous === true) {
                     throw oauthError("FORBIDDEN", "access_denied", "Create an account to sign in the CLI.");
                 }
@@ -175,11 +197,7 @@ const redeemKey = (options: CliDeviceAuthOptions) =>
                 const keys = await ctx.context.adapter.count({ model: "apikey", where: [{ field: "referenceId", value: record.userId as string }] });
 
                 if (keys >= MAX_API_KEYS_PER_USER) {
-                    throw oauthError(
-                        "FORBIDDEN",
-                        "access_denied",
-                        `You already have ${String(MAX_API_KEYS_PER_USER)} API keys. Revoke one in Settings, then try again.`,
-                    );
+                    throw oauthError("FORBIDDEN", "access_denied", keyLimitMessage);
                 }
 
                 return {};
@@ -196,6 +214,19 @@ const redeemKey = (options: CliDeviceAuthOptions) =>
             await restoreClaimedCode(ctx.context.adapter, claimedDeviceCode, error);
 
             throw error;
+        }
+
+        // The cap is counted before the claim and cannot be reserved (the adapter has no transaction across
+        // the count and the insert), so it is counted again once the key exists: if concurrent redemptions
+        // pushed the person past it, this key is withdrawn and the code put back. Two racing mints can both
+        // withdraw; neither can leave the person over the cap.
+        const total = await ctx.context.adapter.count({ model: "apikey", where: [{ field: "referenceId", value: user.id }] });
+
+        if (total > MAX_API_KEYS_PER_USER) {
+            await ctx.context.adapter.delete({ model: "apikey", where: [{ field: "id", value: minted.id }] });
+            await restoreClaimedCode(ctx.context.adapter, claimedDeviceCode, new Error("key cap exceeded"));
+
+            throw oauthError("FORBIDDEN", "access_denied", keyLimitMessage);
         }
 
         authLogger.info("[auth] api_keys.create_cli_device_key", { apiKeyId: minted.id, hostname: cleanHostname(hostname), userId: user.id });

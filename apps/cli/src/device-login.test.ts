@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { run } from "./cli";
 import { ApiError, EXIT, exitCodeFor } from "./client";
 import type { Context } from "./commands";
-import { readConfig } from "./config";
+import { readConfig, writeConfig } from "./config";
 import type { DeviceCode, DeviceFlowDependencies } from "./device-login";
 import { formatUserCode, pollForKey, requestDeviceCode } from "./device-login";
 
@@ -147,10 +147,20 @@ describe("pollForKey", () => {
         const { deps, log } = harness([() => oauthError("authorization_pending"), () => oauthError("authorization_pending")]);
 
         // Two polls fit before the deadline (10 s, 2 x 5 s), a third does not.
-        const error = await pollForKey(deps, BASE, code({ expiresAtMs: 10_000 })).catch((error_: unknown) => error_);
+        const error = await pollForKey(deps, BASE, code({ expiresAtMs: 10_001 })).catch((error_: unknown) => error_);
 
         expect(error).toMatchObject({ code: "device_expired" });
         expect(log).toHaveLength(2);
+    });
+
+    it("reports expiry, not a network error, when the wait itself crosses the deadline", async () => {
+        const { deps, log } = harness([() => oauthError("authorization_pending"), new TypeError("offline"), new TypeError("offline")]);
+
+        // The first poll (5 s) fits; the next wait ends at 10 s, past the 7 s deadline, with the server unreachable.
+        const error = await pollForKey(deps, BASE, code({ expiresAtMs: 7000 })).catch((error_: unknown) => error_);
+
+        expect(error).toMatchObject({ code: "device_expired" });
+        expect(log).toHaveLength(1);
     });
 
     it("fails with device_code_invalid (exit 1) for a code that was already used", async () => {
@@ -321,6 +331,34 @@ describe("neore login --device", () => {
 
         expect(await run(["login", "--device", "--api-url", BASE, "--confirm-host", "api.test"], context)).not.toBe(EXIT.ok);
         expect(await readConfig(context.configFile)).toEqual({ apiKey: "nk_device", apiUrl: BASE });
+    });
+
+    it("leaves the saved key alone when the new key cannot be checked", async () => {
+        const context = contextFor([
+            () => Response.json(CODE_RESPONSE),
+            () => Response.json({ api_key: "nk_new", expires_at: null }),
+            () => Response.json({ error: "unavailable" }, { status: 503 }),
+        ]);
+
+        await writeConfig({ apiKey: "nk_old", apiUrl: BASE }, context.configFile);
+
+        expect(await run(["login", "--device", "--api-url", BASE, "--confirm-host", "api.test"], context)).not.toBe(EXIT.ok);
+        expect(await readConfig(context.configFile)).toEqual({ apiKey: "nk_old", apiUrl: BASE });
+        expect(context.io.stderr.text()).toContain("revoke it in Settings");
+    });
+
+    it("replaces the saved key once the new one checks out, and says the old one is still valid", async () => {
+        const context = contextFor([
+            () => Response.json(CODE_RESPONSE),
+            () => Response.json({ api_key: "nk_new", expires_at: null }),
+            () => Response.json({ apiKeyId: "k2", scopes: ["threads:read"], userId: "u1" }),
+        ]);
+
+        await writeConfig({ apiKey: "nk_old", apiUrl: BASE }, context.configFile);
+
+        expect(await run(["login", "--device", "--api-url", BASE, "--confirm-host", "api.test"], context)).toBe(EXIT.ok);
+        expect(await readConfig(context.configFile)).toEqual({ apiKey: "nk_new", apiUrl: BASE });
+        expect(context.io.stderr.text()).toContain("The key this replaces is still valid");
     });
 
     // eslint-disable-next-line unicorn/prefer-https -- plain http is the case under test

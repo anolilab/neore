@@ -32,7 +32,7 @@ interface DeviceSearch {
 
 type Decision = "approved" | "denied";
 
-type Problem = "expired" | "invalid" | "unavailable";
+type Problem = "expired" | "invalid" | "keyLimit" | "unavailable";
 
 interface Lookup {
     hostname?: string;
@@ -59,6 +59,10 @@ const problemOf = (failure: object | null | undefined): Problem => {
 
     if (error === "expired_token") {
         return "expired";
+    }
+
+    if (error === "key_limit") {
+        return "keyLimit";
     }
 
     return error === "invalid_request" ? "invalid" : "unavailable";
@@ -117,6 +121,7 @@ const ProblemMessage = ({ problem }: { problem: Problem }) => {
     const messages: Record<Problem, string> = {
         expired: t`This code has expired. Run \`neore login --device\` again to get a new one.`,
         invalid: t`This code is not valid, or it was already used. Run \`neore login --device\` again to get a new one.`,
+        keyLimit: t`Your account already has the maximum number of API keys, so the command line was not signed in. Revoke one in Settings, then run \`neore login --device\` again.`,
         unavailable: t`The code could not be checked right now. Try again in a moment.`,
     };
 

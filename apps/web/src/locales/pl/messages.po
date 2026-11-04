@@ -3541,7 +3541,7 @@ msgstr ""
 #: src/features/chat/thread/tool-approval.tsx:121
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:102
-#: src/routes/auth/device.tsx:239
+#: src/routes/auth/device.tsx:244
 msgid "Approve"
 msgstr "Zatwierdź"
 
@@ -3561,7 +3561,7 @@ msgstr ""
 msgid "Approved automatically — low risk"
 msgstr ""
 
-#: src/routes/auth/device.tsx:150
+#: src/routes/auth/device.tsx:155
 msgid "Approved. Return to your terminal: the command line is signed in. You can close this tab."
 msgstr ""
 
@@ -5677,7 +5677,7 @@ msgstr ""
 msgid "Checking image safety..."
 msgstr "Sprawdzanie bezpieczeństwa obrazu..."
 
-#: src/routes/auth/device.tsx:307
+#: src/routes/auth/device.tsx:312
 msgid "Checking the code…"
 msgstr ""
 
@@ -6201,8 +6201,8 @@ msgstr "Konta dostawców chmury"
 #: src/features/workflow/types/index.ts:451
 #: src/features/workflow/types/index.ts:455
 #: src/routes/_shortcut/code/index.tsx:16
-#: src/routes/auth/device.tsx:96
-#: src/routes/auth/device.tsx:211
+#: src/routes/auth/device.tsx:100
+#: src/routes/auth/device.tsx:216
 msgid "Code"
 msgstr "Kod"
 
@@ -6804,7 +6804,7 @@ msgid "Compressing context..."
 msgstr "Kompresowanie kontekstu..."
 
 #: src/features/settings/components/chat/bots-settings.tsx:140
-#: src/routes/auth/device.tsx:207
+#: src/routes/auth/device.tsx:212
 msgid "Computer"
 msgstr ""
 
@@ -7304,7 +7304,7 @@ msgstr "Generowanie uwzględniające kontekst"
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
 #: src/features/chat/host/host-composer.tsx:186
 #: src/features/skills/components/skill-builder-dialog.tsx:328
-#: src/routes/auth/device.tsx:109
+#: src/routes/auth/device.tsx:113
 msgid "Continue"
 msgstr "Dalej"
 
@@ -9417,7 +9417,7 @@ msgstr "Odrzucono — kontynuacja bez niego"
 msgid "Denied on {device}"
 msgstr "{device}: odrzucono"
 
-#: src/routes/auth/device.tsx:151
+#: src/routes/auth/device.tsx:156
 msgid "Denied. The command line was not signed in. You can close this tab."
 msgstr ""
 
@@ -9434,7 +9434,7 @@ msgid "Density updated"
 msgstr ""
 
 #: src/features/chat/thread/tool-approval.tsx:125
-#: src/routes/auth/device.tsx:230
+#: src/routes/auth/device.tsx:235
 msgid "Deny"
 msgstr "Odrzuć"
 
@@ -11108,7 +11108,7 @@ msgstr ""
 msgid "enter"
 msgstr ""
 
-#: src/routes/auth/device.tsx:129
+#: src/routes/auth/device.tsx:134
 msgid "Enter a different code"
 msgstr ""
 
@@ -11198,7 +11198,7 @@ msgstr "Wpisz tekst..."
 msgid "Enter the API key"
 msgstr "Wpisz klucz API"
 
-#: src/routes/auth/device.tsx:94
+#: src/routes/auth/device.tsx:98
 msgid "Enter the code that `neore login --device` shows in your terminal."
 msgstr ""
 
@@ -17910,7 +17910,7 @@ msgstr "Wczytywanie..."
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
-#: src/routes/auth/device.tsx:278
+#: src/routes/auth/device.tsx:283
 #: src/routes/auth/extension.tsx:66
 msgid "Loading…"
 msgstr "Wczytywanie…"
@@ -21502,7 +21502,7 @@ msgstr "Można porównywać tylko modele typu {0}. Wyczyść zaznaczenie, aby zm
 msgid "Only 3B activated per token for efficiency"
 msgstr "Tylko 3B aktywnych parametrów na token dla wydajności"
 
-#: src/routes/auth/device.tsx:215
+#: src/routes/auth/device.tsx:220
 msgid "Only continue if you started this just now by running `neore login --device`, and the code above matches the one in your terminal."
 msgstr ""
 
@@ -27877,7 +27877,7 @@ msgstr "Prawy pasek boczny"
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:325
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
-#: src/routes/auth/device.tsx:290
+#: src/routes/auth/device.tsx:295
 #: src/routes/auth/extension.tsx:78
 msgid "Sign in"
 msgstr "Zaloguj się"
@@ -27901,12 +27901,12 @@ msgstr ""
 msgid "Sign in on another site?"
 msgstr "Zalogować się na innej stronie?"
 
-#: src/routes/auth/device.tsx:93
-#: src/routes/auth/device.tsx:322
+#: src/routes/auth/device.tsx:97
+#: src/routes/auth/device.tsx:327
 msgid "Sign in the command line"
 msgstr ""
 
-#: src/routes/auth/device.tsx:201
+#: src/routes/auth/device.tsx:206
 msgid "Sign in the command line?"
 msgstr ""
 
@@ -30482,7 +30482,7 @@ msgstr ""
 msgid "That computer is not online."
 msgstr ""
 
-#: src/routes/auth/device.tsx:191
+#: src/routes/auth/device.tsx:196
 msgid "That did not go through. Try again."
 msgstr ""
 
@@ -30639,7 +30639,7 @@ msgstr "Zmiana jest za duża, aby pokazać ją w całości."
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "Agent czatu wykonuje zadanie za pomocą swoich narzędzi, opcjonalnie według umiejętności."
 
-#: src/routes/auth/device.tsx:120
+#: src/routes/auth/device.tsx:125
 msgid "The code could not be checked right now. Try again in a moment."
 msgstr ""
 
@@ -30647,7 +30647,7 @@ msgstr ""
 msgid "The coding agent could not start."
 msgstr "Nie udało się uruchomić agenta kodującego."
 
-#: src/routes/auth/device.tsx:203
+#: src/routes/auth/device.tsx:208
 msgid "The command line on the computer below will be signed in as {email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings."
 msgstr ""
 
@@ -31320,19 +31320,19 @@ msgstr ""
 #~ msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
 #~ msgstr ""
 
-#: src/routes/auth/device.tsx:167
+#: src/routes/auth/device.tsx:172
 msgid "This code has already been answered."
 msgstr ""
 
-#: src/routes/auth/device.tsx:118
+#: src/routes/auth/device.tsx:122
 msgid "This code has expired. Run `neore login --device` again to get a new one."
 msgstr ""
 
-#: src/routes/auth/device.tsx:119
+#: src/routes/auth/device.tsx:123
 msgid "This code is not valid, or it was already used. Run `neore login --device` again to get a new one."
 msgstr ""
 
-#: src/routes/auth/device.tsx:159
+#: src/routes/auth/device.tsx:164
 msgid "This code was opened with a different account. Sign in with that account, or run `neore login --device` again."
 msgstr ""
 
@@ -32890,7 +32890,7 @@ msgstr "Unikalne podejście do modelowania języka"
 msgid "United States"
 msgstr "Stany Zjednoczone"
 
-#: src/routes/auth/device.tsx:208
+#: src/routes/auth/device.tsx:213
 msgid "unknown"
 msgstr ""
 
@@ -34959,7 +34959,7 @@ msgstr ""
 #: src/features/chat/thread/streaming-placeholder.tsx:631
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
-#: src/routes/auth/device.tsx:239
+#: src/routes/auth/device.tsx:244
 msgid "Working…"
 msgstr "Pracuję…"
 
@@ -35175,7 +35175,7 @@ msgstr "Dodajesz dokumenty zbyt szybko. Poczekaj chwilę i spróbuj ponownie."
 msgid "You are browsing as a guest. Sign in with your account to connect the extension."
 msgstr "Przeglądasz jako gość. Zaloguj się na swoje konto, aby połączyć rozszerzenie."
 
-#: src/routes/auth/device.tsx:288
+#: src/routes/auth/device.tsx:293
 msgid "You are browsing as a guest. Sign in with your account to sign in the command line."
 msgstr ""
 
@@ -35376,6 +35376,10 @@ msgstr ""
 
 #: src/features/develop/lib/use-review-messages.ts:21
 msgid "Your {label} sign-in has expired. Connect it again."
+msgstr ""
+
+#: src/routes/auth/device.tsx:124
+msgid "Your account already has the maximum number of API keys, so the command line was not signed in. Revoke one in Settings, then run `neore login --device` again."
 msgstr ""
 
 #: src/features/auth/components/settings/account/delete-account-card.tsx:56
