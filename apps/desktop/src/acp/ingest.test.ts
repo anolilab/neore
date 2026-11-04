@@ -1340,6 +1340,19 @@ describe("what the agent reports about itself", () => {
         expect(sent[1]?.post.issuedAt).toBeGreaterThan(sent[0]?.post.issuedAt ?? 0);
     });
 
+    it("keeps the cost reported earlier when a later usage report in the same window leaves it out", async () => {
+        const host = poster();
+
+        await open(host);
+        const cost = { amount: 0.4, currency: "USD" };
+
+        host.sessionState("s1", { usage: { cost, size: 1000, used: 10 } });
+        host.sessionState("s1", { usage: { size: 1000, used: 12 } });
+        await settle(2000);
+
+        expect(statePosts()[0]?.post.events[0]).toMatchObject({ usage: { cost, size: 1000, used: 12 } });
+    });
+
     it("keeps the report of a session opened while unpaired, and posts it once the computer is paired", async () => {
         paired = undefined;
         const host = poster();

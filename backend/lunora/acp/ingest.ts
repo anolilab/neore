@@ -181,6 +181,13 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
     return { ended: false, next: 0, outcome: "applied", threadId: threadId as string };
 };
 
+/** A usage report with the cost it kept from before, when it did not restate one (never an `undefined` value: the store refuses it). */
+const withKeptCost = (usage: Usage, stored: Usage | undefined): Usage => {
+    const cost = usage.cost ?? stored?.cost;
+
+    return { size: usage.size, used: usage.used, ...(cost !== undefined && { cost }) };
+};
+
 /** The same reported usage, field by field: stored values come back in whatever order the store keeps them. */
 const sameUsage = (a: Usage | undefined, b: Usage | undefined): boolean =>
     a?.used === b?.used && a?.size === b?.size && a?.cost?.amount === b?.cost?.amount && a?.cost?.currency === b?.cost?.currency;
@@ -212,8 +219,11 @@ const applySessionState = async (
         return { ended: false, next: 0, outcome: "applied" };
     }
 
-    if (event.usage !== undefined && !sameUsage(event.usage, session.agentState?.usage)) {
-        await ctx.db.patch("acpSessions", session._id, { agentState: { ...session.agentState, usage: event.usage }, agentStateAt: at });
+    // A usage report that leaves the cost out keeps the cost reported before: the agent's cost is cumulative.
+    const usage = event.usage === undefined ? undefined : withKeptCost(event.usage, session.agentState?.usage);
+
+    if (usage !== undefined && !sameUsage(usage, session.agentState?.usage)) {
+        await ctx.db.patch("acpSessions", session._id, { agentState: { ...session.agentState, usage }, agentStateAt: at });
     } else if (session.agentStateAt === undefined || at > session.agentStateAt) {
         // A newer report that repeats the stored usage (or leaves it out) still moves the watermark, so an older report that
         // arrives later cannot overwrite the newest observation.

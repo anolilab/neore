@@ -199,7 +199,11 @@ export class HostPoster implements SessionObserver {
      * usage updates (one per model step) costs one post, not one each.
      */
     public sessionState(sessionId: string, patch: SessionStatePatch): void {
-        this.pendingState.set(sessionId, { ...this.pendingState.get(sessionId), ...patch, at: this.now() });
+        const pending = this.pendingState.get(sessionId);
+        // A usage report inside the same window that leaves the cost out keeps the cost before it: the agent's cost is cumulative.
+        const usage = patch.usage === undefined ? pending?.usage : { ...pending?.usage, ...patch.usage };
+
+        this.pendingState.set(sessionId, { ...pending, ...patch, ...usage !== undefined && { usage }, at: this.now() });
         this.scheduleState(STATE_DEBOUNCE_MS);
     }
 

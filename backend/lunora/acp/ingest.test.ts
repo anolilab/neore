@@ -2424,6 +2424,17 @@ describe("what the agent reports about itself", () => {
         expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(12) }, agentStateAt: 2000, status: "ended" });
     });
 
+    it("keeps the cost reported before when a later usage report leaves it out", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const cost = { amount: 0.4, currency: "USD" };
+
+        await report(device, 1000, { usage: { ...usage(10), cost } });
+        await report(device, 2000, { usage: usage(12) });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: { cost, size: 200_000, used: 12 } } });
+    });
+
     it("orders a report stamped ahead of the server clock at the server's time, so a current report is still applied", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);

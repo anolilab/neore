@@ -22,7 +22,7 @@ interface ContextUsageMeterProps {
  * model's window, a host thread the figures its agent reported (`agentState.usage`).
  */
 const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindow, detail, usedTokens }) => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
 
     const { isAtCapacity, isCriticalUsage, isHighUsage, percentage } = useMemo(() => {
         const rawPct = contextWindow > 0 ? (usedTokens / contextWindow) * 100 : 0;
@@ -35,6 +35,9 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
             percentage: pct,
         };
     }, [usedTokens, contextWindow]);
+
+    // The percentage in the person's number format: a comma in German, not the period `toFixed` always writes.
+    const percent = new Intl.NumberFormat(i18n.locale, { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(percentage);
 
     // SVG circle parameters
     const size = 16;
@@ -66,7 +69,7 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
             <TooltipTrigger
                 render={
                     <button
-                        aria-label={t`${formatTokenCount(usedTokens)}/${formatTokenCount(contextWindow)} tokens used (${percentage.toFixed(1)}%)`}
+                        aria-label={t`${formatTokenCount(usedTokens)}/${formatTokenCount(contextWindow)} tokens used (${percent}%)`}
                         className={cn(
                             "flex items-center gap-1.5 text-xs transition-colors",
                             isCriticalUsage && "text-destructive",
@@ -107,7 +110,7 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
                 <div className="space-y-1.5">
                     <div className="font-medium">{t`Context Usage`}</div>
                     <div className="text-muted-foreground text-xs">
-                        {t`${formatTokenCount(usedTokens)} of ${formatTokenCount(contextWindow)} tokens used (${percentage.toFixed(1)}%)`}
+                        {t`${formatTokenCount(usedTokens)} of ${formatTokenCount(contextWindow)} tokens used (${percent}%)`}
                     </div>
                     {detail !== undefined && <div className="text-muted-foreground text-xs">{detail}</div>}
                     {isAtCapacity && (
