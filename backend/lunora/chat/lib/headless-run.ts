@@ -324,7 +324,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // allowlist, and the final system prompt, so an answer never widens what the child had.
             const snapshot: ToolRunConfig = {
                 autoMediaEnrichment: false,
-                ...(options.origin !== "lead" && { dispatchOrigin: options.origin }),
+                ...(options.origin === "outside_agent" && { dispatchOrigin: "outside_agent" as const }),
                 instructions: system ?? agent.options.instructions,
                 mcpServerNames: toolResult.mcpServerNames,
                 model,

@@ -19,7 +19,7 @@ export const vToolRunConfig = v.object({
      * What started the run that paused, when it was not the user's own chat: the continuation
      * dispatches to workers as that origin did, not as the lead. Absent means the lead.
      */
-    dispatchOrigin: v.optional(v.union(v.literal("trigger"), v.literal("messenger"), v.literal("outside_agent"))),
+    dispatchOrigin: v.optional(v.literal("outside_agent")),
     /**
      * Set when a group-chat participant paused: the continuation resumes that
      * participant, then the rest of the turn (`chat/group/run.ts`).
