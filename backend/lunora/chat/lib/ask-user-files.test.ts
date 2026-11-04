@@ -134,10 +134,7 @@ describe("loadAskUserFiles", () => {
 
 describe("loadAskUserFiles with a model that cannot read a file", () => {
     it("names an unreadable file without downloading its bytes or spending the budget", async () => {
-        const { ctx, download } = makeCtx(
-            { a: fileRow("a", "image/png"), p: fileRow("p", "application/pdf", "spec.pdf") },
-            { "key/a": objectOf(PNG_BYTES) },
-        );
+        const { ctx, download } = makeCtx({ a: fileRow("a", "image/png"), p: fileRow("p", "application/pdf", "spec.pdf") }, { "key/a": objectOf(PNG_BYTES) });
 
         const files = await loadAskUserFiles(ctx, { fileIds: ["p", "a"], threadId: "t1", userId: "u1" }, (mediaType) => mediaType.startsWith("image/"));
 
