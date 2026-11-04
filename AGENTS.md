@@ -1517,9 +1517,12 @@ sed -i 's/\x1b\[[0-9;]*m//g' /tmp/cg.log
 grep -oP "\[(ERROR|WARN|INFO)\] \K[a-z_]+(?= —)" /tmp/cg.log | sort | uniq -c | sort -rn
 ```
 
-A public procedure logs one `ctx.log.event` on its success path, written in the procedure
-itself (one in a helper does not count), and handlers read time from `ctx.now` and plain ids
-from `ctx.newId()`; only a token or secret takes `crypto`.
+Conventions that keep new code clear of the advisor:
+
+- **Every public procedure logs one `ctx.log.event`** on each success return, written in the
+  procedure itself: one in a helper does not count.
+- **Time comes from `ctx.now`**, never `Date.now()`, in a query or mutation.
+- **Plain ids come from `ctx.newId()`**; only a token or secret takes `crypto`.
 
 `unbounded_string_arg` (was 418, now 26) is purely SYNTACTIC: it flags an
 inline `v.string()` in `.input({...})` with no `.max`/`.check`/`.length` chained

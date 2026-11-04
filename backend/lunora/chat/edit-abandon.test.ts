@@ -71,6 +71,29 @@ describe("failAbandonedEditReply", () => {
         expect(await rowsOf(threadId)).toHaveLength(2);
     });
 
+    it("fails every pending row of a long reply, past the first page", async () => {
+        const { promptId, threadId } = await setup();
+        const rows = 205;
+
+        await harness.run(async (ctx: any) => {
+            for (let stepOrder = 1; stepOrder <= rows; stepOrder += 1) {
+                await ctx.db.insert("messages", {
+                    message: { content: [{ text: "step", type: "text" }], role: "assistant" },
+                    order: 0,
+                    status: "pending",
+                    stepOrder,
+                    text: "step",
+                    threadId,
+                    tool: false,
+                    userId: "u1",
+                });
+            }
+        });
+
+        await expect(lapse(threadId, promptId)).resolves.toStrictEqual({ added: false, failed: rows });
+        expect((await rowsOf(threadId)).filter((row) => row.status === "pending")).toHaveLength(0);
+    });
+
     it("adds a failed reply under the prompt when the delivery died before writing one, and only once", async () => {
         const { promptId, threadId } = await setup();
 

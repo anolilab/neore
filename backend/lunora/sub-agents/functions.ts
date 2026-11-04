@@ -1791,6 +1791,8 @@ export const stopWorker = authMutation
             args.clientId.length === 0 ||
             !(await claimOnce(ctx, WORKER_STOP_SCOPE, `${args.workerId}:${args.clientId}`, WORKER_DISPATCH_CLAIM_TTL_MS, ctx.user.userId))
         ) {
+            ctx.log.event("sub_agents.stop_worker", { cancelled: 0, repeated: true, scope: args.scope, targets: 0 });
+
             return { cancelled: 0 };
         }
 

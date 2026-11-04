@@ -94,6 +94,8 @@ export const watchRepo = authMutation
         const { userId } = ctx.user;
 
         if ((await rowFor(ctx, userId, repo)) !== null) {
+            ctx.log.event("source_control.watch_repo", { alreadyWatched: true });
+
             return { status: "ok" as const };
         }
 

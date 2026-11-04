@@ -176,6 +176,8 @@ export const cancelHostTurn = authMutation
         const stream = await liveHostStream(ctx, args.threadId);
 
         if (!stream) {
+            ctx.log.event("acp.cancel_host_turn", { cancelled: false, withdrewPrompt: false });
+
             return { cancelled: false };
         }
 

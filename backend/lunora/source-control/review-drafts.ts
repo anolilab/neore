@@ -271,6 +271,8 @@ export const setDraftReview = authMutation
 
         if (draft === null) {
             if (isEmpty({ body: args.body, comments: [], verdict: args.verdict })) {
+                ctx.log.event("source_control.set_draft_review", { outcome: "unchanged", verdict: args.verdict });
+
                 return { commentId: null, revision: 0, status: "ok" as const };
             }
 

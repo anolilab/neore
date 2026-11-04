@@ -120,6 +120,9 @@ export const beginHostGuide = internalMutation
             throw new LunoraError("INTERNAL", "The guide's session did not start");
         }
 
+        // The public `startHostSession` logs this; a guide starts its session through the helper, not the procedure.
+        ctx.log.event("acp.start_host_session", { started: true });
+
         // The prompt carries a pull request's title, body and paths: third-party text, so the turn is signed as tainted.
         const sent = await sendToHostFor(ctx, {
             plan: args.plan,
