@@ -9,13 +9,13 @@ export interface SetupDevice {
     transport?: "ssh";
 }
 
-/** What the live device list says is already true. */
+/** What the live device list says is already true. An agent offer counts on a computer or on an SSH server. */
 export const detectSetupDone = (devices: readonly SetupDevice[] | undefined): Record<SetupStepId, boolean> => {
     const list = devices ?? [];
     const paired = list.filter((device) => device.transport !== "ssh");
 
     return {
-        agent: paired.some((device) => (device.acpOffers?.length ?? 0) > 0),
+        agent: list.some((device) => (device.acpOffers?.length ?? 0) > 0),
         pair: paired.length > 0,
         ssh: list.some((device) => device.transport === "ssh"),
     };

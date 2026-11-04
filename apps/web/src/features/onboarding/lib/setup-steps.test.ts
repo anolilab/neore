@@ -10,7 +10,7 @@ describe("setup steps", () => {
 
     it("detects pairing, an SSH server and an agent offer", () => {
         expect(detectSetupDone([{ acpOffers: [{}] }, { transport: "ssh" }])).toEqual({ agent: true, pair: true, ssh: true });
-        expect(detectSetupDone([{ acpOffers: [{}], transport: "ssh" }])).toEqual({ agent: false, pair: false, ssh: true });
+        expect(detectSetupDone([{ acpOffers: [{}], transport: "ssh" }])).toEqual({ agent: true, pair: false, ssh: true });
     });
 
     it("marks skipped steps and lets done win", () => {

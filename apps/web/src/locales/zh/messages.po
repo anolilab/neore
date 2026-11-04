@@ -667,7 +667,7 @@ msgstr "发现 {0} 个工具"
 
 #. placeholder {0}: device.toolNames.length
 #. placeholder {1}: device.toolNames.join(", ")
-#: src/features/devices/components/devices-settings.tsx:177
+#: src/features/devices/components/devices-settings.tsx:178
 msgid "{0} tools: {1}"
 msgstr "{0} 个工具：{1}"
 
@@ -1347,15 +1347,15 @@ msgstr "OpenRouter token 用量排名第一"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, other {# 个收藏}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:250
+#: src/features/settings/components/chat/agent-settings.tsx:240
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ 数据源：约 2,700 个 token（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:249
+#: src/features/settings/components/chat/agent-settings.tsx:239
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ 知识：约 2,600 个 token（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:248
+#: src/features/settings/components/chat/agent-settings.tsx:238
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ 任务规划：约 2,500 个 token（+200）"
 
@@ -2044,7 +2044,7 @@ msgstr "添加备注..."
 msgid "Add a note…"
 msgstr "添加备注…"
 
-#: src/features/devices/components/devices-settings.tsx:342
+#: src/features/devices/components/devices-settings.tsx:343
 msgid "Add a server over SSH"
 msgstr ""
 
@@ -2072,6 +2072,10 @@ msgstr "在上方添加提醒，在用量超过阈值时收到通知。"
 #: src/features/auth/components/settings/two-factor/two-factor-card.tsx:44
 msgid "Add an extra layer of security to your account by enabling two-factor authentication."
 msgstr "启用双重验证，为你的账号增加一层安全保护。"
+
+#: src/features/onboarding/components/setup-checklist.tsx:69
+msgid "Add an SSH server"
+msgstr ""
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:261
 msgid "Add at least one deployment name"
@@ -2372,7 +2376,7 @@ msgstr "新增："
 msgid "Adding documents… {0} of {1}"
 msgstr "正在添加文档… {0} / {1}"
 
-#: src/features/devices/components/devices-settings.tsx:324
+#: src/features/devices/components/devices-settings.tsx:325
 msgid "Adding the server was cancelled on this computer."
 msgstr ""
 
@@ -2384,7 +2388,7 @@ msgstr "正在添加你之前的回复…"
 msgid "Adding…"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:355
+#: src/features/devices/components/devices-settings.tsx:356
 msgid "Address"
 msgstr ""
 
@@ -2623,7 +2627,7 @@ msgstr "在此激活连接后，你将获得一个 webhook URL，需在 Discord 
 msgid "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 msgstr "在此激活连接后，你将获得一个 webhook URL，需在 Slack 应用的 Event Subscriptions 中将其设为 Request URL。"
 
-#: src/features/devices/components/devices-settings.tsx:271
+#: src/features/devices/components/devices-settings.tsx:272
 msgid "After outside content"
 msgstr "在外部内容之后"
 
@@ -3944,6 +3948,7 @@ msgstr ""
 #: src/features/chat/thread/composer-image-settings.tsx:28
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
+#: src/features/chat/thread/composer-model-selector.tsx:120
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
@@ -4308,7 +4313,7 @@ msgstr "封禁"
 msgid "Base"
 msgstr "基础"
 
-#: src/features/settings/components/chat/agent-settings.tsx:247
+#: src/features/settings/components/chat/agent-settings.tsx:237
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "基础（仅智能体循环）：约 2,300 个 token"
 
@@ -5667,6 +5672,10 @@ msgstr "勾选的集成会在保存后提供设置。在你确认之前不会建
 msgid "Checked: {0}"
 msgstr ""
 
+#: src/features/onboarding/components/setup-checklist.tsx:73
+msgid "Checking"
+msgstr ""
+
 #: ../../packages/chat-ui/src/chat/message-content.tsx:374
 msgid "Checking image safety..."
 msgstr "正在检查图片安全性..."
@@ -6294,8 +6303,16 @@ msgid "Coding agent runs"
 msgstr ""
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:87
+#: src/features/devices/components/devices-settings.tsx:88
 msgid "Coding agents you can start on {0}"
+msgstr ""
+
+#: src/features/onboarding/components/setup-checklist.tsx:80
+msgid "Coding setup"
+msgstr ""
+
+#: src/features/onboarding/components/setup-checklist.tsx:82
+msgid "Coding setup steps"
 msgstr ""
 
 #: src/features/marketing/data/models-data.ts:561
@@ -6900,7 +6917,7 @@ msgstr "请确认密码"
 msgid "Confirm your password"
 msgstr "确认你的密码"
 
-#: src/features/devices/components/devices-settings.tsx:135
+#: src/features/devices/components/devices-settings.tsx:136
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:250
 #: src/features/skills/components/skill-builder-setup.tsx:136
 #: src/routes/auth/extension.tsx:154
@@ -6944,7 +6961,7 @@ msgstr "连接一个音频/文件节点作为输入"
 msgid "Connect an image node as input"
 msgstr "连接一个图像节点作为输入"
 
-#: src/features/devices/components/devices-settings.tsx:373
+#: src/features/devices/components/devices-settings.tsx:374
 msgid "Connect and add"
 msgstr ""
 
@@ -7097,7 +7114,7 @@ msgstr "连接错误，请检查网络连接后重试。"
 msgid "Connection failed"
 msgstr "连接失败"
 
-#: src/features/devices/components/devices-settings.tsx:189
+#: src/features/devices/components/devices-settings.tsx:190
 msgid "Connection lost"
 msgstr ""
 
@@ -7685,7 +7702,7 @@ msgstr "需要以 Gemini 2.5 最低档获得可靠 Google AI 的成本敏感型�
 msgid "Costa Rica"
 msgstr "哥斯达黎加"
 
-#: src/features/devices/components/devices-settings.tsx:334
+#: src/features/devices/components/devices-settings.tsx:335
 msgid "Could not add the server."
 msgstr ""
 
@@ -7721,12 +7738,25 @@ msgstr ""
 msgid "Could not cancel the run."
 msgstr "无法取消运行。"
 
+#: src/features/chat/thread/composer-model-selector.tsx:127
+msgid "Could not change Auto. Please try again."
+msgstr ""
+
 #: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
 msgstr "无法更改推送通知，请重试。"
 
+#: src/features/chat/model-settings/use-model-combobox.ts:283
+#: src/features/chat/model-settings/use-model-combobox.ts:307
+msgid "Could not change the model. Please try again."
+msgstr ""
+
 #: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
+msgstr ""
+
+#: src/features/onboarding/components/setup-checklist.tsx:76
+msgid "Could not check"
 msgstr ""
 
 #. placeholder {0}: target.name
@@ -7746,7 +7776,7 @@ msgstr ""
 msgid "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:148
+#: src/features/devices/components/devices-settings.tsx:149
 msgid "Could not connect to the server."
 msgstr ""
 
@@ -7873,7 +7903,7 @@ msgstr "无法作为页面打开"
 msgid "Could not open the pull request."
 msgstr "无法打开拉取请求。"
 
-#: src/features/devices/components/devices-settings.tsx:438
+#: src/features/devices/components/devices-settings.tsx:439
 msgid "Could not pair this computer. Try again."
 msgstr "无法配对此计算机。请重试。"
 
@@ -7916,7 +7946,7 @@ msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 msgid "Could not refine the draft. Try again."
 msgstr "无法优化草稿，请重试。"
 
-#: src/features/devices/components/devices-settings.tsx:219
+#: src/features/devices/components/devices-settings.tsx:220
 msgid "Could not remove the device."
 msgstr "无法移除该设备。"
 
@@ -7924,7 +7954,7 @@ msgstr "无法移除该设备。"
 msgid "Could not remove the participant"
 msgstr "无法移除参与者"
 
-#: src/features/devices/components/devices-settings.tsx:169
+#: src/features/devices/components/devices-settings.tsx:170
 msgid "Could not rename the device."
 msgstr "无法重命名该设备。"
 
@@ -7942,6 +7972,10 @@ msgstr ""
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:143
 msgid "Could not retry. Please try again."
+msgstr ""
+
+#: src/features/onboarding/components/setup-checklist.tsx:38
+msgid "Could not save that choice. Try again."
 msgstr ""
 
 #: src/features/notifications/components/notification-settings.tsx:110
@@ -8026,7 +8060,7 @@ msgstr ""
 msgid "Could not stop the worker."
 msgstr ""
 
-#: src/features/chat/model-settings/use-model-combobox.ts:148
+#: src/features/chat/model-settings/use-model-combobox.ts:161
 msgid "Could not switch the model. Please try again."
 msgstr ""
 
@@ -9382,7 +9416,7 @@ msgstr "需要 Z.AI 最强大前沿 GLM 模型的高要求任务"
 msgid "Demanding tasks where maximum AI capability and refined reasoning matter most"
 msgstr "最看重极致 AI 能力和精细推理的高要求任务"
 
-#: src/features/devices/components/devices-settings.tsx:256
+#: src/features/devices/components/devices-settings.tsx:257
 msgid "Denied"
 msgstr "已拒绝"
 
@@ -9672,19 +9706,19 @@ msgstr "需要开源模型具备强大编程和通用能力的开发者"
 msgid "Development"
 msgstr "开发"
 
-#: src/features/devices/components/devices-settings.tsx:513
+#: src/features/devices/components/devices-settings.tsx:519
 msgid "Device activity"
 msgstr "设备活动"
 
-#: src/features/devices/components/devices-settings.tsx:158
+#: src/features/devices/components/devices-settings.tsx:159
 msgid "Device name"
 msgstr "设备名称"
 
-#: src/features/devices/components/devices-settings.tsx:222
+#: src/features/devices/components/devices-settings.tsx:223
 msgid "Device removed"
 msgstr "设备已移除"
 
-#: src/features/devices/components/devices-settings.tsx:448
+#: src/features/devices/components/devices-settings.tsx:451
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "设备"
@@ -9791,7 +9825,7 @@ msgstr ""
 msgid "Discard the review"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:138
+#: src/features/devices/components/devices-settings.tsx:139
 #: src/features/settings/connectors/connector-card.tsx:189
 #: src/features/settings/connectors/connector-card.tsx:209
 msgid "Disconnect"
@@ -9828,7 +9862,7 @@ msgstr "Discord 公钥"
 #: src/features/chat/thread/ask-user-prompt.tsx:191
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
-#: src/features/devices/components/devices-settings.tsx:202
+#: src/features/devices/components/devices-settings.tsx:203
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "关闭"
@@ -9975,7 +10009,8 @@ msgstr "还没有账号？"
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:104
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
-#: src/features/devices/components/devices-settings.tsx:255
+#: src/features/devices/components/devices-settings.tsx:256
+#: src/features/onboarding/components/setup-checklist.tsx:72
 #: src/features/skills/components/bundle-import-dialog.tsx:248
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
@@ -11429,7 +11464,7 @@ msgstr ""
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "预估提供商费用 {display}，计入你自己的 API 密钥"
 
-#: src/features/settings/components/chat/agent-settings.tsx:243
+#: src/features/settings/components/chat/agent-settings.tsx:233
 msgid "Estimated token cost per conversation"
 msgstr "每次对话的预估 token 成本"
 
@@ -11806,7 +11841,7 @@ msgid "expired"
 msgstr "已过期"
 
 #: src/features/chat/thread-list/thread-node.tsx:308
-#: src/features/devices/components/devices-settings.tsx:257
+#: src/features/devices/components/devices-settings.tsx:258
 #: src/features/settings/connectors/connector-card.tsx:76
 msgid "Expired"
 msgstr "已过期"
@@ -12063,7 +12098,7 @@ msgstr "失败"
 #: src/features/chat/thread-list/thread-status-icon.tsx:88
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/develop/components/checks-tab.tsx:77
-#: src/features/devices/components/devices-settings.tsx:258
+#: src/features/devices/components/devices-settings.tsx:259
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:175
@@ -14523,6 +14558,10 @@ msgstr "跳转到消息：{snippet}"
 msgid "Go to next page"
 msgstr "下一页"
 
+#: src/features/onboarding/components/setup-checklist.tsx:62
+msgid "Go to pairing"
+msgstr ""
+
 #: ../../packages/ui/src/components/pagination.tsx:40
 msgid "Go to previous page"
 msgstr "上一页"
@@ -14530,6 +14569,10 @@ msgstr "上一页"
 #: src/components/command-palette.tsx:357
 msgid "Go to Prompts"
 msgstr "前往提示词"
+
+#: src/features/onboarding/components/setup-checklist.tsx:67
+msgid "Go to servers"
+msgstr ""
 
 #: src/components/command-palette.tsx:369
 msgid "Go to Settings"
@@ -16226,6 +16269,14 @@ msgstr ""
 msgid "Install"
 msgstr "安装"
 
+#: src/features/onboarding/components/setup-checklist.tsx:59
+msgid "Install a coding agent"
+msgstr ""
+
+#: src/features/onboarding/components/setup-checklist.tsx:58
+msgid "Install a coding agent in the Neore desktop app and approve it for a folder on a paired computer. The install happens in the desktop window, not here."
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:72
 msgid "Install the bot in Teams (via a Teams app manifest or the Developer Portal) and send it a message."
 msgstr "在 Teams 中安装机器人（通过 Teams 应用清单或开发者门户），并给它发送一条消息。"
@@ -16758,7 +16809,7 @@ msgstr ""
 msgid "Kenya"
 msgstr "肯尼亚"
 
-#: src/features/devices/components/devices-settings.tsx:367
+#: src/features/devices/components/devices-settings.tsx:368
 msgid "Key file (optional, absolute path)"
 msgstr ""
 
@@ -17350,12 +17401,16 @@ msgstr ""
 msgid "Let replies use tools"
 msgstr "允许回复使用工具"
 
-#: src/features/devices/components/devices-settings.tsx:447
+#: src/features/devices/components/devices-settings.tsx:450
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "通过 Neore 桌面应用，让智能体使用你自己电脑上的文件、终端和本地 MCP 服务器。每个操作都会先在那台电脑上征求你的同意，共享聊天或后台任务不会运行任何操作。"
 
-#: src/features/devices/components/devices-settings.tsx:505
+#: src/features/devices/components/devices-settings.tsx:510
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
+msgstr ""
+
+#: src/features/onboarding/components/setup-checklist.tsx:68
+msgid "Let the agent work on a server you reach over SSH. Needs a paired computer."
 msgstr ""
 
 #: src/features/settings/components/chat/trigger-settings.tsx:248
@@ -19585,11 +19640,11 @@ msgstr "静音"
 msgid "my data"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:412
+#: src/features/devices/components/devices-settings.tsx:413
 msgid "My Linux computer"
 msgstr "我的 Linux 电脑"
 
-#: src/features/devices/components/devices-settings.tsx:412
+#: src/features/devices/components/devices-settings.tsx:413
 msgid "My Mac"
 msgstr "我的 Mac"
 
@@ -19601,7 +19656,7 @@ msgstr "我的 MCP 服务器"
 msgid "My skills"
 msgstr "我的技能"
 
-#: src/features/devices/components/devices-settings.tsx:412
+#: src/features/devices/components/devices-settings.tsx:413
 msgid "My Windows PC"
 msgstr "我的 Windows 电脑"
 
@@ -19627,7 +19682,7 @@ msgstr ""
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:485
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:351
+#: src/features/devices/components/devices-settings.tsx:352
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
@@ -19905,7 +19960,7 @@ msgstr "Neore 包含 30+ 个模型：聊天有 GPT-4、Claude、Gemini 和 DeepS
 msgid "Neore keeps these up to date and tells you when someone asks for your review."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:181
+#: src/features/devices/components/devices-settings.tsx:182
 msgid "Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on."
 msgstr ""
 
@@ -20439,7 +20494,7 @@ msgstr "无描述"
 msgid "No description provided."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:499
+#: src/features/devices/components/devices-settings.tsx:502
 msgid "No devices paired."
 msgstr "没有已配对的设备。"
 
@@ -20857,7 +20912,7 @@ msgstr "还没有对话"
 msgid "No tier data yet. Tier info is recorded for new requests after the gateway upgrade."
 msgstr "暂无套餐等级数据。网关升级后，新请求会记录等级信息。"
 
-#: src/features/devices/components/devices-settings.tsx:177
+#: src/features/devices/components/devices-settings.tsx:178
 msgid "No tools shared yet"
 msgstr "尚未共享任何工具"
 
@@ -21096,7 +21151,7 @@ msgstr "备注（可选）"
 msgid "Note for the next run (optional)"
 msgstr "给下次运行的备注（可选）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:253
+#: src/features/settings/components/chat/agent-settings.tsx:243
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "注意：模块按对话而非按消息应用。仅启用你需要的模块以优化 token 用量。"
 
@@ -21104,7 +21159,7 @@ msgstr "注意：模块按对话而非按消息应用。仅启用你需要的模
 msgid "Nothing found"
 msgstr "未找到结果"
 
-#: src/features/devices/components/devices-settings.tsx:250
+#: src/features/devices/components/devices-settings.tsx:251
 msgid "Nothing has run on a device yet."
 msgstr "尚未在任何设备上运行过操作。"
 
@@ -21249,7 +21304,7 @@ msgstr "官方"
 
 #: src/features/code/components/code-shell.tsx:81
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:188
+#: src/features/devices/components/devices-settings.tsx:189
 #: src/routes/admin/gateway/index.tsx:37
 msgid "Offline"
 msgstr "离线"
@@ -21452,7 +21507,7 @@ msgstr "请输入一次性密码"
 
 #: src/features/code/components/code-shell.tsx:81
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:188
+#: src/features/devices/components/devices-settings.tsx:189
 msgid "Online"
 msgstr "在线"
 
@@ -21671,7 +21726,7 @@ msgstr ""
 msgid "Open Model Picker"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:452
+#: src/features/devices/components/devices-settings.tsx:455
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "请在桌面应用中打开 Neore 以配对此计算机。之前配对的设备列在下方。"
 
@@ -22559,15 +22614,23 @@ msgstr "涂抹你想编辑的区域。白色区域将重新生成，深色区域
 msgid "Pair one in Settings"
 msgstr ""
 
+#: src/features/onboarding/components/setup-checklist.tsx:64
+msgid "Pair this computer"
+msgstr ""
+
+#: src/features/onboarding/components/setup-checklist.tsx:63
+msgid "Pair this computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer."
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:190
 msgid "Paired"
 msgstr "已配对"
 
-#: src/features/devices/components/devices-settings.tsx:485
+#: src/features/devices/components/devices-settings.tsx:488
 msgid "Paired devices"
 msgstr "已配对的设备"
 
-#: src/features/devices/components/devices-settings.tsx:428
+#: src/features/devices/components/devices-settings.tsx:429
 msgid "Pairing was cancelled on this computer."
 msgstr "已在此计算机上取消配对。"
 
@@ -23294,7 +23357,7 @@ msgstr "精致的好莱坞风格"
 msgid "Popular"
 msgstr "热门"
 
-#: src/features/devices/components/devices-settings.tsx:363
+#: src/features/devices/components/devices-settings.tsx:364
 msgid "Port"
 msgstr ""
 
@@ -24585,6 +24648,10 @@ msgstr "只读"
 msgid "Read the docs"
 msgstr "阅读文档"
 
+#: src/features/onboarding/components/setup-checklist.tsx:57
+msgid "Read the guide"
+msgstr ""
+
 #: src/features/develop/components/develop-page.tsx:43
 #~ msgid "Read what needs you: the description, commits, files, diff and checks of each change."
 #~ msgstr ""
@@ -24841,7 +24908,7 @@ msgstr "重新连接"
 msgid "Reconnect {0}"
 msgstr "重新连接 {0}"
 
-#: src/features/devices/components/devices-settings.tsx:190
+#: src/features/devices/components/devices-settings.tsx:191
 msgid "Reconnecting"
 msgstr ""
 
@@ -25194,8 +25261,8 @@ msgstr "记住我"
 #: src/features/chat/thread/composer-input.tsx:339
 #: src/features/chat/thread/composer-input.tsx:393
 #: src/features/chat/thread/composer-input.tsx:402
-#: src/features/devices/components/devices-settings.tsx:206
-#: src/features/devices/components/devices-settings.tsx:212
+#: src/features/devices/components/devices-settings.tsx:207
+#: src/features/devices/components/devices-settings.tsx:213
 #: src/features/projects/components/project-form-dialog.tsx:263
 #: src/features/projects/components/project-form-dialog.tsx:304
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
@@ -25212,7 +25279,7 @@ msgid "Remove \"{0}\"?"
 msgstr "移除“{0}”？"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:229
+#: src/features/devices/components/devices-settings.tsx:230
 msgid "Remove “{0}”?"
 msgstr "移除“{0}”？"
 
@@ -25813,6 +25880,7 @@ msgstr "结果"
 msgid "Result not delivered"
 msgstr ""
 
+#: src/features/onboarding/components/setup-checklist.tsx:106
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Resume"
 msgstr "恢复"
@@ -25871,9 +25939,9 @@ msgstr ""
 #: src/features/chat/thread/chat-error.tsx:56
 #: src/features/chat/thread/request-secret-prompt.tsx:311
 #: src/features/chat/translation/message-translation.tsx:88
-#: src/features/devices/components/devices-settings.tsx:140
+#: src/features/devices/components/devices-settings.tsx:141
 #: src/features/local-models/components/ollama-model-manager.tsx:188
-#: src/features/settings/components/chat/agent-settings.tsx:234
+#: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -27330,7 +27398,7 @@ msgstr "正在发送你的消息并等待回复"
 msgid "Sending…"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:259
+#: src/features/devices/components/devices-settings.tsx:260
 msgid "Sent"
 msgstr "已发送"
 
@@ -27382,7 +27450,7 @@ msgstr "塞尔维亚语（塞尔维亚）"
 msgid "Serif"
 msgstr "衬线"
 
-#: src/features/devices/components/devices-settings.tsx:331
+#: src/features/devices/components/devices-settings.tsx:332
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr ""
 
@@ -27398,7 +27466,7 @@ msgstr "服务器错误，请稍后重试。"
 msgid "Server name is required"
 msgstr "请输入服务器名称"
 
-#: src/features/devices/components/devices-settings.tsx:187
+#: src/features/devices/components/devices-settings.tsx:188
 msgid "Server over SSH"
 msgstr ""
 
@@ -27422,7 +27490,7 @@ msgstr "支持分支的 Serverless Postgres 数据库"
 msgid "servers"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:506
+#: src/features/devices/components/devices-settings.tsx:511
 msgid "Servers over SSH"
 msgstr ""
 
@@ -27573,7 +27641,7 @@ msgstr "已共享"
 msgid "Shared conversation"
 msgstr "共享的对话"
 
-#: src/features/devices/components/devices-settings.tsx:480
+#: src/features/devices/components/devices-settings.tsx:483
 msgid "Shared folders and local servers…"
 msgstr "共享文件夹和本地服务器…"
 
@@ -28107,6 +28175,7 @@ msgid "Skills views"
 msgstr "技能视图"
 
 #: src/features/onboarding/components/onboarding-dialog.tsx:405
+#: src/features/onboarding/components/setup-checklist.tsx:106
 msgid "Skip"
 msgstr "跳过"
 
@@ -28128,6 +28197,7 @@ msgstr "跳过导览"
 
 #: src/features/develop/components/checks-tab.tsx:80
 #: src/features/evals/components/run-detail.tsx:36
+#: src/features/onboarding/components/setup-checklist.tsx:72
 #: src/features/settings/components/chat/trigger-settings.tsx:176
 msgid "Skipped"
 msgstr "已跳过"
@@ -28356,7 +28426,7 @@ msgstr "我们这边出了点问题，请稍后重试。"
 msgid "Something went wrong. Nothing was changed. Try again."
 msgstr ""
 
-#: src/features/settings/components/chat/agent-settings.tsx:224
+#: src/features/settings/components/chat/agent-settings.tsx:220
 #: src/features/skills/components/skill-list.tsx:252
 msgid "Something went wrong. Try again."
 msgstr "出错了，请重试。"
@@ -28742,7 +28812,7 @@ msgstr "开始"
 
 #. placeholder {0}: offer.agentLabel
 #. placeholder {1}: offer.folderLabel
-#: src/features/devices/components/devices-settings.tsx:109
+#: src/features/devices/components/devices-settings.tsx:110
 msgid "Start {0} in {1}"
 msgstr ""
 
@@ -30487,7 +30557,7 @@ msgstr ""
 msgid "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 msgstr "43 位的 EncodingAESKey（消息加解密方式必须设为安全模式）"
 
-#: src/features/devices/components/devices-settings.tsx:213
+#: src/features/devices/components/devices-settings.tsx:214
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "智能体将无法再向此设备请求任何操作。其活动日志会保留到过期为止。"
 
@@ -30552,7 +30622,7 @@ msgstr ""
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr ""
 
-#: src/features/chat/thread/composer-model-selector.tsx:90
+#: src/features/chat/thread/composer-model-selector.tsx:135
 msgid "The bot sets the model for this chat."
 msgstr ""
 
@@ -31265,7 +31335,7 @@ msgstr "此集合由你组织中的成员共享给你。你可以将其附加到
 msgid "This command name is reserved"
 msgstr "此命令名称已被保留"
 
-#: src/features/devices/components/devices-settings.tsx:186
+#: src/features/devices/components/devices-settings.tsx:187
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "此电脑"
@@ -31274,20 +31344,20 @@ msgstr "此电脑"
 msgid "This computer did not resume its own session, so the conversation was handed over"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:457
+#: src/features/devices/components/devices-settings.tsx:460
 msgid "This computer is not paired yet."
 msgstr "此计算机尚未配对。"
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:473
+#: src/features/devices/components/devices-settings.tsx:476
 msgid "This computer is paired as “{0}”."
 msgstr "此计算机已配对为“{0}”。"
 
-#: src/features/devices/components/devices-settings.tsx:457
+#: src/features/devices/components/devices-settings.tsx:460
 msgid "This computer is paired with another account."
 msgstr "此计算机已与另一个账户配对。"
 
-#: src/features/devices/components/devices-settings.tsx:435
+#: src/features/devices/components/devices-settings.tsx:436
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "此计算机已配对。请在桌面应用中选择要共享的文件夹。"
 
@@ -31827,6 +31897,10 @@ msgstr "对话会保留完整历史。分支想法、置顶重要聊天，随时
 msgid "Threads working on this {requestNoun}"
 msgstr ""
 
+#: src/features/onboarding/components/setup-checklist.tsx:80
+msgid "Three steps to use coding agents on your own machines. Skip any of them and come back later."
+msgstr ""
+
 #: src/features/canvas/canvas-panel.tsx:215
 #: src/features/settings/components/chat/usage-settings.tsx:496
 msgid "Threshold"
@@ -31907,6 +31981,7 @@ msgstr ""
 msgid "to {0}"
 msgstr "到 {0}"
 
+#: src/features/onboarding/components/setup-checklist.tsx:72
 #: src/features/tasks/components/task-status.tsx:21
 msgid "To do"
 msgstr "待办"
@@ -32002,7 +32077,7 @@ msgstr ""
 msgid "Token budget"
 msgstr "token 预算"
 
-#: src/features/settings/components/chat/agent-settings.tsx:242
+#: src/features/settings/components/chat/agent-settings.tsx:232
 msgid "Token Cost Impact"
 msgstr "Token 成本影响"
 
@@ -33407,7 +33482,7 @@ msgstr "使用组织允许的模型"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "使用这些键盘快捷键更高效地浏览和操作数据表格。"
 
-#: src/features/devices/components/devices-settings.tsx:467
+#: src/features/devices/components/devices-settings.tsx:470
 msgid "Use this computer for agent tools"
 msgstr "将此计算机用于智能体工具"
 
@@ -33447,7 +33522,7 @@ msgstr "用户"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:359
+#: src/features/devices/components/devices-settings.tsx:360
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/sidebar-shortcut.tsx:212
@@ -34311,7 +34386,7 @@ msgstr ""
 msgid "Waiting for {device} to pick this up…"
 msgstr "等待 {device} 接收…"
 
-#: src/features/devices/components/devices-settings.tsx:254
+#: src/features/devices/components/devices-settings.tsx:255
 msgid "Waiting for approval"
 msgstr "等待批准"
 
@@ -34633,7 +34708,7 @@ msgstr "AI 应该怎么称呼你？"
 msgid "What should the guide pay attention to?"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:513
+#: src/features/devices/components/devices-settings.tsx:519
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "过去 30 天内智能体请求你的设备执行的操作。"
 
@@ -34803,7 +34878,7 @@ msgstr "使用邮箱/密码"
 msgid "With this, it fires when the text starts to contain the phrase, not on every change."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:369
+#: src/features/devices/components/devices-settings.tsx:370
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr ""
 

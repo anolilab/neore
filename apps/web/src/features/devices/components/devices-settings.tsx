@@ -445,6 +445,7 @@ const DevicesSettings: FC = () => {
     return (
         <div className="space-y-6">
             <SetupChecklist />
+            <div id="devices-pairing">
             <SettingsCard
                 description={t`Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks.`}
                 title={t`Devices`}
@@ -502,6 +503,8 @@ const DevicesSettings: FC = () => {
                     )}
                 </CardContent>
             </SettingsCard>
+            </div>
+            <div id="devices-ssh">
             {pairedHere !== undefined && native?.deviceId && (
                 <SettingsCard
                     description={t`Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours.`}
@@ -512,6 +515,7 @@ const DevicesSettings: FC = () => {
                     </CardContent>
                 </SettingsCard>
             )}
+            </div>
             <SettingsCard description={t`What the agent asked your devices to do in the last 30 days.`} title={t`Device activity`}>
                 <CardContent>
                     <DeviceActivity />

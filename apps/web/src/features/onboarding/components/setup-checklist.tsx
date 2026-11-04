@@ -1,18 +1,24 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { CardContent } from "@neore/ui/components/card";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 import type { FC } from "react";
+import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
-import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import type { SetupStepId } from "../lib/setup-steps";
-import { deriveSetupSteps, toggleSkipped } from "../lib/setup-steps";
+import { deriveSetupSteps, SETUP_STEP_IDS, toggleSkipped } from "../lib/setup-steps";
 
-const DEVICES_PATH = "/dashboard/settings/chat/devices";
+/** Where each step's action goes: the control on this page, or the guide for the part that happens in the desktop app. */
+const STEP_TARGET: Record<SetupStepId, string> = {
+    agent: "/docs/devices",
+    pair: "#devices-pairing",
+    ssh: "#devices-ssh",
+};
 
 /**
  * First-run setup. The web only explains and links: pairing and agent installs happen in the desktop app's own
@@ -21,54 +27,78 @@ const DEVICES_PATH = "/dashboard/settings/chat/devices";
 const SetupChecklist: FC = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
-    const { data: devices } = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
-    const { data: settings } = useUserSettings();
-    const { updateLatest } = useUpdateUserSettings();
-    const steps = deriveSetupSteps(devices, settings?.setupStepsSkipped);
+    const queryClient = useQueryClient();
+    const devicesQuery = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
+    const settingsQuery = useUserSettings();
+    const settingsKey = crpc.auth.functions.getUserSettings.queryOptions({}).queryKey;
+    // One step per call: the server applies it to the list it holds, so another tab's skip is never overwritten.
+    const setSkipped = useMutation({
+        ...crpc.auth.setup_steps.setSetupStepSkipped.mutationOptions(),
+        onError: () => {
+            toast.error(t`Could not save that choice. Try again.`);
+        },
+        onMutate: (args: { skipped: boolean; stepId: SetupStepId }) => {
+            const previous = queryClient.getQueryData<{ setupStepsSkipped?: string[] } | null>(settingsKey);
+
+            if (previous) {
+                queryClient.setQueryData(settingsKey, { ...previous, setupStepsSkipped: toggleSkipped(previous.setupStepsSkipped, args.stepId, args.skipped) });
+            }
+        },
+        onSettled: async () => {
+            await queryClient.invalidateQueries({ queryKey: settingsKey });
+        },
+    });
+    // An account with no settings row answers `null`; only `undefined` means the read has not finished.
+    const settingsLoaded = settingsQuery.data !== undefined;
+    const steps = devicesQuery.isSuccess ? deriveSetupSteps(devicesQuery.data, settingsQuery.data?.setupStepsSkipped) : undefined;
 
     const copy: Record<SetupStepId, { action: string; description: string; title: string }> = {
         agent: {
-            action: t`Open devices`,
+            action: t`Read the guide`,
             description: t`Install a coding agent in the Neore desktop app and approve it for a folder on a paired computer. The install happens in the desktop window, not here.`,
             title: t`Install a coding agent`,
         },
         pair: {
-            action: t`Open devices`,
+            action: t`Go to pairing`,
             description: t`Pair this computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer.`,
             title: t`Pair this computer`,
         },
         ssh: {
-            action: t`Open devices`,
+            action: t`Go to servers`,
             description: t`Let the agent work on a server you reach over SSH. Needs a paired computer.`,
             title: t`Add an SSH server`,
         },
     };
     const statusLabel = { done: t`Done`, skipped: t`Skipped`, todo: t`To do` };
+    let pendingLabel = t`Checking`;
+
+    if (devicesQuery.isError) {
+        pendingLabel = t`Could not check`;
+    }
 
     return (
         <SettingsCard description={t`Three steps to use coding agents on your own machines. Skip any of them and come back later.`} title={t`Coding setup`}>
             <CardContent>
                 <ol aria-label={t`Coding setup steps`} className="space-y-3">
-                    {steps.map(({ id, status }) => (
+                    {(steps ?? SETUP_STEP_IDS.map((id) => ({ id, status: undefined }))).map(({ id, status }) => (
                         <li className="flex flex-wrap items-center gap-3" key={id}>
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium">
                                     {status === "done" && <Check aria-hidden="true" className="mr-1 inline size-4" />}
-                                    {copy[id].title} <span className="text-muted-foreground font-normal">({statusLabel[status]})</span>
+                                    {copy[id].title} <span className="text-muted-foreground font-normal">({status ? statusLabel[status] : pendingLabel})</span>
                                 </p>
                                 <p className="text-muted-foreground text-xs">{copy[id].description}</p>
                             </div>
-                            {status !== "done" && (
+                            {status !== undefined && status !== "done" && (
                                 <>
-                                    <Button nativeButton={false} render={<a href={DEVICES_PATH} />} size="sm" variant="outline">
+                                    <Button nativeButton={false} render={<a href={STEP_TARGET[id]} />} size="sm" variant="outline">
                                         {copy[id].action}
                                         <span className="sr-only">: {copy[id].title}</span>
                                     </Button>
                                     <Button
+                                        disabled={!settingsLoaded}
                                         onClick={() => {
-                                            updateLatest((current) => {
-                                                return { setupStepsSkipped: toggleSkipped(current?.setupStepsSkipped, id, status === "todo") };
-                                            }).catch(() => {});
+                                            setSkipped.mutate({ skipped: status === "todo", stepId: id });
                                         }}
                                         size="sm"
                                         variant="ghost"
