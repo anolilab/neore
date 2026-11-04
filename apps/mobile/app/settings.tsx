@@ -4,6 +4,7 @@ import { ScrollView, Switch, Text, View } from "react-native";
 import { loadConfig } from "@/lib/config";
 import { crashReportStore } from "@/lib/crash-report-store";
 import { changeCrashReports, crashReportsOn } from "@/lib/crash-reporting";
+import { installMarker } from "@/lib/install-marker";
 
 const SAVE_FAILED_MESSAGE = "Your choice could not be applied. Try again.";
 
@@ -36,7 +37,7 @@ const SettingsScreen = () => {
         setFailure(null);
 
         try {
-            await changeCrashReports(crashReportStore, isOn);
+            await changeCrashReports(crashReportStore, isOn, installMarker);
         } catch (changeError) {
             console.warn("Could not change the crash-report setting.", changeError);
             setFailure(SAVE_FAILED_MESSAGE);

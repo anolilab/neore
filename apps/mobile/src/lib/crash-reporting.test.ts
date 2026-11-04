@@ -81,7 +81,7 @@ describe("changing the choice", () => {
 
         crash.startCrashReporting(() => fakeClient(events));
 
-        await crash.changeCrashReports(memoryStore(events, null), true);
+        await crash.changeCrashReports(memoryStore(events, null), true, returningInstall);
 
         expect(events).toEqual(["optIn", "save:on"]);
         expect(await crash.crashReportsOn()).toBe(true);
@@ -95,7 +95,7 @@ describe("changing the choice", () => {
         await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
         events.length = 0;
 
-        await expect(crash.changeCrashReports(memoryStore(events, "on", true), false)).rejects.toThrow("keychain is unavailable");
+        await expect(crash.changeCrashReports(memoryStore(events, "on", true), false, returningInstall)).rejects.toThrow("keychain is unavailable");
 
         expect(events).toEqual(["optOut", "save:off"]);
         expect(await crash.crashReportsOn()).toBe(false);
@@ -112,7 +112,7 @@ describe("changing the choice", () => {
         crash.startCrashReporting(() => client);
         const store = memoryStore(events, null);
 
-        await expect(crash.changeCrashReports(store, true)).rejects.toThrow("sdk refused");
+        await expect(crash.changeCrashReports(store, true, returningInstall)).rejects.toThrow("sdk refused");
 
         expect(store.value).toBeNull();
         expect(await crash.crashReportsOn()).toBe(false);
@@ -163,6 +163,37 @@ describe("applying the saved choice at startup", () => {
 });
 
 describe("a new install", () => {
+    it("starts off when the install marker cannot be read", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const create = vi.fn(() => fakeClient(events));
+
+        crash.startCrashReporting(create);
+        const unreadable = {
+            create: (): void => undefined,
+            exists: (): boolean => {
+                throw new Error("document folder unavailable");
+            },
+        };
+
+        await expect(crash.applyStoredCrashReportChoice(memoryStore(events, "on"), unreadable)).resolves.toBeUndefined();
+
+        expect(create).not.toHaveBeenCalled();
+        expect(await crash.crashReportsOn()).toBe(false);
+    });
+
+    it("counts as started once an explicit choice is saved, even if the reset never was", async () => {
+        const events: string[] = [];
+        const crash = await load();
+
+        crash.startCrashReporting(() => fakeClient(events));
+        const marker = newInstall();
+
+        await crash.changeCrashReports(memoryStore(events, null), true, marker);
+
+        expect(marker.created).toBe(true);
+    });
+
     it("resets a choice saved by an earlier install, and does not start the client for it", async () => {
         const events: string[] = [];
         const crash = await load();
@@ -278,7 +309,7 @@ describe("the global error handler", () => {
 
         crash.startCrashReporting(() => client);
         crash.installGlobalErrorReporting();
-        await crash.changeCrashReports(memoryStore(events, null), true);
+        await crash.changeCrashReports(memoryStore(events, null), true, returningInstall);
         const error = new TypeError("the reply said: buy milk");
 
         // eslint-disable-next-line unicorn/no-error-property-assignment -- stands in for the stack the engine records when the error is thrown
@@ -311,7 +342,7 @@ describe("the global error handler", () => {
             });
         });
 
-        const pending = crash.changeCrashReports(memoryStore(events, "on"), false);
+        const pending = crash.changeCrashReports(memoryStore(events, "on"), false, returningInstall);
 
         // Let the queued change start, so the opt-out is in progress when the error arrives.
         await new Promise((resolve) => {
@@ -337,7 +368,7 @@ describe("the global error handler", () => {
         });
         crash.startCrashReporting(() => client);
         crash.installGlobalErrorReporting();
-        await crash.changeCrashReports(memoryStore(events, null), true);
+        await crash.changeCrashReports(memoryStore(events, null), true, returningInstall);
         const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
         const error = new Error("boom");
 

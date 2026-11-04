@@ -113,11 +113,13 @@ export const crashReportsOn = (): Promise<boolean> => runChoice(async () => stat
  * Changes the choice. The client is switched first, so an opt-out takes effect even
  * if saving the choice then fails.
  */
-export const changeCrashReports = (store: PreferenceStore, isOn: boolean): Promise<void> =>
+export const changeCrashReports = (store: PreferenceStore, isOn: boolean, marker: InstallMarker): Promise<void> =>
     runChoice(async () => {
         await applyToClient(isOn);
         settleChoice();
         await writeCrashReportsEnabled(store, isOn);
+        // A choice made on this install is trusted, so the install counts as started from here on.
+        marker.create();
     });
 
 /** Whether this install has been started before, and a way to mark that it has. */
@@ -132,7 +134,16 @@ export interface InstallMarker {
  * tries again. A store that cannot be read is off.
  */
 const startupChoice = async (store: PreferenceStore, marker: InstallMarker): Promise<boolean> => {
-    if (!marker.exists()) {
+    let isReturning: boolean;
+
+    try {
+        isReturning = marker.exists();
+    } catch {
+        // Without the marker it cannot be told whether this is a new install, so the choice is not trusted this launch.
+        return false;
+    }
+
+    if (!isReturning) {
         try {
             await writeCrashReportsEnabled(store, false);
             marker.create();
