@@ -663,8 +663,8 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
                 precheck: async (userId) => {
                     await shard.call(internal.devices.internal.checkHeadlessPairing, { userId }, { shardKey: userId });
                 },
-                register: async ({ name, platform, userId }) =>
-                    await shard.call(internal.devices.internal.registerHeadlessDevice, { name, platform, userId }, { shardKey: userId }),
+                register: async ({ codeId, name, platform, userId }) =>
+                    await shard.call(internal.devices.internal.registerHeadlessDevice, { codeId, name, platform, userId }, { shardKey: userId }),
             },
             // Queued, not run here: moving a guest's rows takes a round trip per
             // table and page, too long to hold the sign-up request. The job runs

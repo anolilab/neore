@@ -97,8 +97,11 @@ export interface MintedCliKey {
 export interface HostPairingOptions {
     /** Throws when the account cannot add a device. Runs before the code is spent, so a refusal leaves it unclaimed. */
     precheck: (userId: string) => Promise<void>;
-    /** Creates the device and its secret. Called once per redeemed code, after the atomic claim. */
-    register: (input: { name: string; platform: HostPlatform; userId: string }) => Promise<{ deviceId: string; secret: string }>;
+    /**
+     * Creates the device and its secret, after the atomic claim. `codeId` names the redeemed code: a retry after a
+     * failure puts the code back, so the same id comes again and must find the device it already made.
+     */
+    register: (input: { codeId: string; name: string; platform: HostPlatform; userId: string }) => Promise<{ deviceId: string; secret: string }>;
 }
 
 export interface CliDeviceAuthOptions {
@@ -394,7 +397,7 @@ const redeemHost = (options: HostPairingOptions) =>
         let device: { deviceId: string; secret: string };
 
         try {
-            device = await options.register({ name, platform, userId: user.id });
+            device = await options.register({ codeId: String((claimedDeviceCode as { id?: unknown }).id ?? ""), name, platform, userId: user.id });
         } catch (error) {
             const refusal = refusalOrRetryable(error);
 

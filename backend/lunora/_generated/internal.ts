@@ -617,7 +617,7 @@ export interface InternalApiTypes {
             expireDeviceCall: FunctionReference<"mutation", { callId: Id<"deviceCalls">; reason: string }, null | { createdAt: number; deadline: number; error?: string; exitCode?: number; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; truncated?: boolean }>;
             getDeviceCallState: FunctionReference<"query", { callId: Id<"deviceCalls"> }, null | { createdAt: number; deadline: number; error?: string; exitCode?: number; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; truncated?: boolean }>;
             getDeviceToolContext: FunctionReference<"query", { now: number; threadId: Id<"threads">; userId: string }, null | { devices: Array<{ deviceId: string; name: string; tools: Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }> }>; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files"> }>;
-            registerHeadlessDevice: FunctionReference<"mutation", { name: string; platform: "macos" | "windows" | "linux"; userId: string }, { deviceId: string; secret: string }>;
+            registerHeadlessDevice: FunctionReference<"mutation", { codeId: string; name: string; platform: "macos" | "windows" | "linux"; userId: string }, { deviceId: string; secret: string }>;
             sweepDeviceCalls: FunctionReference<"mutation", {}, null>;
         };
     };

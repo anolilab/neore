@@ -11,7 +11,7 @@ import { setShardRoute } from "../../lib/shard-routes";
 import { MAX_DEVICES_PER_USER } from "./constants";
 import { generateDeviceSecret } from "./signing";
 
-type NewDevice = Partial<Pick<Doc<"devices">, "transport" | "viaDeviceId">> & Pick<Doc<"devices">, "name" | "platform" | "userId">;
+type NewDevice = Partial<Pick<Doc<"devices">, "pairedByCode" | "transport" | "viaDeviceId">> & Pick<Doc<"devices">, "name" | "platform" | "userId">;
 
 /** Refuses when the account already holds as many devices as it may. */
 export const assertRoomForDevice = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<void> => {
@@ -31,6 +31,7 @@ export const insertDevice = async (ctx: Pick<MutationCtx, "db" | "now">, device:
         name: device.name,
         platform: device.platform,
         userId: device.userId,
+        ...(device.pairedByCode !== undefined && { pairedByCode: device.pairedByCode }),
         ...(device.transport !== undefined && { transport: device.transport }),
         ...(device.viaDeviceId !== undefined && { viaDeviceId: device.viaDeviceId }),
     });

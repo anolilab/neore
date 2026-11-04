@@ -418,6 +418,7 @@ export interface Doc_devices {
     manifest?: Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }>;
     manifestIssuedAt?: number;
     name: string;
+    pairedByCode?: string;
     platform: "macos" | "windows" | "linux";
     projectIds?: Array<Id<"projects">>;
     revokedAt?: number;
@@ -3445,6 +3446,7 @@ export interface Insert_devices {
     manifest?: Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }>;
     manifestIssuedAt?: number;
     name: string;
+    pairedByCode?: string;
     platform: "macos" | "windows" | "linux";
     projectIds?: Array<Id<"projects">>;
     revokedAt?: number;

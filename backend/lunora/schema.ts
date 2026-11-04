@@ -723,6 +723,9 @@ export const schema = defineSchema({
         manifest: v.optional(v.array(vDeviceManifestTool)),
         manifestIssuedAt: v.optional(v.number()),
         name: v.string(),
+        // A machine that paired itself by code: the id of the code it redeemed, so a retried registration of the same
+        // code (the first reply was lost) finds this device instead of making a second one.
+        pairedByCode: v.optional(v.string()),
         platform: vDevicePlatform,
         // Where the device's tools are offered (`devices/lib/scope.ts`): unset = any of the
         // owner's chats, a list = only threads of those projects (empty = nowhere).

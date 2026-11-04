@@ -21,6 +21,7 @@ const BASE_URL = "http://localhost:3000";
 const SECRET = "a".repeat(64);
 
 interface Registration {
+    codeId: string;
     name: string;
     platform: string;
     userId: string;
@@ -28,6 +29,7 @@ interface Registration {
 
 const build = (options: { precheck?: (userId: string) => Promise<void>; register?: () => Promise<void>; withHostPairing?: boolean } = {}) => {
     const registrations: Registration[] = [];
+    const attempts: string[] = [];
     const database = memoryAdapter({ account: [], apikey: [], deviceCode: [], rateLimit: [], session: [], user: [], verification: [] });
     const auth = betterAuth({
         baseURL: BASE_URL,
@@ -41,6 +43,7 @@ const build = (options: { precheck?: (userId: string) => Promise<void>; register
                     hostPairing: {
                         precheck: options.precheck ?? (async () => undefined),
                         register: async (input) => {
+                            attempts.push(input.codeId);
                             await options.register?.();
                             registrations.push(input);
 
@@ -59,7 +62,7 @@ const build = (options: { precheck?: (userId: string) => Promise<void>; register
         telemetry: { enabled: false },
     });
 
-    return { auth, registrations };
+    return { attempts, auth, registrations };
 };
 
 type Harness = ReturnType<typeof build>;
@@ -175,7 +178,7 @@ describe("pairing a headless machine by code", () => {
         expect(redeemed.response.status).toBe(200);
         expect(redeemed.response.headers.get("cache-control")).toBe("no-store");
         expect(redeemed.body).toEqual({ account: "o***@example.test", device_id: "device-1", name: "build-box.lan", secret: SECRET, token_type: "device_secret" });
-        expect(harness.registrations).toEqual([{ name: "build-box.lan", platform: "linux", userId: owner.userId }]);
+        expect(harness.registrations).toEqual([{ codeId: expect.any(String), name: "build-box.lan", platform: "linux", userId: owner.userId }]);
     });
 
     it("registers once however many times the code is redeemed", async () => {
@@ -408,6 +411,36 @@ describe("pairing a headless machine by code", () => {
         vi.setSystemTime(Date.now() + 6000);
 
         expect(await statusOf(harness, code.device_code)).toBe(200);
+        expect(harness.registrations).toHaveLength(1);
+    });
+
+    it("registers the retry of a failed registration under the same code id, so one device results", async () => {
+        let calls = 0;
+        const harness = build({
+            register: async () => {
+                calls += 1;
+
+                if (calls === 1) {
+                    // The device was made, then the reply was lost.
+                    throw new Error("timed out after commit");
+                }
+            },
+        });
+        const owner = await signUp(harness);
+        const code = await requestHostCode(harness);
+
+        await approve(harness, owner.cookie, code.user_code);
+        vi.setSystemTime(Date.now() + 6000);
+        const lost = await redeem(harness, code.device_code);
+
+        expect(lost.response.status).toBe(500);
+        vi.setSystemTime(Date.now() + 6000);
+        expect(await statusOf(harness, code.device_code)).toBe(200);
+
+        // Both attempts carried the id of the one code, which is what lets the real registration find its device.
+        expect(harness.attempts).toHaveLength(2);
+        expect(harness.attempts[0]?.length).toBeGreaterThan(0);
+        expect(harness.attempts[1]).toBe(harness.attempts[0]);
         expect(harness.registrations).toHaveLength(1);
     });
 

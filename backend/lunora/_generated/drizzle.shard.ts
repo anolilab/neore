@@ -282,6 +282,7 @@ export const devices = sqliteTable("devices", {
     manifest: text("manifest", { mode: "json" }).$type<Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }>>(),
     manifestIssuedAt: real("manifestIssuedAt"),
     name: text("name").notNull(),
+    pairedByCode: text("pairedByCode"),
     platform: text("platform", { mode: "json" }).$type<"macos" | "windows" | "linux">().notNull(),
     projectIds: text("projectIds", { mode: "json" }).$type<Array<Id<"projects">>>(),
     revokedAt: real("revokedAt"),

@@ -15,7 +15,7 @@ import { threadHandoffTaint, threadSummaryTaint } from "../agent/thread-summary-
 import { decryptKey } from "../lib/encryption";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
-import { DEVICE_CALL_DEADLINE_MS, DEVICE_CALL_RETENTION_MS, MAX_DEVICE_INPUT_BYTES, MAX_OPEN_CALLS_PER_DEVICE } from "./lib/constants";
+import { DEVICE_CALL_DEADLINE_MS, DEVICE_CALL_RETENTION_MS, MAX_DEVICE_INPUT_BYTES, MAX_DEVICES_PER_USER, MAX_OPEN_CALLS_PER_DEVICE } from "./lib/constants";
 import { isDeviceInScope, resolveThreadProject } from "./lib/scope";
 import { signDevicePayload, utf8Length } from "./lib/signing";
 import { assertRoomForDevice, insertDevice } from "./lib/register";
@@ -337,16 +337,30 @@ export const checkHeadlessPairing = internalQuery
 
 /**
  * Registers the machine that redeemed an approved pairing code as a device of the approving account. The secret is
- * returned to the code redemption, which hands it to that machine in its one response; it is never readable again.
- * Only the redemption route calls this, after the plugin's one-time claim of the code.
+ * returned to the code redemption, which hands it to that machine in its response. Idempotent per redeemed code: if
+ * the first reply was lost (a timeout after this committed) the redemption retries with the same `codeId` and gets
+ * the device and secret it already made, not a second device. Only the redemption route calls this, after the
+ * plugin's one-time claim of the code (a retry first puts the code back).
  */
 export const registerHeadlessDevice = internalMutation
-    .input({ name: v.string().max(MAX_LENGTH.short), platform: vDevicePlatform, userId: v.string().max(MAX_LENGTH.short) })
+    .input({
+        codeId: v.string().max(MAX_LENGTH.id),
+        name: v.string().max(MAX_LENGTH.short),
+        platform: vDevicePlatform,
+        userId: v.string().max(MAX_LENGTH.short),
+    })
     .output(v.object({ deviceId: v.string(), secret: v.string() }))
     .mutation(async ({ args, ctx }) => {
+        const { page } = await ctx.db.devices.findMany({ limit: MAX_DEVICES_PER_USER + 1, where: { userId: args.userId } });
+        const existing = page.find((device) => device.pairedByCode === args.codeId && device.encryptedSecret !== undefined);
+
+        if (existing?.encryptedSecret) {
+            return { deviceId: existing._id as string, secret: await decryptKey(existing.encryptedSecret, "device-secrets") };
+        }
+
         await assertMayPairHeadless(ctx, args.userId);
 
-        const registered = await insertDevice(ctx, { name: args.name, platform: args.platform, transport: "headless", userId: args.userId });
+        const registered = await insertDevice(ctx, { name: args.name, pairedByCode: args.codeId, platform: args.platform, transport: "headless", userId: args.userId });
 
         ctx.log.event("devices.register_headless_device", { platform: args.platform });
 

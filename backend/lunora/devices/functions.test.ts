@@ -1221,8 +1221,14 @@ describe("servers reached over SSH", () => {
 });
 
 describe("a headless machine paired by code", () => {
-    const pairHeadless = async (userId: string, name = "build-box") =>
-        (await harness.run(async (ctx: any) => await ctx.runMutation(internals.registerHeadlessDevice, { name, platform: "linux", userId }))) as {
+    let codeCounter = 0;
+    const nextCode = () => {
+        codeCounter += 1;
+
+        return `code-${String(codeCounter)}`;
+    };
+    const pairHeadless = async (userId: string, name = "build-box", codeId = nextCode()) =>
+        (await harness.run(async (ctx: any) => await ctx.runMutation(internals.registerHeadlessDevice, { codeId, name, platform: "linux", userId }))) as {
             deviceId: string;
             secret: string;
         };
@@ -1239,6 +1245,34 @@ describe("a headless machine paired by code", () => {
         expect(JSON.stringify(list)).not.toContain(headless.secret);
         // It is a direct device: no desktop holds its secret.
         expect(list[0]).not.toHaveProperty("viaDeviceId");
+    });
+
+    it("is registered once per redeemed code: a retry after a lost reply gets the same device and secret", async () => {
+        const first = await pairHeadless(ownerId, "build-box", "code-lost-reply");
+        const retried = await pairHeadless(ownerId, "build-box", "code-lost-reply");
+
+        expect(retried).toEqual(first);
+
+        const list = (await as(ownerId).query(functions.listDevices as never, {} as never)) as { _id: string }[];
+
+        expect(list).toHaveLength(1);
+
+        // Another code is another machine.
+        const other = await pairHeadless(ownerId, "second-box", "code-another");
+
+        expect(other.deviceId).not.toBe(first.deviceId);
+        expect(other.secret).not.toBe(first.secret);
+    });
+
+    it("hands the retry its device even when the account has since filled up", async () => {
+        const first = await pairHeadless(ownerId, "build-box", "code-full");
+
+        for (let index = 0; index < 9; index += 1) {
+            await pairHeadless(ownerId, `filler-${String(index)}`);
+        }
+
+        await expect(pairHeadless(ownerId, "late", "code-new")).rejects.toThrow("At most");
+        expect(await pairHeadless(ownerId, "build-box", "code-full")).toEqual(first);
     });
 
     it("cannot be the relay of an SSH server", async () => {
