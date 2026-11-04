@@ -424,6 +424,68 @@ describe("the global error handler", () => {
         });
     });
 
+    it("keeps a fatal report waiting for the saved choice when a burst of handled errors follows it", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const client = fakeClient(events);
+
+        crash.startCrashReporting(() => client, memoryFlag());
+        crash.installGlobalErrorReporting();
+        const startup = crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
+
+        handlers.installed?.(new Error("fatal"), true);
+
+        for (let index = 0; index < 6; index += 1) {
+            handlers.installed?.(new Error(`handled ${index}`), false);
+        }
+
+        await startup;
+
+        await vi.waitFor(() => {
+            expect(client.captureException).toHaveBeenCalledWith(expect.anything(), { fatal: true });
+        });
+    });
+
+    it("hands a fatal error to the previous handler within the bound, even when the saved choice arrives late and the flush hangs", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const events: string[] = [];
+            const crash = await load();
+            const client = fakeClient(events);
+            const slowStore = {
+                get: async (): Promise<string | null> =>
+                    new Promise((resolve) => {
+                        setTimeout(resolve, 1500, "on");
+                    }),
+                set: async (): Promise<void> => undefined,
+            };
+
+            client.flush.mockImplementation(
+                () =>
+                    new Promise<void>(() => {
+                        // A flush that never settles.
+                    }),
+            );
+            crash.startCrashReporting(() => client, memoryFlag());
+            crash.installGlobalErrorReporting();
+            const startup = crash.applyStoredCrashReportChoice(slowStore, returningInstall);
+            const error = new Error("boom");
+
+            handlers.installed?.(error, true);
+            await vi.advanceTimersByTimeAsync(crash.FATAL_FLUSH_MS - 1);
+
+            expect(handlers.previous).not.toHaveBeenCalled();
+
+            await vi.advanceTimersByTimeAsync(1);
+
+            expect(handlers.previous).toHaveBeenCalledWith(error, true);
+            await startup;
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("runs the previous handler when a fatal flush hangs, once the bound has passed", async () => {
         vi.useFakeTimers();
 

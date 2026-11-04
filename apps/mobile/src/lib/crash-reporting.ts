@@ -24,6 +24,22 @@ interface HeldReport {
 const MAX_HELD_REPORTS = 5;
 
 /**
+ * Adds a report to those held, and keeps the list within the limit. The oldest report that is not fatal goes first,
+ * so a fatal report waiting for the choice is not lost to a burst of handled errors.
+ */
+const keepHeld = (held: HeldReport[], item: HeldReport): HeldReport[] => {
+    const next = [...held, item];
+
+    if (next.length <= MAX_HELD_REPORTS) {
+        return next;
+    }
+
+    const oldestHandled = next.findIndex((report) => !report.fatal);
+
+    return oldestHandled === -1 ? next.slice(-MAX_HELD_REPORTS) : next.toSpliced(oldestHandled, 1);
+};
+
+/**
  * A record that an opt-out was made. It is written before the saved choice, which can fail, and removed once the saved
  * choice is off. A record that is still there at launch means the saved "on" is not trusted.
  */
@@ -316,10 +332,10 @@ export const applyStoredCrashReportChoice = (store: PreferenceStore, marker: Ins
  * Lets one step of a fatal error finish, for at most `FATAL_FLUSH_MS`. A step that fails or hangs is not waited for
  * any longer: the previous handler must still run.
  */
-const boundedWait = async (work: () => Promise<unknown>): Promise<void> => {
+const boundedWait = async (work: () => Promise<unknown>, limitMs: number): Promise<void> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, FATAL_FLUSH_MS);
+        timer = setTimeout(resolve, limitMs);
     });
 
     try {
@@ -336,14 +352,17 @@ const boundedWait = async (work: () => Promise<unknown>): Promise<void> => {
  * before the saved choice is known waits for that choice first, so it is sent when the choice is on.
  */
 const endAfterFlush = async (previous: ErrorHandler, error: unknown, isFatal: boolean | undefined, choice?: Promise<void>): Promise<void> => {
+    // One deadline for both steps: the choice and the flush share the bound, so the previous handler is never later than it.
+    const deadline = Date.now() + FATAL_FLUSH_MS;
+
     if (choice) {
-        await boundedWait(() => choice);
+        await boundedWait(() => choice, FATAL_FLUSH_MS);
     }
 
     const { client } = state;
 
     if (client && state.isOn) {
-        await boundedWait(() => client.flush());
+        await boundedWait(() => client.flush(), Math.max(0, deadline - Date.now()));
     }
 
     previous(error, isFatal);
@@ -369,7 +388,7 @@ export const installGlobalErrorReporting = (): void => {
 
             if (!state.isChoiceKnown) {
                 // The saved choice is not read yet, so the report waits for it. The newest are kept.
-                state.held = [...state.held, held].slice(-MAX_HELD_REPORTS);
+                state.held = keepHeld(state.held, held);
             } else if (state.isOn) {
                 sendReport(held);
             }
