@@ -23,6 +23,12 @@ describe("shareLabel", () => {
         expect(shareLabel({ role: "assistant", text: "Here it is." })).toBe("Share reply: Here it is.");
     });
 
+    it("does not split an emoji at the cut", () => {
+        const label = shareLabel({ role: "assistant", text: `${"a".repeat(39)}😀 and more` });
+
+        expect(label).toBe(`Share reply: ${"a".repeat(39)}😀…`);
+    });
+
     it("cuts a long message to a short preview", () => {
         const label = shareLabel({ role: "assistant", text: "a".repeat(100) });
 

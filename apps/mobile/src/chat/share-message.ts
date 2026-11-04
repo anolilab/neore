@@ -19,7 +19,9 @@ const PREVIEW_LENGTH = 40;
  */
 export const shareLabel = (message: { role: string; text: string }): string => {
     const oneLine = message.text.replaceAll(/\s+/g, " ").trim();
-    const preview = oneLine.length > PREVIEW_LENGTH ? `${oneLine.slice(0, PREVIEW_LENGTH)}…` : oneLine;
+    // Cut by characters, not UTF-16 units, so an emoji at the cut is not split into a broken half.
+    const characters = [...oneLine];
+    const preview = characters.length > PREVIEW_LENGTH ? `${characters.slice(0, PREVIEW_LENGTH).join("")}…` : oneLine;
     const who = message.role === "user" ? "your message" : "reply";
 
     return `Share ${who}: ${preview}`;
