@@ -78,7 +78,11 @@ const PermissionRequestCard: FC<{ busy: boolean; onAnswer: (optionId: string) =>
 /** A cost the agent reported, as money. An unknown currency code is shown as the bare number, never a thrown error. */
 const formatReportedCost = (cost: { amount: number; currency: string }): string => {
     try {
-        return new Intl.NumberFormat(undefined, { currency: cost.currency, style: "currency" }).format(cost.amount);
+        // Agents report cumulative costs in fractions of a cent, which the currency's own digits would round to zero: below a cent,
+        // keep two significant digits.
+        const digits = cost.amount > 0 && cost.amount < 0.01 ? { maximumSignificantDigits: 2 } : {};
+
+        return new Intl.NumberFormat(undefined, { currency: cost.currency, style: "currency", ...digits }).format(cost.amount);
     } catch {
         return `${cost.amount} ${cost.currency}`;
     }

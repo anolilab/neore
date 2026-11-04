@@ -10,7 +10,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { HostEvent, PosterOptions } from "./ingest";
-import { HostPoster, KEEPALIVE_MS, POST_INTERVAL_MS } from "./ingest";
+import { HostPoster, KEEPALIVE_MS, newerPending, POST_INTERVAL_MS } from "./ingest";
 
 interface Post {
     close?: boolean;
@@ -1340,6 +1340,23 @@ describe("what the agent reports about itself", () => {
         expect(sent[1]?.post.issuedAt).toBeGreaterThan(sent[0]?.post.issuedAt ?? 0);
     });
 
+    it("keeps the report of a session opened while unpaired, and posts it once the computer is paired", async () => {
+        paired = undefined;
+        const host = poster();
+
+        host.sessionOpened("s1", INFO);
+        host.sessionState("s1", { usage: usage(9) });
+        await settle(2000);
+        expect(statePosts()).toEqual([]);
+
+        paired = "dev1";
+        host.paired();
+        await settle(4000);
+
+        expect(statePosts()).toHaveLength(1);
+        expect(statePosts()[0]?.post.events[0]).toMatchObject({ usage: usage(9) });
+    });
+
     it("posts a fresh report at the debounce, not after a pending retry's long backoff", async () => {
         const host = poster();
 
@@ -1372,5 +1389,16 @@ describe("what the agent reports about itself", () => {
 
         expect(statePosts()).toHaveLength(2);
         expect(statePosts()[1]?.post.events[0]).toMatchObject({ usage: usage(12) });
+    });
+});
+
+describe("a retry that finds a newer report waiting", () => {
+    it("keeps the newer observation for each field when the older send failed last", () => {
+        const failed = { at: 1000, usage: { size: 10, used: 1 } };
+        const waiting = { at: 2000, usage: { size: 10, used: 2 } };
+
+        expect(newerPending(failed, waiting)).toEqual(waiting);
+        expect(newerPending(waiting, failed)).toEqual(waiting);
+        expect(newerPending(failed, undefined)).toEqual(failed);
     });
 });

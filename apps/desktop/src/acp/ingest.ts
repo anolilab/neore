@@ -57,6 +57,18 @@ const STATE_RETRY_MS = 30_000;
 interface PendingState extends SessionStatePatch {
     at: number;
 }
+
+/**
+ * The report to keep after a send failed: a field observed later wins, whichever send it went out with. Two sends can be in
+ * flight at once, so the one that failed may be the older value; it must not replace the newer one.
+ */
+export const newerPending = (failed: PendingState, waiting: PendingState | undefined): PendingState => {
+    if (waiting === undefined || waiting.at < failed.at) {
+        return { ...waiting, ...failed };
+    }
+
+    return { ...failed, ...waiting };
+};
 /** A run of 401s this long and this many is a device the backend no longer knows, not a clock blip. */
 const REVOKED_AFTER_MS = 60_000;
 const REVOKED_AFTER_ATTEMPTS = 5;
@@ -192,9 +204,19 @@ export class HostPoster implements SessionObserver {
         for (const link of this.sessions.values()) {
             link.paired();
         }
+
+        // Reports held for sessions that were opened while unpaired go out once their threads are bound.
+        if (this.pendingState.size > 0) {
+            this.scheduleState(STATE_DEBOUNCE_MS);
+        }
     }
 
     public sessionEnded(sessionId: string): void {
+        // A session that never reached the backend has nothing to deliver its last report to.
+        if (this.sessions.get(sessionId)?.threadId === null) {
+            this.pendingState.delete(sessionId);
+        }
+
         this.sessions.get(sessionId)?.close();
         this.closing.add(sessionId);
         this.closeWhenDrained(sessionId);
@@ -522,14 +544,9 @@ export class HostPoster implements SessionObserver {
 
             const link = this.sessions.get(sessionId);
 
-            // A local-only session never posts; a session not opened yet, or without its thread, keeps the report.
-            if (link?.threadId === null) {
-                this.pendingState.delete(sessionId);
-
-                continue;
-            }
-
-            if (deviceId === undefined || link?.threadId === undefined) {
+            // Not posted now: a session not yet bound to its thread, or one held while unpaired. The report waits, and pairing
+            // or the thread's binding flushes it.
+            if (deviceId === undefined || link?.threadId === undefined || link.threadId === null) {
                 continue;
             }
 
@@ -550,7 +567,7 @@ export class HostPoster implements SessionObserver {
 
             if (result.kind === "retry") {
                 // Keep what is newer than this send, and let the next flush carry it with the rest.
-                this.pendingState.set(sessionId, { ...pending, ...this.pendingState.get(sessionId) });
+                this.pendingState.set(sessionId, newerPending(pending, this.pendingState.get(sessionId)));
                 this.scheduleState(STATE_RETRY_MS);
             }
         }

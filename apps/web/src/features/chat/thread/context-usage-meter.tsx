@@ -65,7 +65,8 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
         <Tooltip>
             <TooltipTrigger
                 render={
-                    <div
+                    <button
+                        aria-label={t`${formatTokenCount(usedTokens)}/${formatTokenCount(contextWindow)} tokens used (${percentage.toFixed(1)}%)`}
                         className={cn(
                             "flex items-center gap-1.5 text-xs transition-colors",
                             isCriticalUsage && "text-destructive",
@@ -73,6 +74,7 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
                             !isHighUsage && "text-muted-foreground",
                             className,
                         )}
+                        type="button"
                     >
                         {/* Circular progress indicator */}
                         <div className="flex size-4 items-center justify-center">
@@ -98,7 +100,7 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
                         <span className="tabular-nums">
                             {formatTokenCount(usedTokens)}/{formatTokenCount(contextWindow)}
                         </span>
-                    </div>
+                    </button>
                 }
             />
             <TooltipContent align="end" side="top">
