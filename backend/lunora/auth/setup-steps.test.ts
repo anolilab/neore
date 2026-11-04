@@ -75,7 +75,7 @@ describe("setSetupStepSkipped", () => {
     it("keeps both steps when two writes start from the same empty state", async () => {
         await Promise.all([toggle("ssh", true), toggle("agent", true)]);
 
-        expect([...((await stored()) ?? [])].sort()).toEqual(["agent", "ssh"]);
+        expect([...((await stored()) ?? [])].toSorted((a, b) => a.localeCompare(b))).toEqual(["agent", "ssh"]);
     });
 
     it("resumes one step without touching the others, and skipping twice stores it once", async () => {

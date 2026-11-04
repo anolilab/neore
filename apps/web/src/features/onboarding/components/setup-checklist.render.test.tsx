@@ -146,9 +146,9 @@ describe("<SetupChecklist>", () => {
         renderChecklist();
         await screen.findAllByText("(To do)");
 
-        expect(screen.getByRole("button", { name: /Go to pairing/ }).getAttribute("href")).toBe("#devices-pairing");
-        expect(screen.getByRole("button", { name: /Go to servers/ }).getAttribute("href")).toBe("#devices-ssh");
-        expect(screen.getByRole("button", { name: /Read the guide/ }).getAttribute("href")).toBe("/docs/devices");
+        expect(screen.getByRole("link", { name: /Go to pairing/ }).getAttribute("href")).toBe("#devices-pairing");
+        expect(screen.getByRole("link", { name: /Go to servers/ }).getAttribute("href")).toBe("#devices-ssh");
+        expect(screen.getByRole("link", { name: /Read the guide/ }).getAttribute("href")).toBe("/docs/devices");
     });
 
     it("offers resume for a skipped step and drops it once its state appears", async () => {

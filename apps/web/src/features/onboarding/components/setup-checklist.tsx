@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button } from "@neore/ui/components/button";
+import { Button, buttonVariants } from "@neore/ui/components/button";
 import { CardContent } from "@neore/ui/components/card";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
@@ -89,10 +89,10 @@ const SetupChecklist: FC = () => {
                             </div>
                             {status !== undefined && status !== "done" && (
                                 <>
-                                    <Button nativeButton={false} render={<a href={STEP_TARGET[id]} />} size="sm" variant="outline">
+                                    <a className={buttonVariants({ size: "sm", variant: "outline" })} href={STEP_TARGET[id]}>
                                         {copy[id].action}
                                         <span className="sr-only">: {copy[id].title}</span>
-                                    </Button>
+                                    </a>
                                     <Button
                                         disabled={!settingsLoaded}
                                         onClick={() => {

@@ -9,7 +9,7 @@ import { authMutation, rateLimit } from "../lib/crpc";
 import { saveUserSettings } from "./lib/preference-writes";
 
 /** The new skipped list for one step; ids stored by other versions are kept. */
-export const applyStepSkip = (stored: readonly string[] | undefined, stepId: string, skipped: boolean): string[] => {
+export const applyStepSkip = (stored: ReadonlyArray<string> | undefined, stepId: string, skipped: boolean): string[] => {
     const rest = (stored ?? []).filter((entry) => entry !== stepId);
 
     return skipped ? [...rest, stepId] : rest;
