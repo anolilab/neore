@@ -39,16 +39,8 @@ const SHARE_FAILED_MESSAGE = "The message could not be shared. Try again.";
 /** The server's replies on screen: every assistant row that is not a local one. */
 const serverReplies = (rows: Row[]): Row[] => rows.filter((row) => row.role === "assistant" && row.status !== "local");
 
-/**
- * Whether a server read has brought in the reply a send waited for: one more server reply than there were before the
- * send, with a final status. A read that holds only an earlier reply does not count.
- */
-const isReplyConfirmed = (rows: Row[], repliesBefore: number): boolean => {
-    const replies = serverReplies(rows);
-    const latest = replies.at(-1);
-
-    return replies.length > repliesBefore && latest !== undefined && (latest.status === "success" || latest.status === "failed");
-};
+/** The creation time of the newest server reply on screen, or 0 when there is none. */
+const latestReplyTime = (rows: Row[]): number => Math.max(0, ...serverReplies(rows).map((row) => row.createdAt));
 
 /** A failed share fills an empty error slot; an error already on screen is not replaced by it. */
 const withShareFailure = (current: string | null): string | null => current ?? SHARE_FAILED_MESSAGE;
@@ -121,6 +113,20 @@ const fetchMessagePage = (threadId: string, cursor: string | null) =>
         paginationOpts: { cursor, numItems: 100 },
         threadId: threadId as Id<"threads">,
     });
+
+/**
+ * Whether the newest page holds a reply created after the send's boundary, with a final status. Older pages cannot
+ * satisfy it, because their replies were created before the send.
+ */
+const hasSettledReplySince = async (threadId: string, boundary: number): Promise<boolean> => {
+    const page = await fetchMessagePage(threadId, null);
+
+    return page.page.some(
+        (message) =>
+            // eslint-disable-next-line no-underscore-dangle -- `_creationTime` is the Lunora document field, not a private one
+            message.role === "assistant" && message._creationTime > boundary && (message.status === "success" || message.status === "failed"),
+    );
+};
 
 const Chat = () => {
     const { threadId: routeThreadId } = useLocalSearchParams<{ threadId: string }>();
@@ -318,28 +324,41 @@ const Chat = () => {
         return () => gate.invalidate();
     }, [threadId]);
 
-    // After a send, re-read on a timer until the server's copy of its reply is final. The send records how many server
-    // replies there were, so only a new one counts. A new send replaces the record, which restarts the reads.
-    const [confirmation, setConfirmation] = useState<{ repliesBefore: number; threadId: string } | null>(null);
+    // After a send, check the newest page on a timer until the server's copy of the reply is final. Each check reads one
+    // page, so older pages on screen are not touched; a full read happens once, when the check settles or runs out.
+    const [confirmation, setConfirmation] = useState<{ boundary: number; threadId: string } | null>(null);
     const [confirmTick, setConfirmTick] = useState(0);
-    const isAwaitingReply = confirmation !== null && confirmation.threadId === threadId && !isReplyConfirmed(rows, confirmation.repliesBefore);
+    const isAwaitingReply = confirmation !== null && confirmation.threadId === threadId;
 
     useEffect(() => {
-        if (!isAwaitingReply) {
+        if (!isAwaitingReply || confirmation === null) {
             return undefined;
         }
 
+        const { boundary, threadId: id } = confirmation;
         let reads = 0;
-        const timer = setInterval(() => {
-            reads += 1;
-            setConfirmTick((tick) => tick + 1);
+        let isActive = true;
 
-            if (reads >= CONFIRM_READS) {
-                setConfirmation(null);
+        const check = async () => {
+            reads += 1;
+            let isConfirmed = false;
+
+            try {
+                isConfirmed = await hasSettledReplySince(id, boundary);
+            } catch {
+                // A failed check is tried again on the next tick.
             }
-        }, CONFIRM_READ_INTERVAL_MS);
+
+            if (isActive && (isConfirmed || reads >= CONFIRM_READS)) {
+                setConfirmation(null);
+                setConfirmTick((tick) => tick + 1);
+            }
+        };
+
+        const timer = setInterval(check, CONFIRM_READ_INTERVAL_MS);
 
         return () => {
+            isActive = false;
             clearInterval(timer);
         };
     }, [confirmation, isAwaitingReply]);
@@ -369,7 +388,7 @@ const Chat = () => {
         const stamp = Date.now();
         const userId = `user-${stamp}`;
         const assistantId = `pending-${stamp}`;
-        const repliesBefore = serverReplies(rows).length;
+        const boundary = latestReplyTime(rows);
 
         setConfirmation(null);
 
@@ -423,7 +442,7 @@ const Chat = () => {
                 setRows((current) => finishRow(current, assistantId));
             }
 
-            setConfirmation({ repliesBefore, threadId: started.threadId });
+            setConfirmation({ boundary, threadId: started.threadId });
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
