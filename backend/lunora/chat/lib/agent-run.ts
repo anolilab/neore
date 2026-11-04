@@ -1126,7 +1126,8 @@ export const resumeApprovedRun = async (
             // Loaded here, not at the top: the tool module pulls in the agent client.
             const { createAnsweredAskUserTool } = await import("../tools/ask-user");
             const loaded = answerFileIds?.length ? await loadAskUserFiles(ctx, { fileIds: answerFileIds, threadId, userId }) : [];
-            const files = filesTheModelReads(loaded, MODEL_LOOKUP.get(config.model));
+            const definition = MODEL_LOOKUP.get(config.model);
+            const files = filesTheModelReads(loaded, definition ? backupCapabilities(definition) : undefined);
 
             toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer, files) as (typeof toolResult.tools)[string];
         }

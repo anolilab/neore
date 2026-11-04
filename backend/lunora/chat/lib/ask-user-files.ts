@@ -15,10 +15,8 @@ import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import type { ActionCtx } from "../../_generated/server";
 import { readStoredObject } from "../../lib/storage-read";
-import type { ModelDefinition } from "@neore/ai/models";
-
 import type { AskUserFile } from "../tools/ask-user-constants";
-import { backupCapabilities } from "./backup-model";
+import type { BackupCapabilities } from "./backup-model";
 import {
     ASK_USER_FILE_MAX_BYTES,
     ASK_USER_FILE_TYPES,
@@ -49,11 +47,8 @@ const toBase64 = (bytes: ArrayBuffer): string => {
  * turn without attachments, so a file the model cannot read is left out (its name still reaches the answer) rather than
  * failing the resumed call. A model the catalogue does not know reads none of them.
  */
-export const filesTheModelReads = (files: ReadonlyArray<AskUserFile>, definition: ModelDefinition | undefined): AskUserFile[] => {
-    const readable = definition ? backupCapabilities(definition) : { files: false, images: false };
-
-    return files.filter((file) => (file.mediaType.startsWith("image/") ? readable.images : readable.files));
-};
+export const filesTheModelReads = (files: ReadonlyArray<AskUserFile>, readable: BackupCapabilities | undefined): AskUserFile[] =>
+    files.filter((file) => readable?.[file.mediaType.startsWith("image/") ? "images" : "files"] === true);
 
 export const loadAskUserFiles = async (
     ctx: Pick<ActionCtx, "runQuery" | "storage">,
