@@ -27,7 +27,8 @@ const PdfPart: FC<PdfPartProps> = ({ filename, url }) => {
         }
     };
 
-    return <PdfThumbnail filename={filename} onOpen={open} url={url} />;
+    // A new URL is a new attachment: its thumbnail starts over rather than keeping a failure or page count.
+    return <PdfThumbnail filename={filename} key={url} onOpen={open} url={url} />;
 };
 
 export default PdfPart;

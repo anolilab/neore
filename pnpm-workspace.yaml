@@ -211,7 +211,7 @@ catalogs:
     # imports the worker from it as a `?url` asset, and a second pdfjs-dist copy
     # makes the API and the worker disagree ("API version does not match Worker
     # version"). Move with react-pdf.
-    pdfjs-dist: 6.4.299
+    pdfjs-dist: 6.3.289
     react-pdf: 11.0.0
     wavesurfer.js: 8.0.3
   forms:

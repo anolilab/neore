@@ -53,9 +53,10 @@ const createBatcher = <T>() => {
 const hoveredMessageBatcher = createBatcher<string | null>();
 const isAtBottomBatcher = createBatcher<boolean>();
 
-/** A chat PDF the side panel shows. `url` is the attachment's own (signed) URL. */
+/** A chat PDF the side panel shows. `url` is the attachment's own (signed) URL; the panel shows it only in `threadId`. */
 export interface PreviewFile {
     filename?: string;
+    threadId?: string;
     url: string;
 }
 
@@ -99,7 +100,6 @@ interface ChatUIStore {
     clearTransitioningMessage: (threadId: string) => void;
 
     closeCanvas: () => void;
-    openPreviewFile: (file: PreviewFile) => void;
 
     composerAttachments: PendingAttachment[];
 
@@ -120,15 +120,16 @@ interface ChatUIStore {
     // Scroll state
     isAtBottom: boolean;
     isCanvasOpen: boolean;
-    /** A chat PDF open in the side panel, instead of a document. Cleared when a document opens or the panel closes. */
-    previewFile: PreviewFile | null;
     // Submission state (to prevent suggestions from opening between submit and streaming)
     isSubmitting: boolean;
     // Composer actions
     noteComposerHiddenRemoved: (count: number) => void;
-
     // Canvas/Artifact actions
     openCanvas: (documentId: string) => void;
+
+    openPreviewFile: (file: PreviewFile) => void;
+    /** A chat PDF open in the side panel, instead of a document. Cleared when a document opens or the panel closes. */
+    previewFile: PreviewFile | null;
     removeAttachedReference: (id: string) => void;
     removeAttachment: (id: string) => void;
     removeEditAttachment: (id: string) => void;
@@ -279,7 +280,7 @@ export const useChatUIStore = create<ChatUIStore>()(
                     set({ canvasDirty: false, isCanvasOpen: false, previewFile: null });
                 },
                 openPreviewFile: (file) => {
-                    set({ canvasDirty: false, isCanvasOpen: true, previewFile: file });
+                    set({ isCanvasOpen: true, previewFile: file });
                 },
 
                 // Canvas/Artifact actions

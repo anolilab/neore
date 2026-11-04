@@ -20,16 +20,18 @@ import type { FC } from "react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
 
-// A stalled signed-URL request must not leave the spinner up forever.
-const PDF_LOAD_TIMEOUT_MS = 30_000;
+import { PDF_LOAD_TIMEOUT_MS } from "./pdf-limits";
 
 export interface PdfViewerProps {
     className?: string;
     filename?: string;
+    /** Takes the height its parent gives it, instead of a 600px document area. */
+    fill?: boolean;
     url: string;
 }
 
-const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, url }) => {
+// A stalled signed-URL request must not leave the spinner up forever (`PDF_LOAD_TIMEOUT_MS`).
+const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, fill, url }) => {
     const { t } = useLingui();
     const [numberPages, setNumberPages] = useState<number>(0);
     const [loadState, setLoadState] = useState<"failed" | "loaded" | "loading">("loading");
@@ -92,7 +94,7 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, url }) => {
     const pageWidth = containerWidth ? (containerWidth - 32) * scale : undefined;
 
     return (
-        <div className={cn("my-2 w-full max-w-2xl overflow-hidden rounded-lg border", className)}>
+        <div className={cn("my-2 w-full max-w-2xl overflow-hidden rounded-lg border", fill && "flex flex-col", className)}>
             {/* Toolbar */}
             <div className="bg-muted/50 flex items-center justify-between border-b px-3 py-1.5">
                 <div className="flex items-center gap-1">
@@ -147,7 +149,11 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, url }) => {
             </div>
 
             {/* PDF Content */}
-            <div className="overflow-auto bg-gray-100 p-4 dark:bg-gray-900" ref={containerRef} style={{ maxHeight: "600px" }}>
+            <div
+                className={cn("overflow-auto bg-gray-100 p-4 dark:bg-gray-900", fill && "min-h-0 flex-1")}
+                ref={containerRef}
+                style={fill ? undefined : { maxHeight: "600px" }}
+            >
                 {loadState === "failed" ? (
                     <p className="text-muted-foreground py-12 text-center text-sm" role="status">
                         {t`This preview could not be loaded.`}

@@ -105,7 +105,7 @@ describe("setComposerText hidden characters", () => {
 });
 
 describe("the side-panel PDF preview", () => {
-    const pdf = { filename: "report.pdf", url: "https://files.example.com/report.pdf" };
+    const pdf = { filename: "report.pdf", threadId: "thread-1", url: "https://files.example.com/report.pdf" };
 
     beforeEach(() => {
         useChatUIStore.getState().reset();

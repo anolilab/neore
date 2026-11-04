@@ -2,14 +2,15 @@ import { useLingui } from "@lingui/react/macro";
 import cn from "@neore/ui/utils/cn";
 import { Download, ExternalLink, X } from "lucide-react";
 import type { FC } from "react";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 
 import type { PreviewFile } from "@/features/chat/core/stores/chat-ui-store";
 import { useCanvasState } from "@/features/chat/core/stores/chat-ui-store";
+import { showError } from "@/lib/toast";
 
 const PdfViewer = lazy(() => import("@neore/ui/components/file-renderers/pdf-viewer"));
 
-const ICON_LINK = "hover:bg-accent rounded p-1";
+const ICON_LINK = "hover:bg-accent rounded p-2";
 
 interface PdfPreviewPanelProps {
     className?: string;
@@ -23,15 +24,46 @@ interface PdfPreviewPanelProps {
 const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
     const { t } = useLingui();
     const { closeCanvas } = useCanvasState();
+    const headingReference = useRef<HTMLHeadingElement>(null);
+
+    // The panel opens from a thumbnail click; focus moves here, so a keyboard user is not left behind in the thread.
+    useEffect(() => {
+        headingReference.current?.focus();
+    }, []);
+
+    // The link is cross-origin, and a browser opens a cross-origin PDF inline whatever the `download` attribute says.
+    // The file is fetched and saved from a local object URL instead.
+    const download = async () => {
+        try {
+            const response = await fetch(file.url);
+
+            if (!response.ok) {
+                throw new Error("The PDF could not be fetched.");
+            }
+
+            const objectUrl = URL.createObjectURL(await response.blob());
+            const link = globalThis.document.createElement("a");
+
+            link.href = objectUrl;
+            link.download = file.filename ?? "document.pdf";
+            link.click();
+            URL.revokeObjectURL(objectUrl);
+        } catch (error) {
+            console.error("Failed to download the PDF:", error);
+            showError(t`The PDF could not be downloaded.`);
+        }
+    };
 
     return (
         <div className={cn("flex h-full min-h-0 flex-col", className)}>
             <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
-                <h2 className="truncate text-sm font-medium">{file.filename ?? t`PDF`}</h2>
+                <h2 className="truncate text-sm font-medium" ref={headingReference} tabIndex={-1}>
+                    {file.filename ?? t`PDF`}
+                </h2>
                 <div className="flex shrink-0 items-center gap-1">
-                    <a aria-label={t`Download PDF`} className={ICON_LINK} download={file.filename ?? true} href={file.url}>
+                    <button aria-label={t`Download PDF`} className={ICON_LINK} onClick={download} type="button">
                         <Download aria-hidden="true" className="size-4" />
-                    </a>
+                    </button>
                     <a aria-label={t`Open PDF in a new tab to print`} className={ICON_LINK} href={file.url} rel="noopener noreferrer" target="_blank">
                         <ExternalLink aria-hidden="true" className="size-4" />
                     </a>
@@ -40,9 +72,10 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
                     </button>
                 </div>
             </div>
-            <div className="min-h-0 flex-1 overflow-auto p-2">
+            <div className="flex min-h-0 flex-1 flex-col p-2">
                 <Suspense fallback={<span className="text-muted-foreground text-sm">{t`Loading preview…`}</span>}>
-                    <PdfViewer className="my-0 h-full max-w-none rounded-none border-0" filename={file.filename} url={file.url} />
+                    {/* A new file is a new viewer: the page and zoom of the last one do not carry over. */}
+                    <PdfViewer className="my-0 min-h-0 max-w-none flex-1 rounded-none border-0" filename={file.filename} fill key={file.url} url={file.url} />
                 </Suspense>
             </div>
         </div>
