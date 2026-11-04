@@ -6,7 +6,7 @@ import { readCrashReportsEnabled, writeCrashReportsEnabled } from "./crash-repor
 import { toCrashReport } from "./crash-report-scrub";
 import { createSerialQueue } from "./serial-queue";
 
-const state: { client?: PostHog; isHandlerInstalled: boolean } = { isHandlerInstalled: false };
+const state: { client?: PostHog; isHandlerInstalled: boolean; isOn: boolean } = { isHandlerInstalled: false, isOn: false };
 
 /**
  * Reads the saved choice and changes it. Both run one at a time, so a startup read
@@ -32,7 +32,11 @@ export const startCrashReporting = ({ apiKey, host }: PostHogConfig): void => {
     });
 };
 
-/** Turns the running client on or off. Does nothing before `startCrashReporting`. */
+/**
+ * Turns the running client on or off. Does nothing before `startCrashReporting`. The
+ * state is recorded only once the client has accepted the change, so it always
+ * matches what the client does.
+ */
 const applyToClient = async (isOn: boolean): Promise<void> => {
     if (!state.client) {
         return;
@@ -40,12 +44,15 @@ const applyToClient = async (isOn: boolean): Promise<void> => {
 
     if (isOn) {
         await state.client.optIn();
-
-        return;
+    } else {
+        await state.client.optOut();
     }
 
-    await state.client.optOut();
+    state.isOn = isOn;
 };
+
+/** Whether reports are being sent right now. Read through the queue, so it follows any change still in progress. */
+export const crashReportsOn = (): Promise<boolean> => runChoice(async () => state.isOn);
 
 /**
  * Changes the choice. The client is switched first, so an opt-out takes effect even
@@ -60,10 +67,19 @@ export const changeCrashReports = (store: PreferenceStore, isOn: boolean): Promi
 /** Applies the saved choice at startup. A store that cannot be read leaves reports off. */
 export const applyStoredCrashReportChoice = (store: PreferenceStore): Promise<void> =>
     runChoice(async () => {
+        let isOn: boolean;
+
         try {
-            await applyToClient(await readCrashReportsEnabled(store));
+            isOn = await readCrashReportsEnabled(store);
         } catch {
             // Nothing was sent: the client starts opted out.
+            return;
+        }
+
+        try {
+            await applyToClient(isOn);
+        } catch (applyError) {
+            console.warn("Could not apply the crash-report setting.", applyError);
         }
     });
 
@@ -90,7 +106,9 @@ export const installGlobalErrorReporting = (): void => {
 
             state.client?.captureException(sendable, { fatal: isFatal === true });
         } catch {
-            // A reporting failure must not hide the crash, so the original handler still runs below.
+            // A reporting failure must not hide the crash, so the original handler still runs below. The error itself
+            // is not logged: its message and stack can hold chat text.
+            console.warn("A crash report could not be sent.");
         }
 
         previous(error, isFatal);

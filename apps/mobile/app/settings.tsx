@@ -2,30 +2,25 @@ import { useEffect, useState } from "react";
 import { Switch, Text, View } from "react-native";
 
 import { loadConfig } from "@/lib/config";
-import { readCrashReportsEnabled } from "@/lib/crash-report-preference";
 import { crashReportStore } from "@/lib/crash-report-store";
-import { changeCrashReports } from "@/lib/crash-reporting";
+import { changeCrashReports, crashReportsOn } from "@/lib/crash-reporting";
+
+const SAVE_FAILED_MESSAGE = "Your choice could not be applied. Try again.";
 
 const SettingsScreen = () => {
     const [isEnabled, setIsEnabled] = useState(false);
     const [isLoaded, setIsLoaded] = useState(false);
+    const [failure, setFailure] = useState<string | null>(null);
     const isConfigured = loadConfig().posthog !== undefined;
 
     useEffect(() => {
         let isActive = true;
 
         const load = async () => {
-            try {
-                const value = await readCrashReportsEnabled(crashReportStore);
-
-                if (isActive) {
-                    setIsEnabled(value);
-                }
-            } catch {
-                // An unreadable choice stays off.
-            }
+            const value = await crashReportsOn();
 
             if (isActive) {
+                setIsEnabled(value);
                 setIsLoaded(true);
             }
         };
@@ -38,8 +33,17 @@ const SettingsScreen = () => {
     }, []);
 
     const change = async (isOn: boolean) => {
-        setIsEnabled(isOn);
-        await changeCrashReports(crashReportStore, isOn);
+        setFailure(null);
+
+        try {
+            await changeCrashReports(crashReportStore, isOn);
+        } catch (changeError) {
+            console.warn("Could not change the crash-report setting.", changeError);
+            setFailure(SAVE_FAILED_MESSAGE);
+        }
+
+        // The switch shows what reporting is doing now, which after a failure can differ from what was asked.
+        setIsEnabled(await crashReportsOn());
     };
 
     return (
@@ -60,6 +64,7 @@ const SettingsScreen = () => {
                 error.
             </Text>
             {isConfigured ? null : <Text style={{ fontSize: 13 }}>Crash reports are not set up in this build.</Text>}
+            {failure ? <Text accessibilityRole="alert" style={{ color: "#b00020", fontSize: 13 }}>{failure}</Text> : null}
         </View>
     );
 };
