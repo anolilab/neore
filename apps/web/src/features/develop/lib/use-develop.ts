@@ -147,8 +147,11 @@ export const useStartWorkOnPullRequest = () => {
 /** Every pull request a thread is linked to, for the thread's own header. Live: a link made elsewhere shows up here too. */
 export const useThreadPullRequests = (threadId: string | undefined) => {
     const crpc = useCRPC();
+    const userId = useDevelopUser();
+    // The key names the account: a session that changes user must not show the previous user's links from the cache.
+    const options = crpc.source_control.pr_thread_attach.listForThread.queryOptions(threadId === undefined ? skipToken : { threadId });
 
-    return useQuery(crpc.source_control.pr_thread_attach.listForThread.queryOptions(threadId === undefined ? skipToken : { threadId }));
+    return useQuery({ ...options, queryKey: [DEVELOP_QUERY_ROOT, userId, "thread-pulls", threadId] });
 };
 
 /** Attaches existing pull requests to a thread by hand. The host reads each one first; a refusal is reported per pull request. */
@@ -179,9 +182,11 @@ const countOf = (read: PullRequestCounts, threadId: string): number => {
  */
 export const useThreadPullRequestCount = (threadId: string, ready: boolean): number | null => {
     const crpc = useCRPC();
+    const userId = useDevelopUser();
     const { data } = useQuery({
         ...crpc.source_control.pr_thread_attach.countsForUser.queryOptions({}),
-        enabled: ready,
+        queryKey: [DEVELOP_QUERY_ROOT, userId, "thread-pull-counts"],
+        enabled: ready && userId !== undefined,
         // `null` when the read hit its row cap: a thread's count may then be partial, so the sidebar shows no number.
         select: (read: PullRequestCounts): number | null => {
             if (read.truncated) {
