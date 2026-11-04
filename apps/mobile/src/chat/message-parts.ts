@@ -22,12 +22,22 @@ const partText = (part: unknown): string => {
 export const displayTextOf = (parts: unknown[]): string => parts.map((part) => partText(part)).join("");
 
 /**
- * The text parts only, which is all the share sheet receives. Attachments are never shared. Parts are joined with a
- * space and empty ones skipped, the same rule the server uses for a message's text.
+ * Whether a text part carries the page the user attached to the message. Its text is the serialized page, which is
+ * not the prompt, so it is never shared.
+ */
+const isPageContext = (part: unknown): boolean => {
+    const metadata = (part as { providerMetadata?: { neore?: { pageContext?: unknown } } } | null)?.providerMetadata;
+
+    return metadata?.neore?.pageContext !== undefined;
+};
+
+/**
+ * The typed text parts only, which is all the share sheet receives. Attachments and the attached page are never shared.
+ * Parts are joined with a space and empty ones skipped, the same rule the server uses for a message's text.
  */
 export const shareTextOf = (parts: unknown[]): string =>
     parts
-        .filter((part) => partKind(part) === "text")
+        .filter((part) => partKind(part) === "text" && !isPageContext(part))
         .map((part) => partText(part))
         .filter(Boolean)
         .join(" ");

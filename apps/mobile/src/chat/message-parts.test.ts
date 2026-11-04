@@ -19,6 +19,15 @@ describe("message parts", () => {
         expect(shareTextOf(parts)).toBe("Look at this");
     });
 
+    it("shares the typed prompt of a message with attached page, and never the page", () => {
+        const parts = [
+            { providerMetadata: { neore: { pageContext: { title: "Page" } } }, text: "Page title: Page\nSelected text: secret", type: "text" },
+            { text: "Summarise this", type: "text" },
+        ];
+
+        expect(shareTextOf(parts)).toBe("Summarise this");
+    });
+
     it("joins adjacent text parts with a space, as the server does", () => {
         expect(shareTextOf([{ text: "Hello", type: "text" }, { text: "world", type: "text" }])).toBe("Hello world");
     });
