@@ -32,21 +32,28 @@ const SetupChecklist: FC = () => {
     const settingsQuery = useUserSettings();
     const settingsKey = crpc.auth.functions.getUserSettings.queryOptions({}).queryKey;
     // One step per call: the server applies it to the list it holds, so another tab's skip is never overwritten. The
-    // cache is patched the same way, one step at a time and never from an earlier snapshot, and it is not refetched here:
-    // the live settings query brings in the server's row, so a write queued elsewhere is never raced by this card.
-    const showStep = (stepId: SetupStepId, skipped: boolean) => {
-        queryClient.setQueryData<{ setupStepsSkipped?: string[] } | null>(settingsKey, (row) =>
-            row ? { ...row, setupStepsSkipped: toggleSkipped(row.setupStepsSkipped, stepId, skipped) } : row,
-        );
-    };
+    // cache is patched one step at a time, never from an earlier snapshot. Two cases read the server instead of guessing:
+    // an account with no settings row yet (nothing to patch) and a failed save (whatever is stored is what to show).
+    const reloadSettings = async () => await queryClient.invalidateQueries({ queryKey: settingsKey });
     const setSkipped = useMutation({
         ...crpc.auth.setup_steps.setSetupStepSkipped.mutationOptions(),
         onMutate: (args: { skipped: boolean; stepId: SetupStepId }) => {
-            showStep(args.stepId, args.skipped);
+            const row = queryClient.getQueryData<{ setupStepsSkipped?: string[] } | null>(settingsKey);
+
+            if (row) {
+                queryClient.setQueryData(settingsKey, { ...row, setupStepsSkipped: toggleSkipped(row.setupStepsSkipped, args.stepId, args.skipped) });
+            }
+
+            return { hadRow: Boolean(row) };
         },
-        onError: (_error, args: { skipped: boolean; stepId: SetupStepId }) => {
-            showStep(args.stepId, !args.skipped);
+        onError: async () => {
             toast.error(t`Could not save that choice. Try again.`);
+            await reloadSettings();
+        },
+        onSuccess: async (_data, _args, context) => {
+            if (!context?.hadRow) {
+                await reloadSettings();
+            }
         },
     });
     // An account with no settings row answers `null`; only `undefined` means the read has not finished.

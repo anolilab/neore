@@ -12,7 +12,7 @@ const { devices, mutate, server, sonnerMock } = vi.hoisted(() => {
     return {
         devices: { current: [] as unknown[] },
         mutate: vi.fn(),
-        server: { fail: false, skipped: undefined as string[] | undefined },
+        server: { fail: false, noRow: false, skipped: undefined as string[] | undefined },
         sonnerMock: { toast: vi.fn() },
     };
 });
@@ -47,9 +47,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                         getUserSettings: {
                             queryOptions: () => {
                                 return {
-                                    queryFn: async () => {
-                                        return { setupStepsSkipped: server.skipped };
-                                    },
+                                    queryFn: async () => (server.noRow ? null : { setupStepsSkipped: server.skipped }),
                                     queryKey: ["getUserSettings"],
                                 };
                             },
@@ -65,6 +63,8 @@ vi.mock("@/lib/lunora/crpc", () => {
                                         if (server.fail) {
                                             throw new Error("down");
                                         }
+
+                                        server.noRow = false;
 
                                         const rest = (server.skipped ?? []).filter((id) => id !== args.stepId);
 
@@ -92,6 +92,7 @@ vi.mock("@/lib/lunora/crpc", () => {
 const SKIP_ADD_AN_SSH_SERVER = /Skip.*Add an SSH server/;
 const RESUME_ADD_AN_SSH_SERVER = /Resume.*Add an SSH server/;
 const SKIP_INSTALL_A_CODING_AGENT = /Skip.*Install a coding agent/;
+const RESUME_PAIR_THIS_COMPUTER = /Resume.*Pair this computer/;
 const SKIP = /Skip/;
 const GO_TO_PAIRING = /Go to pairing/;
 const GO_TO_SERVERS = /Go to servers/;
@@ -110,6 +111,7 @@ describe("<SetupChecklist>", () => {
     beforeEach(() => {
         devices.current = [];
         server.fail = false;
+        server.noRow = false;
         server.skipped = undefined;
         mutate.mockClear();
         sonnerMock.toast.mockClear();
@@ -127,6 +129,30 @@ describe("<SetupChecklist>", () => {
         fireEvent.click(screen.getByRole("button", { name: RESUME_ADD_AN_SSH_SERVER }));
         await waitFor(() => expect(screen.getAllByText("(To do)")).toHaveLength(3));
         expect(mutate).toHaveBeenLastCalledWith({ skipped: false, stepId: "ssh" });
+    });
+
+    it("shows a first skip for an account with no settings row yet", async () => {
+        server.noRow = true;
+        renderChecklist();
+        await screen.findAllByText("(To do)");
+        fireEvent.click(screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }));
+
+        expect(await screen.findByText("(Skipped)")).toBeTruthy();
+        expect(mutate).toHaveBeenCalledWith({ skipped: true, stepId: "ssh" });
+        expect(server.skipped).toEqual(["ssh"]);
+    });
+
+    it("shows what the server saved after a failed save, not the click", async () => {
+        server.skipped = ["pair"];
+        server.fail = true;
+        renderChecklist();
+        await screen.findByText("(Skipped)");
+        fireEvent.click(screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }));
+
+        await waitFor(() => expect(sonnerMock.toast).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(screen.getAllByText("(Skipped)")).toHaveLength(1));
+        expect(screen.getByRole("button", { name: RESUME_PAIR_THIS_COMPUTER })).toBeTruthy();
+        expect(server.skipped).toEqual(["pair"]);
     });
 
     it("keeps an earlier skip when a second step is skipped right after", async () => {
