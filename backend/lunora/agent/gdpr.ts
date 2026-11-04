@@ -6,7 +6,7 @@
  */
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
-import { BATCH, type BatchResult, full } from "../gdpr/batch";
+import { BATCH, type BatchResult, deleteParentsWithChildren, full } from "../gdpr/batch";
 import { gdprLogger } from "../lib/logger";
 import { deleteVectorRow } from "./table-writes";
 import type { VectorTableName } from "./vector/tables";
@@ -187,4 +187,37 @@ export const eraseWorkflowExecutionsForProject = async (ctx: MutationCtx, projec
     const hasMore = await eraseExecutionBatch(ctx, executions);
 
     return { hasMore: hasMore || full(executions) };
+};
+
+/** The user's thread passcodes. A passcode row is the hash of a lock on one of their threads: it goes with them. */
+export const eraseThreadPasscodesForUser = async (ctx: MutationCtx, userId: string): Promise<void> => {
+    const passcodes = await ctx.db
+        .query("threadPasscodes")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .collect();
+
+    await Promise.all(passcodes.map((row) => ctx.db.delete("threadPasscodes", row._id)));
+};
+
+/** One batch of the user's documents, each after its versions. */
+export const eraseDocumentsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
+    const documents = await ctx.db
+        .query("documents")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .take(BATCH);
+
+    const hasMore = await deleteParentsWithChildren(
+        documents,
+        async (documentRow) =>
+            await ctx.db
+                .query("documentVersions")
+                .withIndex("by_documentId_version", (q) => q.eq("documentId", documentRow._id))
+                .take(BATCH),
+        {
+            child: (version) => ctx.db.delete("documentVersions", version._id),
+            parent: (documentRow) => ctx.db.delete("documents", documentRow._id),
+        },
+    );
+
+    return { hasMore };
 };

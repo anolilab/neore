@@ -265,16 +265,24 @@ describe("batched account-deletion steps", () => {
             }
 
             const parent = await ctx.db.get("folders", folder);
-            const firstPass = await deleteParentsWithChildren(ctx, { child: "files", parent: "folders" }, [parent], async () => {
-                const { page } = await ctx.db.files.findMany({ limit: BATCH, where: { folderId: folder } });
+            const firstPass = await deleteParentsWithChildren(
+                [parent],
+                async () => {
+                    const { page } = await ctx.db.files.findMany({ limit: BATCH, where: { folderId: folder } });
 
-                return page;
-            });
-            const secondPass = await deleteParentsWithChildren(ctx, { child: "files", parent: "folders" }, [parent], async () => {
-                const { page } = await ctx.db.files.findMany({ limit: BATCH, where: { folderId: folder } });
+                    return page;
+                },
+                { child: (file: { _id: string }) => ctx.db.delete("files", file._id), parent: (row: { _id: string }) => ctx.db.delete("folders", row._id) },
+            );
+            const secondPass = await deleteParentsWithChildren(
+                [parent],
+                async () => {
+                    const { page } = await ctx.db.files.findMany({ limit: BATCH, where: { folderId: folder } });
 
-                return page;
-            });
+                    return page;
+                },
+                { child: (file: { _id: string }) => ctx.db.delete("files", file._id), parent: (row: { _id: string }) => ctx.db.delete("folders", row._id) },
+            );
 
             return { folderId: folder, remaining: [firstPass, secondPass] };
         });
