@@ -370,6 +370,38 @@ const VirtualizedThreadList: FC<{
 
 VirtualizedThreadList.displayName = "VirtualizedThreadList";
 
+/**
+ * The thread with this id wherever it sits in the groups, including under a collapsed group or a collapsed branch parent.
+ * The flattened keyboard list leaves those out, so it cannot tell a hidden thread from one that left the list.
+ */
+const findThreadNode = (groups: ThreadGroup[], threadId: string): BranchNode | undefined => {
+    const search = (nodes: BranchNode[]): BranchNode | undefined => {
+        for (const node of nodes) {
+            if (node.threadId === threadId) {
+                return node;
+            }
+
+            const found = search(node.children);
+
+            if (found) {
+                return found;
+            }
+        }
+
+        return undefined;
+    };
+
+    for (const group of groups) {
+        const found = search(group.threads);
+
+        if (found) {
+            return found;
+        }
+    }
+
+    return undefined;
+};
+
 const HierarchicalThreadList: FC<
     HierarchicalThreadListProperties & { currentThreadId: string | undefined; threadRelationships: MinimalThreadRelationship[] }
 > = ({
@@ -1051,7 +1083,8 @@ const HierarchicalThreadList: FC<
     // The snooze dialog lives here, not in a row: a row can unmount while the dialog is open (virtualization, a filter).
     const snoozeThreadId = useThreadListUIStore((state) => state.snoozeThreadId);
     const setSnoozeThreadId = useThreadListUIStore((state) => state.setSnoozeThreadId);
-    const snoozeThread = snoozeThreadId === null ? undefined : flattenedThreads.find((node) => node.threadId === snoozeThreadId);
+    const snoozeThread = useMemo(() => (snoozeThreadId === null ? undefined : findThreadNode(threadGroups, snoozeThreadId)), [snoozeThreadId, threadGroups]);
+    const listReference = useRef<HTMLDivElement>(null);
 
     // A dialog whose thread left the list is closed, so it cannot reopen when that thread comes back.
     useEffect(() => {
@@ -1255,7 +1288,7 @@ const HierarchicalThreadList: FC<
 
     // Regular rendering with groups
     return (
-        <div className="relative flex flex-col gap-2">
+        <div className="relative flex flex-col gap-2" ref={listReference} tabIndex={-1}>
             {isSelectionMode && (
                 <SelectionToolbar
                     isAllSelected={isAllSelected}
@@ -1297,6 +1330,7 @@ const HierarchicalThreadList: FC<
                     }}
                     open
                     previousUntil={snoozeThread.snoozedUntil}
+                    returnFocusTo={() => listReference.current}
                     threadId={snoozeThread.threadId}
                 />
             )}

@@ -127,15 +127,23 @@ export const bumpedExpiry = (stream: Pick<Stream, "_creationTime" | "expiresAt">
     return next > stream.expiresAt ? next : undefined;
 };
 
-/** Hands the thread back from `running` unless another live stream or an edit on it still holds it. */
-export const releaseThread = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">, now: number): Promise<void> => {
+/**
+ * Hands the thread back from `running` unless another live stream or an edit on it still holds it. `failed` says the turn
+ * failed, so a snoozed thread wakes (`patchThread`).
+ */
+export const releaseThread = async (
+    ctx: Pick<MutationCtx, "db">,
+    threadId: Id<"threads">,
+    now: number,
+    { failed = false }: { failed?: boolean } = {},
+): Promise<void> => {
     const [thread, live] = await Promise.all([
         ctx.db.threads.findFirst({ where: { _id: threadId } }),
         ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId } }),
     ]);
 
     if (thread?.status === "running" && !live) {
-        await patchThread(ctx.db, threadId, { status: "active", updatedAt: now });
+        await patchThread(ctx.db, threadId, { status: "active", updatedAt: now }, { failed });
     }
 };
 
@@ -160,7 +168,8 @@ export const endHostStream = async (
         status: end.status,
         ...(stream.hostPendingPermissions !== undefined && { hostPendingPermissions: undefined }),
     });
-    await releaseThread(ctx, stream.threadId as Id<"threads">, now);
+    // A stop or a finished turn keeps a snooze; an error or a timeout wakes the thread, as a failed run does.
+    await releaseThread(ctx, stream.threadId as Id<"threads">, now, { failed: end.status !== "done" });
 
     return true;
 };

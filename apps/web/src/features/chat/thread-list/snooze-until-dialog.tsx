@@ -7,7 +7,7 @@ import type { FormEvent } from "react";
 import { useId, useState } from "react";
 
 import { useThreadStateActions } from "./hooks/use-thread-state-actions";
-import { customSnoozeUntil } from "./lib/thread-state-rules";
+import { customSnoozeCheck } from "./lib/thread-state-rules";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -24,11 +24,17 @@ interface SnoozeUntilDialogProps {
     open: boolean;
     /** The snooze the thread had before, which the undo toast restores. */
     previousUntil: number | undefined;
+
+    /**
+     * Where focus goes when the dialog closes. The list, not the control that opened the dialog: that was a menu item, which is
+     * gone once the menu closes, and the save may move the row out of the list as well.
+     */
+    returnFocusTo: () => HTMLElement | null;
     threadId: string;
 }
 
 /** Snoozes a thread until a time the owner picks, in their local time. */
-const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, threadId }: SnoozeUntilDialogProps) => {
+const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, threadId }: SnoozeUntilDialogProps) => {
     const { t } = useLingui();
     const { snoozeAt } = useThreadStateActions();
     const inputId = useId();
@@ -45,17 +51,21 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, threadId }: Snoo
             return;
         }
 
-        const until = customSnoozeUntil(value, new Date());
+        const result = customSnoozeCheck(value, new Date());
 
-        if (until === undefined) {
-            setError(t`Choose a time later than now, and within the next year.`);
+        if ("problem" in result) {
+            setError(
+                result.problem === "gap"
+                    ? t`That time does not exist on that day, because the clocks skip it. Choose another time.`
+                    : t`Choose a time later than now, and within the next year.`,
+            );
 
             return;
         }
 
         setSaving(true);
 
-        if (await snoozeAt(threadId, until, previousUntil)) {
+        if (await snoozeAt(threadId, result.until, previousUntil)) {
             onOpenChange(false);
 
             return;
@@ -78,7 +88,7 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, threadId }: Snoo
             }}
             open={open}
         >
-            <DialogContent className="sm:max-w-sm">
+            <DialogContent className="sm:max-w-sm" finalFocus={returnFocusTo}>
                 <DialogHeader>
                     <DialogTitle>{t`Snooze until`}</DialogTitle>
                     <DialogDescription>{t`The thread leaves your active list until then. An approval, a question or a failed run brings it back sooner.`}</DialogDescription>
@@ -109,9 +119,14 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, threadId }: Snoo
                             {t`Cancel`}
                         </Button>
                         <Button disabled={saving} type="submit">
-                            {t`Snooze`}
+                            {saving ? t`Saving…` : t`Snooze`}
                         </Button>
                     </DialogFooter>
+                    {saving && (
+                        <p className="sr-only" role="status">
+                            {t`Saving the snooze`}
+                        </p>
+                    )}
                 </form>
             </DialogContent>
         </Dialog>

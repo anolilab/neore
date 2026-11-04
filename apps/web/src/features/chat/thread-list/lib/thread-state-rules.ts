@@ -72,6 +72,37 @@ const instantsOf = (year: number, month: number, day: number, hour: number, minu
 };
 
 /**
+ * Why a custom snooze time is refused: `gap` when the clock never shows that time on that day (a daylight-saving change
+ * skips it), `range` when it is not in the future or is further than the server accepts, or the value is unreadable.
+ */
+export type CustomSnoozeProblem = "gap" | "range";
+
+/**
+ * The time a custom snooze ends, from a `datetime-local` value (local wall-clock time, `YYYY-MM-DDTHH:mm`): the earliest
+ * occurrence of that time still in the future, or the reason it cannot be used: a time the clock skips, or one out of range.
+ * In the hour a change repeats, the second pass is taken once the first has gone by.
+ */
+export const customSnoozeCheck = (localValue: string, now: Date): { until: number } | { problem: CustomSnoozeProblem } => {
+    if (!LOCAL_DATE_TIME_RE.test(localValue)) {
+        return { problem: "range" };
+    }
+
+    const [datePart = "", timePart = ""] = localValue.split("T", 2);
+    const [year = 0, month = 0, day = 0] = datePart.split("-", 3).map(Number);
+    const [hour = 0, minute = 0] = timePart.split(":", 2).map(Number);
+    const occurrences = instantsOf(year, month, day, hour, minute);
+
+    if (occurrences.length === 0) {
+        return { problem: "gap" };
+    }
+
+    const nowMs = now.getTime();
+    const usable = occurrences.filter((instant) => instant > nowMs && instant <= nowMs + SNOOZE_MAX_MS);
+
+    return usable.length > 0 ? { until: Math.min(...usable) } : { problem: "range" };
+};
+
+/**
  * The time a custom snooze ends, from a `datetime-local` value (local wall-clock time, `YYYY-MM-DDTHH:mm`): the earliest
  * occurrence of that time still in the future. In the hour a change repeats, the second pass is taken once the first has
  * gone by. `undefined` when the value is empty or unreadable, falls in a daylight-saving gap, or is not in the future or
@@ -79,15 +110,7 @@ const instantsOf = (year: number, month: number, day: number, hour: number, minu
  * it refuses.
  */
 export const customSnoozeUntil = (localValue: string, now: Date): number | undefined => {
-    if (!LOCAL_DATE_TIME_RE.test(localValue)) {
-        return undefined;
-    }
+    const result = customSnoozeCheck(localValue, now);
 
-    const [datePart = "", timePart = ""] = localValue.split("T", 2);
-    const [year = 0, month = 0, day = 0] = datePart.split("-", 3).map(Number);
-    const [hour = 0, minute = 0] = timePart.split(":", 2).map(Number);
-    const nowMs = now.getTime();
-    const usable = instantsOf(year, month, day, hour, minute).filter((instant) => instant > nowMs && instant <= nowMs + SNOOZE_MAX_MS);
-
-    return usable.length > 0 ? Math.min(...usable) : undefined;
+    return "until" in result ? result.until : undefined;
 };

@@ -57,9 +57,10 @@ export const hasLiveStream = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"thr
  * while a round was queued) is skipped, so one goal of a vanished thread never fails the write that
  * ends it, or the sweep that reaps many.
  */
-export const giveThreadBack = async (ctx: GoalCtx, threadId: Id<"threads">): Promise<void> => {
+/** Hands the thread back to the owner. `failed` says the goal ended in an error, so a snoozed thread wakes (`patchThread`). */
+export const giveThreadBack = async (ctx: GoalCtx, threadId: Id<"threads">, { failed = false }: { failed?: boolean } = {}): Promise<void> => {
     if (await ctx.db.get("threads", threadId)) {
-        await patchThread(ctx.db, threadId, { status: "active", updatedAt: ctx.now });
+        await patchThread(ctx.db, threadId, { status: "active", updatedAt: ctx.now }, { failed });
     }
 };
 

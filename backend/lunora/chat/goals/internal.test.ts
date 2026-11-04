@@ -388,6 +388,16 @@ describe("ending a goal from outside", () => {
         expect((await read(threadId)).status).toBe("active");
     });
 
+    it("failGoalReview wakes a snoozed thread", async () => {
+        const goalId = await start();
+
+        await run(claimGoalRound, { goalId, round: 1 });
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId as never, { snoozedUntil: 9_000_000_000_000 }));
+
+        expect(await run(failGoalReview, { goalId, reason: "review_failed", round: 1 })).toBe(true);
+        expect((await read(threadId)).snoozedUntil).toBeUndefined();
+    });
+
     it("the housekeeping sweep ends a goal whose round was lost", async () => {
         const goalId = await start();
 

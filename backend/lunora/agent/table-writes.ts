@@ -72,14 +72,18 @@ export const patchesWithoutAwaitingInput = (
 ): boolean => (fields.status === "running" || fields.lastReplyAt !== undefined) && fields.awaitingInput === undefined && row?.awaitingInput !== undefined;
 
 /**
- * Whether a write wakes a snoozed thread before its time: a run that pauses for the owner (an approval or a question),
- * or one that fails. The owner should not have to find the thread in Snoozed to answer it, or to learn that it broke.
+ * The one wake rule: a write that pauses for the owner (an approval or a question), or that fails. The owner should not have
+ * to find the thread in Snoozed to answer it, or to learn that it broke. `patchThread` reads the row only for a write this
+ * rule admits, so both of its uses must share this definition.
  */
+const fieldsWake = (fields: Pick<ThreadPatch, "awaitingInput" | "status">, failed: boolean): boolean =>
+    fields.awaitingInput !== undefined || fields.status === "error" || failed;
+
 export const patchesWakeSnooze = (
     row: Pick<Doc<"threads">, "snoozedUntil"> | null,
     fields: Pick<ThreadPatch, "awaitingInput" | "status">,
     failed = false,
-): boolean => row?.snoozedUntil !== undefined && (fields.awaitingInput !== undefined || fields.status === "error" || failed);
+): boolean => row?.snoozedUntil !== undefined && fieldsWake(fields, failed);
 
 /**
  * The one writer of a thread's run state. A write that ends a pause or records a reply removes `awaitingInput`
@@ -88,7 +92,7 @@ export const patchesWakeSnooze = (
  */
 export const patchThread = async (db: Database, threadId: Id<"threads">, fields: ThreadPatch, { failed = false }: { failed?: boolean } = {}): Promise<void> => {
     const endsPause = fields.status === "running" || fields.lastReplyAt !== undefined;
-    const wakes = fields.awaitingInput !== undefined || fields.status === "error" || failed;
+    const wakes = fieldsWake(fields, failed);
 
     if (endsPause || wakes) {
         const row = await db.get("threads", threadId);

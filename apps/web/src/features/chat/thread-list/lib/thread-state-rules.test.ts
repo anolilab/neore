@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { customSnoozeUntil, hasUnreadReply, hasUnseenReply, isSnoozed, snoozeUntil } from "./thread-state-rules";
+import { customSnoozeCheck, customSnoozeUntil, hasUnreadReply, hasUnseenReply, isSnoozed, snoozeUntil } from "./thread-state-rules";
 
 const idle = { isOpen: false, isStreaming: false };
 
@@ -101,6 +101,13 @@ describe("customSnoozeUntil across a daylight-saving change", () => {
 
         expect(customSnoozeUntil("2027-03-14T02:30", now)).toBeUndefined();
         expect(customSnoozeUntil("2027-03-14T03:30", now)).toBe(new Date(2027, 2, 14, 3, 30).getTime());
+    });
+
+    it("names a skipped clock time as a gap, and a time out of range as a range", () => {
+        const now = new Date(2027, 2, 1, 12, 0, 0);
+
+        expect(customSnoozeCheck("2027-03-14T02:30", now)).toEqual({ problem: "gap" });
+        expect(customSnoozeCheck("2027-03-01T09:00", now)).toEqual({ problem: "range" });
     });
 
     it("takes the first pass of a repeated hour while it is still ahead", () => {

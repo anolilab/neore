@@ -5,6 +5,7 @@ import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { patchThread } from "../agent/table-writes";
+import { releaseThread } from "./streaming/persistent/host";
 import { getThread, updateThread } from "../agent/threads";
 import schema from "../schema";
 import { isSnoozeInRange, SNOOZE_MAX_MS } from "./lib/thread-state-logic";
@@ -193,6 +194,35 @@ describe("a snoozed thread wakes early", () => {
         const row = await readThread(id);
 
         expect(row.snoozedUntil).toBeUndefined();
+    });
+
+    it("un-snoozes when a host turn fails, and keeps the snooze when the owner stopped it", async () => {
+        const insertRunning = async (): Promise<string> =>
+            await harness.run(
+                async (context: any) =>
+                    await context.db.insert("threads", {
+                        snoozedUntil: SNOOZED_UNTIL,
+                        status: "running",
+                        title: "Host",
+                        updatedAt: 111,
+                        userId: OWNER,
+                    }),
+            );
+        const failed = await insertRunning();
+        const stopped = await insertRunning();
+
+        await harness.run(async (context: any) => {
+            await releaseThread(context, failed as never, 10, { failed: true });
+        });
+        await harness.run(async (context: any) => {
+            await releaseThread(context, stopped as never, 10);
+        });
+
+        const failedRow = await readThread(failed);
+        const stoppedRow = await readThread(stopped);
+
+        expect(failedRow.snoozedUntil).toBeUndefined();
+        expect(stoppedRow).toMatchObject({ snoozedUntil: SNOOZED_UNTIL, status: "active" });
     });
 
     it("stays snoozed for an ordinary write", async () => {

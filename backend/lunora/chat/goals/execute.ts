@@ -133,7 +133,7 @@ export const reviewGoalRound = internalAction
 
             // Only a goal this call ended gives the thread back: one the user stopped, or that a new message superseded, is no longer ours to settle.
             if (await ctx.runMutation(internal.chat.goals.internal.failGoalReview, { goalId, reason: "review_failed", round })) {
-                await setThreadStatus(ctx, goal.threadId, "active").catch(() => undefined);
+                await setThreadStatus(ctx, goal.threadId, "active", { failed: true }).catch(() => undefined);
             }
 
             return null;
@@ -159,7 +159,7 @@ export const reviewGoalRound = internalAction
             streamLogger.error(`[Goal] The verdict on round ${String(round)} could not be recorded:`, error);
 
             if (await ctx.runMutation(internal.chat.goals.internal.failGoalReview, { goalId, reason: "error", round })) {
-                await setThreadStatus(ctx, goal.threadId, "active").catch(() => undefined);
+                await setThreadStatus(ctx, goal.threadId, "active", { failed: true }).catch(() => undefined);
             }
 
             return null;
@@ -186,7 +186,7 @@ export const reviewGoalRound = internalAction
                 });
 
                 if (failed) {
-                    await setThreadStatus(ctx, goal.threadId, "active").catch(() => undefined);
+                    await setThreadStatus(ctx, goal.threadId, "active", { failed: true }).catch(() => undefined);
                 }
             }
         }
