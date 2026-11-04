@@ -105,6 +105,24 @@ describe("a session's observer", () => {
         expect(reported).toEqual([{ usage: { cost: { amount: 0.42, currency: "USD" }, size: 200_000, used: 12_345 } }]);
     });
 
+    it("is told the tail of what a command tool printed, masked, and keeps it when a later update carries no content", async () => {
+        const { calls, observer } = recorder();
+        const secret = { scrub: (text: string) => text.replaceAll("TOKEN-123", "***"), secretLength: 9 };
+        const { player, session, steps } = await start(refuse, observer, secret, undefined, "tool-output-and-prompt");
+
+        session.send("say hi");
+        await player.play(steps.slice(4));
+        await expect.poll(() => session.snapshot().status).toBe("idle");
+
+        expect(calls.filter(([name]) => name === "tool").map((call) => call[2])).toEqual([
+            { id: "call_1", kind: "execute", status: "in_progress", title: "Run tests" },
+            { id: "call_1", kind: "execute", output: "3 passed ***", status: "in_progress", title: "Run tests" },
+            { id: "call_1", kind: "execute", output: "3 passed ***", status: "completed", title: "Run tests" },
+        ]);
+        // The window's transcript never carries what the call printed.
+        expect(JSON.stringify(session.snapshot())).not.toContain("passed");
+    });
+
     it("is told each plan the agent sends for the turn, whole", async () => {
         const { observer } = recorder();
         const plans: unknown[] = [];

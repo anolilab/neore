@@ -968,6 +968,18 @@ describe("a host turn", () => {
         expect(JSON.stringify(saved)).not.toContain("Run the tests");
     });
 
+    it("refuses a tool's output past its tail and an exit code that is not whole", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const call = { id: "c1", kind: "tool", status: "completed", title: "Run", toolKind: "execute" };
+
+        await expect(turn(device, threadId, "t1", 0, [START(), { ...call, output: "x".repeat(2001) }])).resolves.toMatchObject({ status: 400 });
+        await expect(turn(device, threadId, "t1", 0, [START(), { ...call, exit: { code: 1.5 } }])).resolves.toMatchObject({ status: 400 });
+        await expect(
+            turn(device, threadId, "t1", 0, [START(), { ...call, exit: { code: 1, signal: "SIGTERM" }, output: "x".repeat(2000) }]),
+        ).resolves.toMatchObject({ status: 200 });
+    });
+
     it("refuses a plan past its limits", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);

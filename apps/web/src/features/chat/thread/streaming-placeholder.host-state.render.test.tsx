@@ -127,4 +127,28 @@ describe("a coding agent's turn", () => {
         expect(await screen.findByTestId("content")).toBeTruthy();
         expect(screen.queryByRole("list")).toBeNull();
     });
+
+    it("shows each tool call with its status in words and the tail of what it printed in a labelled region", async () => {
+        mount({
+            hostActivity: {
+                tools: [
+                    { exit: { code: 1 }, id: "c1", output: "1 failed", status: "failed", title: "Run tests", toolKind: "execute" },
+                    { id: "c2", status: "in_progress", title: "Read a.ts", toolKind: "read" },
+                ],
+            },
+            hostState: "running",
+            reasoning: "",
+            status: "streaming",
+            text: "",
+        });
+
+        const output = await screen.findByRole("region", { name: "Output of Run tests" });
+
+        expect(output.textContent).toBe("1 failed");
+        expect(output.getAttribute("tabindex")).toBe("0");
+        expect(screen.getByText("Failed")).toBeTruthy();
+        expect(screen.getByText("Exited with code 1")).toBeTruthy();
+        expect(screen.getByText("Running")).toBeTruthy();
+        expect(screen.queryByRole("region", { name: "Output of Read a.ts" })).toBeNull();
+    });
 });

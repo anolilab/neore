@@ -712,6 +712,21 @@ describe("a turn", () => {
         ]);
     });
 
+    it("posts a call's output tail and its terminal's exit, cut to what the backend takes", async () => {
+        const host = poster();
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.tool("s1", "t1", { exit: { code: 2, signal: "S".repeat(40) }, id: "c1", kind: "execute", output: `${"x".repeat(3000)}END`, status: "completed", title: "Run" });
+        await settle(POST_INTERVAL_MS);
+
+        const [, posted] = backend.chunks.get("t1") ?? [];
+
+        expect(posted).toMatchObject({ exit: { code: 2, signal: "S".repeat(32) }, id: "c1", kind: "tool", status: "completed" });
+        expect(posted && "output" in posted ? posted.output : "").toHaveLength(2000);
+        expect(posted && "output" in posted ? posted.output?.endsWith("END") : false).toBe(true);
+    });
+
     it("never posts twice inside the interval", async () => {
         const host = poster();
 

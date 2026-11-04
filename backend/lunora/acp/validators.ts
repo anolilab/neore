@@ -185,8 +185,17 @@ export const vHostEvent = v.union(
     v.object({ kind: v.literal("text"), text: v.string().max(65_536) }),
     v.object({ kind: v.literal("reasoning"), text: v.string().max(65_536) }),
     v.object({
+        // Set once a terminal the call ran in has exited: its exit code, or the signal that ended it.
+        exit: v.optional(
+            v.object({
+                code: v.optional(v.number().check((code) => Number.isSafeInteger(code), { message: "Invalid exit code" })),
+                signal: v.optional(v.string().max(32)),
+            }),
+        ),
         id: v.string().max(128),
         kind: v.literal("tool"),
+        // The tail of what the call printed (its text output, or its terminal's), masked on the desktop.
+        output: v.optional(v.string().max(2000)),
         status: v.union(
             v.literal("pending"),
             v.literal("in_progress"),

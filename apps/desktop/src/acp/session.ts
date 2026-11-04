@@ -32,6 +32,7 @@ import type { AgentProcess } from "./process";
 import type { Handshake } from "./protocol";
 import { initialize, loadSession, METHOD, openNewSession, promptParams, setConfigOption, setMode } from "./protocol";
 import { INVALID_PARAMS, METHOD_NOT_FOUND, RpcError } from "./rpc-error";
+import { outputTail, toolTextOf } from "./tool-output";
 import { Turn } from "./turn";
 import type { SessionSnapshot, SessionStatus, SessionSummary, StopReason, ToolState, ToolStatus } from "./types";
 
@@ -155,6 +156,9 @@ export class AgentSession {
     private readonly toolOwner = new Map<string, Turn>();
 
     private readonly tools = new Map<string, ToolState>();
+
+    /** What each call printed, raw (`tool-output.ts`); masked and cut only when it is posted, and never shown in the window. */
+    private readonly toolOutput = new Map<string, string>();
 
     private readonly turns: Turn[] = [];
 
@@ -825,7 +829,18 @@ export class AgentSession {
             // Ids and kinds are the agent's own text: what is stored goes through the scrubber like the rest.
             const { scrub } = this.options.process;
 
-            this.observe((observer) => observer.tool(this.id, turn.id, { id: scrub(tool.id), kind: scrub(tool.kind), status: tool.status, title: tool.title }));
+            const printed = this.toolOutput.get(tool.id);
+            const output = printed === undefined ? undefined : outputTail(printed, scrub);
+
+            this.observe((observer) =>
+                observer.tool(this.id, turn.id, {
+                    id: scrub(tool.id),
+                    kind: scrub(tool.kind),
+                    status: tool.status,
+                    title: tool.title,
+                    ...output !== undefined && output !== "" && { output },
+                }),
+            );
         }
     }
 
@@ -1049,6 +1064,14 @@ export class AgentSession {
 
         if (typeof update.kind === "string") {
             tool.kind = update.kind;
+        }
+
+        // The content is the call's whole content each time: an update that carries it replaces what was printed, one
+        // without it leaves it.
+        const printed = toolTextOf(update.content);
+
+        if (printed !== undefined) {
+            this.toolOutput.set(id, printed);
         }
 
         // A call we ended as cancelled or declined stays that way: a late `in_progress` must not bring it back.

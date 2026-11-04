@@ -513,7 +513,17 @@ export const getStreamText = internalQuery
                     ),
                     tools: v.array(
                         v.object({
+                            exit: v.optional(
+                                v.object({
+                                    // Spelled out inline, however deep: codegen reads only an inline validator.
+                                    // eslint-disable-next-line unicorn/max-nested-calls
+                                    code: v.optional(v.number()),
+                                    // eslint-disable-next-line unicorn/max-nested-calls
+                                    signal: v.optional(v.string().max(32)),
+                                }),
+                            ),
                             id: v.string().max(128),
+                            output: v.optional(v.string().max(2000)),
                             status: v.union(
                                 v.literal("pending"),
                                 v.literal("in_progress"),

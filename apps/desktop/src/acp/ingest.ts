@@ -28,13 +28,14 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { ChildEvent } from "./children";
-import type { AgentUsage, HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver, SessionStatePatch, TurnSummary } from "./host-events";
-import { capPermissionRequest, capPrompt, capRequestId, capSessionInfo, childHostEvents, endReasonOf } from "./host-events";
+import type { AgentUsage, HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver, SessionStatePatch, ToolReport, TurnSummary } from "./host-events";
+import { capExit, capPermissionRequest, capPrompt, capRequestId, capSessionInfo, childHostEvents, endReasonOf } from "./host-events";
 import type { ImportIo } from "./import-post";
 import type { MediaOptions } from "./media";
 import { collectMedia, imageReferences } from "./media";
 import type { PlanEntry } from "./plan";
 import { SessionLink } from "./session-link";
+import { MAX_TOOL_OUTPUT_CHARS } from "./tool-output";
 import type { ChannelHost } from "./turn-channel";
 import { TurnChannel } from "./turn-channel";
 import type { StopReason } from "./types";
@@ -321,10 +322,16 @@ export class HostPoster implements SessionObserver {
         this.channels.get(turnId)?.append("reasoning", delta);
     }
 
-    public tool(_sessionId: string, turnId: string, tool: { id: string; kind: string; status: string; title: string }): void {
-        this.channels
-            .get(turnId)
-            ?.enqueue({ id: tool.id.slice(0, 128), kind: "tool", status: tool.status, title: tool.title.slice(0, 500), toolKind: tool.kind.slice(0, 64) });
+    public tool(_sessionId: string, turnId: string, tool: ToolReport): void {
+        this.channels.get(turnId)?.enqueue({
+            id: tool.id.slice(0, 128),
+            kind: "tool",
+            status: tool.status,
+            title: tool.title.slice(0, 500),
+            toolKind: tool.kind.slice(0, 64),
+            ...tool.output !== undefined && { output: tool.output.slice(-MAX_TOOL_OUTPUT_CHARS) },
+            ...tool.exit !== undefined && { exit: capExit(tool.exit) },
+        });
     }
 
     public child(_sessionId: string, turnId: string, spawnId: string, event: ChildEvent): void {

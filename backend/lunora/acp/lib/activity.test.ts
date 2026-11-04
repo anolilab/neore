@@ -28,6 +28,14 @@ describe(hostActivityOf, () => {
         ]);
     });
 
+    it("carries the latest output tail and exit status a call reported", () => {
+        const done = { event: { ...tool("a", "completed").event, exit: { code: 0 }, output: "ok" } };
+
+        expect(hostActivityOf([tool("a", "in_progress"), done])?.tools).toEqual([
+            { exit: { code: 0 }, id: "a", output: "ok", status: "completed", title: "Run a", toolKind: "execute" },
+        ]);
+    });
+
     it("keeps the most recent calls of a long turn", () => {
         const chunks = Array.from({ length: MAX_ACTIVITY_TOOLS + 3 }, (_, index) => tool(`t${String(index)}`, "completed"));
         const tools = hostActivityOf(chunks)?.tools ?? [];

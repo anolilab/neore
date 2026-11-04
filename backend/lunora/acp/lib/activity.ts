@@ -11,7 +11,10 @@ type PlanEvent = Extract<ChunkEvent, { kind: "plan" }>;
 type ToolEvent = Extract<ChunkEvent, { kind: "tool" }>;
 
 export interface HostActivityTool {
+    exit?: ToolEvent["exit"];
     id: string;
+    /** The tail of what the call printed, masked on the desktop. */
+    output?: string;
     status: ToolEvent["status"];
     title: string;
     toolKind: string;
@@ -37,7 +40,14 @@ export const hostActivityOf = (chunks: ReadonlyArray<Pick<Doc<"persistentChunks"
             plan = event.entries;
         } else if (event?.kind === "tool") {
             // A later report of a call replaces the earlier one in place, so a row keeps its position.
-            tools.set(event.id, { id: event.id, status: event.status, title: event.title, toolKind: event.toolKind });
+            tools.set(event.id, {
+                id: event.id,
+                status: event.status,
+                title: event.title,
+                toolKind: event.toolKind,
+                ...(event.output !== undefined && { output: event.output }),
+                ...(event.exit !== undefined && { exit: event.exit }),
+            });
         }
     }
 
