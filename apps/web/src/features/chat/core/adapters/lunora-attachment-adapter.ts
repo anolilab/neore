@@ -284,8 +284,11 @@ const getFileLabel = (isVideo: boolean | undefined, isAudio: boolean | undefined
 // The types the chat upload accepts (the server's allowlist), so the picker offers nothing it would refuse.
 export const ATTACHMENT_ACCEPT = `image/*,.heic,.heif,text/plain,text/markdown,text/html,text/css,text/javascript,text/xml,text/yaml,application/pdf,application/json,application/javascript,application/typescript,application/xml,${DOCX_TYPE},.md,${TEXT_PREVIEW_SUFFIXES.join(",")},.txt,.docx`;
 
-/** A HEIC photo is judged by the JPEG it becomes: the image size limit applies to it. */
-const JPEG_OF_HEIC = { name: "photo.jpg", type: "image/jpeg" } as const;
+/**
+ * The largest HEIC file that is opened for conversion. A photo's JPEG is judged by the image size limit once converted,
+ * so this only keeps a huge file from being decoded at all: iPhone photos are a few megabytes.
+ */
+const HEIC_SOURCE_MAX_BYTES = 40 * 1024 * 1024;
 
 /**
  * A closure rather than a class: two of the three adapter members never touched
@@ -293,17 +296,17 @@ const JPEG_OF_HEIC = { name: "photo.jpg", type: "image/jpeg" } as const;
  */
 export const createLunoraAttachmentAdapter = (lunora: LunoraClient): AttachmentAdapter => {
     const add = async (state: ProgressState): Promise<PendingAttachment> => {
-        // A HEIC/HEIF photo this browser converts is judged by the JPEG it becomes, and refused by that size before any decode.
-        if (willConvertHeic(state.file) && state.file.size > attachmentSizeLimit(JPEG_OF_HEIC).maxBytes) {
-            throw new AttachmentTooLargeError(state.file.name, attachmentSizeLimit(JPEG_OF_HEIC));
+        // A HEIC/HEIF photo this browser converts is refused before any decode when it is over the source ceiling.
+        if (willConvertHeic(state.file) && state.file.size > HEIC_SOURCE_MAX_BYTES) {
+            throw new AttachmentTooLargeError(state.file.name, { isDocument: false, maxBytes: HEIC_SOURCE_MAX_BYTES });
         }
 
         let source: File;
 
         try {
             source = await convertHeicToJpeg(state.file);
-        } catch {
-            throw new AttachmentUploadError(state.file.name, "unsupported");
+        } catch (error) {
+            throw new AttachmentUploadError(state.file.name, "unsupported", error);
         }
 
         const contentType = attachmentContentType(source);
