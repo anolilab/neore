@@ -36,11 +36,18 @@ const CONFIRM_READ_INTERVAL_MS = 2000;
 const REFUSED_MESSAGE = "This chat is locked or no longer available.";
 const SHARE_FAILED_MESSAGE = "The message could not be shared. Try again.";
 
-/** Whether the newest assistant row has a final server status, so a follow-up read has nothing left to wait for. */
-const isReplySettled = (rows: Row[]): boolean => {
-    const latest = rows.findLast((row) => row.role === "assistant");
+/** The server's replies on screen: every assistant row that is not a local one. */
+const serverReplies = (rows: Row[]): Row[] => rows.filter((row) => row.role === "assistant" && row.status !== "local");
 
-    return latest !== undefined && (latest.status === "success" || latest.status === "failed");
+/**
+ * Whether a server read has brought in the reply a send waited for: one more server reply than there were before the
+ * send, with a final status. A read that holds only an earlier reply does not count.
+ */
+const isReplyConfirmed = (rows: Row[], repliesBefore: number): boolean => {
+    const replies = serverReplies(rows);
+    const latest = replies.at(-1);
+
+    return replies.length > repliesBefore && latest !== undefined && (latest.status === "success" || latest.status === "failed");
 };
 
 /** A failed share fills an empty error slot; an error already on screen is not replaced by it. */
@@ -311,11 +318,11 @@ const Chat = () => {
         return () => gate.invalidate();
     }, [threadId]);
 
-    // After a reply the relay could not confirm, re-read on a timer until the server reports it settled. The thread
-    // is recorded, so leaving the chat stops the reads without a clean-up step, and unmounting clears the timer.
-    const [confirmingThreadId, setConfirmingThreadId] = useState<string | null>(null);
+    // After a send, re-read on a timer until the server's copy of its reply is final. The send records how many server
+    // replies there were, so only a new one counts. A new send replaces the record, which restarts the reads.
+    const [confirmation, setConfirmation] = useState<{ repliesBefore: number; threadId: string } | null>(null);
     const [confirmTick, setConfirmTick] = useState(0);
-    const isAwaitingReply = confirmingThreadId === threadId && !isReplySettled(rows);
+    const isAwaitingReply = confirmation !== null && confirmation.threadId === threadId && !isReplyConfirmed(rows, confirmation.repliesBefore);
 
     useEffect(() => {
         if (!isAwaitingReply) {
@@ -328,14 +335,14 @@ const Chat = () => {
             setConfirmTick((tick) => tick + 1);
 
             if (reads >= CONFIRM_READS) {
-                setConfirmingThreadId(null);
+                setConfirmation(null);
             }
         }, CONFIRM_READ_INTERVAL_MS);
 
         return () => {
             clearInterval(timer);
         };
-    }, [isAwaitingReply]);
+    }, [confirmation, isAwaitingReply]);
 
     useEffect(() => {
         // Without a token (a launch with no network) the saved messages are all there is; the read waits for one.
@@ -362,6 +369,9 @@ const Chat = () => {
         const stamp = Date.now();
         const userId = `user-${stamp}`;
         const assistantId = `pending-${stamp}`;
+        const repliesBefore = serverReplies(rows).length;
+
+        setConfirmation(null);
 
         setRows((current) => [
             ...current,
@@ -408,12 +418,12 @@ const Chat = () => {
                 throw new ChatError("The reply did not finish. Try again.");
             }
 
-            // Only a reply relayed through its end marker is complete here; a 205 ("unconfirmed") waits for the next read to supply the server's copy.
+            // Only a reply relayed through its end marker is complete here. Either way the server's copy is re-read until it is final.
             if (outcome === "finished") {
                 setRows((current) => finishRow(current, assistantId));
-            } else {
-                setConfirmingThreadId(started.threadId);
             }
+
+            setConfirmation({ repliesBefore, threadId: started.threadId });
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {

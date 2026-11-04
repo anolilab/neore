@@ -48,8 +48,8 @@ const orNull = <T extends number | string>(value: T | undefined): T | null => va
 const TABLES = ["cached_messages", "cached_statuses", "cached_threads", "cache_meta"] as const;
 
 /**
- * Stored in the file (`PRAGMA user_version`). A file written under another version is only a cache: its tables are
- * dropped and recreated, never migrated. Bump it whenever SCHEMA changes.
+ * Stored in the file (`PRAGMA user_version`). A file written under an older version is only a cache: unless setUp
+ * has a step for that version, its tables are dropped and recreated. Bump it whenever SCHEMA changes.
  */
 const SCHEMA_VERSION = 2;
 
