@@ -72,6 +72,12 @@ export class AcpManager {
 
     private readonly processes = new Set<AgentProcess>();
 
+    /** Starts that have asked for a plan and not yet registered a session; they hold a place under `MAX_SESSIONS`. */
+    private starting = 0;
+
+    /** Bumped whenever approvals may have been revoked (`closeUnapproved`): a plan made across a bump is made again. */
+    private revocations = 0;
+
     /** The hook runner of each session that has one; it lives and dies with the session. */
     private readonly runners = new Map<string, HookRunner>();
 
@@ -105,7 +111,7 @@ export class AcpManager {
     ): Promise<Result> {
         requireSupported();
 
-        const plan = await this.options.plan(agentKey, folder);
+        const plan = await this.planCurrent(agentKey, folder);
         let child: AgentProcess;
 
         try {
@@ -174,13 +180,23 @@ export class AcpManager {
     public async startSession(agentKey: string, agentLabel: string, folder: string, remote?: { nativeSessionId?: string; sessionId: string; threadId: string }): Promise<string> {
         requireSupported();
 
-        if (this.summaries().filter((session) => session.status !== "ended").length >= MAX_SESSIONS) {
+        if (this.summaries().filter((session) => session.status !== "ended").length + this.starting >= MAX_SESSIONS) {
             throw new Error(`at most ${String(MAX_SESSIONS)} agents at once; close one first`);
         }
 
-        // The core decides: it refuses an unregistered agent and (with consent) a folder the user has not approved.
-        const plan = await this.options.plan(agentKey, folder);
-        const child = this.spawn(plan, agentKey);
+        // The slot is held while the plan is made, so starts that overlap cannot all pass the check above.
+        this.starting += 1;
+
+        let plan: SpawnPlan;
+        let child: AgentProcess;
+
+        try {
+            plan = await this.planCurrent(agentKey, folder);
+            child = this.spawn(plan, agentKey);
+        } finally {
+            this.starting -= 1;
+        }
+
         const folderInfo = this.options.hostInfo?.(agentKey, plan.cwd);
         const { hooks } = this.options;
         // The runner needs the session to prompt and the session needs the runner to say when its turns start and end.
@@ -268,6 +284,8 @@ export class AcpManager {
      * approval is gone (revoked, or dropped because the agent's command or `PATH` changed).
      */
     public async closeUnapproved(view: Pick<AcpView, "agents" | "consents">): Promise<void> {
+        this.revocations += 1;
+
         const covered = (agentKey: string, folder: string): boolean =>
             view.agents.some((agent) => agent.key === agentKey)
             && view.consents.some((consent) => consent.agentKey === agentKey && consent.folderPath === folder);
@@ -337,6 +355,28 @@ export class AcpManager {
                 child.killNow();
             } catch {
                 // One group that cannot be signalled must not spare the others.
+            }
+        }
+    }
+
+    /**
+     * The core's plan, made again when approvals were revoked while it was being made (an install replaced the
+     * agent): the plan that was in flight may belong to files or a folder consent that no longer exist, and the
+     * session it would become is not yet there for `closeUnapproved` to close. Nothing awaits between the last
+     * check and the spawn that follows.
+     */
+    private async planCurrent(agentKey: string, folder: string | null): Promise<SpawnPlan> {
+        for (let attempt = 0; ; attempt += 1) {
+            const before = this.revocations;
+            // eslint-disable-next-line no-await-in-loop -- each plan depends on the approvals as they are now
+            const plan = await this.options.plan(agentKey, folder);
+
+            if (before === this.revocations || attempt >= 3) {
+                if (before !== this.revocations) {
+                    throw new Error("The agent's approvals changed while it started. Try again.");
+                }
+
+                return plan;
             }
         }
     }

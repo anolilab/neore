@@ -24,7 +24,7 @@ let scratch: Scratch;
 let manager: AcpManager;
 const plans: { env: Record<string, string>; folder: string | null; key: string }[] = [];
 
-const make = (env: Record<string, string> = {}, options: { cancelGraceMs?: number; plan?: (key: string, folder: string | null) => SpawnPlan } = {}): AcpManager => new AcpManager({
+const make = (env: Record<string, string> = {}, options: { cancelGraceMs?: number; plan?: (key: string, folder: string | null) => Promise<SpawnPlan> | SpawnPlan } = {}): AcpManager => new AcpManager({
     appVersion: "9.9.9",
     cancelGraceMs: options.cancelGraceMs ?? 400,
     onChange: () => {},
@@ -438,5 +438,40 @@ describe("unsupported platforms and missing commands", () => {
         );
 
         await expect(target.probe("missing")).rejects.toThrow(MISSING_COMMAND);
+    });
+});
+
+describe("starts that wait for their plan", () => {
+    it("hold their place, so overlapping starts cannot pass the session limit together", async () => {
+        const target = make({}, { plan: () => new Promise<SpawnPlan>(() => {}) });
+
+        for (let index = 0; index < 8; index += 1) {
+            // eslint-disable-next-line unicorn/prefer-await -- the start never settles in this test; only the limit is under test
+            target.startSession("fake", "Fake", scratch.work).catch(() => {});
+        }
+
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow("at most");
+    });
+
+    it("plan again when approvals were revoked while the plan was being made", async () => {
+        const calls: number[] = [];
+        const bad = { args: [], command: "neore-no-such-agent", cwd: scratch.dir, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    calls.push(calls.length);
+
+                    if (calls.length === 1) {
+                        await target.closeUnapproved({ agents: [], consents: [] });
+                    }
+
+                    return bad;
+                },
+            },
+        );
+
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow(MISSING_COMMAND);
+        expect(calls).toHaveLength(2);
     });
 });

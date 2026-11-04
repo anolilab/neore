@@ -173,7 +173,11 @@ fn a_verified_download_is_installed_without_scripts_and_pinned_with_its_hashes()
     assert!(fs::read_to_string(&log)
         .unwrap()
         .contains("--ignore-scripts"));
-    assert_eq!(agent.command, node.to_string_lossy());
+    assert_eq!(
+        Path::new(&agent.command),
+        fs::canonicalize(&node).unwrap(),
+        "the command is the interpreter resolved"
+    );
     assert_eq!(
         agent.args,
         vec![script.to_string_lossy().into_owned(), "--acp".into()]
@@ -217,7 +221,10 @@ fn a_changed_added_or_removed_file_refuses_the_start_and_says_so() {
         .join("cli.js");
     let untouched = state.acp_spawn_plan("fixture", None).unwrap();
 
-    assert_eq!(untouched.command, node.to_string_lossy());
+    assert_eq!(
+        Path::new(&untouched.command),
+        fs::canonicalize(&node).unwrap()
+    );
 
     fs::write(&script, "console.log('changed');\n").unwrap();
     let changed = state.acp_spawn_plan("fixture", None).unwrap_err();
@@ -358,6 +365,21 @@ fn editing_the_arguments_after_the_program_keeps_the_pin_and_the_check() {
     assert!(state.acp_spawn_plan("fixture", None).is_err());
     fs::write(&script, "console.log('hello');\n").unwrap();
 
+    // Only the interpreter changes (a Node upgrade moved it): the program is the same, so the check stays on.
+    let new_node = state
+        .acp_update(
+            serde_json::from_value(json!({
+                "op": "saveAgent", "key": "fixture", "label": "Fixture", "command": "/opt/other/node", "args": [script.clone()],
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+    assert!(new_node.agents[0].install.is_some());
+    fs::write(&script, "changed").unwrap();
+    assert!(state.acp_spawn_plan("fixture", None).is_err());
+    fs::write(&script, "console.log('hello');\n").unwrap();
+
     // The program itself is replaced: no longer the install, and its files go with it, as for a binary.
     let moved = edit(vec!["/elsewhere/agent.js".into()]);
 
@@ -493,6 +515,10 @@ fn no_lifecycle_script_runs_during_an_install() {
         ])
         .arg(&control)
         .arg(&tgz)
+        .env_clear()
+        .env("npm_config_ignore_scripts", "false")
+        .env("npm_config_userconfig", control.join("userrc"))
+        .env("npm_config_globalconfig", control.join("globalrc"))
         .env(
             "PATH",
             format!("{}:/usr/bin:/bin", node.parent().unwrap().display()),
@@ -605,30 +631,6 @@ fn a_program_node_cannot_run_is_refused_before_anything_is_recorded() {
     state
         .acp_install_npm(request(&state, &node, &npm, &shebang, integrity(&shebang)))
         .unwrap();
-}
-
-#[test]
-fn a_background_check_spares_one_start_the_hashing_and_only_one() {
-    let (state, guard) = state("precheck");
-    let dir = guard.path().to_path_buf();
-    let (node, npm, _) = fake_tools(&dir);
-    let bytes = tarball(&manifest(), &[]);
-
-    state
-        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
-        .unwrap();
-    state.precheck_installed_tree("fixture");
-
-    let script = installed(&dir).join("node_modules/fixture-agent/cli.js");
-
-    // The check vouched for the folder as it was: the first start uses it, the next one hashes again.
-    fs::write(&script, "tampered").unwrap();
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
-    assert!(state.acp_spawn_plan("fixture", None).is_err());
-
-    // A check of a changed folder records nothing.
-    state.precheck_installed_tree("fixture");
-    assert!(state.acp_spawn_plan("fixture", None).is_err());
 }
 
 #[test]

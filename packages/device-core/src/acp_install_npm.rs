@@ -24,7 +24,6 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use serde::Deserialize;
@@ -43,8 +42,6 @@ const MAX_TREE_ENTRIES: usize = 200_000;
 /// What the staging folder (the unpacked package, its dependencies and npm's cache) may occupy while npm runs.
 const MAX_STAGE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const STAGE_CHECK_EVERY: u32 = 10;
-/// How long a successful background check of an installed folder vouches for the start that follows it.
-const VERIFIED_FOR: Duration = Duration::from_secs(15);
 const TARBALL: &str = "package.tgz";
 const HOME_DIR: &str = "home";
 /// Variables the install passes on: a proxy and certificate settings decide whether the network is reachable, and
@@ -518,51 +515,7 @@ fn digests(file: &mut fs::File) -> Result<(String, String), String> {
     }
 }
 
-/// Folders a background check ([`DeviceState::precheck_installed_tree`]) found unchanged, and when. A start that
-/// follows within [`VERIFIED_FOR`] uses the entry once instead of hashing the folder on the thread that starts it.
-static VERIFIED: Mutex<Vec<(PathBuf, String, Instant)>> = Mutex::new(Vec::new());
-
-fn take_verified(dir: &Path, hash: &str) -> bool {
-    let Ok(mut list) = VERIFIED.lock() else {
-        return false;
-    };
-
-    list.retain(|(_, _, at)| at.elapsed() < VERIFIED_FOR);
-
-    match list.iter().position(|(d, h, _)| d == dir && h == hash) {
-        Some(index) => {
-            list.remove(index);
-
-            true
-        }
-        None => false,
-    }
-}
-
 impl DeviceState {
-    /// Hashes the installed folder of `agent_key` and, when it matches what was recorded, remembers that for the
-    /// next start of it. For callers that run it off the thread that starts agents; a mismatch records nothing and
-    /// the start itself finds and reports it.
-    pub fn precheck_installed_tree(&self, agent_key: &str) {
-        let settings = self.settings();
-        let Some(agent) = settings.acp_agents.iter().find(|a| a.key == agent_key) else {
-            return;
-        };
-        let Some(pin) = &agent.install else { return };
-        let Some(expected) = &pin.tree_sha256 else {
-            return;
-        };
-        let dir = self.install_root().join(&agent.key).join(&pin.version);
-
-        if fs::symlink_metadata(&dir).is_ok_and(|meta| meta.is_dir())
-            && tree_hash(&dir).ok().as_ref() == Some(expected)
-        {
-            if let Ok(mut list) = VERIFIED.lock() {
-                list.push((dir, expected.clone(), Instant::now()));
-            }
-        }
-    }
-
     /// Verifies, installs and registers `request`. Any refusal leaves no file behind.
     pub fn acp_install_npm(&self, request: NpmInstallRequest) -> Result<AcpView, String> {
         let (node, npm) = validate(&request)?;
@@ -662,7 +615,12 @@ impl DeviceState {
 
         let mut agent = AcpAgent {
             args,
-            command: node.to_string_lossy().into_owned(),
+            // The interpreter the person's PATH pointed at, resolved: a link a package manager re-points later
+            // (a Node upgrade or switch) must not change which Node runs a pinned agent.
+            command: fs::canonicalize(node)
+                .unwrap_or_else(|_| node.to_path_buf())
+                .to_string_lossy()
+                .into_owned(),
             env: EnvVars(request.env.clone()),
             install: Some(AcpInstall {
                 index_integrity: Some(request.integrity.clone()),
@@ -699,10 +657,6 @@ impl DeviceState {
             return Ok(());
         };
         let dir = self.install_root().join(&agent.key).join(&pin.version);
-
-        if take_verified(&dir, expected) {
-            return Ok(());
-        }
 
         let actual = if fs::symlink_metadata(&dir).is_ok_and(|meta| meta.is_dir()) {
             tree_hash(&dir).ok()

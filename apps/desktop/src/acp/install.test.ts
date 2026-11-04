@@ -329,6 +329,16 @@ describe("an npm agent", () => {
         expect(existsSync(failing.staged[0])).toBe(false);
     });
 
+    it("removes the staging folder and never calls the core when the tarball download fails", async () => {
+        const broken = await setupNpm();
+        const original = broken.fetchSpy.getMockImplementation();
+
+        broken.fetchSpy.mockImplementation(async (url, init) => String(url) === TARBALL ? new Response(null, { status: 500 }) : original?.(url, init) as Promise<Response>);
+        await expect(broken.installer.install("thing", "1.0.0")).rejects.toThrow("download failed");
+        expect(existsSync(broken.staged[0])).toBe(false);
+        expect(broken.core.acpInstallNpm).not.toHaveBeenCalled();
+    });
+
     it("words its text without a hash the registry did not give", () => {
         const text = npmConsentText(
             { agent: { binary: {}, description: "", distributions: ["npx"], id: "t", license: "MIT", name: "T", publisher: "Acme", repository: "", version: "1.0.0" }, args: ["--acp"], env: { A: "1" }, kind: "npm", name: "t", version: "1.0.0" },

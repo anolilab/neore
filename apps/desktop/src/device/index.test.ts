@@ -224,7 +224,6 @@ const makeCore = () => {
         acpPermissionCancelSession: vi.fn(),
         acpPermissionDecline: vi.fn(),
         acpPermissions: vi.fn(() => "[]"),
-        acpPrecheckInstall: vi.fn(async (_agentKey: string) => true),
         acpPrepare: vi.fn((): string =>
             JSON.stringify({ callId: "c1", command: null, expiresAt: Date.now() + 60_000, refusal: "not approved on this computer" }),
         ),
@@ -234,7 +233,7 @@ const makeCore = () => {
         acpSign: vi.fn((_envelope: string, _signature: string, outcome: string) =>
             JSON.stringify({ payload: JSON.stringify({ outcome }), signature: "signed" }),
         ),
-        acpSpawnPlan: vi.fn((): string => {
+        acpSpawnPlanAsync: vi.fn(async (): Promise<string> => {
             throw new Error("that folder is not allowed");
         }),
         acpUpdate: vi.fn(() => JSON.stringify({ agents: [], envNames: [] })),
@@ -611,20 +610,20 @@ describe("coding agents on a server", () => {
         // Planned by the core for the server (not for this computer), and handed to the server's host.
         await vi.waitFor(() => expect(core.hostAgentStart).toHaveBeenCalledWith("srv-1", 1, "claude", "/srv/app"));
         expect(core.acpHostSpawnPlan).toHaveBeenCalledWith("srv-1", "claude", "/srv/app");
-        expect(core.acpSpawnPlan).not.toHaveBeenCalled();
+        expect(core.acpSpawnPlanAsync).not.toHaveBeenCalled();
         expect(spawnAgent).not.toHaveBeenCalled();
         expect(core.acpSign).toHaveBeenLastCalledWith(ACP_ENVELOPE, ACP_SIGNATURE, "accepted");
     });
 
     it("starts a command for this computer as a process of its own and asks the core for nothing about a server", async () => {
         core.acpPrepare.mockReturnValue(prepared({ deviceId: "desk-1", server: null }));
-        core.acpSpawnPlan.mockImplementation(() => {
+        core.acpSpawnPlanAsync.mockImplementation(() => {
             throw new Error("that folder is not allowed");
         });
 
         await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
 
-        await vi.waitFor(() => expect(core.acpSpawnPlan).toHaveBeenCalledWith("claude", "/srv/app"));
+        await vi.waitFor(() => expect(core.acpSpawnPlanAsync).toHaveBeenCalledWith("claude", "/srv/app"));
         expect(core.acpHostSpawnPlan).not.toHaveBeenCalled();
         expect(core.hostAgentStart).not.toHaveBeenCalled();
     });
@@ -877,7 +876,7 @@ describe("coding-agent channels", () => {
         }
 
         expect(core.acpUpdate).not.toHaveBeenCalled();
-        expect(core.acpSpawnPlan).not.toHaveBeenCalled();
+        expect(core.acpSpawnPlanAsync).not.toHaveBeenCalled();
         expect(core.acpPermissionAnswer).not.toHaveBeenCalled();
         expect(core.acpPermissionAnswerBatch).not.toHaveBeenCalled();
         expect(spawnAgent).not.toHaveBeenCalled();
@@ -948,7 +947,7 @@ describe("coding-agent channels", () => {
         await expect(invoke(LOCAL_CHANNEL.acpStart, localEvent(), "alpha", "/not/allowed")).rejects.toThrow("that folder is not allowed");
         await expect(invoke(LOCAL_CHANNEL.acpProbe, localEvent(), "alpha")).rejects.toThrow("that folder is not allowed");
 
-        expect(core.acpSpawnPlan).toHaveBeenCalledWith("alpha", "/not/allowed");
+        expect(core.acpSpawnPlanAsync).toHaveBeenCalledWith("alpha", "/not/allowed");
         expect(spawnAgent).not.toHaveBeenCalled();
     });
 
@@ -956,14 +955,14 @@ describe("coding-agent channels", () => {
         await expect(invoke(LOCAL_CHANNEL.acpImportList, localEvent(), "alpha", "/not/allowed")).rejects.toThrow("that folder is not allowed");
         await expect(invoke(LOCAL_CHANNEL.acpImport, localEvent(), "nobody", "/work", "s1")).rejects.toThrow("that agent is not registered");
 
-        expect(core.acpSpawnPlan).toHaveBeenCalledTimes(1);
+        expect(core.acpSpawnPlanAsync).toHaveBeenCalledTimes(1);
         expect(spawnAgent).not.toHaveBeenCalled();
     });
 
     it("check the shape of an import request before it reaches the agent", () => {
         expect(() => invoke(LOCAL_CHANNEL.acpImport, localEvent(), "alpha", "/work", 7)).toThrow("device: saved session is invalid");
         expect(() => invoke(LOCAL_CHANNEL.acpImportList, localEvent(), "alpha", 7)).toThrow("device: folder is invalid");
-        expect(core.acpSpawnPlan).not.toHaveBeenCalled();
+        expect(core.acpSpawnPlanAsync).not.toHaveBeenCalled();
     });
 
     it("report what no agent has said yet as nothing", () => {
@@ -973,7 +972,7 @@ describe("coding-agent channels", () => {
     it("refuse an unregistered agent before asking for a plan", async () => {
         await expect(invoke(LOCAL_CHANNEL.acpStart, localEvent(), "nobody", "/work")).rejects.toThrow("that agent is not registered");
 
-        expect(core.acpSpawnPlan).not.toHaveBeenCalled();
+        expect(core.acpSpawnPlanAsync).not.toHaveBeenCalled();
     });
 
     it("check the shape of what the window sends before it reaches the core", () => {

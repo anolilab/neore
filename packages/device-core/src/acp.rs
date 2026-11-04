@@ -394,15 +394,14 @@ impl DeviceState {
 
                                 // An npm install runs `node <program> <arguments>`: the program (the first
                                 // argument) is what was pinned and is still hashed at every start, so the
-                                // arguments after it are the person's to change.
-                                before.command == command
-                                    && (before.args == args
-                                        || before
-                                            .install
-                                            .as_ref()
-                                            .is_some_and(|pin| pin.tree_sha256.is_some())
-                                            && !args.is_empty()
-                                            && before.args.first() == args.first())
+                                // interpreter and the arguments after it are the person's to change.
+                                (before.command == command && before.args == args)
+                                    || before
+                                        .install
+                                        .as_ref()
+                                        .is_some_and(|pin| pin.tree_sha256.is_some())
+                                        && !args.is_empty()
+                                        && before.args.first() == args.first()
                             })
                             .and_then(|i| settings.acp_agents[i].install.clone()),
                         args,

@@ -479,6 +479,8 @@ export const fetchHttps = async (fetchImpl: Fetch, url: string, init: RequestIni
 export interface RegistryOptions {
     arch?: string;
     fetch?: Fetch;
+    /** Whether node and npm are here; without them an npm agent is listed with the reason instead of an Install button. */
+    hasNpmTools?: () => boolean;
     now?: () => number;
     platform?: string;
     /** False where coding agents cannot run (`acpSupported`): everything is listed, nothing is installable. */
@@ -495,6 +497,8 @@ export class AgentRegistry {
 
     private readonly fetchImpl: Fetch;
 
+    private readonly hasNpmTools: () => boolean;
+
     private readonly now: () => number;
 
     private readonly platform: string | undefined;
@@ -502,6 +506,7 @@ export class AgentRegistry {
     public constructor(options: RegistryOptions = {}) {
         this.fetchImpl = options.fetch ?? globalThis.fetch;
         this.now = options.now ?? Date.now;
+        this.hasNpmTools = options.hasNpmTools ?? (() => true);
         this.platform = options.supported === false ? undefined : platformKey(options.platform ?? process.platform, options.arch ?? process.arch);
     }
 
@@ -555,7 +560,8 @@ export class AgentRegistry {
     }
 
     private listing(agent: RegistryAgent): RegistryListing {
-        const resolved = resolveInstall(agent, this.platform);
+        const found = resolveInstall(agent, this.platform);
+        const resolved = typeof found !== "string" && found.kind === "npm" && !this.hasNpmTools() ? "Node.js and npm were not found. Install Node.js (which includes npm), then search again." : found;
 
         return {
             description: agent.description,

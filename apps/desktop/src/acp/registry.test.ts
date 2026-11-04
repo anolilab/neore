@@ -170,6 +170,15 @@ describe("AgentRegistry", () => {
         expect(listings[1].reason).toMatch("no checksum");
     });
 
+    it("lists an npm agent with the reason when node and npm are not here", async () => {
+        const fetchSpy = vi.fn(async () => jsonResponse(REGISTRY_FIXTURE));
+        const registry = new AgentRegistry({ arch: "x64", fetch: fetchSpy as unknown as typeof fetch, hasNpmTools: () => false, platform: "linux" });
+        const listings = await registry.search("");
+
+        expect(listings.map(({ id, installable }) => [id, installable])).toEqual([["amp-acp", true], ["cortex-code", false], ["thing", false]]);
+        expect(listings[2].reason).toMatch("Node.js and npm were not found");
+    });
+
     it("lists nothing as installable where coding agents cannot run", async () => {
         const fetchSpy = vi.fn(async () => jsonResponse(REGISTRY_FIXTURE));
         const registry = new AgentRegistry({ arch: "x64", fetch: fetchSpy as unknown as typeof fetch, platform: "linux", supported: false });

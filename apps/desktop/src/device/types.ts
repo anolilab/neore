@@ -225,13 +225,13 @@ export interface DeviceCore {
     acpPermissionCancelSession: (sessionId: string) => void;
     acpPermissionDecline: (id: number) => void;
     acpPermissions: () => string;
-    acpPrecheckInstall: (agentKey: string) => Promise<boolean>;
     /** A relayed coding-agent command, checked but not acted on (`acp/commands.ts`). */
     acpPrepare: (envelope: string, signature: string) => string;
     /** Reads a file an agent's reply refers to, in Rust: only inside the folder the agent was approved for, only an allowed type. */
     acpReadMedia: (agentKey: string, folder: string, reference: string) => Promise<MediaRead>;
     acpSign: (envelope: string, signature: string, outcome: string) => string;
     acpSpawnPlan: (agentKey: string, folder: string | null) => string;
+    acpSpawnPlanAsync: (agentKey: string, folder: string | null) => Promise<string>;
     acpUpdate: (update: string) => string;
     acpView: () => string;
     auditTail: () => string[];

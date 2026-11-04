@@ -120,7 +120,6 @@ export declare class DeviceCore {
    * (`NpmInstallRequest`, JSON). Not reachable through `acp_update`. Validation is in Rust.
    */
   acpInstallNpm(request: string): Promise<string>
-  acpPrecheckInstall(agentKey: string): Promise<boolean>
   /**
    * Deletes the installed versions of an agent other than the pinned one. Run it after closing the sessions
    * the install took the approval from.
@@ -131,6 +130,7 @@ export declare class DeviceCore {
    * version probe. The environment holds secrets: it goes to the main process and nowhere else.
    */
   acpSpawnPlan(agentKey: string, folder?: string | undefined | null): string
+  acpSpawnPlanAsync(agentKey: string, folder?: string | undefined | null): Promise<string>
   /**
    * Registers, changes or removes a coding agent of a server, or approves it for a folder shared with the server
    * (an `acpUpdate` operation, JSON; JSON back: `{ agents, consents }` of that server). Local window only.

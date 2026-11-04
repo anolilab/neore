@@ -551,24 +551,6 @@ impl DeviceCore {
         })
     }
 
-    /// Hashes an installed npm agent's files off the calling thread and remembers an unchanged result for the
-    /// start that follows (`acpSpawnPlan` then does not hash them again). It never fails and decides nothing: a
-    /// changed folder is refused by `acpSpawnPlan` itself.
-    #[napi]
-    pub fn acp_precheck_install<'env>(
-        &self,
-        env: &'env Env,
-        agent_key: String,
-    ) -> Result<PromiseRaw<'env, bool>> {
-        let state = Arc::clone(&self.state);
-
-        blocking(env, move || {
-            state.precheck_installed_tree(&agent_key);
-
-            Ok(true)
-        })
-    }
-
     /// Deletes the installed versions of an agent other than the pinned one. Run it after closing the sessions
     /// the install took the approval from.
     #[napi]
@@ -586,6 +568,24 @@ impl DeviceCore {
             .map_err(Error::from_reason)?;
 
         to_json(&plan)
+    }
+
+    /// `acpSpawnPlan` on a worker thread: an installed npm agent's files are hashed first, which can take long
+    /// on a big dependency tree, so the app's main thread must not do it.
+    #[napi]
+    pub fn acp_spawn_plan_async<'env>(
+        &self,
+        env: &'env Env,
+        agent_key: String,
+        folder: Option<String>,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let plan = state.acp_spawn_plan(&agent_key, folder.as_deref())?;
+
+            serde_json::to_string(&plan).map_err(|error| error.to_string())
+        })
     }
 
     /// Registers, changes or removes a coding agent of a server, or approves it for a folder shared with the server
