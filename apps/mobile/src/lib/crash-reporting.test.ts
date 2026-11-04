@@ -35,6 +35,22 @@ const fakeClient = (events: string[]) => {
 };
 
 /** The global handler as the app sees it: the one installed, and the one that was there before. */
+/** An install that has started before: its saved choice is trusted. */
+const returningInstall = { create: (): void => undefined, exists: (): boolean => true };
+
+/** A new install, which resets any saved choice before reading it. */
+const newInstall = () => {
+    const marker = {
+        create: (): void => {
+            marker.created = true;
+        },
+        created: false,
+        exists: (): boolean => false,
+    };
+
+    return marker;
+};
+
 const handlers: { installed?: (error: unknown, isFatal?: boolean) => void; previous: ReturnType<typeof vi.fn> } = { previous: vi.fn() };
 
 beforeEach(() => {
@@ -76,7 +92,7 @@ describe("changing the choice", () => {
         const crash = await load();
 
         crash.startCrashReporting(() => fakeClient(events));
-        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"));
+        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
         events.length = 0;
 
         await expect(crash.changeCrashReports(memoryStore(events, "on", true), false)).rejects.toThrow("keychain is unavailable");
@@ -110,7 +126,7 @@ describe("applying the saved choice at startup", () => {
 
         crash.startCrashReporting(() => fakeClient(events));
 
-        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"));
+        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
 
         expect(events).toEqual(["optIn"]);
         expect(await crash.crashReportsOn()).toBe(true);
@@ -122,7 +138,7 @@ describe("applying the saved choice at startup", () => {
 
         crash.startCrashReporting(() => fakeClient(events));
 
-        await crash.applyStoredCrashReportChoice(memoryStore(events, null));
+        await crash.applyStoredCrashReportChoice(memoryStore(events, null), returningInstall);
 
         expect(events).not.toContain("optIn");
         expect(await crash.crashReportsOn()).toBe(false);
@@ -139,10 +155,45 @@ describe("applying the saved choice at startup", () => {
         crash.startCrashReporting(() => client);
         const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
-        await expect(crash.applyStoredCrashReportChoice(memoryStore(events, "on"))).resolves.toBeUndefined();
+        await expect(crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall)).resolves.toBeUndefined();
 
         expect(warn).toHaveBeenCalledWith("Could not apply the crash-report setting.", expect.any(Error));
         expect(await crash.crashReportsOn()).toBe(false);
+    });
+});
+
+describe("a new install", () => {
+    it("resets a choice saved by an earlier install, and does not start the client for it", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const create = vi.fn(() => fakeClient(events));
+
+        crash.startCrashReporting(create);
+        const store = memoryStore(events, "on");
+        const marker = newInstall();
+
+        await crash.applyStoredCrashReportChoice(store, marker);
+
+        expect(store.value).toBe("off");
+        expect(create).not.toHaveBeenCalled();
+        expect(marker.created).toBe(true);
+        expect(await crash.crashReportsOn()).toBe(false);
+    });
+
+    it("does not start the client when the reset cannot be saved, and tries again next launch", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const create = vi.fn(() => fakeClient(events));
+
+        crash.startCrashReporting(create);
+        const marker = newInstall();
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+        await crash.applyStoredCrashReportChoice(memoryStore(events, "on", true), marker);
+
+        expect(create).not.toHaveBeenCalled();
+        expect(marker.created).toBe(false);
+        expect(warn).toHaveBeenCalledWith("Could not reset the saved crash-report choice.");
     });
 });
 
@@ -154,7 +205,7 @@ describe("making the client", () => {
 
         crash.startCrashReporting(create);
 
-        await crash.applyStoredCrashReportChoice(memoryStore(events, null));
+        await crash.applyStoredCrashReportChoice(memoryStore(events, null), returningInstall);
 
         expect(create).not.toHaveBeenCalled();
     });
@@ -166,7 +217,7 @@ describe("making the client", () => {
 
         crash.startCrashReporting(create);
 
-        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"));
+        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
 
         expect(create).toHaveBeenCalledOnce();
     });
@@ -219,7 +270,7 @@ describe("the global error handler", () => {
 
         crash.startCrashReporting(() => client);
         crash.installGlobalErrorReporting();
-        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"));
+        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"), returningInstall);
         const release: { finish?: () => void } = {};
 
         client.optOut.mockImplementation(async () => {

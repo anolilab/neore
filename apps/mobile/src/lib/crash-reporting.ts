@@ -70,9 +70,31 @@ export const changeCrashReports = (store: PreferenceStore, isOn: boolean): Promi
         await writeCrashReportsEnabled(store, isOn);
     });
 
-/** Applies the saved choice at startup. A store that cannot be read leaves reports off. */
-export const applyStoredCrashReportChoice = (store: PreferenceStore): Promise<void> =>
+/** Whether this install has been started before, and a way to mark that it has. */
+export interface InstallMarker {
+    create: () => void;
+    exists: () => boolean;
+}
+
+/**
+ * Applies the saved choice at startup. A store that cannot be read leaves reports off.
+ * On a new install the saved choice is reset to off first: the Keychain can still hold a choice from an app
+ * that was deleted, and nobody has agreed to that choice on this install. If the reset cannot be saved, the
+ * client is not started, and the next launch tries again.
+ */
+export const applyStoredCrashReportChoice = (store: PreferenceStore, marker: InstallMarker): Promise<void> =>
     runChoice(async () => {
+        if (!marker.exists()) {
+            try {
+                await writeCrashReportsEnabled(store, false);
+                marker.create();
+            } catch {
+                console.warn("Could not reset the saved crash-report choice.");
+            }
+
+            return;
+        }
+
         let isOn: boolean;
 
         try {

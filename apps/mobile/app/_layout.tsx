@@ -1,13 +1,14 @@
 import { Link, Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { AuthProvider } from "@/auth/auth-context";
 import { useAuth } from "@/auth/auth-state";
 import { loadConfig } from "@/lib/config";
 import { crashReportStore } from "@/lib/crash-report-store";
 import { applyStoredCrashReportChoice, installGlobalErrorReporting, startCrashReporting } from "@/lib/crash-reporting";
+import { installMarker } from "@/lib/install-marker";
 import { createPostHogClient } from "@/lib/posthog-client";
 import { OfflineProvider } from "@/offline/offline-provider";
 
@@ -22,7 +23,7 @@ const CrashReportingStartup = () => {
 
         startCrashReporting(() => createPostHogClient(posthog));
         installGlobalErrorReporting();
-        applyStoredCrashReportChoice(crashReportStore);
+        applyStoredCrashReportChoice(crashReportStore, installMarker);
     }, []);
 
     return null;
@@ -49,7 +50,19 @@ const SignInGate = () => {
 
     return (
         <Stack>
-            <Stack.Screen name="index" options={{ headerRight: () => <Link href="/settings">Settings</Link>, title: "Chats" }} />
+            <Stack.Screen
+                name="index"
+                options={{
+                    headerRight: () => (
+                        <Link asChild href="/settings">
+                            <Pressable accessibilityRole="link" style={{ justifyContent: "center", minHeight: 44, minWidth: 44 }}>
+                                <Text>Settings</Text>
+                            </Pressable>
+                        </Link>
+                    ),
+                    title: "Chats",
+                }}
+            />
             <Stack.Screen name="settings" options={{ title: "Settings" }} />
             <Stack.Screen name="sign-in" options={{ title: "Sign in" }} />
             <Stack.Screen name="chat/[threadId]" options={{ title: "Chat" }} />
