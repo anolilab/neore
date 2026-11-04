@@ -62,7 +62,7 @@ describe("readAllReplyStates", () => {
 
     it("reports a refused chat for the confirmations it could not read", async () => {
         const fetchPage = vi.fn(async (): Promise<ConfirmPage> => {
-            throw Object.assign(new Error("Access denied to this thread"), { code: "UNAUTHORIZED", message: "Access denied to this thread" });
+            throw Object.assign(new Error("Access denied to this thread"), { code: "UNAUTHORIZED" });
         });
 
         const [outcome] = await readAllReplyStates(fetchPage, "t1", [confirmation("a")]);
