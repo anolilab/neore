@@ -64,6 +64,17 @@ export const prependPrompt = <A>(state: PromptQueueState<A>, item: QueuedPrompt<
     return { ...state, items: [withoutHidden(item), ...state.items] };
 };
 
+/**
+ * Replaces the text of a queued message in place, so it keeps its place and id. A steered message is already in the
+ * running reply, so it cannot be edited here. Hidden characters go, as on enqueue.
+ */
+export const editQueuedPrompt = <A>(state: PromptQueueState<A>, id: string, text: string): PromptQueueState<A> => {
+    return {
+        ...state,
+        items: state.items.map((item) => (item.id === id && item.steer === undefined ? withoutHidden({ ...item, text }) : item)),
+    };
+};
+
 export const removeQueuedPrompt = <A>(state: PromptQueueState<A>, id: string): PromptQueueState<A> => {
     const items = state.items.filter((item) => item.id !== id);
 

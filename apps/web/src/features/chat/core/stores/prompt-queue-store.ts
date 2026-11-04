@@ -20,6 +20,7 @@ import { create } from "zustand";
 import type { PromptQueueState, QueuedPrompt } from "@/features/chat/core/utils/prompt-queue";
 import {
     dequeuePrompt,
+    editQueuedPrompt,
     EMPTY_PROMPT_QUEUE,
     enqueuePrompt,
     prependPrompt,
@@ -35,6 +36,8 @@ export type QueuedChatPrompt = QueuedPrompt<PendingAttachment>;
 type ThreadQueue = PromptQueueState<PendingAttachment>;
 
 interface PromptQueueStore {
+    /** Replaces a queued message's text in place; a steered message is left as it is. */
+    edit: (threadId: string, id: string, text: string) => void;
     enqueue: (threadId: string, prompt: Omit<QueuedChatPrompt, "id">) => void;
     /** Puts the prompt first and lifts a pause, so it is the next one sent. */
     enqueueNext: (threadId: string, prompt: Omit<QueuedChatPrompt, "id">) => void;
@@ -97,6 +100,7 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
     };
 
     return {
+        edit: (threadId, id, text) => update(threadId, (queue) => editQueuedPrompt(queue, id, text)),
         enqueue: (threadId, prompt) => update(threadId, (queue) => enqueuePrompt(queue, { ...prompt, id: generatePromptId() })),
         enqueueNext: (threadId, prompt) =>
             update(threadId, (queue) => {

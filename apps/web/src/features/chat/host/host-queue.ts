@@ -30,17 +30,28 @@ export const shouldQueueMessage = (state: { pendingStart: boolean; queued: numbe
     state.running || state.pendingStart || state.queued > 0;
 
 /**
- * Whether the queue's head may be sent now. Never while a turn runs, while a send is in flight, while the session is
- * ended, or while the queue is paused after a refusal. `pendingStart` holds the queue for the stream of the send that
- * just succeeded: the backend stores it at once, but the composer learns of it a moment later, and sending the next
- * message in that gap would be refused as `turn_running`.
+ * Whether the queue's head may be sent now. Never while a turn runs or its end is still being decided, while a send is in flight, while
+ * the session is ended or starting, or while the queue is paused after a refusal. `pendingStart` holds the queue for the
+ * stream of the send that just succeeded: the backend stores it at once, but the composer learns of it a moment later,
+ * and sending the next message in that gap would be refused as `turn_running`.
  */
 export const canSendQueueHead = (state: {
     blocked: boolean;
+    held: boolean;
     loaded: boolean;
     paused: boolean;
     pendingStart: boolean;
     queued: number;
     running: boolean;
     sending: boolean;
-}): boolean => state.queued > 0 && state.loaded && !state.paused && !state.blocked && !state.running && !state.sending && !state.pendingStart;
+    starting: boolean;
+}): boolean =>
+    state.queued > 0 &&
+    state.loaded &&
+    !state.paused &&
+    !state.blocked &&
+    !state.starting &&
+    !state.held &&
+    !state.running &&
+    !state.sending &&
+    !state.pendingStart;

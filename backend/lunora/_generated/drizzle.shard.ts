@@ -1858,6 +1858,7 @@ export const userSettings = sqliteTable("userSettings", {
     onboardingCompleted: integer("onboardingCompleted", { mode: "boolean" }),
     profession: text("profession"),
     resumeInterruptedRuns: integer("resumeInterruptedRuns", { mode: "boolean" }),
+    hostFollowUpSteer: integer("hostFollowUpSteer", { mode: "boolean" }),
     resumeLastChat: integer("resumeLastChat", { mode: "boolean" }),
     searchDomainBlocklist: text("searchDomainBlocklist", { mode: "json" }).$type<Array<string>>(),
     sendBehavior: text("sendBehavior"),

@@ -4,7 +4,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => {
@@ -15,6 +15,9 @@ const harness = vi.hoisted(() => {
         data: {} as Record<string, unknown>,
         /** The client of the mounted composer, so a test can end the turn it started. */
         client: undefined as QueryClient | undefined,
+        /** Query keys that wait on `gate` before answering, so a test can mount while they are still loading. */
+        hold: [] as string[],
+        gate: undefined as Promise<void> | undefined,
     };
 });
 
@@ -57,7 +60,13 @@ vi.mock("@/lib/lunora/crpc", async () => {
                                 queryFn:
                                     args === skipToken
                                         ? skipToken
-                                        : async () => harness.data[path.join(".")] ?? (path.at(-1) === "getHostPendingPermissions" ? [] : null),
+                                        : async () => {
+                                              if (harness.hold.includes(path.join("."))) {
+                                                  await harness.gate;
+                                              }
+
+                                              return harness.data[path.join(".")] ?? (path.at(-1) === "getHostPendingPermissions" ? [] : null);
+                                          },
                                 queryKey: [path.join("."), args],
                             };
                         };
@@ -113,11 +122,15 @@ const mount = (data: Record<string, unknown>) => {
     );
 };
 
-const sendCalls = () => harness.calls.filter(([name]) => name === "send");
+const sendCalls = () => harness.calls.filter(([name]: [string, unknown]) => name === "send");
 
 /** Ends the stream the test set up: the next read of it finds no turn running, as after the agent finishes. */
-const endTurn = async () => {
-    harness.data = { ...harness.data, "chat.streaming.getActiveStreamForThread": null };
+const endTurn = async (lastEndReason = "finished") => {
+    harness.data = {
+        ...harness.data,
+        "acp.functions.getHostSession": { lastEndReason, status: "idle" },
+        "chat.streaming.getActiveStreamForThread": null,
+    };
     await harness.client?.invalidateQueries();
 };
 
@@ -128,6 +141,8 @@ const session = (fields: Record<string, unknown> = {}) => {
 beforeEach(() => {
     harness.calls = [];
     harness.sendResults = [];
+    harness.hold = [];
+    harness.gate = undefined;
     usePromptQueueStore.setState({ queues: {} });
     globalThis.sessionStorage?.clear();
 });
@@ -220,6 +235,10 @@ describe("the coding-agent composer", () => {
         expect(await screen.findByText("use the other fixture")).toBeTruthy();
         // The turn is still running on the stream, so the text waits for it to end rather than going out now.
         expect(harness.calls.some(([name]) => name === "send")).toBe(false);
+        await endTurn();
+
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+        expect(sendCalls()[0]).toEqual(["send", { requestId: expect.any(String), text: "use the other fixture", threadId: "thread-1" }]);
     });
 
     it("pauses the queue on Stop, so the messages behind a stopped reply do not start on their own", async () => {
@@ -340,6 +359,99 @@ describe("the coding-agent composer", () => {
         await waitFor(() =>
             expect(harness.calls[0]).toEqual(["send", { requestId: expect.any(String), text: "Continue where you left off.", threadId: "thread-1" }]),
         );
+    });
+
+    it("edits a queued message in place, keeping its place in the queue", async () => {
+        usePromptQueueStore.getState().enqueue("thread-1", { attachments: [], text: "first draft" });
+        usePromptQueueStore.getState().enqueue("thread-1", { attachments: [], text: "second" });
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const editButtons = await screen.findAllByRole("button", { name: "Edit" });
+
+        fireEvent.click(editButtons[0] as HTMLElement);
+        fireEvent.change(screen.getByLabelText("Edit queued message"), { target: { value: "rewritten" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        expect(await screen.findByText("rewritten")).toBeTruthy();
+        expect(screen.queryByText("first draft")).toBeNull();
+        const queued = within(screen.getByRole("region", { name: "Queued messages" })).getAllByRole("listitem");
+
+        expect(queued[0]?.textContent).toContain("rewritten");
+        expect(queued[1]?.textContent).toContain("second");
+    });
+
+    it("interrupts the turn on Enter when the person chose to send during a turn", async () => {
+        mount({
+            ...session(),
+            "auth.functions.getUserSettings": { hostFollowUpSteer: true },
+            "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" },
+        });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "use the other fixture" } });
+        await waitFor(() => expect(box.value).toBe("use the other fixture"));
+        fireEvent.keyDown(box, { key: "Enter" });
+
+        await waitFor(() => expect(harness.calls).toContainEqual(["acp.remote.cancelHostTurn", { threadId: "thread-1" }]));
+        expect(sendCalls()).toHaveLength(0);
+    });
+
+    it("sends a queued message after a turn that finished, even though the turn before it failed", async () => {
+        mount({ ...session({ lastEndReason: "failed" }), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "after the finish" } });
+        fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+        await screen.findByText("after the finish");
+        await endTurn("finished");
+
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+        expect(screen.queryByRole("button", { name: "Send next" })).toBeNull();
+    });
+
+    it("pauses the queue when the turn ends in failure, so the message waits for the person", async () => {
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "waits for the person" } });
+        fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+        await screen.findByText("waits for the person");
+        await endTurn("failed");
+
+        expect(await screen.findByRole("button", { name: "Send next" })).toBeTruthy();
+        expect(sendCalls()).toHaveLength(0);
+    });
+
+    it("pauses a queue on arrival when its thread's last turn failed while the composer was away", async () => {
+        usePromptQueueStore.getState().enqueue("thread-1", { attachments: [], text: "left behind" });
+        mount(session({ lastEndReason: "failed" }));
+
+        expect(await screen.findByRole("button", { name: "Send next" })).toBeTruthy();
+        expect(sendCalls()).toHaveLength(0);
+    });
+
+    it("sends a queued message once the session and stream load, when they were still loading on arrival", async () => {
+        usePromptQueueStore.getState().enqueue("thread-1", { attachments: [], text: "waiting" });
+        let release: () => void = () => undefined;
+
+        // Explicit resolver: the configured Node range (22.0) predates `Promise.withResolvers`.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        harness.gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        harness.hold = ["acp.functions.getHostSession", "chat.streaming.getActiveStreamForThread"];
+        mount({ "acp.functions.getHostSession": { status: "idle" }, "chat.streaming.getActiveStreamForThread": null });
+
+        expect(await screen.findByText("waiting")).toBeTruthy();
+        expect(sendCalls()).toHaveLength(0);
+
+        harness.hold = [];
+        release();
+
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
     });
 
     it("hides Continue while messages are queued, since they go first", async () => {

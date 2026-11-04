@@ -2096,6 +2096,7 @@ export interface Doc_userSettings {
     onboardingCompleted?: boolean;
     profession?: string;
     resumeInterruptedRuns?: boolean;
+    hostFollowUpSteer?: boolean;
     resumeLastChat?: boolean;
     searchDomainBlocklist?: Array<string>;
     sendBehavior?: string;
@@ -5101,6 +5102,7 @@ export interface Insert_userSettings {
     onboardingCompleted?: boolean;
     profession?: string;
     resumeInterruptedRuns?: boolean;
+    hostFollowUpSteer?: boolean;
     resumeLastChat?: boolean;
     searchDomainBlocklist?: Array<string>;
     sendBehavior?: string;

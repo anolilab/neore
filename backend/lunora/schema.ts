@@ -3417,6 +3417,8 @@ export const schema = defineSchema({
         profession: v.optional(v.string()),
         // A run whose worker died resumes from its last saved row, up to 3 times per reply (`chat/streaming/persistent/interrupted.ts`). Absent = on.
         resumeInterruptedRuns: v.optional(v.boolean()),
+        // A message sent during a coding agent's turn interrupts that turn and goes next, instead of queueing behind it. Absent = queue.
+        hostFollowUpSteer: v.optional(v.boolean()),
         // Opt-in: opening /chat lands on the most recent thread. Absent = off.
         resumeLastChat: v.optional(v.boolean()),
         // Hostnames the web search tool never returns (`chat/tools/search-domains.ts`). Absent = none.

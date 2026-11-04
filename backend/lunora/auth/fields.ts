@@ -112,6 +112,7 @@ export const userSettingsFieldsWithoutUserId = {
     onboardingCompleted: v.optional(v.boolean()),
     profession: v.optional(v.string().max(MAX_LENGTH.short)), // User's profession (e.g., "Product Designer", "Software Developer") (max 100 chars)
     resumeInterruptedRuns: v.optional(v.boolean()), // A run whose worker died resumes from its last saved row (max 3 times). Absent means on.
+    hostFollowUpSteer: v.optional(v.boolean()), // A message sent during a coding agent's turn interrupts it and goes next. Absent means queue.
     resumeLastChat: v.optional(v.boolean()), // Open /chat on the most recent thread instead of a blank one. OPT-IN: absent means off.
     searchDomainBlocklist: v.optional(
         v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= MAX_SEARCH_DOMAIN_BLOCKLIST, {
