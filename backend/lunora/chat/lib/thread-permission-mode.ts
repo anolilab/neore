@@ -63,7 +63,4 @@ export const BUILTIN_TOOLS_READ_ONLY: ReadonlySet<string> = new Set([
  * asks. `retrieve` is not a lookup: it fetches model-chosen URLs, which can carry thread data and spend quota. `auto-edit` lets the listed tools run; shell, code execution, browser, network,
  * generation and delegation tools keep asking.
  */
-export const BUILTIN_TOOLS_FILE_EDIT: ReadonlySet<string> = new Set([
-    "createDocument",
-    "updateDocument",
-]);
+export const BUILTIN_TOOLS_FILE_EDIT: ReadonlySet<string> = new Set(["createDocument", "updateDocument"]);
