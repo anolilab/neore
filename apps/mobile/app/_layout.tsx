@@ -8,6 +8,7 @@ import { useAuth } from "@/auth/auth-state";
 import { loadConfig } from "@/lib/config";
 import { crashReportStore } from "@/lib/crash-report-store";
 import { applyStoredCrashReportChoice, installGlobalErrorReporting, startCrashReporting } from "@/lib/crash-reporting";
+import { createPostHogClient } from "@/lib/posthog-client";
 import { OfflineProvider } from "@/offline/offline-provider";
 
 /** Starts crash reporting when the build has a PostHog key, and applies the stored choice. */
@@ -19,7 +20,7 @@ const CrashReportingStartup = () => {
             return;
         }
 
-        startCrashReporting(posthog);
+        startCrashReporting(() => createPostHogClient(posthog));
         installGlobalErrorReporting();
         applyStoredCrashReportChoice(crashReportStore);
     }, []);

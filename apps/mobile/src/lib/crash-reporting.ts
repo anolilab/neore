@@ -1,12 +1,14 @@
-import { PostHog } from "posthog-react-native";
+import type { PostHog } from "posthog-react-native";
 
-import type { PostHogConfig } from "./config";
 import type { PreferenceStore } from "./crash-report-preference";
 import { readCrashReportsEnabled, writeCrashReportsEnabled } from "./crash-report-preference";
 import { toCrashReport } from "./crash-report-scrub";
 import { createSerialQueue } from "./serial-queue";
 
-const state: { client?: PostHog; isHandlerInstalled: boolean; isOn: boolean } = { isHandlerInstalled: false, isOn: false };
+/** The part of the SDK this module uses. A test can supply its own. */
+export type CrashReportClient = Pick<PostHog, "captureException" | "optIn" | "optOut">;
+
+const state: { client?: CrashReportClient; isHandlerInstalled: boolean; isOn: boolean } = { isHandlerInstalled: false, isOn: false };
 
 /**
  * Reads the saved choice and changes it. Both run one at a time, so a startup read
@@ -14,22 +16,9 @@ const state: { client?: PostHog; isHandlerInstalled: boolean; isOn: boolean } = 
  */
 const runChoice = createSerialQueue();
 
-/**
- * Creates the SDK once. The client starts opted out, and it is built with no
- * automatic capture and no flag, remote-config or survey fetch, so nothing but a
- * crash the user has agreed to report reaches PostHog. `defaultOptIn: false` alone
- * still lets the core request feature flags on start, so those are turned off here.
- */
-export const startCrashReporting = ({ apiKey, host }: PostHogConfig): void => {
-    state.client ??= new PostHog(apiKey, {
-        captureAppLifecycleEvents: false,
-        defaultOptIn: false,
-        disableRemoteFeatureFlags: true,
-        disableSurveys: true,
-        errorTracking: { autocapture: false },
-        host,
-        preloadFeatureFlags: false,
-    });
+/** Sets the client once, from the given factory. Later calls do nothing. */
+export const startCrashReporting = (create: () => CrashReportClient): void => {
+    state.client ??= create();
 };
 
 /**
@@ -99,12 +88,15 @@ export const installGlobalErrorReporting = (): void => {
 
     ErrorUtils.setGlobalHandler((error, isFatal) => {
         try {
-            const report = toCrashReport(error);
-            // The SDK reads `name` and `stack` from the error. The message stays empty, so no user text is sent.
-            // eslint-disable-next-line unicorn/no-error-property-assignment, unicorn/error-message -- the fields are the scrubbed report
-            const sendable = Object.assign(new Error(""), { name: report.name, stack: report.stack });
+            // Nothing is sent unless the applied choice is on, so an error is never handed to the SDK for a user who has not opted in.
+            if (state.isOn) {
+                const report = toCrashReport(error);
+                // The SDK reads `name` and `stack` from the error. The message stays empty, so no user text is sent.
+                // eslint-disable-next-line unicorn/no-error-property-assignment, unicorn/error-message -- the fields are the scrubbed report
+                const sendable = Object.assign(new Error(""), { name: report.name, stack: report.stack });
 
-            state.client?.captureException(sendable, { fatal: isFatal === true });
+                state.client?.captureException(sendable, { fatal: isFatal === true });
+            }
         } catch {
             // A reporting failure must not hide the crash, so the original handler still runs below. The error itself
             // is not logged: its message and stack can hold chat text.
