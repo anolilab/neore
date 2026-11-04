@@ -187,15 +187,32 @@ const turnOff = async (store: PreferenceStore): Promise<void> => {
     }
 };
 
+/** Turns reporting back off after an opt-in could not be kept, so the session matches what the next launch will read. */
+const rollBackOptIn = async (): Promise<void> => {
+    try {
+        await applyToClient(false);
+    } catch {
+        console.warn("Could not turn reporting back off.");
+    }
+};
+
 /**
- * An opt-in. A record of an earlier opt-out is removed first: while it remains, it would override the opt-in at the
- * next launch. If that removal fails, nothing has changed.
+ * An opt-in. Reporting is enabled first, but nothing is released until the saved choice is written. The record of an
+ * earlier opt-out is removed only after that write: until then it keeps the next launch off. If either step fails,
+ * reporting is turned back off, so the session matches the next launch.
  */
 const turnOn = async (store: PreferenceStore, marker: InstallMarker): Promise<void> => {
-    state.revocation?.remove();
     await applyToClient(true);
+
+    try {
+        await writeCrashReportsEnabled(store, true);
+        state.revocation?.remove();
+    } catch (error) {
+        await rollBackOptIn();
+        throw error;
+    }
+
     settleChoice();
-    await writeCrashReportsEnabled(store, true);
     // A choice made on this install is trusted, so the install counts as started from here on.
     marker.create();
 };

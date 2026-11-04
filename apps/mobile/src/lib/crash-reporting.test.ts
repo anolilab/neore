@@ -240,17 +240,32 @@ describe("changing the choice when a step fails", () => {
         const events: string[] = [];
         const crash = await load();
         const client = fakeClient(events);
-        const flag = { ...memoryFlag(true), remove: vi.fn(() => {
-            throw new Error("file is locked");
-        }) };
-        const store = memoryStore(events, null);
+        const flag = {
+            ...memoryFlag(true),
+            remove: vi.fn(() => {
+                throw new Error("file is locked");
+            }),
+        };
 
         crash.startCrashReporting(() => client, flag);
 
-        await expect(crash.changeCrashReports(store, true, returningInstall)).rejects.toThrow("file is locked");
+        await expect(crash.changeCrashReports(memoryStore(events, null), true, returningInstall)).rejects.toThrow("file is locked");
 
-        expect(client.optIn).not.toHaveBeenCalled();
-        expect(store.value).toBeNull();
+        expect(await crash.crashReportsOn()).toBe(false);
+        expect(flag.exists()).toBe(true);
+    });
+
+    it("turns reporting back off when the opt-in cannot be saved, and releases nothing", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const client = fakeClient(events);
+
+        crash.startCrashReporting(() => client, memoryFlag());
+        await crash.applyStoredCrashReportChoice(memoryStore(events, "off"), returningInstall);
+
+        await expect(crash.changeCrashReports(memoryStore(events, null, true), true, returningInstall)).rejects.toThrow("keychain is unavailable");
+
+        expect(client.optOut).toHaveBeenCalled();
         expect(await crash.crashReportsOn()).toBe(false);
     });
 
