@@ -76,6 +76,8 @@ describe("changing the choice", () => {
         const crash = await load();
 
         crash.startCrashReporting(() => fakeClient(events));
+        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"));
+        events.length = 0;
 
         await expect(crash.changeCrashReports(memoryStore(events, "on", true), false)).rejects.toThrow("keychain is unavailable");
 
@@ -141,6 +143,32 @@ describe("applying the saved choice at startup", () => {
 
         expect(warn).toHaveBeenCalledWith("Could not apply the crash-report setting.", expect.any(Error));
         expect(await crash.crashReportsOn()).toBe(false);
+    });
+});
+
+describe("making the client", () => {
+    it("is not made while reporting has never been turned on", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const create = vi.fn(() => fakeClient(events));
+
+        crash.startCrashReporting(create);
+
+        await crash.applyStoredCrashReportChoice(memoryStore(events, null));
+
+        expect(create).not.toHaveBeenCalled();
+    });
+
+    it("is made when a saved opt-in is applied at startup", async () => {
+        const events: string[] = [];
+        const crash = await load();
+        const create = vi.fn(() => fakeClient(events));
+
+        crash.startCrashReporting(create);
+
+        await crash.applyStoredCrashReportChoice(memoryStore(events, "on"));
+
+        expect(create).toHaveBeenCalledOnce();
     });
 });
 

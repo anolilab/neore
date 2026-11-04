@@ -8,7 +8,10 @@ import { createSerialQueue } from "./serial-queue";
 /** The part of the SDK this module uses. A test can supply its own. */
 export type CrashReportClient = Pick<PostHog, "captureException" | "optIn" | "optOut">;
 
-const state: { client?: CrashReportClient; isHandlerInstalled: boolean; isOn: boolean } = { isHandlerInstalled: false, isOn: false };
+const state: { client?: CrashReportClient; create?: () => CrashReportClient; isHandlerInstalled: boolean; isOn: boolean } = {
+    isHandlerInstalled: false,
+    isOn: false,
+};
 
 /**
  * Reads the saved choice and changes it. Both run one at a time, so a startup read
@@ -16,28 +19,41 @@ const state: { client?: CrashReportClient; isHandlerInstalled: boolean; isOn: bo
  */
 const runChoice = createSerialQueue();
 
-/** Sets the client once, from the given factory. Later calls do nothing. */
+/**
+ * Records how to make the client. Nothing is made here: the client is made only when reporting is
+ * first turned on, so a user who never opted in never loads the SDK.
+ */
 export const startCrashReporting = (create: () => CrashReportClient): void => {
-    state.client ??= create();
+    state.create = create;
+};
+
+/** The client, made the first time it is needed. `undefined` when reporting is not configured. */
+const clientForOn = (): CrashReportClient | undefined => {
+    state.client ??= state.create?.();
+
+    return state.client;
 };
 
 /**
- * Turns the running client on or off. Does nothing before `startCrashReporting`. The
- * state is recorded only once the client has accepted the change, so it always
- * matches what the client does.
+ * Turns the client on or off. An off change makes no client: one that was never made has nothing to opt out.
+ * The state is recorded only once the client has accepted the change, so it always matches what the client does.
  */
 const applyToClient = async (isOn: boolean): Promise<void> => {
-    if (!state.client) {
+    if (!isOn) {
+        await state.client?.optOut();
+        state.isOn = false;
+
         return;
     }
 
-    if (isOn) {
-        await state.client.optIn();
-    } else {
-        await state.client.optOut();
+    const client = clientForOn();
+
+    if (!client) {
+        return;
     }
 
-    state.isOn = isOn;
+    await client.optIn();
+    state.isOn = true;
 };
 
 /** Whether reports are being sent right now. Read through the queue, so it follows any change still in progress. */

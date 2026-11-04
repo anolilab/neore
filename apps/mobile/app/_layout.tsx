@@ -34,16 +34,18 @@ const SignInGate = () => {
     const router = useRouter();
     const segments = useSegments();
     const isOnSignIn = segments[0] === "sign-in";
+    // Settings is open without a sign-in: a saved crash-report choice stays in force after sign-out, so it must stay reachable.
+    const isOnSettings = segments[0] === "settings";
 
     useEffect(() => {
-        if (status === "signed-out" && !isOnSignIn) {
+        if (status === "signed-out" && !isOnSignIn && !isOnSettings) {
             router.replace("/sign-in");
         }
 
         if (status === "signed-in" && isOnSignIn) {
             router.replace("/");
         }
-    }, [isOnSignIn, router, status]);
+    }, [isOnSettings, isOnSignIn, router, status]);
 
     return (
         <Stack>

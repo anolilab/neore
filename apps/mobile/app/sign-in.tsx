@@ -1,3 +1,4 @@
+import { Link } from "expo-router";
 import { useState } from "react";
 import { AccessibilityInfo, Pressable, Text, View } from "react-native";
 
@@ -41,6 +42,7 @@ const SignInScreen = () => {
                 </Text>
                 )
                 : null}
+            <Link href="/settings">Settings</Link>
         </View>
     );
 };
