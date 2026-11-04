@@ -16,6 +16,7 @@ import {
     onNativeDeviceProgress,
 } from "@/lib/native/bridge";
 
+import type { ClockOffset } from "../lib/device-errors";
 import { clearDeviceErrors, recordDeviceError } from "../lib/device-errors";
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
 import type { DeviceRelayPorts } from "../lib/device-relay";
@@ -49,9 +50,9 @@ const rememberDeviceFailure = (id: string, error: unknown): void => {
     }
 
     const { data } = error as { data?: { code?: unknown; direction?: unknown; minutes?: unknown } };
-    const offset = data?.direction === "ahead" ? "ahead" : "behind";
-    const isClock = data?.code === "DEVICE_CLOCK_SKEW" && typeof data.minutes === "number";
-    const clock = isClock ? `about ${data.minutes} minutes ${offset}` : undefined;
+    const minutes = data?.minutes;
+    const clock: ClockOffset | undefined =
+        data?.code === "DEVICE_CLOCK_SKEW" && typeof minutes === "number" ? { direction: data.direction === "ahead" ? "ahead" : "behind", minutes } : undefined;
 
     recordDeviceError(id, clock ? clockSkewText(error) : error.message, { clockOffset: clock });
 };

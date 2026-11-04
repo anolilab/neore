@@ -12,7 +12,7 @@ describe("buildDeviceDiagnostics", () => {
         const text = buildDeviceDiagnostics({
             appVersion: "1.2.3",
             clientAgent: "Mozilla/5.0 Electron",
-            clockOffset: "about 12 minutes behind",
+            clockOffset: { direction: "behind", minutes: 12 },
             errors: [{ kind: "service", message: "Could not connect" }],
             hostVersion: "0.4.0",
             lastSeenAt: Date.UTC(2026, 10, 3, 12, 0, 0),

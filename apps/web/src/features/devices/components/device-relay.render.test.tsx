@@ -209,6 +209,6 @@ describe("<DeviceRelay>", () => {
         const { result } = renderHook(() => useDeviceErrors("d1"));
 
         act(() => bridge.changedListener?.());
-        await waitFor(() => expect(result.current.at(-1)?.clockOffset).toBe("about 12 minutes ahead"));
+        await waitFor(() => expect(result.current.at(-1)?.clockOffset).toEqual({ direction: "ahead", minutes: 12 }));
     });
 });

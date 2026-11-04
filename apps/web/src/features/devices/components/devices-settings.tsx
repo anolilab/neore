@@ -158,14 +158,14 @@ export const DeviceRow: FC<{
             })
             .catch(failed);
     };
-    const gaveUpReason = reconnect?.reason;
+    const failureReason = reconnect?.reason;
 
     // The reason a server gave up stays on its row through "Retry" and the attempts after it, until it connects.
     useEffect(() => {
-        if (gaveUpReason) {
-            recordDeviceError(device._id, gaveUpReason, { kind: "connection" });
+        if (failureReason) {
+            recordDeviceError(device._id, failureReason, { kind: "connection" });
         }
-    }, [device._id, gaveUpReason]);
+    }, [device._id, failureReason]);
 
     useEffect(() => {
         if (connected) {

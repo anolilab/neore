@@ -1,5 +1,7 @@
 import { t } from "@lingui/core/macro";
 
+import type { ClockOffset } from "./device-errors";
+
 export type DeviceRoute = "relay" | "ssh-via-computer" | "this-computer";
 
 export interface DeviceDiagnosticsInput {
@@ -8,7 +10,7 @@ export interface DeviceDiagnosticsInput {
     /** The browser or desktop shell user agent. */
     clientAgent: string;
     /** The size of the newest clock refusal for this connection, e.g. "about 12 minutes behind". */
-    clockOffset?: string;
+    clockOffset?: ClockOffset;
     /** Messages shown for this connection, newest last. A connection one is reduced to a category here. */
     errors: { kind: "connection" | "service"; message: string }[];
     /** Version of the host program on the server, when the shell reported one. */
@@ -60,6 +62,9 @@ const routeText = (route: DeviceRoute): string => {
     }
 };
 
+const clockOffsetText = ({ direction, minutes }: ClockOffset): string =>
+    direction === "ahead" ? t`about ${minutes} minutes ahead` : t`about ${minutes} minutes behind`;
+
 const MAX_ERROR_CHARS = 500;
 
 /**
@@ -74,6 +79,7 @@ export const buildDeviceDiagnostics = (input: DeviceDiagnosticsInput): string =>
         return `  - ${text.slice(0, MAX_ERROR_CHARS).replaceAll(/\s+/g, " ")}`;
     });
     const unknown = t`unknown`;
+    const clockOffset = input.clockOffset ? clockOffsetText(input.clockOffset) : unknown;
     const lastSeen = input.lastSeenAt === undefined ? t`never` : new Date(input.lastSeenAt).toISOString();
 
     return [
@@ -83,7 +89,7 @@ export const buildDeviceDiagnostics = (input: DeviceDiagnosticsInput): string =>
         t`Host version: ${input.hostVersion ?? unknown}`,
         t`Route: ${route}`,
         t`Last seen: ${lastSeen}`,
-        t`Clock offset: ${input.clockOffset ?? unknown}`,
+        t`Clock offset: ${clockOffset}`,
         errors.length > 0 ? `${t`Last errors:`}\n${errors.join("\n")}` : t`Last errors: none`,
     ].join("\n");
 };

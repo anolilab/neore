@@ -2,16 +2,22 @@ import { useSyncExternalStore } from "react";
 
 const MAX_KEPT = 5;
 
+/** How far a computer's clock is from the server's, as the refusal reported it. */
+export interface ClockOffset {
+    direction: "ahead" | "behind";
+    minutes: number;
+}
+
 export interface DeviceError {
     /** The size of a clock refusal ("about 12 minutes behind"), when the error carried one. */
-    clockOffset?: string;
+    clockOffset?: ClockOffset;
     /** `connection`: what ssh or the shell said about reaching a server (free text, never copied). `service`: a refusal in our own words. */
     kind: "connection" | "service";
     message: string;
 }
 
 export interface RecordOptions {
-    clockOffset?: string;
+    clockOffset?: ClockOffset;
     kind?: DeviceError["kind"];
 }
 
