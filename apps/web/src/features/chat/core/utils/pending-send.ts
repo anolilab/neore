@@ -92,7 +92,9 @@ export const takePendingSend = (path: string, now: number = Date.now()): string 
     }
 
     const pending = parse(raw);
-    const isStale = !pending || pending.text.trim() === "" || now - pending.savedAt > PENDING_SEND_MAX_AGE_MS;
+    // A time later than now (the clock moved back) is no age at all: treat it as stale rather than as fresh.
+    const age = pending ? now - pending.savedAt : NaN;
+    const isStale = !pending || pending.text.trim() === "" || !(age >= 0 && age <= PENDING_SEND_MAX_AGE_MS);
 
     if (!isStale && pending.path !== path) {
         return undefined;

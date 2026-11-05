@@ -26,6 +26,13 @@ describe("pending send", () => {
         expect(takePendingSend(CHAT, 2000)).toBe("hello");
     });
 
+    it("drops a message saved 'in the future', after the clock moved back", () => {
+        savePendingSend("hello", CHAT, 10_000);
+
+        expect(takePendingSend(CHAT, 1000)).toBeUndefined();
+        expect(sessionStorage.getItem("neore:pending-send")).toBeNull();
+    });
+
     it("keeps only the latest message", () => {
         savePendingSend("first", CHAT, 1000);
         savePendingSend("second", CHAT, 1000);
