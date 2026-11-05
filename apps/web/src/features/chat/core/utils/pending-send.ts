@@ -5,6 +5,11 @@
  * URL; the composer sends it once a real account is signed in
  * (`composer-input.tsx`), then it is gone.
  *
+ * It belongs to the chat it was typed in (its path): a composer on any other
+ * page leaves it alone, so a visitor who moves to another thread before
+ * signing in never has it posted there. It waits for that chat until it
+ * expires; closing the sign-in prompt drops it.
+ *
  * Text only: attachments belong to an upload session the visitor does not have
  * (signed out) or to a guest account that is not the one signing in.
  *
@@ -17,9 +22,14 @@ const PENDING_SEND_KEY = "neore:pending-send";
 export const PENDING_SEND_MAX_AGE_MS = 30 * 60 * 1000;
 
 interface PendingSend {
+    /** The pathname of the chat it was typed in. */
+    path: string;
     savedAt: number;
     text: string;
 }
+
+/** The current page's pathname; `""` outside a browser. */
+export const currentPath = (): string => globalThis.location?.pathname ?? "";
 
 const storage = (): Storage | undefined => {
     try {
@@ -30,9 +40,9 @@ const storage = (): Storage | undefined => {
     }
 };
 
-export const savePendingSend = (text: string, now: number = Date.now()): void => {
+export const savePendingSend = (text: string, path: string = currentPath(), now: number = Date.now()): void => {
     try {
-        storage()?.setItem(PENDING_SEND_KEY, JSON.stringify({ savedAt: now, text } satisfies PendingSend));
+        storage()?.setItem(PENDING_SEND_KEY, JSON.stringify({ path, savedAt: now, text } satisfies PendingSend));
     } catch {
         // Quota or blocked storage: the draft stays in the composer either way.
     }
@@ -54,18 +64,21 @@ const parse = (raw: string | null | undefined): PendingSend | undefined => {
     try {
         const value = JSON.parse(raw) as Partial<PendingSend> | null;
 
-        return typeof value?.text === "string" && typeof value.savedAt === "number" ? { savedAt: value.savedAt, text: value.text } : undefined;
+        return typeof value?.text === "string" && typeof value.savedAt === "number" && typeof value.path === "string"
+            ? { path: value.path, savedAt: value.savedAt, text: value.text }
+            : undefined;
     } catch {
         return undefined;
     }
 };
 
 /**
- * Takes the pending message, at most once: the entry is removed before it is
- * returned, so a second caller (StrictMode's second effect run, a second
- * composer) gets nothing. A stale or empty one is dropped.
+ * Takes the pending message for the chat at `path`, at most once: the entry is
+ * removed before it is returned, so a second caller (StrictMode's second effect
+ * run, a second composer) gets nothing. One held for another chat is left in
+ * place; a stale, empty or unreadable one is dropped.
  */
-export const takePendingSend = (now: number = Date.now()): string | undefined => {
+export const takePendingSend = (path: string, now: number = Date.now()): string | undefined => {
     let raw: string | null | undefined;
 
     try {
@@ -78,13 +91,14 @@ export const takePendingSend = (now: number = Date.now()): string | undefined =>
         return undefined;
     }
 
-    clearPendingSend();
-
     const pending = parse(raw);
+    const isStale = !pending || pending.text.trim() === "" || now - pending.savedAt > PENDING_SEND_MAX_AGE_MS;
 
-    if (!pending || pending.text.trim() === "" || now - pending.savedAt > PENDING_SEND_MAX_AGE_MS) {
+    if (!isStale && pending.path !== path) {
         return undefined;
     }
 
-    return pending.text;
+    clearPendingSend();
+
+    return isStale ? undefined : pending.text;
 };

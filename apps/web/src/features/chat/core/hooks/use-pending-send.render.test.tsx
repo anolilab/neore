@@ -50,7 +50,7 @@ describe("usePendingSend", () => {
         harness.isAuthenticated = true;
         harness.token = jwtFor("member");
         harness.user = { id: "member" };
-        savePendingSend("hello");
+        savePendingSend("hello", "/chat");
     });
 
     afterEach(() => {
@@ -115,6 +115,22 @@ describe("usePendingSend", () => {
 
         expect(send).not.toHaveBeenCalled();
         expect(sessionStorage.getItem("neore:pending-send")).not.toBeNull();
+    });
+
+    it("does not send it into another thread the visitor moved to before signing in", () => {
+        globalThis.history.replaceState(null, "", "/chat/thread-b");
+
+        const send = vi.fn();
+
+        renderHook(() => usePendingSend(true, send));
+
+        expect(send).not.toHaveBeenCalled();
+
+        // Back in the chat it was typed in, it goes out.
+        globalThis.history.replaceState(null, "", "/chat");
+        renderHook(() => usePendingSend(true, send));
+
+        expect(send).toHaveBeenCalledExactlyOnceWith("hello");
     });
 
     it("leaves the message for a composer that takes it", () => {

@@ -3,7 +3,7 @@ import { useEffect, useEffectEvent } from "react";
 
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { openLoginPrompt } from "@/features/auth/stores/login-prompt-store";
-import { savePendingSend, takePendingSend } from "@/features/chat/core/utils/pending-send";
+import { currentPath, savePendingSend, takePendingSend } from "@/features/chat/core/utils/pending-send";
 import { useLunoraAuth } from "@/lib/lunora/crpc";
 
 /** Hold `text` for after sign-in and ask the visitor to sign in; nothing is sent. */
@@ -44,24 +44,22 @@ export const useCanTakePendingSend = (): boolean => {
     return Boolean(user && !isAnonymous && isAuthenticated && tokenSubject(token) === user.id);
 };
 
-/** The chat's own pages; the landing page renders the same composer over a provider that sends nothing. */
-const isChatPage = (): boolean => globalThis.location?.pathname.startsWith("/chat") === true;
-
 /**
  * Sends the message held for after sign-in (`pending-send.ts`) through `send`,
- * once, as soon as {@link useCanTakePendingSend} allows, and only on a chat
- * page. Taking it removes it, so a second composer or effect run finds nothing.
+ * once, as soon as {@link useCanTakePendingSend} allows, and only on the chat
+ * it was typed in (not another thread, nor the landing page's composer).
+ * Taking it removes it, so a second composer or effect run finds nothing.
  */
 const usePendingSend = (enabled: boolean, send: (text: string) => void): void => {
     const canTake = useCanTakePendingSend();
     const onSend = useEffectEvent(send);
 
     useEffect(() => {
-        if (!enabled || !canTake || !isChatPage()) {
+        if (!enabled || !canTake) {
             return;
         }
 
-        const pending = takePendingSend();
+        const pending = takePendingSend(currentPath());
 
         if (pending !== undefined) {
             onSend(pending);
