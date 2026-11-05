@@ -14,6 +14,7 @@ import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx as ActionContext } from "../_generated/server";
+import { backupFilterRejection } from "../chat/lib/backup-model";
 import { GatewayLanguageModel } from "../chat/lib/gateway-language-model";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { authAction, internalAction, rateLimit } from "../lib/crpc";
@@ -109,6 +110,18 @@ const generateOnGateway = async (ctx: Pick<ActionContext, "runQuery">, gateway: 
     });
 };
 
+/**
+ * Why the runner's model filters exclude the model a node names, or `undefined` when they allow it. A node on a
+ * provider's own SDK never passes the gateway, which is where the filters are otherwise enforced, so it is checked
+ * here before the call. Read fail-closed (`loadModelFilterRules`).
+ */
+export const directModelRefusal = async (ctx: Pick<ActionContext, "runQuery">, userId: string, modelId: string): Promise<string | undefined> => {
+    const definition = MODEL_LOOKUP.get(modelId);
+    const refusal = definition ? backupFilterRejection(definition, await loadModelFilterRules(ctx, userId)) : null;
+
+    return refusal === null ? undefined : `Your model settings exclude this node's model. ${refusal}`;
+};
+
 /** {@link generateOnGateway} for the streaming workflow route: an HTTP action, which cannot reach the gateway itself. */
 export const generateWorkflowText = internalAction
     .input({
@@ -166,6 +179,12 @@ const executeAINode = async (
             const completionTokens = result.usage.outputTokens ?? 0;
 
             return { output: result.text, success: true, usage: { completionTokens, promptTokens, totalTokens: promptTokens + completionTokens } };
+        }
+
+        const refusal = await directModelRefusal(run.ctx, run.userId, modelId);
+
+        if (refusal) {
+            return { error: refusal, success: false };
         }
 
         const agents = await getAgents();

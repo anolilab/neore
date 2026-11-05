@@ -38,7 +38,7 @@ import { imageRequestArgs, runVideoNode, systemPromptFor, type VideoRunContext }
 import { imageCountOf, type MediaCharge, withMediaCharge } from "./media-billing";
 import { executeTextNode } from "./mention-targets";
 import { buildExecutionContext, resolveRunAccount, workflowRunErrors } from "./run-setup";
-import { runsOnGatewayOnly } from "./executor";
+import { directModelRefusal, runsOnGatewayOnly } from "./executor";
 
 let _agentsPromise: Promise<Record<string, AgentConfig>> | undefined;
 
@@ -225,7 +225,14 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                         }
 
                         case "ai": {
-                            const result = await executeAINodeStreaming(node, executionContext, { actionContext: context, orgId: account.orgId, userId }, userProviderKeys ?? undefined, sendEvent, nodeId);
+                            const result = await executeAINodeStreaming(
+                                node,
+                                executionContext,
+                                { actionContext: context, orgId: account.orgId, userId },
+                                userProviderKeys ?? undefined,
+                                sendEvent,
+                                nodeId,
+                            );
 
                             output = result.output;
                             usage = result.usage;
@@ -569,6 +576,12 @@ const executeAINodeStreaming = async (
             output: result.text,
             usage: { completionTokens: result.outputTokens, promptTokens: result.inputTokens, totalTokens: result.inputTokens + result.outputTokens },
         };
+    }
+
+    const refusal = await directModelRefusal(run.actionContext, run.userId, modelId);
+
+    if (refusal) {
+        throw new Error(refusal);
     }
 
     const agents = await getAgents();
