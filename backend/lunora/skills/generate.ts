@@ -103,7 +103,7 @@ export const generateSkillDraft = authAction
 
         ctx.log.event("skills.generate_draft", {
             inputTokens: result.usage.inputTokens,
-            model: DEFAULT_PROMPT_IMPROVEMENT_MODEL,
+            model,
             outputTokens: result.usage.outputTokens,
             toolCount: tools.length,
         });

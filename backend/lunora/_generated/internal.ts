@@ -1202,7 +1202,7 @@ export interface InternalApiTypes {
     };
     workflow: {
         executor: {
-            generateWorkflowText: FunctionReference<"action", { maxTokens?: number; modelId: string; prompt: string; system?: string; temperature?: number; userId: string }, { inputTokens: number; outputTokens: number; text: string }>;
+            generateWorkflowText: FunctionReference<"action", { maxTokens?: number; modelId: string; orgId?: string; prompt: string; system?: string; temperature?: number; userId: string }, { inputTokens: number; outputTokens: number; text: string }>;
         };
         fork: {
             completeFork: FunctionReference<"mutation", { sourceProjectId: string; userId: string; vaultRows: Array<{ isGenerated?: boolean; key: string; name: string; nsfwScores?: { drawing: number; hentai: number; neutral: number; porn: number; sexy: number }; nsfwStatus?: "pending" | "checking" | "safe" | "blocked" | "failed"; size: number; type: string }> }, { projectId: string }>;

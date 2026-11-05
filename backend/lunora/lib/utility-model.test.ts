@@ -3,13 +3,17 @@
  * reach the gateway (where `requireZDR` / `denyDataCollection` shape provider routing), and when no candidate is
  * allowed the call refuses with a typed error instead of falling back to a forbidden model.
  */
-import { DEFAULT_MEMORY_EXTRACTION_MODEL } from "@neore/ai/constants";
+import { DEFAULT_CHAT_MODEL, DEFAULT_MEMORY_EXTRACTION_MODEL } from "@neore/ai/constants";
+import { MODEL_LOOKUP } from "@neore/ai/models";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+    callsTools,
+    defaultModelUnderRules,
     getUtilityModel,
     NoAllowedUtilityModelError,
     pickUtilityModelId,
+    readsImagesAndCallsTools,
     requireUtilityModelId,
     UTILITY_FALLBACK_MODELS,
     withPaidPlanGrant,
@@ -135,5 +139,26 @@ describe("getUtilityModel", () => {
                 strict: true,
             }),
         ).rejects.toBeInstanceOf(NoAllowedUtilityModelError);
+    });
+});
+
+describe("defaultModelUnderRules", () => {
+    it("keeps the default when the user set no rules, or rules it passes", () => {
+        expect(defaultModelUnderRules(DEFAULT_CHAT_MODEL, undefined, readsImagesAndCallsTools)).toBe(DEFAULT_CHAT_MODEL);
+        expect(defaultModelUnderRules(DEFAULT_CHAT_MODEL, { denyDataCollection: true }, readsImagesAndCallsTools)).toBe(DEFAULT_CHAT_MODEL);
+    });
+
+    it("moves the Workers AI default under a region rule to a model that keeps its capabilities", () => {
+        const standIn = defaultModelUnderRules(DEFAULT_CHAT_MODEL, { blockedRegions: ["CN"] }, readsImagesAndCallsTools);
+
+        expect(standIn).not.toBe(DEFAULT_CHAT_MODEL);
+        expect(readsImagesAndCallsTools(MODEL_LOOKUP.get(standIn)!)).toBe(true);
+    });
+
+    it("offers a paid stand-in only with the plan grant", () => {
+        const rules = { allowedModels: [DEFAULT_CHAT_MODEL, "anthropic/claude-haiku-4.5"], blockedRegions: ["CN"] };
+
+        expect(defaultModelUnderRules(DEFAULT_CHAT_MODEL, rules, callsTools)).toBe(DEFAULT_CHAT_MODEL);
+        expect(defaultModelUnderRules(DEFAULT_CHAT_MODEL, withPaidPlanGrant(rules, true), callsTools)).toBe("anthropic/claude-haiku-4.5");
     });
 });

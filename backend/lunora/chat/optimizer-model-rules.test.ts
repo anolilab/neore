@@ -138,7 +138,7 @@ describe.each(Object.keys(runs))("%s", (name) => {
 
     it("runs on a fallback the rules allow when they exclude the optimizer's default model", async () => {
         await saveRules({ blockedModels: [DEFAULT_PROMPT_IMPROVEMENT_MODEL] });
-        await runs[name]!().catch(() => undefined);
+        await runs[name]!();
 
         expect(getAgent).toHaveBeenCalledTimes(1);
         expect(getAgent.mock.calls[0]![0]).not.toBe(DEFAULT_PROMPT_IMPROVEMENT_MODEL);

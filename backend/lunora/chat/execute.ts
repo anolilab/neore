@@ -15,7 +15,7 @@
  * two share lives in `lib/agent-run.ts`.
  */
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
-import { estimateTokensFromCharacters, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
+import { estimateTokensFromCharacters, hasActiveFilters, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -57,8 +57,8 @@ import { createToolRunMarker } from "./lib/mark-tool-runs";
 import { isRunReplaced } from "./lib/run-epoch";
 import { gatewayFetch } from "../lib/services";
 import getAgent from "./lib/get-agent";
-import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
-import { callsTools, defaultModelUnderRules } from "../lib/utility-model";
+import { loadModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
+import { defaultModelUnderRules, readsImagesAndCallsTools } from "../lib/utility-model";
 import { injectsSkillText } from "./lib/low-risk-approval";
 import { closeMCPClientsThenSettle } from "./lib/mcp-tools";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
@@ -426,9 +426,16 @@ export const runStreamingAgent = internalAction
                     effectiveSearchMode = invokedSkill.config.searchMode as SearchMode;
                 }
 
-                // The Workers AI default cannot keep to a region rule: a user with one runs on a default their rules allow.
-                if (model === DEFAULT_CHAT_MODEL) {
-                    model = defaultModelUnderRules(model, agentModulePrefs.modelFilterRules ?? undefined, callsTools);
+                // The Workers AI default cannot keep to a region rule: a user with one runs on a default their rules allow, with
+                // the plan grant (`loadModelFilterRules`) so a paid user may land on a paid model. Recorded like an Auto route,
+                // so a resume continues on the same model even if the rules changed meanwhile.
+                if (resume === undefined && model === DEFAULT_CHAT_MODEL && hasActiveFilters(agentModulePrefs.modelFilterRules ?? undefined)) {
+                    const standIn = defaultModelUnderRules(model, await loadModelFilterRules(ctx, userId), readsImagesAndCallsTools);
+
+                    if (standIn !== model) {
+                        model = standIn;
+                        routedModel = standIn;
+                    }
                 }
 
                 // A custom endpoint gets no tools (built-in or MCP) unless the user

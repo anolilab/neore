@@ -6,7 +6,7 @@ import type { AgentConfig } from "@neore/ai/providers";
  * Executes workflow nodes in topological order, passing data between nodes
  * via a shared execution context.
  */
-import { MODEL_LOOKUP, resolveWorkflowModel } from "@neore/ai/models";
+import { hasActiveFilters, MODEL_LOOKUP, resolveWorkflowModel } from "@neore/ai/models";
 import { generateText, type LanguageModel } from "ai";
 import { LunoraError, v } from "lunorash/server";
 
@@ -15,6 +15,7 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx as ActionContext } from "../_generated/server";
 import { GatewayLanguageModel } from "../chat/lib/gateway-language-model";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { authAction, internalAction, rateLimit } from "../lib/crpc";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
 import {
@@ -66,22 +67,39 @@ export const runsOnGatewayOnly = (modelId: string): boolean => MODEL_LOOKUP.get(
 interface GatewayTextRequest {
     maxTokens?: number;
     modelId: string;
+    /** The run account's organization, charged for the call like every other node (`resolveRunAccount`). */
+    orgId?: string;
     prompt: string;
     system?: string;
     temperature?: number;
     userId: string;
 }
 
-/** Generates a node's text on a gateway-only model, metered to the user who runs the workflow. */
-const generateOnGateway = async (gateway: ServiceFetch, request: GatewayTextRequest) => {
+/** How long one node's generation may take on the gateway before the node fails. */
+const GATEWAY_NODE_TIMEOUT_MS = 5 * 60_000;
+
+/**
+ * Generates a node's text on a gateway-only model, metered to the user who runs the workflow. The runner's model
+ * filters go with the call, read fail-closed (`loadModelFilterRules`), so the gateway refuses a model they exclude:
+ * the node named this model, so nothing stands in for it.
+ */
+const generateOnGateway = async (ctx: Pick<ActionContext, "runQuery">, gateway: ServiceFetch, request: GatewayTextRequest) => {
+    if (request.prompt.length > MAX_LENGTH.document || (request.system?.length ?? 0) > MAX_LENGTH.document) {
+        throw new LunoraError("BAD_REQUEST", "This node's prompt is too long to send to the model.");
+    }
+
     const definition = MODEL_LOOKUP.get(request.modelId)!;
+    const rules = await loadModelFilterRules(ctx, request.userId);
 
     return await generateText({
+        abortSignal: AbortSignal.timeout(GATEWAY_NODE_TIMEOUT_MS),
         maxOutputTokens: request.maxTokens,
         model: new GatewayLanguageModel({
             gateway,
             modelApiId: definition.modelApiId,
+            modelFilterRules: hasActiveFilters(rules) ? rules : undefined,
             modelId: definition.id,
+            orgId: request.orgId,
             provider: definition.provider,
             userId: request.userId,
         }),
@@ -95,15 +113,16 @@ const generateOnGateway = async (gateway: ServiceFetch, request: GatewayTextRequ
 export const generateWorkflowText = internalAction
     .input({
         maxTokens: v.optional(v.number()),
-        modelId: v.string(),
-        prompt: v.string(),
-        system: v.optional(v.string()),
+        modelId: v.string().max(MAX_LENGTH.short),
+        orgId: v.optional(v.string().max(MAX_LENGTH.short)),
+        prompt: v.string().max(MAX_LENGTH.document),
+        system: v.optional(v.string().max(MAX_LENGTH.document)),
         temperature: v.optional(v.number()),
-        userId: v.string(),
+        userId: v.string().max(MAX_LENGTH.short),
     })
     .output(v.object({ inputTokens: v.number(), outputTokens: v.number(), text: v.string() }))
     .action(async ({ args, ctx }) => {
-        const result = await generateOnGateway(gatewayFetch(ctx), args);
+        const result = await generateOnGateway(ctx, gatewayFetch(ctx), args);
 
         return { inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0, text: result.text };
     });
@@ -114,7 +133,7 @@ export const generateWorkflowText = internalAction
 const executeAINode = async (
     node: WorkflowNode,
     context: ExecutionContext,
-    run: { gateway: ServiceFetch; userId: string },
+    run: { ctx: Pick<ActionContext, "runQuery">; gateway: ServiceFetch; orgId?: string; userId: string },
     userProviderKeys?: Record<string, string>,
 ): Promise<NodeExecutionResult> => {
     const data = node.data as {
@@ -134,9 +153,10 @@ const executeAINode = async (
 
     try {
         if (runsOnGatewayOnly(modelId)) {
-            const result = await generateOnGateway(run.gateway, {
+            const result = await generateOnGateway(run.ctx, run.gateway, {
                 maxTokens: data.maxTokens,
                 modelId,
+                orgId: run.orgId,
                 prompt,
                 system: systemPromptFor(node, context),
                 temperature: data.temperature,
@@ -1039,7 +1059,12 @@ export const executeWorkflow = authAction
                             break;
                         }
                         case "ai": {
-                            result = await executeAINode(node, executionContext, { gateway: gatewayFetch(context), userId }, userProviderKeys ?? undefined);
+                            result = await executeAINode(
+                                node,
+                                executionContext,
+                                { ctx: context, gateway: gatewayFetch(context), orgId: account.orgId, userId },
+                                userProviderKeys ?? undefined,
+                            );
                             break;
                         }
                         case "audio": {

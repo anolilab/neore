@@ -11,10 +11,9 @@
  * connection's owner, with their quota and keys.
  */
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
-import type { ModelDefinition, ModelFilterRules } from "@neore/ai/models";
+import type { ModelFilterRules } from "@neore/ai/models";
 
-import { backupCapabilities } from "../../chat/lib/backup-model";
-import { defaultModelUnderRules } from "../../lib/utility-model";
+import { callsTools, defaultModelUnderRules, readsImagesAndCallsTools } from "../../lib/utility-model";
 
 /** The groups an owner can allow, in the order the settings list them. */
 export const MESSENGER_REPLY_TOOL_GROUPS = ["webSearch", "urlFetch", "imageGeneration", "codeExecution", "knowledge", "dateTime", "connectors"] as const;
@@ -58,19 +57,18 @@ export const MESSENGER_TEXT_REPLY_MAX_STEPS = 3;
  */
 export const MESSENGER_MEDIA_MODEL = "cf-llama-4-scout";
 
-/** A stand-in for {@link MESSENGER_MEDIA_MODEL} must do what it is pinned for: read images and call tools. */
-const readsImagesAndCallsTools = (definition: ModelDefinition): boolean => {
-    const capabilities = backupCapabilities(definition);
-
-    return capabilities.images && capabilities.tools;
-};
-
 /**
  * Model for a reply: the media/tool model when either needs it, else the default chat model. The media model is a
  * Workers AI default, which no region rule allows, so under the owner's `rules` it may be a stand-in they allow.
  */
-export const chooseReplyModel = (options: { hasMedia: boolean; rules?: ModelFilterRules; tools: boolean }): string =>
-    options.hasMedia || options.tools ? defaultModelUnderRules(MESSENGER_MEDIA_MODEL, options.rules, readsImagesAndCallsTools) : DEFAULT_CHAT_MODEL;
+export const chooseReplyModel = (options: { hasMedia: boolean; rules?: ModelFilterRules; tools: boolean }): string => {
+    if (!options.hasMedia && !options.tools) {
+        return DEFAULT_CHAT_MODEL;
+    }
+
+    // A stand-in must do what this reply needs the media model for: read images only when the thread has media.
+    return defaultModelUnderRules(MESSENGER_MEDIA_MODEL, options.rules, options.hasMedia ? readsImagesAndCallsTools : callsTools);
+};
 
 /** A connection row's stored setting, as the schema holds it. */
 export interface StoredReplyTools {

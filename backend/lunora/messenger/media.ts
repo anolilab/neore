@@ -109,7 +109,7 @@ const documentLine = (name: string, text: string): string =>
 
 /**
  * A PDF's text from the document parser, as chat attaches a document, or `undefined` when the parser is not bound,
- * fails or finds none. The reply then reads text: the media model need not take file input, and Workers AI does not.
+ * fails or finds none. The reply reads text either way: the media model need not take file input, and Workers AI does not.
  */
 const pdfText = async (context: ActionCtx, bytes: MediaBytes, mediaType: string): Promise<string | undefined> => {
     if (!isServiceBound(context, "documentParser")) {
@@ -254,11 +254,8 @@ export const ingestAttachments = async (
         } else if (MODEL_READABLE_TYPES.has(mediaType)) {
             const text = await pdfText(context, bytes, mediaType);
 
-            if (text) {
-                lines.push(documentLine(name, text));
-            } else {
-                parts.push({ data: reference, filename: name, mediaType, type: "file" });
-            }
+            // An unreadable PDF is named, not sent: the media model takes images, not file input.
+            lines.push(text ? documentLine(name, text) : `[Attached file: ${name} (${mediaType}) — its contents cannot be read here]`);
         } else if (TEXT_DOCUMENT_TYPES.has(mediaType)) {
             lines.push(documentLine(name, decodeInlineText(bytes)));
         } else {

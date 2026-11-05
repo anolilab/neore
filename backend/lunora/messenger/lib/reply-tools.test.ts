@@ -1,5 +1,5 @@
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
-import { MODEL_REGISTRY } from "@neore/ai/models";
+import { deriveModelRegions, getModelRejectionReason, GLOBAL_REGION, MODEL_REGISTRY } from "@neore/ai/models";
 import { describe, expect, it } from "vitest";
 
 import { listBuiltInTools, modelSupportsTools } from "../../chat/lib/tool-builder";
@@ -91,7 +91,17 @@ describe(chooseReplyModel, () => {
         expect(model).not.toBe(MESSENGER_MEDIA_MODEL);
         expect(definition?.supportsImages).toBe(true);
         expect(modelSupportsTools(model)).toBe(true);
+        // It passes the rules the gateway enforces: not served from any region, and allowed with CN blocked.
+        expect(deriveModelRegions(definition!)).not.toContain(GLOBAL_REGION);
+        expect(getModelRejectionReason({ modelId: model, provider: definition!.provider, regions: deriveModelRegions(definition!) }, { blockedRegions: ["CN"] })).toBeNull();
         expect(chooseReplyModel({ hasMedia: false, rules: { blockedRegions: ["CN"] }, tools: false })).toBe(DEFAULT_CHAT_MODEL);
+    });
+
+    it("needs only tool calling from a stand-in for a tool reply without media", () => {
+        const rules = { allowedModels: [MESSENGER_MEDIA_MODEL, "cf-gpt-oss-120b"], blockedModels: [MESSENGER_MEDIA_MODEL] };
+
+        expect(chooseReplyModel({ hasMedia: false, rules, tools: true })).toBe("cf-gpt-oss-120b");
+        expect(chooseReplyModel({ hasMedia: true, rules, tools: true })).toBe(MESSENGER_MEDIA_MODEL);
     });
 
     it("picks an enabled, image-reading registry model for tool replies", () => {

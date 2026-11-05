@@ -225,7 +225,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                         }
 
                         case "ai": {
-                            const result = await executeAINodeStreaming(node, executionContext, { actionContext: context, userId }, userProviderKeys ?? undefined, sendEvent, nodeId);
+                            const result = await executeAINodeStreaming(node, executionContext, { actionContext: context, orgId: account.orgId, userId }, userProviderKeys ?? undefined, sendEvent, nodeId);
 
                             output = result.output;
                             usage = result.usage;
@@ -536,7 +536,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
 const executeAINodeStreaming = async (
     node: WorkflowNode,
     context: ExecutionContext,
-    run: { actionContext: HttpActionCtx; userId: string },
+    run: { actionContext: HttpActionCtx; orgId?: string; userId: string },
     userProviderKeys: Record<string, string> | undefined,
     sendEvent: (event: StreamEvent) => Promise<void>,
     nodeId: string,
@@ -556,6 +556,7 @@ const executeAINodeStreaming = async (
         const result = await run.actionContext.runAction(internal.workflow.executor.generateWorkflowText, {
             maxTokens: data.maxTokens,
             modelId,
+            orgId: run.orgId,
             prompt,
             system: systemPromptFor(node, context),
             temperature: data.temperature,
