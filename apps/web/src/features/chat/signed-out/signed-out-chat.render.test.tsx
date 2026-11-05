@@ -14,9 +14,37 @@ import { SignedOutComposer } from "./signed-out-chat";
 vi.mock("@lingui/react/macro", () => {
     return {
         useLingui: () => {
-            return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+            return {
+                i18n: { _: (descriptor: { id: string }) => descriptor.id, locale: "en" },
+                t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values),
+            };
         },
     };
+});
+
+vi.mock("@lingui/core/macro", () => {
+    return {
+        msg: (strings: TemplateStringsArray) => {
+            return { id: strings.join("") };
+        },
+    };
+});
+
+// The chrome around the input is static and covered by the render check; these tests are about sending.
+vi.mock("@/features/chat/thread/composer", () => {
+    return { ComposerModeSwitcher: () => null };
+});
+
+vi.mock("@/features/chat/thread/composer-search-mode", () => {
+    return { default: () => null };
+});
+
+vi.mock("@/features/chat/thread/thread-welcome-suggestions", () => {
+    return { default: () => null };
+});
+
+vi.mock("@/features/layout/components/sidebar-shortcut", () => {
+    return { NAV_LINK_DEFS: [] };
 });
 
 vi.mock("@/features/chat/thread/composer-base", () => {
