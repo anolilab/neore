@@ -7,7 +7,7 @@
  * another browser or device carries no guest cookie, so the guest's rows would stay behind.
  *
  * So the sign-up records which guest the new account came from, server-side, under better-auth's verification store,
- * and the first session the account gets (from the link, or a later sign-in) finishes the link. The guest id is only
+ * and the first session the account gets, by any sign-in method, finishes the link. The guest id is only
  * ever read from the request's resolved session, never from the body or the query. The record goes only once the move
  * is queued, so a failed hand-over is retried at the next sign-in; an unverified sign-in, which mails a new link,
  * renews it in place. If the record cannot be written at sign-up, the move is queued there and then, while the request
@@ -25,8 +25,8 @@ export const PENDING_GUEST_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const pendingIdentifier = (userId: string): string => `guest-conversion:${userId}`;
 
-/** Where an account gets a session, or (unverified) is mailed a new link. */
-const SESSION_PATHS = new Set(["/sign-in/email", "/verify-email"]);
+/** The one refused request that still proves the password, and so mails a new link and renews the pending guest. */
+const PASSWORD_SIGN_IN_PATH = "/sign-in/email";
 
 interface SignUpReturn {
     token?: string | null;
@@ -81,6 +81,10 @@ export const guestConversion = (onGuestConverted: (guestId: string, userId: stri
                         const sessionUserId = ctx.context.newSession?.user.id;
 
                         if (!sessionUserId) {
+                            if (ctx.path !== PASSWORD_SIGN_IN_PATH) {
+                                return;
+                            }
+
                             // No session. Only `EMAIL_NOT_VERIFIED` means the password was right and a new link went out:
                             // keep the guest for that link. Any other failure (a wrong password) renews nothing.
                             const refusal = ctx.context.returned as { body?: { code?: string } } | undefined;
@@ -124,7 +128,9 @@ export const guestConversion = (onGuestConverted: (guestId: string, userId: stri
 
                         await adapter.deleteVerificationByIdentifier(pendingIdentifier(sessionUserId));
                     }),
-                    matcher: (ctx) => SESSION_PATHS.has(ctx.path ?? ""),
+                    // Every endpoint: a session from a magic link, an email code, a passkey, a social provider or a
+                    // second factor must finish a pending hand-over as much as one from a password or the link.
+                    matcher: () => true,
                 },
             ],
         },

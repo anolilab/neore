@@ -564,6 +564,41 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         expect(pendingRows()).toHaveLength(0);
     });
 
+    it("finishes a hand-over left pending at the next session from any sign-in method, not only a password", async () => {
+        expect.assertions(3);
+
+        const onGuestConverted = vi.fn<(guestId: string, userId: string) => Promise<void>>().mockRejectedValueOnce(new Error("queue down"));
+        const { auth, db } = await createTestAuth({ onGuestConverted });
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+        const guestId = ((await guest.json()) as { user: { id: string } }).user.id;
+
+        await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, cookieOf(guest)));
+
+        const [link] = await queuedVerificationLinks();
+
+        await auth.handler(new Request(link!, { headers: { origin: SITE } }));
+
+        const pendingRows = () => db.verification!.filter((row) => String(row.identifier).startsWith("guest-conversion:"));
+
+        expect(pendingRows()).toHaveLength(1);
+
+        await auth.handler(post("/sign-in/magic-link", { callbackURL: "/", email: EMAIL }));
+
+        const { jobsQueueMessages } = (await import("cloudflare:workers")) as unknown as {
+            jobsQueueMessages: { body: { args?: { message?: { subject?: string; text?: string } } } }[];
+        };
+        const magicLink = jobsQueueMessages
+            .map((queued) => queued.body.args?.message)
+            .filter((message) => message?.subject === "Sign in to your account")
+            .flatMap((message) => /https?:\/\/\S+\/magic-link\/verify\S+/.exec(message?.text ?? "")?.[0] ?? [])
+            .at(-1);
+
+        await auth.handler(new Request(magicLink!, { headers: { origin: SITE } }));
+
+        expect(onGuestConverted).toHaveBeenLastCalledWith(guestId, db.user!.find((row) => row.email === EMAIL)?.id);
+        expect(pendingRows()).toHaveLength(0);
+    });
+
     it("queues the move at sign-up when the guest cannot be recorded, so verifying elsewhere loses nothing", async () => {
         expect.assertions(3);
 
