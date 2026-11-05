@@ -58,8 +58,14 @@ const SCOPED_VECTOR_TOP_K = 100;
  */
 const embedQuery = async (ctx: ActionCtx, query: string, userId: string): Promise<number[] | null> => {
     try {
-        const { createGatewayEmbeddingModel } = await import("../chat/lib/gateway-embedding-model");
-        const embeddingModel = createGatewayEmbeddingModel(gatewayFetch(ctx), { modelFilterRules: await loadModelFilterRules(ctx, userId), userId });
+        const { createGatewayEmbeddingModel, embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
+        const modelFilterRules = await loadModelFilterRules(ctx, userId);
+
+        if (!embeddingModelAllowed(modelFilterRules)) {
+            return null;
+        }
+
+        const embeddingModel = createGatewayEmbeddingModel(gatewayFetch(ctx), { modelFilterRules, userId });
 
         const { embedMany } = await import("../agent/client/search");
         const { embeddings } = await embedMany(ctx, {

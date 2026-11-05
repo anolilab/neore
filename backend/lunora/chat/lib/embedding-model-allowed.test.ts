@@ -14,6 +14,11 @@ describe(embeddingModelAllowed, () => {
         expect(embeddingModelAllowed({ blockedModels: ["openai/o3"] })).toBe(true);
     });
 
+    it("allows it under a chat model allow-list, which names chat models, not the embedding model", () => {
+        expect(embeddingModelAllowed({ allowedModels: ["openai/gpt-5"] })).toBe(true);
+        expect(embeddingModelAllowed({ allowedProviders: ["openrouter"] })).toBe(true);
+    });
+
     it("refuses it under a region rule or a privacy rule", () => {
         expect(embeddingModelAllowed({ allowedRegions: ["EU"] })).toBe(false);
         expect(embeddingModelAllowed({ blockedRegions: ["CN"] })).toBe(false);

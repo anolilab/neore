@@ -126,6 +126,23 @@ export const filterModels = <T extends FilterableModel>(candidates: T[], rules: 
 /**
  * Check if the rules object has any active filters.
  */
+
+/**
+ * The rules that govern where a user's data may go: regions, providers they block, zero data retention and no data
+ * collection. An embedding model is checked against these only: it is hidden and never picked, so a chat-model
+ * allow-list (`allowedModels`, `allowedProviders`, `blockedModels`) is not about it and must not switch off vector
+ * memory and knowledge.
+ */
+export const dataHandlingRules = (rules: ModelFilterRules): ModelFilterRules => {
+    return {
+        ...(rules.allowedRegions && { allowedRegions: rules.allowedRegions }),
+        ...(rules.blockedProviders && { blockedProviders: rules.blockedProviders }),
+        ...(rules.blockedRegions && { blockedRegions: rules.blockedRegions }),
+        ...(rules.denyDataCollection !== undefined && { denyDataCollection: rules.denyDataCollection }),
+        ...(rules.requireZDR !== undefined && { requireZDR: rules.requireZDR }),
+    };
+};
+
 export const hasActiveFilters = (rules: ModelFilterRules | undefined): rules is ModelFilterRules => {
     if (!rules) return false;
 

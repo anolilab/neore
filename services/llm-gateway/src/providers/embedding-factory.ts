@@ -14,6 +14,8 @@ export interface EmbeddingModelInfo {
     costPer1MTokensMicrodollars: number;
     /** Dimensions in the output embedding vector */
     dimensions: number;
+    /** The longest input string the model takes, where it is shorter than the route's own cap. */
+    maxInputChars?: number;
     modelApiId: string;
     provider: string;
 }
@@ -21,7 +23,8 @@ export interface EmbeddingModelInfo {
 export const EMBEDDING_MODELS: Record<string, EmbeddingModelInfo> = {
     // Cloudflare Workers AI ($0.012 per 1M tokens). The default for memory and
     // knowledge: no provider key, and multilingual, where bge-base-en is English only.
-    "bge-m3": { costPer1MTokensMicrodollars: 12_000, dimensions: 1024, modelApiId: "@cf/baai/bge-m3", provider: "cloudflare" },
+    // 8,192 input tokens; a character is at most about one token in its tokenizer.
+    "bge-m3": { costPer1MTokensMicrodollars: 12_000, dimensions: 1024, maxInputChars: 8000, modelApiId: "@cf/baai/bge-m3", provider: "cloudflare" },
     "embedding-001": { costPer1MTokensMicrodollars: 0, dimensions: 768, modelApiId: "embedding-001", provider: "google" },
     // Groq (via OpenAI-compatible API)
     "nomic-embed-text-v1.5": { costPer1MTokensMicrodollars: 0, dimensions: 768, modelApiId: "nomic-embed-text-v1.5", provider: "groq" },
@@ -32,6 +35,10 @@ export const EMBEDDING_MODELS: Record<string, EmbeddingModelInfo> = {
     "text-embedding-004": { costPer1MTokensMicrodollars: 0, dimensions: 768, modelApiId: "text-embedding-004", provider: "google" }, // Free in Gemini API
     "text-embedding-ada-002": { costPer1MTokensMicrodollars: 100_000, dimensions: 1536, modelApiId: "text-embedding-ada-002", provider: "openai" },
 };
+
+/** Whether an input is longer than `model` takes, so the request is refused before the provider is paid for it. */
+export const isTooLongForModel = (model: EmbeddingModelInfo, inputs: ReadonlyArray<string>): boolean =>
+    model.maxInputChars !== undefined && inputs.some((input) => input.length > model.maxInputChars!);
 
 /**
  * Create an AI SDK embedding model instance for the given provider and model.

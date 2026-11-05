@@ -38,7 +38,7 @@ import { imageRequestArgs, runVideoNode, systemPromptFor, type VideoRunContext }
 import { imageCountOf, type MediaCharge, withMediaCharge } from "./media-billing";
 import { executeTextNode } from "./mention-targets";
 import { buildExecutionContext, resolveRunAccount, workflowRunErrors } from "./run-setup";
-import { AI_NODE_DEFAULT_MODEL, directModelRefusal, runsOnGatewayOnly, workflowModelRefusals } from "./executor";
+import { aiNodeModel, directModelRefusal, nodeMaxTokens, runsOnGatewayOnly, workflowModelRefusals } from "./executor";
 
 let _agentsPromise: Promise<Record<string, AgentConfig>> | undefined;
 
@@ -556,12 +556,18 @@ const executeAINodeStreaming = async (
     };
 
     const prompt = getLastOutputAsString(context);
-    const modelId = data.model ?? AI_NODE_DEFAULT_MODEL;
+
+    if (!prompt) {
+        throw new Error("No input provided to AI node");
+    }
+
+    const modelId = await aiNodeModel(run.actionContext, run.userId, data.model);
+    const maxTokens = nodeMaxTokens(data.maxTokens);
 
     // A gateway-only model is reached through an action (this route has no gateway binding), so its text arrives whole.
     if (runsOnGatewayOnly(modelId)) {
         const result = await run.actionContext.runAction(internal.workflow.executor.generateWorkflowText, {
-            maxTokens: data.maxTokens,
+            maxTokens,
             modelId,
             orgId: run.orgId,
             prompt,
@@ -585,7 +591,7 @@ const executeAINodeStreaming = async (
     }
 
     const agents = await getAgents();
-    const agent = agents[modelId] ?? agents[AI_NODE_DEFAULT_MODEL];
+    const agent = agents[modelId];
     let languageModel = agent?.chat;
 
     if (userProviderKeys && Object.keys(userProviderKeys).length > 0) {
@@ -603,7 +609,7 @@ const executeAINodeStreaming = async (
 
     let fullText = "";
     const streamResult = streamTextAi({
-        maxOutputTokens: data.maxTokens,
+        maxOutputTokens: maxTokens,
         model: languageModel,
         prompt,
         system: systemPromptFor(node, context),

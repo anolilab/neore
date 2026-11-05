@@ -69,6 +69,7 @@ export {
     validateLocalEndpointUrl,
 } from "./local-endpoint";
 export {
+    dataHandlingRules,
     deriveModelRegions,
     type FilterableModel,
     filterModels,

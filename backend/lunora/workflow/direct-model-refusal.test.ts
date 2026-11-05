@@ -2,9 +2,10 @@
  * A workflow node on a provider's own SDK never reaches the gateway, so the runner's model filters are checked before
  * the call: a node naming a model they exclude fails instead of running.
  */
+import { MODEL_LOOKUP } from "@neore/ai/models";
 import { describe, expect, it, vi } from "vitest";
 
-import { AI_NODE_DEFAULT_MODEL, directModelRefusal, workflowModelRefusals } from "./executor";
+import { AI_NODE_DEFAULT_MODEL, directModelRefusal, nodeMaxTokens, workflowModelRefusals } from "./executor";
 
 const withRules = (modelFilterRules: Record<string, unknown>) =>
     ({
@@ -53,10 +54,16 @@ describe(workflowModelRefusals, () => {
     });
 
     it("refuses a model the registry does not know while any rule is active, since it cannot be checked", async () => {
-        const [refusal] = await workflowModelRefusals(withRules({ blockedRegions: ["CN"] }), "user-1", [aiNode()]);
+        const [refusal] = await workflowModelRefusals(withRules({ blockedRegions: ["CN"] }), "user-1", [aiNode("retired/model")]);
 
-        expect(refusal).toContain(AI_NODE_DEFAULT_MODEL);
+        expect(refusal).toContain("retired/model");
+        await expect(workflowModelRefusals(withRules({}), "user-1", [aiNode("retired/model")])).resolves.toStrictEqual([]);
+    });
+
+    it("runs a node that names no model on a registry default, moved to a fallback the rules allow", async () => {
+        expect(MODEL_LOOKUP.has(AI_NODE_DEFAULT_MODEL)).toBe(true);
         await expect(workflowModelRefusals(withRules({}), "user-1", [aiNode()])).resolves.toStrictEqual([]);
+        await expect(workflowModelRefusals(withRules({ blockedRegions: ["CN"] }), "user-1", [aiNode()])).resolves.toStrictEqual([]);
     });
 
     it("passes a graph whose models the rules allow, and one with no AI node without reading the rules", async () => {
@@ -76,5 +83,16 @@ describe(workflowModelRefusals, () => {
         await expect(workflowModelRefusals(unreadable, "user-1", [aiNode("openai/gpt-5")])).resolves.toStrictEqual([
             "Your model settings could not be read; try again.",
         ]);
+    });
+});
+
+describe(nodeMaxTokens, () => {
+    it("passes a positive integer, capped, and drops anything else", () => {
+        expect(nodeMaxTokens(512)).toBe(512);
+        expect(nodeMaxTokens(10_000_000)).toBe(32_768);
+        expect(nodeMaxTokens(0)).toBeUndefined();
+        expect(nodeMaxTokens(-5)).toBeUndefined();
+        expect(nodeMaxTokens(1.5)).toBeUndefined();
+        expect(nodeMaxTokens(undefined)).toBeUndefined();
     });
 });

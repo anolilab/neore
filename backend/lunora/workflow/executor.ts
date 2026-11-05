@@ -6,6 +6,7 @@ import type { AgentConfig } from "@neore/ai/providers";
  * Executes workflow nodes in topological order, passing data between nodes
  * via a shared execution context.
  */
+import { DEFAULT_TEXT_TO_TEXT_MODEL } from "@neore/ai/constants";
 import { hasActiveFilters, MODEL_LOOKUP, type ModelFilterRules, resolveWorkflowModel } from "@neore/ai/models";
 import { generateText, type LanguageModel } from "ai";
 import { LunoraError, v } from "lunorash/server";
@@ -19,6 +20,7 @@ import { GatewayLanguageModel } from "../chat/lib/gateway-language-model";
 import { loadModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, ModelFilterRulesUnavailableError } from "../chat/lib/model-filter-rules";
 import { authAction, internalAction, rateLimit } from "../lib/crpc";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
+import { defaultModelUnderRules } from "../lib/utility-model";
 import {
     accumulateUsage,
     createEmptyUsage,
@@ -131,8 +133,22 @@ const refusalUnder = (rules: ModelFilterRules, modelId: string): string | undefi
     return refusal === null ? undefined : `Your model settings exclude this node's model. ${refusal}`;
 };
 
-/** The model an AI node runs on when it names none. */
-export const AI_NODE_DEFAULT_MODEL = "claude-sonnet-4-20250514";
+/** The model an AI node runs on when it names none, unless the runner's rules exclude it ({@link aiNodeModel}). */
+export const AI_NODE_DEFAULT_MODEL = DEFAULT_TEXT_TO_TEXT_MODEL;
+
+/**
+ * The model an AI node runs on: the one it names, else the default, moved to the first fallback the runner's rules
+ * allow when they exclude it (`defaultModelUnderRules`), as a chat on the default model would be. Read fail-closed.
+ */
+export const aiNodeModel = async (ctx: Pick<ActionContext, "runQuery">, userId: string, model: string | undefined): Promise<string> =>
+    model ?? defaultModelUnderRules(AI_NODE_DEFAULT_MODEL, await loadModelFilterRules(ctx, userId));
+
+/** The most output tokens a node may ask for. */
+export const MAX_NODE_OUTPUT_TOKENS = 32_768;
+
+/** A node's `maxTokens` as a model call takes it: a positive integer, capped; anything else leaves the model's own limit. */
+export const nodeMaxTokens = (maxTokens: number | undefined): number | undefined =>
+    maxTokens !== undefined && Number.isSafeInteger(maxTokens) && maxTokens > 0 ? Math.min(maxTokens, MAX_NODE_OUTPUT_TOKENS) : undefined;
 
 /**
  * Why the runner's model filters exclude the model of any AI node in the graph, one line per refused model. Checked
@@ -141,9 +157,9 @@ export const AI_NODE_DEFAULT_MODEL = "claude-sonnet-4-20250514";
  * while a long run is in flight.
  */
 export const workflowModelRefusals = async (ctx: Pick<ActionContext, "runQuery">, userId: string, nodes: ReadonlyArray<WorkflowNode>): Promise<string[]> => {
-    const models = [...new Set(nodes.filter((node) => node.type === "ai").map((node) => (node.data as { model?: string }).model ?? AI_NODE_DEFAULT_MODEL))];
+    const aiNodes = nodes.filter((node) => node.type === "ai");
 
-    if (models.length === 0) {
+    if (aiNodes.length === 0) {
         return [];
     }
 
@@ -159,7 +175,9 @@ export const workflowModelRefusals = async (ctx: Pick<ActionContext, "runQuery">
         throw error;
     }
 
-    return models.flatMap((model) => {
+    const models = new Set(aiNodes.map((node) => (node.data as { model?: string }).model ?? defaultModelUnderRules(AI_NODE_DEFAULT_MODEL, rules)));
+
+    return [...models].flatMap((model) => {
         const refusal = refusalUnder(rules, model);
 
         return refusal === undefined ? [] : [refusal];
@@ -169,7 +187,9 @@ export const workflowModelRefusals = async (ctx: Pick<ActionContext, "runQuery">
 /** {@link generateOnGateway} for the streaming workflow route: an HTTP action, which cannot reach the gateway itself. */
 export const generateWorkflowText = internalAction
     .input({
-        maxTokens: v.optional(v.number()),
+        maxTokens: v.optional(
+            v.number().check((value) => Number.isSafeInteger(value) && value > 0 && value <= MAX_NODE_OUTPUT_TOKENS, { message: "Invalid output token limit" }),
+        ),
         modelId: v.string().max(MAX_LENGTH.short),
         orgId: v.optional(v.string().max(MAX_LENGTH.short)),
         prompt: v.string().max(MAX_LENGTH.document),
@@ -206,12 +226,12 @@ const executeAINode = async (
         return { error: "No input provided to AI node", success: false };
     }
 
-    const modelId = data.model ?? AI_NODE_DEFAULT_MODEL;
-
     try {
+        const modelId = await aiNodeModel(run.ctx, run.userId, data.model);
+
         if (runsOnGatewayOnly(modelId)) {
             const result = await generateOnGateway(run.ctx, run.gateway, {
-                maxTokens: data.maxTokens,
+                maxTokens: nodeMaxTokens(data.maxTokens),
                 modelId,
                 orgId: run.orgId,
                 prompt,
@@ -232,14 +252,10 @@ const executeAINode = async (
         }
 
         const agents = await getAgents();
-        let agent = agents[modelId];
+        const agent = agents[modelId];
 
         if (!agent) {
-            agent = agents[AI_NODE_DEFAULT_MODEL];
-
-            if (!agent) {
-                return { error: `Unknown model: ${modelId}`, success: false };
-            }
+            return { error: `Unknown model: ${modelId}`, success: false };
         }
 
         let languageModel = agent.chat;
@@ -259,7 +275,7 @@ const executeAINode = async (
         }
 
         const result = await generateText({
-            maxOutputTokens: data.maxTokens,
+            maxOutputTokens: nodeMaxTokens(data.maxTokens),
             model: languageModel,
             prompt,
             system: systemPromptFor(node, context),

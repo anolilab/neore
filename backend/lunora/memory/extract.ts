@@ -386,19 +386,24 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
         // 4. Generate embeddings for all extracted facts upfront (for vector dedup)
         let factEmbeddings: (number[] | null)[] = extractedFacts.map(() => null);
 
+        // Rules that refuse the embedding model (`embeddingModelAllowed`) go straight to Jaccard dedup: the gateway would refuse the call.
         try {
-            const embeddingModel = await getMemoryEmbeddingModel(gatewayFetch(ctx), rules);
-            const { embedMany } = await import("../agent/client/search");
+            const { embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
 
-            const factTexts = extractedFacts.map((f) => f.memory);
-            const { embeddings } = await embedMany(ctx, {
-                embeddingModel,
-                threadId: undefined,
-                userId: args.userId,
-                values: factTexts,
-            });
+            if (embeddingModelAllowed(rules)) {
+                const embeddingModel = await getMemoryEmbeddingModel(gatewayFetch(ctx), rules);
+                const { embedMany } = await import("../agent/client/search");
 
-            factEmbeddings = embeddings;
+                const factTexts = extractedFacts.map((f) => f.memory);
+                const { embeddings } = await embedMany(ctx, {
+                    embeddingModel,
+                    threadId: undefined,
+                    userId: args.userId,
+                    values: factTexts,
+                });
+
+                factEmbeddings = embeddings;
+            }
         } catch (error) {
             console.warn("[memory/extract] Fact embedding generation failed, falling back to Jaccard dedup:", error);
         }
@@ -680,7 +685,15 @@ export const regenerateMemoryEmbedding = internalAction
 
         // Generate and save a fresh embedding for the updated text
         try {
-            const embeddingModel = await getMemoryEmbeddingModel(gatewayFetch(ctx), await loadModelFilterRules(ctx, args.userId));
+            const rules = await loadModelFilterRules(ctx, args.userId);
+            const { embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
+
+            // The gateway would refuse the call: the memory is kept without a vector, found by keyword.
+            if (!embeddingModelAllowed(rules)) {
+                return;
+            }
+
+            const embeddingModel = await getMemoryEmbeddingModel(gatewayFetch(ctx), rules);
             const { embedMany } = await import("../agent/client/search");
 
             const { embeddings } = await embedMany(ctx, {

@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("../chat/lib/gateway-embedding-model", () => {
-    return { createGatewayEmbeddingModel: mocks.createGatewayEmbeddingModel };
+    return { createGatewayEmbeddingModel: mocks.createGatewayEmbeddingModel, embeddingModelAllowed: () => true };
 });
 vi.mock("../agent/client/search", () => {
     return { embedMany: mocks.embedMany };

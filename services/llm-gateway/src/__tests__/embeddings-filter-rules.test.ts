@@ -53,11 +53,13 @@ describe("/internal/embeddings with model filter rules", () => {
         };
 
         const allowed = await call({ modelFilterRules: { blockedProviders: ["openai"] } }, ai);
+        const chatAllowList = await call({ modelFilterRules: { allowedModels: ["openai/gpt-5"], allowedProviders: ["openrouter"] } }, ai);
         const unruled = await call({}, ai);
 
         expect(allowed.status).toBe(200);
+        expect(chatAllowList.status).toBe(200);
         expect(unruled.status).toBe(200);
         await expect(unruled.json()).resolves.toMatchObject({ embeddings: [[0.1, 0.2]] });
-        expect(ai.run).toHaveBeenCalledTimes(2);
+        expect(ai.run).toHaveBeenCalledTimes(3);
     });
 });
