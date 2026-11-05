@@ -258,12 +258,17 @@ export const API_KEY_OPTIONS = {
  *   either;
  * - the limiter itself is the expensive part: one D1 read + write per request.
  *
+ * `sign-in-methods` is exempt too: it answers the same static JSON to everyone.
+ *
  * Everything a brute-force or mail-bomb would use keeps its strict rule; this
- * map names only the one path it relaxes. `auth.rate-limit.test.ts` drives
+ * map names only the paths it relaxes. `auth.rate-limit.test.ts` drives
  * better-auth's real limiter to pin both halves.
  */
 export const AUTH_RATE_LIMIT_CUSTOM_RULES: Record<string, false | { max: number; window: number }> = {
     "/get-session": false,
+    // Static configuration, read on every chat page load to choose between guest chat and the signed-out chat. The
+    // `/sign-in` prefix rule held it to 3 per 10 s, and a 429 reads as invite-only in the app.
+    "/sign-in-methods": false,
 };
 
 export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions => {
