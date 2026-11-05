@@ -27,6 +27,7 @@ import { AlertTriangleIcon, EditIcon, InfoIcon, XIcon } from "lucide-react";
 import type { ChangeEvent, DragEvent, FC } from "react";
 import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
+import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import ReferenceStrip from "@/features/chat/components/reference-picker/reference-strip";
 import type { AttachmentAdapter } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import {
@@ -40,7 +41,7 @@ import {
 } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import { useChatActions, useChatIsStreaming, useChatLunora, useChatThread } from "@/features/chat/core/context/chat-context";
 import useComparisonChat from "@/features/chat/core/hooks/use-comparison-chat";
-import usePendingSend from "@/features/chat/core/hooks/use-pending-send";
+import usePendingSend, { holdForSignIn } from "@/features/chat/core/hooks/use-pending-send";
 import useRunnerCapabilities from "@/features/chat/core/hooks/use-runner-capabilities";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
 import { selectAttachedReferences, selectRemoveAttachedReference, useChatUIStore, useComposerState } from "@/features/chat/core/stores/chat-ui-store";
@@ -479,6 +480,8 @@ const ComposerInput = ({
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     const { isNewThread, threadId } = useChatThread();
+    // Invite-only: a guest's comparison send is held for sign-in (a plain send is held in `ChatProvider`).
+    const { mustSignIn } = useInviteOnly();
     const { getChatKey, isMounted, trackToast } = usePasteGuard(threadId);
 
     // Opt-in ghost text; `undefined` (off) unless the user enabled it in settings.
@@ -1023,6 +1026,14 @@ const ComposerInput = ({
             return;
         }
 
+        // A comparison send does not go through `sendMessage`, where a guest's send is held under invite-only, so hold
+        // it here: the draft stays and sign-in opens.
+        if (mustSignIn && (onSubmitOverride || isComparisonValid)) {
+            holdForSignIn(draftText);
+
+            return;
+        }
+
         // Set submitting flag briefly (guards against double-send, cleared inside sendMessage)
         useChatUIStore.getState().setIsSubmitting(true);
 
@@ -1049,6 +1060,7 @@ const ComposerInput = ({
         onSubmitProp?.();
     }, [
         disabled,
+        mustSignIn,
         sendMessage,
         onSubmitProp,
         contextStats,
