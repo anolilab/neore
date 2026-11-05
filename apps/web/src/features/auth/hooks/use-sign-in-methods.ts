@@ -11,12 +11,14 @@ import socialProviders from "../lib/social-providers";
  * than from a build-time list that could offer a provider the backend lacks.
  */
 export interface SignInMethods {
+    /** Registration needs an invitation, and guests are refused (`SIGNUP_INVITE_ONLY`). */
+    inviteOnly: boolean;
     oidc: { label: string; providerId: string } | null;
     passkey: boolean;
     social: string[];
 }
 
-const NO_METHODS: SignInMethods = { oidc: null, passkey: false, social: [] };
+const NO_METHODS: SignInMethods = { inviteOnly: true, oidc: null, passkey: false, social: [] };
 
 const isSignInMethods = (value: unknown): value is SignInMethods => {
     const candidate = value as Partial<SignInMethods> | null;
@@ -36,7 +38,12 @@ const fetchSignInMethods = async (): Promise<SignInMethods> => {
 
     const body: unknown = await response.json();
 
-    return isSignInMethods(body) ? body : NO_METHODS;
+    if (!isSignInMethods(body)) {
+        return NO_METHODS;
+    }
+
+    // A backend that does not say is treated as invite-only: the failure direction of "open" is guests and sign-up links.
+    return { ...body, inviteOnly: body.inviteOnly !== false };
 };
 
 /**
@@ -47,14 +54,23 @@ const fetchSignInMethods = async (): Promise<SignInMethods> => {
  * Only queried where sign-in UI renders, and once per page load at most. Until
  * it answers (and during SSR) nothing but email is offered, which is also the
  * safe reading when the backend is unreachable.
+ *
+ * `inviteOnly` is `undefined` until the answer arrives (and during SSR), so a
+ * caller can wait rather than guess; after a failed fetch it reads `true`.
  */
 const useSignInMethods = (): {
     findProvider: (id: string) => Provider | undefined;
+    inviteOnly: boolean | undefined;
     isLoading: boolean;
     passkey: boolean;
     socialProviders: string[];
 } => {
-    const { data = NO_METHODS, isLoading } = useQuery({
+    const {
+        data = NO_METHODS,
+        isError,
+        isLoading,
+        isSuccess,
+    } = useQuery({
         enabled: globalThis.window !== undefined,
         queryFn: fetchSignInMethods,
         queryKey: ["auth", "sign-in-methods"],
@@ -72,6 +88,7 @@ const useSignInMethods = (): {
 
             return socialProviders.find((candidate) => candidate.provider === id);
         },
+        inviteOnly: isSuccess || isError ? data.inviteOnly : undefined,
         isLoading,
         passkey: data.passkey,
         socialProviders: oidc ? [...data.social, oidc.providerId] : data.social,

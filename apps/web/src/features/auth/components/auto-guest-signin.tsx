@@ -7,7 +7,7 @@ import useAnonymousSignInTracking from "@/features/auth/hooks/use-anonymous-sign
 import useOnSuccessTransition from "@/features/auth/hooks/use-success-transition";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import type { GuestSessionOutcome } from "@/features/auth/lib/guest-session";
-import { adoptSessionToken, ensureGuestSession, nextAdoptionDelay } from "@/features/auth/lib/guest-session";
+import { adoptSessionTokenWhileShut, ensureGuestSession } from "@/features/auth/lib/guest-session";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { trackEvent } from "@/lib/analytics";
 import getSessionToken from "@/lib/auth/server-functions";
@@ -86,6 +86,7 @@ const AutoGuestSignIn = ({ onSignInError, onSignInStart, onSignInSuccess, redire
         // result, so tracking, callbacks and the redirect happen once.
         let cancelled = false;
         let timer: ReturnType<typeof setTimeout> | undefined;
+        const adoption = new AbortController();
         let retryDelay = RETRY_BASE_MS;
         let reported = false;
 
@@ -98,26 +99,6 @@ const AutoGuestSignIn = ({ onSignInError, onSignInStart, onSignInSuccess, redire
         // token only while the client holds none. So if the gate is still shut
         // after a pause, hand the client the session's token again. The gate
         // opening unmounts this component, which cancels the timer.
-        const adoptWhileShut = async () => {
-            while (!cancelled) {
-                await new Promise<void>((resolve) => {
-                    timer = setTimeout(resolve, nextAdoptionDelay());
-                });
-
-                if (cancelled) {
-                    return;
-                }
-
-                try {
-                    await adoptSessionToken(lunoraClient, getSessionToken);
-
-                    return;
-                } catch (error) {
-                    console.warn("Guest session token adoption failed:", error);
-                }
-            }
-        };
-
         const signInAsGuest = async () => {
             try {
                 const outcome = await ensureGuestSession(authClient);
@@ -129,7 +110,7 @@ const AutoGuestSignIn = ({ onSignInError, onSignInStart, onSignInSuccess, redire
                 await handleOutcome(outcome);
 
                 if (!cancelled) {
-                    void adoptWhileShut();
+                    void adoptSessionTokenWhileShut(lunoraClient, getSessionToken, adoption.signal);
                 }
             } catch (error) {
                 if (cancelled) {
@@ -155,6 +136,7 @@ const AutoGuestSignIn = ({ onSignInError, onSignInStart, onSignInSuccess, redire
         return () => {
             cancelled = true;
             clearTimeout(timer);
+            adoption.abort();
         };
     }, [authClient, lunoraClient]);
 

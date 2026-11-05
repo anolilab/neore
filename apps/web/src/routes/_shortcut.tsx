@@ -5,10 +5,17 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 import GlobalCommandPalette from "@/components/command-palette";
 import { ModelPickerPopup } from "@/components/model-picker";
-import AutoGuestSignIn from "@/features/auth/components/auto-guest-signin";
+import SignInRedirect from "@/features/auth/components/sign-in-redirect";
+import UnauthenticatedGate from "@/features/auth/components/unauthenticated-gate";
 import { KeyboardShortcutsManager } from "@/features/keyboard/components/keyboard-shortcuts-manager";
 import useKeyboardShortcutHandler from "@/features/keyboard/hooks/use-keyboard-shortcut-handler";
 import SidebarShortcut from "@/features/layout/components/sidebar-shortcut";
+
+const ShortcutLoading = () => (
+    <div>
+        <Trans>Loading...</Trans>
+    </div>
+);
 
 const ShortcutLayout = () => {
     const handleShortcut = useKeyboardShortcutHandler();
@@ -36,12 +43,18 @@ export const Route = createFileRoute("/_shortcut")({
     component: () => (
         <>
             <AuthLoading>
-                <div>
-                    <Trans>Loading...</Trans>
-                </div>
+                <ShortcutLoading />
             </AuthLoading>
             <Unauthenticated>
-                <AutoGuestSignIn />
+                {/* A guest session when registration is open; under invite-only these pages need an account, so sign in. */}
+                <UnauthenticatedGate
+                    loading={<ShortcutLoading />}
+                    signedOut={
+                        <SignInRedirect>
+                            <ShortcutLoading />
+                        </SignInRedirect>
+                    }
+                />
             </Unauthenticated>
             <Authenticated>
                 <ShortcutLayout />

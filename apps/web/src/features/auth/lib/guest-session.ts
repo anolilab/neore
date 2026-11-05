@@ -187,3 +187,43 @@ export const resetAdoptionBackoff = (): void => {
     adoption.count = 0;
     adoption.lastAt = -Infinity;
 };
+
+/**
+ * Keep handing the RPC client the session's token until one adoption succeeds
+ * or `signal` aborts (the `<Unauthenticated>` gate opened and unmounted the
+ * caller). Waits {@link nextAdoptionDelay} before each try. For a caller that
+ * knows a session exists while the client reads unauthenticated: the guest
+ * sign-in, and the signed-out chat shell when a session turns up under it.
+ */
+export const adoptSessionTokenWhileShut = async (
+    client: IdentityTokenClient,
+    fetchToken: () => Promise<string | null | undefined>,
+    signal: AbortSignal,
+): Promise<void> => {
+    while (!signal.aborted) {
+        await new Promise<void>((resolve) => {
+            const timer = setTimeout(resolve, nextAdoptionDelay());
+
+            signal.addEventListener(
+                "abort",
+                () => {
+                    clearTimeout(timer);
+                    resolve();
+                },
+                { once: true },
+            );
+        });
+
+        if (signal.aborted) {
+            return;
+        }
+
+        try {
+            await adoptSessionToken(client, fetchToken);
+
+            return;
+        } catch (error) {
+            console.warn("Session token adoption failed:", error);
+        }
+    }
+};

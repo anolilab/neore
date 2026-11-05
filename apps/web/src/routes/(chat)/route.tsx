@@ -8,10 +8,12 @@ import { lazy, Suspense } from "react";
 import GlobalCommandPalette from "@/components/command-palette";
 import { ModelPickerPopup } from "@/components/model-picker";
 import ProgrammableSidebarProvider from "@/components/programmable-sidebar-provider";
-import AutoGuestSignIn from "@/features/auth/components/auto-guest-signin";
+import LoginPromptHost from "@/features/auth/components/auth/login-prompt-host";
+import UnauthenticatedGate from "@/features/auth/components/unauthenticated-gate";
 import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import ChatLoadingSkeleton from "@/features/chat/loading/chat-loading-skeleton";
 import { chatDefaultOpen, chatSidebarNames, chatSidebarStyle } from "@/features/chat/shell-layout";
+import SignedOutChat from "@/features/chat/signed-out/signed-out-chat";
 import { KeyboardShortcutsManager } from "@/features/keyboard/components/keyboard-shortcuts-manager";
 import useKeyboardShortcutHandler from "@/features/keyboard/hooks/use-keyboard-shortcut-handler";
 import { PresentationViewerRoot } from "@/features/slides";
@@ -31,7 +33,8 @@ const RouteComponent = () => {
                 <ChatLoadingSkeleton />
             </AuthLoading>
             <Unauthenticated>
-                <AutoGuestSignIn />
+                {/* A guest session when registration is open; the signed-out chat when it is invite-only. */}
+                <UnauthenticatedGate loading={<ChatLoadingSkeleton />} signedOut={<SignedOutChat />} />
             </Unauthenticated>
             <Authenticated>
                 <GlobalCommandPalette />
@@ -46,6 +49,8 @@ const RouteComponent = () => {
                     </ProgrammableSidebarProvider>
                 </KeyboardShortcutsManager>
             </Authenticated>
+            {/* Sending while signed out or as a guest under invite-only opens this (`openLoginPrompt`). */}
+            <LoginPromptHost />
         </>
     );
 };
