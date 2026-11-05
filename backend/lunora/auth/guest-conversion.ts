@@ -10,8 +10,9 @@
  * and the account's first password sign-in, or the verification link, finishes the link (see `HAND_OVER_PATHS`). The guest id is only
  * ever read from the request's resolved session, never from the body or the query. The record goes only once the move
  * is queued, so a failed hand-over is retried at the next sign-in; an unverified sign-in, which mails a new link,
- * renews it in place. If the record cannot be written at sign-up, the move is queued there and then, while the request
- * still holds the guest's session: the email is now taken, so no later request could rebuild the record. The record
+ * renews it in place. If the record cannot be written at sign-up (or the account's password cannot be read), there is
+ * no hand-over at all: the data stays with the guest and the failure is logged. Moving it right away would skip the
+ * password check below. The record
  * also holds a digest of the sign-up's password hash ({@link credentialFingerprint}); a hand-over happens only while the
  * account still has that password. Someone can sign up as a guest with another person's address; when the real owner
  * resets the password and verifies, the digest no longer matches and the stranger's data stays out of their account.
@@ -192,14 +193,10 @@ export const guestConversion = (onGuestConverted: (guestId: string, userId: stri
                                 value: JSON.stringify({ credential, guest: guest.id } satisfies PendingGuest),
                             });
                         } catch (error) {
-                            authLogger.error(`[auth] recording guest ${guest.id} for ${userId} failed; queueing the move now:`, error);
-
-                            try {
-                                await onGuestConverted(guest.id, userId);
-                            } catch (queueError) {
-                                // The account exists already, so the sign-up must still answer; only this log is left.
-                                authLogger.error(`[auth] handing guest ${guest.id} over to ${userId} failed:`, queueError);
-                            }
+                            // No record means no hand-over. Moving the guest now instead would skip the password check
+                            // that stops a stranger's guest from landing in an address owner's account; losing the
+                            // guest's data is the lesser failure. The sign-up itself still answers.
+                            authLogger.error(`[auth] recording guest ${guest.id} for ${userId} failed; its data stays with the guest:`, error);
                         }
                     }),
                     matcher: (ctx) => ctx.path === "/sign-up/email",

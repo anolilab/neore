@@ -685,8 +685,8 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         expect(pendingRows()).toHaveLength(1);
     });
 
-    it("queues the move at sign-up when the guest cannot be recorded, so verifying elsewhere loses nothing", async () => {
-        expect.assertions(3);
+    it("moves nothing when the guest cannot be recorded at sign-up, even after the owner resets and verifies", async () => {
+        expect.assertions(5);
 
         const onGuestConverted = vi.fn(async () => undefined);
         const { auth, db } = await createTestAuth({ onGuestConverted });
@@ -701,12 +701,26 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
             return create(data);
         });
 
+        // A stranger signs up with the owner's address from a guest session; the record cannot be written.
         const guest = await auth.handler(post("/sign-in/anonymous", {}));
-        const guestId = ((await guest.json()) as { user: { id: string } }).user.id;
-        const signUp = await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, cookieOf(guest)));
+        const signUp = await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Stranger", password: PASSWORD }, cookieOf(guest)));
 
         expect(signUp.status).toBe(200);
-        expect(onGuestConverted).toHaveBeenCalledExactlyOnceWith(guestId, db.user!.find((row) => row.email === EMAIL)?.id);
+        // No password binding, so no move: not at sign-up, and not after the owner takes the address back.
+        expect(onGuestConverted).not.toHaveBeenCalled();
+
+        await auth.handler(post("/request-password-reset", { email: EMAIL, redirectTo: "/auth/reset-password" }));
+
+        const [token] = await queuedResetTokens();
+
+        await auth.handler(post("/reset-password", { newPassword: OWNER_PASSWORD, token: token! }));
+        await auth.handler(post("/sign-in/email", { email: EMAIL, password: OWNER_PASSWORD }));
+
+        const links = await queuedVerificationLinks();
+        const verified = await auth.handler(new Request(links.at(-1)!, { headers: { origin: SITE } }));
+
+        expect(verified.status).toBeLessThan(400);
+        expect(onGuestConverted).not.toHaveBeenCalled();
         expect(db.verification!.some((row) => String(row.identifier).startsWith("guest-conversion:"))).toBe(false);
     });
 
