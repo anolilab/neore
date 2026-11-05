@@ -14,6 +14,7 @@ import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { searchVectors } from "../agent/vector/index";
 import { validateVectorDimension, type VectorDimension } from "../agent/vector/tables";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 import { getMemoryEmbeddingModel, MEMORY_EMBEDDING_MODEL_NAME } from "./extract";
 
@@ -158,7 +159,7 @@ export const retrieveRelevantMemories = internalAction
         const vectorScoreMap = new Map<string, number>(); // memoryId → cosine score
 
         try {
-            const embeddingModel = await getMemoryEmbeddingModel(gatewayFetch(ctx));
+            const embeddingModel = await getMemoryEmbeddingModel(gatewayFetch(ctx), await loadModelFilterRules(ctx, args.userId));
             const { embedMany } = await import("../agent/client/search");
 
             const { embeddings } = await embedMany(ctx, {

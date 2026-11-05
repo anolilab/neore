@@ -286,7 +286,10 @@ export const ingestFile = internalAction
 
             // 5. Generate embeddings for all chunks via LLM Gateway
             const { createGatewayEmbeddingModel } = await import("../chat/lib/gateway-embedding-model");
-            const embeddingModel = createGatewayEmbeddingModel(gatewayFetch(ctx), { userId: args.userId });
+            const embeddingModel = createGatewayEmbeddingModel(gatewayFetch(ctx), {
+                modelFilterRules: await loadModelFilterRules(ctx, args.userId),
+                userId: args.userId,
+            });
 
             const { embedMany } = await import("../agent/client/search");
             const chunkTexts = chunks.map((c) => embeddingInput(c, EMBEDDING_INPUT_BUDGET));

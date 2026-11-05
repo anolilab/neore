@@ -66,12 +66,14 @@ export const MEMORY_EMBEDDING_MODEL_NAME = "bge-m3";
  *
  * The gateway is mandatory — produces 1024-dimensional vectors
  * (bge-m3) for compatibility with the vector table. `gateway` is
- * the calling action's binding, `gatewayFetch(ctx)`.
+ * the calling action's binding, `gatewayFetch(ctx)`; the gateway refuses the
+ * model when the user's `modelFilterRules` exclude it, and callers fall back
+ * (Jaccard dedup, keyword retrieval) as on any embedding failure.
  */
-export const getMemoryEmbeddingModel = async (gateway: ServiceFetch) => {
+export const getMemoryEmbeddingModel = async (gateway: ServiceFetch, modelFilterRules: ModelFilterRules) => {
     const { createGatewayEmbeddingModel } = await import("../chat/lib/gateway-embedding-model");
 
-    return createGatewayEmbeddingModel(gateway);
+    return createGatewayEmbeddingModel(gateway, { modelFilterRules });
 };
 
 // ============================================================================
@@ -313,10 +315,12 @@ export const extractMemories = internalAction
         }
 
         let model: Awaited<ReturnType<typeof getUtilityModel>>;
+        let rules: ModelFilterRules;
 
         try {
+            rules = await loadModelFilterRules(ctx, args.userId);
             model = await getUtilityModel(gatewayFetch(ctx), {
-                rules: await loadModelFilterRules(ctx, args.userId),
+                rules,
                 threadId: args.threadId,
                 userId: args.userId,
             });
@@ -383,7 +387,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
         let factEmbeddings: (number[] | null)[] = extractedFacts.map(() => null);
 
         try {
-            const embeddingModel = await getMemoryEmbeddingModel(gatewayFetch(ctx));
+            const embeddingModel = await getMemoryEmbeddingModel(gatewayFetch(ctx), rules);
             const { embedMany } = await import("../agent/client/search");
 
             const factTexts = extractedFacts.map((f) => f.memory);
@@ -676,7 +680,7 @@ export const regenerateMemoryEmbedding = internalAction
 
         // Generate and save a fresh embedding for the updated text
         try {
-            const embeddingModel = await getMemoryEmbeddingModel(gatewayFetch(ctx));
+            const embeddingModel = await getMemoryEmbeddingModel(gatewayFetch(ctx), await loadModelFilterRules(ctx, args.userId));
             const { embedMany } = await import("../agent/client/search");
 
             const { embeddings } = await embedMany(ctx, {

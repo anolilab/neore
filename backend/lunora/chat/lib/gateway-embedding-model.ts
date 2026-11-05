@@ -5,6 +5,7 @@
  * Replaces direct `@ai-sdk/google` and CF Workers AI embedding calls.
  */
 import type { EmbeddingModelV3, EmbeddingModelV3CallOptions, EmbeddingModelV3Result } from "@ai-sdk/provider";
+import { hasActiveFilters, type ModelFilterRules } from "@neore/ai/models";
 
 import { fetchWithDeadline } from "../../lib/fetch-timeout";
 import { SERVICE_ORIGIN, type ServiceFetch } from "../../lib/services.js";
@@ -13,6 +14,11 @@ import { generateTraceparent } from "../../lib/traceparent.js";
 export interface GatewayEmbeddingModelOptions {
     /** The gateway's service binding (`gatewayFetch(ctx)`). */
     gateway: ServiceFetch;
+    /**
+     * The user's model filters, read fail-closed (`loadModelFilterRules`). The gateway refuses the embedding model
+     * when they exclude it (`MODEL_BLOCKED`): Workers AI embeddings are served from any region, so any region rule does.
+     */
+    modelFilterRules?: ModelFilterRules;
     modelId: string;
     orgId?: string;
     threadId?: string;
@@ -47,6 +53,8 @@ export class GatewayEmbeddingModel implements EmbeddingModelV3 {
 
     private readonly orgId?: string;
 
+    private readonly modelFilterRules?: ModelFilterRules;
+
     private readonly threadId?: string;
 
     /**
@@ -60,6 +68,7 @@ export class GatewayEmbeddingModel implements EmbeddingModelV3 {
         this.gateway = options.gateway;
         this.userId = options.userId ?? "system";
         this.orgId = options.orgId;
+        this.modelFilterRules = hasActiveFilters(options.modelFilterRules) ? options.modelFilterRules : undefined;
         this.threadId = options.threadId;
         this.traceparent = options.traceparent ?? generateTraceparent();
     }
@@ -68,6 +77,7 @@ export class GatewayEmbeddingModel implements EmbeddingModelV3 {
         const requestBody = JSON.stringify({
             input: options.values,
             model: this.modelId,
+            modelFilterRules: this.modelFilterRules,
             orgId: this.orgId,
             requestId: `embed-${this.userId}-${Date.now()}`,
             threadId: this.threadId,
@@ -121,10 +131,11 @@ export class GatewayEmbeddingModel implements EmbeddingModelV3 {
  */
 export const createGatewayEmbeddingModel = (
     gateway: ServiceFetch,
-    options?: { threadId?: string; traceparent?: string; userId?: string },
+    options?: { modelFilterRules?: ModelFilterRules; threadId?: string; traceparent?: string; userId?: string },
 ): GatewayEmbeddingModel =>
     new GatewayEmbeddingModel({
         gateway,
+        modelFilterRules: options?.modelFilterRules,
         modelId: "bge-m3",
         threadId: options?.threadId,
         traceparent: options?.traceparent,

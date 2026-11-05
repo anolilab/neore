@@ -6,7 +6,7 @@ import type { AgentConfig } from "@neore/ai/providers";
  * Executes workflow nodes in topological order, passing data between nodes
  * via a shared execution context.
  */
-import { hasActiveFilters, MODEL_LOOKUP, resolveWorkflowModel } from "@neore/ai/models";
+import { hasActiveFilters, MODEL_LOOKUP, type ModelFilterRules, resolveWorkflowModel } from "@neore/ai/models";
 import { generateText, type LanguageModel } from "ai";
 import { LunoraError, v } from "lunorash/server";
 
@@ -16,7 +16,7 @@ import type { Id } from "../_generated/dataModel";
 import type { ActionCtx as ActionContext } from "../_generated/server";
 import { backupFilterRejection } from "../chat/lib/backup-model";
 import { GatewayLanguageModel } from "../chat/lib/gateway-language-model";
-import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
+import { loadModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, ModelFilterRulesUnavailableError } from "../chat/lib/model-filter-rules";
 import { authAction, internalAction, rateLimit } from "../lib/crpc";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
 import {
@@ -115,11 +115,54 @@ const generateOnGateway = async (ctx: Pick<ActionContext, "runQuery">, gateway: 
  * provider's own SDK never passes the gateway, which is where the filters are otherwise enforced, so it is checked
  * here before the call. Read fail-closed (`loadModelFilterRules`).
  */
-export const directModelRefusal = async (ctx: Pick<ActionContext, "runQuery">, userId: string, modelId: string): Promise<string | undefined> => {
+export const directModelRefusal = async (ctx: Pick<ActionContext, "runQuery">, userId: string, modelId: string): Promise<string | undefined> =>
+    refusalUnder(await loadModelFilterRules(ctx, userId), modelId);
+
+/** Why `rules` exclude `modelId`, or `undefined` when they allow it (an unknown id is left to the node itself). */
+const refusalUnder = (rules: ModelFilterRules, modelId: string): string | undefined => {
     const definition = MODEL_LOOKUP.get(modelId);
-    const refusal = definition ? backupFilterRejection(definition, await loadModelFilterRules(ctx, userId)) : null;
+    const refusal = definition ? backupFilterRejection(definition, rules) : null;
 
     return refusal === null ? undefined : `Your model settings exclude this node's model. ${refusal}`;
+};
+
+/** The model an AI node runs on when it names none. */
+export const AI_NODE_DEFAULT_MODEL = "claude-sonnet-4-20250514";
+
+/**
+ * Why the runner's model filters exclude the model of any AI node in the graph, one line per refused model. Checked
+ * before the first node runs, with the media checks (`workflowRunErrors`), so a run that cannot finish never bills
+ * an earlier clip or image. Read fail-closed (`loadModelFilterRules`). The per-node checks stay: the rules may change
+ * while a long run is in flight.
+ */
+export const workflowModelRefusals = async (
+    ctx: Pick<ActionContext, "runQuery">,
+    userId: string,
+    nodes: ReadonlyArray<WorkflowNode>,
+): Promise<string[]> => {
+    const models = [...new Set(nodes.filter((node) => node.type === "ai").map((node) => (node.data as { model?: string }).model ?? AI_NODE_DEFAULT_MODEL))];
+
+    if (models.length === 0) {
+        return [];
+    }
+
+    let rules: ModelFilterRules;
+
+    try {
+        rules = await loadModelFilterRules(ctx, userId);
+    } catch (error) {
+        if (error instanceof ModelFilterRulesUnavailableError) {
+            return [MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE];
+        }
+
+        throw error;
+    }
+
+    return models.flatMap((model) => {
+        const refusal = refusalUnder(rules, model);
+
+        return refusal === undefined ? [] : [refusal];
+    });
 };
 
 /** {@link generateOnGateway} for the streaming workflow route: an HTTP action, which cannot reach the gateway itself. */
@@ -162,7 +205,7 @@ const executeAINode = async (
         return { error: "No input provided to AI node", success: false };
     }
 
-    const modelId = (data.model ?? "claude-sonnet-4-20250514") as string;
+    const modelId = data.model ?? AI_NODE_DEFAULT_MODEL;
 
     try {
         if (runsOnGatewayOnly(modelId)) {
@@ -191,7 +234,7 @@ const executeAINode = async (
         let agent = agents[modelId];
 
         if (!agent) {
-            agent = agents["claude-sonnet-4-20250514" as string];
+            agent = agents[AI_NODE_DEFAULT_MODEL];
 
             if (!agent) {
                 return { error: `Unknown model: ${modelId}`, success: false };
@@ -1024,7 +1067,7 @@ export const executeWorkflow = authAction
         const account = await resolveRunAccount(context, userId);
 
         // Checked before any node runs, so a run that cannot finish never bills an earlier clip.
-        const inputErrors = workflowRunErrors(account, workflowContent);
+        const inputErrors = [...workflowRunErrors(account, workflowContent), ...(await workflowModelRefusals(context, userId, workflowContent.nodes))];
 
         if (inputErrors.length > 0) {
             throw new LunoraError("BAD_REQUEST", inputErrors.join("; "));

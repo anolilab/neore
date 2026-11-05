@@ -6,6 +6,7 @@
  * BYOK support, and rate limiting.
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { deriveModelRegions } from "@neore/ai/models";
 import { embed, embedMany } from "ai";
 import { z } from "zod";
 
@@ -15,6 +16,7 @@ import { bearerAuth, internalAuth } from "../../middleware/auth.js";
 import { expensiveEndpointRateLimit } from "../../middleware/rate-limit.js";
 import { createEmbeddingModel, EMBEDDING_MODELS } from "../../providers/embedding-factory.js";
 import { resolveApiKey, resolveCloudflareOptions } from "../../providers/factory.js";
+import { getModelRejectionReason, hasActiveFilters } from "../../routing/filters.js";
 import { UsageReporter } from "../../usage/reporter.js";
 import { UsageTracker } from "../../usage/tracker.js";
 
@@ -216,6 +218,19 @@ const internalRequestSchema = z.object({
     dimensions: z.int().positive().optional(),
     input: z.union([z.string(), z.array(z.string())]),
     model: z.string(),
+    /** The user's model filter rules: the embedding model is refused when they exclude it, as a chat model is. */
+    modelFilterRules: z
+        .object({
+            allowedModels: z.array(z.string()).optional(),
+            allowedProviders: z.array(z.string()).optional(),
+            allowedRegions: z.array(z.string()).optional(),
+            blockedModels: z.array(z.string()).optional(),
+            blockedProviders: z.array(z.string()).optional(),
+            blockedRegions: z.array(z.string()).optional(),
+            denyDataCollection: z.boolean().optional(),
+            requireZDR: z.boolean().optional(),
+        })
+        .optional(),
     orgId: z.string().optional(),
     requestId: z.string(),
     threadId: z.string().optional(),
@@ -251,6 +266,22 @@ embeddingsRouter.post("/internal/embeddings", internalAuth, async (c) => {
             },
             400,
         );
+    }
+
+    // Workers AI embeddings are served from any region, so a region rule refuses them like any other model.
+    if (hasActiveFilters(body.modelFilterRules)) {
+        const rejectionReason = getModelRejectionReason(
+            {
+                modelId: body.model,
+                provider: modelInfo.provider,
+                regions: deriveModelRegions({ modelApiId: modelInfo.modelApiId, provider: modelInfo.provider }),
+            },
+            body.modelFilterRules,
+        );
+
+        if (rejectionReason) {
+            return c.json({ error: { code: "MODEL_BLOCKED", message: rejectionReason, type: "invalid_request_error" } }, 403);
+        }
     }
 
     let apiKey: string;

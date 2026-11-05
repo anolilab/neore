@@ -38,7 +38,7 @@ import { imageRequestArgs, runVideoNode, systemPromptFor, type VideoRunContext }
 import { imageCountOf, type MediaCharge, withMediaCharge } from "./media-billing";
 import { executeTextNode } from "./mention-targets";
 import { buildExecutionContext, resolveRunAccount, workflowRunErrors } from "./run-setup";
-import { directModelRefusal, runsOnGatewayOnly } from "./executor";
+import { AI_NODE_DEFAULT_MODEL, directModelRefusal, runsOnGatewayOnly, workflowModelRefusals } from "./executor";
 
 let _agentsPromise: Promise<Record<string, AgentConfig>> | undefined;
 
@@ -115,7 +115,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
 
     // Checked before any node runs, so a run that cannot finish never bills an earlier clip.
     const account = await resolveRunAccount(context, userId);
-    const inputErrors = workflowRunErrors(account, workflowContent);
+    const inputErrors = [...workflowRunErrors(account, workflowContent), ...(await workflowModelRefusals(context, userId, workflowContent.nodes))];
 
     if (inputErrors.length > 0) {
         return Response.json({ error: inputErrors.join("; ") }, { status: 400 });
@@ -556,7 +556,7 @@ const executeAINodeStreaming = async (
     };
 
     const prompt = getLastOutputAsString(context);
-    const modelId = (data.model ?? "claude-sonnet-4-20250514") as string;
+    const modelId = data.model ?? AI_NODE_DEFAULT_MODEL;
 
     // A gateway-only model is reached through an action (this route has no gateway binding), so its text arrives whole.
     if (runsOnGatewayOnly(modelId)) {
@@ -585,7 +585,7 @@ const executeAINodeStreaming = async (
     }
 
     const agents = await getAgents();
-    const agent = agents[modelId] ?? agents["claude-sonnet-4-20250514" as string];
+    const agent = agents[modelId] ?? agents[AI_NODE_DEFAULT_MODEL];
     let languageModel = agent?.chat;
 
     if (userProviderKeys && Object.keys(userProviderKeys).length > 0) {
