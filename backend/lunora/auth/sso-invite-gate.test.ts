@@ -564,8 +564,8 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         expect(pendingRows()).toHaveLength(0);
     });
 
-    it("renews the recorded guest when an unverified sign-in mails a new link", async () => {
-        expect.assertions(2);
+    it("renews the recorded guest when an unverified sign-in mails a new link, never on a wrong password", async () => {
+        expect.assertions(4);
 
         const { auth, db } = await createTestAuth({ onGuestConverted: async () => undefined });
         const guest = await auth.handler(post("/sign-in/anonymous", {}));
@@ -576,6 +576,11 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         const nearlyExpired = new Date(Date.now() + 60_000);
 
         pending()!.expiresAt = nearlyExpired;
+
+        const wrongPassword = await auth.handler(post("/sign-in/email", { email: EMAIL, password: "not-the-password" })); // secret-scanner:allow
+
+        expect(wrongPassword.status).toBe(401);
+        expect((pending()!.expiresAt as Date).getTime()).toBe(nearlyExpired.getTime());
 
         const signIn = await auth.handler(post("/sign-in/email", { email: EMAIL, password: PASSWORD }));
 

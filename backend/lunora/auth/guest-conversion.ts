@@ -71,9 +71,12 @@ export const guestConversion = (onGuestConverted: (guestId: string, userId: stri
                         const sessionUserId = ctx.context.newSession?.user.id;
 
                         if (!sessionUserId) {
-                            // No session: an unverified sign-in, which mails a new link. Keep the guest for that link.
+                            // No session. Only `EMAIL_NOT_VERIFIED` means the password was right and a new link went out:
+                            // keep the guest for that link. Any other failure (a wrong password) renews nothing.
+                            const refusal = ctx.context.returned as { body?: { code?: string } } | undefined;
                             const email = (ctx.body as { email?: unknown } | undefined)?.email;
-                            const account = typeof email === "string" ? await adapter.findUserByEmail(email) : null;
+                            const account =
+                                refusal?.body?.code === "EMAIL_NOT_VERIFIED" && typeof email === "string" ? await adapter.findUserByEmail(email) : null;
                             const pending =
                                 account && !account.user.emailVerified ? await adapter.findVerificationValue(pendingIdentifier(account.user.id)) : null;
 
