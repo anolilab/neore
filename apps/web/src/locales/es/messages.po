@@ -25,11 +25,11 @@ msgstr " · modelo: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, one {# fila} other {# filas}}, {1, plural, one {# columna} other {# columnas}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:584
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:596
 msgid "-- INSERT --"
 msgstr "-- INSERTAR --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:584
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:596
 msgid "-- NORMAL --"
 msgstr "-- NORMAL --"
 
@@ -52,23 +52,23 @@ msgstr "\"{0}\" tiene variables que necesitan valores."
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "\"{0}\" empezará cuando terminen sus dependencias"
 
-#: src/features/chat/thread/composer-input.tsx:571
+#: src/features/chat/thread/composer-input.tsx:575
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "No se puede adjuntar «{fileName}»: este tipo de archivo no es compatible."
 
-#: src/features/chat/thread/composer-input.tsx:564
+#: src/features/chat/thread/composer-input.tsx:568
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "No se pudo adjuntar «{fileName}»: su contenido no coincide con su tipo de archivo."
 
-#: src/features/chat/thread/composer-input.tsx:566
+#: src/features/chat/thread/composer-input.tsx:570
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "No se pudo subir «{fileName}». Comprueba tu conexión e inténtalo de nuevo."
 
-#: src/features/chat/thread/composer-input.tsx:569
+#: src/features/chat/thread/composer-input.tsx:573
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "«{fileName}» es demasiado grande. Los documentos pueden tener como máximo {maxMegabytes} MB."
 
-#: src/features/chat/thread/composer-input.tsx:570
+#: src/features/chat/thread/composer-input.tsx:574
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "«{fileName}» es demasiado grande. Los archivos de este tipo pueden tener como máximo {maxMegabytes} MB."
 
@@ -506,7 +506,7 @@ msgstr "{0} de {1} valoraciones"
 
 #. placeholder {0}: formatPricePerMillion(model.pricing.input_per_million)
 #. placeholder {1}: formatPricePerMillion(model.pricing.output_per_million)
-#: src/components/model-picker/model-picker.tsx:320
+#: src/components/model-picker/model-picker.tsx:321
 msgid "{0} input, {1} output per 1M tokens"
 msgstr ""
 
@@ -599,7 +599,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "{0} de {1} tokens usados ({2} %)"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1221
+#: src/components/model-picker/model-picker.tsx:1228
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} de {MAX_PARALLEL} seleccionados"
 
@@ -880,16 +880,16 @@ msgstr "{extraRowCount, plural, one {+# fila más} other {+# filas más}}"
 msgid "{failed} document(s) could not be added."
 msgstr "No se pudieron añadir {failed} documento(s)."
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:212
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:289
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:211
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:288
 #: src/features/auth/components/settings/account/update-field-card.tsx:73
 #: src/features/auth/components/settings/account/update-field-card.tsx:110
 msgid "{fieldLabel} is invalid"
 msgstr "{fieldLabel} no es válido"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:207
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:221
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:227
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:206
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:220
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:226
 #: src/features/auth/components/settings/account/update-field-card.tsx:68
 #: src/features/auth/components/settings/account/update-field-card.tsx:82
 #: src/features/auth/components/settings/account/update-field-card.tsx:86
@@ -937,7 +937,7 @@ msgstr ""
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:181
+#: src/features/chat/thread/composer-input-area.tsx:184
 msgid "{hiddenRemoved, plural, one {# invisible character was removed from your message.} other {# invisible characters were removed from your message.}}"
 msgstr ""
 
@@ -1274,7 +1274,7 @@ msgstr "{selectedCount, plural, one {# prompt seleccionado} other {# prompts sel
 msgid "{selectedCount, plural, one {# thread selected} other {# threads selected}}"
 msgstr "{selectedCount, plural, one {# conversación seleccionada} other {# conversaciones seleccionadas}}"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:745
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:739
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "{selectedCount} de {MAX_PARALLEL} seleccionados"
 
@@ -2085,10 +2085,10 @@ msgstr "Añade al menos un modelo: usa \"Obtener modelos\" o escribe los ids"
 msgid "Add at least one model id"
 msgstr "Añade al menos un ID de modelo"
 
-#: src/features/chat/thread/composer-input-area.tsx:221
-#: src/features/chat/thread/composer-input-area.tsx:255
-#: src/features/chat/thread/composer-input-area.tsx:262
-#: src/features/chat/thread/composer-input-area.tsx:276
+#: src/features/chat/thread/composer-input-area.tsx:224
+#: src/features/chat/thread/composer-input-area.tsx:258
+#: src/features/chat/thread/composer-input-area.tsx:265
+#: src/features/chat/thread/composer-input-area.tsx:279
 #: src/features/chat/thread/edit-composer.tsx:132
 msgid "Add attachment"
 msgstr "Añadir adjunto"
@@ -2302,7 +2302,7 @@ msgid "Add to review"
 msgstr ""
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:168
-#: src/components/model-picker/model-picker.tsx:341
+#: src/components/model-picker/model-picker.tsx:342
 msgid "Add to starred"
 msgstr "Añadir a destacados"
 
@@ -2892,10 +2892,10 @@ msgstr "Alinear verticalmente"
 msgid "Align vertically (V)"
 msgstr "Alinear verticalmente (V)"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:618
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:680
-#: src/components/model-picker/model-picker.tsx:1070
-#: src/components/model-picker/model-picker.tsx:1148
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:612
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:674
+#: src/components/model-picker/model-picker.tsx:1076
+#: src/components/model-picker/model-picker.tsx:1154
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:422
@@ -2980,8 +2980,8 @@ msgstr "Todos los instaladores"
 msgid "All MCP servers active"
 msgstr "Todos los servidores MCP activos"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:564
-#: src/components/model-picker/model-picker.tsx:1018
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:558
+#: src/components/model-picker/model-picker.tsx:1024
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "Todos los modelos"
@@ -3124,7 +3124,7 @@ msgstr "Alloy (neutra)"
 msgid "Alphabetical"
 msgstr "Alfabético"
 
-#: src/features/auth/components/auth/auth-card.tsx:421
+#: src/features/auth/components/auth/auth-card.tsx:437
 msgid "Already have an account?"
 msgstr "¿Ya tienes una cuenta?"
 
@@ -3880,8 +3880,8 @@ msgstr "Intentos: {0}"
 msgid "Auckland"
 msgstr "Auckland"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:668
-#: src/components/model-picker/model-picker.tsx:1122
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:662
+#: src/components/model-picker/model-picker.tsx:1128
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:123
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -3928,7 +3928,7 @@ msgstr "Austria"
 msgid "Auth"
 msgstr "Autenticación"
 
-#: src/features/auth/components/auth/auth-card.tsx:374
+#: src/features/auth/components/auth/auth-card.tsx:390
 #: src/features/settings/components/chat/native-providers-settings.tsx:575
 msgid "Authentication"
 msgstr "Autenticación"
@@ -4107,7 +4107,7 @@ msgstr "Disponible cuando se guarde la respuesta"
 msgid "Available when the reply finishes"
 msgstr ""
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:426
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:419
 #: src/features/auth/components/settings/account/update-avatar-card.tsx:119
 msgid "Avatar"
 msgstr "Avatar"
@@ -4182,7 +4182,7 @@ msgstr "Volver al editor"
 msgid "Back to Gallery"
 msgstr "Volver a la galería"
 
-#: src/components/settings/settings-modal.tsx:576
+#: src/components/settings/settings-modal.tsx:589
 msgid "Back to settings sections"
 msgstr ""
 
@@ -5057,7 +5057,7 @@ msgstr "Caché"
 msgid "Cache Hit Rate"
 msgstr "Tasa de aciertos de caché"
 
-#: src/components/model-picker/model-picker.tsx:211
+#: src/components/model-picker/model-picker.tsx:212
 #: src/features/chat/thread/message-cost-badge.tsx:56
 msgid "Cached input"
 msgstr "Entrada en caché"
@@ -5320,7 +5320,7 @@ msgstr "Pie de foto"
 msgid "Caption text"
 msgstr "Texto de pie de foto"
 
-#: src/features/chat/thread/composer-input-area.tsx:250
+#: src/features/chat/thread/composer-input-area.tsx:253
 msgid "Capture screen"
 msgstr "Capturar pantalla"
 
@@ -6026,7 +6026,7 @@ msgstr "Clic"
 msgid "Click \"{selector}\""
 msgstr "Clic en \"{selector}\""
 
-#: src/components/model-picker/model-picker.tsx:1180
+#: src/components/model-picker/model-picker.tsx:1186
 msgid "Click ★ on any model in All models to add it here."
 msgstr "Haz clic en ★ en cualquier modelo de Todos los modelos para añadirlo aquí."
 
@@ -6055,11 +6055,11 @@ msgstr "Haz clic en el botón de abajo para registrar una nueva passkey con tu d
 msgid "Click the pin icon on any message to save it here."
 msgstr "Haz clic en el icono de fijar de cualquier mensaje para guardarlo aquí."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:706
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:700
 msgid "Click the star on any model in All models to add it here."
 msgstr "Haz clic en la estrella de cualquier modelo en Todos los modelos para añadirlo aquí."
 
-#: src/features/chat/thread/composer-input.tsx:301
+#: src/features/chat/thread/composer-input.tsx:303
 msgid "Click to edit"
 msgstr "Haz clic para editar"
 
@@ -6861,7 +6861,7 @@ msgstr "Configura los valores de las variables para esta conversación. Estos va
 msgid "Configure Variables"
 msgstr "Configurar variables"
 
-#: src/components/settings/settings-modal.tsx:491
+#: src/components/settings/settings-modal.tsx:504
 msgid "Configure your application settings"
 msgstr "Configura los ajustes de la aplicación"
 
@@ -6870,9 +6870,9 @@ msgstr "Configura los ajustes de la aplicación"
 msgid "Configured"
 msgstr "Configurado"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:768
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:762
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1243
+#: src/components/model-picker/model-picker.tsx:1250
 msgid "Confirm"
 msgstr "Confirmar"
 
@@ -6890,13 +6890,13 @@ msgid "Confirm password"
 msgstr "Confirma la contraseña"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:222
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:587
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:580
 #: src/features/auth/components/settings/security/change-password-card.tsx:324
 msgid "Confirm Password"
 msgstr "Confirmar contraseña"
 
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:40
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:135
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:134
 #: src/features/auth/components/settings/security/change-password-card.tsx:56
 msgid "Confirm password is required"
 msgstr "La confirmación de la contraseña es obligatoria"
@@ -7413,12 +7413,12 @@ msgstr ""
 msgid "Conversations on lines this diff no longer shows"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:750
-#: src/features/chat/thread/composer-input.tsx:1303
+#: src/features/chat/thread/composer-input.tsx:754
+#: src/features/chat/thread/composer-input.tsx:1327
 msgid "Conversion failed"
 msgstr "La conversión falló"
 
-#: src/features/auth/components/anonymous/anonymous-convert-card.tsx:50
+#: src/features/auth/components/anonymous/anonymous-convert-card.tsx:53
 #: src/features/chat/thread/composer-long-text-prompt.tsx:68
 msgid "Convert"
 msgstr "Convertir"
@@ -7448,7 +7448,7 @@ msgstr "Convertir en cuenta completa"
 msgid "Convert to permanent"
 msgstr "Convertir en permanente"
 
-#: src/features/auth/components/anonymous/anonymous-convert-card.tsx:42
+#: src/features/auth/components/anonymous/anonymous-convert-card.tsx:45
 msgid "Convert to save your data"
 msgstr "Convierte tu cuenta para guardar tus datos"
 
@@ -7710,7 +7710,7 @@ msgstr ""
 msgid "Could not apply the changes"
 msgstr "No se pudieron aplicar los cambios"
 
-#: src/features/chat/thread/composer-input.tsx:1325
+#: src/features/chat/thread/composer-input.tsx:1349
 msgid "Could not attach the chat"
 msgstr "No se pudo adjuntar el chat"
 
@@ -7910,7 +7910,7 @@ msgstr "No se pudo previsualizar · Haz clic para descargar"
 msgid "Could not pull {0}: {1}"
 msgstr "No se pudo descargar {0}: {1}"
 
-#: src/features/chat/core/context/chat-context.tsx:655
+#: src/features/chat/core/context/chat-context.tsx:658
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
@@ -7918,11 +7918,11 @@ msgstr ""
 msgid "Could not reach the server. Try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1328
+#: src/features/chat/thread/composer-input.tsx:1352
 msgid "Could not read that chat"
 msgstr "No se pudo leer ese chat"
 
-#: src/features/chat/thread/composer-input.tsx:1329
+#: src/features/chat/thread/composer-input.tsx:1353
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "No se pudo leer ese chat. Si está bloqueado, desbloquéalo primero."
 
@@ -8163,7 +8163,7 @@ msgstr "Crea una etiqueta…"
 msgid "Create a task, give it success criteria, and run it. You can chain tasks with dependencies and repeat them on a schedule."
 msgstr "Crea una tarea, dale criterios de éxito y ejecútala. Puedes encadenar tareas con dependencias y repetirlas según una programación."
 
-#: src/components/settings/settings-modal.tsx:153
+#: src/components/settings/settings-modal.tsx:159
 msgid "Create an account"
 msgstr "Crear una cuenta"
 
@@ -9035,7 +9035,7 @@ msgstr "Modelo predeterminado actualizado"
 msgid "Default Models"
 msgstr "Modelos predeterminados"
 
-#: src/components/model-picker/model-picker.tsx:1133
+#: src/components/model-picker/model-picker.tsx:1139
 msgid "Default order"
 msgstr ""
 
@@ -9165,7 +9165,7 @@ msgstr "Eliminar todo"
 msgid "Delete API Key"
 msgstr "Eliminar clave de API"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:463
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:456
 #: src/features/auth/components/settings/account/update-avatar-card.tsx:144
 msgid "Delete Avatar"
 msgstr "Eliminar avatar"
@@ -9542,7 +9542,7 @@ msgstr "Describe lo que quieres. El creador pregunta si algo no está claro y lu
 msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it, then remove the background'"
 msgstr "Describe tu flujo de trabajo... p. ej., \"Genera una imagen a partir de texto, amplíala y luego quita el fondo\""
 
-#: src/components/model-picker/model-picker.tsx:166
+#: src/components/model-picker/model-picker.tsx:167
 #: src/features/develop/components/pull-request-view.tsx:72
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
@@ -9641,7 +9641,7 @@ msgstr "Determinista, coherente"
 msgid "Develop"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:233
+#: src/components/model-picker/model-picker.tsx:234
 #: src/features/marketing/components/tutorials-page.tsx:131
 msgid "Developer"
 msgstr "Desarrollador"
@@ -9980,7 +9980,7 @@ msgstr "No se repite"
 msgid "Dominican Republic"
 msgstr "República Dominicana"
 
-#: src/features/auth/components/auth/auth-card.tsx:417
+#: src/features/auth/components/auth/auth-card.tsx:433
 msgid "Don't have an account?"
 msgstr "¿No tienes una cuenta?"
 
@@ -10193,7 +10193,7 @@ msgstr "Arrastra archivos aquí"
 msgid "Draw an image"
 msgstr "Dibujar una imagen"
 
-#: src/features/chat/thread/composer-input-area.tsx:244
+#: src/features/chat/thread/composer-input-area.tsx:247
 msgid "Draw image"
 msgstr "Dibujar imagen"
 
@@ -10215,7 +10215,7 @@ msgstr "Suelta un archivo o haz clic para subirlo"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1513
+#: src/features/chat/thread/composer-input.tsx:1537
 msgid "Drop files here"
 msgstr "Suelta archivos aquí"
 
@@ -10491,8 +10491,8 @@ msgstr "Editar colección"
 msgid "Edit comment"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:308
-#: src/features/chat/thread/composer-input.tsx:320
+#: src/features/chat/thread/composer-input.tsx:310
+#: src/features/chat/thread/composer-input.tsx:322
 msgid "Edit content"
 msgstr "Editar contenido"
 
@@ -10754,7 +10754,7 @@ msgid "Efficient reasoning with sparse activation"
 msgstr "Razonamiento eficiente con activación dispersa"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:165
-#: src/components/model-picker/model-picker.tsx:78
+#: src/components/model-picker/model-picker.tsx:79
 msgid "Effort Control"
 msgstr "Control del esfuerzo"
 
@@ -10791,8 +10791,8 @@ msgstr ""
 #: src/features/auth/components/auth/forms/email-otp-form.tsx:232
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:107
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:124
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:78
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:536
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:81
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:529
 #: src/features/auth/components/organization/invite-member-dialog.tsx:108
 msgid "Email"
 msgstr "Correo electrónico"
@@ -10806,7 +10806,7 @@ msgstr "Dirección de correo electrónico"
 msgid "Email banner"
 msgstr "Banner de email"
 
-#: src/features/auth/components/auth/auth-card.tsx:326
+#: src/features/auth/components/auth/auth-card.tsx:335
 msgid "Email Code"
 msgstr "Código por correo"
 
@@ -10823,7 +10823,7 @@ msgstr "Hero de email"
 msgid "Email is the same"
 msgstr "El correo es el mismo"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:75
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:78
 msgid "Email or Username"
 msgstr "Correo o nombre de usuario"
 
@@ -10835,7 +10835,7 @@ msgstr "Correo enviado correctamente"
 msgid "Email updated successfully"
 msgstr "Correo actualizado correctamente"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:328
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:327
 msgid "Email verification sent"
 msgstr "Correo de verificación enviado"
 
@@ -11224,8 +11224,8 @@ msgstr "Introduce aquí tu prompt de sistema personalizado. Se usará en cada me
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:188
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:118
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:135
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:90
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:547
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:93
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:540
 msgid "Enter your email"
 msgstr "Introduce tu correo"
 
@@ -11234,23 +11234,23 @@ msgstr "Introduce tu correo"
 msgid "Enter your email address"
 msgstr "Introduce tu dirección de correo"
 
-#: src/features/auth/components/auth/auth-card.tsx:355
+#: src/features/auth/components/auth/auth-card.tsx:364
 msgid "Enter your email below to login to your account"
 msgstr "Introduce tu correo para iniciar sesión en tu cuenta"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:87
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:90
 msgid "Enter your email or username"
 msgstr "Introduce tu correo o nombre de usuario"
 
-#: src/features/auth/components/auth/auth-card.tsx:325
+#: src/features/auth/components/auth/auth-card.tsx:334
 msgid "Enter your email to receive a code"
 msgstr "Introduce tu correo para recibir un código"
 
-#: src/features/auth/components/auth/auth-card.tsx:337
+#: src/features/auth/components/auth/auth-card.tsx:346
 msgid "Enter your email to receive a magic link"
 msgstr "Introduce tu correo para recibir un enlace mágico"
 
-#: src/features/auth/components/auth/auth-card.tsx:331
+#: src/features/auth/components/auth/auth-card.tsx:340
 msgid "Enter your email to reset your password"
 msgstr "Introduce tu correo para restablecer tu contraseña"
 
@@ -11258,7 +11258,7 @@ msgstr "Introduce tu correo para restablecer tu contraseña"
 msgid "Enter your full name or display name"
 msgstr "Introduce tu nombre completo o el nombre visible"
 
-#: src/features/auth/components/auth/auth-card.tsx:361
+#: src/features/auth/components/auth/auth-card.tsx:377
 msgid "Enter your information to create an account"
 msgstr "Introduce tus datos para crear una cuenta"
 
@@ -11266,7 +11266,7 @@ msgstr "Introduce tus datos para crear una cuenta"
 msgid "Enter your location"
 msgstr "Introduce tu ubicación"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:496
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:489
 #: src/features/auth/components/settings/account/update-name-card.tsx:25
 msgid "Enter your name"
 msgstr "Introduce tu nombre"
@@ -11275,7 +11275,7 @@ msgstr "Introduce tu nombre"
 msgid "Enter your new email address below"
 msgstr "Introduce tu nueva dirección de correo"
 
-#: src/features/auth/components/auth/auth-card.tsx:349
+#: src/features/auth/components/auth/auth-card.tsx:358
 msgid "Enter your new password below"
 msgstr "Introduce tu nueva contraseña"
 
@@ -11284,13 +11284,13 @@ msgid "Enter your nickname"
 msgstr "Introduce tu apodo"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:210
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:292
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:573
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:349
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:566
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:157
 msgid "Enter your password"
 msgstr "Introduce tu contraseña"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:599
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:592
 msgid "Enter your password again"
 msgstr "Vuelve a introducir tu contraseña"
 
@@ -11314,8 +11314,8 @@ msgstr "Escribe aquí el contenido de tu prompt... Usa {VARIABLE_PLACEHOLDER} pa
 msgid "Enter your title instructions..."
 msgstr ""
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:83
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:522
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:86
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:515
 #: src/features/auth/components/settings/account/update-username-card.tsx:30
 msgid "Enter your username"
 msgstr "Introduce tu nombre de usuario"
@@ -11988,7 +11988,7 @@ msgstr "duración ampliada"
 msgid "extended thinking"
 msgstr "razonamiento extendido"
 
-#: src/components/model-picker/model-picker.tsx:82
+#: src/components/model-picker/model-picker.tsx:83
 msgid "Extended Thinking"
 msgstr "Razonamiento extendido"
 
@@ -12128,7 +12128,7 @@ msgid "Failed to attach collection"
 msgstr "No se pudo adjuntar la colección"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1165
+#: src/features/chat/thread/composer-input.tsx:1189
 msgid "Failed to attach file"
 msgstr "No se pudo adjuntar el archivo"
 
@@ -12525,7 +12525,7 @@ msgstr "No se pudo solicitar la exportación"
 msgid "Failed to reset to defaults"
 msgstr "No se pudieron restablecer los valores predeterminados"
 
-#: src/features/chat/thread/composer-input.tsx:1197
+#: src/features/chat/thread/composer-input.tsx:1221
 msgid "Failed to restore attachment"
 msgstr "No se pudo restaurar el adjunto"
 
@@ -12815,7 +12815,7 @@ msgstr "No se pudo actualizar el disparador"
 msgid "Failed to update user role"
 msgstr "No se pudo actualizar el rol del usuario"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:377
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:370
 msgid "Failed to upload avatar"
 msgstr "No se pudo subir el avatar"
 
@@ -12912,7 +12912,7 @@ msgid "fast"
 msgstr "rápido"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:153
-#: src/components/model-picker/model-picker.tsx:79
+#: src/components/model-picker/model-picker.tsx:80
 #: src/features/marketing/components/model-detail-page.tsx:33
 #: src/features/settings/components/chat/models-settings.tsx:30
 msgid "Fast"
@@ -13202,7 +13202,7 @@ msgstr "Destacados"
 msgid "Featured image"
 msgstr "Imagen destacada"
 
-#: src/components/model-picker/model-picker.tsx:178
+#: src/components/model-picker/model-picker.tsx:179
 #: src/features/marketing/components/gateway-footer.tsx:32
 #: src/features/marketing/components/gateway-landing-page.tsx:508
 #: src/features/marketing/components/gateway-navbar.tsx:53
@@ -13378,11 +13378,11 @@ msgstr "Cineastas que crean videos cinematográficos con un fuerte enfoque en la
 msgid "Filter by action"
 msgstr "Filtrar por acción"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:605
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:599
 msgid "Filter by mode"
 msgstr "Filtrar por modo"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:676
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:670
 msgid "Filter by provider"
 msgstr "Filtrar por proveedor"
 
@@ -13703,13 +13703,13 @@ msgstr ""
 msgid "Forgot authenticator"
 msgstr "¿No tienes acceso al autenticador?"
 
-#: src/features/auth/components/auth/auth-card.tsx:332
+#: src/features/auth/components/auth/auth-card.tsx:341
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:134
 #: src/routes/auth/forgot-password.tsx:17
 msgid "Forgot Password"
 msgstr "Contraseña olvidada"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:280
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:337
 msgid "Forgot password?"
 msgstr "¿Olvidaste tu contraseña?"
 
@@ -14486,7 +14486,7 @@ msgid "Global analyst research, market analysis, and investment data"
 msgstr "Investigación de analistas globales, análisis de mercado y datos de inversión"
 
 #: ../../packages/chat-ui/src/chat/chat-view.tsx:96
-#: src/features/auth/components/auth/auth-card.tsx:476
+#: src/features/auth/components/auth/auth-card.tsx:494
 msgid "Go back"
 msgstr "Volver"
 
@@ -14966,7 +14966,7 @@ msgstr "Guatemala"
 msgid "Guest"
 msgstr "Invitado"
 
-#: src/features/auth/components/anonymous/anonymous-convert-card.tsx:41
+#: src/features/auth/components/anonymous/anonymous-convert-card.tsx:44
 msgid "Guest Account"
 msgstr "Cuenta de invitado"
 
@@ -14978,7 +14978,7 @@ msgstr "Cuentas de invitado"
 msgid "Guest accounts use free models only."
 msgstr "Las cuentas de invitado solo usan modelos gratuitos."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:524
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:518
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "Las cuentas de invitado solo usan modelos gratuitos. Regístrate para desbloquear todos los modelos."
 
@@ -15130,7 +15130,7 @@ msgstr ""
 msgid "Hidden in Model Picker"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1157
+#: src/components/model-picker/model-picker.tsx:1163
 msgid "Hide {name} from model picker"
 msgstr ""
 
@@ -15619,12 +15619,12 @@ msgstr "ilustración"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
 #: ../../packages/chat-ui/src/chat/message-content.tsx:403
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:642
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:636
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: src/components/model-picker/model-picker.tsx:1096
+#: src/components/model-picker/model-picker.tsx:1102
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:121
 #: src/features/marketing/components/landing-footer.tsx:165
@@ -15666,7 +15666,7 @@ msgstr "Imagen adjunta (oculta)"
 msgid "image editing"
 msgstr "edición de imágenes"
 
-#: src/components/model-picker/model-picker.tsx:80
+#: src/components/model-picker/model-picker.tsx:81
 #: src/features/settings/components/chat/models-settings.tsx:34
 msgid "Image Gen"
 msgstr "Generación de imágenes"
@@ -16173,7 +16173,7 @@ msgid "inpainting"
 msgstr "inpainting"
 
 #: ../../packages/ui/src/components/ai-elements/context.tsx:237
-#: src/components/model-picker/model-picker.tsx:201
+#: src/components/model-picker/model-picker.tsx:202
 #: src/features/devices/components/device-tool-call.tsx:168
 #: src/features/evals/components/case-fields.tsx:69
 #: src/features/evals/components/dataset-panel.tsx:144
@@ -16330,11 +16330,11 @@ msgstr "Modelo de vídeo inteligente que piensa antes de generar"
 msgid "Intensity"
 msgstr "Intensidad"
 
-#: src/features/chat/thread/composer-input-area.tsx:336
+#: src/features/chat/thread/composer-input-area.tsx:340
 msgid "Interrupt and restart"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:352
+#: src/features/chat/thread/composer-input-area.tsx:356
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr ""
 
@@ -16377,9 +16377,9 @@ msgstr "Callback de OAuth no válido"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:77
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:57
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:83
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:138
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:123
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:152
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:141
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:122
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:151
 #: src/features/auth/components/settings/security/change-password-card.tsx:73
 #: src/features/auth/components/settings/security/change-password-card.tsx:99
 #: src/features/auth/components/settings/security/change-password-card.tsx:124
@@ -17890,7 +17890,7 @@ msgstr ""
 #: src/features/settings/components/chat/trigger-settings.tsx:958
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
-#: src/routes/_shortcut.tsx:40
+#: src/routes/_shortcut.tsx:16
 msgid "Loading..."
 msgstr "Cargando..."
 
@@ -17908,7 +17908,7 @@ msgstr "Cargando…"
 msgid "local"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:691
+#: src/features/chat/core/context/chat-context.tsx:706
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "Los modelos locales solo admiten texto. Quita los adjuntos para enviar."
 
@@ -17964,11 +17964,11 @@ msgid "Locked chat"
 msgstr ""
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1226
+#: src/components/model-picker/model-picker.tsx:1233
 msgid "Locked to {0} models"
 msgstr "Limitado a modelos de {0}"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:750
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
 msgid "Locked to {anchorModeName} models"
 msgstr "Limitado a modelos de {anchorModeName}"
 
@@ -17980,7 +17980,8 @@ msgstr "Registro"
 msgid "Log out"
 msgstr "Cerrar sesión"
 
-#: src/features/auth/components/auth/login-modal.tsx:40
+#: src/features/auth/components/auth/login-modal.tsx:46
+#: src/features/chat/signed-out/signed-out-chat.tsx:94
 #: src/features/layout/components/app-sidebar.tsx:54
 #: src/features/layout/components/app-sidebar.tsx:67
 #: src/features/marketing/components/gateway-navbar.tsx:87
@@ -18050,7 +18051,7 @@ msgstr "Texto largo detectado"
 msgid "Long text generation in images"
 msgstr "Generación de textos largos en imágenes"
 
-#: src/features/chat/thread/composer-input.tsx:808
+#: src/features/chat/thread/composer-input.tsx:812
 msgid "Long text was attached as a file."
 msgstr ""
 
@@ -18181,7 +18182,7 @@ msgstr "Macro teleobjetivo, encuadre cerrado"
 msgid "Madrid"
 msgstr "Madrid"
 
-#: src/features/auth/components/auth/auth-card.tsx:338
+#: src/features/auth/components/auth/auth-card.tsx:347
 msgid "Magic Link"
 msgstr "Enlace mágico"
 
@@ -18472,8 +18473,8 @@ msgstr "Tamaño máx.: {size}"
 msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "Tamaño máx.: {size} • Máx. {maxFiles} archivos"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:745
-#: src/components/model-picker/model-picker.tsx:1220
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:739
+#: src/components/model-picker/model-picker.tsx:1227
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "Se alcanzó el máximo de {MAX_PARALLEL} modelos"
 
@@ -19160,7 +19161,7 @@ msgstr "Modelo activado"
 msgid "Model filter"
 msgstr "Filtro de modelos"
 
-#: src/components/model-picker/model-picker.tsx:390
+#: src/components/model-picker/model-picker.tsx:391
 msgid "Model info"
 msgstr "Información del modelo"
 
@@ -19177,7 +19178,7 @@ msgstr "Restricciones de modelos"
 msgid "Model server"
 msgstr "Servidor de modelos"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:533
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:527
 msgid "Model tabs"
 msgstr "Pestañas de modelos"
 
@@ -19459,11 +19460,11 @@ msgstr "Bajar {0}"
 msgid "Move {0} up"
 msgstr "Subir {0}"
 
-#: src/components/model-picker/model-picker.tsx:373
+#: src/components/model-picker/model-picker.tsx:374
 msgid "Move {label} down in starred"
 msgstr "Bajar {label} en destacados"
 
-#: src/components/model-picker/model-picker.tsx:358
+#: src/components/model-picker/model-picker.tsx:359
 msgid "Move {label} up in starred"
 msgstr "Subir {label} en destacados"
 
@@ -19666,7 +19667,7 @@ msgstr ""
 msgid "name"
 msgstr ""
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:485
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:478
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
 #: src/features/devices/components/devices-settings.tsx:351
@@ -19689,7 +19690,7 @@ msgstr ""
 msgid "Name"
 msgstr "Nombre"
 
-#: src/components/model-picker/model-picker.tsx:1134
+#: src/components/model-picker/model-picker.tsx:1140
 msgid "Name (A to Z)"
 msgstr ""
 
@@ -19697,7 +19698,7 @@ msgstr ""
 msgid "Name and prompt are required"
 msgstr "El nombre y el prompt son obligatorios"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:164
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:163
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:46
 #: src/features/evals/components/dataset-form-dialog.tsx:42
 #: src/features/prompts/components/prompt-form-dialog.tsx:170
@@ -19882,6 +19883,7 @@ msgstr "neore"
 msgid "Neore"
 msgstr "Neore"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:75
 #: src/features/layout/components/sidebar-shortcut.tsx:238
 #: src/features/marketing/components/navbar-menu.tsx:44
 msgid "Neore - AI Text & Video & Audio & Image & Documents Generation Platform"
@@ -19891,6 +19893,7 @@ msgstr "Neore - Plataforma de generación de texto, video, audio, imágenes y do
 msgid "Neore (timestamped)"
 msgstr ""
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:48
 #: src/features/chat/thread/composer.tsx:652
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore puede cometer errores. Verifica la información importante."
@@ -20020,7 +20023,7 @@ msgid "Never used"
 msgstr "Nunca usada"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:146
-#: src/components/model-picker/model-picker.tsx:327
+#: src/components/model-picker/model-picker.tsx:328
 #: src/features/settings/components/chat/models-settings.tsx:43
 #: src/features/settings/components/chat/models-settings.tsx:568
 msgid "New"
@@ -20055,6 +20058,7 @@ msgstr "Nuevo chat"
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:46
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
 #: src/features/chat/header/chat-header.tsx:30
+#: src/features/chat/signed-out/signed-out-chat.tsx:102
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:239
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:115
 #: src/features/settings/lib/settings-keywords.ts:37
@@ -20087,7 +20091,7 @@ msgstr "Nuevo conjunto de datos"
 msgid "New Export"
 msgstr "Nueva exportación"
 
-#: src/components/model-picker/model-picker.tsx:1135
+#: src/components/model-picker/model-picker.tsx:1141
 msgid "New first"
 msgstr ""
 
@@ -20624,8 +20628,8 @@ msgstr "No hay modelos disponibles"
 msgid "No models found matching your filters."
 msgstr "No se encontraron modelos que coincidan con tus filtros."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:712
-#: src/components/model-picker/model-picker.tsx:1186
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:706
+#: src/components/model-picker/model-picker.tsx:1192
 msgid "No models found."
 msgstr "No se encontraron modelos."
 
@@ -20837,8 +20841,8 @@ msgstr "Sin ordenación aplicada"
 msgid "No speech detected. Hands-free mode stopped."
 msgstr "No se detectó voz. Modo manos libres detenido."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:704
-#: src/components/model-picker/model-picker.tsx:1178
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:698
+#: src/components/model-picker/model-picker.tsx:1184
 msgid "No starred models"
 msgstr "No hay modelos destacados"
 
@@ -21503,7 +21507,7 @@ msgid "Online"
 msgstr "En línea"
 
 #. placeholder {0}: getModelModeName(anchorMode!)
-#: src/components/model-picker/model-picker.tsx:484
+#: src/components/model-picker/model-picker.tsx:488
 msgid "Only {0} models can be compared. Clear selection to switch types."
 msgstr "Solo se pueden comparar modelos de {0}. Borra la selección para cambiar de tipo."
 
@@ -22110,11 +22114,11 @@ msgstr "El LLM más pequeño de OpenAI"
 msgid "OpenAI's smallest model for maximum speed"
 msgstr "El modelo más pequeño de OpenAI para la máxima velocidad"
 
-#: src/components/settings/settings-modal.tsx:326
+#: src/components/settings/settings-modal.tsx:339
 msgid "Opened {tabLabel}"
 msgstr ""
 
-#: src/components/settings/settings-modal.tsx:326
+#: src/components/settings/settings-modal.tsx:339
 msgid "Opened {tabLabel}: {label}"
 msgstr ""
 
@@ -22281,7 +22285,7 @@ msgstr "o haz clic para explorar"
 msgid "Or connect a Text node to provide the prompt"
 msgstr "O conecta un nodo de texto para proporcionar el prompt"
 
-#: src/features/auth/components/auth/auth-card.tsx:216
+#: src/features/auth/components/auth/auth-card.tsx:217
 msgid "or continue with"
 msgstr "o continúa con"
 
@@ -22452,7 +22456,7 @@ msgstr "Outpaint"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:547
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
-#: src/components/model-picker/model-picker.tsx:205
+#: src/components/model-picker/model-picker.tsx:206
 #: src/features/devices/components/device-tool-call.tsx:174
 #: src/features/workflow/components/nodes/output-node.tsx:52
 #: src/features/workflow/types/index.ts:584
@@ -22647,8 +22651,8 @@ msgstr ""
 msgid "Paraguay"
 msgstr "Paraguay"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:596
-#: src/components/model-picker/model-picker.tsx:1048
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:590
+#: src/components/model-picker/model-picker.tsx:1054
 msgid "Parallel"
 msgstr "En paralelo"
 
@@ -22739,8 +22743,8 @@ msgstr "Las passkeys te permiten iniciar sesión de forma segura con la autentic
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:84
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:201
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:273
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:561
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:330
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
 msgid "Password"
 msgstr "Contraseña"
@@ -22750,8 +22754,8 @@ msgid "Password changed successfully"
 msgstr "Contraseña cambiada correctamente"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:60
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:121
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:106
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:124
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:105
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:42
 msgid "Password is required"
 msgstr "La contraseña es obligatoria"
@@ -22759,9 +22763,9 @@ msgstr "La contraseña es obligatoria"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:71
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:51
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:77
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:132
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:117
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:146
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:135
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:116
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:145
 #: src/features/auth/components/settings/security/change-password-card.tsx:67
 #: src/features/auth/components/settings/security/change-password-card.tsx:93
 #: src/features/auth/components/settings/security/change-password-card.tsx:118
@@ -22771,9 +22775,9 @@ msgstr "La contraseña es demasiado larga"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:65
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:45
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:71
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:126
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:111
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:140
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:129
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:110
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:139
 #: src/features/auth/components/settings/security/change-password-card.tsx:61
 #: src/features/auth/components/settings/security/change-password-card.tsx:87
 #: src/features/auth/components/settings/security/change-password-card.tsx:112
@@ -22790,7 +22794,7 @@ msgstr "Contraseña restablecida correctamente"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:84
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:91
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:238
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:237
 #: src/features/auth/components/settings/security/change-password-card.tsx:132
 msgid "Passwords do not match"
 msgstr "Las contraseñas no coinciden"
@@ -22902,7 +22906,7 @@ msgstr "Pagos, pedidos, facturas y suscripciones mediante PayPal"
 msgid "Payments, subscriptions, and financial data"
 msgstr "Pagos, suscripciones y datos financieros"
 
-#: src/components/model-picker/model-picker.tsx:81
+#: src/components/model-picker/model-picker.tsx:82
 #: src/features/settings/components/chat/models-settings.tsx:35
 msgid "PDF"
 msgstr "PDF"
@@ -23239,7 +23243,7 @@ msgstr "Reproducir"
 msgid "Play a short sound when a reply finishes. Applies to this browser only."
 msgstr "Reproducir un sonido breve cuando termina una respuesta. Solo se aplica a este navegador."
 
-#: src/features/auth/components/auth/auth-card.tsx:373
+#: src/features/auth/components/auth/auth-card.tsx:389
 msgid "Please authenticate to continue"
 msgstr "Autentícate para continuar"
 
@@ -23251,7 +23255,7 @@ msgstr "Revisa tu correo y haz clic en el enlace de verificación"
 msgid "Please confirm your password"
 msgstr "Confirma tu contraseña"
 
-#: src/features/auth/components/auth/auth-card.tsx:343
+#: src/features/auth/components/auth/auth-card.tsx:352
 msgid "Please enter a backup code to access your account"
 msgstr "Introduce un código de respaldo para acceder a tu cuenta"
 
@@ -23259,7 +23263,7 @@ msgstr "Introduce un código de respaldo para acceder a tu cuenta"
 msgid "Please enter an email address"
 msgstr "Introduce una dirección de correo electrónico"
 
-#: src/features/auth/components/auth/auth-card.tsx:367
+#: src/features/auth/components/auth/auth-card.tsx:383
 msgid "Please enter your one-time password to continue"
 msgstr "Introduce tu contraseña de un solo uso para continuar"
 
@@ -23757,15 +23761,15 @@ msgstr "Diapositiva anterior"
 msgid "Previous version"
 msgstr "Versión anterior"
 
-#: src/components/model-picker/model-picker.tsx:197
+#: src/components/model-picker/model-picker.tsx:198
 msgid "Price per 1M tokens"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1137
+#: src/components/model-picker/model-picker.tsx:1143
 msgid "Price: high to low"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1136
+#: src/components/model-picker/model-picker.tsx:1142
 msgid "Price: low to high"
 msgstr ""
 
@@ -23845,7 +23849,7 @@ msgid "Private by default"
 msgstr "Privado por defecto"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:141
-#: src/components/model-picker/model-picker.tsx:314
+#: src/components/model-picker/model-picker.tsx:315
 #: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:130
 #: src/features/marketing/components/landing-page.tsx:344
@@ -24204,7 +24208,7 @@ msgstr "Estética cinematográfica probada"
 msgid "Proven reliability from previous generation"
 msgstr "Fiabilidad probada de la generación anterior"
 
-#: src/components/model-picker/model-picker.tsx:227
+#: src/components/model-picker/model-picker.tsx:228
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -24387,11 +24391,11 @@ msgstr "Consulta las analíticas de uso y los costes"
 msgid "Question"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:363
+#: src/features/chat/thread/composer-input-area.tsx:367
 msgid "Queue message"
 msgstr "Poner mensaje en cola"
 
-#: src/features/chat/thread/composer-input-area.tsx:382
+#: src/features/chat/thread/composer-input-area.tsx:386
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Poner mensaje en cola: se envía cuando termine la respuesta actual"
 
@@ -24659,7 +24663,7 @@ msgstr "Vista previa de solo lectura: bifurca para editar"
 msgid "Read-only shared conversation"
 msgstr "Conversación compartida de solo lectura"
 
-#: src/features/chat/thread/composer-input.tsx:265
+#: src/features/chat/thread/composer-input.tsx:267
 msgid "Reading \"{attachmentName}\"…"
 msgstr "Leyendo «{attachmentName}»…"
 
@@ -24928,7 +24932,7 @@ msgstr "Grabando la entrada de voz"
 msgid "Recover account"
 msgstr "Recuperar cuenta"
 
-#: src/features/auth/components/auth/auth-card.tsx:344
+#: src/features/auth/components/auth/auth-card.tsx:353
 msgid "Recover Account"
 msgstr "Recuperar cuenta"
 
@@ -25119,6 +25123,10 @@ msgstr "Restricciones de región"
 msgid "Register it with Telegram's setWebhook, passing your webhook secret as secret_token."
 msgstr "Regístrala con setWebhook de Telegram y pasa tu webhook secret como secret_token."
 
+#: src/features/auth/components/auth/auth-card.tsx:371
+msgid "Registration is by invitation only. Open the link from your invitation, or sign in if you already have an account."
+msgstr "El registro es solo por invitación. Abre el enlace de tu invitación o inicia sesión si ya tienes una cuenta."
+
 #: src/features/evals/components/run-comparison.tsx:55
 msgid "Regressed"
 msgstr "Empeorado"
@@ -25240,7 +25248,7 @@ msgstr "Recargar la otra versión"
 msgid "remember"
 msgstr ""
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:314
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:371
 msgid "Remember me"
 msgstr "Recordarme"
 
@@ -25248,10 +25256,10 @@ msgstr "Recordarme"
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:327
-#: src/features/chat/thread/composer-input.tsx:339
-#: src/features/chat/thread/composer-input.tsx:393
-#: src/features/chat/thread/composer-input.tsx:402
+#: src/features/chat/thread/composer-input.tsx:329
+#: src/features/chat/thread/composer-input.tsx:341
+#: src/features/chat/thread/composer-input.tsx:395
+#: src/features/chat/thread/composer-input.tsx:404
 #: src/features/devices/components/devices-settings.tsx:206
 #: src/features/devices/components/devices-settings.tsx:212
 #: src/features/projects/components/project-form-dialog.tsx:263
@@ -25382,7 +25390,7 @@ msgid "Remove from project"
 msgstr "Quitar del proyecto"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:168
-#: src/components/model-picker/model-picker.tsx:341
+#: src/components/model-picker/model-picker.tsx:342
 msgid "Remove from starred"
 msgstr "Quitar de destacados"
 
@@ -25602,7 +25610,7 @@ msgstr "Responder"
 msgid "Reply complete"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:622
+#: src/features/chat/core/context/chat-context.tsx:625
 msgid "Reply ready"
 msgstr "Respuesta lista"
 
@@ -25676,7 +25684,7 @@ msgstr "Faltan variables obligatorias"
 msgid "Required."
 msgstr "Obligatorio."
 
-#: src/components/settings/settings-modal.tsx:147
+#: src/components/settings/settings-modal.tsx:150
 msgid "requires an account"
 msgstr "requiere una cuenta"
 
@@ -25749,7 +25757,7 @@ msgstr ""
 msgid "Reset password"
 msgstr "Restablecer contraseña"
 
-#: src/features/auth/components/auth/auth-card.tsx:350
+#: src/features/auth/components/auth/auth-card.tsx:359
 #: src/routes/auth/reset-password.tsx:13
 msgid "Reset Password"
 msgstr "Restablecer contraseña"
@@ -25952,11 +25960,11 @@ msgstr "Reintentar en {retryAfterMinutes} min"
 msgid "Retry now"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:416
+#: src/features/chat/thread/composer-input.tsx:418
 msgid "Retry upload"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:411
+#: src/features/chat/thread/composer-input.tsx:413
 msgid "Retry upload of {attachmentName}"
 msgstr ""
 
@@ -26679,7 +26687,7 @@ msgstr "Puntuación"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Puntúa cada respuesta de 0 a 100 % según la respuesta esperada o la rúbrica. Añade una pequeña llamada a un modelo por caso."
 
-#: src/features/chat/thread/composer-input.tsx:1124
+#: src/features/chat/thread/composer-input.tsx:1148
 msgid "Screen capture failed. Please try again."
 msgstr "No se pudo capturar la pantalla. Inténtalo de nuevo."
 
@@ -26829,8 +26837,8 @@ msgstr ""
 msgid "Search models by name, ID, or provider..."
 msgstr "Busca modelos por nombre, ID o proveedor..."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:529
-#: src/components/model-picker/model-picker.tsx:989
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:523
+#: src/components/model-picker/model-picker.tsx:995
 msgid "Search models..."
 msgstr "Buscar modelos..."
 
@@ -27267,7 +27275,7 @@ msgstr ""
 msgid "Selection context"
 msgstr "Contexto de la selección"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:571
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:565
 msgid "Selection mode"
 msgstr "Modo de selección"
 
@@ -27308,6 +27316,10 @@ msgstr "Envía un mensaje abajo para empezar"
 msgid "Send a message to begin"
 msgstr "Envía un mensaje para empezar"
 
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:390
+msgid "Send a new verification link"
+msgstr ""
+
 #: src/features/chat/thread/ask-user-prompt.tsx:187
 msgid "Send answer"
 msgstr "Enviar respuesta"
@@ -27334,12 +27346,12 @@ msgid "Send Magic Link"
 msgstr "Enviar enlace mágico"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:168
-#: src/features/chat/thread/composer-input-area.tsx:176
-#: src/features/chat/thread/composer-input-area.tsx:417
+#: src/features/chat/thread/composer-input-area.tsx:179
+#: src/features/chat/thread/composer-input-area.tsx:421
 msgid "Send message"
 msgstr "Enviar mensaje"
 
-#: src/features/chat/thread/composer-input-area.tsx:176
+#: src/features/chat/thread/composer-input-area.tsx:179
 msgid "Send message ({sendShortcut})"
 msgstr ""
 
@@ -27547,8 +27559,8 @@ msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in resp
 msgstr "Configura disparadores para automatizar tareas de forma programada, mediante webhooks o en respuesta a eventos."
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:255
-#: src/components/settings/settings-modal.tsx:391
-#: src/components/settings/settings-modal.tsx:489
+#: src/components/settings/settings-modal.tsx:404
+#: src/components/settings/settings-modal.tsx:502
 #: src/features/layout/components/mobile-section-nav.tsx:59
 #: src/features/layout/lib/dashboard-page-names.ts:38
 msgid "Settings"
@@ -27890,8 +27902,9 @@ msgstr "Barra lateral derecha"
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:43
 #: src/components/not-found.tsx:12
-#: src/features/auth/components/auth/auth-card.tsx:472
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:325
+#: src/components/settings/settings-modal.tsx:163
+#: src/features/auth/components/auth/auth-card.tsx:490
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:382
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
 #: src/routes/auth/extension.tsx:78
@@ -27929,6 +27942,10 @@ msgstr ""
 msgid "Sign in to fork this workflow"
 msgstr "Inicia sesión para bifurcar este flujo de trabajo"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:82
+msgid "Sign in to see your chats."
+msgstr "Inicia sesión para ver tus chats."
+
 #: src/features/develop/components/watched-repositories.tsx:66
 msgid "Sign in to the host again to keep this fresh."
 msgstr ""
@@ -27937,9 +27954,21 @@ msgstr ""
 msgid "Sign in to the Neore desktop app"
 msgstr "Inicia sesión en la app de escritorio de Neore"
 
-#: src/features/auth/components/auth/login-modal.tsx:41
+#: src/components/model-picker/model-picker.tsx:485
+msgid "Sign in to unlock all models"
+msgstr "Inicia sesión para desbloquear todos los modelos"
+
+#: src/components/model-picker/model-picker.tsx:989
+msgid "Sign in to unlock all models."
+msgstr "Inicia sesión para desbloquear todos los modelos."
+
+#: src/features/auth/components/auth/login-modal.tsx:47
 msgid "Sign in to your account"
 msgstr "Inicia sesión en tu cuenta"
+
+#: src/components/settings/settings-modal.tsx:153
+msgid "Sign in to your account to use it."
+msgstr "Inicia sesión con tu cuenta para usarlo."
 
 #. placeholder {0}: provider.name
 #: src/features/auth/components/auth/provider-button.tsx:117
@@ -27975,28 +28004,28 @@ msgstr "Cerrar sesión"
 msgid "Sign out of {0}"
 msgstr "Cerrar sesión en {0}"
 
-#: src/features/auth/components/auth/auth-card.tsx:472
+#: src/features/auth/components/auth/auth-card.tsx:490
 #: src/features/marketing/components/landing-page.tsx:331
 #: src/features/marketing/components/landing-page.tsx:349
 msgid "Sign up"
 msgstr "Regístrate"
 
-#: src/features/auth/components/auth/auth-card.tsx:362
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:685
+#: src/features/auth/components/auth/auth-card.tsx:378
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:678
 #: src/routes/auth/sign-up.tsx:26
 msgid "Sign Up"
 msgstr "Registrarse"
 
-#: src/components/settings/settings-modal.tsx:149
+#: src/components/settings/settings-modal.tsx:153
 msgid "Sign up and subscribe for $8/mo to unlock all features."
 msgstr "Regístrate y suscríbete por 8 $/mes para desbloquear todas las funciones."
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:333
-msgid "Sign up successful"
-msgstr "Registro completado"
+#~ msgid "Sign up successful"
+#~ msgstr "Registro completado"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:247
-#: src/components/model-picker/model-picker.tsx:481
+#: src/components/model-picker/model-picker.tsx:485
 msgid "Sign up to unlock all models"
 msgstr "Regístrate para desbloquear todos los modelos"
 
@@ -28007,6 +28036,10 @@ msgstr "La sesión ha caducado"
 #: src/features/layout/components/nav-user.tsx:292
 msgid "Sign-out failed. Please try again."
 msgstr "Error al cerrar sesión. Inténtalo de nuevo."
+
+#: src/features/auth/components/auth/auth-card.tsx:372
+msgid "Sign-up needs an invitation"
+msgstr "El registro requiere una invitación"
 
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:267
 msgid "Signature"
@@ -28065,8 +28098,8 @@ msgstr "sustituido desde entonces"
 msgid "Singapore"
 msgstr "Singapur"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:583
-#: src/components/model-picker/model-picker.tsx:1036
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:577
+#: src/components/model-picker/model-picker.tsx:1042
 msgid "Single"
 msgstr "Individual"
 
@@ -28396,7 +28429,7 @@ msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "Algunos pasos no tenían datos de precio; el total es un mínimo."
 
 #: src/components/error-boundary.tsx:51
-#: src/components/settings/settings-modal.tsx:126
+#: src/components/settings/settings-modal.tsx:127
 #: src/features/pages/components/page-share-dialog.tsx:50
 msgid "Something went wrong"
 msgstr "Algo salió mal"
@@ -28439,7 +28472,7 @@ msgstr "Ordenar datos"
 msgid "Sort desc"
 msgstr "Orden desc."
 
-#: src/components/model-picker/model-picker.tsx:1127
+#: src/components/model-picker/model-picker.tsx:1133
 msgid "Sort models"
 msgstr ""
 
@@ -28788,8 +28821,8 @@ msgstr ""
 msgid "starred"
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:548
-#: src/components/model-picker/model-picker.tsx:1005
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:542
+#: src/components/model-picker/model-picker.tsx:1011
 msgid "Starred"
 msgstr "Destacados"
 
@@ -29026,11 +29059,11 @@ msgstr "Estado"
 msgid "Status Page"
 msgstr "Página de estado"
 
-#: src/features/chat/thread/composer-input-area.tsx:353
+#: src/features/chat/thread/composer-input-area.tsx:357
 msgid "Steer — the current reply reads this at its next step"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:336
+#: src/features/chat/thread/composer-input-area.tsx:340
 msgid "Steer the reply"
 msgstr ""
 
@@ -29107,8 +29140,8 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:554
 #: src/features/chat/thread-list/thread-node.tsx:576
-#: src/features/chat/thread/composer-input-area.tsx:390
-#: src/features/chat/thread/composer-input-area.tsx:403
+#: src/features/chat/thread/composer-input-area.tsx:394
+#: src/features/chat/thread/composer-input-area.tsx:407
 msgid "Stop generating"
 msgstr "Detener la generación"
 
@@ -29596,7 +29629,7 @@ msgstr ""
 msgid "Submitting…"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:984
+#: src/components/model-picker/model-picker.tsx:985
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "Suscríbete por 8 $/mes para desbloquear todos los modelos."
 
@@ -29644,7 +29677,7 @@ msgstr "Sugeridos"
 msgid "Suggested answers"
 msgstr "Respuestas sugeridas"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:462
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:474
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Sugerencia disponible, pulsa Flecha derecha para aceptarla"
 
@@ -30315,10 +30348,10 @@ msgstr "pruebas"
 msgid "text"
 msgstr "texto"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:630
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:624
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:1083
+#: src/components/model-picker/model-picker.tsx:1089
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:120
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -30371,7 +30404,7 @@ msgstr "Dirección del texto establecida en LTR"
 msgid "Text direction set to RTL"
 msgstr "Dirección del texto establecida en RTL"
 
-#: src/features/chat/thread/composer-input.tsx:301
+#: src/features/chat/thread/composer-input.tsx:303
 msgid "Text document"
 msgstr "Documento de texto"
 
@@ -30961,7 +30994,7 @@ msgstr "La página muestra ahora la otra versión. Copia lo que quieras conserva
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "Se eliminan la página, todas sus subpáginas, sus comentarios y su historial de versiones. No se puede deshacer."
 
-#: src/features/chat/thread/composer-input.tsx:886
+#: src/features/chat/thread/composer-input.tsx:890
 msgid "The pasted text could not be attached and was not inserted."
 msgstr ""
 
@@ -31073,7 +31106,7 @@ msgstr ""
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "El gateway de LLM unificado para aplicaciones de IA modernas."
 
-#: src/features/chat/thread/composer-input.tsx:565
+#: src/features/chat/thread/composer-input.tsx:569
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "La subida de «{fileName}» ha caducado. Vuelve a adjuntarlo."
 
@@ -32129,7 +32162,7 @@ msgstr "llamada a herramientas"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:169
 #: ../../packages/chat-ui/src/model-picker/utils.ts:173
-#: src/components/model-picker/model-picker.tsx:83
+#: src/components/model-picker/model-picker.tsx:84
 #: src/features/settings/components/chat/models-settings.tsx:33
 msgid "Tool Calling"
 msgstr "Llamada a herramientas"
@@ -32471,7 +32504,7 @@ msgstr "Reintentar"
 
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:248
 #: src/components/error-boundaries/route-error-boundary.tsx:80
-#: src/components/settings/settings-modal.tsx:131
+#: src/components/settings/settings-modal.tsx:132
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:442
 msgid "Try Again"
 msgstr "Intentar de nuevo"
@@ -32590,7 +32623,7 @@ msgstr "Dos formas de conectar"
 msgid "Two-factor authentication"
 msgstr "Autenticación en dos pasos"
 
-#: src/features/auth/components/auth/auth-card.tsx:368
+#: src/features/auth/components/auth/auth-card.tsx:384
 #: src/features/auth/components/settings/two-factor/two-factor-card.tsx:49
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:126
 #: src/routes/auth/two-factor/index.tsx:13
@@ -32614,8 +32647,8 @@ msgid "Two-factor authentication is currently enabled for your account. This add
 msgstr "La autenticación en dos pasos está activada en tu cuenta. Esto añade una capa extra de seguridad."
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:607
-#: src/components/model-picker/model-picker.tsx:1059
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:601
+#: src/components/model-picker/model-picker.tsx:1065
 #: src/features/devices/components/device-tool-call.tsx:119
 msgid "Type"
 msgstr "Tipo"
@@ -32645,8 +32678,9 @@ msgstr "Escribe para buscar"
 msgid "Type your answer…"
 msgstr "Escribe tu respuesta…"
 
-#: src/features/chat/thread/composer-input.tsx:1503
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:174
+#: src/features/chat/signed-out/signed-out-chat.tsx:50
+#: src/features/chat/thread/composer-input.tsx:1527
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:182
 msgid "Type your message..."
 msgstr "Escribe tu mensaje..."
 
@@ -32808,7 +32842,7 @@ msgstr "Bajo el capó"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:48
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:64
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:810
+#: src/features/chat/thread/composer-input.tsx:814
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "Deshacer"
@@ -33036,7 +33070,7 @@ msgstr "Documentación actualizada de cualquier biblioteca o framework"
 msgid "Update Duration"
 msgstr "Actualizar duración"
 
-#: src/features/chat/thread/composer-input.tsx:1360
+#: src/features/chat/thread/composer-input.tsx:1384
 msgid "Update failed"
 msgstr "Error al actualizar"
 
@@ -33176,7 +33210,7 @@ msgstr "Mejorar a Pro, mensual"
 msgid "upload"
 msgstr ""
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:472
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:465
 #: src/features/auth/components/organization/create-organization-dialog.tsx:255
 #: src/features/vault/components/empty-states.tsx:45
 #: src/features/vault/components/upload-button.tsx:11
@@ -33211,7 +33245,7 @@ msgstr "Sube una imagen o genera una en esta conversación para usarla como refe
 msgid "Upload an image to any thread or generate one with an image model."
 msgstr "Sube una imagen a cualquier conversación o genera una con un modelo de imagen."
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:457
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:450
 #: src/features/auth/components/settings/account/update-avatar-card.tsx:139
 msgid "Upload Avatar"
 msgstr "Subir avatar"
@@ -33224,18 +33258,18 @@ msgstr "Sube archivos CSV, ejecuta análisis en Python y exporta gráficos, sin 
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Sube documentos a tu base de conocimiento y agrúpalos en colecciones. La IA busca en ellos contexto relevante y cita los pasajes que utilizó."
 
-#: src/features/chat/thread/composer-input.tsx:408
-#: src/features/chat/thread/composer-input.tsx:610
-#: src/features/chat/thread/composer-input.tsx:1281
+#: src/features/chat/thread/composer-input.tsx:410
+#: src/features/chat/thread/composer-input.tsx:614
+#: src/features/chat/thread/composer-input.tsx:1305
 msgid "Upload failed"
 msgstr "Error al subir"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1274
+#: src/features/chat/thread/composer-input.tsx:1298
 msgid "Upload failed: {0}"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:239
+#: src/features/chat/thread/composer-input-area.tsx:242
 msgid "Upload file"
 msgstr "Subir archivo"
 
@@ -33281,7 +33315,7 @@ msgstr "Subida"
 msgid "Uploaded {fileName}"
 msgstr "{fileName} subido"
 
-#: src/features/chat/thread/composer-input.tsx:345
+#: src/features/chat/thread/composer-input.tsx:347
 msgid "Uploading {attachmentName}"
 msgstr "Subiendo {attachmentName}"
 
@@ -33498,7 +33532,7 @@ msgstr "Se usa en botones, resaltados y anillos de foco. Todas las opciones mant
 msgid "user"
 msgstr "usuario"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:443
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:436
 #: src/features/auth/components/organization/personal-account-view.tsx:31
 #: src/features/auth/components/organization/personal-account-view.tsx:58
 #: src/features/auth/components/settings/account/update-avatar-card.tsx:127
@@ -33572,18 +33606,18 @@ msgstr "Organización del usuario"
 msgid "User's role"
 msgstr "Rol del usuario"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:71
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:511
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:74
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:504
 #: src/features/auth/components/settings/account/update-username-card.tsx:28
 msgid "Username"
 msgstr "Nombre de usuario"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:101
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:172
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:104
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:171
 msgid "Username is required"
 msgstr "El nombre de usuario es obligatorio"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:109
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:112
 msgid "Username or email is required"
 msgstr "El nombre de usuario o el correo es obligatorio"
 
@@ -33759,6 +33793,7 @@ msgstr "Código de verificación enviado a tu correo"
 msgid "Verification could not run, so nobody has checked this result. Review the answer yourself: approve it as is, reject it, or send it back with a note."
 msgstr "No se pudo ejecutar la verificación, así que nadie ha comprobado este resultado. Revisa tú la respuesta: apruébala tal cual, recházala o devuélvela con una nota."
 
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:273
 #: src/features/auth/components/settings/security/change-email-card.tsx:105
 msgid "Verification email sent"
 msgstr "Correo de verificación enviado"
@@ -33916,8 +33951,8 @@ msgstr "Coste por generación muy bajo"
 msgid "video"
 msgstr "vídeo"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:654
-#: src/components/model-picker/model-picker.tsx:1109
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:648
+#: src/components/model-picker/model-picker.tsx:1115
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:122
 #: src/features/marketing/components/landing-footer.tsx:166
@@ -34225,7 +34260,7 @@ msgid "vision"
 msgstr "visión"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:157
-#: src/components/model-picker/model-picker.tsx:84
+#: src/components/model-picker/model-picker.tsx:85
 #: src/features/settings/components/chat/models-settings.tsx:31
 msgid "Vision"
 msgstr "Visión"
@@ -34397,10 +34432,10 @@ msgstr "Esperando la respuesta del propietario"
 msgid "Waiting for the owner to approve"
 msgstr "Esperando la aprobación del propietario"
 
-#: src/features/chat/thread/composer-input-area.tsx:363
-#: src/features/chat/thread/composer-input-area.tsx:382
-#: src/features/chat/thread/composer-input-area.tsx:417
-#: src/features/chat/thread/composer-input-area.tsx:431
+#: src/features/chat/thread/composer-input-area.tsx:367
+#: src/features/chat/thread/composer-input-area.tsx:386
+#: src/features/chat/thread/composer-input-area.tsx:421
+#: src/features/chat/thread/composer-input-area.tsx:435
 msgid "Waiting for uploads to complete…"
 msgstr "Esperando a que terminen las subidas…"
 
@@ -34447,7 +34482,7 @@ msgstr ""
 msgid "Watched repositories"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:693
+#: src/features/chat/core/context/chat-context.tsx:708
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "No pudimos confirmar tu sesión a tiempo. Tu mensaje sigue en el editor. Intenta enviarlo de nuevo."
 
@@ -34589,7 +34624,7 @@ msgstr "Crecimiento semanal"
 msgid "Weight"
 msgstr "Grosor"
 
-#: src/features/auth/components/auth/auth-card.tsx:356
+#: src/features/auth/components/auth/auth-card.tsx:365
 msgid "Welcome back"
 msgstr "Bienvenido de nuevo"
 
@@ -35360,7 +35395,7 @@ msgstr "Tu espacio de trabajo de IA <0>empieza aquí.</0>"
 msgid "Your answer"
 msgstr "Tu respuesta"
 
-#: src/features/chat/core/context/chat-context.tsx:622
+#: src/features/chat/core/context/chat-context.tsx:625
 msgid "Your answer in Neore has finished."
 msgstr "Tu respuesta en Neore ha terminado."
 
@@ -35454,12 +35489,12 @@ msgid "Your First Chat"
 msgstr "Tu primer chat"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:670
+#: src/features/chat/thread/composer-input.tsx:674
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Tu entrada es grande (~{0} tokens) y consumirá una parte importante de la ventana de contexto del modelo."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:663
+#: src/features/chat/thread/composer-input.tsx:667
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Tu entrada es demasiado grande (~{0} tokens) y supera la ventana de contexto del modelo. Acorta el mensaje o quita adjuntos para enviarlo."
 
@@ -35488,7 +35523,7 @@ msgstr "Tu servidor local respondió, pero rechazó este sitio (CORS). Permite e
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "Tu ubicación (p. ej., \"Nueva York, EE. UU.\", \"Berlín, Alemania\")."
 
-#: src/features/chat/core/context/chat-context.tsx:690
+#: src/features/chat/core/context/chat-context.tsx:705
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Tu mensaje contiene contenido inapropiado y no se puede enviar."
 
