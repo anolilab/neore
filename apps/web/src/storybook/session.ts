@@ -7,14 +7,25 @@ import { http, HttpResponse } from "msw";
  * query and Lunora's identity probe all read the same handler (`*` matches both the
  * Storybook origin and `VITE_LUNORA_URL`).
  */
-export type Persona = "free" | "guest" | "pro" | "signed-out";
+export type Persona = "admin" | "free" | "guest" | "org-member" | "pro" | "signed-out";
+
+/** The organization the `org-member` persona has active. */
+export const ORGANIZATION = { id: "org_acme", logo: null, name: "Acme Research", slug: "acme-research" } as const;
 
 const CREATED_AT = "2026-01-15T09:00:00.000Z";
 const EXPIRES_AT = "2099-01-01T00:00:00.000Z";
 
-const NAMES: Record<Exclude<Persona, "signed-out">, string> = { free: "Sam Rivera", guest: "Guest", pro: "Ada Lovelace" };
+type SignedIn = Exclude<Persona, "signed-out">;
 
-const user = (persona: Exclude<Persona, "signed-out">) => {
+const NAMES: Record<SignedIn, string> = {
+    admin: "Grace Hopper",
+    free: "Sam Rivera",
+    guest: "Guest",
+    "org-member": "Alan Turing",
+    pro: "Ada Lovelace",
+};
+
+const user = (persona: SignedIn) => {
     const isAnonymous = persona === "guest";
 
     return {
@@ -25,7 +36,7 @@ const user = (persona: Exclude<Persona, "signed-out">) => {
         image: null,
         isAnonymous,
         name: NAMES[persona],
-        role: "user",
+        role: persona === "admin" ? "admin" : "user",
         updatedAt: CREATED_AT,
     };
 };
@@ -41,6 +52,7 @@ export const sessionFor = (persona: Persona) => {
         session: {
             createdAt: CREATED_AT,
             expiresAt: EXPIRES_AT,
+            activeOrganizationId: persona === "org-member" ? ORGANIZATION.id : null,
             id: `session_${persona}`,
             token: `storybook-${persona}`,
             updatedAt: CREATED_AT,
@@ -74,7 +86,37 @@ export const sessionHandlers = (): HttpHandler[] => {
 
             return session ? HttpResponse.json({ token: session.session.token }) : HttpResponse.json(null, { status: 401 });
         }),
-        // No active organization: the personas are personal accounts.
-        http.get("*/api/auth/organization/get-full-organization", () => HttpResponse.json(null)),
+        // Only the `org-member` persona has an organization active.
+        http.get("*/api/auth/organization/get-full-organization", () => {
+            const session = current();
+
+            if (!session?.session.activeOrganizationId) {
+                return HttpResponse.json(null);
+            }
+
+            return HttpResponse.json({
+                ...ORGANIZATION,
+                createdAt: CREATED_AT,
+                invitations: [],
+                members: [
+                    {
+                        createdAt: CREATED_AT,
+                        id: "member_owner",
+                        organizationId: ORGANIZATION.id,
+                        role: "owner",
+                        user: { email: "owner@acme.test", id: "user_owner", image: null, name: "Katherine Johnson" },
+                        userId: "user_owner",
+                    },
+                    {
+                        createdAt: CREATED_AT,
+                        id: "member_self",
+                        organizationId: ORGANIZATION.id,
+                        role: "member",
+                        user: { email: session.user.email, id: session.user.id, image: null, name: session.user.name },
+                        userId: session.user.id,
+                    },
+                ],
+            });
+        }),
     ];
 };

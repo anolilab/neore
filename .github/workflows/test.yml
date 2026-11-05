@@ -167,6 +167,8 @@ jobs:
             - name: "Git checkout"
               uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
               with:
+                  # `vis affected` diffs against the base.
+                  fetch-depth: 0
                   persist-credentials: false
 
             - name: "Setup resources and environment"
@@ -217,9 +219,9 @@ jobs:
             # violet accent (`apps/web/vitest.storybook.config.ts`). A story fails on a render error,
             # a failing `play` function or an axe violation; one that cannot meet axe yet is marked
             # `a11y: { test: "todo" }` in its file, with the reason.
-            - name: "Run the stories"
+            - name: "Run the stories (affected)"
               shell: "bash"
-              run: "pnpm --filter @neore/web run test:storybook"
+              run: 'pnpm exec vis affected test:storybook --if-present --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
 
     rust-worker:
         name: "Rust Worker tests"

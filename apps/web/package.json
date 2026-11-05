@@ -16,7 +16,7 @@
     "type": "module",
     "scripts": {
         "build": "node scripts/generate-og.mjs && vite build && node scripts/generate-sw.mjs && tsc --noEmit",
-        "build:storybook": "storybook build --output-dir storybook-static",
+        "build-storybook": "storybook build --output-dir storybook-static",
         "cf:typegen": "wrangler types",
         "clean": "rimraf node_modules dist .eslintcache .tanstack",
         "dev": "vite dev --port 5173",

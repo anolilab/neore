@@ -37,6 +37,7 @@ const noop = (): void => {};
 
 interface AppProvidersProps {
     children: ReactNode;
+    direction: "ltr" | "rtl";
     /** PostHog flags that are on, from the story's `parameters.featureFlags`. */
     featureFlags: ReadonlyArray<string>;
     persona: Persona;
@@ -84,7 +85,7 @@ export const settleSession = async (persona: Persona): Promise<void> => {
  * per story (so no story sees another's cache), the persona's bearer on the Lunora client,
  * Lingui and a fake PostHog. Mirrors `routes/__root.tsx`.
  */
-export const AppProviders = ({ children, featureFlags, persona, theme }: AppProvidersProps) => {
+export const AppProviders = ({ children, direction, featureFlags, persona, theme }: AppProvidersProps) => {
     const clients = useMemo(() => {
         const queryClient = createQueryClient();
 
@@ -105,7 +106,7 @@ export const AppProviders = ({ children, featureFlags, persona, theme }: AppProv
     return (
         <PostHogProvider client={posthog}>
             <I18nProvider i18n={storyI18n}>
-                <DirectionProvider direction="ltr">
+                <DirectionProvider direction={direction}>
                     <QueryClientProvider client={clients.queryClient}>
                         <CRPCProvider client={clients.lunoraClient} queryClient={clients.queryClient}>
                             <AuthQueryProvider>

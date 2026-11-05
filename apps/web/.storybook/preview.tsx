@@ -5,7 +5,9 @@ import { mswLoader } from "msw-storybook-addon/csf3";
 import { useEffect } from "react";
 
 import { ACCENT_IDS } from "@/features/appearance/lib/accent-presets";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { locales } from "@/lib/intl/shared";
+import { pinClock, STORY_NOW } from "@/storybook/clock";
 import { lunoraHandlers, resetLunoraAnswers } from "@/storybook/lunora";
 import { AppProviders, loadStoryLocale, settleSession, StoryRouter } from "@/storybook/providers";
 import type { Persona } from "@/storybook/session";
@@ -15,34 +17,52 @@ import { setActivePersona } from "@/storybook/session";
 import { worker } from "./msw";
 
 type Theme = "dark" | "light";
+type Direction = "ltr" | "rtl";
+
+interface Mode {
+    accent?: string;
+    direction?: Direction;
+    theme?: Theme;
+}
 
 /**
- * Where the toolbar starts: `light` in Storybook, and one per Vitest project in CI
- * (`vitest.storybook.config.ts`), written `<theme>` or `<theme>:<accent>`.
+ * Where the toolbar starts: light, LTR and the default accent in Storybook, and one mode per
+ * Vitest project in CI (`vitest.storybook.config.ts`), passed as JSON.
  */
-const [initialTheme = "light", initialAccent = "default"] = (import.meta.env.VITE_STORYBOOK_APPEARANCE ?? "light").split(":", 2);
+const MODE = JSON.parse(import.meta.env.VITE_STORYBOOK_MODE ?? "{}") as Mode;
 
-/** `class="dark"` and `data-accent` on `<html>`, as `AppearanceSync` and the boot scripts set them in the app. */
-const DocumentAppearance = ({ accent, theme }: { accent: string; theme: Theme }) => {
+/**
+ * `class="dark"`, `data-accent` and `dir` on `<html>`, as `AppearanceSync`, the boot scripts and
+ * the root route set them in the app.
+ */
+const DocumentAppearance = ({ accent, direction, theme }: { accent: string; direction: Direction; theme: Theme }) => {
     useEffect(() => {
         const root = document.documentElement;
 
         root.classList.toggle("dark", theme === "dark");
         root.style.colorScheme = theme;
+        root.dir = direction;
+        useUIStateStore.setState((state) => {
+            return { layout: { ...state.layout, direction } };
+        });
 
         if (accent === "default") {
             delete root.dataset.accent;
         } else {
             root.dataset.accent = accent;
         }
-    }, [theme, accent]);
+    }, [theme, accent, direction]);
 
     return null;
 };
 
 const withAppearance: Decorator = (Story, context) => (
     <>
-        <DocumentAppearance accent={context.globals.accent as string} theme={context.globals.theme as Theme} />
+        <DocumentAppearance
+            accent={context.globals.accent as string}
+            direction={context.globals.direction as Direction}
+            theme={context.globals.theme as Theme}
+        />
         <Story />
     </>
 );
@@ -59,6 +79,7 @@ const withApp: Decorator = (Story, context) => {
         // The router is outermost: the auth UI provider reads search params.
         <StoryRouter path={path}>
             <AppProviders
+                direction={context.globals.direction as Direction}
                 featureFlags={(context.parameters.featureFlags as string[] | undefined) ?? NO_FLAGS}
                 persona={persona}
                 theme={context.globals.theme as Theme}
@@ -76,6 +97,18 @@ const preview: Preview = {
             description: "Accent colour preset (data-accent)",
             toolbar: { dynamicTitle: true, icon: "paintbrush", items: [...ACCENT_IDS], title: "Accent" },
         },
+        direction: {
+            description: "Text direction",
+            toolbar: {
+                dynamicTitle: true,
+                icon: "transfer",
+                items: [
+                    { title: "Left to right", value: "ltr" },
+                    { title: "Right to left", value: "rtl" },
+                ],
+                title: "Direction",
+            },
+        },
         locale: {
             description: "Interface language",
             toolbar: { dynamicTitle: true, icon: "globe", items: Object.keys(locales), title: "Locale" },
@@ -89,6 +122,8 @@ const preview: Preview = {
                     { title: "Pro user", value: "pro" },
                     { title: "Free user", value: "free" },
                     { title: "Guest", value: "guest" },
+                    { title: "Admin", value: "admin" },
+                    { title: "Organization member", value: "org-member" },
                     { title: "Signed out", value: "signed-out" },
                 ],
                 title: "Persona",
@@ -99,9 +134,19 @@ const preview: Preview = {
             toolbar: { dynamicTitle: true, icon: "mirror", items: ["light", "dark"], title: "Theme" },
         },
     },
-    initialGlobals: { accent: initialAccent, locale: "en", persona: "pro", theme: initialTheme },
+    initialGlobals: {
+        accent: MODE.accent ?? "default",
+        direction: MODE.direction ?? "ltr",
+        locale: "en",
+        persona: "pro",
+        theme: MODE.theme ?? "light",
+        // Storybook's built-in viewport tool; CI's mobile project sizes the page itself.
+        viewport: { isRotated: false, value: undefined },
+    },
     loaders: [
         async (context) => {
+            // A story that needs another "now" sets `parameters.now` (a timestamp).
+            pinClock((context.parameters.now as number | undefined) ?? STORY_NOW);
             setActivePersona(personaOf(context));
             resetLunoraAnswers();
             await loadStoryLocale(context.globals.locale as string);
@@ -119,6 +164,13 @@ const preview: Preview = {
         },
         controls: { expanded: true, matchers: { color: /(background|color)$/i, date: /Date$/i } },
         layout: "centered",
+        viewport: {
+            options: {
+                desktop: { name: "Desktop", styles: { height: "900px", width: "1440px" }, type: "desktop" },
+                mobile: { name: "Mobile (iPhone 15)", styles: { height: "844px", width: "390px" }, type: "mobile" },
+                tablet: { name: "Tablet", styles: { height: "1024px", width: "768px" }, type: "tablet" },
+            },
+        },
         msw: {
             // Named groups, so a story replaces one (`handlers: { lunora: lunoraHandlers(...) }`)
             // and keeps the others.

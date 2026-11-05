@@ -222,6 +222,14 @@ export default defineConfig({
             inputs: ["default", "^production", "{projectRoot}/vite.config.ts", "{projectRoot}/vitest.config.ts"],
             cache: true,
         },
+        // Every story of the project, in Chromium, once per mode (`apps/web/vitest.storybook.config.ts`).
+        // `^production` covers the stories of `packages/ui` and `packages/chat-ui`, which the web
+        // app's Storybook runs. Packages are built by the caller (`pnpm build:packages`): `^build`
+        // would also build the backend Worker.
+        "test:storybook": {
+            inputs: ["default", "^production"],
+            cache: true,
+        },
         "build-storybook": {
             dependsOn: ["^build", "^build-storybook"],
             inputs: [

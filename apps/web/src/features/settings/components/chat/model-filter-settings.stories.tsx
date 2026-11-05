@@ -4,7 +4,7 @@ import { expect, userEvent, waitFor } from "storybook/test";
 
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
 import { userFixtures } from "@/storybook/fixtures/user";
-import { lunoraAnswered, lunoraHandlers, lunoraPending } from "@/storybook/lunora";
+import { lunoraAnswered, lunoraError, lunoraHandlers, lunoraPending } from "@/storybook/lunora";
 
 import ModelFilterSettings from "./model-filter-settings";
 
@@ -63,6 +63,37 @@ export const PrivacyRules: Story = {
 export const Loading: Story = {
     parameters: {
         msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), lunoraPending(api.auth.functions.getAIUserPreferences)) } },
+    },
+};
+
+/** Preferences failed to load: the page renders without rules and an edit is refused. */
+export const LoadError: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(...userFixtures(), lunoraError(api.auth.functions.getAIUserPreferences, "INTERNAL", "Shard unavailable", 500)),
+            },
+        },
+    },
+};
+
+/** The save is refused: the switch goes back and a toast says so. */
+export const SaveFails: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(...userFixtures(), lunoraError(api.auth.functions.updateAIUserPreferences, "RATE_LIMITED", "Too many updates", 429)),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        const toggle = await canvas.findByRole("switch", { name: /zero data retention/i });
+
+        await lunoraAnswered(api.auth.functions.getAIUserPreferences);
+        await userEvent.click(toggle);
+        await waitFor(async () => {
+            await expect(toggle).not.toBeChecked();
+        });
     },
 };
 

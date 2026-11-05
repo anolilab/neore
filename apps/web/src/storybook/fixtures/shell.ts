@@ -1,10 +1,8 @@
 import { api } from "@neore/backend/api";
 
 import type { LunoraFixture } from "../lunora";
+import { ago, HOUR } from "../clock";
 import { lunora } from "../lunora";
-
-const HOUR = 60 * 60 * 1000;
-const NOW = Date.UTC(2026, 10, 5, 12);
 
 const quota = (capacity: number, remaining: number) => {
     return { capacity, remaining };
@@ -28,8 +26,8 @@ export const shellFixtures = (options: { tier?: "anonymous" | "free" | "premium"
             options.unread === false
                 ? []
                 : [
-                      { _id: "n1", createdAt: NOW - HOUR, link: "/chat/t1", read: false, title: "Deploy the preview", type: "tool_approval" },
-                      { _id: "n2", createdAt: NOW - 5 * HOUR, outcome: "success", read: true, title: "Weekly report", type: "task" },
+                      { _id: "n1", createdAt: ago(HOUR), link: "/chat/t1", read: false, title: "Deploy the preview", type: "tool_approval" },
+                      { _id: "n2", createdAt: ago(5 * HOUR), outcome: "success", read: true, title: "Weekly report", type: "task" },
                   ],
         unreadCount: options.unread === false ? 0 : 1,
     }),

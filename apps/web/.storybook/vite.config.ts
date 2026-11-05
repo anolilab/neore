@@ -37,6 +37,7 @@ const SERVER_MODULES: ReadonlyArray<[suffix: string, replacement: string]> = [
 const PACKAGE_MOCKS: Readonly<Record<string, string>> = {
     "@tanstack/react-start": mock("react-start.ts"),
     "@tanstack/react-start/server": mock("react-start-server.ts"),
+    "next-themes": mock("next-themes.tsx"),
 };
 
 const mockServerModules = (): Plugin => {

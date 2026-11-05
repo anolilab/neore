@@ -3,6 +3,7 @@ import { api } from "@neore/backend/api";
 
 import type { LunoraFixture } from "../lunora";
 import { lunora } from "../lunora";
+import { getActivePersona } from "../session";
 
 type Preferences = NonNullable<ReturnOf<typeof api.auth.functions.getAIUserPreferences>>;
 type Settings = NonNullable<ReturnOf<typeof api.auth.functions.getUserSettings>>;
@@ -38,7 +39,13 @@ export const settings = (overrides: Partial<Settings> = {}): Settings => {
  * which win.
  */
 export const userFixtures = (
-    options: { canRunPaidModels?: boolean; isAdmin?: boolean; preferences?: Partial<Preferences>; settings?: Partial<Settings> } = {},
+    options: {
+        canRunPaidModels?: boolean;
+        isAdmin?: boolean;
+        isImpersonating?: boolean;
+        preferences?: Partial<Preferences>;
+        settings?: Partial<Settings>;
+    } = {},
 ): LunoraFixture[] => {
     let preferencesRow = preferences(options.preferences);
     let settingsRow = settings(options.settings);
@@ -46,8 +53,16 @@ export const userFixtures = (
     return [
         lunora(api.auth.functions.getAIUserPreferences, () => preferencesRow),
         lunora(api.auth.functions.getUserSettings, () => settingsRow),
-        lunora(api.auth.admin.isCurrentUserAdmin, { isAdmin: options.isAdmin ?? false }),
-        lunora(api.auth.functions.getPaidModelAccess, { canRunPaidModels: options.canRunPaidModels ?? true }),
+        // Unless a story says otherwise, these follow the persona.
+        lunora(api.auth.admin.isCurrentUserAdmin, () => {
+            return { isAdmin: options.isAdmin ?? getActivePersona() === "admin" };
+        }),
+        lunora(api.auth.admin.isImpersonating, () => {
+            return { isImpersonating: options.isImpersonating ?? false };
+        }),
+        lunora(api.auth.functions.getPaidModelAccess, () => {
+            return { canRunPaidModels: options.canRunPaidModels ?? !["free", "guest"].includes(getActivePersona()) };
+        }),
         lunora(api.chat.custom_providers.listCustomProviders, []),
         lunora(api.auth.functions.updateAIUserPreferences, (patch) => {
             preferencesRow = { ...preferencesRow, ...(patch as Partial<Preferences>) };

@@ -116,6 +116,12 @@ export const FeatureFlaggedModel: Story = {
     },
 };
 
+/** The gateway is down: `/v1/models` answers 503, so the picker's own catalog stays empty. */
+export const GatewayUnavailable: Story = {
+    args: { defaultTab: "all", favorites: [], initialModelId: undefined, models: undefined },
+    parameters: { msw: { handlers: { gateway: gatewayModelsHandler("error") } } },
+};
+
 /** The gateway answered with no models. */
 export const Empty: Story = {
     args: { defaultTab: "all", favorites: [], initialModelId: undefined, models: [] },

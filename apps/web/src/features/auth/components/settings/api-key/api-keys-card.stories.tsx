@@ -54,6 +54,9 @@ export const Empty: Story = {
 /** `/api-key/list` has not answered yet. */
 export const Loading: Story = { parameters: { msw: { handlers: { apiKeys: apiKeyHandlers("pending") } } } };
 
+/** `/api-key/list` failed. */
+export const LoadError: Story = { parameters: { msw: { handlers: { apiKeys: apiKeyHandlers("error") } } } };
+
 export const CreateDialog: Story = {
     play: async ({ canvas }) => {
         await userEvent.click(await canvas.findByRole("button", { name: /create api key/i }));

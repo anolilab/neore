@@ -10,22 +10,31 @@ import storybookViteConfig from "./.storybook/vite.config.ts";
  * Every story as a test, in Chromium: it must render without throwing, its `play` function
  * must pass, and axe must find no violation (`a11y.test: "error"` in `.storybook/preview.tsx`).
  *
- * Each story runs once per appearance below. `.storybook/preview.tsx` reads
- * `VITE_STORYBOOK_APPEARANCE` into its starting globals, so a contrast failure in dark mode or
- * under an accent preset fails like one in light mode.
+ * Each story runs once per mode below. `.storybook/preview.tsx` reads `VITE_STORYBOOK_MODE`
+ * into its starting globals, so a contrast failure in dark mode or under an accent preset, a
+ * layout that throws on a phone, or one that breaks right to left fails like any other. The
+ * time zone and locale are pinned, as the clock is (`src/storybook/clock.ts`).
  *
  * Named apart from `vitest.config.ts` so the root workspace glob does not pull it into
  * `pnpm vis run test`.
  */
-const APPEARANCES = ["light", "dark", "dark:violet"] as const;
+const DESKTOP = { height: 900, width: 1440 };
+const MOBILE = { height: 844, width: 390 };
+
+const MODES = [
+    { mode: { theme: "light" }, name: "light", viewport: DESKTOP },
+    { mode: { accent: "violet", theme: "dark" }, name: "dark-violet", viewport: DESKTOP },
+    { mode: { theme: "light" }, name: "mobile", viewport: MOBILE },
+    { mode: { direction: "rtl", theme: "dark" }, name: "rtl", viewport: DESKTOP },
+] as const;
 
 export default mergeConfig(
     storybookViteConfig,
     defineConfig({
         test: {
-            projects: APPEARANCES.map((appearance) => {
+            projects: MODES.map(({ mode, name, viewport }) => {
                 return {
-                    define: { "import.meta.env.VITE_STORYBOOK_APPEARANCE": JSON.stringify(appearance) },
+                    define: { "import.meta.env.VITE_STORYBOOK_MODE": JSON.stringify(JSON.stringify(mode)) },
                     extends: true,
                     plugins: [storybookTest({ configDir: join(import.meta.dirname, ".storybook") })],
                     test: {
@@ -33,9 +42,10 @@ export default mergeConfig(
                             enabled: true,
                             headless: true,
                             instances: [{ browser: "chromium" }],
-                            provider: playwright(),
+                            provider: playwright({ contextOptions: { locale: "en-US", timezoneId: "UTC" } }),
+                            viewport,
                         },
-                        name: `storybook:${appearance}`,
+                        name: `storybook:${name}`,
                     },
                 };
             }),
