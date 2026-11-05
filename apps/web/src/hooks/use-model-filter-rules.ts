@@ -63,6 +63,9 @@ const isModelAllowed = (model: GatewayModel, rules: ModelFilterRules): boolean =
     // Provider block-list
     if (rules.blockedProviders && rules.blockedProviders.length > 0 && rules.blockedProviders.includes(model.provider)) return false;
 
+    // Zero data retention and no data collection are enforced only through OpenRouter; Workers AI cannot honour them.
+    if (model.provider === "cloudflare" && (rules.requireZDR === true || rules.denyDataCollection === true)) return false;
+
     // Served from any region (Workers AI): no region rule can be honoured.
     if (getModelRegions(model).includes(GLOBAL_REGION) && ((rules.allowedRegions?.length ?? 0) > 0 || (rules.blockedRegions?.length ?? 0) > 0)) return false;
 
@@ -110,7 +113,9 @@ export const useFilteredModels = (models: GatewayModel[]): GatewayModel[] => {
         (rules.allowedModels && rules.allowedModels.length > 0) ||
         (rules.blockedModels && rules.blockedModels.length > 0) ||
         (rules.allowedProviders && rules.allowedProviders.length > 0) ||
-        (rules.blockedProviders && rules.blockedProviders.length > 0);
+        (rules.blockedProviders && rules.blockedProviders.length > 0) ||
+        rules.requireZDR === true ||
+        rules.denyDataCollection === true;
 
     if (!hasRules) return models;
 

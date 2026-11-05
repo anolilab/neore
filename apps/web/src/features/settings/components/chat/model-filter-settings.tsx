@@ -363,7 +363,8 @@ const ModelFilterSettings: FC = () => {
                         {t`Privacy`}
                     </CardTitle>
                     <CardDescription className="text-xs">
-                        {t`Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter.`}
+                        {t`Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter.`}{" "}
+                        {t`Either setting also hides the Cloudflare Workers AI models, which cannot guarantee it.`}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

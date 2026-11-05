@@ -599,7 +599,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "{1} トークン中 {0} トークン使用（{2}%）"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1219
+#: src/components/model-picker/model-picker.tsx:1221
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} / {MAX_PARALLEL} 個を選択中"
 
@@ -2894,8 +2894,8 @@ msgstr "垂直方向に整列（V）"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:618
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:680
-#: src/components/model-picker/model-picker.tsx:1068
-#: src/components/model-picker/model-picker.tsx:1146
+#: src/components/model-picker/model-picker.tsx:1070
+#: src/components/model-picker/model-picker.tsx:1148
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:422
@@ -3881,7 +3881,7 @@ msgid "Auckland"
 msgstr "オークランド"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:668
-#: src/components/model-picker/model-picker.tsx:1120
+#: src/components/model-picker/model-picker.tsx:1122
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:123
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -4548,7 +4548,7 @@ msgstr "黒"
 msgid "Block"
 msgstr "ブロック"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:393
+#: src/features/settings/components/chat/model-filter-settings.tsx:394
 msgid "Block providers that may use your data for training or collect usage data."
 msgstr "データをトレーニングに利用したり、利用データを収集したりする可能性のあるプロバイダーをブロックします。"
 
@@ -6026,7 +6026,7 @@ msgstr "クリック"
 msgid "Click \"{selector}\""
 msgstr "「{selector}」をクリック"
 
-#: src/components/model-picker/model-picker.tsx:1178
+#: src/components/model-picker/model-picker.tsx:1180
 msgid "Click ★ on any model in All models to add it here."
 msgstr "「すべてのモデル」で任意のモデルの ★ をクリックすると、ここに追加されます。"
 
@@ -6872,7 +6872,7 @@ msgstr "設定済み"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:768
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1241
+#: src/components/model-picker/model-picker.tsx:1243
 msgid "Confirm"
 msgstr "確認"
 
@@ -9035,7 +9035,7 @@ msgstr "既定のモデルを更新しました"
 msgid "Default Models"
 msgstr "既定のモデル"
 
-#: src/components/model-picker/model-picker.tsx:1131
+#: src/components/model-picker/model-picker.tsx:1133
 msgid "Default order"
 msgstr ""
 
@@ -9428,8 +9428,8 @@ msgstr "拒否"
 msgid "Deny {tool}"
 msgstr "{tool} を拒否"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:392
-#: src/features/settings/components/chat/model-filter-settings.tsx:396
+#: src/features/settings/components/chat/model-filter-settings.tsx:393
+#: src/features/settings/components/chat/model-filter-settings.tsx:397
 msgid "Deny Data Collection"
 msgstr "データ収集を拒否"
 
@@ -10761,6 +10761,10 @@ msgstr "推論レベルの制御"
 #: src/features/chat/core/utils/language-utilities.ts:350
 msgid "Egypt"
 msgstr "エジプト"
+
+#: src/features/settings/components/chat/model-filter-settings.tsx:367
+msgid "Either setting also hides the Cloudflare Workers AI models, which cannot guarantee it."
+msgstr "どちらの設定でも、これを保証できない Cloudflare Workers AI のモデルは表示されなくなります。"
 
 #: src/features/chat/core/utils/language-utilities.ts:400
 msgid "El Salvador"
@@ -15126,7 +15130,7 @@ msgstr ""
 msgid "Hidden in Model Picker"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1155
+#: src/components/model-picker/model-picker.tsx:1157
 msgid "Hide {name} from model picker"
 msgstr ""
 
@@ -15620,7 +15624,7 @@ msgstr "イラスト"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: src/components/model-picker/model-picker.tsx:1094
+#: src/components/model-picker/model-picker.tsx:1096
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:121
 #: src/features/marketing/components/landing-footer.tsx:165
@@ -17960,7 +17964,7 @@ msgid "Locked chat"
 msgstr ""
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1224
+#: src/components/model-picker/model-picker.tsx:1226
 msgid "Locked to {0} models"
 msgstr "{0}モデルに固定"
 
@@ -18469,7 +18473,7 @@ msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "最大サイズ: {size} • 最大 {maxFiles} ファイル"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:745
-#: src/components/model-picker/model-picker.tsx:1218
+#: src/components/model-picker/model-picker.tsx:1220
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "モデルは最大 {MAX_PARALLEL} 個までです"
 
@@ -19685,7 +19689,7 @@ msgstr ""
 msgid "Name"
 msgstr "名前"
 
-#: src/components/model-picker/model-picker.tsx:1132
+#: src/components/model-picker/model-picker.tsx:1134
 msgid "Name (A to Z)"
 msgstr ""
 
@@ -20083,7 +20087,7 @@ msgstr "新しいデータセット"
 msgid "New Export"
 msgstr "新しいエクスポート"
 
-#: src/components/model-picker/model-picker.tsx:1133
+#: src/components/model-picker/model-picker.tsx:1135
 msgid "New first"
 msgstr ""
 
@@ -20621,7 +20625,7 @@ msgid "No models found matching your filters."
 msgstr "フィルターに一致するモデルが見つかりません。"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:712
-#: src/components/model-picker/model-picker.tsx:1184
+#: src/components/model-picker/model-picker.tsx:1186
 msgid "No models found."
 msgstr "モデルが見つかりません。"
 
@@ -20834,7 +20838,7 @@ msgid "No speech detected. Hands-free mode stopped."
 msgstr "音声が検出されませんでした。ハンズフリーモードを停止しました。"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:704
-#: src/components/model-picker/model-picker.tsx:1176
+#: src/components/model-picker/model-picker.tsx:1178
 msgid "No starred models"
 msgstr "スター付きのモデルはありません"
 
@@ -21559,7 +21563,7 @@ msgstr ""
 msgid "Only this check is started again on {hostLabel}, not the rest of its workflow."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:374
+#: src/features/settings/components/chat/model-filter-settings.tsx:375
 msgid "Only use providers that guarantee zero data retention — your prompts are never stored."
 msgstr "データを一切保持しないことを保証するプロバイダーのみを使用します。プロンプトが保存されることはありません。"
 
@@ -23757,11 +23761,11 @@ msgstr "前のバージョン"
 msgid "Price per 1M tokens"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1135
+#: src/components/model-picker/model-picker.tsx:1137
 msgid "Price: high to low"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1134
+#: src/components/model-picker/model-picker.tsx:1136
 msgid "Price: low to high"
 msgstr ""
 
@@ -28435,7 +28439,7 @@ msgstr "データを並べ替え"
 msgid "Sort desc"
 msgstr "降順で並べ替え"
 
-#: src/components/model-picker/model-picker.tsx:1125
+#: src/components/model-picker/model-picker.tsx:1127
 msgid "Sort models"
 msgstr ""
 
@@ -30314,7 +30318,7 @@ msgstr "テキスト"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:630
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:1081
+#: src/components/model-picker/model-picker.tsx:1083
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:120
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -33913,7 +33917,7 @@ msgid "video"
 msgstr "動画"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:654
-#: src/components/model-picker/model-picker.tsx:1107
+#: src/components/model-picker/model-picker.tsx:1109
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:122
 #: src/features/marketing/components/landing-footer.tsx:166
@@ -35657,8 +35661,8 @@ msgstr "Z.AI の最も強力なフラッグシップモデル"
 msgid "Z.AI's vision-enhanced flagship model"
 msgstr "ビジョンを強化した Z.AI のフラッグシップモデル"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:372
-#: src/features/settings/components/chat/model-filter-settings.tsx:378
+#: src/features/settings/components/chat/model-filter-settings.tsx:373
+#: src/features/settings/components/chat/model-filter-settings.tsx:379
 msgid "Zero Data Retention (ZDR)"
 msgstr "データ保持ゼロ（ZDR）"
 

@@ -5,7 +5,7 @@
  * Replaces direct `@ai-sdk/google` and CF Workers AI embedding calls.
  */
 import type { EmbeddingModelV3, EmbeddingModelV3CallOptions, EmbeddingModelV3Result } from "@ai-sdk/provider";
-import { hasActiveFilters, type ModelFilterRules } from "@neore/ai/models";
+import { deriveModelRegions, getModelRejectionReason, hasActiveFilters, type ModelFilterRules } from "@neore/ai/models";
 
 import { fetchWithDeadline } from "../../lib/fetch-timeout";
 import { SERVICE_ORIGIN, type ServiceFetch } from "../../lib/services.js";
@@ -125,6 +125,18 @@ export class GatewayEmbeddingModel implements EmbeddingModelV3 {
     }
 }
 
+/** The memory and knowledge embedding model, Workers AI `bge-m3`, as the gateway's catalog names it. */
+const EMBEDDING_MODEL = { modelApiId: "@cf/baai/bge-m3", modelId: "bge-m3", provider: "cloudflare" } as const;
+
+/**
+ * Whether `rules` allow the embedding model. When they do not (Workers AI: any region rule, zero data retention or no
+ * data collection), the gateway refuses it with `MODEL_BLOCKED`, so a caller can skip the call and use keyword search.
+ */
+export const embeddingModelAllowed = (rules: ModelFilterRules | undefined): boolean =>
+    !hasActiveFilters(rules) ||
+    getModelRejectionReason({ modelId: EMBEDDING_MODEL.modelId, provider: EMBEDDING_MODEL.provider, regions: deriveModelRegions(EMBEDDING_MODEL) }, rules!) ===
+        null;
+
 /**
  * Create a gateway embedding model for memory/knowledge embedding calls,
  * bound to the calling action's gateway binding (`gatewayFetch(ctx)`).
@@ -136,7 +148,7 @@ export const createGatewayEmbeddingModel = (
     new GatewayEmbeddingModel({
         gateway,
         modelFilterRules: options?.modelFilterRules,
-        modelId: "bge-m3",
+        modelId: EMBEDDING_MODEL.modelId,
         threadId: options?.threadId,
         traceparent: options?.traceparent,
         userId: options?.userId,

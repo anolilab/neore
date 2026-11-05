@@ -599,7 +599,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "{0} de {1} tokens usados ({2}%)"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1219
+#: src/components/model-picker/model-picker.tsx:1221
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} de {MAX_PARALLEL} selecionados"
 
@@ -2894,8 +2894,8 @@ msgstr "Alinhar verticalmente (V)"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:618
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:680
-#: src/components/model-picker/model-picker.tsx:1068
-#: src/components/model-picker/model-picker.tsx:1146
+#: src/components/model-picker/model-picker.tsx:1070
+#: src/components/model-picker/model-picker.tsx:1148
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:422
@@ -3881,7 +3881,7 @@ msgid "Auckland"
 msgstr "Auckland"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:668
-#: src/components/model-picker/model-picker.tsx:1120
+#: src/components/model-picker/model-picker.tsx:1122
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:123
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -4548,7 +4548,7 @@ msgstr "Preto"
 msgid "Block"
 msgstr "Bloquear"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:393
+#: src/features/settings/components/chat/model-filter-settings.tsx:394
 msgid "Block providers that may use your data for training or collect usage data."
 msgstr "Bloqueie provedores que possam usar seus dados para treinamento ou coletar dados de uso."
 
@@ -6026,7 +6026,7 @@ msgstr "Clicar"
 msgid "Click \"{selector}\""
 msgstr "Clicar em \"{selector}\""
 
-#: src/components/model-picker/model-picker.tsx:1178
+#: src/components/model-picker/model-picker.tsx:1180
 msgid "Click ★ on any model in All models to add it here."
 msgstr "Clique em ★ em qualquer modelo em Todos os modelos para adicioná-lo aqui."
 
@@ -6872,7 +6872,7 @@ msgstr "Configurado"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:768
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1241
+#: src/components/model-picker/model-picker.tsx:1243
 msgid "Confirm"
 msgstr "Confirmar"
 
@@ -9035,7 +9035,7 @@ msgstr "Modelo padrão atualizado"
 msgid "Default Models"
 msgstr "Modelos padrão"
 
-#: src/components/model-picker/model-picker.tsx:1131
+#: src/components/model-picker/model-picker.tsx:1133
 msgid "Default order"
 msgstr ""
 
@@ -9428,8 +9428,8 @@ msgstr "Negar"
 msgid "Deny {tool}"
 msgstr "Negar {tool}"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:392
-#: src/features/settings/components/chat/model-filter-settings.tsx:396
+#: src/features/settings/components/chat/model-filter-settings.tsx:393
+#: src/features/settings/components/chat/model-filter-settings.tsx:397
 msgid "Deny Data Collection"
 msgstr "Negar coleta de dados"
 
@@ -10761,6 +10761,10 @@ msgstr "Controle de esforço"
 #: src/features/chat/core/utils/language-utilities.ts:350
 msgid "Egypt"
 msgstr "Egito"
+
+#: src/features/settings/components/chat/model-filter-settings.tsx:367
+msgid "Either setting also hides the Cloudflare Workers AI models, which cannot guarantee it."
+msgstr "Qualquer uma das configurações também oculta os modelos do Cloudflare Workers AI, que não podem garantir isso."
 
 #: src/features/chat/core/utils/language-utilities.ts:400
 msgid "El Salvador"
@@ -15126,7 +15130,7 @@ msgstr ""
 msgid "Hidden in Model Picker"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1155
+#: src/components/model-picker/model-picker.tsx:1157
 msgid "Hide {name} from model picker"
 msgstr ""
 
@@ -15620,7 +15624,7 @@ msgstr "ilustração"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: src/components/model-picker/model-picker.tsx:1094
+#: src/components/model-picker/model-picker.tsx:1096
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:121
 #: src/features/marketing/components/landing-footer.tsx:165
@@ -17960,7 +17964,7 @@ msgid "Locked chat"
 msgstr ""
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1224
+#: src/components/model-picker/model-picker.tsx:1226
 msgid "Locked to {0} models"
 msgstr "Restrito a modelos de {0}"
 
@@ -18469,7 +18473,7 @@ msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "Tamanho máx.: {size} • Máx. {maxFiles} arquivos"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:745
-#: src/components/model-picker/model-picker.tsx:1218
+#: src/components/model-picker/model-picker.tsx:1220
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "Máximo de {MAX_PARALLEL} modelos atingido"
 
@@ -19685,7 +19689,7 @@ msgstr ""
 msgid "Name"
 msgstr "Nome"
 
-#: src/components/model-picker/model-picker.tsx:1132
+#: src/components/model-picker/model-picker.tsx:1134
 msgid "Name (A to Z)"
 msgstr ""
 
@@ -20083,7 +20087,7 @@ msgstr "Novo dataset"
 msgid "New Export"
 msgstr "Nova exportação"
 
-#: src/components/model-picker/model-picker.tsx:1133
+#: src/components/model-picker/model-picker.tsx:1135
 msgid "New first"
 msgstr ""
 
@@ -20621,7 +20625,7 @@ msgid "No models found matching your filters."
 msgstr "Nenhum modelo corresponde aos seus filtros."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:712
-#: src/components/model-picker/model-picker.tsx:1184
+#: src/components/model-picker/model-picker.tsx:1186
 msgid "No models found."
 msgstr "Nenhum modelo encontrado."
 
@@ -20834,7 +20838,7 @@ msgid "No speech detected. Hands-free mode stopped."
 msgstr "Nenhuma fala detectada. Modo mãos-livres interrompido."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:704
-#: src/components/model-picker/model-picker.tsx:1176
+#: src/components/model-picker/model-picker.tsx:1178
 msgid "No starred models"
 msgstr "Nenhum modelo marcado com estrela"
 
@@ -21559,7 +21563,7 @@ msgstr ""
 msgid "Only this check is started again on {hostLabel}, not the rest of its workflow."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:374
+#: src/features/settings/components/chat/model-filter-settings.tsx:375
 msgid "Only use providers that guarantee zero data retention — your prompts are never stored."
 msgstr "Use apenas provedores que garantem retenção zero de dados — seus prompts nunca são armazenados."
 
@@ -23757,11 +23761,11 @@ msgstr "Versão anterior"
 msgid "Price per 1M tokens"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1135
+#: src/components/model-picker/model-picker.tsx:1137
 msgid "Price: high to low"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1134
+#: src/components/model-picker/model-picker.tsx:1136
 msgid "Price: low to high"
 msgstr ""
 
@@ -28435,7 +28439,7 @@ msgstr "Ordenar dados"
 msgid "Sort desc"
 msgstr "Ordem decrescente"
 
-#: src/components/model-picker/model-picker.tsx:1125
+#: src/components/model-picker/model-picker.tsx:1127
 msgid "Sort models"
 msgstr ""
 
@@ -30314,7 +30318,7 @@ msgstr "texto"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:630
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:1081
+#: src/components/model-picker/model-picker.tsx:1083
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:120
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -33913,7 +33917,7 @@ msgid "video"
 msgstr "vídeo"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:654
-#: src/components/model-picker/model-picker.tsx:1107
+#: src/components/model-picker/model-picker.tsx:1109
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:122
 #: src/features/marketing/components/landing-footer.tsx:166
@@ -35657,8 +35661,8 @@ msgstr "O modelo carro-chefe mais poderoso da Z.AI"
 msgid "Z.AI's vision-enhanced flagship model"
 msgstr "O modelo carro-chefe da Z.AI com visão aprimorada"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:372
-#: src/features/settings/components/chat/model-filter-settings.tsx:378
+#: src/features/settings/components/chat/model-filter-settings.tsx:373
+#: src/features/settings/components/chat/model-filter-settings.tsx:379
 msgid "Zero Data Retention (ZDR)"
 msgstr "Retenção zero de dados (ZDR)"
 

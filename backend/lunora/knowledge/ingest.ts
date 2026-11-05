@@ -284,21 +284,22 @@ export const ingestFile = internalAction
                 throw new LunoraError("UNPROCESSABLE", "No text content could be extracted from the file");
             }
 
-            // 5. Generate embeddings for all chunks via LLM Gateway
-            const { createGatewayEmbeddingModel } = await import("../chat/lib/gateway-embedding-model");
-            const embeddingModel = createGatewayEmbeddingModel(gatewayFetch(ctx), {
-                modelFilterRules: await loadModelFilterRules(ctx, args.userId),
-                userId: args.userId,
-            });
+            // 5. Generate embeddings for all chunks via LLM Gateway. Rules that refuse the embedding model leave the
+            // file to keyword search: its chunks are saved without vectors rather than the file failing.
+            const { createGatewayEmbeddingModel, embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
+            const modelFilterRules = await loadModelFilterRules(ctx, args.userId);
+            let embeddings: (number[] | null)[] = chunks.map(() => null);
 
-            const { embedMany } = await import("../agent/client/search");
-            const chunkTexts = chunks.map((c) => embeddingInput(c, EMBEDDING_INPUT_BUDGET));
-            const { embeddings } = await embedMany(ctx, {
-                embeddingModel,
-                threadId: undefined,
-                userId: args.userId,
-                values: chunkTexts,
-            });
+            if (embeddingModelAllowed(modelFilterRules)) {
+                const { embedMany } = await import("../agent/client/search");
+
+                ({ embeddings } = await embedMany(ctx, {
+                    embeddingModel: createGatewayEmbeddingModel(gatewayFetch(ctx), { modelFilterRules, userId: args.userId }),
+                    threadId: undefined,
+                    userId: args.userId,
+                    values: chunks.map((c) => embeddingInput(c, EMBEDDING_INPUT_BUDGET)),
+                }));
+            }
 
             // 6. Store chunks and embeddings
             const dimension = embeddings[0]?.length ?? 1024;
