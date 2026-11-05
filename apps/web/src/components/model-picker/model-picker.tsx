@@ -255,7 +255,7 @@ const ProviderSidebarButton = memo<{
             "relative flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors duration-150",
             showBorder && "mb-0.5 border-b pb-2",
             isSelected
-                ? "text-foreground before:bg-primary before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full"
+                ? "text-foreground before:bg-primary-text before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full"
                 : "text-muted-foreground/70 hover:text-foreground",
         )}
         onClick={onClick}
@@ -407,7 +407,7 @@ const ModelItemContent = memo<{
                 </button>
                 {selectionMode === "single" ? (
                     <span className="ml-0.5 flex size-3.5 shrink-0 items-center justify-center">
-                        {isSelected ? <CheckIcon className="text-primary size-3.5" /> : null}
+                        {isSelected ? <CheckIcon className="text-primary-text size-3.5" /> : null}
                     </span>
                 ) : null}
             </div>
@@ -491,7 +491,7 @@ const ModelGroupRenderer = memo<{
                         if (isTypeMismatch) {
                             parallelIndicator = <Lock className="text-muted-foreground/30 size-4" />;
                         } else if (isParallelSelected) {
-                            parallelIndicator = <CheckSquare2 className="text-primary size-4" />;
+                            parallelIndicator = <CheckSquare2 className="text-primary-text size-4" />;
                         } else {
                             parallelIndicator = <Square className={cn("size-4", isDisabled ? "text-muted-foreground/20" : "text-muted-foreground/30")} />;
                         }
@@ -1050,7 +1050,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                 <button
                                     className={cn(
                                         "rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                        modeFilter === null ? "bg-primary/10 text-primary" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                        modeFilter === null ? "bg-primary/10 text-primary-text" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter(null)}
                                     type="button"
@@ -1061,7 +1061,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                     className={cn(
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "text"
-                                            ? "bg-primary/10 text-primary"
+                                            ? "bg-primary/10 text-primary-text"
                                             : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("text")}
@@ -1074,7 +1074,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                     className={cn(
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "image"
-                                            ? "bg-primary/10 text-primary"
+                                            ? "bg-primary/10 text-primary-text"
                                             : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("image")}
@@ -1087,7 +1087,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                     className={cn(
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "video"
-                                            ? "bg-primary/10 text-primary"
+                                            ? "bg-primary/10 text-primary-text"
                                             : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("video")}
@@ -1100,7 +1100,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                     className={cn(
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "speech-to-text"
-                                            ? "bg-primary/10 text-primary"
+                                            ? "bg-primary/10 text-primary-text"
                                             : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("speech-to-text")}
