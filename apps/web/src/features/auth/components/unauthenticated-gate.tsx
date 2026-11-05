@@ -38,14 +38,14 @@ const AdoptSession: FC<{ children: ReactNode }> = ({ children }) => {
  * Registration open: a guest session is made, as it always was
  * (`AutoGuestSignIn`). Invite-only: no guest (the backend refuses one), and
  * `signedOut` instead. Until the backend has said which
- * (`useSignInMethods().inviteOnly`), and while the session read is pending or
- * failed, `loading`, so no guest is made early and no signed-out page flashes
- * over a session that exists.
+ * (`useSignInMethods().inviteOnly`), and while the session read is pending,
+ * `loading`, so no guest is made early and no signed-out page flashes over a
+ * session that exists. A failed read with no session shows `signedOut`.
  */
 const UnauthenticatedGate: FC<{ loading: ReactNode; signedOut: ReactNode }> = ({ loading, signedOut }) => {
     const { inviteOnly } = useSignInMethods();
     const { hooks } = useAuth();
-    const { data: sessionData, error: sessionError, isPending: isSessionPending } = hooks.useSession();
+    const { data: sessionData, isPending: isSessionPending } = hooks.useSession();
 
     if (inviteOnly === undefined) {
         return loading;
@@ -59,7 +59,9 @@ const UnauthenticatedGate: FC<{ loading: ReactNode; signedOut: ReactNode }> = ({
         return <AdoptSession>{loading}</AdoptSession>;
     }
 
-    if (isSessionPending || sessionError) {
+    // A failed read with no session in hand shows the signed-out page rather than loading forever; the session
+    // atom keeps re-reading (`lib/auth/client.ts`), and a session that turns up is adopted above.
+    if (isSessionPending) {
         return loading;
     }
 

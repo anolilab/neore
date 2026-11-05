@@ -92,15 +92,21 @@ describe("UnauthenticatedGate", () => {
         expect(harness.adopt).toHaveBeenCalledTimes(1);
     });
 
-    it.each([
-        ["pending", { data: null, error: null, isPending: true }],
-        ["failed", { data: null, error: new Error("429"), isPending: false }],
-    ])("does not read a %s session read as signed out", (_label, session) => {
+    it("does not read a pending session read as signed out", () => {
         harness.inviteOnly = true;
-        harness.session = session;
+        harness.session = { data: null, error: null, isPending: true };
 
         render(gate());
 
         expect(screen.getByText("loading")).toBeTruthy();
+    });
+
+    it("shows the signed-out page, not loading forever, when the session read failed with no session", () => {
+        harness.inviteOnly = true;
+        harness.session = { data: undefined as never, error: new Error("429"), isPending: false };
+
+        render(gate());
+
+        expect(screen.getByText("signed out")).toBeTruthy();
     });
 });
