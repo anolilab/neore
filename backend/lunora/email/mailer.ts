@@ -12,7 +12,7 @@
  *    is the credential. Email Service rejects a sender off its verified domain
  *    (`E_SENDER_NOT_VERIFIED`).
  *
- * With neither the mailer still queues, and `deliverEmail`'s send rejects,
+ * With neither, the mailer still queues, and `deliverEmail`'s send rejects,
  * so a deploy without a transport fills the jobs DLQ (logged there) instead of
  * dropping password resets silently; `alchemy.run.ts` refuses a production
  * deploy without `MAIL_FROM` for the same reason.
