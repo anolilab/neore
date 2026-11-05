@@ -19,6 +19,7 @@ const CREATOR_DISPLAY_NAMES: Record<string, string> = {
     fal: "fal.ai",
     "fal-ai": "fal.ai",
     google: "Google",
+    ibm: "IBM",
     "ibm-granite": "IBM",
     inception: "Inception",
     inflection: "Inflection",
@@ -60,6 +61,17 @@ export const getCreatorSlug = (model: GatewayModel): string => {
     const displayName = CREATOR_DISPLAY_NAMES[rawSlug];
 
     return displayName ? normalizeProviderSlug(displayName) : rawSlug;
+};
+
+/**
+ * The creator the picker opens scoped to: the one of the model already selected, by the same slug the creator
+ * sidebar uses. `null` (every creator) when the model is not in the list. The id's prefix is not the creator:
+ * `cf-kimi-k2.5` has none, and `moonshotai/…` belongs to `moonshot`.
+ */
+export const initialCreatorSlug = (models: ReadonlyArray<GatewayModel>, modelId: string | undefined): string | null => {
+    const model = modelId === undefined ? undefined : models.find((candidate) => candidate.id === modelId);
+
+    return model ? getCreatorSlug(model) : null;
 };
 
 export const getCreatorDisplayName = (slug: string): string => {

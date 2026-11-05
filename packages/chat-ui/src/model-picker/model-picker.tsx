@@ -28,6 +28,7 @@ import {
     getModelMode,
     getModelModeName,
     groupModelsByCreator,
+    initialCreatorSlug,
     stripProviderPrefix,
 } from "./utils";
 
@@ -345,17 +346,15 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     const [activeTab, setActiveTab] = useState<ModelPickerTab>(defaultTab);
     const [selectionMode, setSelectionMode] = useState<"parallel" | "single">(() => ((initialModelIds?.length ?? 0) > 0 ? "parallel" : "single"));
     const [modeFilter, setModeFilter] = useState<ModelModeFilter>(defaultModeFilter);
-    const [selectedProvider, setSelectedProvider] = useState<string | null>(() => {
-        if (initialModelId) {
-            const slug = initialModelId.split("/", 1)[0];
+    const [selectedProvider, setSelectedProvider] = useState<string | null>(() => initialCreatorSlug(models, initialModelId));
+    // The catalog can arrive after the picker opens: the opening scope is decided once the list has models, unless
+    // the user picked a creator or a tab first.
+    const [isScopeSettled, setIsScopeSettled] = useState(() => models.length > 0);
 
-            if (slug) {
-                return slug;
-            }
-        }
-
-        return null;
-    });
+    if (!isScopeSettled && models.length > 0) {
+        setIsScopeSettled(true);
+        setSelectedProvider(initialCreatorSlug(models, initialModelId));
+    }
 
     const onSelectRef = useRef(onSelect);
     const onSelectMultipleRef = useRef(onSelectMultiple);
@@ -405,6 +404,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     );
 
     const handleProviderSelect = useCallback((slug: string | null) => {
+        setIsScopeSettled(true);
         setSelectedProvider(slug);
         setSearchQuery("");
     }, []);
@@ -413,6 +413,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
     const handleTabChange = useCallback((tab: ModelPickerTab) => {
         setActiveTab(tab);
+        setIsScopeSettled(true);
         setSelectedProvider(null);
         setSearchQuery("");
     }, []);

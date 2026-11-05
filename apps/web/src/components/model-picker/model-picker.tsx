@@ -650,6 +650,14 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const toggleFavorite = useCallback((id: string, setFavorite: boolean) => onToggleFavorite?.(id, setFavorite), [onToggleFavorite]);
 
     const [selectedProvider, setSelectedProvider] = useState<string | null>(() => initialCreatorSlug(sourceModels, initialModelId));
+    // The catalog can arrive after the picker opens: the opening scope is decided once the list has models, unless
+    // the user picked a creator or a tab first.
+    const [isScopeSettled, setIsScopeSettled] = useState(() => sourceModels.length > 0);
+
+    if (!isScopeSettled && sourceModels.length > 0) {
+        setIsScopeSettled(true);
+        setSelectedProvider(initialCreatorSlug(sourceModels, initialModelId));
+    }
 
     const handleModelSelect = useCallback(
         (modelId: string) => {
@@ -698,6 +706,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
     );
 
     const handleProviderSelect = useCallback((slug: string | null) => {
+        setIsScopeSettled(true);
         setSelectedProvider(slug);
         setSearchQuery("");
     }, []);
@@ -737,6 +746,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
 
     const handleTabChange = useCallback((tab: ModelPickerTab) => {
         setActiveTab(tab);
+        setIsScopeSettled(true);
         setSelectedProvider(null);
         setSearchQuery("");
         setInfoModelId(undefined);
