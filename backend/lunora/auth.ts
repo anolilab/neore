@@ -258,12 +258,17 @@ export const API_KEY_OPTIONS = {
  *   either;
  * - the limiter itself is the expensive part: one D1 read + write per request.
  *
+ * `sign-in-methods` is exempt too: it answers the same static JSON to everyone.
+ *
  * Everything a brute-force or mail-bomb would use keeps its strict rule; this
- * map names only the one path it relaxes. `auth.rate-limit.test.ts` drives
+ * map names only the paths it relaxes. `auth.rate-limit.test.ts` drives
  * better-auth's real limiter to pin both halves.
  */
 export const AUTH_RATE_LIMIT_CUSTOM_RULES: Record<string, false | { max: number; window: number }> = {
     "/get-session": false,
+    // Static configuration, read on every chat page load to choose between guest chat and the signed-out chat. The
+    // `/sign-in` prefix rule held it to 3 per 10 s, and a 429 reads as invite-only in the app.
+    "/sign-in-methods": false,
 };
 
 export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions => {
@@ -351,9 +356,9 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
             /**
              * Invite-only registration. Gates email sign-up (including an anonymous
              * user converting to a real account, which creates a new user) and
-             * social first-sign-in. Anonymous sign-in stays open: `inviteOnly()`
-             * exempts rows carrying `isAnonymous` as of `@lunora/auth@127`, so
-             * the wrapper this used to need is gone.
+             * social first-sign-in. Anonymous (guest) sign-in is refused under
+             * the gate by `signInMethods` below (`GUEST_SIGN_IN_DISABLED`);
+             * `inviteOnly()` itself still exempts `isAnonymous` rows.
              *
              * `allowFirstUser` is deliberately left off: it races two concurrent
              * sign-ups and opens a window between deploy and the owner signing up.
@@ -364,7 +369,7 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
             // A guest that converts and verifies in another browser keeps its data (`auth/guest-conversion.ts`).
             ...(hooks.onGuestConverted ? [guestConversion(hooks.onGuestConverted)] : []),
             // `GET /sign-in-methods`, the verified-email rule for OAuth first
-            // sign-in under the invite gate, and no passkeys for guests.
+            // sign-in and the guest refusal under the invite gate, and no passkeys for guests.
             signInMethods(resolveSignInMethods(), { inviteOnly: SIGNUP_INVITE_ONLY }),
             /**
              * Passkeys. Registration needs a signed-in, non-guest session

@@ -26,6 +26,25 @@ const authViewPaths = {
  */
 export const ORGANIZATIONS_SETTINGS_PATH = "/dashboard/settings/auth/organizations";
 
+/**
+ * The query string for a link to another auth view: the current page's, plus `redirectTo` when the form was given
+ * one. The sign-in prompt over a chat passes the chat's URL, so the forgot-password, magic-link and email-code
+ * pages it links to still come back to that chat (`use-success-transition.ts` reads `redirectTo` from the search).
+ */
+export const authViewSearch = (redirectTo?: string): string => {
+    const search = globalThis.location?.search ?? "";
+
+    if (!redirectTo) {
+        return search;
+    }
+
+    const parameters = new URLSearchParams(search);
+
+    parameters.set("redirectTo", redirectTo);
+
+    return `?${parameters.toString()}`;
+};
+
 export type AuthViewPaths = typeof authViewPaths;
 export type AuthView = keyof AuthViewPaths;
 

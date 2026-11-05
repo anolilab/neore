@@ -12,13 +12,14 @@ import { useStore } from "@tanstack/react-form";
 import { Link } from "@tanstack/react-router";
 import type { BetterFetchOption } from "better-auth/react";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as z from "zod";
 
 import useCaptcha from "@/features/auth/hooks/use-captcha";
 import useLastSignInMethod from "@/features/auth/hooks/use-last-signin-method";
 import useOnSuccessTransition from "@/features/auth/hooks/use-success-transition";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { authViewSearch } from "@/features/auth/lib/auth-view-paths";
 import { getLocalizedError, isValidEmail } from "@/features/auth/lib/utilities";
 import type { AuthClientWithUsernamePlugin } from "@/features/auth/types/auth-core-types";
 import type { PasswordValidation } from "@/features/auth/types/form-validation-types";
@@ -27,6 +28,11 @@ import { trackEvent } from "@/lib/analytics";
 
 import Captcha from "../../captcha/captcha";
 import type { AuthFormClassNames } from "../auth-form";
+
+/** A failure while a submit reports its own outcome (a throwing custom toast): logged, not left unhandled. */
+const reportSubmitFailure = (error: unknown): void => {
+    console.error("Sign-in form: reporting the outcome failed", error);
+};
 
 export interface SignInFormProperties {
     className?: string;
@@ -45,6 +51,9 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
     // The address a sign-in was refused for as unverified: offered a new verification link without a session.
     const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
     const [isResending, setIsResending] = useState(false);
+    // The sign-in and the new-link request share one captcha response, which a request spends: one at a time. A ref,
+    // not state, so two clicks in one frame cannot both pass.
+    const inFlightRef = useRef<"resend" | "submit" | null>(null);
 
     const { authClient, basePath, credentials, navigate, toast, viewPaths } = useAuth();
 
@@ -158,6 +167,12 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
             rememberMe: !rememberMeEnabled,
         },
         onSubmit: async ({ value }) => {
+            if (inFlightRef.current) {
+                return;
+            }
+
+            inFlightRef.current = "submit";
+
             try {
                 let response: Record<string, unknown> = {};
 
@@ -199,6 +214,9 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
                 }
 
                 setUnverifiedEmail(null);
+                // Released before anything below can throw (no `finally`: it makes the React Compiler skip this
+                // component), so a failure never leaves every later submit refused.
+                inFlightRef.current = null;
 
                 if (response.twoFactorRedirect) {
                     navigate(`${basePath}/${viewPaths.TWO_FACTOR}${globalThis.location.search}`);
@@ -206,6 +224,8 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
                     await onSuccess();
                 }
             } catch (error) {
+                inFlightRef.current = null;
+
                 const unverified = (error as { error?: { code?: unknown } } | null)?.error?.code === "EMAIL_NOT_VERIFIED";
 
                 // `EMAIL_NOT_VERIFIED` means the password was right: keep it, so a new link can be asked for by
@@ -251,23 +271,31 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
         const email = form.getFieldValue("email");
         const password = form.getFieldValue("password");
 
-        if (!unverifiedEmail || email !== unverifiedEmail || !password) {
+        if (!unverifiedEmail || email !== unverifiedEmail || !password || inFlightRef.current) {
             return;
         }
 
+        inFlightRef.current = "resend";
         setIsResending(true);
 
         try {
-            await authClient.signIn.email({
+            const response: Record<string, unknown> = await authClient.signIn.email({
                 email,
                 fetchOptions: { headers: await getCaptchaHeaders("/sign-in/email"), throw: true },
                 password,
                 rememberMe: form.getFieldValue("rememberMe"),
             });
 
-            // Verified in the meantime: this was a normal sign-in.
+            // Verified in the meantime: this was a normal sign-in, and finishes like one.
+            saveLastSignIn("email", email);
+            trackEvent("signed_in", { provider: "email" });
             setUnverifiedEmail(null);
-            await onSuccess();
+
+            if (response.twoFactorRedirect) {
+                navigate(`${basePath}/${viewPaths.TWO_FACTOR}${globalThis.location.search}`);
+            } else {
+                await onSuccess();
+            }
         } catch (error) {
             if ((error as { error?: { code?: unknown } } | null)?.error?.code === "EMAIL_NOT_VERIFIED") {
                 toast({ message: t`Verification email sent`, variant: "success" });
@@ -278,6 +306,7 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
         } finally {
             resetCaptcha();
             setIsResending(false);
+            inFlightRef.current = null;
         }
     };
 
@@ -289,7 +318,7 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
                 onSubmit={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
-                    form.handleSubmit();
+                    form.handleSubmit().catch(reportSubmitFailure);
                 }}
                 suppressHydrationWarning
             >
@@ -332,7 +361,7 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
                                 {credentials?.forgotPassword && (
                                     <Link
                                         className={cn("text-sm hover:underline", classNames?.forgotPasswordLink)}
-                                        to={`${basePath}/${viewPaths.FORGOT_PASSWORD}${isHydrated ? globalThis.location.search : ""}`}
+                                        to={`${basePath}/${viewPaths.FORGOT_PASSWORD}${isHydrated ? authViewSearch(redirectTo) : ""}`}
                                     >
                                         {t`Forgot password?`}
                                     </Link>
@@ -378,14 +407,25 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
 
                 <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting }) as unknown as typeof state}>
                     {({ canSubmit, isSubmitting: isSubmittingState }) => (
-                        <Button className={cn("w-full", classNames?.button, classNames?.primaryButton)} disabled={!canSubmit || isSubmitting} type="submit">
+                        <Button
+                            className={cn("w-full", classNames?.button, classNames?.primaryButton)}
+                            disabled={!canSubmit || isSubmitting || isResending}
+                            type="submit"
+                        >
                             {isSubmittingState || isSubmitting ? <Loader2 className="animate-spin" /> : t`Sign in`}
                         </Button>
                     )}
                 </form.Subscribe>
 
                 {unverifiedEmail ? (
-                    <Button aria-busy={isResending} className="w-full" disabled={isResending} onClick={resendVerification} type="button" variant="outline">
+                    <Button
+                        aria-busy={isResending}
+                        className="w-full"
+                        disabled={isResending || isFormSubmitting}
+                        onClick={resendVerification}
+                        type="button"
+                        variant="outline"
+                    >
                         {isResending ? <Loader2 aria-hidden="true" className="animate-spin" /> : null}
                         {t`Send a new verification link`}
                     </Button>

@@ -54,6 +54,18 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
     };
 });
 
+const inviteOnly = vi.hoisted(() => {
+    return { canSignUp: true, signUpHref: "/auth/sign-up" };
+});
+
+vi.mock("@/features/auth/hooks/use-invite-only", () => {
+    return {
+        default: () => {
+            return { canSignUp: inviteOnly.canSignUp, inviteOnly: !inviteOnly.canSignUp, mustSignIn: false, signUpHref: inviteOnly.signUpHref };
+        },
+    };
+});
+
 vi.mock("@/features/chat/core/hooks/use-model-nicknames", () => {
     return {
         default: () => {
@@ -73,6 +85,8 @@ vi.mock("@tanstack/react-router", () => {
 // Base UI's scroll area constructs a ResizeObserver; the shared setup's stub (redefined before each test) is not a
 // constructor, so this one is set after it.
 beforeEach(() => {
+    inviteOnly.canSignUp = true;
+    inviteOnly.signUpHref = "/auth/sign-up";
     vi.stubGlobal(
         "ResizeObserver",
         class {
@@ -133,5 +147,32 @@ describe("ModelPicker opening scope", () => {
 
         expect(screen.getByText("Kimi K2.5 (Workers AI)")).toBeTruthy();
         expect(screen.queryByText("GPT-5")).toBeNull();
+    });
+});
+
+describe("ModelPicker guest banner", () => {
+    const guestPicker = () => <ModelPicker defaultModeFilter="text" defaultTab="all" footer={null} initialModelId={kimi.id} isAnonymous models={[kimi, gpt]} />;
+
+    it("offers sign-up when registration is open", () => {
+        render(guestPicker());
+
+        expect(screen.getByRole("link", { name: "Subscribe for $8/mo to unlock all models." }).getAttribute("href")).toBe("/auth/sign-up");
+    });
+
+    it("keeps the visitor's invitation on the sign-up link", () => {
+        inviteOnly.signUpHref = "/auth/sign-up?invite=tok";
+
+        render(guestPicker());
+
+        expect(screen.getByRole("link", { name: "Subscribe for $8/mo to unlock all models." }).getAttribute("href")).toBe("/auth/sign-up?invite=tok");
+    });
+
+    it("offers sign-in, not sign-up, under invite-only without an invitation", () => {
+        inviteOnly.canSignUp = false;
+
+        render(guestPicker());
+
+        expect(screen.getByRole("link", { name: "Sign in to unlock all models." }).getAttribute("href")).toBe("/auth/sign-in");
+        expect(screen.queryByRole("link", { name: "Subscribe for $8/mo to unlock all models." })).toBeNull();
     });
 });

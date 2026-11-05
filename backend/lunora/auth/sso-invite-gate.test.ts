@@ -19,6 +19,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const SITE = "http://localhost:3000";
 /** A verify-email link in a queued mail's text. */
 const VERIFY_LINK = /https?:\/\/\S+\/verify-email\S+/;
+/** A magic-link sign-in link in a queued mail's text. */
+const MAGIC_LINK = /https?:\/\/\S+\/magic-link\/verify\S+/;
+/** The token in a reset-password mail's link (`/reset-password/<token>?callbackURL=…`). */
+const RESET_TOKEN = /\/reset-password\/([\w-]+)/;
 const EMAIL = "stranger@example.com";
 const MICROSOFT_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad";
 
@@ -255,6 +259,7 @@ describe("GET /api/auth/sign-in-methods", { timeout: 30_000 }, () => {
         await stubProviders({ emailVerified: true });
 
         expect(await readMethods()).toStrictEqual({
+            inviteOnly: true,
             oidc: { label: "Acme SSO", providerId: "oidc" },
             passkey: true,
             social: ["google", "github", "microsoft"],
@@ -272,7 +277,62 @@ describe("GET /api/auth/sign-in-methods", { timeout: 30_000 }, () => {
         vi.stubEnv("OIDC_ISSUER", "https://idp.example.com");
         vi.stubEnv("OIDC_CLIENT_ID", "");
 
-        expect(await readMethods()).toStrictEqual({ oidc: null, passkey: true, social: [] });
+        expect(await readMethods()).toStrictEqual({ inviteOnly: true, oidc: null, passkey: true, social: [] });
+    });
+
+    it.each([
+        ["unset", undefined, true],
+        ["false", "false", false],
+        ["0", "0", false],
+    ])("reports inviteOnly when SIGNUP_INVITE_ONLY is %s", async (_label, value, expected) => {
+        expect.assertions(1);
+
+        vi.stubEnv("SITE_URL", SITE);
+
+        if (value !== undefined) {
+            vi.stubEnv("SIGNUP_INVITE_ONLY", value);
+        }
+
+        expect(await readMethods()).toMatchObject({ inviteOnly: expected });
+    });
+});
+
+describe("guest sign-in", { timeout: 30_000 }, () => {
+    beforeEach(() => {
+        vi.resetModules();
+        vi.stubEnv("SITE_URL", SITE);
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
+    const signInAsGuest = async () => {
+        const { auth, db } = await createTestAuth();
+        const response = await auth.handler(new Request(`${SITE}/api/auth/sign-in/anonymous`, { headers: { origin: SITE }, method: "POST" }));
+
+        return { db, response };
+    };
+
+    it("is refused while registration is invite-only, and creates no user", async () => {
+        expect.assertions(3);
+
+        const { db, response } = await signInAsGuest();
+
+        expect(response.status).toBe(403);
+        expect(((await response.json()) as { code?: string }).code).toBe("GUEST_SIGN_IN_DISABLED");
+        expect(db.user).toStrictEqual([]);
+    });
+
+    it("still works when registration is open", async () => {
+        expect.assertions(2);
+
+        vi.stubEnv("SIGNUP_INVITE_ONLY", "false");
+
+        const { db, response } = await signInAsGuest();
+
+        expect(response.status).toBe(200);
+        expect(db.user?.map((user) => user.isAnonymous)).toStrictEqual([true]);
     });
 });
 
@@ -407,6 +467,9 @@ describe("passkeys", { timeout: 30_000 }, () => {
     it("refuses to register one for a guest session", async () => {
         expect.assertions(2);
 
+        // Guests exist only while registration is open.
+        vi.stubEnv("SIGNUP_INVITE_ONLY", "false");
+
         const { auth } = await createTestAuth();
         const guest = await auth.handler(new Request(`${SITE}/api/auth/sign-in/anonymous`, { headers: { origin: SITE }, method: "POST" }));
 
@@ -448,6 +511,7 @@ describe("passkeys", { timeout: 30_000 }, () => {
 
 describe("email verification where mail is delivered", { timeout: 30_000 }, () => {
     const PASSWORD = "a-long-enough-password"; // secret-scanner:allow
+    const OWNER_PASSWORD = "the-real-owners-password"; // secret-scanner:allow
 
     beforeEach(async () => {
         vi.resetModules();
@@ -541,6 +605,28 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         expect(db.verification!.some((row) => String(row.identifier).startsWith("guest-conversion:"))).toBe(false);
     });
 
+    it("signs the guest's browser out once its data is handed over from another browser", async () => {
+        expect.assertions(3);
+
+        const { auth, db } = await createTestAuth({ onGuestConverted: async () => undefined });
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+        const guestId = ((await guest.json()) as { user: { id: string } }).user.id;
+        const guestCookie = cookieOf(guest)
+            .split("; ")
+            .filter((cookie) => !cookie.includes("session_data"))
+            .join("; ");
+
+        await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, cookieOf(guest)));
+
+        const [link] = await queuedVerificationLinks();
+        const verified = await auth.handler(new Request(link!, { headers: { origin: SITE } }));
+        const session = await auth.handler(new Request(`${SITE}/api/auth/get-session`, { headers: { cookie: guestCookie, origin: SITE } }));
+
+        expect(verified.status).toBeLessThan(400);
+        expect(await session.json()).toBeNull();
+        expect(db.session!.some((row) => row.userId === guestId)).toBe(false);
+    });
+
     it("keeps the guest when queueing the move fails, and hands it over at the next sign-in", async () => {
         expect.assertions(4);
 
@@ -589,7 +675,7 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         const magicLink = jobsQueueMessages
             .map((queued) => queued.body.args?.message)
             .filter((message) => message?.subject === "Sign in to your account")
-            .flatMap((message) => /https?:\/\/\S+\/magic-link\/verify\S+/.exec(message?.text ?? "")?.[0] ?? [])
+            .flatMap((message) => MAGIC_LINK.exec(message?.text ?? "")?.[0] ?? [])
             .at(-1);
 
         await auth.handler(new Request(magicLink!, { headers: { origin: SITE } }));
@@ -599,8 +685,8 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         expect(pendingRows()).toHaveLength(1);
     });
 
-    it("queues the move at sign-up when the guest cannot be recorded, so verifying elsewhere loses nothing", async () => {
-        expect.assertions(3);
+    it("moves nothing when the guest cannot be recorded at sign-up, even after the owner resets and verifies", async () => {
+        expect.assertions(5);
 
         const onGuestConverted = vi.fn(async () => undefined);
         const { auth, db } = await createTestAuth({ onGuestConverted });
@@ -615,12 +701,26 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
             return create(data);
         });
 
+        // A stranger signs up with the owner's address from a guest session; the record cannot be written.
         const guest = await auth.handler(post("/sign-in/anonymous", {}));
-        const guestId = ((await guest.json()) as { user: { id: string } }).user.id;
-        const signUp = await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, cookieOf(guest)));
+        const signUp = await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Stranger", password: PASSWORD }, cookieOf(guest)));
 
         expect(signUp.status).toBe(200);
-        expect(onGuestConverted).toHaveBeenCalledExactlyOnceWith(guestId, db.user!.find((row) => row.email === EMAIL)?.id);
+        // No password binding, so no move: not at sign-up, and not after the owner takes the address back.
+        expect(onGuestConverted).not.toHaveBeenCalled();
+
+        await auth.handler(post("/request-password-reset", { email: EMAIL, redirectTo: "/auth/reset-password" }));
+
+        const [token] = await queuedResetTokens();
+
+        await auth.handler(post("/reset-password", { newPassword: OWNER_PASSWORD, token: token! }));
+        await auth.handler(post("/sign-in/email", { email: EMAIL, password: OWNER_PASSWORD }));
+
+        const links = await queuedVerificationLinks();
+        const verified = await auth.handler(new Request(links.at(-1)!, { headers: { origin: SITE } }));
+
+        expect(verified.status).toBeLessThan(400);
+        expect(onGuestConverted).not.toHaveBeenCalled();
         expect(db.verification!.some((row) => String(row.identifier).startsWith("guest-conversion:"))).toBe(false);
     });
 
@@ -651,7 +751,7 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         const pending = db.verification!.find((row) => String(row.identifier).startsWith("guest-conversion:"));
 
         expect(signIn.status).toBe(403);
-        expect(pending?.value).toBe(guestId);
+        expect(JSON.parse(String(pending?.value))).toMatchObject({ guest: guestId });
 
         const [, link] = await queuedVerificationLinks();
         const verified = await auth.handler(new Request(link!, { headers: { origin: SITE } }));
@@ -682,5 +782,119 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
 
         expect(signIn.status).toBe(403);
         expect((pending()!.expiresAt as Date).getTime()).toBeGreaterThan(nearlyExpired.getTime() + 24 * 60 * 60 * 1000);
+    });
+
+    /** The password-reset tokens queued for delivery since the test began. */
+    const queuedResetTokens = async (): Promise<string[]> => {
+        const { jobsQueueMessages } = (await import("cloudflare:workers")) as unknown as {
+            jobsQueueMessages: { body: { args?: { message?: { subject?: string; text?: string } } } }[];
+        };
+
+        return jobsQueueMessages.map((queued) => queued.body.args?.message?.text ?? "").flatMap((text) => RESET_TOKEN.exec(text)?.[1] ?? []);
+    };
+
+    it("does not hand a stranger's guest over to the owner who reset the password", async () => {
+        expect.assertions(4);
+
+        const onGuestConverted = vi.fn(async () => undefined);
+        const { auth, db } = await createTestAuth({ onGuestConverted });
+
+        // A stranger signs up, from a guest session, with the owner's address.
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+
+        await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Stranger", password: PASSWORD }, cookieOf(guest)));
+
+        // The owner resets the password, signs in (mailing a new verification link) and verifies.
+        await auth.handler(post("/request-password-reset", { email: EMAIL, redirectTo: "/auth/reset-password" }));
+
+        const [token] = await queuedResetTokens();
+        const reset = await auth.handler(post("/reset-password", { newPassword: OWNER_PASSWORD, token: token! }));
+
+        expect(reset.status).toBe(200);
+
+        await auth.handler(post("/sign-in/email", { email: EMAIL, password: OWNER_PASSWORD }));
+
+        const links = await queuedVerificationLinks();
+        const verified = await auth.handler(new Request(links.at(-1)!, { headers: { origin: SITE } }));
+
+        expect(verified.status).toBeLessThan(400);
+        expect(onGuestConverted).not.toHaveBeenCalled();
+        expect(db.verification!.some((row) => String(row.identifier).startsWith("guest-conversion:"))).toBe(false);
+    });
+
+    /** Makes every read of a guest-conversion record fail, as a D1 error would; other verification reads still work. */
+    const failGuestRecordReads = async (auth: Awaited<ReturnType<typeof createTestAuth>>["auth"]) => {
+        const { internalAdapter } = await auth.$context;
+        const find = internalAdapter.findVerificationValue.bind(internalAdapter);
+
+        return vi.spyOn(internalAdapter, "findVerificationValue").mockImplementation(async (identifier) => {
+            if (identifier.startsWith("guest-conversion:")) {
+                throw new Error("D1 unavailable");
+            }
+
+            return find(identifier);
+        });
+    };
+
+    it("still verifies and signs in when the guest record cannot be read, and keeps the record", async () => {
+        expect.assertions(4);
+
+        const onGuestConverted = vi.fn(async () => undefined);
+        const { auth, db } = await createTestAuth({ onGuestConverted });
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+
+        await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, cookieOf(guest)));
+        await failGuestRecordReads(auth);
+
+        const [link] = await queuedVerificationLinks();
+        const verified = await auth.handler(new Request(link!, { headers: { origin: SITE } }));
+        const signIn = await auth.handler(post("/sign-in/email", { email: EMAIL, password: PASSWORD }));
+
+        expect(verified.status).toBeLessThan(400);
+        expect(signIn.status).toBe(200);
+        expect(onGuestConverted).not.toHaveBeenCalled();
+        expect(db.verification!.some((row) => String(row.identifier).startsWith("guest-conversion:"))).toBe(true);
+    });
+
+    it("still refuses an unverified sign-in with EMAIL_NOT_VERIFIED when the guest record cannot be read", async () => {
+        expect.assertions(2);
+
+        const { auth } = await createTestAuth({ onGuestConverted: async () => undefined });
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+
+        await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, cookieOf(guest)));
+        await failGuestRecordReads(auth);
+
+        const signIn = await auth.handler(post("/sign-in/email", { email: EMAIL, password: PASSWORD }));
+
+        expect(signIn.status).toBe(403);
+        expect(((await signIn.json()) as { code?: string }).code).toBe("EMAIL_NOT_VERIFIED");
+    });
+
+    it("still answers a guest's sign-up when its session cannot be read", async () => {
+        expect.assertions(3);
+
+        const { auth, db } = await createTestAuth({ onGuestConverted: async () => undefined });
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+        const { internalAdapter } = await auth.$context;
+        let reads = 0;
+
+        // The only session read in a sign-up is the guest-conversion hook's, after the account exists.
+        vi.spyOn(internalAdapter, "findSession").mockImplementation(async () => {
+            reads += 1;
+
+            throw new Error("D1 unavailable");
+        });
+
+        // Without the signed session cache, so every session read goes to the store.
+        const tokenOnly = cookieOf(guest)
+            .split("; ")
+            .filter((cookie) => !cookie.includes("session_data"))
+            .join("; ");
+        const signUp = await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, tokenOnly));
+
+        expect(signUp.status).toBe(200);
+        expect(db.user!.some((row) => row.email === EMAIL)).toBe(true);
+        expect(reads).toBe(1);
     });
 });

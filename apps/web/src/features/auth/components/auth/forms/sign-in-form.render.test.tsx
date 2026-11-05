@@ -252,6 +252,131 @@ describe("SignInForm", () => {
         expect(harness.onSuccess).not.toHaveBeenCalled();
     });
 
+    /** A sign-in left unanswered, with the function that answers it. */
+    const deferred = () => {
+        let settle: (outcome: { reject?: unknown; resolve?: unknown }) => void = () => undefined;
+        const promise = new Promise((resolve, reject) => {
+            settle = ({ reject: rejection, resolve: value }) => (rejection === undefined ? resolve(value) : reject(rejection));
+        });
+
+        return { promise, settle };
+    };
+
+    it("does not submit while a new link is being requested, so the two never spend one captcha", async () => {
+        harness.signInEmail.mockRejectedValueOnce({ error: { code: "EMAIL_NOT_VERIFIED" }, status: 403 });
+
+        const resend = deferred();
+
+        harness.signInEmail.mockReturnValueOnce(resend.promise);
+        render(<SignInForm />);
+        fill("ada@example.com", "correct horse battery");
+        submit();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Send a new verification link" }));
+        await waitFor(() => expect(harness.signInEmail).toHaveBeenCalledTimes(2));
+
+        expect((screen.getByRole("button", { name: "Sign in" }) as HTMLButtonElement).disabled).toBe(true);
+        // Enter in a field submits the form even with the button disabled.
+        fireEvent.submit(passwordInput());
+        await new Promise((resolve) => {
+            setTimeout(resolve, 50);
+        });
+
+        expect(harness.signInEmail).toHaveBeenCalledTimes(2);
+
+        resend.settle({ reject: { error: { code: "EMAIL_NOT_VERIFIED" }, status: 403 } });
+        await waitFor(() => expect(harness.toast).toHaveBeenLastCalledWith({ message: "Verification email sent", variant: "success" }));
+        // The request that finished resets the captcha it spent.
+        expect(harness.resetCaptcha).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not request a new link while a sign-in is on its way", async () => {
+        harness.signInEmail.mockRejectedValueOnce({ error: { code: "EMAIL_NOT_VERIFIED" }, status: 403 });
+
+        const signIn = deferred();
+
+        harness.signInEmail.mockReturnValueOnce(signIn.promise);
+        render(<SignInForm />);
+        fill("ada@example.com", "correct horse battery");
+        submit();
+
+        const resend = await screen.findByRole("button", { name: "Send a new verification link" });
+
+        submit();
+        await waitFor(() => expect(harness.signInEmail).toHaveBeenCalledTimes(2));
+
+        expect((resend as HTMLButtonElement).disabled).toBe(true);
+        fireEvent.click(resend);
+        await new Promise((resolve) => {
+            setTimeout(resolve, 50);
+        });
+
+        expect(harness.signInEmail).toHaveBeenCalledTimes(2);
+
+        signIn.settle({ resolve: {} });
+        await waitFor(() => expect(harness.onSuccess).toHaveBeenCalledTimes(1));
+    });
+
+    it("sends a two-factor account to the second step when the new-link request signs it in", async () => {
+        harness.signInEmail.mockRejectedValueOnce({ error: { code: "EMAIL_NOT_VERIFIED" }, status: 403 });
+        // Verified in the meantime, and the account has a second factor.
+        harness.signInEmail.mockResolvedValueOnce({ twoFactorRedirect: true });
+        render(<SignInForm />);
+        fill("ada@example.com", "correct horse battery");
+        submit();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Send a new verification link" }));
+
+        await waitFor(() => {
+            expect(harness.navigate).toHaveBeenCalledTimes(1);
+        });
+
+        expect(String(harness.navigate.mock.calls[0]?.[0])).toContain("/auth/two-factor");
+        expect(harness.onSuccess).not.toHaveBeenCalled();
+        expect(harness.saveLastSignIn).toHaveBeenCalledWith("email", "ada@example.com");
+        expect(harness.trackEvent).toHaveBeenCalledWith("signed_in", { provider: "email" });
+    });
+
+    it("finishes like a normal sign-in when the new-link request signs the account in", async () => {
+        harness.signInEmail.mockRejectedValueOnce({ error: { code: "EMAIL_NOT_VERIFIED" }, status: 403 });
+        harness.signInEmail.mockResolvedValueOnce({});
+        render(<SignInForm />);
+        fill("ada@example.com", "correct horse battery");
+        submit();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Send a new verification link" }));
+
+        await waitFor(() => {
+            expect(harness.onSuccess).toHaveBeenCalledTimes(1);
+        });
+
+        expect(harness.navigate).not.toHaveBeenCalled();
+        expect(harness.saveLastSignIn).toHaveBeenCalledWith("email", "ada@example.com");
+    });
+
+    it("lets the next sign-in through when reporting a refused one throws", async () => {
+        harness.signInEmail.mockRejectedValueOnce({ error: { code: "INVALID_EMAIL_OR_PASSWORD" }, status: 401 });
+        // A custom toast renderer that throws while the refusal is reported.
+        harness.toast.mockImplementationOnce(() => {
+            throw new Error("toast renderer failed");
+        });
+        render(<SignInForm />);
+        fill("ada@example.com", "wrong password");
+        submit();
+
+        await waitFor(() => {
+            expect(harness.toast).toHaveBeenCalledTimes(1);
+        });
+
+        harness.signInEmail.mockResolvedValueOnce({});
+        fill("ada@example.com", "correct horse battery");
+        submit();
+
+        await waitFor(() => {
+            expect(harness.signInEmail).toHaveBeenCalledTimes(2);
+        });
+    });
+
     it("does not call the server for an invalid email, and says why", async () => {
         render(<SignInForm />);
         fill("not-an-email", "correct horse battery");

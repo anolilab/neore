@@ -266,6 +266,7 @@ export interface InternalApiTypes {
         };
         hooks: {
             cascadeDeleteUser: FunctionReference<"mutation", { userId: Id<"user"> }, void>;
+            deleteMergedGuest: FunctionReference<"mutation", { userId: string }, { deleted: boolean }>;
             deleteUserRecord: FunctionReference<"mutation", { userDocId: Id<"user"> }, null>;
             initializeUserDefaults: FunctionReference<"mutation", { userId: Id<"user"> }, void>;
             promoteVerifiedAdmin: FunctionReference<"mutation", { userId: Id<"user"> }, void>;
@@ -1480,6 +1481,7 @@ export const internal: InternalApiTypes = {
         },
         hooks: {
             cascadeDeleteUser: { __lunoraRef: "auth_hooks:cascadeDeleteUser" },
+            deleteMergedGuest: { __lunoraRef: "auth_hooks:deleteMergedGuest" },
             deleteUserRecord: { __lunoraRef: "auth_hooks:deleteUserRecord" },
             initializeUserDefaults: { __lunoraRef: "auth_hooks:initializeUserDefaults" },
             promoteVerifiedAdmin: { __lunoraRef: "auth_hooks:promoteVerifiedAdmin" },

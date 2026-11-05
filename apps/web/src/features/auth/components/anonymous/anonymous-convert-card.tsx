@@ -8,6 +8,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Shield } from "lucide-react";
 import type { FC } from "react";
 
+import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
@@ -27,8 +28,10 @@ const AnonymousConvertCard: FC<AnonymousConvertCardProperties> = ({ classNames }
     const { basePath, viewPaths } = useAuth();
     const navigate = useNavigate({ from: "/chat/$threadId" as "/chat/$threadId" | "/dashboard" });
     const { t } = useLingui();
+    // Converting is a sign-up: without an invitation (invite-only) there is nothing to offer.
+    const { canSignUp } = useInviteOnly();
 
-    if (!isAnonymous) {
+    if (!isAnonymous || !canSignUp) {
         return null;
     }
 

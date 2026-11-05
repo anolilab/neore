@@ -25,11 +25,11 @@ msgstr " · modello: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, one {# riga} other {# righe}}, {1, plural, one {# colonna} other {# colonne}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:584
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:596
 msgid "-- INSERT --"
 msgstr "-- INSERISCI --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:584
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:596
 msgid "-- NORMAL --"
 msgstr "-- NORMALE --"
 
@@ -52,23 +52,23 @@ msgstr "\"{0}\" ha variabili che richiedono un valore."
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "\"{0}\" partirà quando le sue dipendenze saranno completate"
 
-#: src/features/chat/thread/composer-input.tsx:571
+#: src/features/chat/thread/composer-input.tsx:572
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "Impossibile allegare «{fileName}»: questo tipo di file non è supportato."
 
-#: src/features/chat/thread/composer-input.tsx:564
+#: src/features/chat/thread/composer-input.tsx:565
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "Impossibile allegare «{fileName}»: il contenuto non corrisponde al tipo di file."
 
-#: src/features/chat/thread/composer-input.tsx:566
+#: src/features/chat/thread/composer-input.tsx:567
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "Impossibile caricare «{fileName}». Controlla la connessione e riprova."
 
-#: src/features/chat/thread/composer-input.tsx:569
+#: src/features/chat/thread/composer-input.tsx:570
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "«{fileName}» è troppo grande. I documenti possono essere al massimo di {maxMegabytes} MB."
 
-#: src/features/chat/thread/composer-input.tsx:570
+#: src/features/chat/thread/composer-input.tsx:571
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "«{fileName}» è troppo grande. I file di questo tipo possono essere al massimo di {maxMegabytes} MB."
 
@@ -506,7 +506,7 @@ msgstr "{0} da {1} valutazioni"
 
 #. placeholder {0}: formatPricePerMillion(model.pricing.input_per_million)
 #. placeholder {1}: formatPricePerMillion(model.pricing.output_per_million)
-#: src/components/model-picker/model-picker.tsx:320
+#: src/components/model-picker/model-picker.tsx:321
 msgid "{0} input, {1} output per 1M tokens"
 msgstr ""
 
@@ -599,7 +599,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "{0} di {1} token usati ({2}%)"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1221
+#: src/components/model-picker/model-picker.tsx:1228
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} di {MAX_PARALLEL} selezionati"
 
@@ -880,16 +880,16 @@ msgstr "{extraRowCount, plural, one {+# altra riga} other {+# altre righe}}"
 msgid "{failed} document(s) could not be added."
 msgstr "Non è stato possibile aggiungere {failed} documento/i."
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:212
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:289
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:211
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:288
 #: src/features/auth/components/settings/account/update-field-card.tsx:73
 #: src/features/auth/components/settings/account/update-field-card.tsx:110
 msgid "{fieldLabel} is invalid"
 msgstr "{fieldLabel} non è valido"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:207
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:221
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:227
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:206
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:220
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:226
 #: src/features/auth/components/settings/account/update-field-card.tsx:68
 #: src/features/auth/components/settings/account/update-field-card.tsx:82
 #: src/features/auth/components/settings/account/update-field-card.tsx:86
@@ -937,7 +937,7 @@ msgstr ""
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:181
+#: src/features/chat/thread/composer-input-area.tsx:184
 msgid "{hiddenRemoved, plural, one {# invisible character was removed from your message.} other {# invisible characters were removed from your message.}}"
 msgstr ""
 
@@ -1274,7 +1274,7 @@ msgstr "{selectedCount, plural, one {# prompt selezionato} other {# prompt selez
 msgid "{selectedCount, plural, one {# thread selected} other {# threads selected}}"
 msgstr "{selectedCount, plural, one {# conversazione selezionata} other {# conversazioni selezionate}}"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:745
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:739
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "{selectedCount} di {MAX_PARALLEL} selezionati"
 
@@ -1430,11 +1430,11 @@ msgstr "1 giorno"
 msgid "1 hour"
 msgstr "1 ora"
 
-#: src/features/marketing/components/landing-page.tsx:334
+#: src/features/marketing/components/landing-page.tsx:335
 msgid "1,000 messages a day"
 msgstr "1.000 messaggi al giorno"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:108
+#: src/features/marketing/components/gateway-landing-page.tsx:109
 msgid "1,000 requests/day"
 msgstr "1.000 richieste/giorno"
 
@@ -1454,7 +1454,7 @@ msgstr "10 secondi"
 msgid "10,000 to 5,000,000. Applies to cases that report no cost — your own API keys or custom endpoints without pricing."
 msgstr "Da 10.000 a 5.000.000. Si applica ai casi che non riportano un costo: le tue chiavi API o endpoint personalizzati senza prezzi."
 
-#: src/features/marketing/components/landing-page.tsx:286
+#: src/features/marketing/components/landing-page.tsx:287
 msgid "10+ models — compare and pick the best"
 msgstr "Oltre 10 modelli: confronta e scegli il migliore"
 
@@ -1478,7 +1478,7 @@ msgstr "Formato 16:9"
 msgid "1970s glass, dreamlike"
 msgstr "Ottiche anni '70, atmosfera onirica"
 
-#: src/features/marketing/components/landing-page.tsx:976
+#: src/features/marketing/components/landing-page.tsx:979
 msgid "20 free messages a day to start. No credit card required. Upgrade when you're ready, cancel anytime."
 msgstr "20 messaggi gratuiti al giorno per iniziare. Nessuna carta di credito richiesta. Passa a un piano superiore quando vuoi, disdici in qualsiasi momento."
 
@@ -1494,7 +1494,7 @@ msgstr "Architettura Mixture-of-Experts da 235B parametri"
 msgid "24 hours"
 msgstr "24 ore"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:161
+#: src/features/marketing/components/gateway-landing-page.tsx:162
 msgid "24/7 support"
 msgstr "Supporto 24/7"
 
@@ -1542,11 +1542,11 @@ msgstr "Oltre 30 modelli di IA per chat, immagini, video, documenti e codice. Un
 msgid "30+ Models, One Thread"
 msgstr "Oltre 30 modelli, una sola conversazione"
 
-#: src/features/marketing/components/landing-page.tsx:827
+#: src/features/marketing/components/landing-page.tsx:830
 msgid "30+ models, one workspace, one price. Free to start — no credit card required."
 msgstr "Oltre 30 modelli, un unico spazio di lavoro, un solo prezzo. Inizia gratis, senza carta di credito."
 
-#: src/features/marketing/components/landing-page.tsx:1080
+#: src/features/marketing/components/landing-page.tsx:1088
 msgid "30+ models. Images, video, code, and documents. 20 free messages a day — no credit card, cancel anytime."
 msgstr "Oltre 30 modelli. Immagini, video, codice e documenti. 20 messaggi gratuiti al giorno — senza carta di credito, disdici quando vuoi."
 
@@ -1574,7 +1574,7 @@ msgstr "MoE da 400B parametri con 13B attivi per token"
 msgid "4K"
 msgstr "4K"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:120
+#: src/features/marketing/components/gateway-landing-page.tsx:121
 msgid "50,000 requests/day"
 msgstr "50.000 richieste/giorno"
 
@@ -1614,7 +1614,7 @@ msgstr "9:16 (verticale)"
 msgid "9:16 ratio"
 msgstr "Formato 9:16"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:160
+#: src/features/marketing/components/gateway-landing-page.tsx:161
 msgid "99.99% SLA"
 msgstr "SLA del 99,99%"
 
@@ -1642,7 +1642,7 @@ msgstr "Un coordinatore sceglie chi risponde: fino a tre per messaggio."
 msgid "A dataset is a set of test cases you run against an agent, a model or your knowledge base."
 msgstr "Un dataset è un insieme di casi di test da eseguire su un agente, un modello o la tua base di conoscenza."
 
-#: src/features/marketing/components/landing-page.tsx:217
+#: src/features/marketing/components/landing-page.tsx:218
 msgid "A document editor that thinks with you."
 msgstr "Un editor di documenti che pensa con te."
 
@@ -1799,7 +1799,7 @@ msgstr "A-Z"
 msgid "A4 Flyer"
 msgstr "Volantino A4"
 
-#: src/features/marketing/components/gateway-footer.tsx:17
+#: src/features/marketing/components/gateway-footer.tsx:18
 #: src/features/marketing/components/landing-footer.tsx:101
 msgid "About"
 msgstr "Chi siamo"
@@ -2085,10 +2085,10 @@ msgstr "Aggiungi almeno un modello: usa \"Recupera modelli\" o digita gli ID"
 msgid "Add at least one model id"
 msgstr "Aggiungi almeno un ID modello"
 
-#: src/features/chat/thread/composer-input-area.tsx:221
-#: src/features/chat/thread/composer-input-area.tsx:255
-#: src/features/chat/thread/composer-input-area.tsx:262
-#: src/features/chat/thread/composer-input-area.tsx:276
+#: src/features/chat/thread/composer-input-area.tsx:224
+#: src/features/chat/thread/composer-input-area.tsx:258
+#: src/features/chat/thread/composer-input-area.tsx:265
+#: src/features/chat/thread/composer-input-area.tsx:279
 #: src/features/chat/thread/edit-composer.tsx:132
 msgid "Add attachment"
 msgstr "Aggiungi allegato"
@@ -2302,7 +2302,7 @@ msgid "Add to review"
 msgstr ""
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:168
-#: src/components/model-picker/model-picker.tsx:341
+#: src/components/model-picker/model-picker.tsx:342
 msgid "Add to starred"
 msgstr "Aggiungi ai contrassegnati"
 
@@ -2504,7 +2504,7 @@ msgstr "Ragionamento e generazione avanzati su più file"
 msgid "Advanced multimodal analysis capabilities"
 msgstr "Capacità avanzate di analisi multimodale"
 
-#: src/features/marketing/components/landing-page.tsx:64
+#: src/features/marketing/components/landing-page.tsx:65
 msgid "Advanced multimodal reasoning"
 msgstr "Ragionamento multimodale avanzato"
 
@@ -2524,11 +2524,11 @@ msgstr "Modello video Kling con ragionamento avanzato e output 4K nativo"
 msgid "Advanced reasoning with improved output quality"
 msgstr "Ragionamento avanzato con una qualità dell'output migliorata"
 
-#: src/features/marketing/components/landing-page.tsx:152
+#: src/features/marketing/components/landing-page.tsx:153
 msgid "Advanced video AI"
 msgstr "IA video avanzata"
 
-#: src/features/marketing/components/landing-page.tsx:66
+#: src/features/marketing/components/landing-page.tsx:67
 msgid "Advanced video generation"
 msgstr "Generazione video avanzata"
 
@@ -2710,8 +2710,8 @@ msgstr "Metriche di valutazione dell'IA, esperimenti e analisi della qualità de
 msgid "AI Generate"
 msgstr "Genera con IA"
 
-#: src/features/marketing/components/landing-page.tsx:105
-#: src/features/marketing/components/landing-page.tsx:187
+#: src/features/marketing/components/landing-page.tsx:106
+#: src/features/marketing/components/landing-page.tsx:188
 msgid "AI image generation"
 msgstr "Generazione di immagini con IA"
 
@@ -2752,16 +2752,16 @@ msgstr "Modelli AI di generazione di testo, immagini e video"
 msgid "AI updated this document"
 msgstr "L'IA ha aggiornato questo documento"
 
-#: src/features/marketing/components/landing-page.tsx:188
+#: src/features/marketing/components/landing-page.tsx:189
 msgid "AI video creation"
 msgstr "Creazione di video con IA"
 
-#: src/features/marketing/components/landing-page.tsx:132
+#: src/features/marketing/components/landing-page.tsx:133
 msgid "AI video editing"
 msgstr "Montaggio video con IA"
 
-#: src/features/marketing/components/landing-page.tsx:65
-#: src/features/marketing/components/landing-page.tsx:151
+#: src/features/marketing/components/landing-page.tsx:66
+#: src/features/marketing/components/landing-page.tsx:152
 msgid "AI video generation"
 msgstr "Generazione di video con IA"
 
@@ -2892,10 +2892,10 @@ msgstr "Allinea verticalmente"
 msgid "Align vertically (V)"
 msgstr "Allinea verticalmente (V)"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:618
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:680
-#: src/components/model-picker/model-picker.tsx:1070
-#: src/components/model-picker/model-picker.tsx:1148
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:612
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:674
+#: src/components/model-picker/model-picker.tsx:1076
+#: src/components/model-picker/model-picker.tsx:1154
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:422
@@ -2980,13 +2980,13 @@ msgstr "Tutti i programmi di installazione"
 msgid "All MCP servers active"
 msgstr "Tutti i server MCP attivi"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:564
-#: src/components/model-picker/model-picker.tsx:1018
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:558
+#: src/components/model-picker/model-picker.tsx:1024
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "Tutti i modelli"
 
-#: src/features/marketing/components/landing-page.tsx:335
+#: src/features/marketing/components/landing-page.tsx:336
 msgid "All models & tools"
 msgstr "Tutti i modelli e gli strumenti"
 
@@ -3024,11 +3024,11 @@ msgstr "Tutta l'organizzazione"
 msgid "All Prompts"
 msgstr "Tutti i prompt"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:108
+#: src/features/marketing/components/gateway-landing-page.tsx:109
 msgid "All providers"
 msgstr "Tutti i provider"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:121
+#: src/features/marketing/components/gateway-landing-page.tsx:122
 msgid "All providers + BYOK"
 msgstr "Tutti i provider + BYOK"
 
@@ -3040,7 +3040,7 @@ msgstr ""
 msgid "All required or unknown checks passed."
 msgstr ""
 
-#: src/features/marketing/components/gateway-footer.tsx:135
+#: src/features/marketing/components/gateway-footer.tsx:141
 #: src/features/marketing/components/landing-footer.tsx:269
 msgid "All rights reserved."
 msgstr "Tutti i diritti riservati."
@@ -3124,7 +3124,7 @@ msgstr "Alloy (neutra)"
 msgid "Alphabetical"
 msgstr "Alfabetico"
 
-#: src/features/auth/components/auth/auth-card.tsx:421
+#: src/features/auth/components/auth/auth-card.tsx:437
 msgid "Already have an account?"
 msgstr "Hai già un account?"
 
@@ -3277,11 +3277,11 @@ msgstr "Anime"
 msgid "Anime and stylized animation projects requiring consistent character design and expressive motion"
 msgstr "Progetti di anime e animazione stilizzata che richiedono un character design coerente e movimenti espressivi"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:752
+#: src/features/marketing/components/gateway-landing-page.tsx:755
 msgid "Annual"
 msgstr "Annuale"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:736
+#: src/features/marketing/components/gateway-landing-page.tsx:739
 msgid "Annual billing"
 msgstr "Fatturazione annuale"
 
@@ -3441,8 +3441,8 @@ msgstr "Chiave API creata"
 msgid "API Keys"
 msgstr "Chiavi API"
 
-#: src/features/marketing/components/gateway-footer.tsx:23
-#: src/features/marketing/components/gateway-landing-page.tsx:655
+#: src/features/marketing/components/gateway-footer.tsx:24
+#: src/features/marketing/components/gateway-landing-page.tsx:658
 msgid "API Reference"
 msgstr "Riferimento API"
 
@@ -3783,7 +3783,7 @@ msgstr "Chiedi qualsiasi cosa a tutti i modelli..."
 msgid "Ask anything to start a new chat…"
 msgstr "Chiedi qualsiasi cosa per iniziare una nuova chat…"
 
-#: src/features/marketing/components/landing-page.tsx:228
+#: src/features/marketing/components/landing-page.tsx:229
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "Fai la stessa domanda a GPT-4, Claude e Gemini. Esegui lo stesso prompt su FLUX, Imagen e Stable Diffusion. Scegli il migliore, non quello predefinito."
 
@@ -3880,8 +3880,8 @@ msgstr "Tentativi: {0}"
 msgid "Auckland"
 msgstr "Auckland"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:668
-#: src/components/model-picker/model-picker.tsx:1122
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:662
+#: src/components/model-picker/model-picker.tsx:1128
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:123
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -3928,7 +3928,7 @@ msgstr "Austria"
 msgid "Auth"
 msgstr "Autenticazione"
 
-#: src/features/auth/components/auth/auth-card.tsx:374
+#: src/features/auth/components/auth/auth-card.tsx:390
 #: src/features/settings/components/chat/native-providers-settings.tsx:575
 msgid "Authentication"
 msgstr "Autenticazione"
@@ -3957,7 +3957,7 @@ msgstr "Auto"
 msgid "Auto Media Enrichment"
 msgstr "Arricchimento multimediale automatico"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:75
+#: src/features/marketing/components/gateway-landing-page.tsx:76
 msgid "Auto pricing"
 msgstr "Prezzi automatici"
 
@@ -4036,7 +4036,7 @@ msgstr "Completamento automatico durante la digitazione"
 msgid "Automate agent execution on schedules, webhooks or events"
 msgstr ""
 
-#: src/features/marketing/components/landing-page.tsx:282
+#: src/features/marketing/components/landing-page.tsx:283
 msgid "Automated multi-step analysis with cited sources"
 msgstr "Analisi automatizzata in più passaggi con fonti citate"
 
@@ -4049,11 +4049,11 @@ msgstr ""
 msgid "Automatic"
 msgstr "Automatico"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:68
+#: src/features/marketing/components/gateway-landing-page.tsx:69
 msgid "Automatic provider health tracking with circuit breaker pattern. Failed providers are bypassed within 30 seconds."
 msgstr "Monitoraggio automatico dello stato dei provider con pattern circuit breaker. I provider non funzionanti vengono esclusi entro 30 secondi."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:48
+#: src/features/marketing/components/gateway-landing-page.tsx:49
 msgid "Automatic query classification (Simple/Standard/Complex/Reasoning) routes each request to the optimal model. Health-aware fallback with circuit breaker pattern ensures 99.9% uptime."
 msgstr "La classificazione automatica delle richieste (Semplice/Standard/Complessa/Ragionamento) indirizza ogni richiesta al modello ottimale. Il fallback basato sullo stato di salute con pattern circuit breaker garantisce un uptime del 99,9%."
 
@@ -4107,7 +4107,7 @@ msgstr "Disponibile dopo il salvataggio della risposta"
 msgid "Available when the reply finishes"
 msgstr ""
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:426
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:419
 #: src/features/auth/components/settings/account/update-avatar-card.tsx:119
 msgid "Avatar"
 msgstr "Avatar"
@@ -4182,7 +4182,7 @@ msgstr "Torna all'editor"
 msgid "Back to Gallery"
 msgstr "Torna alla galleria"
 
-#: src/components/settings/settings-modal.tsx:576
+#: src/components/settings/settings-modal.tsx:589
 msgid "Back to settings sections"
 msgstr ""
 
@@ -4393,7 +4393,7 @@ msgstr "Bielorusso (Bielorussia)"
 msgid "Belgium"
 msgstr "Belgio"
 
-#: src/features/marketing/components/landing-page.tsx:764
+#: src/features/marketing/components/landing-page.tsx:767
 msgid "Benefits"
 msgstr "Vantaggi"
 
@@ -4766,7 +4766,7 @@ msgstr "Porta avanti"
 msgid "Bring your own API keys for AI providers and tools. Manage encrypted keys in settings."
 msgstr "Usa le tue chiavi API per provider e strumenti di IA. Gestisci le chiavi crittografate nelle impostazioni."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:83
+#: src/features/marketing/components/gateway-landing-page.tsx:84
 msgid "Bring your own API keys for any supported provider. Keys are encrypted at rest and never logged."
 msgstr "Usa le tue chiavi API per qualsiasi provider supportato. Le chiavi sono crittografate a riposo e mai registrate nei log."
 
@@ -4894,11 +4894,11 @@ msgstr "Crea bozza"
 msgid "Build with AI"
 msgstr "Crea con l'IA"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:580
+#: src/features/marketing/components/gateway-landing-page.tsx:583
 msgid "Built for <0>production.</0>"
 msgstr "Pensato per <0>la produzione.</0>"
 
-#: src/features/marketing/components/landing-page.tsx:916
+#: src/features/marketing/components/landing-page.tsx:919
 msgid "Built for <0>real workflows.</0>"
 msgstr "Pensato per <0>flussi di lavoro reali.</0>"
 
@@ -4932,6 +4932,7 @@ msgstr "Bulgaro"
 msgid "Bulgarian (Bulgaria)"
 msgstr "Bulgaro (Bulgaria)"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:155
 #: src/features/chat/thread-list/thread-list-header.tsx:167
 #: src/features/chat/thread-list/thread-list-header.tsx:178
 msgid "Bulk actions"
@@ -4976,7 +4977,7 @@ msgstr "Da:"
 msgid "byok"
 msgstr ""
 
-#: src/features/marketing/components/gateway-landing-page.tsx:85
+#: src/features/marketing/components/gateway-landing-page.tsx:86
 msgid "BYOK support"
 msgstr "Supporto BYOK"
 
@@ -5057,7 +5058,7 @@ msgstr "Cache"
 msgid "Cache Hit Rate"
 msgstr "Tasso di hit della cache"
 
-#: src/components/model-picker/model-picker.tsx:211
+#: src/components/model-picker/model-picker.tsx:212
 #: src/features/chat/thread/message-cost-badge.tsx:56
 msgid "Cached input"
 msgstr "Input in cache"
@@ -5091,11 +5092,11 @@ msgstr "Può commentare"
 msgid "Can edit"
 msgstr "Può modificare"
 
-#: src/features/marketing/components/landing-page.tsx:261
+#: src/features/marketing/components/landing-page.tsx:262
 msgid "Can I generate images and videos?"
 msgstr "Posso generare immagini e video?"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:190
+#: src/features/marketing/components/gateway-landing-page.tsx:191
 msgid "Can I use my own API keys?"
 msgstr "Posso usare le mie chiavi API?"
 
@@ -5272,7 +5273,7 @@ msgstr "Impossibile usare il prompt: {errorMessages}"
 msgid "Canny Edge"
 msgstr "Canny Edge"
 
-#: src/features/marketing/components/landing-page.tsx:216
+#: src/features/marketing/components/landing-page.tsx:217
 msgid "Canvas"
 msgstr "Canvas"
 
@@ -5280,15 +5281,15 @@ msgstr "Canvas"
 msgid "Canvas & Artifacts"
 msgstr "Canvas e artefatti"
 
-#: src/features/marketing/components/landing-page.tsx:322
+#: src/features/marketing/components/landing-page.tsx:323
 msgid "Canvas editor"
 msgstr "Editor canvas"
 
-#: src/features/marketing/components/landing-page.tsx:284
+#: src/features/marketing/components/landing-page.tsx:285
 msgid "Canvas Editor"
 msgstr "Editor canvas"
 
-#: src/features/marketing/components/landing-page.tsx:264
+#: src/features/marketing/components/landing-page.tsx:265
 msgid "Canvas opens a side-by-side editor next to your chat. Write long-form documents, edit code, and refine content with AI assistance. Changes are versioned so you can always go back."
 msgstr "Canvas apre un editor affiancato alla chat. Scrivi documenti lunghi, modifica codice e perfeziona i contenuti con l'aiuto dell'IA. Le modifiche sono versionate, così puoi sempre tornare indietro."
 
@@ -5320,7 +5321,7 @@ msgstr "Didascalia"
 msgid "Caption text"
 msgstr "Testo della didascalia"
 
-#: src/features/chat/thread/composer-input-area.tsx:250
+#: src/features/chat/thread/composer-input-area.tsx:253
 msgid "Capture screen"
 msgstr "Cattura schermo"
 
@@ -5494,7 +5495,7 @@ msgstr "coerenza dei personaggi"
 msgid "Character Consistency"
 msgstr "Coerenza dei personaggi"
 
-#: src/features/marketing/components/landing-page.tsx:82
+#: src/features/marketing/components/landing-page.tsx:83
 msgid "Character performance"
 msgstr "Interpretazione dei personaggi"
 
@@ -5526,7 +5527,7 @@ msgstr "chat"
 msgid "Chat"
 msgstr "Chat"
 
-#: src/features/marketing/components/landing-page.tsx:565
+#: src/features/marketing/components/landing-page.tsx:568
 msgid "Chat · Images · Video · Audio · Documents"
 msgstr "Chat · Immagini · Video · Audio · Documenti"
 
@@ -5591,7 +5592,7 @@ msgstr "Chatta con il bot IA nei canali Discord. Ogni canale corrisponde a una c
 msgid "Chat with the AI from a Feishu or Lark custom app bot, in direct messages or groups."
 msgstr "Chatta con l'IA tramite il bot di un'app personalizzata Feishu o Lark, in messaggi diretti o nei gruppi."
 
-#: src/features/marketing/components/landing-page.tsx:705
+#: src/features/marketing/components/landing-page.tsx:708
 msgid "Chat, create, <0>and build.</0>"
 msgstr "Chatta, crea <0>e costruisci.</0>"
 
@@ -5599,11 +5600,11 @@ msgstr "Chatta, crea <0>e costruisci.</0>"
 msgid "chatgpt"
 msgstr ""
 
-#: src/features/marketing/components/landing-page.tsx:223
+#: src/features/marketing/components/landing-page.tsx:224
 msgid "ChatGPT ($20), Midjourney ($10–30), Runway ($15), Claude ($20) — that's $85+/month. Neore gives you all of them for $20."
 msgstr "ChatGPT (20 $), Midjourney (10–30 $), Runway (15 $), Claude (20 $): sono oltre 85 $ al mese. Neore te li offre tutti per 20 $."
 
-#: src/features/marketing/components/landing-page.tsx:276
+#: src/features/marketing/components/landing-page.tsx:277
 msgid "ChatGPT gives you one model family. Neore gives you 30+ models from 12 providers — chat, image generation, video creation, a canvas editor, code execution, and deep research. Same $20/month, but you get GPT-4 plus Claude, Gemini, FLUX, Runway, and 25 more."
 msgstr "ChatGPT ti offre una sola famiglia di modelli. Neore te ne offre più di 30 da 12 provider: chat, generazione di immagini, creazione di video, un editor canvas, esecuzione di codice e ricerca approfondita. Stessi 20 $ al mese, ma ottieni GPT-4 più Claude, Gemini, FLUX, Runway e altri 25."
 
@@ -5829,7 +5830,7 @@ msgstr "Cinematografico"
 msgid "Cinematic (ultra-wide)"
 msgstr "Cinematografico (ultra-wide)"
 
-#: src/features/marketing/components/landing-page.tsx:168
+#: src/features/marketing/components/landing-page.tsx:169
 msgid "Cinematic AI video"
 msgstr "Video IA cinematografici"
 
@@ -5849,8 +5850,8 @@ msgstr "Qualità cinematografica con movimento migliorato"
 msgid "Cinematic texture and material quality"
 msgstr "Qualità cinematografica di texture e materiali"
 
-#: src/features/marketing/components/landing-page.tsx:133
-#: src/features/marketing/components/landing-page.tsx:195
+#: src/features/marketing/components/landing-page.tsx:134
+#: src/features/marketing/components/landing-page.tsx:196
 msgid "Cinematic video AI"
 msgstr "IA video cinematografica"
 
@@ -5883,7 +5884,7 @@ msgstr "Cerchio"
 msgid "Circuit breaker status from the last 5 minutes"
 msgstr "Stato dei circuit breaker negli ultimi 5 minuti"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:70
+#: src/features/marketing/components/gateway-landing-page.tsx:71
 msgid "Circuit breakers"
 msgstr "Circuit breaker"
 
@@ -5911,7 +5912,7 @@ msgstr "Claude Code (agente di coding)"
 msgid "Claude Code and other MCP clients can reach your account with this key. They only see the tools its permissions allow."
 msgstr ""
 
-#: src/features/marketing/components/gateway-landing-page.tsx:34
+#: src/features/marketing/components/gateway-landing-page.tsx:35
 msgid "Claude Opus, Sonnet, Haiku — latest model family"
 msgstr "Claude Opus, Sonnet, Haiku: l'ultima famiglia di modelli"
 
@@ -6026,7 +6027,7 @@ msgstr "Clic"
 msgid "Click \"{selector}\""
 msgstr "Clic su \"{selector}\""
 
-#: src/components/model-picker/model-picker.tsx:1180
+#: src/components/model-picker/model-picker.tsx:1186
 msgid "Click ★ on any model in All models to add it here."
 msgstr "Clicca ★ su un modello in Tutti i modelli per aggiungerlo qui."
 
@@ -6055,11 +6056,11 @@ msgstr "Clicca il pulsante qui sotto per registrare una nuova passkey con il tuo
 msgid "Click the pin icon on any message to save it here."
 msgstr "Clicca l'icona della puntina su un messaggio per salvarlo qui."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:706
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:700
 msgid "Click the star on any model in All models to add it here."
 msgstr "Fai clic sulla stella di un modello in Tutti i modelli per aggiungerlo qui."
 
-#: src/features/chat/thread/composer-input.tsx:301
+#: src/features/chat/thread/composer-input.tsx:302
 msgid "Click to edit"
 msgstr "Clicca per modificare"
 
@@ -6199,7 +6200,7 @@ msgstr "I modelli Cloudflare Workers AI vengono eseguiti ovunque Cloudflare abbi
 msgid "Code"
 msgstr "Codice"
 
-#: src/features/marketing/components/landing-page.tsx:337
+#: src/features/marketing/components/landing-page.tsx:338
 msgid "Code execution"
 msgstr "Esecuzione di codice"
 
@@ -6239,7 +6240,7 @@ msgstr "Output del codice"
 msgid "Code review panel"
 msgstr "Pannello di revisione del codice"
 
-#: src/features/marketing/components/landing-page.tsx:283
+#: src/features/marketing/components/landing-page.tsx:284
 msgid "Code Sandbox"
 msgstr "Sandbox di codice"
 
@@ -6332,7 +6333,7 @@ msgstr "Il LLM command avanzato di Cohere, con ragionamento"
 msgid "Cohere's most capable command model"
 msgstr "Il modello Command più capace di Cohere"
 
-#: src/features/marketing/components/landing-page.tsx:350
+#: src/features/marketing/components/landing-page.tsx:351
 msgid "Collaborate with shared AI workflows."
 msgstr "Collabora con workflow IA condivisi."
 
@@ -6560,7 +6561,7 @@ msgstr "Comunicazione"
 msgid "Community Gallery"
 msgstr "Galleria della community"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:108
+#: src/features/marketing/components/gateway-landing-page.tsx:109
 msgid "Community support"
 msgstr "Supporto della community"
 
@@ -6597,7 +6598,7 @@ msgstr "Modello compatto con ragionamento trasparente"
 msgid "Compact reasoning tasks requiring Arcee's efficient small model"
 msgstr "Attività di ragionamento compatte che richiedono il piccolo ed efficiente modello di Arcee"
 
-#: src/features/marketing/components/gateway-footer.tsx:44
+#: src/features/marketing/components/gateway-footer.tsx:45
 #: src/features/marketing/components/landing-footer.tsx:127
 msgid "Company"
 msgstr "Azienda"
@@ -6611,11 +6612,11 @@ msgstr "Confronta"
 msgid "Compare {name}"
 msgstr "Confronta {name}"
 
-#: src/features/marketing/components/landing-page.tsx:230
+#: src/features/marketing/components/landing-page.tsx:231
 msgid "Compare before you commit"
 msgstr "Confronta prima di decidere"
 
-#: src/features/marketing/components/landing-page.tsx:304
+#: src/features/marketing/components/landing-page.tsx:305
 msgid "Compare concepts across FLUX, Runway, and Stable Diffusion. Pick the best style, not the only option."
 msgstr "Confronta idee tra FLUX, Runway e Stable Diffusion. Scegli lo stile migliore, non l'unica opzione."
 
@@ -6694,7 +6695,7 @@ msgstr "Completamento della connessione..."
 msgid "Completion Tokens"
 msgstr "Token di completamento"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:405
+#: src/features/marketing/components/gateway-landing-page.tsx:408
 msgid "Completions · Embeddings · Images · Audio · Video"
 msgstr "Completions · Embeddings · Immagini · Audio · Video"
 
@@ -6861,7 +6862,7 @@ msgstr "Configura i valori delle variabili per questa conversazione. Questi valo
 msgid "Configure Variables"
 msgstr "Configura variabili"
 
-#: src/components/settings/settings-modal.tsx:491
+#: src/components/settings/settings-modal.tsx:504
 msgid "Configure your application settings"
 msgstr "Configura le impostazioni dell'applicazione"
 
@@ -6870,9 +6871,9 @@ msgstr "Configura le impostazioni dell'applicazione"
 msgid "Configured"
 msgstr "Configurato"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:768
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:762
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1243
+#: src/components/model-picker/model-picker.tsx:1250
 msgid "Confirm"
 msgstr "Conferma"
 
@@ -6890,13 +6891,13 @@ msgid "Confirm password"
 msgstr "Conferma password"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:222
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:587
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:580
 #: src/features/auth/components/settings/security/change-password-card.tsx:324
 msgid "Confirm Password"
 msgstr "Conferma password"
 
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:40
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:135
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:134
 #: src/features/auth/components/settings/security/change-password-card.tsx:56
 msgid "Confirm password is required"
 msgstr "La conferma della password è obbligatoria"
@@ -6953,7 +6954,7 @@ msgstr "Collega un nodo immagine come input"
 msgid "Connect and add"
 msgstr ""
 
-#: src/features/marketing/components/landing-page.tsx:288
+#: src/features/marketing/components/landing-page.tsx:289
 msgid "Connect any external tool or API"
 msgstr "Collega qualsiasi strumento o API esterni"
 
@@ -6961,7 +6962,7 @@ msgstr "Collega qualsiasi strumento o API esterni"
 msgid "Connect any OpenAI- or Anthropic-compatible server — Ollama, LM Studio, vLLM or a hosted proxy. Its models appear in the chat model picker."
 msgstr "Collega qualsiasi server compatibile con OpenAI o Anthropic: Ollama, LM Studio, vLLM o un proxy ospitato. I suoi modelli compaiono nel selettore dei modelli della chat."
 
-#: src/features/marketing/components/landing-page.tsx:248
+#: src/features/marketing/components/landing-page.tsx:249
 msgid "Connect APIs, databases, and custom services through integrations. Your workspace grows with your needs."
 msgstr "Collega API, database e servizi personalizzati tramite le integrazioni. Il tuo spazio di lavoro cresce con le tue esigenze."
 
@@ -7194,14 +7195,14 @@ msgstr "console.mistral.ai → Chiavi API. Crittografata a riposo e mai più mos
 msgid "Contact our Data Protection Officer for questions about your data rights"
 msgstr "Contatta il nostro responsabile della protezione dei dati per domande sui tuoi diritti relativi ai dati"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:153
-#: src/features/marketing/components/landing-page.tsx:360
-#: src/features/marketing/components/landing-page.tsx:620
+#: src/features/marketing/components/gateway-landing-page.tsx:154
+#: src/features/marketing/components/landing-page.tsx:361
+#: src/features/marketing/components/landing-page.tsx:623
 msgid "Contact sales"
 msgstr "Contatta le vendite"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:902
-#: src/features/marketing/components/landing-page.tsx:1143
+#: src/features/marketing/components/gateway-landing-page.tsx:910
+#: src/features/marketing/components/landing-page.tsx:1151
 msgid "Contact support"
 msgstr "Contatta l'assistenza"
 
@@ -7224,7 +7225,7 @@ msgstr "Contiene"
 msgid "Content"
 msgstr "Contenuto"
 
-#: src/features/marketing/components/landing-page.tsx:296
+#: src/features/marketing/components/landing-page.tsx:297
 msgid "Content Creation"
 msgstr "Creazione di contenuti"
 
@@ -7240,7 +7241,7 @@ msgstr "URL dell'immagine di contenuto (facoltativo)"
 msgid "Content is required"
 msgstr "Il contenuto è obbligatorio"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:65
+#: src/features/marketing/components/gateway-landing-page.tsx:66
 msgid "Content safety"
 msgstr "Sicurezza dei contenuti"
 
@@ -7269,10 +7270,11 @@ msgstr "Precisione del contesto"
 msgid "Context recall"
 msgstr "Recall del contesto"
 
-#: src/features/marketing/components/landing-page.tsx:240
+#: src/features/marketing/components/landing-page.tsx:241
 msgid "Context that never resets"
 msgstr "Un contesto che non si azzera mai"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:196
 #: src/features/chat/thread/composer-context-count.tsx:116
 msgid "Context Usage"
 msgstr "Utilizzo del contesto"
@@ -7289,7 +7291,7 @@ msgstr "La finestra di contesto è piena. Inizia una nuova conversazione per con
 msgid "Context-aware edits that preserve the original"
 msgstr "Modifiche consapevoli del contesto che preservano l'originale"
 
-#: src/features/marketing/components/landing-page.tsx:115
+#: src/features/marketing/components/landing-page.tsx:116
 msgid "Context-aware generation"
 msgstr "Generazione consapevole del contesto"
 
@@ -7413,12 +7415,12 @@ msgstr ""
 msgid "Conversations on lines this diff no longer shows"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:750
-#: src/features/chat/thread/composer-input.tsx:1303
+#: src/features/chat/thread/composer-input.tsx:751
+#: src/features/chat/thread/composer-input.tsx:1315
 msgid "Conversion failed"
 msgstr "Conversione non riuscita"
 
-#: src/features/auth/components/anonymous/anonymous-convert-card.tsx:50
+#: src/features/auth/components/anonymous/anonymous-convert-card.tsx:53
 #: src/features/chat/thread/composer-long-text-prompt.tsx:68
 msgid "Convert"
 msgstr "Converti"
@@ -7448,7 +7450,7 @@ msgstr "Converti in account completo"
 msgid "Convert to permanent"
 msgstr "Rendi permanente"
 
-#: src/features/auth/components/anonymous/anonymous-convert-card.tsx:42
+#: src/features/auth/components/anonymous/anonymous-convert-card.tsx:45
 msgid "Convert to save your data"
 msgstr "Converti per salvare i tuoi dati"
 
@@ -7710,7 +7712,7 @@ msgstr ""
 msgid "Could not apply the changes"
 msgstr "Impossibile applicare le modifiche"
 
-#: src/features/chat/thread/composer-input.tsx:1325
+#: src/features/chat/thread/composer-input.tsx:1337
 msgid "Could not attach the chat"
 msgstr "Impossibile allegare la chat"
 
@@ -7910,7 +7912,7 @@ msgstr "Anteprima non disponibile · Fai clic per scaricare"
 msgid "Could not pull {0}: {1}"
 msgstr "Impossibile scaricare {0}: {1}"
 
-#: src/features/chat/core/context/chat-context.tsx:655
+#: src/features/chat/core/context/chat-context.tsx:658
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
@@ -7918,11 +7920,11 @@ msgstr ""
 msgid "Could not reach the server. Try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1328
+#: src/features/chat/thread/composer-input.tsx:1340
 msgid "Could not read that chat"
 msgstr "Impossibile leggere quella chat"
 
-#: src/features/chat/thread/composer-input.tsx:1329
+#: src/features/chat/thread/composer-input.tsx:1341
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Impossibile leggere quella chat. Se è bloccata, sbloccala prima."
 
@@ -8163,7 +8165,7 @@ msgstr "Crea un tag…"
 msgid "Create a task, give it success criteria, and run it. You can chain tasks with dependencies and repeat them on a schedule."
 msgstr "Crea un'attività, definisci i criteri di successo ed eseguila. Puoi concatenare le attività con dipendenze e ripeterle secondo una pianificazione."
 
-#: src/components/settings/settings-modal.tsx:153
+#: src/components/settings/settings-modal.tsx:159
 msgid "Create an account"
 msgstr "Crea un account"
 
@@ -8223,7 +8225,7 @@ msgstr "Crea chat di gruppo"
 msgid "Create Images and Videos"
 msgstr "Crea immagini e video"
 
-#: src/features/marketing/components/landing-page.tsx:208
+#: src/features/marketing/components/landing-page.tsx:209
 msgid "Create images with FLUX, Imagen, and Stable Diffusion. Generate videos with Runway, Luma, and Kling. Compare outputs across providers — pick the best result, not the only result."
 msgstr "Crea immagini con FLUX, Imagen e Stable Diffusion. Genera video con Runway, Luma e Kling. Confronta gli output dei vari provider: scegli il risultato migliore, non l'unico."
 
@@ -8261,6 +8263,7 @@ msgstr "Crea organizzazione"
 msgid "Create PR"
 msgstr "Crea PR"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:146
 #: src/features/chat/thread-list/thread-list-header.tsx:127
 #: src/features/chat/thread-list/thread-list-header.tsx:137
 msgid "Create project"
@@ -8379,11 +8382,11 @@ msgstr "Creatività"
 msgid "creative direction"
 msgstr "direzione creativa"
 
-#: src/features/marketing/components/landing-page.tsx:306
+#: src/features/marketing/components/landing-page.tsx:307
 msgid "Creative Direction"
 msgstr "Direzione creativa"
 
-#: src/features/marketing/components/landing-page.tsx:160
+#: src/features/marketing/components/landing-page.tsx:161
 msgid "Creative video AI"
 msgstr "IA video creativa"
 
@@ -8540,8 +8543,8 @@ msgstr "Attualmente limitati"
 
 #: src/features/canvas/components/design-preset-selector.tsx:87
 #: src/features/chat/sharing/thread-share-button.tsx:303
-#: src/features/marketing/components/gateway-landing-page.tsx:789
-#: src/features/marketing/components/landing-page.tsx:1011
+#: src/features/marketing/components/gateway-landing-page.tsx:792
+#: src/features/marketing/components/landing-page.tsx:1014
 #: src/features/prompts/components/prompt-form-dialog.tsx:444
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:77
 msgid "Custom"
@@ -8551,11 +8554,11 @@ msgstr "Personalizzato"
 msgid "Custom (cron)"
 msgstr "Personalizzato (cron)"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:154
+#: src/features/marketing/components/gateway-landing-page.tsx:155
 msgid "Custom deployment for your org."
 msgstr "Deployment personalizzato per la tua organizzazione."
 
-#: src/features/marketing/components/landing-page.tsx:361
+#: src/features/marketing/components/landing-page.tsx:362
 msgid "Custom deployment for your organization."
 msgstr "Deployment personalizzato per la tua organizzazione."
 
@@ -8572,7 +8575,7 @@ msgstr "Endpoint personalizzati"
 msgid "custom instructions"
 msgstr ""
 
-#: src/features/marketing/components/landing-page.tsx:338
+#: src/features/marketing/components/landing-page.tsx:339
 msgid "Custom instructions"
 msgstr "Istruzioni personalizzate"
 
@@ -8582,12 +8585,12 @@ msgstr "Istruzioni personalizzate"
 msgid "Custom Instructions"
 msgstr "Istruzioni personalizzate"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:158
-#: src/features/marketing/components/landing-page.tsx:362
+#: src/features/marketing/components/gateway-landing-page.tsx:159
+#: src/features/marketing/components/landing-page.tsx:363
 msgid "Custom integrations"
 msgstr "Integrazioni personalizzate"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:140
+#: src/features/marketing/components/gateway-landing-page.tsx:141
 msgid "Custom rate limits"
 msgstr "Limiti di frequenza personalizzati"
 
@@ -8746,7 +8749,7 @@ msgstr "Dashboard"
 msgid "Data"
 msgstr "Dati"
 
-#: src/features/marketing/components/landing-page.tsx:314
+#: src/features/marketing/components/landing-page.tsx:315
 msgid "Data & Analysis"
 msgstr "Dati e analisi"
 
@@ -8857,12 +8860,12 @@ msgstr "Riduci il numero di immagini"
 msgid "Decrease Reasoning Effort"
 msgstr ""
 
-#: src/features/marketing/components/gateway-landing-page.tsx:159
+#: src/features/marketing/components/gateway-landing-page.tsx:160
 msgid "Dedicated infrastructure"
 msgstr "Infrastruttura dedicata"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:143
-#: src/features/marketing/components/landing-page.tsx:362
+#: src/features/marketing/components/gateway-landing-page.tsx:144
+#: src/features/marketing/components/landing-page.tsx:363
 msgid "Dedicated support"
 msgstr "Supporto dedicato"
 
@@ -8882,8 +8885,8 @@ msgstr "Ragionamento approfondito per problemi analitici complessi"
 msgid "Deep reasoning tasks with Kimi K2.5's transparent thinking capability"
 msgstr "Attività di ragionamento approfondito con la capacità di pensiero trasparente di Kimi K2.5"
 
-#: src/features/marketing/components/landing-page.tsx:282
-#: src/features/marketing/components/landing-page.tsx:336
+#: src/features/marketing/components/landing-page.tsx:283
+#: src/features/marketing/components/landing-page.tsx:337
 msgid "Deep Research"
 msgstr "Ricerca approfondita"
 
@@ -9035,7 +9038,7 @@ msgstr "Modello predefinito aggiornato"
 msgid "Default Models"
 msgstr "Modelli predefiniti"
 
-#: src/components/model-picker/model-picker.tsx:1133
+#: src/components/model-picker/model-picker.tsx:1139
 msgid "Default order"
 msgstr ""
 
@@ -9165,7 +9168,7 @@ msgstr "Elimina tutto"
 msgid "Delete API Key"
 msgstr "Elimina chiave API"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:463
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:456
 #: src/features/auth/components/settings/account/update-avatar-card.tsx:144
 msgid "Delete Avatar"
 msgstr "Elimina avatar"
@@ -9461,7 +9464,7 @@ msgstr "Profondità"
 msgid "Depth Map"
 msgstr "Mappa di profondità"
 
-#: src/features/marketing/components/landing-page.tsx:118
+#: src/features/marketing/components/landing-page.tsx:119
 msgid "Depth-aware generation"
 msgstr "Generazione consapevole della profondità"
 
@@ -9542,7 +9545,7 @@ msgstr "Descrivi cosa vuoi. Il builder ti fa domande se qualcosa non è chiaro, 
 msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it, then remove the background'"
 msgstr "Descrivi il tuo workflow... ad es. \"Genera un'immagine da un testo, aumentane la risoluzione, poi rimuovi lo sfondo\""
 
-#: src/components/model-picker/model-picker.tsx:166
+#: src/components/model-picker/model-picker.tsx:167
 #: src/features/develop/components/pull-request-view.tsx:72
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
@@ -9641,7 +9644,7 @@ msgstr "Deterministico, coerente"
 msgid "Develop"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:233
+#: src/components/model-picker/model-picker.tsx:234
 #: src/features/marketing/components/tutorials-page.tsx:131
 msgid "Developer"
 msgstr "Sviluppatore"
@@ -9654,11 +9657,11 @@ msgstr "Catalogo software del portale per sviluppatori e automazione dei workflo
 msgid "developer tools"
 msgstr "strumenti per sviluppatori"
 
-#: src/features/marketing/components/landing-page.tsx:116
+#: src/features/marketing/components/landing-page.tsx:117
 msgid "Developer-friendly image AI"
 msgstr "IA per immagini pensata per gli sviluppatori"
 
-#: src/features/marketing/components/gateway-footer.tsx:45
+#: src/features/marketing/components/gateway-footer.tsx:46
 msgid "Developers"
 msgstr "Sviluppatori"
 
@@ -9949,7 +9952,7 @@ msgstr "Documento"
 msgid "Documentary realism, vivid"
 msgstr "Realismo documentaristico, vivido"
 
-#: src/features/marketing/components/gateway-footer.tsx:22
+#: src/features/marketing/components/gateway-footer.tsx:23
 #: src/features/marketing/components/landing-footer.tsx:116
 #: src/routes/docs/$.tsx:42
 #: src/routes/docs/index.tsx:32
@@ -9980,7 +9983,7 @@ msgstr "Non si ripete"
 msgid "Dominican Republic"
 msgstr "Repubblica Dominicana"
 
-#: src/features/auth/components/auth/auth-card.tsx:417
+#: src/features/auth/components/auth/auth-card.tsx:433
 msgid "Don't have an account?"
 msgstr "Non hai un account?"
 
@@ -10169,7 +10172,7 @@ msgstr "Scrivi una bozza di email, report o saggio..."
 msgid "Draft ready — review the fields below before saving."
 msgstr "Bozza pronta: rivedi i campi qui sotto prima di salvare."
 
-#: src/features/marketing/components/landing-page.tsx:214
+#: src/features/marketing/components/landing-page.tsx:215
 msgid "Draft, edit, and refine long-form content in a side-by-side canvas. AI handles the first draft — you shape the final version."
 msgstr "Scrivi, modifica e perfeziona contenuti lunghi in un canvas affiancato. L'IA si occupa della prima bozza, tu dai forma alla versione finale."
 
@@ -10193,7 +10196,7 @@ msgstr "Trascina qui i file"
 msgid "Draw an image"
 msgstr "Disegna un'immagine"
 
-#: src/features/chat/thread/composer-input-area.tsx:244
+#: src/features/chat/thread/composer-input-area.tsx:247
 msgid "Draw image"
 msgstr "Disegna immagine"
 
@@ -10215,7 +10218,7 @@ msgstr "Rilascia un file o fai clic per caricarlo"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1513
+#: src/features/chat/thread/composer-input.tsx:1525
 msgid "Drop files here"
 msgstr "Rilascia qui i file"
 
@@ -10232,7 +10235,7 @@ msgstr "Trascina qui le conversazioni per aggiungerle a questo progetto"
 msgid "Drop your documents and files here. <0/>Maximum of 25 files at a time."
 msgstr "Rilascia qui i tuoi documenti e file. <0/>Massimo 25 file alla volta."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:667
+#: src/features/marketing/components/gateway-landing-page.tsx:670
 msgid "Drop-in replacement for the OpenAI SDK. Change one line and access every provider."
 msgstr "Sostituto immediato dell'SDK di OpenAI. Cambia una riga e accedi a tutti i provider."
 
@@ -10428,7 +10431,7 @@ msgstr "edge"
 msgid "Edge and on-device deployment requiring Mistral's smallest multi-modal model"
 msgstr "Deployment edge e on-device che richiedono il più piccolo modello multimodale di Mistral"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:90
+#: src/features/marketing/components/gateway-landing-page.tsx:91
 msgid "Edge deployed"
 msgstr "Distribuito sull'edge"
 
@@ -10440,7 +10443,7 @@ msgstr "Rilevamento dei bordi"
 msgid "Edge Detection"
 msgstr "Rilevamento dei bordi"
 
-#: src/features/marketing/components/landing-page.tsx:119
+#: src/features/marketing/components/landing-page.tsx:120
 msgid "Edge-guided generation"
 msgstr "Generazione guidata dai bordi"
 
@@ -10491,8 +10494,8 @@ msgstr "Modifica raccolta"
 msgid "Edit comment"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:308
-#: src/features/chat/thread/composer-input.tsx:320
+#: src/features/chat/thread/composer-input.tsx:309
+#: src/features/chat/thread/composer-input.tsx:321
 msgid "Edit content"
 msgstr "Modifica contenuto"
 
@@ -10754,7 +10757,7 @@ msgid "Efficient reasoning with sparse activation"
 msgstr "Ragionamento efficiente con attivazione sparsa"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:165
-#: src/components/model-picker/model-picker.tsx:78
+#: src/components/model-picker/model-picker.tsx:79
 msgid "Effort Control"
 msgstr "Controllo dell'impegno"
 
@@ -10791,8 +10794,8 @@ msgstr ""
 #: src/features/auth/components/auth/forms/email-otp-form.tsx:232
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:107
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:124
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:78
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:536
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:84
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:529
 #: src/features/auth/components/organization/invite-member-dialog.tsx:108
 msgid "Email"
 msgstr "Email"
@@ -10806,7 +10809,7 @@ msgstr "Indirizzo email"
 msgid "Email banner"
 msgstr "Banner email"
 
-#: src/features/auth/components/auth/auth-card.tsx:326
+#: src/features/auth/components/auth/auth-card.tsx:335
 msgid "Email Code"
 msgstr "Codice via email"
 
@@ -10823,7 +10826,7 @@ msgstr "Hero email"
 msgid "Email is the same"
 msgstr "L'email è la stessa"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:75
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:81
 msgid "Email or Username"
 msgstr "Email o nome utente"
 
@@ -10835,7 +10838,7 @@ msgstr "Email inviata"
 msgid "Email updated successfully"
 msgstr "Email aggiornata"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:328
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:327
 msgid "Email verification sent"
 msgstr "Email di verifica inviata"
 
@@ -11040,6 +11043,7 @@ msgid "English (UK)"
 msgstr "Inglese (Regno Unito)"
 
 #: src/features/chat/core/utils/language-utilities.ts:151
+#: src/features/chat/signed-out/signed-out-chat.tsx:177
 #: src/features/chat/thread/composer-language-selector.tsx:102
 msgid "English (US)"
 msgstr "Inglese (USA)"
@@ -11070,7 +11074,7 @@ msgstr "Immagine migliorata"
 msgid "Enhanced photorealism over Flux 1.x"
 msgstr "Fotorealismo migliorato rispetto a Flux 1.x"
 
-#: src/features/marketing/components/landing-page.tsx:171
+#: src/features/marketing/components/landing-page.tsx:172
 msgid "Enhanced video AI"
 msgstr "IA video potenziata"
 
@@ -11224,8 +11228,8 @@ msgstr "Inserisci qui il tuo prompt di sistema personalizzato. Verrà usato per 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:188
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:118
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:135
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:90
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:547
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:96
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:540
 msgid "Enter your email"
 msgstr "Inserisci la tua email"
 
@@ -11234,23 +11238,23 @@ msgstr "Inserisci la tua email"
 msgid "Enter your email address"
 msgstr "Inserisci il tuo indirizzo email"
 
-#: src/features/auth/components/auth/auth-card.tsx:355
+#: src/features/auth/components/auth/auth-card.tsx:364
 msgid "Enter your email below to login to your account"
 msgstr "Inserisci la tua email qui sotto per accedere al tuo account"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:87
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:93
 msgid "Enter your email or username"
 msgstr "Inserisci la tua email o il nome utente"
 
-#: src/features/auth/components/auth/auth-card.tsx:325
+#: src/features/auth/components/auth/auth-card.tsx:334
 msgid "Enter your email to receive a code"
 msgstr "Inserisci la tua email per ricevere un codice"
 
-#: src/features/auth/components/auth/auth-card.tsx:337
+#: src/features/auth/components/auth/auth-card.tsx:346
 msgid "Enter your email to receive a magic link"
 msgstr "Inserisci la tua email per ricevere un magic link"
 
-#: src/features/auth/components/auth/auth-card.tsx:331
+#: src/features/auth/components/auth/auth-card.tsx:340
 msgid "Enter your email to reset your password"
 msgstr "Inserisci la tua email per reimpostare la password"
 
@@ -11258,7 +11262,7 @@ msgstr "Inserisci la tua email per reimpostare la password"
 msgid "Enter your full name or display name"
 msgstr "Inserisci il tuo nome completo o il nome visualizzato"
 
-#: src/features/auth/components/auth/auth-card.tsx:361
+#: src/features/auth/components/auth/auth-card.tsx:377
 msgid "Enter your information to create an account"
 msgstr "Inserisci i tuoi dati per creare un account"
 
@@ -11266,7 +11270,7 @@ msgstr "Inserisci i tuoi dati per creare un account"
 msgid "Enter your location"
 msgstr "Inserisci la tua località"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:496
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:489
 #: src/features/auth/components/settings/account/update-name-card.tsx:25
 msgid "Enter your name"
 msgstr "Inserisci il tuo nome"
@@ -11275,7 +11279,7 @@ msgstr "Inserisci il tuo nome"
 msgid "Enter your new email address below"
 msgstr "Inserisci qui sotto il nuovo indirizzo email"
 
-#: src/features/auth/components/auth/auth-card.tsx:349
+#: src/features/auth/components/auth/auth-card.tsx:358
 msgid "Enter your new password below"
 msgstr "Inserisci qui sotto la nuova password"
 
@@ -11284,13 +11288,13 @@ msgid "Enter your nickname"
 msgstr "Inserisci il tuo soprannome"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:210
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:292
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:573
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:369
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:566
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:157
 msgid "Enter your password"
 msgstr "Inserisci la tua password"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:599
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:592
 msgid "Enter your password again"
 msgstr "Inserisci di nuovo la password"
 
@@ -11314,8 +11318,8 @@ msgstr "Inserisci qui il contenuto del prompt... Usa {VARIABLE_PLACEHOLDER} per 
 msgid "Enter your title instructions..."
 msgstr ""
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:83
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:522
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:89
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:515
 #: src/features/auth/components/settings/account/update-username-card.tsx:30
 msgid "Enter your username"
 msgstr "Inserisci il tuo nome utente"
@@ -11325,8 +11329,8 @@ msgstr "Inserisci il tuo nome utente"
 msgid "enterprise"
 msgstr "enterprise"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:166
-#: src/features/marketing/components/landing-page.tsx:366
+#: src/features/marketing/components/gateway-landing-page.tsx:167
+#: src/features/marketing/components/landing-page.tsx:367
 msgid "Enterprise"
 msgstr "Enterprise"
 
@@ -11338,7 +11342,7 @@ msgstr "Deployment aziendali che richiedono il modello più premium e capace di 
 msgid "Enterprise tasks requiring Cohere's advanced command-following model"
 msgstr "Attività aziendali che richiedono il modello Command avanzato di Cohere, ottimo nel seguire le istruzioni"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:585
+#: src/features/marketing/components/gateway-landing-page.tsx:588
 msgid "Enterprise-grade infrastructure that scales with your application."
 msgstr "Infrastruttura di livello enterprise che cresce con la tua applicazione."
 
@@ -11514,15 +11518,15 @@ msgstr "Ogni giorno alle 8"
 msgid "Every hour"
 msgstr "Ogni ora"
 
-#: src/features/marketing/components/landing-page.tsx:205
+#: src/features/marketing/components/landing-page.tsx:206
 msgid "Every leading AI model. One conversation."
 msgstr "Tutti i principali modelli di IA. Una sola conversazione."
 
-#: src/features/marketing/components/gateway-footer.tsx:62
+#: src/features/marketing/components/gateway-footer.tsx:65
 msgid "Every Model"
 msgstr "Ogni modello"
 
-#: src/features/marketing/components/landing-page.tsx:332
+#: src/features/marketing/components/landing-page.tsx:333
 msgid "Every model and tool, 1,000 messages a day."
 msgstr "Tutti i modelli e gli strumenti, 1.000 messaggi al giorno."
 
@@ -11538,7 +11542,7 @@ msgstr "Ogni modello. <0>Un solo abbonamento.</0>"
 msgid "Every participant answers on its own, without seeing the others; a synthesizer can merge the answers."
 msgstr "Ogni partecipante risponde da solo, senza vedere gli altri; un sintetizzatore può unire le risposte."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:460
+#: src/features/marketing/components/gateway-landing-page.tsx:463
 msgid "Every provider. <0>One SDK.</0>"
 msgstr "Ogni provider. <0>Un unico SDK.</0>"
 
@@ -11567,25 +11571,25 @@ msgstr "uso quotidiano"
 msgid "Everyone answers"
 msgstr "Rispondono tutti"
 
-#: src/features/marketing/components/landing-page.tsx:854
+#: src/features/marketing/components/landing-page.tsx:857
 msgid "Everything built <0>in.</0>"
 msgstr "Tutto <0>integrato.</0>"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:139
-#: src/features/marketing/components/landing-page.tsx:351
+#: src/features/marketing/components/gateway-landing-page.tsx:140
+#: src/features/marketing/components/landing-page.tsx:352
 msgid "Everything in Pro"
 msgstr "Tutto ciò che c'è in Pro"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:156
-#: src/features/marketing/components/landing-page.tsx:362
+#: src/features/marketing/components/gateway-landing-page.tsx:157
+#: src/features/marketing/components/landing-page.tsx:363
 msgid "Everything in Team"
 msgstr "Tutto ciò che c'è in Team"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:875
+#: src/features/marketing/components/gateway-landing-page.tsx:883
 msgid "Everything you need to know about Neore Gateway."
 msgstr "Tutto quello che devi sapere su Neore Gateway."
 
-#: src/features/marketing/components/landing-page.tsx:1116
+#: src/features/marketing/components/landing-page.tsx:1124
 msgid "Everything you need to know about Neore."
 msgstr "Tutto quello che devi sapere su Neore."
 
@@ -11885,7 +11889,7 @@ msgstr "Spiega cause ed effetti del cambiamento climatico"
 msgid "Explore all {modelCount}+ AI models on Neore — {textModelNames}, image generation, video generation, and more. One subscription, every model."
 msgstr "Esplora tutti gli oltre {modelCount} modelli AI su Neore — {textModelNames}, generazione di immagini, generazione video e altro. Un solo abbonamento, tutti i modelli."
 
-#: src/features/marketing/components/landing-page.tsx:289
+#: src/features/marketing/components/landing-page.tsx:290
 msgid "Explore alternate ideas without losing context"
 msgstr "Esplora idee alternative senza perdere il contesto"
 
@@ -11920,6 +11924,7 @@ msgstr "Esportazione annullata"
 
 #: src/features/chat/header/thread-download-button.tsx:103
 #: src/features/chat/header/thread-download-button.tsx:140
+#: src/features/chat/signed-out/signed-out-chat.tsx:294
 msgid "Export chat"
 msgstr "Esporta chat"
 
@@ -11988,7 +11993,7 @@ msgstr "durata estesa"
 msgid "extended thinking"
 msgstr "ragionamento esteso"
 
-#: src/components/model-picker/model-picker.tsx:82
+#: src/components/model-picker/model-picker.tsx:83
 msgid "Extended Thinking"
 msgstr "Ragionamento esteso"
 
@@ -12128,7 +12133,7 @@ msgid "Failed to attach collection"
 msgstr "Impossibile allegare la raccolta"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1165
+#: src/features/chat/thread/composer-input.tsx:1177
 msgid "Failed to attach file"
 msgstr "Impossibile allegare il file"
 
@@ -12525,7 +12530,7 @@ msgstr "Impossibile richiedere l'esportazione"
 msgid "Failed to reset to defaults"
 msgstr "Impossibile ripristinare i valori predefiniti"
 
-#: src/features/chat/thread/composer-input.tsx:1197
+#: src/features/chat/thread/composer-input.tsx:1209
 msgid "Failed to restore attachment"
 msgstr "Impossibile ripristinare l'allegato"
 
@@ -12815,7 +12820,7 @@ msgstr "Impossibile aggiornare il trigger"
 msgid "Failed to update user role"
 msgstr "Impossibile aggiornare il ruolo dell'utente"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:377
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:370
 msgid "Failed to upload avatar"
 msgstr "Impossibile caricare l'avatar"
 
@@ -12853,11 +12858,11 @@ msgstr ""
 msgid "False"
 msgstr "Falso"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:864
-#: src/features/marketing/components/gateway-navbar.tsx:80
-#: src/features/marketing/components/gateway-navbar.tsx:172
+#: src/features/marketing/components/gateway-landing-page.tsx:872
+#: src/features/marketing/components/gateway-navbar.tsx:83
+#: src/features/marketing/components/gateway-navbar.tsx:175
 #: src/features/marketing/components/landing-footer.tsx:115
-#: src/features/marketing/components/landing-page.tsx:1105
+#: src/features/marketing/components/landing-page.tsx:1113
 #: src/features/marketing/components/model-detail-page.tsx:225
 #: src/features/marketing/components/navbar-menu.tsx:85
 #: src/features/marketing/components/navbar-menu.tsx:186
@@ -12912,13 +12917,13 @@ msgid "fast"
 msgstr "veloce"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:153
-#: src/components/model-picker/model-picker.tsx:79
+#: src/components/model-picker/model-picker.tsx:80
 #: src/features/marketing/components/model-detail-page.tsx:33
 #: src/features/settings/components/chat/models-settings.tsx:30
 msgid "Fast"
 msgstr "Veloce"
 
-#: src/features/marketing/components/landing-page.tsx:104
+#: src/features/marketing/components/landing-page.tsx:105
 msgid "Fast and affordable AI"
 msgstr "IA veloce e conveniente"
 
@@ -12962,7 +12967,7 @@ msgstr "Generazione veloce con un'elevata qualità dell'output"
 msgid "Fast generation with professional-quality output"
 msgstr "Generazione veloce con output di qualità professionale"
 
-#: src/features/marketing/components/landing-page.tsx:61
+#: src/features/marketing/components/landing-page.tsx:62
 msgid "Fast image generation"
 msgstr "Generazione di immagini veloce"
 
@@ -13034,8 +13039,8 @@ msgstr "Risposte rapide con qualità migliorata rispetto a Flash 2.x"
 msgid "Fast Seedance 2.0 iterations when speed matters more than maximum quality"
 msgstr "Iterazioni rapide con Seedance 2.0 quando la velocità conta più della massima qualità"
 
-#: src/features/marketing/components/landing-page.tsx:80
-#: src/features/marketing/components/landing-page.tsx:134
+#: src/features/marketing/components/landing-page.tsx:81
+#: src/features/marketing/components/landing-page.tsx:135
 msgid "Fast video generation"
 msgstr "Generazione video veloce"
 
@@ -13095,11 +13100,11 @@ msgstr "Generazione video veloce e di alta qualità con il modello Seedance di l
 msgid "Fast, inexpensive model with live previews"
 msgstr "Modello veloce ed economico con anteprime dal vivo"
 
-#: src/features/marketing/components/landing-page.tsx:322
+#: src/features/marketing/components/landing-page.tsx:323
 msgid "Fast, low-cost models"
 msgstr "Modelli veloci ed economici"
 
-#: src/features/marketing/components/landing-page.tsx:321
+#: src/features/marketing/components/landing-page.tsx:322
 msgid "Fast, low-cost models. 20 messages a day."
 msgstr "Modelli veloci ed economici. 20 messaggi al giorno."
 
@@ -13202,13 +13207,13 @@ msgstr "In evidenza"
 msgid "Featured image"
 msgstr "Immagine in evidenza"
 
-#: src/components/model-picker/model-picker.tsx:178
-#: src/features/marketing/components/gateway-footer.tsx:32
-#: src/features/marketing/components/gateway-landing-page.tsx:508
-#: src/features/marketing/components/gateway-navbar.tsx:53
-#: src/features/marketing/components/gateway-navbar.tsx:145
+#: src/components/model-picker/model-picker.tsx:179
+#: src/features/marketing/components/gateway-footer.tsx:33
+#: src/features/marketing/components/gateway-landing-page.tsx:511
+#: src/features/marketing/components/gateway-navbar.tsx:56
+#: src/features/marketing/components/gateway-navbar.tsx:148
 #: src/features/marketing/components/landing-footer.tsx:110
-#: src/features/marketing/components/landing-page.tsx:698
+#: src/features/marketing/components/landing-page.tsx:701
 #: src/features/marketing/components/navbar-menu.tsx:67
 #: src/features/marketing/components/navbar-menu.tsx:168
 msgid "Features"
@@ -13378,11 +13383,11 @@ msgstr "Filmmaker che creano video cinematografici con una forte attenzione alla
 msgid "Filter by action"
 msgstr "Filtra per azione"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:605
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:599
 msgid "Filter by mode"
 msgstr "Filtra per modalità"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:676
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:670
 msgid "Filter by provider"
 msgstr "Filtra per provider"
 
@@ -13667,7 +13672,7 @@ msgstr ""
 msgid "For example: look hard at error handling, skip the generated files."
 msgstr ""
 
-#: src/features/marketing/components/gateway-landing-page.tsx:118
+#: src/features/marketing/components/gateway-landing-page.tsx:119
 msgid "For production applications."
 msgstr "Per applicazioni in produzione."
 
@@ -13675,11 +13680,11 @@ msgstr "Per applicazioni in produzione."
 msgid "For security reasons, please confirm your password to continue with this action."
 msgstr "Per motivi di sicurezza, conferma la password per proseguire con questa azione."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:107
+#: src/features/marketing/components/gateway-landing-page.tsx:108
 msgid "For side projects and experimentation."
 msgstr "Per progetti personali e sperimentazione."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:136
+#: src/features/marketing/components/gateway-landing-page.tsx:137
 msgid "For teams shipping AI products."
 msgstr "Per team che rilasciano prodotti di IA."
 
@@ -13703,13 +13708,13 @@ msgstr ""
 msgid "Forgot authenticator"
 msgstr "Ho perso l'app di autenticazione"
 
-#: src/features/auth/components/auth/auth-card.tsx:332
+#: src/features/auth/components/auth/auth-card.tsx:341
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:134
 #: src/routes/auth/forgot-password.tsx:17
 msgid "Forgot Password"
 msgstr "Password dimenticata"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:280
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:357
 msgid "Forgot password?"
 msgstr "Password dimenticata?"
 
@@ -13789,8 +13794,8 @@ msgid "France"
 msgstr "Francia"
 
 #: src/features/billing/components/personal-plan-card.tsx:25
-#: src/features/marketing/components/gateway-landing-page.tsx:112
-#: src/features/marketing/components/landing-page.tsx:326
+#: src/features/marketing/components/gateway-landing-page.tsx:113
+#: src/features/marketing/components/landing-page.tsx:327
 #: src/features/settings/components/chat/models-settings.tsx:40
 #: src/features/settings/components/chat/models-settings.tsx:578
 msgid "Free"
@@ -13818,11 +13823,11 @@ msgstr "Gli account gratuiti possono creare fino a 3 prompt. Passa a Pro per ave
 msgid "Free accounts can create up to 5 skills. Upgrade to Pro for unlimited skills."
 msgstr "Gli account gratuiti possono creare fino a 5 skill. Passa a Pro per avere skill illimitate."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:444
+#: src/features/marketing/components/gateway-landing-page.tsx:447
 msgid "Free tier included. No credit card required."
 msgstr "Piano gratuito incluso. Nessuna carta di credito richiesta."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:726
+#: src/features/marketing/components/gateway-landing-page.tsx:729
 msgid "Free tier to start. Scale as you grow. Provider costs passed through at cost — you only pay for the gateway."
 msgstr "Inizia con il piano gratuito. Cresci quando ne hai bisogno. I costi dei provider vengono riaddebitati al prezzo di costo: paghi solo il gateway."
 
@@ -13853,8 +13858,8 @@ msgstr "Francese (Canada)"
 msgid "French (Switzerland)"
 msgstr "Francese (Svizzera)"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:871
-#: src/features/marketing/components/landing-page.tsx:1112
+#: src/features/marketing/components/gateway-landing-page.tsx:879
+#: src/features/marketing/components/landing-page.tsx:1120
 msgid "Frequently asked <0>questions</0>."
 msgstr "Domande <0>frequenti</0>."
 
@@ -13862,7 +13867,7 @@ msgstr "Domande <0>frequenti</0>."
 msgid "From"
 msgstr ""
 
-#: src/features/marketing/components/landing-page.tsx:211
+#: src/features/marketing/components/landing-page.tsx:212
 msgid "From prompt to production-ready visuals."
 msgstr "Dal prompt a immagini pronte per la produzione."
 
@@ -14109,7 +14114,7 @@ msgstr "Elemento della galleria"
 msgid "Gamma"
 msgstr "Gamma"
 
-#: src/features/marketing/components/gateway-navbar.tsx:40
+#: src/features/marketing/components/gateway-navbar.tsx:43
 #: src/routes/admin/route.tsx:54
 msgid "Gateway"
 msgstr "Gateway"
@@ -14135,7 +14140,7 @@ msgstr "Richieste GDPR:"
 msgid "gemini"
 msgstr ""
 
-#: src/features/marketing/components/gateway-landing-page.tsx:33
+#: src/features/marketing/components/gateway-landing-page.tsx:34
 msgid "Gemini 2.5 Pro, Flash, Imagen, Veo, text-embedding"
 msgstr "Gemini 2.5 Pro, Flash, Imagen, Veo, text-embedding"
 
@@ -14406,20 +14411,20 @@ msgstr "Ottieni l'accesso"
 msgid "Get an email with a link to the result when a task or trigger run finishes with one."
 msgstr "Ricevi un'email con un link al risultato quando un'attività o un'esecuzione di trigger termina con un risultato."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:436
-#: src/features/marketing/components/gateway-landing-page.tsx:702
-#: src/features/marketing/components/gateway-landing-page.tsx:847
-#: src/features/marketing/components/gateway-landing-page.tsx:899
-#: src/features/marketing/components/gateway-navbar.tsx:90
-#: src/features/marketing/components/gateway-navbar.tsx:184
+#: src/features/marketing/components/gateway-landing-page.tsx:439
+#: src/features/marketing/components/gateway-landing-page.tsx:705
+#: src/features/marketing/components/gateway-landing-page.tsx:855
+#: src/features/marketing/components/gateway-landing-page.tsx:907
+#: src/features/marketing/components/gateway-navbar.tsx:93
+#: src/features/marketing/components/gateway-navbar.tsx:187
 msgid "Get API key"
 msgstr "Ottieni una chiave API"
 
-#: src/features/marketing/components/gateway-footer.tsx:28
+#: src/features/marketing/components/gateway-footer.tsx:29
 msgid "Get API Key"
 msgstr "Ottieni una chiave API"
 
-#: src/features/marketing/components/landing-page.tsx:299
+#: src/features/marketing/components/landing-page.tsx:300
 msgid "Get cited, multi-step analysis in minutes. Deep Research reads sources so you don't have to."
 msgstr "Ottieni in pochi minuti analisi in più passaggi con citazioni. La Ricerca approfondita legge le fonti al posto tuo."
 
@@ -14427,26 +14432,26 @@ msgstr "Ottieni in pochi minuti analisi in più passaggi con citazioni. La Ricer
 msgid "Get notified or block requests when usage thresholds are reached"
 msgstr "Ricevi una notifica o blocca le richieste al raggiungimento delle soglie di utilizzo"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:559
-#: src/features/marketing/components/landing-page.tsx:320
-#: src/features/marketing/components/landing-page.tsx:750
+#: src/features/marketing/components/gateway-landing-page.tsx:562
+#: src/features/marketing/components/landing-page.tsx:321
+#: src/features/marketing/components/landing-page.tsx:753
 msgid "Get started"
 msgstr "Inizia"
 
-#: src/features/marketing/components/gateway-footer.tsx:46
-#: src/features/marketing/components/gateway-landing-page.tsx:830
+#: src/features/marketing/components/gateway-footer.tsx:47
+#: src/features/marketing/components/gateway-landing-page.tsx:838
 #: src/features/marketing/components/landing-footer.tsx:128
-#: src/features/marketing/components/landing-page.tsx:1068
+#: src/features/marketing/components/landing-page.tsx:1076
 msgid "Get Started"
 msgstr "Inizia"
 
-#: src/features/marketing/components/landing-page.tsx:1085
+#: src/features/marketing/components/landing-page.tsx:1093
 #: src/features/marketing/components/model-detail-page.tsx:288
 #: src/features/marketing/components/models-page.tsx:516
 msgid "Get started free"
 msgstr "Inizia gratis"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:639
+#: src/features/marketing/components/gateway-landing-page.tsx:642
 msgid "Get your API key"
 msgstr "Ottieni la tua chiave API"
 
@@ -14486,7 +14491,7 @@ msgid "Global analyst research, market analysis, and investment data"
 msgstr "Ricerche di analisti globali, analisi di mercato e dati sugli investimenti"
 
 #: ../../packages/chat-ui/src/chat/chat-view.tsx:96
-#: src/features/auth/components/auth/auth-card.tsx:476
+#: src/features/auth/components/auth/auth-card.tsx:495
 msgid "Go back"
 msgstr "Torna indietro"
 
@@ -14494,11 +14499,11 @@ msgstr "Torna indietro"
 msgid "Go Back"
 msgstr "Torna indietro"
 
-#: src/features/marketing/components/landing-page.tsx:294
+#: src/features/marketing/components/landing-page.tsx:295
 msgid "Go from brief to published content — draft in chat, refine in canvas, generate images — without switching tools."
 msgstr "Dal brief al contenuto pubblicato: scrivi la bozza in chat, perfezionala nel canvas, genera immagini, senza cambiare strumento."
 
-#: src/features/marketing/components/landing-page.tsx:710
+#: src/features/marketing/components/landing-page.tsx:713
 msgid "Go from idea to finished output without switching tools. Text, images, video, and documents — one thread."
 msgstr "Passa dall'idea al risultato finale senza cambiare strumento. Testo, immagini, video e documenti: un'unica conversazione."
 
@@ -14830,7 +14835,7 @@ msgstr "La comprovata qualità fotorealistica di Google"
 msgid "Google's state-of-the-art image generation and editing model"
 msgstr "Il modello all'avanguardia di Google per generare e modificare immagini"
 
-#: src/features/marketing/components/landing-page.tsx:610
+#: src/features/marketing/components/landing-page.tsx:613
 msgid "GPT-4, Claude, Gemini, FLUX, Runway, Luma, and 25 more — one subscription replaces $100+/month in separate tools."
 msgstr "GPT-4, Claude, Gemini, FLUX, Runway, Luma e altri 25: un solo abbonamento sostituisce oltre 100 $/mese di strumenti separati."
 
@@ -14838,7 +14843,7 @@ msgstr "GPT-4, Claude, Gemini, FLUX, Runway, Luma e altri 25: un solo abbonament
 msgid "GPT-4.1 architecture in a compact form"
 msgstr "L'architettura GPT-4.1 in formato compatto"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:32
+#: src/features/marketing/components/gateway-landing-page.tsx:33
 msgid "GPT-4o, GPT-4o Mini, o1, o3, DALL-E, Whisper"
 msgstr "GPT-4o, GPT-4o Mini, o1, o3, DALL-E, Whisper"
 
@@ -14909,7 +14914,7 @@ msgstr "Verde"
 msgid "Green Channel"
 msgstr "Canale verde"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:35
+#: src/features/marketing/components/gateway-landing-page.tsx:36
 msgid "Grok 3, Grok 3 Mini — real-time knowledge"
 msgstr "Grok 3, Grok 3 Mini: conoscenza in tempo reale"
 
@@ -14966,7 +14971,7 @@ msgstr "Guatemala"
 msgid "Guest"
 msgstr "Ospite"
 
-#: src/features/auth/components/anonymous/anonymous-convert-card.tsx:41
+#: src/features/auth/components/anonymous/anonymous-convert-card.tsx:44
 msgid "Guest Account"
 msgstr "Account ospite"
 
@@ -14978,7 +14983,7 @@ msgstr "Account ospite"
 msgid "Guest accounts use free models only."
 msgstr "Gli account ospite usano solo modelli gratuiti."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:524
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:518
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "Gli account ospite usano solo modelli gratuiti. Registrati per sbloccare tutti i modelli."
 
@@ -15104,6 +15109,7 @@ msgstr "Altezza"
 msgid "Hello {0}! What would you like to do today?"
 msgstr "Ciao {0}! Cosa vuoi fare oggi?"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:115
 #: src/features/layout/components/mobile-section-nav.tsx:72
 #: src/features/layout/components/sidebar-shortcut.tsx:301
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:113
@@ -15130,7 +15136,7 @@ msgstr ""
 msgid "Hidden in Model Picker"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1157
+#: src/components/model-picker/model-picker.tsx:1163
 msgid "Hide {name} from model picker"
 msgstr ""
 
@@ -15259,7 +15265,7 @@ msgstr "Immagini ad alta fedeltà di Google"
 msgid "High-quality image generation using Google's proven AI capabilities for photorealistic results"
 msgstr "Generazione di immagini di alta qualità con le comprovate capacità di IA di Google per risultati fotorealistici"
 
-#: src/features/marketing/components/landing-page.tsx:62
+#: src/features/marketing/components/landing-page.tsx:63
 msgid "High-quality image synthesis"
 msgstr "Sintesi di immagini di alta qualità"
 
@@ -15452,11 +15458,11 @@ msgstr "Come posso aiutarti oggi?"
 msgid "How does {0} compare to other {1} models?"
 msgstr "Come si confronta {0} con altri modelli {1}?"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:186
+#: src/features/marketing/components/gateway-landing-page.tsx:187
 msgid "How does smart routing work?"
 msgstr "Come funziona lo smart routing?"
 
-#: src/features/marketing/components/landing-page.tsx:277
+#: src/features/marketing/components/landing-page.tsx:278
 msgid "How is Neore different from ChatGPT?"
 msgstr "In cosa Neore è diverso da ChatGPT?"
 
@@ -15570,7 +15576,7 @@ msgstr "Icona"
 msgid "Icon URL (Optional)"
 msgstr "URL dell'icona (facoltativo)"
 
-#: src/features/marketing/components/landing-page.tsx:235
+#: src/features/marketing/components/landing-page.tsx:236
 msgid "Idea to finished output, one thread"
 msgstr "Dall'idea al risultato finale, in una sola conversazione"
 
@@ -15619,12 +15625,12 @@ msgstr "illustrazione"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
 #: ../../packages/chat-ui/src/chat/message-content.tsx:403
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:642
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:636
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: src/components/model-picker/model-picker.tsx:1096
+#: src/components/model-picker/model-picker.tsx:1102
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:121
 #: src/features/marketing/components/landing-footer.tsx:165
@@ -15644,11 +15650,11 @@ msgstr "illustrazione"
 msgid "Image"
 msgstr "Immagine"
 
-#: src/features/marketing/components/landing-page.tsx:210
+#: src/features/marketing/components/landing-page.tsx:211
 msgid "Image & Video"
 msgstr "Immagini e video"
 
-#: src/features/marketing/components/landing-page.tsx:322
+#: src/features/marketing/components/landing-page.tsx:323
 msgid "Image & video generation, small daily limits"
 msgstr "Generazione di immagini e video, con piccoli limiti giornalieri"
 
@@ -15666,7 +15672,7 @@ msgstr "Immagine allegata (nascosta)"
 msgid "image editing"
 msgstr "modifica delle immagini"
 
-#: src/components/model-picker/model-picker.tsx:80
+#: src/components/model-picker/model-picker.tsx:81
 #: src/features/settings/components/chat/models-settings.tsx:34
 msgid "Image Gen"
 msgstr "Generazione immagini"
@@ -15677,7 +15683,7 @@ msgstr "Generazione immagini"
 msgid "image generation"
 msgstr "generazione di immagini"
 
-#: src/features/marketing/components/landing-page.tsx:135
+#: src/features/marketing/components/landing-page.tsx:136
 #: src/features/marketing/components/models-page.tsx:486
 #: src/features/settings/connectors/messenger/messenger-reply-tools.tsx:21
 msgid "Image generation"
@@ -15685,7 +15691,7 @@ msgstr "Generazione di immagini"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:177
 #: src/features/chat/thread/media-gallery-view.tsx:342
-#: src/features/marketing/components/landing-page.tsx:286
+#: src/features/marketing/components/landing-page.tsx:287
 #: src/features/marketing/components/model-detail-page.tsx:87
 #: src/features/workflow/components/gallery/publish-dialog.tsx:28
 msgid "Image Generation"
@@ -15741,7 +15747,7 @@ msgstr "URL dell'immagine"
 msgid "Image URL or uploaded image required"
 msgstr "È necessario un URL dell'immagine o un'immagine caricata"
 
-#: src/features/marketing/components/landing-page.tsx:117
+#: src/features/marketing/components/landing-page.tsx:118
 msgid "Image variation & editing"
 msgstr "Variazioni e modifica delle immagini"
 
@@ -15934,8 +15940,8 @@ msgstr "Skill \"{0}\" importata"
 msgid "Importing from {0}..."
 msgstr "Importazione da {0}..."
 
-#: src/features/marketing/components/gateway-footer.tsx:19
-#: src/features/marketing/components/gateway-footer.tsx:142
+#: src/features/marketing/components/gateway-footer.tsx:20
+#: src/features/marketing/components/gateway-footer.tsx:148
 #: src/features/marketing/components/landing-footer.tsx:103
 #: src/features/marketing/components/landing-footer.tsx:273
 msgid "Imprint"
@@ -16173,7 +16179,7 @@ msgid "inpainting"
 msgstr "inpainting"
 
 #: ../../packages/ui/src/components/ai-elements/context.tsx:237
-#: src/components/model-picker/model-picker.tsx:201
+#: src/components/model-picker/model-picker.tsx:202
 #: src/features/devices/components/device-tool-call.tsx:168
 #: src/features/evals/components/case-fields.tsx:69
 #: src/features/evals/components/dataset-panel.tsx:144
@@ -16308,7 +16314,7 @@ msgstr "Le istruzioni devono avere al massimo {INSTRUCTIONS_MAX} caratteri"
 msgid "integrations"
 msgstr ""
 
-#: src/features/marketing/components/landing-page.tsx:288
+#: src/features/marketing/components/landing-page.tsx:289
 #: src/features/marketing/components/tutorials-page.tsx:133
 #: src/features/skills/components/skill-builder-review.tsx:249
 msgid "Integrations"
@@ -16330,11 +16336,11 @@ msgstr "Modello video intelligente che ragiona prima di generare"
 msgid "Intensity"
 msgstr "Intensità"
 
-#: src/features/chat/thread/composer-input-area.tsx:336
+#: src/features/chat/thread/composer-input-area.tsx:340
 msgid "Interrupt and restart"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:352
+#: src/features/chat/thread/composer-input-area.tsx:356
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr ""
 
@@ -16377,9 +16383,9 @@ msgstr "Callback OAuth non valida"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:77
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:57
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:83
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:138
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:123
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:152
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:144
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:122
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:151
 #: src/features/auth/components/settings/security/change-password-card.tsx:73
 #: src/features/auth/components/settings/security/change-password-card.tsx:99
 #: src/features/auth/components/settings/security/change-password-card.tsx:124
@@ -16535,7 +16541,7 @@ msgstr "Irlandese (Irlanda)"
 msgid "Is {0} free to use?"
 msgstr "{0} è gratuito?"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:178
+#: src/features/marketing/components/gateway-landing-page.tsx:179
 msgid "Is it compatible with the OpenAI SDK?"
 msgstr "È compatibile con l'SDK di OpenAI?"
 
@@ -16543,7 +16549,7 @@ msgstr "È compatibile con l'SDK di OpenAI?"
 msgid "Is it true that drinking 8 glasses of water daily is necessary?"
 msgstr "È vero che bere 8 bicchieri d'acqua al giorno è necessario?"
 
-#: src/features/marketing/components/landing-page.tsx:269
+#: src/features/marketing/components/landing-page.tsx:270
 msgid "Is my data private?"
 msgstr "I miei dati sono privati?"
 
@@ -16789,6 +16795,7 @@ msgid "Key file (optional, absolute path)"
 msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
+#: src/features/chat/signed-out/signed-out-chat.tsx:152
 #: src/features/chat/thread-list/thread-list-header.tsx:146
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:122
 #: src/features/workflow/components/canvas/workflow-controls.tsx:374
@@ -16913,7 +16920,7 @@ msgstr "Integrazione con i workflow Krea"
 msgid "Krea's signature aesthetic quality"
 msgstr "La qualità estetica distintiva di Krea"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:78
+#: src/features/marketing/components/gateway-landing-page.tsx:79
 msgid "KV-backed rate limiting per user and tier. Configurable burst and sustained limits."
 msgstr "Rate limiting basato su KV per utente e piano. Limiti di picco e sostenuti configurabili."
 
@@ -17549,7 +17556,7 @@ msgstr "Linux"
 msgid "List"
 msgstr "Elenco"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:98
+#: src/features/marketing/components/gateway-landing-page.tsx:99
 msgid "List all available models and pricing"
 msgstr "Elenca tutti i modelli disponibili e i prezzi"
 
@@ -17606,7 +17613,7 @@ msgstr "Anteprima dal vivo: viene mostrata quando il componente ha finito lo str
 msgid "Live preview — updating as the artifact streams"
 msgstr "Anteprima dal vivo: si aggiorna durante lo streaming dell'artefatto"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:36
+#: src/features/marketing/components/gateway-landing-page.tsx:37
 msgid "LLaMA, Mixtral, Gemma — fastest inference"
 msgstr "LLaMA, Mixtral, Gemma: l’inferenza più veloce"
 
@@ -17890,7 +17897,7 @@ msgstr ""
 #: src/features/settings/components/chat/trigger-settings.tsx:958
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
-#: src/routes/_shortcut.tsx:40
+#: src/routes/_shortcut.tsx:16
 msgid "Loading..."
 msgstr "Caricamento..."
 
@@ -17908,7 +17915,7 @@ msgstr "Caricamento…"
 msgid "local"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:691
+#: src/features/chat/core/context/chat-context.tsx:707
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "I modelli locali supportano solo testo. Rimuovi gli allegati per inviare."
 
@@ -17964,11 +17971,11 @@ msgid "Locked chat"
 msgstr ""
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1226
+#: src/components/model-picker/model-picker.tsx:1233
 msgid "Locked to {0} models"
 msgstr "Limitato ai modelli {0}"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:750
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
 msgid "Locked to {anchorModeName} models"
 msgstr "Limitato ai modelli {anchorModeName}"
 
@@ -17980,11 +17987,12 @@ msgstr "Log"
 msgid "Log out"
 msgstr "Esci"
 
-#: src/features/auth/components/auth/login-modal.tsx:40
+#: src/features/auth/components/auth/login-modal.tsx:46
+#: src/features/chat/signed-out/signed-out-chat.tsx:283
 #: src/features/layout/components/app-sidebar.tsx:54
 #: src/features/layout/components/app-sidebar.tsx:67
-#: src/features/marketing/components/gateway-navbar.tsx:87
-#: src/features/marketing/components/gateway-navbar.tsx:181
+#: src/features/marketing/components/gateway-navbar.tsx:90
+#: src/features/marketing/components/gateway-navbar.tsx:184
 #: src/features/marketing/components/navbar-menu.tsx:99
 #: src/features/marketing/components/navbar-menu.tsx:196
 msgid "Login"
@@ -18050,7 +18058,7 @@ msgstr "Rilevato testo lungo"
 msgid "Long text generation in images"
 msgstr "Generazione di testi lunghi nelle immagini"
 
-#: src/features/chat/thread/composer-input.tsx:808
+#: src/features/chat/thread/composer-input.tsx:809
 msgid "Long text was attached as a file."
 msgstr ""
 
@@ -18181,7 +18189,7 @@ msgstr "Macro tele, inquadratura stretta"
 msgid "Madrid"
 msgstr "Madrid"
 
-#: src/features/auth/components/auth/auth-card.tsx:338
+#: src/features/auth/components/auth/auth-card.tsx:347
 msgid "Magic Link"
 msgstr "Magic link"
 
@@ -18382,7 +18390,7 @@ msgstr "Markdown"
 msgid "Market Cap"
 msgstr "Capitalizzazione"
 
-#: src/features/marketing/components/landing-page.tsx:301
+#: src/features/marketing/components/landing-page.tsx:302
 msgid "Market Research"
 msgstr "Ricerca di mercato"
 
@@ -18472,8 +18480,8 @@ msgstr "Dimensione max: {size}"
 msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "Dimensione max: {size} • Max {maxFiles} file"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:745
-#: src/components/model-picker/model-picker.tsx:1220
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:739
+#: src/components/model-picker/model-picker.tsx:1227
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "Raggiunto il massimo di {MAX_PARALLEL} modelli"
 
@@ -18763,7 +18771,7 @@ msgstr ""
 msgid "Merging…"
 msgstr ""
 
-#: src/features/marketing/components/landing-page.tsx:289
+#: src/features/marketing/components/landing-page.tsx:290
 msgid "Message Branching"
 msgstr "Ramificazione dei messaggi"
 
@@ -18994,7 +19002,7 @@ msgstr "Applicazioni di IA mission-critical che richiedono il modello premium e 
 msgid "Mistral"
 msgstr "Mistral"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:37
+#: src/features/marketing/components/gateway-landing-page.tsx:38
 msgid "Mistral Large, Medium, Small, Codestral"
 msgstr "Mistral Large, Medium, Small, Codestral"
 
@@ -19076,10 +19084,10 @@ msgstr ""
 msgid "Mixed to video"
 msgstr "Misto a video"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:801
-#: src/features/marketing/components/landing-page.tsx:328
-#: src/features/marketing/components/landing-page.tsx:346
-#: src/features/marketing/components/landing-page.tsx:368
+#: src/features/marketing/components/gateway-landing-page.tsx:804
+#: src/features/marketing/components/landing-page.tsx:329
+#: src/features/marketing/components/landing-page.tsx:347
+#: src/features/marketing/components/landing-page.tsx:369
 msgid "mo"
 msgstr "mese"
 
@@ -19160,11 +19168,11 @@ msgstr "Modello attivato"
 msgid "Model filter"
 msgstr "Filtro modelli"
 
-#: src/components/model-picker/model-picker.tsx:390
+#: src/components/model-picker/model-picker.tsx:391
 msgid "Model info"
 msgstr "Info sul modello"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:73
+#: src/features/marketing/components/gateway-landing-page.tsx:74
 msgid "Model pricing from models.dev, KV-cached for 24 hours. Automatic cost calculation in microdollars."
 msgstr "Prezzi dei modelli da models.dev, in cache KV per 24 ore. Calcolo automatico dei costi in microdollari."
 
@@ -19177,7 +19185,7 @@ msgstr "Restrizioni sui modelli"
 msgid "Model server"
 msgstr "Server dei modelli"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:533
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:527
 msgid "Model tabs"
 msgstr "Schede modelli"
 
@@ -19199,7 +19207,7 @@ msgstr "Modello: OpenAI Whisper"
 #: src/features/layout/lib/dashboard-page-names.ts:31
 #: src/features/marketing/components/landing-footer.tsx:111
 #: src/features/marketing/components/landing-footer.tsx:157
-#: src/features/marketing/components/landing-page.tsx:597
+#: src/features/marketing/components/landing-page.tsx:600
 #: src/features/marketing/components/model-detail-page.tsx:114
 #: src/features/marketing/components/navbar-menu.tsx:58
 #: src/features/marketing/components/navbar-menu.tsx:159
@@ -19304,7 +19312,7 @@ msgstr ""
 msgid "Month"
 msgstr "Mese"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:732
+#: src/features/marketing/components/gateway-landing-page.tsx:735
 msgid "Monthly"
 msgstr "Mensile"
 
@@ -19382,7 +19390,7 @@ msgstr "Altre pagine"
 msgid "More steps = higher quality, longer generation"
 msgstr "Più passaggi = qualità più alta, generazione più lunga"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:520
+#: src/features/marketing/components/gateway-landing-page.tsx:523
 msgid "More than a proxy — an intelligent layer between your app and every LLM provider."
 msgstr "Più di un proxy: uno strato intelligente tra la tua app e ogni provider di LLM."
 
@@ -19398,7 +19406,7 @@ msgstr "Il ragionamento esteso più avanzato della famiglia Claude"
 msgid "Most affordable model in the Claude 4.x family"
 msgstr "Il modello più conveniente della famiglia Claude 4.x"
 
-#: src/features/marketing/components/landing-page.tsx:103
+#: src/features/marketing/components/landing-page.tsx:104
 msgid "Most capable language model"
 msgstr "Il modello linguistico più capace"
 
@@ -19459,11 +19467,11 @@ msgstr "Sposta {0} giù"
 msgid "Move {0} up"
 msgstr "Sposta {0} su"
 
-#: src/components/model-picker/model-picker.tsx:373
+#: src/components/model-picker/model-picker.tsx:374
 msgid "Move {label} down in starred"
 msgstr "Sposta {label} giù tra i contrassegnati"
 
-#: src/components/model-picker/model-picker.tsx:358
+#: src/components/model-picker/model-picker.tsx:359
 msgid "Move {label} up in starred"
 msgstr "Sposta {label} su tra i contrassegnati"
 
@@ -19550,7 +19558,7 @@ msgstr "Video MP4/MOV"
 msgid "MRR"
 msgstr "MRR"
 
-#: src/features/marketing/components/landing-page.tsx:204
+#: src/features/marketing/components/landing-page.tsx:205
 msgid "Multi-Model Chat"
 msgstr "Chat multi-modello"
 
@@ -19666,7 +19674,7 @@ msgstr ""
 msgid "name"
 msgstr ""
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:485
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:478
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
 #: src/features/devices/components/devices-settings.tsx:351
@@ -19689,7 +19697,7 @@ msgstr ""
 msgid "Name"
 msgstr "Nome"
 
-#: src/components/model-picker/model-picker.tsx:1134
+#: src/components/model-picker/model-picker.tsx:1140
 msgid "Name (A to Z)"
 msgstr ""
 
@@ -19697,7 +19705,7 @@ msgstr ""
 msgid "Name and prompt are required"
 msgstr "Nome e prompt sono obbligatori"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:164
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:163
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:46
 #: src/features/evals/components/dataset-form-dialog.tsx:42
 #: src/features/prompts/components/prompt-form-dialog.tsx:170
@@ -19873,15 +19881,16 @@ msgstr "Prompt negativo: cosa escludere"
 msgid "Negative Prompt (optional)"
 msgstr "Prompt negativo (facoltativo)"
 
-#: src/features/marketing/components/gateway-footer.tsx:77
+#: src/features/marketing/components/gateway-footer.tsx:80
 #: src/features/marketing/components/landing-footer.tsx:212
 msgid "neore"
 msgstr "neore"
 
-#: src/features/marketing/components/gateway-footer.tsx:47
+#: src/features/marketing/components/gateway-footer.tsx:48
 msgid "Neore"
 msgstr "Neore"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:89
 #: src/features/layout/components/sidebar-shortcut.tsx:238
 #: src/features/marketing/components/navbar-menu.tsx:44
 msgid "Neore - AI Text & Video & Audio & Image & Documents Generation Platform"
@@ -19899,11 +19908,11 @@ msgstr "Neore può commettere errori. Verifica le informazioni importanti."
 msgid "Neore cannot reach the server. It will keep trying to reconnect."
 msgstr "Neore non riesce a raggiungere il server. Continuerà a riprovare la riconnessione."
 
-#: src/features/marketing/components/gateway-footer.tsx:31
+#: src/features/marketing/components/gateway-footer.tsx:32
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:554
+#: src/routes/__root.tsx:557
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat è una moderna app di chat con IA. Chatta con i modelli di IA più recenti, organizza le tue conversazioni e resta produttivo."
 
@@ -19915,7 +19924,7 @@ msgstr "Neore Chat è un'app di chat AI moderna. Chatta con i modelli più recen
 msgid "Neore Chat Tutorials"
 msgstr "Tutorial di Neore Chat"
 
-#: src/features/marketing/components/gateway-navbar.tsx:37
+#: src/features/marketing/components/gateway-navbar.tsx:40
 msgid "Neore Gateway - Unified LLM API"
 msgstr "Neore Gateway - API LLM unificata"
 
@@ -19927,19 +19936,19 @@ msgstr "Neore Gateway — API LLM unificata"
 msgid "Neore Gateway — unified LLM API for OpenAI, Google, Anthropic, xAI, Groq, and Mistral. Smart routing, automatic fallback, real-time usage tracking, and cost optimization. One API key, every model."
 msgstr "Neore Gateway — API LLM unificata per OpenAI, Google, Anthropic, xAI, Groq e Mistral. Instradamento intelligente, fallback automatico, monitoraggio dell'utilizzo in tempo reale e ottimizzazione dei costi. Una sola chiave API, tutti i modelli."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:173
+#: src/features/marketing/components/gateway-landing-page.tsx:174
 msgid "Neore Gateway is a unified LLM API proxy that sits between your application and AI providers like OpenAI, Google, Anthropic, xAI, Groq, and Mistral. It provides smart model routing, automatic fallback, usage tracking, and cost optimization — all through a single, OpenAI-compatible API endpoint."
 msgstr "Neore Gateway è un proxy API unificato per LLM che si colloca tra la tua applicazione e i provider di IA come OpenAI, Google, Anthropic, xAI, Groq e Mistral. Offre instradamento intelligente dei modelli, fallback automatico, monitoraggio dell’utilizzo e ottimizzazione dei costi, tutto tramite un unico endpoint API compatibile con OpenAI."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:193
+#: src/features/marketing/components/gateway-landing-page.tsx:194
 msgid "Neore Gateway runs on Cloudflare Workers at 300+ edge locations. Cold start is under 50ms. The proxy overhead is typically 5-15ms. Provider response times are the main latency factor, and smart routing selects the fastest healthy provider for each request."
 msgstr "Neore Gateway gira su Cloudflare Workers in oltre 300 località edge. L’avvio a freddo è inferiore a 50 ms. L’overhead del proxy è in genere di 5-15 ms. I tempi di risposta dei provider sono il principale fattore di latenza, e l’instradamento intelligente sceglie per ogni richiesta il provider funzionante più veloce."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:181
+#: src/features/marketing/components/gateway-landing-page.tsx:182
 msgid "Neore Gateway supports OpenAI (GPT-4o, o1, o3, DALL-E), Google (Gemini 2.5, Imagen, Veo), Anthropic (Claude 4), xAI (Grok 3), Groq (LLaMA, Mixtral), Mistral (Large, Codestral), and more via OpenRouter. New providers are added regularly."
 msgstr "Neore Gateway supporta OpenAI (GPT-4o, o1, o3, DALL-E), Google (Gemini 2.5, Imagen, Veo), Anthropic (Claude 4), xAI (Grok 3), Groq (LLaMA, Mixtral), Mistral (Large, Codestral) e altri tramite OpenRouter. Nuovi provider vengono aggiunti regolarmente."
 
-#: src/features/marketing/components/landing-page.tsx:256
+#: src/features/marketing/components/landing-page.tsx:257
 msgid "Neore includes 30+ models: GPT-4, Claude, Gemini, and DeepSeek for chat. FLUX, Imagen, Stable Diffusion, and Recraft for images. Runway, Luma, Kling, and Pika for video. Switch between any of them mid-conversation."
 msgstr "Neore include oltre 30 modelli: GPT-4, Claude, Gemini e DeepSeek per la chat. FLUX, Imagen, Stable Diffusion e Recraft per le immagini. Runway, Luma, Kling e Pika per i video. Passa dall’uno all’altro anche a metà conversazione."
 
@@ -20020,7 +20029,7 @@ msgid "Never used"
 msgstr "Mai usata"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:146
-#: src/components/model-picker/model-picker.tsx:327
+#: src/components/model-picker/model-picker.tsx:328
 #: src/features/settings/components/chat/models-settings.tsx:43
 #: src/features/settings/components/chat/models-settings.tsx:568
 msgid "New"
@@ -20055,6 +20064,7 @@ msgstr "Nuova chat"
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:46
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
 #: src/features/chat/header/chat-header.tsx:30
+#: src/features/chat/signed-out/signed-out-chat.tsx:315
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:239
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:115
 #: src/features/settings/lib/settings-keywords.ts:37
@@ -20087,7 +20097,7 @@ msgstr "Nuovo dataset"
 msgid "New Export"
 msgstr "Nuova esportazione"
 
-#: src/components/model-picker/model-picker.tsx:1135
+#: src/components/model-picker/model-picker.tsx:1141
 msgid "New first"
 msgstr ""
 
@@ -20099,6 +20109,7 @@ msgstr "Nuovo obiettivo"
 #: src/features/chat/group/create-group-chat-button.tsx:115
 #: src/features/chat/group/create-group-chat-button.tsx:120
 #: src/features/chat/group/create-group-chat-button.tsx:129
+#: src/features/chat/signed-out/signed-out-chat.tsx:149
 msgid "New group chat"
 msgstr "Nuova chat di gruppo"
 
@@ -20174,6 +20185,7 @@ msgstr "Nuovi questa settimana"
 msgid "New thread"
 msgstr "Nuova conversazione"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:140
 #: src/features/chat/thread-list/thread-list-header.tsx:99
 msgid "New Thread"
 msgstr "Nuova conversazione"
@@ -20263,7 +20275,7 @@ msgstr "Versione successiva"
 msgid "next-gen"
 msgstr "nuova generazione"
 
-#: src/features/marketing/components/landing-page.tsx:79
+#: src/features/marketing/components/landing-page.tsx:80
 msgid "Next-gen creative AI"
 msgstr "IA creativa di nuova generazione"
 
@@ -20283,7 +20295,7 @@ msgstr "Architettura Flux di nuova generazione a costo contenuto"
 msgid "Next-gen frontier model preview from Google"
 msgstr "Anteprima del modello di frontiera di nuova generazione di Google"
 
-#: src/features/marketing/components/landing-page.tsx:63
+#: src/features/marketing/components/landing-page.tsx:64
 msgid "Next-gen image generation"
 msgstr "Generazione di immagini di nuova generazione"
 
@@ -20624,8 +20636,8 @@ msgstr "Nessun modello disponibile"
 msgid "No models found matching your filters."
 msgstr "Nessun modello corrisponde ai tuoi filtri."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:712
-#: src/components/model-picker/model-picker.tsx:1186
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:706
+#: src/components/model-picker/model-picker.tsx:1192
 msgid "No models found."
 msgstr "Nessun modello trovato."
 
@@ -20837,8 +20849,8 @@ msgstr "Nessun ordinamento applicato"
 msgid "No speech detected. Hands-free mode stopped."
 msgstr "Nessuna voce rilevata. Modalità a mani libere interrotta."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:704
-#: src/components/model-picker/model-picker.tsx:1178
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:698
+#: src/components/model-picker/model-picker.tsx:1184
 msgid "No starred models"
 msgstr "Nessun modello contrassegnato"
 
@@ -20891,6 +20903,7 @@ msgstr "Nessuna conversazione in questo gruppo"
 msgid "No threads were active in that date range."
 msgstr ""
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:272
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1065
 msgid "No threads yet"
 msgstr "Ancora nessuna conversazione"
@@ -21378,8 +21391,8 @@ msgstr "Su questo computer"
 msgid "On-demand web scraping and data extraction recipes"
 msgstr "Ricette di web scraping ed estrazione dati on demand"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:157
-#: src/features/marketing/components/landing-page.tsx:362
+#: src/features/marketing/components/gateway-landing-page.tsx:158
+#: src/features/marketing/components/landing-page.tsx:363
 msgid "On-premise option"
 msgstr "Opzione on-premise"
 
@@ -21416,23 +21429,23 @@ msgstr "Procedura guidata di onboarding"
 msgid "One"
 msgstr "One"
 
-#: src/features/marketing/components/gateway-footer.tsx:60
+#: src/features/marketing/components/gateway-footer.tsx:63
 msgid "One API"
 msgstr "Un'unica API"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:42
+#: src/features/marketing/components/gateway-landing-page.tsx:43
 msgid "One API endpoint, any model. Switch providers with a single parameter — no SDK changes, no migration headaches. OpenAI-compatible format."
 msgstr "Un endpoint API, qualsiasi modello. Cambia provider con un solo parametro: nessuna modifica all’SDK, nessun grattacapo di migrazione. Formato compatibile con OpenAI."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:842
+#: src/features/marketing/components/gateway-landing-page.tsx:850
 msgid "One API key, every model, production-ready infrastructure. Free tier included — start building in minutes."
 msgstr "Una chiave API, tutti i modelli, un'infrastruttura pronta per la produzione. Piano gratuito incluso: inizia a sviluppare in pochi minuti."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:635
+#: src/features/marketing/components/gateway-landing-page.tsx:638
 msgid "One API key, one SDK, one dashboard. Smart routing handles the rest."
 msgstr "Una chiave API, un SDK, una dashboard. Al resto pensa il routing intelligente."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:408
+#: src/features/marketing/components/gateway-landing-page.tsx:411
 msgid "One API.<0/><1>Every LLM.</1>"
 msgstr "Un'unica API.<0/><1>Ogni LLM.</1>"
 
@@ -21444,7 +21457,7 @@ msgstr "Un nome di distribuzione per riga, esattamente come in Azure AI Foundry 
 msgid "One domain per line, for example example.com. Results from these sites and their subdomains are never shown, even if the assistant asks for them."
 msgstr ""
 
-#: src/features/marketing/components/gateway-landing-page.tsx:45
+#: src/features/marketing/components/gateway-landing-page.tsx:46
 msgid "One endpoint. Every model."
 msgstr "Un endpoint. Tutti i modelli."
 
@@ -21464,15 +21477,15 @@ msgstr "Un ID di modello o di profilo di inferenza per riga, ad es. us.anthropic
 msgid "One per line, matched by file name — for files not in your knowledge base yet."
 msgstr "Uno per riga, abbinati per nome del file: per i file non ancora presenti nella tua base di conoscenza."
 
-#: src/features/marketing/components/landing-page.tsx:225
+#: src/features/marketing/components/landing-page.tsx:226
 msgid "One subscription, not six"
 msgstr "Un abbonamento, non sei"
 
-#: src/features/marketing/components/landing-page.tsx:605
+#: src/features/marketing/components/landing-page.tsx:608
 msgid "One subscription. <0>Every model.</0>"
 msgstr "Un solo abbonamento. <0>Ogni modello.</0>"
 
-#: src/features/marketing/components/landing-page.tsx:575
+#: src/features/marketing/components/landing-page.tsx:578
 msgid "One workspace for 30+ AI models. Chat, generate images, create videos, write documents, and run code — one account, one price."
 msgstr "Un unico spazio di lavoro per oltre 30 modelli di IA. Chatta, genera immagini, crea video, scrivi documenti ed esegui codice: un solo account, un solo prezzo."
 
@@ -21503,7 +21516,7 @@ msgid "Online"
 msgstr "Online"
 
 #. placeholder {0}: getModelModeName(anchorMode!)
-#: src/components/model-picker/model-picker.tsx:484
+#: src/components/model-picker/model-picker.tsx:488
 msgid "Only {0} models can be compared. Clear selection to switch types."
 msgstr "Si possono confrontare solo modelli {0}. Annulla la selezione per cambiare tipo."
 
@@ -21674,7 +21687,7 @@ msgstr "Apri la home"
 msgid "Open Home"
 msgstr "Apri la home"
 
-#: src/features/marketing/components/landing-page.tsx:143
+#: src/features/marketing/components/landing-page.tsx:144
 msgid "Open image generation"
 msgstr "Generazione di immagini open"
 
@@ -21754,6 +21767,7 @@ msgstr "Apri ricerca"
 msgid "Open settings"
 msgstr "Apri impostazioni"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:112
 #: src/features/layout/components/sidebar-shortcut.tsx:282
 msgid "Open Settings"
 msgstr "Apri Impostazioni"
@@ -21856,6 +21870,7 @@ msgstr ""
 msgid "Open thread"
 msgstr "Apri conversazione"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:118
 #: src/features/layout/components/sidebar-shortcut.tsx:221
 #: src/features/layout/components/sidebar-shortcut.tsx:328
 msgid "Open user menu"
@@ -21925,7 +21940,7 @@ msgstr "Trasparenza e riproducibilità dell’open source"
 msgid "Open-source under permissive license (Apache 2.0)"
 msgstr "Open source con licenza permissiva (Apache 2.0)"
 
-#: src/features/marketing/components/landing-page.tsx:95
+#: src/features/marketing/components/landing-page.tsx:96
 msgid "Open-source video AI"
 msgstr "IA video open source"
 
@@ -21969,7 +21984,7 @@ msgstr "Gli endpoint compatibili con OpenAI e Anthropic vengono chiamati dai nos
 msgid "OpenAI-compatible"
 msgstr "Compatibile con OpenAI"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:662
+#: src/features/marketing/components/gateway-landing-page.tsx:665
 msgid "OpenAI-compatible <0>API.</0>"
 msgstr "API <0>compatibile con OpenAI.</0>"
 
@@ -22110,11 +22125,11 @@ msgstr "Il LLM più piccolo di OpenAI"
 msgid "OpenAI's smallest model for maximum speed"
 msgstr "Il modello più piccolo di OpenAI, per la massima velocità"
 
-#: src/components/settings/settings-modal.tsx:326
+#: src/components/settings/settings-modal.tsx:339
 msgid "Opened {tabLabel}"
 msgstr ""
 
-#: src/components/settings/settings-modal.tsx:326
+#: src/components/settings/settings-modal.tsx:339
 msgid "Opened {tabLabel}: {label}"
 msgstr ""
 
@@ -22281,7 +22296,7 @@ msgstr "o fai clic per sfogliare"
 msgid "Or connect a Text node to provide the prompt"
 msgstr "Oppure collega un nodo Testo per fornire il prompt"
 
-#: src/features/auth/components/auth/auth-card.tsx:216
+#: src/features/auth/components/auth/auth-card.tsx:217
 msgid "or continue with"
 msgstr "oppure continua con"
 
@@ -22452,7 +22467,7 @@ msgstr "Outpaint"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:547
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
-#: src/components/model-picker/model-picker.tsx:205
+#: src/components/model-picker/model-picker.tsx:206
 #: src/features/devices/components/device-tool-call.tsx:174
 #: src/features/workflow/components/nodes/output-node.tsx:52
 #: src/features/workflow/types/index.ts:584
@@ -22647,8 +22662,8 @@ msgstr ""
 msgid "Paraguay"
 msgstr "Paraguay"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:596
-#: src/components/model-picker/model-picker.tsx:1048
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:590
+#: src/components/model-picker/model-picker.tsx:1054
 msgid "Parallel"
 msgstr "In parallelo"
 
@@ -22739,8 +22754,8 @@ msgstr "Le passkey ti permettono di accedere in modo sicuro usando l'autenticazi
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:84
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:201
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:273
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:561
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:350
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
 msgid "Password"
 msgstr "Password"
@@ -22750,8 +22765,8 @@ msgid "Password changed successfully"
 msgstr "Password cambiata"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:60
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:121
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:106
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:127
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:105
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:42
 msgid "Password is required"
 msgstr "La password è obbligatoria"
@@ -22759,9 +22774,9 @@ msgstr "La password è obbligatoria"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:71
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:51
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:77
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:132
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:117
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:146
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:138
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:116
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:145
 #: src/features/auth/components/settings/security/change-password-card.tsx:67
 #: src/features/auth/components/settings/security/change-password-card.tsx:93
 #: src/features/auth/components/settings/security/change-password-card.tsx:118
@@ -22771,9 +22786,9 @@ msgstr "La password è troppo lunga"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:65
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:45
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:71
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:126
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:111
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:140
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:132
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:110
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:139
 #: src/features/auth/components/settings/security/change-password-card.tsx:61
 #: src/features/auth/components/settings/security/change-password-card.tsx:87
 #: src/features/auth/components/settings/security/change-password-card.tsx:112
@@ -22790,7 +22805,7 @@ msgstr "Password reimpostata"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:84
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:91
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:238
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:237
 #: src/features/auth/components/settings/security/change-password-card.tsx:132
 msgid "Passwords do not match"
 msgstr "Le password non corrispondono"
@@ -22881,7 +22896,7 @@ msgstr "Pausa"
 msgid "Paused"
 msgstr "In pausa"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:721
+#: src/features/marketing/components/gateway-landing-page.tsx:724
 msgid "Pay for what <0>you use.</0>"
 msgstr "Paghi solo <0>ciò che usi.</0>"
 
@@ -22902,7 +22917,7 @@ msgstr "Pagamenti, ordini, fatture e abbonamenti tramite PayPal"
 msgid "Payments, subscriptions, and financial data"
 msgstr "Pagamenti, abbonamenti e dati finanziari"
 
-#: src/components/model-picker/model-picker.tsx:81
+#: src/components/model-picker/model-picker.tsx:82
 #: src/features/settings/components/chat/models-settings.tsx:35
 msgid "PDF"
 msgstr "PDF"
@@ -23226,7 +23241,7 @@ msgid "Planning"
 msgstr "Pianificazione"
 
 #: src/features/code/components/host-details.tsx:26
-#: src/features/marketing/components/landing-page.tsx:847
+#: src/features/marketing/components/landing-page.tsx:850
 msgid "Platform"
 msgstr "Piattaforma"
 
@@ -23239,7 +23254,7 @@ msgstr "Riproduci"
 msgid "Play a short sound when a reply finishes. Applies to this browser only."
 msgstr "Riproduci un breve suono al termine di una risposta. Vale solo per questo browser."
 
-#: src/features/auth/components/auth/auth-card.tsx:373
+#: src/features/auth/components/auth/auth-card.tsx:389
 msgid "Please authenticate to continue"
 msgstr "Autenticati per continuare"
 
@@ -23251,7 +23266,7 @@ msgstr "Controlla la tua email e clicca sul link di verifica"
 msgid "Please confirm your password"
 msgstr "Conferma la tua password"
 
-#: src/features/auth/components/auth/auth-card.tsx:343
+#: src/features/auth/components/auth/auth-card.tsx:352
 msgid "Please enter a backup code to access your account"
 msgstr "Inserisci un codice di backup per accedere al tuo account"
 
@@ -23259,7 +23274,7 @@ msgstr "Inserisci un codice di backup per accedere al tuo account"
 msgid "Please enter an email address"
 msgstr "Inserisci un indirizzo email"
 
-#: src/features/auth/components/auth/auth-card.tsx:367
+#: src/features/auth/components/auth/auth-card.tsx:383
 msgid "Please enter your one-time password to continue"
 msgstr "Inserisci la password monouso per continuare"
 
@@ -23311,7 +23326,7 @@ msgstr "Digita <0>{0}</0> per confermare"
 msgid "Please verify your new email address"
 msgstr "Verifica il tuo nuovo indirizzo email"
 
-#: src/features/marketing/components/landing-page.tsx:250
+#: src/features/marketing/components/landing-page.tsx:251
 msgid "Plug in your own tools"
 msgstr "Collega i tuoi strumenti"
 
@@ -23343,8 +23358,8 @@ msgstr "Polacco (Polonia)"
 msgid "Polished Hollywood look"
 msgstr "Look hollywoodiano raffinato"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:781
-#: src/features/marketing/components/landing-page.tsx:1003
+#: src/features/marketing/components/gateway-landing-page.tsx:784
+#: src/features/marketing/components/landing-page.tsx:1006
 msgid "Popular"
 msgstr "Popolare"
 
@@ -23757,24 +23772,24 @@ msgstr "Slide precedente"
 msgid "Previous version"
 msgstr "Versione precedente"
 
-#: src/components/model-picker/model-picker.tsx:197
+#: src/components/model-picker/model-picker.tsx:198
 msgid "Price per 1M tokens"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1137
+#: src/components/model-picker/model-picker.tsx:1143
 msgid "Price: high to low"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1136
+#: src/components/model-picker/model-picker.tsx:1142
 msgid "Price: low to high"
 msgstr ""
 
-#: src/features/marketing/components/gateway-footer.tsx:27
-#: src/features/marketing/components/gateway-landing-page.tsx:714
-#: src/features/marketing/components/gateway-navbar.tsx:71
-#: src/features/marketing/components/gateway-navbar.tsx:163
+#: src/features/marketing/components/gateway-footer.tsx:28
+#: src/features/marketing/components/gateway-landing-page.tsx:717
+#: src/features/marketing/components/gateway-navbar.tsx:74
+#: src/features/marketing/components/gateway-navbar.tsx:166
 #: src/features/marketing/components/landing-footer.tsx:106
-#: src/features/marketing/components/landing-page.tsx:964
+#: src/features/marketing/components/landing-page.tsx:967
 #: src/features/marketing/components/navbar-menu.tsx:76
 #: src/features/marketing/components/navbar-menu.tsx:177
 msgid "Pricing"
@@ -23792,11 +23807,11 @@ msgstr "Stampa"
 msgid "Print Screen"
 msgstr "Stamp"
 
-#: src/features/marketing/components/landing-page.tsx:339
+#: src/features/marketing/components/landing-page.tsx:340
 msgid "Priority responses"
 msgstr "Risposte prioritarie"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:125
+#: src/features/marketing/components/gateway-landing-page.tsx:126
 msgid "Priority support"
 msgstr "Supporto prioritario"
 
@@ -23805,8 +23820,8 @@ msgid "privacy"
 msgstr ""
 
 #: src/features/layout/lib/dashboard-page-names.ts:35
-#: src/features/marketing/components/gateway-footer.tsx:18
-#: src/features/marketing/components/gateway-footer.tsx:139
+#: src/features/marketing/components/gateway-footer.tsx:19
+#: src/features/marketing/components/gateway-footer.tsx:145
 #: src/features/marketing/components/landing-footer.tsx:102
 #: src/features/marketing/components/landing-footer.tsx:272
 #: src/features/settings/components/account/account-settings.tsx:133
@@ -23840,15 +23855,15 @@ msgstr ""
 msgid "Private"
 msgstr "Privata"
 
-#: src/features/marketing/components/landing-page.tsx:245
+#: src/features/marketing/components/landing-page.tsx:246
 msgid "Private by default"
 msgstr "Privato per impostazione predefinita"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:141
-#: src/components/model-picker/model-picker.tsx:314
+#: src/components/model-picker/model-picker.tsx:315
 #: src/features/billing/components/personal-plan-card.tsx:25
-#: src/features/marketing/components/gateway-landing-page.tsx:130
-#: src/features/marketing/components/landing-page.tsx:344
+#: src/features/marketing/components/gateway-landing-page.tsx:131
+#: src/features/marketing/components/landing-page.tsx:345
 #: src/features/settings/components/chat/models-settings.tsx:558
 #: src/features/workflow/components/nodes/pro-badge.tsx:6
 msgid "Pro"
@@ -23969,7 +23984,7 @@ msgstr "Creator professionisti che cercano la massima intelligenza per immagini 
 msgid "Professional image editors who need precise, prompt-driven photo editing with frontier-quality results"
 msgstr "Editor di immagini professionisti che cercano un fotoritocco preciso, guidato dal prompt, con risultati di livello frontiera"
 
-#: src/features/marketing/components/landing-page.tsx:114
+#: src/features/marketing/components/landing-page.tsx:115
 msgid "Professional image generation"
 msgstr "Generazione di immagini professionale"
 
@@ -23985,7 +24000,7 @@ msgstr "Sviluppo software professionale che richiede il modello specializzato pe
 msgid "Professional software engineers who need a specialized coding model at open-source cost"
 msgstr "Ingegneri software professionisti che cercano un modello specializzato per il codice a costi da open source"
 
-#: src/features/marketing/components/landing-page.tsx:170
+#: src/features/marketing/components/landing-page.tsx:171
 msgid "Professional video AI"
 msgstr "IA video professionale"
 
@@ -24086,7 +24101,7 @@ msgstr "Prompt aggiunto con segnaposto"
 msgid "prompt adherence"
 msgstr "aderenza al prompt"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:100
+#: src/features/marketing/components/gateway-landing-page.tsx:101
 msgid "Prompt cache management"
 msgstr "Gestione della cache dei prompt"
 
@@ -24204,7 +24219,7 @@ msgstr "Estetica cinematografica collaudata"
 msgid "Proven reliability from previous generation"
 msgstr "L’affidabilità collaudata della generazione precedente"
 
-#: src/components/model-picker/model-picker.tsx:227
+#: src/components/model-picker/model-picker.tsx:228
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -24242,10 +24257,10 @@ msgstr "Provider aggiornato"
 msgid "Provider:"
 msgstr "Provider:"
 
-#: src/features/marketing/components/gateway-footer.tsx:33
-#: src/features/marketing/components/gateway-landing-page.tsx:452
-#: src/features/marketing/components/gateway-navbar.tsx:62
-#: src/features/marketing/components/gateway-navbar.tsx:154
+#: src/features/marketing/components/gateway-footer.tsx:34
+#: src/features/marketing/components/gateway-landing-page.tsx:455
+#: src/features/marketing/components/gateway-navbar.tsx:65
+#: src/features/marketing/components/gateway-navbar.tsx:157
 msgid "Providers"
 msgstr "Provider"
 
@@ -24379,7 +24394,7 @@ msgstr "Qualità"
 msgid "Query complexity tiers assigned by the routing engine"
 msgstr "Livelli di complessità delle query assegnati dal motore di instradamento"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:99
+#: src/features/marketing/components/gateway-landing-page.tsx:100
 msgid "Query usage analytics and costs"
 msgstr "Interroga analisi e costi di utilizzo"
 
@@ -24387,11 +24402,11 @@ msgstr "Interroga analisi e costi di utilizzo"
 msgid "Question"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:363
+#: src/features/chat/thread/composer-input-area.tsx:367
 msgid "Queue message"
 msgstr "Metti in coda il messaggio"
 
-#: src/features/chat/thread/composer-input-area.tsx:382
+#: src/features/chat/thread/composer-input-area.tsx:386
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Metti in coda il messaggio: verrà inviato al termine della risposta attuale"
 
@@ -24570,7 +24585,7 @@ msgstr ""
 msgid "Rate limited. Retrying in about {announced}"
 msgstr ""
 
-#: src/features/marketing/components/gateway-landing-page.tsx:80
+#: src/features/marketing/components/gateway-landing-page.tsx:81
 msgid "Rate limiting"
 msgstr "Rate limiting"
 
@@ -24639,7 +24654,7 @@ msgstr "Sola lettura"
 msgid "Read Only"
 msgstr "Sola lettura"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:439
+#: src/features/marketing/components/gateway-landing-page.tsx:442
 msgid "Read the docs"
 msgstr "Leggi la documentazione"
 
@@ -24659,7 +24674,7 @@ msgstr "Anteprima in sola lettura: duplica per modificare"
 msgid "Read-only shared conversation"
 msgstr "Conversazione condivisa in sola lettura"
 
-#: src/features/chat/thread/composer-input.tsx:265
+#: src/features/chat/thread/composer-input.tsx:266
 msgid "Reading \"{attachmentName}\"…"
 msgstr "Lettura di «{attachmentName}»…"
 
@@ -24675,7 +24690,7 @@ msgstr "Pronto"
 msgid "Ready to merge"
 msgstr ""
 
-#: src/features/marketing/components/gateway-landing-page.tsx:123
+#: src/features/marketing/components/gateway-landing-page.tsx:124
 msgid "Real-time analytics"
 msgstr "Analisi in tempo reale"
 
@@ -24687,7 +24702,7 @@ msgstr "Anteprima dal vivo in tempo reale durante la generazione"
 msgid "Real-time relational database with live queries"
 msgstr "Database relazionale in tempo reale con query live"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:54
+#: src/features/marketing/components/gateway-landing-page.tsx:55
 msgid "Real-time token counting, per-request cost calculation, and daily usage aggregation. D1-backed analytics with Prometheus metrics endpoint. Know exactly what you spend."
 msgstr "Conteggio dei token in tempo reale, calcolo dei costi per richiesta e aggregazione giornaliera dell’utilizzo. Analisi su D1 con endpoint di metriche Prometheus. Sai esattamente quanto spendi."
 
@@ -24928,7 +24943,7 @@ msgstr "Registrazione dell'input vocale"
 msgid "Recover account"
 msgstr "Recupera account"
 
-#: src/features/auth/components/auth/auth-card.tsx:344
+#: src/features/auth/components/auth/auth-card.tsx:353
 msgid "Recover Account"
 msgstr "Recupera account"
 
@@ -25119,6 +25134,10 @@ msgstr "Restrizioni per regione"
 msgid "Register it with Telegram's setWebhook, passing your webhook secret as secret_token."
 msgstr "Registralo con setWebhook di Telegram, passando il tuo webhook secret come secret_token."
 
+#: src/features/auth/components/auth/auth-card.tsx:371
+msgid "Registration is by invitation only. Open the link from your invitation, or sign in if you already have an account."
+msgstr "La registrazione è solo su invito. Apri il link del tuo invito oppure accedi se hai già un account."
+
 #: src/features/evals/components/run-comparison.tsx:55
 msgid "Regressed"
 msgstr "Peggiorati"
@@ -25240,7 +25259,7 @@ msgstr "Ricarica la loro versione"
 msgid "remember"
 msgstr ""
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:314
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:391
 msgid "Remember me"
 msgstr "Ricordami"
 
@@ -25248,10 +25267,10 @@ msgstr "Ricordami"
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:327
-#: src/features/chat/thread/composer-input.tsx:339
-#: src/features/chat/thread/composer-input.tsx:393
-#: src/features/chat/thread/composer-input.tsx:402
+#: src/features/chat/thread/composer-input.tsx:328
+#: src/features/chat/thread/composer-input.tsx:340
+#: src/features/chat/thread/composer-input.tsx:394
+#: src/features/chat/thread/composer-input.tsx:403
 #: src/features/devices/components/devices-settings.tsx:206
 #: src/features/devices/components/devices-settings.tsx:212
 #: src/features/projects/components/project-form-dialog.tsx:263
@@ -25382,7 +25401,7 @@ msgid "Remove from project"
 msgstr "Rimuovi dal progetto"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:168
-#: src/components/model-picker/model-picker.tsx:341
+#: src/components/model-picker/model-picker.tsx:342
 msgid "Remove from starred"
 msgstr "Rimuovi dai contrassegnati"
 
@@ -25602,7 +25621,7 @@ msgstr "Rispondi"
 msgid "Reply complete"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:622
+#: src/features/chat/core/context/chat-context.tsx:625
 msgid "Reply ready"
 msgstr "Risposta pronta"
 
@@ -25634,7 +25653,7 @@ msgstr "Richiedi esportazione dati"
 msgid "Request timed out"
 msgstr "Richiesta scaduta"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:63
+#: src/features/marketing/components/gateway-landing-page.tsx:64
 msgid "Request validation, content filtering, and HMAC-SHA256 authentication on every request."
 msgstr "Convalida delle richieste, filtro dei contenuti e autenticazione HMAC-SHA256 su ogni richiesta."
 
@@ -25676,7 +25695,7 @@ msgstr "Mancano variabili obbligatorie"
 msgid "Required."
 msgstr "Obbligatorio."
 
-#: src/components/settings/settings-modal.tsx:147
+#: src/components/settings/settings-modal.tsx:150
 msgid "requires an account"
 msgstr "richiede un account"
 
@@ -25707,7 +25726,7 @@ msgstr "Approfondisci un argomento..."
 msgid "Research the latest developments in renewable energy storage technology."
 msgstr "Cerca gli ultimi sviluppi nelle tecnologie di accumulo di energia rinnovabile."
 
-#: src/features/marketing/components/landing-page.tsx:859
+#: src/features/marketing/components/landing-page.tsx:862
 msgid "Research, code, create, and connect — without leaving the conversation."
 msgstr "Ricerca, codice, creazione e connessione, senza lasciare la conversazione."
 
@@ -25749,7 +25768,7 @@ msgstr ""
 msgid "Reset password"
 msgstr "Reimposta password"
 
-#: src/features/auth/components/auth/auth-card.tsx:350
+#: src/features/auth/components/auth/auth-card.tsx:359
 #: src/routes/auth/reset-password.tsx:13
 msgid "Reset Password"
 msgstr "Reimposta password"
@@ -25952,11 +25971,11 @@ msgstr "Riprova tra {retryAfterMinutes} min"
 msgid "Retry now"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:416
+#: src/features/chat/thread/composer-input.tsx:417
 msgid "Retry upload"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:411
+#: src/features/chat/thread/composer-input.tsx:412
 msgid "Retry upload of {attachmentName}"
 msgstr ""
 
@@ -26198,7 +26217,7 @@ msgstr "Rotazione: {rotation}°"
 msgid "Round {0}: not yet. {1}"
 msgstr ""
 
-#: src/features/marketing/components/gateway-landing-page.tsx:515
+#: src/features/marketing/components/gateway-landing-page.tsx:518
 msgid "Route, track, <0>optimize.</0>"
 msgstr "Instrada, monitora, <0>ottimizza.</0>"
 
@@ -26272,7 +26291,7 @@ msgstr "Cronologia delle esecuzioni"
 msgid "Run progress"
 msgstr "Avanzamento dell'esecuzione"
 
-#: src/features/marketing/components/landing-page.tsx:283
+#: src/features/marketing/components/landing-page.tsx:284
 msgid "Run Python, see charts and images instantly"
 msgstr "Esegui Python e vedi subito grafici e immagini"
 
@@ -26351,7 +26370,7 @@ msgstr "Viene eseguito in una sandbox cloud per un massimo di 20 minuti con la t
 msgid "Runs of {0}"
 msgstr "Esecuzioni di {0}"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:88
+#: src/features/marketing/components/gateway-landing-page.tsx:89
 msgid "Runs on Cloudflare Workers — sub-50ms cold starts, 300+ edge locations worldwide."
 msgstr "Gira su Cloudflare Workers: avvii a freddo sotto i 50 ms, oltre 300 località edge in tutto il mondo."
 
@@ -26383,7 +26402,7 @@ msgstr "Esecuzioni: {runCount}"
 msgid "Runway flagship"
 msgstr "Modello di punta di Runway"
 
-#: src/features/marketing/components/landing-page.tsx:287
+#: src/features/marketing/components/landing-page.tsx:288
 msgid "Runway, Luma, Kling, and more in one place"
 msgstr "Runway, Luma, Kling e altri in un unico posto"
 
@@ -26479,7 +26498,7 @@ msgstr "Salva"
 msgid "Save & Close"
 msgstr "Salva e chiudi"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:753
+#: src/features/marketing/components/gateway-landing-page.tsx:756
 msgid "Save 25%"
 msgstr "Risparmia il 25%"
 
@@ -26679,7 +26698,7 @@ msgstr "Punteggio"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Assegna a ogni risposta un punteggio da 0 a 100% rispetto alla risposta attesa o alla rubrica. Aggiunge una piccola chiamata al modello per caso."
 
-#: src/features/chat/thread/composer-input.tsx:1124
+#: src/features/chat/thread/composer-input.tsx:1136
 msgid "Screen capture failed. Please try again."
 msgstr "Acquisizione dello schermo non riuscita. Riprova."
 
@@ -26829,8 +26848,8 @@ msgstr ""
 msgid "Search models by name, ID, or provider..."
 msgstr "Cerca modelli per nome, ID o provider..."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:529
-#: src/components/model-picker/model-picker.tsx:989
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:523
+#: src/components/model-picker/model-picker.tsx:995
 msgid "Search models..."
 msgstr "Cerca modelli..."
 
@@ -26926,6 +26945,7 @@ msgstr ""
 msgid "Search thread titles..."
 msgstr "Cerca nei titoli delle conversazioni..."
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:143
 #: src/features/chat/thread-list/thread-list-header.tsx:70
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:78
 msgid "Search threads"
@@ -26985,7 +27005,7 @@ msgstr "Ricerca..."
 msgid "Searching…"
 msgstr "Ricerca…"
 
-#: src/features/marketing/components/landing-page.tsx:357
+#: src/features/marketing/components/landing-page.tsx:358
 msgid "seat/mo"
 msgstr "postazione/mese"
 
@@ -27020,11 +27040,11 @@ msgstr "Sicurezza"
 msgid "Security, performance and maintainability reviewers answer side by side; the review lead merges their findings."
 msgstr "Revisori di sicurezza, prestazioni e manutenibilità rispondono fianco a fianco; il responsabile della revisione unisce i risultati."
 
-#: src/features/marketing/components/landing-page.tsx:900
+#: src/features/marketing/components/landing-page.tsx:903
 msgid "See all features"
 msgstr "Vedi tutte le funzionalità"
 
-#: src/features/marketing/components/landing-page.tsx:921
+#: src/features/marketing/components/landing-page.tsx:924
 msgid "See how teams use Neore to replace their entire AI stack."
 msgstr "Scopri come i team usano Neore per sostituire l'intero stack di IA."
 
@@ -27267,7 +27287,7 @@ msgstr ""
 msgid "Selection context"
 msgstr "Contesto della selezione"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:571
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:565
 msgid "Selection mode"
 msgstr "Modalità di selezione"
 
@@ -27308,6 +27328,10 @@ msgstr "Invia un messaggio qui sotto per iniziare"
 msgid "Send a message to begin"
 msgstr "Invia un messaggio per iniziare"
 
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:421
+msgid "Send a new verification link"
+msgstr ""
+
 #: src/features/chat/thread/ask-user-prompt.tsx:187
 msgid "Send answer"
 msgstr "Invia risposta"
@@ -27334,12 +27358,12 @@ msgid "Send Magic Link"
 msgstr "Invia magic link"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:168
-#: src/features/chat/thread/composer-input-area.tsx:176
-#: src/features/chat/thread/composer-input-area.tsx:417
+#: src/features/chat/thread/composer-input-area.tsx:179
+#: src/features/chat/thread/composer-input-area.tsx:421
 msgid "Send message"
 msgstr "Invia messaggio"
 
-#: src/features/chat/thread/composer-input-area.tsx:176
+#: src/features/chat/thread/composer-input-area.tsx:179
 msgid "Send message ({sendShortcut})"
 msgstr ""
 
@@ -27547,8 +27571,8 @@ msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in resp
 msgstr "Configura i trigger per automatizzare le attività secondo una pianificazione, tramite webhook o in risposta a eventi."
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:255
-#: src/components/settings/settings-modal.tsx:391
-#: src/components/settings/settings-modal.tsx:489
+#: src/components/settings/settings-modal.tsx:404
+#: src/components/settings/settings-modal.tsx:502
 #: src/features/layout/components/mobile-section-nav.tsx:59
 #: src/features/layout/lib/dashboard-page-names.ts:38
 msgid "Settings"
@@ -27608,7 +27632,7 @@ msgstr "Condividi pagina"
 msgid "Share Thread"
 msgstr "Condividi conversazione"
 
-#: src/features/marketing/components/landing-page.tsx:310
+#: src/features/marketing/components/landing-page.tsx:311
 msgid "Share threads, branch discussions, and give your whole team access to every model from one plan."
 msgstr "Condividi conversazioni, crea branch delle discussioni e dai a tutto il tuo team l’accesso a ogni modello con un unico piano."
 
@@ -27645,7 +27669,7 @@ msgstr "Pagina condivisa"
 msgid "Shared Prompt"
 msgstr "Prompt condiviso"
 
-#: src/features/marketing/components/landing-page.tsx:351
+#: src/features/marketing/components/landing-page.tsx:352
 msgid "Shared threads"
 msgstr "Conversazioni condivise"
 
@@ -27677,7 +27701,7 @@ msgstr ""
 msgid "Shimmer (Warm)"
 msgstr "Shimmer (calda)"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:837
+#: src/features/marketing/components/gateway-landing-page.tsx:845
 msgid "Ship AI features <0>faster.</0>"
 msgstr "Rilascia funzionalità di IA <0>più velocemente.</0>"
 
@@ -27890,9 +27914,11 @@ msgstr "Barra laterale destra"
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:43
 #: src/components/not-found.tsx:12
-#: src/features/auth/components/auth/auth-card.tsx:472
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:325
+#: src/components/settings/settings-modal.tsx:163
+#: src/features/auth/components/auth/auth-card.tsx:491
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:406
 #: src/features/layout/components/nav-user.tsx:237
+#: src/features/marketing/components/landing-page.tsx:1058
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
 #: src/routes/auth/extension.tsx:78
 msgid "Sign in"
@@ -27929,6 +27955,10 @@ msgstr ""
 msgid "Sign in to fork this workflow"
 msgstr "Accedi per duplicare questo workflow"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:273
+msgid "Sign in to see your chats."
+msgstr "Accedi per vedere le tue chat."
+
 #: src/features/develop/components/watched-repositories.tsx:66
 msgid "Sign in to the host again to keep this fresh."
 msgstr ""
@@ -27937,9 +27967,21 @@ msgstr ""
 msgid "Sign in to the Neore desktop app"
 msgstr "Accedi all'app desktop di Neore"
 
-#: src/features/auth/components/auth/login-modal.tsx:41
+#: src/components/model-picker/model-picker.tsx:485
+msgid "Sign in to unlock all models"
+msgstr "Accedi per sbloccare tutti i modelli"
+
+#: src/components/model-picker/model-picker.tsx:989
+msgid "Sign in to unlock all models."
+msgstr "Accedi per sbloccare tutti i modelli."
+
+#: src/features/auth/components/auth/login-modal.tsx:47
 msgid "Sign in to your account"
 msgstr "Accedi al tuo account"
+
+#: src/components/settings/settings-modal.tsx:153
+msgid "Sign in to your account to use it."
+msgstr "Accedi al tuo account per usarlo."
 
 #. placeholder {0}: provider.name
 #: src/features/auth/components/auth/provider-button.tsx:117
@@ -27975,28 +28017,28 @@ msgstr "Esci"
 msgid "Sign out of {0}"
 msgstr "Esci da {0}"
 
-#: src/features/auth/components/auth/auth-card.tsx:472
-#: src/features/marketing/components/landing-page.tsx:331
-#: src/features/marketing/components/landing-page.tsx:349
+#: src/features/auth/components/auth/auth-card.tsx:491
+#: src/features/marketing/components/landing-page.tsx:332
+#: src/features/marketing/components/landing-page.tsx:350
 msgid "Sign up"
 msgstr "Registrati"
 
-#: src/features/auth/components/auth/auth-card.tsx:362
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:685
+#: src/features/auth/components/auth/auth-card.tsx:378
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:678
 #: src/routes/auth/sign-up.tsx:26
 msgid "Sign Up"
 msgstr "Registrati"
 
-#: src/components/settings/settings-modal.tsx:149
+#: src/components/settings/settings-modal.tsx:153
 msgid "Sign up and subscribe for $8/mo to unlock all features."
 msgstr "Registrati e abbonati a 8 $/mese per sbloccare tutte le funzionalità."
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:333
-msgid "Sign up successful"
-msgstr "Registrazione completata"
+#~ msgid "Sign up successful"
+#~ msgstr "Registrazione completata"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:247
-#: src/components/model-picker/model-picker.tsx:481
+#: src/components/model-picker/model-picker.tsx:485
 msgid "Sign up to unlock all models"
 msgstr "Registrati per sbloccare tutti i modelli"
 
@@ -28007,6 +28049,10 @@ msgstr "Accesso scaduto"
 #: src/features/layout/components/nav-user.tsx:292
 msgid "Sign-out failed. Please try again."
 msgstr "Disconnessione non riuscita. Riprova."
+
+#: src/features/auth/components/auth/auth-card.tsx:372
+msgid "Sign-up needs an invitation"
+msgstr "La registrazione richiede un invito"
 
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:267
 msgid "Signature"
@@ -28049,7 +28095,7 @@ msgstr "Signing secret dalla pagina Basic Information della tua app Slack"
 msgid "Simple centered card"
 msgstr "Scheda centrata semplice"
 
-#: src/features/marketing/components/landing-page.tsx:971
+#: src/features/marketing/components/landing-page.tsx:974
 msgid "Simple, transparent <0>pricing</0>."
 msgstr "Prezzi <0>semplici e trasparenti</0>."
 
@@ -28065,8 +28111,8 @@ msgstr "poi sostituito"
 msgid "Singapore"
 msgstr "Singapore"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:583
-#: src/components/model-picker/model-picker.tsx:1036
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:577
+#: src/components/model-picker/model-picker.tsx:1042
 msgid "Single"
 msgstr "Singolo"
 
@@ -28176,7 +28222,7 @@ msgstr "Salta livelli CLIP (0 = nessuno, 1-2 = più stilizzato)"
 msgid "Skip questions"
 msgstr "Salta le domande"
 
-#: src/routes/__root.tsx:427
+#: src/routes/__root.tsx:428
 msgid "Skip to content"
 msgstr "Vai al contenuto"
 
@@ -28199,8 +28245,8 @@ msgstr "File che non sono export di chat, saltati: {0}"
 msgid "Skips a run when your workspace has had no new activity since the routine last posted. A skipped run creates no chat and sends no notification."
 msgstr ""
 
-#: src/features/marketing/components/gateway-landing-page.tsx:142
-#: src/features/marketing/components/landing-page.tsx:362
+#: src/features/marketing/components/gateway-landing-page.tsx:143
+#: src/features/marketing/components/landing-page.tsx:363
 msgid "SLA guarantee"
 msgstr "Garanzia SLA"
 
@@ -28289,19 +28335,19 @@ msgstr "Lo slug non corrisponde"
 msgid "Small"
 msgstr ""
 
-#: src/features/marketing/components/gateway-landing-page.tsx:108
+#: src/features/marketing/components/gateway-landing-page.tsx:109
 msgid "Smart routing"
 msgstr "Instradamento intelligente"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:50
+#: src/features/marketing/components/gateway-landing-page.tsx:51
 msgid "Smart Routing"
 msgstr "Instradamento intelligente"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:122
+#: src/features/marketing/components/gateway-landing-page.tsx:123
 msgid "Smart routing + fallback"
 msgstr "Instradamento intelligente + fallback"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:185
+#: src/features/marketing/components/gateway-landing-page.tsx:186
 msgid "Smart routing automatically classifies each query by complexity (Simple, Standard, Complex, Reasoning) and routes it to the optimal model based on capability, cost, and provider health. If a provider is down, the circuit breaker triggers automatic fallback within 30 seconds."
 msgstr "L’instradamento intelligente classifica automaticamente ogni query per complessità (Semplice, Standard, Complessa, Ragionamento) e la indirizza al modello ottimale in base a capacità, costo e stato del provider. Se un provider non è disponibile, il circuit breaker attiva il fallback automatico entro 30 secondi."
 
@@ -28396,7 +28442,7 @@ msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "Per alcuni passaggi mancano i dati sui prezzi; il totale è un minimo."
 
 #: src/components/error-boundary.tsx:51
-#: src/components/settings/settings-modal.tsx:126
+#: src/components/settings/settings-modal.tsx:127
 #: src/features/pages/components/page-share-dialog.tsx:50
 msgid "Something went wrong"
 msgstr "Qualcosa è andato storto"
@@ -28439,7 +28485,7 @@ msgstr "Ordina i dati"
 msgid "Sort desc"
 msgstr "Ordine decrescente"
 
-#: src/components/model-picker/model-picker.tsx:1127
+#: src/components/model-picker/model-picker.tsx:1133
 msgid "Sort models"
 msgstr ""
 
@@ -28718,11 +28764,11 @@ msgstr ""
 msgid "Sri Lanka"
 msgstr "Sri Lanka"
 
-#: src/features/marketing/components/landing-page.tsx:351
+#: src/features/marketing/components/landing-page.tsx:352
 msgid "SSO"
 msgstr "SSO"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:141
+#: src/features/marketing/components/gateway-landing-page.tsx:142
 msgid "SSO & team management"
 msgstr "SSO e gestione del team"
 
@@ -28788,8 +28834,8 @@ msgstr ""
 msgid "starred"
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:548
-#: src/components/model-picker/model-picker.tsx:1005
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:542
+#: src/components/model-picker/model-picker.tsx:1011
 msgid "Starred"
 msgstr "Contrassegnati"
 
@@ -28824,7 +28870,7 @@ msgstr "Inizia una conversazione per configurare le variabili."
 msgid "Start a conversation to pin messages."
 msgstr "Inizia una conversazione per fissare i messaggi."
 
-#: src/features/marketing/components/landing-page.tsx:233
+#: src/features/marketing/components/landing-page.tsx:234
 msgid "Start a conversation, generate images, write a document in canvas, run code — no tab-switching, no copy-pasting between apps."
 msgstr "Avvia una conversazione, genera immagini, scrivi un documento nel canvas, esegui codice: niente cambi di scheda, niente copia-incolla tra le app."
 
@@ -28850,7 +28896,7 @@ msgstr "Inizia una nuova chat per creare la tua prima conversazione"
 msgid "Start a new temporary chat ({0})"
 msgstr "Inizia una nuova chat temporanea ({0})"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:106
+#: src/features/marketing/components/gateway-landing-page.tsx:107
 msgid "Start building"
 msgstr "Inizia a sviluppare"
 
@@ -28858,9 +28904,9 @@ msgstr "Inizia a sviluppare"
 msgid "Start chat"
 msgstr "Avvia chat"
 
-#: src/features/marketing/components/landing-page.tsx:831
-#: src/features/marketing/components/landing-page.tsx:897
-#: src/features/marketing/components/landing-page.tsx:1140
+#: src/features/marketing/components/landing-page.tsx:834
+#: src/features/marketing/components/landing-page.tsx:900
+#: src/features/marketing/components/landing-page.tsx:1148
 msgid "Start chatting free"
 msgstr "Inizia a chattare gratis"
 
@@ -28875,8 +28921,8 @@ msgstr "Inizia a modificare la cella"
 msgid "Start frame"
 msgstr "Fotogramma iniziale"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:117
-#: src/features/marketing/components/gateway-landing-page.tsx:135
+#: src/features/marketing/components/gateway-landing-page.tsx:118
+#: src/features/marketing/components/gateway-landing-page.tsx:136
 msgid "Start free trial"
 msgstr "Inizia la prova gratuita"
 
@@ -29022,15 +29068,15 @@ msgstr "Modalità senza stato"
 msgid "Status"
 msgstr "Stato"
 
-#: src/features/marketing/components/gateway-footer.tsx:24
+#: src/features/marketing/components/gateway-footer.tsx:25
 msgid "Status Page"
 msgstr "Pagina di stato"
 
-#: src/features/chat/thread/composer-input-area.tsx:353
+#: src/features/chat/thread/composer-input-area.tsx:357
 msgid "Steer — the current reply reads this at its next step"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:336
+#: src/features/chat/thread/composer-input-area.tsx:340
 msgid "Steer the reply"
 msgstr ""
 
@@ -29107,8 +29153,8 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:554
 #: src/features/chat/thread-list/thread-node.tsx:576
-#: src/features/chat/thread/composer-input-area.tsx:390
-#: src/features/chat/thread/composer-input-area.tsx:403
+#: src/features/chat/thread/composer-input-area.tsx:394
+#: src/features/chat/thread/composer-input-area.tsx:407
 msgid "Stop generating"
 msgstr "Interrompi la generazione"
 
@@ -29120,7 +29166,7 @@ msgstr "Interrompi la modalità a mani libere (Esc)"
 msgid "Stop Impersonating"
 msgstr "Interrompi impersonificazione"
 
-#: src/features/marketing/components/landing-page.tsx:775
+#: src/features/marketing/components/landing-page.tsx:778
 msgid "Stop juggling subscriptions. One workspace, every model, one price."
 msgstr "Basta destreggiarsi tra abbonamenti. Un unico spazio di lavoro, tutti i modelli, un solo prezzo."
 
@@ -29128,11 +29174,11 @@ msgstr "Basta destreggiarsi tra abbonamenti. Un unico spazio di lavoro, tutti i 
 msgid "Stop listening"
 msgstr "Interrompi l'ascolto"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:633
+#: src/features/marketing/components/gateway-landing-page.tsx:636
 msgid "Stop managing six provider SDKs."
 msgstr "Basta gestire sei SDK di provider diversi."
 
-#: src/features/marketing/components/landing-page.tsx:825
+#: src/features/marketing/components/landing-page.tsx:828
 msgid "Stop paying for six AI tools."
 msgstr "Basta pagare sei strumenti di IA."
 
@@ -29542,7 +29588,7 @@ msgstr "Intensità dello stile"
 msgid "Style Transfer"
 msgstr "Trasferimento di stile"
 
-#: src/features/marketing/components/landing-page.tsx:81
+#: src/features/marketing/components/landing-page.tsx:82
 msgid "Style-consistent generation"
 msgstr "Generazione con stile coerente"
 
@@ -29596,7 +29642,7 @@ msgstr ""
 msgid "Submitting…"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:984
+#: src/components/model-picker/model-picker.tsx:985
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "Abbonati a 8 $/mese per sbloccare tutti i modelli."
 
@@ -29644,7 +29690,7 @@ msgstr "Suggeriti"
 msgid "Suggested answers"
 msgstr "Risposte suggerite"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:462
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:474
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Suggerimento disponibile, premi Freccia destra per accettarlo"
 
@@ -29677,7 +29723,7 @@ msgstr ""
 msgid "Summarize a document or URL..."
 msgstr "Riassumi un documento o un URL..."
 
-#: src/features/marketing/components/landing-page.tsx:285
+#: src/features/marketing/components/landing-page.tsx:286
 msgid "Summarize any webpage in seconds"
 msgstr "Riassumi qualsiasi pagina web in pochi secondi"
 
@@ -29794,11 +29840,11 @@ msgstr "Cambia account"
 msgid "Switch AI model"
 msgstr "Cambia modello di IA"
 
-#: src/features/marketing/components/landing-page.tsx:202
+#: src/features/marketing/components/landing-page.tsx:203
 msgid "Switch between GPT-4, Claude, Gemini, and DeepSeek mid-conversation. Compare answers, pick the best one — no extra tabs, no extra logins."
 msgstr "Passa da GPT-4 a Claude, Gemini e DeepSeek a metà conversazione. Confronta le risposte e scegli la migliore: niente schede o login in più."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:465
+#: src/features/marketing/components/gateway-landing-page.tsx:468
 msgid "Switch between OpenAI, Google, Anthropic, and more with a single parameter. No SDK changes, no migration."
 msgstr "Passa da OpenAI a Google, Anthropic e altri con un solo parametro. Nessuna modifica all'SDK, nessuna migrazione."
 
@@ -29965,8 +30011,8 @@ msgstr "A turno"
 msgid "Taking screenshot..."
 msgstr "Acquisizione screenshot..."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:851
-#: src/features/marketing/components/landing-page.tsx:1089
+#: src/features/marketing/components/gateway-landing-page.tsx:859
+#: src/features/marketing/components/landing-page.tsx:1097
 msgid "Talk to sales"
 msgstr "Parla con le vendite"
 
@@ -30075,12 +30121,12 @@ msgstr "Attività che richiedono le capacità visive di xAI e l’accesso a info
 msgid "Teal"
 msgstr "Verde acqua"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:148
-#: src/features/marketing/components/landing-page.tsx:355
+#: src/features/marketing/components/gateway-landing-page.tsx:149
+#: src/features/marketing/components/landing-page.tsx:356
 msgid "Team"
 msgstr "Team"
 
-#: src/features/marketing/components/landing-page.tsx:312
+#: src/features/marketing/components/landing-page.tsx:313
 msgid "Team Alignment"
 msgstr "Allineamento del team"
 
@@ -30097,7 +30143,7 @@ msgstr "Team creato"
 msgid "Team deleted successfully"
 msgstr "Team eliminato"
 
-#: src/features/marketing/components/landing-page.tsx:351
+#: src/features/marketing/components/landing-page.tsx:352
 msgid "Team management"
 msgstr "Gestione del team"
 
@@ -30168,7 +30214,7 @@ msgstr "Team che cercano il nuovo modello di punta di Google con ragionamento av
 msgid "Teams who want Z.AI's latest GLM capabilities with improved reasoning"
 msgstr "Team che vogliono le ultime capacità GLM di Z.AI con un ragionamento migliorato"
 
-#: src/features/marketing/components/landing-page.tsx:308
+#: src/features/marketing/components/landing-page.tsx:309
 msgid "Technical Work"
 msgstr "Lavoro tecnico"
 
@@ -30230,6 +30276,7 @@ msgid "Temporary chat"
 msgstr "Chat temporanea"
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:293
+#: src/features/chat/signed-out/signed-out-chat.tsx:309
 msgid "Temporary Chat"
 msgstr "Chat temporanea"
 
@@ -30315,10 +30362,10 @@ msgstr "test"
 msgid "text"
 msgstr "testo"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:630
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:624
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:1083
+#: src/components/model-picker/model-picker.tsx:1089
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:120
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -30371,7 +30418,7 @@ msgstr "Direzione del testo impostata su LTR"
 msgid "Text direction set to RTL"
 msgstr "Direzione del testo impostata su RTL"
 
-#: src/features/chat/thread/composer-input.tsx:301
+#: src/features/chat/thread/composer-input.tsx:302
 msgid "Text document"
 msgstr "Documento di testo"
 
@@ -30383,7 +30430,7 @@ msgstr "Generazione di testo"
 msgid "Text generation model"
 msgstr "Modello di generazione di testo"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:95
+#: src/features/marketing/components/gateway-landing-page.tsx:96
 msgid "Text generation with streaming support"
 msgstr "Generazione di testo con supporto allo streaming"
 
@@ -30769,7 +30816,7 @@ msgstr "La cartella non contiene documenti supportati."
 msgid "The forwarded messages were shortened to fit."
 msgstr "I messaggi inoltrati sono stati accorciati per rientrare nei limiti."
 
-#: src/features/marketing/components/landing-page.tsx:272
+#: src/features/marketing/components/landing-page.tsx:273
 msgid "The free plan includes 20 text messages a day on a curated set of fast, low-cost models, image and video generation with small daily limits, canvas, code execution, and thread management. Premium models need Pro or your own API key. Pro and Team raise the limit to 1,000 messages a day on every model."
 msgstr "Il piano gratuito include 20 messaggi di testo al giorno su una selezione di modelli veloci ed economici, generazione di immagini e video con piccoli limiti giornalieri, canvas, esecuzione di codice e gestione dei thread. I modelli premium richiedono Pro o la tua chiave API. Pro e Team portano il limite a 1.000 messaggi al giorno su tutti i modelli."
 
@@ -30961,7 +31008,7 @@ msgstr "La pagina ora mostra l'altra versione. Copia dalla tua tutto ciò che vu
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "La pagina, tutte le sottopagine, i relativi commenti e la cronologia delle versioni vengono eliminati. Questa azione non può essere annullata."
 
-#: src/features/chat/thread/composer-input.tsx:886
+#: src/features/chat/thread/composer-input.tsx:887
 msgid "The pasted text could not be attached and was not inserted."
 msgstr ""
 
@@ -31020,7 +31067,7 @@ msgstr "L'endpoint della risorsa da Chiavi ed endpoint: *.openai.azure.com o *.c
 msgid "The retry is taking longer than expected"
 msgstr ""
 
-#: src/features/marketing/components/gateway-landing-page.tsx:51
+#: src/features/marketing/components/gateway-landing-page.tsx:52
 msgid "The right model, every time."
 msgstr "Il modello giusto, ogni volta."
 
@@ -31069,11 +31116,11 @@ msgstr "Il video tagliato supera i {0} MB. Scegli un intervallo più breve."
 msgid "The two passcodes do not match."
 msgstr ""
 
-#: src/features/marketing/components/gateway-footer.tsx:79
+#: src/features/marketing/components/gateway-footer.tsx:82
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "Il gateway LLM unificato per le applicazioni di IA moderne."
 
-#: src/features/chat/thread/composer-input.tsx:565
+#: src/features/chat/thread/composer-input.tsx:566
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "Il caricamento di «{fileName}» è scaduto. Allegalo di nuovo."
 
@@ -31577,7 +31624,7 @@ msgstr "Questa piattaforma è un prodotto indipendente e non è affiliata, appro
 msgid "This platform is an independent product and is not affiliated with, endorsed by, or officially connected to any AI model provider, including but not limited to Google, OpenAI, Anthropic, Meta, or Mistral. We provide access to these models through our own interface and infrastructure. All model names, trademarks, and brand identities are the property of their respective owners."
 msgstr "Questa piattaforma è un prodotto indipendente e non è affiliata, approvata o ufficialmente collegata ad alcun provider di modelli di IA, inclusi a titolo esemplificativo Google, OpenAI, Anthropic, Meta o Mistral. Offriamo l'accesso a questi modelli tramite la nostra interfaccia e la nostra infrastruttura. Tutti i nomi dei modelli, i marchi e le identità di brand appartengono ai rispettivi proprietari."
 
-#: src/features/marketing/components/gateway-footer.tsx:128
+#: src/features/marketing/components/gateway-footer.tsx:134
 #: src/features/marketing/components/landing-footer.tsx:262
 msgid "This platform is an independent product and is not affiliated with, endorsed by, or officially connected to any AI model provider. All model names, trademarks, and brand identities are the property of their respective owners."
 msgstr "Questa piattaforma è un prodotto indipendente e non è affiliata, approvata o ufficialmente collegata ad alcun provider di modelli di IA. Tutti i nomi dei modelli, i marchi e le identità di brand appartengono ai rispettivi proprietari."
@@ -31820,7 +31867,7 @@ msgstr "Conversazione resa privata"
 msgid "Thread made public"
 msgstr "Conversazione resa pubblica"
 
-#: src/features/marketing/components/landing-page.tsx:322
+#: src/features/marketing/components/landing-page.tsx:323
 msgid "Thread management"
 msgstr "Gestione delle conversazioni"
 
@@ -31877,7 +31924,7 @@ msgstr "La conversazione verrà eliminata automaticamente tra {0}"
 msgid "Threads"
 msgstr "Conversazioni"
 
-#: src/features/marketing/components/landing-page.tsx:238
+#: src/features/marketing/components/landing-page.tsx:239
 msgid "Threads keep your full history. Branch ideas, pin important chats, and pick up exactly where you left off."
 msgstr "Le conversazioni conservano tutta la cronologia. Crea branch delle idee, fissa le chat importanti e riprendi esattamente da dove avevi lasciato."
 
@@ -32010,12 +32057,12 @@ msgstr ""
 msgid "Toggle left sidebar ({0})"
 msgstr "Mostra/nascondi barra laterale sinistra ({0})"
 
-#: src/features/marketing/components/gateway-navbar.tsx:98
+#: src/features/marketing/components/gateway-navbar.tsx:101
 #: src/features/marketing/components/navbar-menu.tsx:112
 msgid "Toggle menu"
 msgstr "Apri/chiudi menu"
 
-#: src/features/marketing/components/gateway-navbar.tsx:129
+#: src/features/marketing/components/gateway-navbar.tsx:132
 #: src/features/marketing/components/navbar-menu.tsx:143
 msgid "Toggle Menu"
 msgstr "Mostra/nascondi menu"
@@ -32036,6 +32083,7 @@ msgstr "Mostra/nascondi barra laterale destra ({0})"
 #: ../../packages/ui/src/components/sidebar.tsx:358
 #: ../../packages/ui/src/components/sidebar.tsx:380
 #: ../../packages/ui/src/components/sidebar.tsx:394
+#: src/features/chat/signed-out/signed-out-chat.tsx:297
 msgid "Toggle Sidebar"
 msgstr "Mostra/nascondi barra laterale"
 
@@ -32129,7 +32177,7 @@ msgstr "chiamata di strumenti"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:169
 #: ../../packages/chat-ui/src/model-picker/utils.ts:173
-#: src/components/model-picker/model-picker.tsx:83
+#: src/components/model-picker/model-picker.tsx:84
 #: src/features/settings/components/chat/models-settings.tsx:33
 msgid "Tool Calling"
 msgstr "Chiamata di strumenti"
@@ -32232,7 +32280,7 @@ msgstr "Totali per modello"
 msgid "Track all admin actions for accountability"
 msgstr "Tieni traccia di tutte le azioni degli admin per la responsabilità"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:57
+#: src/features/marketing/components/gateway-landing-page.tsx:58
 msgid "Track every token and dollar."
 msgstr "Tieni traccia di ogni token e di ogni dollaro."
 
@@ -32471,7 +32519,7 @@ msgstr "Riprova"
 
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:248
 #: src/components/error-boundaries/route-error-boundary.tsx:80
-#: src/components/settings/settings-modal.tsx:131
+#: src/components/settings/settings-modal.tsx:132
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:442
 msgid "Try Again"
 msgstr "Riprova"
@@ -32488,7 +32536,7 @@ msgstr "Prova un altro termine di ricerca"
 msgid "Try free"
 msgstr "Prova gratis"
 
-#: src/features/marketing/components/landing-page.tsx:617
+#: src/features/marketing/components/landing-page.tsx:620
 #: src/features/marketing/components/models-page.tsx:463
 #: src/features/marketing/components/navbar-menu.tsx:102
 msgid "Try it free"
@@ -32590,7 +32638,7 @@ msgstr "Due modi per connettersi"
 msgid "Two-factor authentication"
 msgstr "Autenticazione a due fattori"
 
-#: src/features/auth/components/auth/auth-card.tsx:368
+#: src/features/auth/components/auth/auth-card.tsx:384
 #: src/features/auth/components/settings/two-factor/two-factor-card.tsx:49
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:126
 #: src/routes/auth/two-factor/index.tsx:13
@@ -32614,8 +32662,8 @@ msgid "Two-factor authentication is currently enabled for your account. This add
 msgstr "L'autenticazione a due fattori è attualmente attiva per il tuo account. Aggiunge un ulteriore livello di sicurezza."
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:607
-#: src/components/model-picker/model-picker.tsx:1059
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:601
+#: src/components/model-picker/model-picker.tsx:1065
 #: src/features/devices/components/device-tool-call.tsx:119
 msgid "Type"
 msgstr "Tipo"
@@ -32645,8 +32693,9 @@ msgstr "Digita per cercare"
 msgid "Type your answer…"
 msgstr "Scrivi la tua risposta…"
 
-#: src/features/chat/thread/composer-input.tsx:1503
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:174
+#: src/features/chat/signed-out/signed-out-chat.tsx:248
+#: src/features/chat/thread/composer-input.tsx:1515
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:182
 msgid "Type your message..."
 msgstr "Scrivi il tuo messaggio..."
 
@@ -32794,7 +32843,7 @@ msgstr ""
 msgid "Unchanged"
 msgstr "Invariati"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:573
+#: src/features/marketing/components/gateway-landing-page.tsx:576
 msgid "Under the Hood"
 msgstr "Dietro le quinte"
 
@@ -32808,7 +32857,7 @@ msgstr "Dietro le quinte"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:48
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:64
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:810
+#: src/features/chat/thread/composer-input.tsx:811
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "Annulla"
@@ -32827,15 +32876,15 @@ msgstr "Scongela il caso {0}"
 msgid "Ungroup"
 msgstr "Separa gruppo"
 
-#: src/features/marketing/components/gateway-footer.tsx:65
+#: src/features/marketing/components/gateway-footer.tsx:68
 msgid "Unified access to OpenAI, Google, Anthropic, xAI, and more. Smart routing, usage tracking, and cost optimization — built for production."
 msgstr "Accesso unificato a OpenAI, Google, Anthropic, xAI e altri. Routing intelligente, monitoraggio dell'utilizzo e ottimizzazione dei costi, pensato per la produzione."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:415
+#: src/features/marketing/components/gateway-landing-page.tsx:418
 msgid "Unified access to OpenAI, Google, Anthropic, xAI, Groq, and Mistral through a single endpoint. Smart routing, automatic fallback, real-time usage tracking, and cost optimization — built on Cloudflare Workers."
 msgstr "Accesso unificato a OpenAI, Google, Anthropic, xAI, Groq e Mistral tramite un unico endpoint. Routing intelligente, fallback automatico, monitoraggio dell'utilizzo in tempo reale e ottimizzazione dei costi, basato su Cloudflare Workers."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:44
+#: src/features/marketing/components/gateway-landing-page.tsx:45
 msgid "Unified API"
 msgstr "API unificata"
 
@@ -32883,7 +32932,7 @@ msgstr "Dispositivo sconosciuto"
 msgid "Unknown user"
 msgstr "Utente sconosciuto"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:138
+#: src/features/marketing/components/gateway-landing-page.tsx:139
 msgid "Unlimited requests"
 msgstr "Richieste illimitate"
 
@@ -33036,7 +33085,7 @@ msgstr "Documentazione aggiornata per qualsiasi libreria o framework"
 msgid "Update Duration"
 msgstr "Aggiorna durata"
 
-#: src/features/chat/thread/composer-input.tsx:1360
+#: src/features/chat/thread/composer-input.tsx:1372
 msgid "Update failed"
 msgstr "Aggiornamento non riuscito"
 
@@ -33150,8 +33199,8 @@ msgid "Updates"
 msgstr "Novità"
 
 #: src/features/billing/hooks/use-checkout.ts:56
-#: src/features/marketing/components/landing-page.tsx:1032
-#: src/features/marketing/components/landing-page.tsx:1045
+#: src/features/marketing/components/landing-page.tsx:1035
+#: src/features/marketing/components/landing-page.tsx:1048
 msgid "Upgrade"
 msgstr "Esegui upgrade"
 
@@ -33176,7 +33225,7 @@ msgstr "Passa a Pro, mensile"
 msgid "upload"
 msgstr ""
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:472
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:465
 #: src/features/auth/components/organization/create-organization-dialog.tsx:255
 #: src/features/vault/components/empty-states.tsx:45
 #: src/features/vault/components/upload-button.tsx:11
@@ -33211,12 +33260,12 @@ msgstr "Carica un'immagine o generane una in questa conversazione per usarla com
 msgid "Upload an image to any thread or generate one with an image model."
 msgstr "Carica un'immagine in una conversazione qualsiasi o generane una con un modello di immagini."
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:457
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:450
 #: src/features/auth/components/settings/account/update-avatar-card.tsx:139
 msgid "Upload Avatar"
 msgstr "Carica avatar"
 
-#: src/features/marketing/components/landing-page.tsx:314
+#: src/features/marketing/components/landing-page.tsx:315
 msgid "Upload CSVs, run Python analysis, and export charts — no Jupyter setup required."
 msgstr "Carica CSV, esegui analisi in Python ed esporta grafici, senza configurare Jupyter."
 
@@ -33224,18 +33273,18 @@ msgstr "Carica CSV, esegui analisi in Python ed esporta grafici, senza configura
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Carica documenti nella tua base di conoscenza e raggruppali in raccolte. L’IA vi cerca il contesto pertinente e cita i passaggi utilizzati."
 
-#: src/features/chat/thread/composer-input.tsx:408
-#: src/features/chat/thread/composer-input.tsx:610
-#: src/features/chat/thread/composer-input.tsx:1281
+#: src/features/chat/thread/composer-input.tsx:409
+#: src/features/chat/thread/composer-input.tsx:611
+#: src/features/chat/thread/composer-input.tsx:1293
 msgid "Upload failed"
 msgstr "Caricamento non riuscito"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1274
+#: src/features/chat/thread/composer-input.tsx:1286
 msgid "Upload failed: {0}"
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:239
+#: src/features/chat/thread/composer-input-area.tsx:242
 msgid "Upload file"
 msgstr "Carica file"
 
@@ -33281,7 +33330,7 @@ msgstr "Caricata"
 msgid "Uploaded {fileName}"
 msgstr "{fileName} caricato"
 
-#: src/features/chat/thread/composer-input.tsx:345
+#: src/features/chat/thread/composer-input.tsx:346
 msgid "Uploading {attachmentName}"
 msgstr "Caricamento di {attachmentName}"
 
@@ -33332,7 +33381,7 @@ msgstr "URL"
 msgid "URL contains a dangerous protocol (javascript:, data:, vbscript:, or file:)"
 msgstr "L’URL contiene un protocollo pericoloso (javascript:, data:, vbscript: o file:)"
 
-#: src/features/marketing/components/landing-page.tsx:285
+#: src/features/marketing/components/landing-page.tsx:286
 msgid "URL Retrieval"
 msgstr "Recupero di URL"
 
@@ -33353,11 +33402,11 @@ msgstr "Utilizzo"
 msgid "Usage & Cost"
 msgstr "Utilizzo e costi"
 
-#: src/features/marketing/components/landing-page.tsx:351
+#: src/features/marketing/components/landing-page.tsx:352
 msgid "Usage analytics"
 msgstr "Analisi dell’utilizzo"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:56
+#: src/features/marketing/components/gateway-landing-page.tsx:57
 msgid "Usage Analytics"
 msgstr "Analisi dell’utilizzo"
 
@@ -33365,7 +33414,7 @@ msgstr "Analisi dell’utilizzo"
 msgid "Usage by skill"
 msgstr "Utilizzo per skill"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:108
+#: src/features/marketing/components/gateway-landing-page.tsx:109
 msgid "Usage dashboard"
 msgstr "Dashboard di utilizzo"
 
@@ -33412,7 +33461,7 @@ msgid "Use browser automation to navigate websites, extract data, take screensho
 msgstr "Usa l’automazione del browser per navigare nei siti web, estrarre dati, acquisire screenshot e interagire con le pagine web."
 
 #: src/features/marketing/components/landing-footer.tsx:112
-#: src/features/marketing/components/landing-page.tsx:909
+#: src/features/marketing/components/landing-page.tsx:912
 msgid "Use Cases"
 msgstr "Casi d’uso"
 
@@ -33498,7 +33547,7 @@ msgstr "Usato per pulsanti, evidenziazioni e anelli di focus. Ogni opzione manti
 msgid "user"
 msgstr "utente"
 
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:443
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:436
 #: src/features/auth/components/organization/personal-account-view.tsx:31
 #: src/features/auth/components/organization/personal-account-view.tsx:58
 #: src/features/auth/components/settings/account/update-avatar-card.tsx:127
@@ -33572,18 +33621,18 @@ msgstr "Organizzazione dell’utente"
 msgid "User's role"
 msgstr "Ruolo dell’utente"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:71
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:511
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:77
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:504
 #: src/features/auth/components/settings/account/update-username-card.tsx:28
 msgid "Username"
 msgstr "Nome utente"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:101
-#: src/features/auth/components/auth/forms/sign-up-form.tsx:172
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:107
+#: src/features/auth/components/auth/forms/sign-up-form.tsx:171
 msgid "Username is required"
 msgstr "Il nome utente è obbligatorio"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:109
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:115
 msgid "Username or email is required"
 msgstr "Il nome utente o l'email sono obbligatori"
 
@@ -33711,7 +33760,7 @@ msgstr "File dell'Archivio"
 msgid "vector"
 msgstr "vettoriale"
 
-#: src/features/marketing/components/landing-page.tsx:179
+#: src/features/marketing/components/landing-page.tsx:180
 msgid "Vector & design AI"
 msgstr "IA per vettoriale e design"
 
@@ -33723,7 +33772,7 @@ msgstr "grafica vettoriale"
 msgid "Vector art output and brand-style support"
 msgstr "Output in grafica vettoriale e supporto per lo stile del brand"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:96
+#: src/features/marketing/components/gateway-landing-page.tsx:97
 msgid "Vector embeddings for any text"
 msgstr "Embedding vettoriali per qualsiasi testo"
 
@@ -33759,6 +33808,7 @@ msgstr "Codice di verifica inviato alla tua email"
 msgid "Verification could not run, so nobody has checked this result. Review the answer yourself: approve it as is, reject it, or send it back with a note."
 msgstr "Non è stato possibile eseguire la verifica, quindi nessuno ha controllato questo risultato. Rivedi tu la risposta: approvala così com'è, rifiutala o rimandala indietro con una nota."
 
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:292
 #: src/features/auth/components/settings/security/change-email-card.tsx:105
 msgid "Verification email sent"
 msgstr "Email di verifica inviata"
@@ -33916,8 +33966,8 @@ msgstr "Costo per generazione molto basso"
 msgid "video"
 msgstr "video"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:654
-#: src/components/model-picker/model-picker.tsx:1109
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:648
+#: src/components/model-picker/model-picker.tsx:1115
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:122
 #: src/features/marketing/components/landing-footer.tsx:166
@@ -33948,7 +33998,7 @@ msgstr "Allegato video"
 msgid "Video can be at most {0} MB and audio at most {1} MB."
 msgstr "Il video può pesare al massimo {0} MB e l’audio {1} MB."
 
-#: src/features/marketing/components/landing-page.tsx:287
+#: src/features/marketing/components/landing-page.tsx:288
 msgid "Video Creation"
 msgstr "Creazione video"
 
@@ -33965,8 +34015,8 @@ msgstr "Descrizione del video"
 msgid "video generation"
 msgstr "generazione video"
 
-#: src/features/marketing/components/landing-page.tsx:83
-#: src/features/marketing/components/landing-page.tsx:169
+#: src/features/marketing/components/landing-page.tsx:84
+#: src/features/marketing/components/landing-page.tsx:170
 #: src/features/marketing/components/models-page.tsx:498
 msgid "Video generation"
 msgstr "Generazione di video"
@@ -33976,7 +34026,7 @@ msgstr "Generazione di video"
 msgid "Video Generation"
 msgstr "Generazione di video"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:97
+#: src/features/marketing/components/gateway-landing-page.tsx:98
 msgid "Video generation (Runway, Luma, Kling)"
 msgstr "Generazione video (Runway, Luma, Kling)"
 
@@ -34087,7 +34137,7 @@ msgstr "Visualizza modifiche"
 msgid "View error details"
 msgstr "Visualizza i dettagli dell’errore"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:705
+#: src/features/marketing/components/gateway-landing-page.tsx:708
 msgid "View full docs"
 msgstr "Vedi la documentazione completa"
 
@@ -34225,7 +34275,7 @@ msgid "vision"
 msgstr "visione"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:157
-#: src/components/model-picker/model-picker.tsx:84
+#: src/components/model-picker/model-picker.tsx:85
 #: src/features/settings/components/chat/models-settings.tsx:31
 msgid "Vision"
 msgstr "Visione"
@@ -34397,10 +34447,10 @@ msgstr "In attesa della risposta del proprietario"
 msgid "Waiting for the owner to approve"
 msgstr "In attesa dell'approvazione del proprietario"
 
-#: src/features/chat/thread/composer-input-area.tsx:363
-#: src/features/chat/thread/composer-input-area.tsx:382
-#: src/features/chat/thread/composer-input-area.tsx:417
-#: src/features/chat/thread/composer-input-area.tsx:431
+#: src/features/chat/thread/composer-input-area.tsx:367
+#: src/features/chat/thread/composer-input-area.tsx:386
+#: src/features/chat/thread/composer-input-area.tsx:421
+#: src/features/chat/thread/composer-input-area.tsx:435
 msgid "Waiting for uploads to complete…"
 msgstr "In attesa del completamento dei caricamenti…"
 
@@ -34447,11 +34497,11 @@ msgstr ""
 msgid "Watched repositories"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:693
+#: src/features/chat/core/context/chat-context.tsx:709
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "Non siamo riusciti a confermare la tua sessione in tempo. Il tuo messaggio è ancora nel campo di scrittura. Prova a inviarlo di nuovo."
 
-#: src/features/marketing/components/landing-page.tsx:243
+#: src/features/marketing/components/landing-page.tsx:244
 msgid "We never train on your data. GDPR compliant. Full export anytime. Your conversations and creations stay yours."
 msgstr "Non addestriamo mai modelli sui tuoi dati. Conforme al GDPR. Esportazione completa in qualsiasi momento. Le tue conversazioni e creazioni restano tue."
 
@@ -34506,7 +34556,7 @@ msgstr "Ricerca web tramite l’API di ricerca di Parallel"
 msgid "Webhook"
 msgstr "Webhook"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:124
+#: src/features/marketing/components/gateway-landing-page.tsx:125
 msgid "Webhook notifications"
 msgstr "Notifiche webhook"
 
@@ -34589,7 +34639,7 @@ msgstr "Crescita settimanale"
 msgid "Weight"
 msgstr "Peso"
 
-#: src/features/auth/components/auth/auth-card.tsx:356
+#: src/features/auth/components/auth/auth-card.tsx:365
 msgid "Welcome back"
 msgstr "Bentornato"
 
@@ -34649,11 +34699,11 @@ msgstr "Cosa ho imparato ({0})"
 msgid "What is {0} best for?"
 msgstr "In cosa eccelle {0}?"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:174
+#: src/features/marketing/components/gateway-landing-page.tsx:175
 msgid "What is Neore Gateway?"
 msgstr "Che cos’è Neore Gateway?"
 
-#: src/features/marketing/components/landing-page.tsx:265
+#: src/features/marketing/components/landing-page.tsx:266
 msgid "What is the Canvas feature?"
 msgstr "Che cos’è la funzione Canvas?"
 
@@ -34725,7 +34775,7 @@ msgstr ""
 msgid "What would you like to improve? (optional)"
 msgstr "Cosa vorresti migliorare? (facoltativo)"
 
-#: src/features/marketing/components/landing-page.tsx:273
+#: src/features/marketing/components/landing-page.tsx:274
 msgid "What's included in the free plan?"
 msgstr "Cosa include il piano gratuito?"
 
@@ -34734,7 +34784,7 @@ msgstr "Cosa include il piano gratuito?"
 msgid "What's New"
 msgstr "Novità"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:194
+#: src/features/marketing/components/gateway-landing-page.tsx:195
 msgid "What's the latency overhead?"
 msgstr "Qual è l’overhead di latenza?"
 
@@ -34790,15 +34840,15 @@ msgstr ""
 msgid "Where this device is offered"
 msgstr ""
 
-#: src/features/marketing/components/landing-page.tsx:568
+#: src/features/marketing/components/landing-page.tsx:571
 msgid "Where thoughts<0/><1>become actions.</1>"
 msgstr "Dove i pensieri<0/><1>diventano azioni.</1>"
 
-#: src/features/marketing/components/landing-page.tsx:257
+#: src/features/marketing/components/landing-page.tsx:258
 msgid "Which AI models are included?"
 msgstr "Quali modelli di IA sono inclusi?"
 
-#: src/features/marketing/components/gateway-landing-page.tsx:182
+#: src/features/marketing/components/gateway-landing-page.tsx:183
 msgid "Which providers are supported?"
 msgstr "Quali provider sono supportati?"
 
@@ -34816,7 +34866,7 @@ msgstr "Chi risponde"
 msgid "Why {0}"
 msgstr "Perché {0}"
 
-#: src/features/marketing/components/landing-page.tsx:771
+#: src/features/marketing/components/landing-page.tsx:774
 msgid "Why <0>Neore.</0>"
 msgstr "Perché <0>Neore.</0>"
 
@@ -34961,7 +35011,7 @@ msgstr ""
 msgid "Write a video description for a product launch"
 msgstr "Scrivi la descrizione di un video per il lancio di un prodotto"
 
-#: src/features/marketing/components/landing-page.tsx:308
+#: src/features/marketing/components/landing-page.tsx:309
 msgid "Write code with AI, run it in the sandbox, and document results — all in one thread."
 msgstr "Scrivi codice con l’IA, eseguilo nella sandbox e documenta i risultati, tutto in un’unica conversazione."
 
@@ -34969,7 +35019,7 @@ msgstr "Scrivi codice con l’IA, eseguilo nella sandbox e documenta i risultati
 msgid "Write it again"
 msgstr ""
 
-#: src/features/marketing/components/landing-page.tsx:284
+#: src/features/marketing/components/landing-page.tsx:285
 msgid "Write long-form content alongside chat"
 msgstr "Scrivi contenuti lunghi accanto alla chat"
 
@@ -35098,19 +35148,19 @@ msgstr "Giallo"
 msgid "Yes"
 msgstr "Sì"
 
-#: src/features/marketing/components/landing-page.tsx:260
+#: src/features/marketing/components/landing-page.tsx:261
 msgid "Yes. Generate images with 10+ models including FLUX, Imagen 4, and Stable Diffusion. Create videos with Runway, Luma, Kling, Hailuo, and more. All from within a chat thread — compare results across providers instantly."
 msgstr "Sì. Genera immagini con oltre 10 modelli, tra cui FLUX, Imagen 4 e Stable Diffusion. Crea video con Runway, Luma, Kling, Hailuo e altri. Tutto all’interno di una conversazione: confronta subito i risultati dei diversi provider."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:177
+#: src/features/marketing/components/gateway-landing-page.tsx:178
 msgid "Yes. Neore Gateway uses an OpenAI-compatible API format. If your application already uses the OpenAI SDK, you only need to change the base URL and API key. No code changes to your prompts, tools, or streaming logic."
 msgstr "Sì. Neore Gateway usa un formato API compatibile con OpenAI. Se la tua applicazione usa già l’SDK di OpenAI, devi solo cambiare l’URL di base e la chiave API. Nessuna modifica al codice di prompt, strumenti o logica di streaming."
 
-#: src/features/marketing/components/landing-page.tsx:268
+#: src/features/marketing/components/landing-page.tsx:269
 msgid "Yes. We never train on your conversations or generated content. All data is encrypted, GDPR-compliant, and exportable at any time. You own everything you create."
 msgstr "Sì. Non addestriamo mai modelli sulle tue conversazioni o sui contenuti generati. Tutti i dati sono crittografati, conformi al GDPR ed esportabili in qualsiasi momento. Tutto ciò che crei è tuo."
 
-#: src/features/marketing/components/gateway-landing-page.tsx:189
+#: src/features/marketing/components/gateway-landing-page.tsx:190
 msgid "Yes. You can bring your own API keys for any supported provider. Keys are encrypted at rest, never logged, and passed directly to the provider. This lets you use your own billing relationship while still benefiting from routing, analytics, and fallback."
 msgstr "Sì. Puoi usare le tue chiavi API per qualsiasi provider supportato. Le chiavi sono crittografate a riposo, mai registrate nei log e passate direttamente al provider. Così mantieni il tuo rapporto di fatturazione continuando a beneficiare di instradamento, analisi e fallback."
 
@@ -35352,7 +35402,7 @@ msgstr ""
 msgid "Your account and all associated data are being deleted. This cannot be cancelled."
 msgstr "Il tuo account e tutti i dati associati sono in fase di eliminazione. L'operazione non può essere annullata."
 
-#: src/features/marketing/components/landing-page.tsx:1075
+#: src/features/marketing/components/landing-page.tsx:1083
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "Il tuo spazio di lavoro IA <0>inizia qui.</0>"
 
@@ -35360,7 +35410,7 @@ msgstr "Il tuo spazio di lavoro IA <0>inizia qui.</0>"
 msgid "Your answer"
 msgstr "La tua risposta"
 
-#: src/features/chat/core/context/chat-context.tsx:622
+#: src/features/chat/core/context/chat-context.tsx:625
 msgid "Your answer in Neore has finished."
 msgstr "La risposta in Neore è pronta."
 
@@ -35420,7 +35470,7 @@ msgstr ""
 msgid "Your connectors and MCP tools set to \"Auto\""
 msgstr "I tuoi connettori e strumenti MCP impostati su \"Auto\""
 
-#: src/features/marketing/components/landing-page.tsx:587
+#: src/features/marketing/components/landing-page.tsx:590
 msgid "Your conversations stay private"
 msgstr "Le tue conversazioni restano private"
 
@@ -35454,12 +35504,12 @@ msgid "Your First Chat"
 msgstr "La tua prima chat"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:670
+#: src/features/chat/thread/composer-input.tsx:671
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Il tuo input è grande (~{0} token) e occuperà una parte significativa della finestra di contesto del modello."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:663
+#: src/features/chat/thread/composer-input.tsx:664
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Il tuo input è troppo grande (~{0} token) e supera la finestra di contesto del modello. Riduci la lunghezza del messaggio o rimuovi gli allegati per inviarlo."
 
@@ -35488,7 +35538,7 @@ msgstr "Il tuo server locale ha risposto, ma ha rifiutato questo sito (CORS). Co
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "La tua località (ad es. \"Roma, Italia\", \"Berlino, Germania\")."
 
-#: src/features/chat/core/context/chat-context.tsx:690
+#: src/features/chat/core/context/chat-context.tsx:706
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Il tuo messaggio contiene contenuti inappropriati e non può essere inviato."
 
