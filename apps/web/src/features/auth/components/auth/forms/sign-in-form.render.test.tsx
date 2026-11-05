@@ -145,9 +145,8 @@ describe("SignInForm", () => {
         expect(harness.saveLastSignIn).not.toHaveBeenCalled();
     });
 
-    it("offers an unverified visitor a new verification link without a session", async () => {
+    it("gets an unverified visitor a new link by signing in again with the kept password", async () => {
         harness.signInEmail.mockRejectedValue({ error: { code: "EMAIL_NOT_VERIFIED" }, status: 403 });
-        harness.sendVerificationEmail.mockResolvedValue({ status: true });
         render(<SignInForm />);
         fill("ada@example.com", "correct horse battery");
         submit();
@@ -155,8 +154,39 @@ describe("SignInForm", () => {
         fireEvent.click(await screen.findByRole("button", { name: "Send a new verification link" }));
 
         await waitFor(() => {
-            expect(harness.sendVerificationEmail).toHaveBeenCalledWith({ email: "ada@example.com", fetchOptions: { throw: true } });
             expect(harness.toast).toHaveBeenLastCalledWith({ message: "Verification email sent", variant: "success" });
+        });
+
+        // Never the unauthenticated endpoint: only a proven sign-in mails a link and renews a guest hand-over.
+        expect(harness.sendVerificationEmail).not.toHaveBeenCalled();
+        expect(harness.signInEmail).toHaveBeenCalledTimes(2);
+        expect(harness.signInEmail).toHaveBeenLastCalledWith(expect.objectContaining({ email: "ada@example.com", password: "correct horse battery" }));
+        expect(passwordInput().value).toBe("correct horse battery");
+    });
+
+    it("withdraws the new-link button once the email is edited", async () => {
+        harness.signInEmail.mockRejectedValue({ error: { code: "EMAIL_NOT_VERIFIED" }, status: 403 });
+        render(<SignInForm />);
+        fill("ada@example.com", "correct horse battery");
+        submit();
+
+        await screen.findByRole("button", { name: "Send a new verification link" });
+        fireEvent.change(emailInput(), { target: { value: "grace@example.com" } });
+
+        expect(screen.queryByRole("button", { name: "Send a new verification link" })).toBeNull();
+    });
+
+    it("keeps the new-link button named and marks it busy while it works", async () => {
+        harness.signInEmail.mockRejectedValueOnce({ error: { code: "EMAIL_NOT_VERIFIED" }, status: 403 });
+        harness.signInEmail.mockReturnValueOnce(new Promise(() => {}));
+        render(<SignInForm />);
+        fill("ada@example.com", "correct horse battery");
+        submit();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Send a new verification link" }));
+
+        await waitFor(() => {
+            expect(screen.getByRole("button", { name: "Send a new verification link" }).getAttribute("aria-busy")).toBe("true");
         });
     });
 
