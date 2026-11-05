@@ -25,7 +25,7 @@ export interface RecordedQueueMessage {
 
 export const jobsQueueMessages: RecordedQueueMessage[] = [];
 
-export const env: { EMAIL?: unknown; MAIL_FROM: string; QUEUE_JOBS: unknown; RESEND_API_KEY: string } = {
+export const env: { EMAIL?: unknown; MAIL_FROM: string; QUEUE_JOBS: unknown } = {
     MAIL_FROM: "Neore <noreply@neore.test>",
     QUEUE_JOBS: {
         send: async (body: RecordedQueueMessage["body"], options?: { delaySeconds?: number }) => {
@@ -37,7 +37,6 @@ export const env: { EMAIL?: unknown; MAIL_FROM: string; QUEUE_JOBS: unknown; RES
             }
         },
     },
-    RESEND_API_KEY: "re_test",
 };
 
 /**

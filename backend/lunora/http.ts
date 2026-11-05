@@ -110,7 +110,6 @@ app.post("/workflow/stream", httpAction(onCallerShard(lazy(async () => await imp
 // Auth headers stay server-side; the client authenticates via session cookie
 app.post("/mcp/resource", httpAction(onCallerShard(lazy(async () => await import("./chat/lib/mcp-apps"), "readMCPResourceHttpAction"))));
 app.post("/mcp/tool", httpAction(onCallerShard(lazy(async () => await import("./chat/lib/mcp-apps"), "callMCPToolFromAppHttpAction"))));
-app.post("/email/resend/webhook", httpAction(lazy(async () => await import("./email/webhook"), "handleResendWebhook")));
 app.post("/billing/creem/webhook", httpAction(lazy(async () => await import("./billing/webhook"), "handleCreemWebhook")));
 
 // Messenger platform webhooks (no CORS/auth — platform-signed requests). Each

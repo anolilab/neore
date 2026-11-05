@@ -7,14 +7,12 @@
  *    `.dev.vars` sets `ENVIRONMENT=development`): every send lands in the studio's
  *    Mail tab instead of going out. Recording it uses `LUNORA_ADMIN_TOKEN`, which
  *    `lunora dev` generates into `.dev.vars`.
- * 2. **Cloudflare Email Service** when the `EMAIL` `send_email` binding exists —
- *    `alchemy.run.ts` binds it only when `MAIL_FROM` is set and `RESEND_API_KEY`
- *    is not. No API token: the binding is the credential.
- * 3. **Resend** when `RESEND_API_KEY` is set — the fallback for a deployment whose
- *    Email Service sending domain is not verified yet (Email Service rejects an
- *    unverified sender with `E_SENDER_NOT_VERIFIED`).
+ * 2. **Cloudflare Email Service** through the `EMAIL` `send_email` binding, which
+ *    `alchemy.run.ts` binds whenever `MAIL_FROM` is set. No API token: the binding
+ *    is the credential. Email Service rejects a sender off its verified domain
+ *    (`E_SENDER_NOT_VERIFIED`).
  *
- * With none of them the mailer still queues, and `deliverEmail`'s send rejects,
+ * With neither the mailer still queues, and `deliverEmail`'s send rejects,
  * so a deploy without a transport fills the jobs DLQ (logged there) instead of
  * dropping password resets silently; `alchemy.run.ts` refuses a production
  * deploy without `MAIL_FROM` for the same reason.
@@ -49,7 +47,7 @@ const jobsQueue: QueueLike = {
 /**
  * Built per call (no I/O) so the transport follows the env as it is now — tests
  * swap bindings on the `cloudflare:workers` stub. `cloudflareSend` goes in only when the `EMAIL`
- * binding exists — `createMailerFromEnv` prefers it over `RESEND_API_KEY` whenever it is passed.
+ * binding exists.
  */
 export const mailer = (): Mailer => {
     const binding = (env as { EMAIL?: SendEmail }).EMAIL;
@@ -70,19 +68,10 @@ export const mailer = (): Mailer => {
 };
 
 /**
- * Whether mail sent from here reaches an inbox: through Cloudflare Email Service (the `EMAIL` binding) or Resend
- * (`RESEND_API_KEY`). Dev capture is not delivery, and neither is a deploy with no transport. Read from the live env,
- * like {@link mailer}.
+ * Whether mail sent from here reaches an inbox: through Cloudflare Email Service (the `EMAIL` binding). Dev capture is
+ * not delivery, and neither is a deploy with no binding. Read from the live env, like {@link mailer}.
  */
-export const deliversMail = (): boolean => {
-    const current = env as { EMAIL?: unknown; RESEND_API_KEY?: unknown };
-
-    if (shouldCaptureMail(Object.fromEntries(Object.entries(env)))) {
-        return false;
-    }
-
-    return current.EMAIL !== undefined || (typeof current.RESEND_API_KEY === "string" && current.RESEND_API_KEY.trim() !== "");
-};
+export const deliversMail = (): boolean => (env as { EMAIL?: unknown }).EMAIL !== undefined && !shouldCaptureMail(Object.fromEntries(Object.entries(env)));
 
 /** Render `react` now, deliver from the jobs queue. */
 export const queueEmail = async (options: Pick<SendOptions, "react" | "subject" | "to">): Promise<void> => {

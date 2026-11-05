@@ -419,12 +419,7 @@ describe("passkeys", { timeout: 30_000 }, () => {
 
         vi.stubEnv("SIGNUP_INVITE_ONLY", "false");
 
-        // No mail transport: a password sign-up gets its session at once (`deliversMail`).
-        const { env: stubEnv } = await import("cloudflare:workers");
-        const workerEnv = stubEnv as { RESEND_API_KEY?: string };
-
-        workerEnv.RESEND_API_KEY = "";
-
+        // No mail binding: a password sign-up gets its session at once (`deliversMail`).
         const { auth } = await createTestAuth();
         const signUp = await auth.handler(
             new Request(`${SITE}/api/auth/sign-up/email`, {
@@ -449,9 +444,9 @@ describe("passkeys", { timeout: 30_000 }, () => {
         vi.stubEnv("SIGNUP_INVITE_ONLY", "false");
 
         const { env: stubEnv } = await import("cloudflare:workers");
-        const workerEnv = stubEnv as { RESEND_API_KEY?: string };
+        const workerEnv = stubEnv as { EMAIL?: unknown };
 
-        workerEnv.RESEND_API_KEY = "re_test";
+        workerEnv.EMAIL = { send: vi.fn() };
 
         const { auth } = await createTestAuth();
         const signUp = await auth.handler(

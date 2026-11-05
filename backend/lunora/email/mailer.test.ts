@@ -57,22 +57,15 @@ describe(deliversMail, () => {
     const stubEnv = env as typeof env & { LUNORA_MAIL_CAPTURE?: string };
 
     afterEach(() => {
-        stubEnv.RESEND_API_KEY = "re_test";
         delete stubEnv.LUNORA_MAIL_CAPTURE;
     });
 
-    it("is true with the EMAIL binding (Cloudflare Email Service) or a Resend key", () => {
-        stubEnv.RESEND_API_KEY = "";
+    it("is true with the EMAIL binding (Cloudflare Email Service)", () => {
         stubEnv.EMAIL = { send: vi.fn() };
-        expect(deliversMail()).toBe(true);
-
-        delete stubEnv.EMAIL;
-        stubEnv.RESEND_API_KEY = "re_key";
         expect(deliversMail()).toBe(true);
     });
 
-    it("is false with no transport, and while mail is captured", () => {
-        stubEnv.RESEND_API_KEY = "";
+    it("is false without the binding, and while mail is captured", () => {
         expect(deliversMail()).toBe(false);
 
         stubEnv.EMAIL = { send: vi.fn() };

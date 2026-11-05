@@ -35,7 +35,7 @@
  * That one is for AI-TOOL fetches of user-supplied URLs: it refuses unsafe hosts
  * (`isSafeUrl`) and defaults `redirect: "manual"`, because there the URL is
  * attacker-influenced and SSRF is the threat. This one is for calls to hosts WE
- * chose — the gateway, R2, Resend, messenger APIs — where the threat is a stalled
+ * chose — the gateway, R2, messenger APIs — where the threat is a stalled
  * response holding the `__root__` shard. Different risks, so deliberately
  * different functions; do not merge them.
  */

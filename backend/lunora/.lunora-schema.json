@@ -6157,57 +6157,6 @@
       },
       "shardMode": "shardBy:userId"
     },
-    "emails": {
-      "commitOrdered": false,
-      "fields": {
-        "email": {
-          "kind": "string",
-          "nullable": false,
-          "optional": false,
-          "unique": false
-        },
-        "expectation": {
-          "kind": "union",
-          "nullable": false,
-          "optional": false,
-          "unique": false,
-          "members": [
-            {
-              "kind": "literal",
-              "nullable": false,
-              "optional": false,
-              "unique": false,
-              "literal": "\"bounced\""
-            },
-            {
-              "kind": "literal",
-              "nullable": false,
-              "optional": false,
-              "unique": false,
-              "literal": "\"complained\""
-            },
-            {
-              "kind": "literal",
-              "nullable": false,
-              "optional": false,
-              "unique": false,
-              "literal": "\"delivered\""
-            }
-          ]
-        }
-      },
-      "indexes": {
-        "by_email": {
-          "fields": [
-            "email"
-          ],
-          "unique": false
-        }
-      },
-      "memory": false,
-      "relations": {},
-      "shardMode": "global:d1"
-    },
     "embeddings_1024": {
       "commitOrdered": false,
       "fields": {

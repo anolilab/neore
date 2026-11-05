@@ -674,7 +674,6 @@ class AppBuilder<Env extends object> {
             ["documentHistory", { mode: { kind: "global" } }],
             ["documents", { mode: { field: "userId", kind: "shardBy" } }],
             ["documentVersions", { mode: { field: "userId", kind: "shardBy" } }],
-            ["emails", { mode: { kind: "global" } }],
             ["embeddings_128", { mode: { field: "userId", kind: "shardBy" } }],
             ["embeddings_256", { mode: { field: "userId", kind: "shardBy" } }],
             ["embeddings_512", { mode: { field: "userId", kind: "shardBy" } }],

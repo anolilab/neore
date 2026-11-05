@@ -18,8 +18,6 @@ export const BETTER_AUTH_SECRET = read("BETTER_AUTH_SECRET");
 export const SIGNUP_INVITE_ONLY = read("SIGNUP_INVITE_ONLY") !== "false" && read("SIGNUP_INVITE_ONLY") !== "0";
 export const ENVIRONMENT = read("ENVIRONMENT");
 
-export const RESEND_WEBHOOK_SECRET = read("RESEND_WEBHOOK_SECRET");
-
 export const SITE_URL = read("SITE_URL");
 
 /** Creem subscriptions (`billing/`). Checkout is off while the API key is unset. */

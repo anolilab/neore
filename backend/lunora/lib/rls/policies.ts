@@ -423,7 +423,6 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     connectorDefinitions: "global connector catalog",
     cronRuns: "cron slot claims; system only",
     documentHistory: "audit trail written by triggers; no client read",
-    emails: "outbound mail log; system only",
     idempotencyClaims: "internal claims; no client access",
     invitation: "better-auth organization invitations; org-scoped, checked by org role",
     jwks: "better-auth signing keys",

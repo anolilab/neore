@@ -248,21 +248,13 @@ const requiredEnvPassthrough = Object.fromEntries(REQUIRED_ENV_KEYS.map((name) =
 const optionalEnvPassthrough = boundWhereSet(OPTIONAL_ENV_KEYS);
 
 /**
- * Cloudflare Email Service, bound only when it is the transport to use.
+ * Cloudflare Email Service, the only mail transport, bound whenever `MAIL_FROM`
+ * is set. Email Service rejects an unverified sender domain
+ * (`E_SENDER_NOT_VERIFIED`), so `MAIL_FROM` must be on a sending domain of a zone
+ * in THIS account; a stage without one leaves `MAIL_FROM` unset and sends no mail
+ * (sign-up then needs no email verification, `email/mailer.ts#deliversMail`).
  *
- * `email/mailer.ts` (`@lunora/mail`) prefers this binding whenever it exists, so
- * the deploy decides the transport. Email Service rejects an unverified sender
- * domain (`E_SENDER_NOT_VERIFIED`), so the binding is useless until a sending
- * subdomain exists on a zone in THIS account — and the product is in beta, so an
- * account without the entitlement could fail the deploy on a binding it cannot
- * create. Resend's key is therefore the switch, which makes the cutover a secret
- * change rather than a code change:
- *
- *   MAIL_FROM set, RESEND_API_KEY unset -> EMAIL bound -> Cloudflare Email Service
- *   MAIL_FROM set, RESEND_API_KEY set   -> no binding  -> Resend
- *
- * `MAIL_FROM` itself rides `requiredEnvPassthrough` (the mailer reads it for
- * every transport). `allowedSenderAddresses` pins the From to its address.
+ * `MAIL_FROM` itself rides `requiredEnvPassthrough` (the mailer reads it). `allowedSenderAddresses` pins the From to its address.
  * Destination is deliberately left unrestricted: `destinationAddress` /
  * `allowedDestinationAddresses` would cap delivery to verified addresses, and
  * this account sends signup and invitation mail to arbitrary users.
@@ -270,7 +262,7 @@ const optionalEnvPassthrough = boundWhereSet(OPTIONAL_ENV_KEYS);
 const mailFrom = process.env.MAIL_FROM?.trim() ?? "";
 /** `allowedSenderAddresses` takes the bare address of a `Name <addr@host>` sender. */
 const mailFromAddress = /<([^<>]+)>\s*$/u.exec(mailFrom)?.[1]?.trim() ?? mailFrom;
-const useEmailService = mailFrom !== "" && !process.env.RESEND_API_KEY?.trim();
+const useEmailService = mailFrom !== "";
 
 /**
  * Turnstile is two independent variables with nothing tying them together, and
@@ -325,13 +317,12 @@ if (accessEnabled && accessEmails.length === 0 && !destroying) {
 /**
  * Production must be able to send mail. `@lunora/mail` throws without a sender,
  * so with `MAIL_FROM` unset every sign-up, password reset and invitation that
- * sends mail fails. With it set there is always a transport: the EMAIL binding,
- * or Resend when its key is set (see above).
+ * sends mail fails. With it set, the EMAIL binding is the transport (see above).
  */
 if (stage === "production" && !mailFrom && !destroying) {
     throw new Error(
         "Cannot deploy (stage: production) — no outbound mail. Set MAIL_FROM to a verified sender: a Cloudflare Email Service " +
-            "sending domain, or a Resend domain together with RESEND_API_KEY. Without it, password resets and invitations are never sent.",
+            "sending domain in this account. Without it, password resets and invitations are never sent.",
     );
 }
 
@@ -935,8 +926,8 @@ export default Alchemy.Stack(
                 // hosted Studio's advisor route to it. Unbound, that route answers 404 and
                 // the Studio says the companion is not deployed.
                 ADVISOR_COMPANION: AdvisorCompanion,
-                // `MAIL_FROM` and Resend's key ride `requiredEnvPassthrough` above; only
-                // the Email Service binding is decided here. See `email/mailer.ts`.
+                // `MAIL_FROM` rides `requiredEnvPassthrough` above; only the Email
+                // Service binding is decided here. See `email/mailer.ts`.
                 ...(useEmailService ? { EMAIL: Cloudflare.Email.SendEmail("EMAIL", { allowedSenderAddresses: [mailFromAddress] }) } : {}),
                 R2_ENDPOINT: requireEnv("R2_ENDPOINT"),
                 SITE_URL: requireEnv("SITE_URL"),
