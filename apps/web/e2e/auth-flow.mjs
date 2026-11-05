@@ -115,7 +115,7 @@ console.log(`chat body:                    ${finalText.slice(0, 400)}`);
 console.log(`chat greets by name:          ${shows(finalText, USER.name.split(" ", 1)[0])}`);
 console.log(`still "Anonymous" after auth: ${shows(finalText, "Hello Anonymous")}`);
 
-// Exit non-zero when a check fails. `AGENTS.md` points at this script as the
+// Exit non-zero when a check fails. `backend/AGENTS.md` points at this script as the
 // verification loop for the runtime lessons, and a loop that always exits 0
 // verifies nothing — every earlier failure here was noticed only by a human
 // reading the output.

@@ -2,11 +2,11 @@
 
 **Generated:** 2026-01-23 20:32:15
 **Updated:** 2026-10-10 (module map, shard routing, services)
-**Parent:** ../../AGENTS.md
+**Parent:** ../AGENTS.md
 
 ## RUNTIME NOTES (Lunora on D1 vs Durable Objects)
 
-Full detail in the root `CLAUDE.md` ("RUNTIME LESSONS"). The short version for
+Full detail in `backend/AGENTS.md` ("RUNTIME LESSONS"). The short version for
 anyone editing handlers here:
 
 - `.global()` (D1) tables **cannot** use `ctx.db.query(t).withIndex(...)` — that
@@ -28,7 +28,7 @@ anyone editing handlers here:
 - `ctx.db.patch` refuses `undefined` as a value. Use `lib/patch.ts` (`patchRow` /
   `patchById`: `undefined` removes a field; `withoutUndefined`: `undefined` leaves
   it unchanged).
-- **Per-user sharding** (root `CLAUDE.md` → "Sharding and concurrency",
+- **Per-user sharding** (`backend/AGENTS.md` → "Sharding and concurrency",
   per-user-sharding.md): requests land on the owner's shard. Code in
   a shard reads its shard from `lib/shard-context.ts` (`currentShard`,
   `shardOf`); an HTTP action wraps its handler with `lib/http-shard.ts`
@@ -127,7 +127,7 @@ choice, not a flag, so `ctx.user` is non-nullable on the authed variants.
 | `internalQuery` / `internalMutation` / `internalAction` | none (no auth)         | Server-only; re-exported from `_generated/server`                 |
 
 Every client-reachable builder ends in `withRlsScope` + `rowLevelSecurity()`
-(see root `CLAUDE.md`). Rate limiting is opt-in per procedure:
+(see `auth/AGENTS.md`). Rate limiting is opt-in per procedure:
 `.use(rateLimit("<name>"))` after `.input(...)`. It counts the user when signed in,
 otherwise the client IP. `requireDevelopment()` is opt-in too; never add it to a
 base builder.
@@ -213,7 +213,7 @@ Auth contract:
    real account. Conversion creates a NEW user, so the guest's shard-local rows are
    moved by `lib/account-merge.ts`.
 3. `AUTH_RATE_LIMIT_CUSTOM_RULES` sets per-path overrides for better-auth's
-   `/api/auth/*` limiter. Keep `get-session` exempt (see root `CLAUDE.md`).
+   `/api/auth/*` limiter. Keep `get-session` exempt (see `apps/web/src/features/auth/AGENTS.md`).
 4. `auth/module.ts` lists the Better Auth tables it owns. `auth.schema.test.ts` checks the
    hand-maintained copies in `schema.ts` against the plugins `buildAuthOptions`
    installs; run it after any better-auth bump.
@@ -247,14 +247,14 @@ Tracked tables: `account`, `aiUserPreferences`, `files`, `folders`, `gdprConsent
 
 Trigger work runs inside the same mutation as the write: keep it bounded.
 Deleting audited rows one at a time is required (a batched delete nests triggers
-past the runtime's limit; see root `CLAUDE.md`).
+past the runtime's limit; see `backend/AGENTS.md`).
 
 ## COUNTS AND AGGREGATES
 
 Counts are
 `ctx.db.<table>.count({ where })`, which must be called on the owner's own rows
 (it throws behind a read policy: `COUNT_RLS_UNSUPPORTED`; use `systemDb` for an
-own-row count, per the RLS notes in root `CLAUDE.md`).
+own-row count, per the RLS notes in `auth/AGENTS.md`).
 
 ## TRIGGERS MODULE
 
@@ -306,8 +306,8 @@ All five are `authQuery` / `authMutation`.
 - **Lunora**: `@lunora/*` packages, pinned in `pnpm-workspace.yaml` (`catalog:lunora`).
   The agent skills are in `.agents/skills/lunora*`.
 - **Better Auth**: <https://better-auth.com>
-- **Root `CLAUDE.md`**: runtime lessons, sharding, billing, auth and the other
-  subsystems this file does not repeat.
+- **`backend/AGENTS.md`**: runtime lessons and sharding; each feature folder's `AGENTS.md` holds its
+  subsystem, and the root `AGENTS.md` lists them all.
 
 ## CONVENTIONS
 

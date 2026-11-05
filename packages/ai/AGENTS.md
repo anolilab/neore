@@ -2,7 +2,7 @@
 
 **Generated:** 2026-01-23 20:32:15
 **Updated:** 2026-10-10 (single source of truth in registry.ts; speech models)
-**Parent:** ./AGENTS.md
+**Parent:** ../../AGENTS.md
 
 ## OVERVIEW
 
@@ -113,3 +113,28 @@ interface ModelDefinition {
 - Don't hardcode provider credentials — use `process.env.*_API_KEY`
 - Don't mix prompts with business logic
 - Don't assume model availability — check the registry
+
+## INVARIANTS (moved from the root AGENTS.md)
+
+- **AI model registry** — `packages/ai/src/models/registry.ts` is the single
+  source for every model (text/image/video/music). `listed: true` puts a model
+  in marketing catalogs; `enabled: false` hides it everywhere;
+  `provider: "external"` is listed-only and skipped by agents.
+  `IMAGE_CATALOG`/`VIDEO_CATALOG`/`TEXT_CATALOG` are derived via `deriveCatalog()`.
+  The text and embedding defaults are Workers AI (`cf-*`, `bge-m3`; `constants.ts`), which any region
+  rule refuses: a run on a default moves under the user's rules (`defaultModelUnderRules`).
+
+- **Multi-reference images** — `MODEL_REGISTRY.maxReferenceImages` (1/2/4) is the
+  source of truth; the cap is enforced at three boundaries (backend action,
+  gateway request schema, gateway media middleware). FAL always gets
+  `image_url: string`; multi-ref models additionally get `image_urls: string[]`
+  via `buildFalReferenceImageInput`, FAL-gated.
+
+- **Prompt optimizer** — templates ported (MIT) from linshenkx/prompt-optimizer
+  as plain TS in `packages/ai/src/prompts/optimizer/`. User input is wrapped as
+  JSON via `toJson` and the model is told to treat strings as **evidence, not
+  instructions** — that is the prompt-injection defence, do not unwrap it. The
+  renderer substitutes in a **single left-to-right pass** so values containing
+  `{{var}}`-like syntax are not re-substituted; `render.test.ts` pins this.
+  Three backend actions share `runOptimizer` and the `chat/promptImprovement`
+  rate-limit family.

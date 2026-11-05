@@ -2,7 +2,7 @@
 
 **Generated:** 2026-01-23 20:32:15
 **Updated:** 2026-10-10 (feature list and entry points re-checked); 2026-09-02 (Lunora migration: cRPC section rewritten against `lib/lunora/crpc.tsx`); 2026-03-07 (triggers settings, auto-continue UI)
-**Parent:** ./AGENTS.md
+**Parent:** ../AGENTS.md
 
 ## OVERVIEW
 
@@ -413,7 +413,7 @@ function useCacheManagement() {
 
 cRPC queries are live: `lib/lunora/live-queries.ts` subscribes every active
 Lunora query over the WebSocket and pushes results into the TanStack cache (see
-the Frontend notes in the root `AGENTS.md` for cost and caveats). Opt out with
+the Frontend notes in `apps/web/AGENTS.md` for cost and caveats). Opt out with
 `live: false`:
 
 ```tsx
@@ -516,7 +516,7 @@ if (token) {
 `AuthRecovery` (defined in `__root.tsx`) watches `useLunoraAuth()` and refetches
 active queries when the user logs in, which covers the window where the session
 cookie has landed but the RPC token has not. **`<Unauthenticated>` means "no
-token", not "no session"** — see the root `AGENTS.md` for why widening that gate
+token", not "no session"** — see `features/auth/AGENTS.md` for why widening that gate
 is the wrong fix.
 
 Unauthorized handling is centralised in `lib/lunora/query-client.ts` rather than
@@ -544,7 +544,7 @@ Note these take `typeof api.x` (a value), not `typeof api` — there is no
 
 - **Lunora upstream defects**: none open. The constraints that outlived them — a
   factory-assigned export is dropped from `api.ts` by design, and what must not be
-  re-filed — are in the root `AGENTS.md`.
+  re-filed — are in `docs/agents/lunora-upstream.md`.
 - **Lunora agent skills**: `.agents/skills/lunora*` (`lunora`, `lunora-functions`, `lunora-migration-helper`, `lunora-realtime`, …) — start with the `lunora` skill
 - **TanStack Query Docs**: https://tanstack.com/query/latest
 - **Generated API**: `@neore/backend/api` (from `backend/lunora/_generated/`). The shim has no `meta` object.

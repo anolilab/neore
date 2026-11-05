@@ -2,7 +2,8 @@
 # https://docs.qodo.ai/configuration/configuration-and-command-reference
 #
 # Qodo reads AGENTS.md from the default branch as review context on its own,
-# so repo conventions live there, not here.
+# so repo conventions live there, not here. The root file is an index: the
+# invariants live in scoped AGENTS.md files next to the code it lists.
 
 [github_app]
 # Summary comment + review on open / reopen / ready-for-review.

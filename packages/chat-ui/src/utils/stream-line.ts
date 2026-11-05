@@ -1,6 +1,6 @@
 /**
  * The gateway's `/v1/stream` NDJSON relay protocol (edge streaming, see
- * CLAUDE.md), shared by the web app and the browser extension so neither can
+ * `backend/lunora/chat/AGENTS.md`), shared by the web app and the browser extension so neither can
  * drift from the other.
  */
 
