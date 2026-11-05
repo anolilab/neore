@@ -67,7 +67,7 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
   calls the backend and gateway cross-origin, where the web hostname's Access login does not
   apply. It needs a Zero Trust organisation in the account and the token's account-scoped
   `Access: Apps and Policies Write` and `Access: Organizations, Identity Providers, and Groups
-  Write`; without them the deploy fails, hence the switch.
+Write`; without them the deploy fails, hence the switch.
 - **The web Worker is near Cloudflare's 64 MiB module cap, so it uploads without its browser-only
   chunks.** The SSR output is one chunk per `import()` target: ~3,300 chunks, ~68 MiB of JS,
   and the spreadsheet editor alone is 12 MiB. `WEB_CLIENT_ONLY_CHUNKS` in
@@ -126,10 +126,10 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
 - **A Worker that passes the size cap can still fail Cloudflare's startup check** ("Script startup
   exceeded CPU time limit", error 10021): the module-level code of the whole bundle may take 1 s of
   CPU, and it is checked at upload, so it first shows on a deploy. `cd backend && pnpm exec wrangler
-  check startup` profiles `lunora build`'s esbuild bundle, which is NOT what deploys (Alchemy bundles
+check startup` profiles `lunora build`'s esbuild bundle, which is NOT what deploys (Alchemy bundles
   with rolldown); to profile the real one, take the `worker-bundles-<stage>` artifact that
   `deploy.yml` keeps (also when the deploy fails) and run `pnpm exec tsx
-  scripts/profile-worker-startup.ts <dir> <main>`. Local profiles swing ~100 ms (mostly GC): take
+scripts/profile-worker-startup.ts <dir> <main>`. Local profiles swing ~100 ms (mostly GC): take
   the best of several.
   Since codegen alpha.384 the generated app already loads `@lunora/auth` and the
   OpenAPI/OpenRPC/architecture documents on the first event (`_generated/authModule.ts`), not at

@@ -87,8 +87,7 @@ generated output, run `tsc` per project: `vis run lint:types` re-runs the
 backend's `codegen` target first and silently overwrites any `_generated/`
 you are testing. **Build the packages first in a fresh checkout or worktree**
 (`pnpm build:packages`): `packages/*/dist` is git-ignored, and without it a
-return type imported from `@neore/service-sdk` degrades to `unknown` (36, not
-35) with codegen still exiting 0.
+return type imported from `@neore/service-sdk` degrades to `unknown` (36, not 35) with codegen still exiting 0.
 
 **Workflows are wrangler `exports`, keyed by class name** (since
 `@lunora/workflow@alpha.69` / codegen alpha.240): the runtime finds one as
@@ -109,10 +108,10 @@ Before, `queryCoordinator` pointed `createDynamicShardRegistry` at `env.SHARD`
 and no shard ever registered there. A shard written before the registry was
 bound is listed only after its next write (no data exists yet).
 
-|                                                       |                                                                                                                             |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| [#687](https://github.com/anolilab/lunora/issues/687) | Cloud prices 35 meters against one observed.                                                                                |
-| [#360](https://github.com/anolilab/lunora/issues/360) | Pluggable queue drivers; feature request, closed as not planned.                                                            |
+|                                                       |                                                                  |
+| ----------------------------------------------------- | ---------------------------------------------------------------- |
+| [#687](https://github.com/anolilab/lunora/issues/687) | Cloud prices 35 meters against one observed.                     |
+| [#360](https://github.com/anolilab/lunora/issues/360) | Pluggable queue drivers; feature request, closed as not planned. |
 
 Check
 `gh issue list --repo anolilab/lunora --author prisis --state open` rather than

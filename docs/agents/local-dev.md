@@ -102,9 +102,9 @@ error")` (any transport, including the SSRF-guarded tool
 - **Port 8788 belongs to the backend** — and to the services it binds, which
   run INSIDE its `lunora dev` session with no port of their own. The standalone
   ports — 8787 (llm-gateway, the browser's public gateway, started by `pnpm
-  dev`), 8789 (browser-renderer), 8790 (embeddings), 8791 (nsfw-checker), 8792
+dev`), 8789 (browser-renderer), 8790 (embeddings), 8791 (nsfw-checker), 8792
   (document-parser) — matter only when a service runs ALONE (`pnpm
-  dev:<service>`, spec extraction). The gap at 8788 is deliberate, because
+dev:<service>`, spec extraction). The gap at 8788 is deliberate, because
   `backend/.dev.vars` pins `PUBLIC_ORIGIN=http://localhost:8788` (written by
   `scripts/dev-setup.js`; it cannot live in `wrangler.jsonc`, where
   `lunora build` blocks on any loopback address) and
@@ -151,7 +151,7 @@ error")` (any transport, including the SSRF-guarded tool
 - **Renaming or deleting an exported procedure kills a running backend.** The
   source save hot-reloads before codegen rewrites `_generated/functions.ts`,
   which still imports the old name: `Cannot read properties of undefined
-  (reading 'args')` at startup, and wrangler exits for good. Add the new export
+(reading 'args')` at startup, and wrangler exits for good. Add the new export
   first, run codegen, then remove the old one — or restart the backend after.
 - **`wrangler dev` needs `--local` for the gateway.** From wrangler 4.122 the
   Workers AI binding is proxied to the real network by default, so plain
