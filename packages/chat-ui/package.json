@@ -45,11 +45,14 @@
     "devDependencies": {
         "@anolilab/eslint-config": "catalog:lint",
         "@lingui/babel-plugin-lingui-macro": "catalog:i18n",
+        "@storybook/react-vite": "catalog:storybook",
         "@types/react": "catalog:types",
         "@types/react-dom": "catalog:types",
         "eslint": "catalog:lint",
+        "eslint-plugin-storybook": "catalog:storybook",
         "react": "catalog:react",
         "react-dom": "catalog:react",
+        "storybook": "catalog:storybook",
         "typescript": "catalog:tsc",
         "vitest": "catalog:test"
     },

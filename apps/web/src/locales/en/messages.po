@@ -8374,7 +8374,7 @@ msgstr "Create and manage API keys for programmatic access to your account."
 
 #: src/features/auth/components/settings/api-key/api-keys-card.tsx:46
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:97
-#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:179
+#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:180
 msgid "Create API Key"
 msgstr "Create API Key"
 
@@ -12078,6 +12078,7 @@ msgstr "Expired Sessions ({0})"
 
 #: src/features/auth/components/organization/invitation-cell.tsx:81
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:142
+#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:147
 msgid "Expires"
 msgstr "Expires"
 
@@ -20839,8 +20840,8 @@ msgstr "No enabled MCP servers."
 msgid "No executions yet"
 msgstr "No executions yet"
 
-#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:147
-#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:152
+#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:148
+#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:153
 msgid "No expiration"
 msgstr "No expiration"
 

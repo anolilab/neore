@@ -8338,7 +8338,7 @@ msgstr "アカウントへのプログラムによるアクセス用の API キ�
 
 #: src/features/auth/components/settings/api-key/api-keys-card.tsx:46
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:97
-#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:179
+#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:180
 msgid "Create API Key"
 msgstr "API キーを作成"
 
@@ -12046,6 +12046,7 @@ msgstr "期限切れのセッション（{0}）"
 
 #: src/features/auth/components/organization/invitation-cell.tsx:81
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:142
+#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:147
 msgid "Expires"
 msgstr "有効期限"
 
@@ -20792,8 +20793,8 @@ msgstr "有効な MCP サーバーはありません。"
 msgid "No executions yet"
 msgstr "まだ実行されていません"
 
-#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:147
-#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:152
+#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:148
+#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:153
 msgid "No expiration"
 msgstr "有効期限なし"
 

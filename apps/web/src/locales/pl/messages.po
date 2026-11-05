@@ -8338,7 +8338,7 @@ msgstr "Twórz klucze API do programowego dostępu do konta i zarządzaj nimi."
 
 #: src/features/auth/components/settings/api-key/api-keys-card.tsx:46
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:97
-#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:179
+#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:180
 msgid "Create API Key"
 msgstr "Utwórz klucz API"
 
@@ -12046,6 +12046,7 @@ msgstr "Wygasłe sesje ({0})"
 
 #: src/features/auth/components/organization/invitation-cell.tsx:81
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:142
+#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:147
 msgid "Expires"
 msgstr "Wygasa"
 
@@ -20792,8 +20793,8 @@ msgstr "Brak włączonych serwerów MCP."
 msgid "No executions yet"
 msgstr "Brak wykonań"
 
-#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:147
-#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:152
+#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:148
+#: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:153
 msgid "No expiration"
 msgstr "Bez wygaśnięcia"
 
