@@ -83,6 +83,28 @@ describe(deliversMail, () => {
     });
 });
 
+describe("a leftover Resend key", () => {
+    it("never sends through Resend: without the EMAIL binding nothing delivers", async () => {
+        vi.resetModules();
+
+        const stub = (await import("cloudflare:workers")) as unknown as { env: Record<string, unknown> };
+        const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+        stub.env.RESEND_API_KEY = "re_leftover";
+
+        try {
+            const fresh = await import("./mailer");
+
+            await expect(fresh.mailer().send({ html: "<p>hi</p>", subject: "Hi", to: "user@example.com" })).rejects.toThrow();
+            expect(fetchSpy).not.toHaveBeenCalled();
+            expect(fresh.deliversMail()).toBe(false);
+        } finally {
+            delete stub.env.RESEND_API_KEY;
+            fetchSpy.mockRestore();
+        }
+    });
+});
+
 describe("the EMAIL binding", () => {
     it("delivers through Cloudflare Email Service, not Resend, when it is bound", async () => {
         const send = vi.fn(async () => undefined);

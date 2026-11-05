@@ -339,7 +339,12 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
                 // guest's shard: move them to the new user's (`lib/account-merge.ts`).
                 ...(hooks.onGuestConverted && {
                     onLinkAccount: async ({ anonymousUser, newUser }) => {
-                        await hooks.onGuestConverted?.(String(anonymousUser.user.id), String(newUser.user.id));
+                        try {
+                            await hooks.onGuestConverted?.(String(anonymousUser.user.id), String(newUser.user.id));
+                        } catch (error) {
+                            // The account itself is created; losing the guest's history must not fail the sign-up.
+                            authLogger.error(`[auth] queueing the move of guest ${String(anonymousUser.user.id)} failed:`, error);
+                        }
                     },
                 }),
             }),
@@ -624,15 +629,10 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
         ...buildAuthOptions({
             // Queued, not run here: moving a guest's rows takes a round trip per
             // table and page, too long to hold the sign-up request. The job runs
-            // on the NEW user's shard (`lib/account-merge.ts#runGuestMerge`).
+            // on the NEW user's shard (`lib/account-merge.ts#runGuestMerge`). A
+            // failure is the caller's to handle: each one keeps the request alive.
             onGuestConverted: async (guestId, userId) => {
-                try {
-                    await enqueueJob(internal.lib.account_merge.runGuestMerge, { from: guestId, to: userId }, { shardKey: userId });
-                } catch (error) {
-                    // The account itself is created; losing the guest's history
-                    // must not fail the sign-up.
-                    authLogger.error(`[auth] queueing the move of guest ${guestId} to ${userId} failed:`, error);
-                }
+                await enqueueJob(internal.lib.account_merge.runGuestMerge, { from: guestId, to: userId }, { shardKey: userId });
             },
         }),
         database: lunoraD1Adapter(env.DB),

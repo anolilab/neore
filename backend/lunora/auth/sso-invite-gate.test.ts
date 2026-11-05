@@ -540,4 +540,46 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         expect(onGuestConverted).toHaveBeenCalledExactlyOnceWith(guestId, member?.id);
         expect(db.verification!.some((row) => String(row.identifier).startsWith("guest-conversion:"))).toBe(false);
     });
+
+    it("keeps the guest when queueing the move fails, and hands it over at the next sign-in", async () => {
+        expect.assertions(4);
+
+        const onGuestConverted = vi.fn<(guestId: string, userId: string) => Promise<void>>().mockRejectedValueOnce(new Error("queue down"));
+        const { auth, db } = await createTestAuth({ onGuestConverted: async (guestId, userId) => await onGuestConverted(guestId, userId) });
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+        const guestId = ((await guest.json()) as { user: { id: string } }).user.id;
+
+        await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, cookieOf(guest)));
+
+        const [link] = await queuedVerificationLinks();
+        const verified = await auth.handler(new Request(link!, { headers: { origin: SITE } }));
+        const pendingRows = () => db.verification!.filter((row) => String(row.identifier).startsWith("guest-conversion:"));
+
+        expect(verified.status).toBeLessThan(400);
+        expect(pendingRows()).toHaveLength(1);
+
+        await auth.handler(post("/sign-in/email", { email: EMAIL, password: PASSWORD }));
+
+        expect(onGuestConverted).toHaveBeenLastCalledWith(guestId, db.user!.find((row) => row.email === EMAIL)?.id);
+        expect(pendingRows()).toHaveLength(0);
+    });
+
+    it("renews the recorded guest when an unverified sign-in mails a new link", async () => {
+        expect.assertions(2);
+
+        const { auth, db } = await createTestAuth({ onGuestConverted: async () => undefined });
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+
+        await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, cookieOf(guest)));
+
+        const pending = () => db.verification!.find((row) => String(row.identifier).startsWith("guest-conversion:"));
+        const nearlyExpired = new Date(Date.now() + 60_000);
+
+        pending()!.expiresAt = nearlyExpired;
+
+        const signIn = await auth.handler(post("/sign-in/email", { email: EMAIL, password: PASSWORD }));
+
+        expect(signIn.status).toBe(403);
+        expect((pending()!.expiresAt as Date).getTime()).toBeGreaterThan(nearlyExpired.getTime() + 24 * 60 * 60 * 1000);
+    });
 });

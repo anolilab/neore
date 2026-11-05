@@ -35,7 +35,9 @@ import { enqueueJob } from "../lib/job-queue";
 
 // A plain copy, not a cast: `env`'s type is the Worker's ambient `Env`, which
 // differs per project (the web app type-checks this file against its own).
-const workerEnv: MailEnv = Object.fromEntries(Object.entries(env));
+// `RESEND_API_KEY` is left out: `createMailerFromEnv` would send through Resend
+// with it, and Cloudflare Email Service is the only transport (`deliversMail`).
+const workerEnv: MailEnv = Object.fromEntries(Object.entries(env).filter(([key]) => key !== "RESEND_API_KEY"));
 
 /** `mailer.queue()` hands the rendered payload here; `deliverEmail` sends it from the queue. */
 const jobsQueue: QueueLike = {
