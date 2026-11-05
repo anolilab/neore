@@ -43,6 +43,63 @@ interface SignUpReturn {
 
 const pendingExpiry = (): Date => new Date(Date.now() + PENDING_GUEST_LINK_TTL_MS);
 
+type HandOverContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0];
+
+/**
+ * Finish a recorded guest's hand-over once its account has a session from {@link HAND_OVER_PATHS}, or renew the
+ * record when an unverified sign-in mailed a new link. Throws on a storage error; the caller logs it.
+ */
+const handOver = async (ctx: HandOverContext, onGuestConverted: (guestId: string, userId: string) => Promise<void>): Promise<void> => {
+    const adapter = ctx.context.internalAdapter;
+    const sessionUserId = ctx.context.newSession?.user.id;
+
+    if (!sessionUserId) {
+        if (ctx.path !== PASSWORD_SIGN_IN_PATH) {
+            return;
+        }
+
+        // No session. Only `EMAIL_NOT_VERIFIED` means the password was right and a new link went out:
+        // keep the guest for that link. Any other failure (a wrong password) renews nothing.
+        const refusal = ctx.context.returned as { body?: { code?: string } } | undefined;
+        const email = (ctx.body as { email?: unknown } | undefined)?.email;
+        const account = refusal?.body?.code === "EMAIL_NOT_VERIFIED" && typeof email === "string" ? await adapter.findUserByEmail(email) : null;
+        const pending = account && !account.user.emailVerified ? await adapter.findVerificationValue(pendingIdentifier(account.user.id)) : null;
+
+        if (account && pending) {
+            try {
+                // One in-place write: a failed renewal leaves the record and its expiry as they were.
+                await adapter.updateVerificationByIdentifier(pendingIdentifier(account.user.id), { expiresAt: pendingExpiry() });
+            } catch (error) {
+                authLogger.error(`[auth] renewing guest ${pending.value} for ${account.user.id} failed:`, error);
+            }
+        }
+
+        return;
+    }
+
+    const pending = await adapter.findVerificationValue(pendingIdentifier(sessionUserId));
+
+    if (!pending || pending.expiresAt.getTime() < Date.now()) {
+        return;
+    }
+
+    // Only a guest that still exists, and is still a guest, hands its rows over.
+    const guest = (await adapter.findUserById(pending.value)) as { isAnonymous?: boolean | null } | null;
+
+    if (guest?.isAnonymous === true) {
+        try {
+            await onGuestConverted(pending.value, sessionUserId);
+        } catch (error) {
+            // Kept, so the next sign-in tries again; the session itself must not fail.
+            authLogger.error(`[auth] handing guest ${pending.value} over to ${sessionUserId} failed:`, error);
+
+            return;
+        }
+    }
+
+    await adapter.deleteVerificationByIdentifier(pendingIdentifier(sessionUserId));
+};
+
 export const guestConversion = (onGuestConverted: (guestId: string, userId: string) => Promise<void>) =>
     ({
         hooks: {
@@ -85,56 +142,13 @@ export const guestConversion = (onGuestConverted: (guestId: string, userId: stri
                 },
                 {
                     handler: createAuthMiddleware(async (ctx) => {
-                        const adapter = ctx.context.internalAdapter;
-                        const sessionUserId = ctx.context.newSession?.user.id;
-
-                        if (!sessionUserId) {
-                            if (ctx.path !== PASSWORD_SIGN_IN_PATH) {
-                                return;
-                            }
-
-                            // No session. Only `EMAIL_NOT_VERIFIED` means the password was right and a new link went out:
-                            // keep the guest for that link. Any other failure (a wrong password) renews nothing.
-                            const refusal = ctx.context.returned as { body?: { code?: string } } | undefined;
-                            const email = (ctx.body as { email?: unknown } | undefined)?.email;
-                            const account =
-                                refusal?.body?.code === "EMAIL_NOT_VERIFIED" && typeof email === "string" ? await adapter.findUserByEmail(email) : null;
-                            const pending =
-                                account && !account.user.emailVerified ? await adapter.findVerificationValue(pendingIdentifier(account.user.id)) : null;
-
-                            if (account && pending) {
-                                try {
-                                    // One in-place write: a failed renewal leaves the record and its expiry as they were.
-                                    await adapter.updateVerificationByIdentifier(pendingIdentifier(account.user.id), { expiresAt: pendingExpiry() });
-                                } catch (error) {
-                                    authLogger.error(`[auth] renewing guest ${pending.value} for ${account.user.id} failed:`, error);
-                                }
-                            }
-
-                            return;
+                        try {
+                            await handOver(ctx, onGuestConverted);
+                        } catch (error) {
+                            // The sign-in or verification has already succeeded or been refused on its own terms; a
+                            // storage error here must not turn it into a 500. The record stays for the next sign-in.
+                            authLogger.error(`[auth] guest hand-over on ${String(ctx.path)} failed; the record is kept:`, error);
                         }
-
-                        const pending = await adapter.findVerificationValue(pendingIdentifier(sessionUserId));
-
-                        if (!pending || pending.expiresAt.getTime() < Date.now()) {
-                            return;
-                        }
-
-                        // Only a guest that still exists, and is still a guest, hands its rows over.
-                        const guest = (await adapter.findUserById(pending.value)) as { isAnonymous?: boolean | null } | null;
-
-                        if (guest?.isAnonymous === true) {
-                            try {
-                                await onGuestConverted(pending.value, sessionUserId);
-                            } catch (error) {
-                                // Kept, so the next sign-in tries again; the session itself must not fail.
-                                authLogger.error(`[auth] handing guest ${pending.value} over to ${sessionUserId} failed:`, error);
-
-                                return;
-                            }
-                        }
-
-                        await adapter.deleteVerificationByIdentifier(pendingIdentifier(sessionUserId));
                     }),
                     matcher: (ctx) => HAND_OVER_PATHS.has(ctx.path ?? ""),
                 },

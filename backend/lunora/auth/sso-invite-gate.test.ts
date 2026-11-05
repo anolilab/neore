@@ -742,4 +742,80 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         expect(signIn.status).toBe(403);
         expect((pending()!.expiresAt as Date).getTime()).toBeGreaterThan(nearlyExpired.getTime() + 24 * 60 * 60 * 1000);
     });
+
+    /** Makes every read of a guest-conversion record fail, as a D1 error would; other verification reads still work. */
+    const failGuestRecordReads = async (auth: Awaited<ReturnType<typeof createTestAuth>>["auth"]) => {
+        const { internalAdapter } = await auth.$context;
+        const find = internalAdapter.findVerificationValue.bind(internalAdapter);
+
+        return vi.spyOn(internalAdapter, "findVerificationValue").mockImplementation(async (identifier) => {
+            if (identifier.startsWith("guest-conversion:")) {
+                throw new Error("D1 unavailable");
+            }
+
+            return find(identifier);
+        });
+    };
+
+    it("still verifies and signs in when the guest record cannot be read, and keeps the record", async () => {
+        expect.assertions(4);
+
+        const onGuestConverted = vi.fn(async () => undefined);
+        const { auth, db } = await createTestAuth({ onGuestConverted });
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+
+        await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, cookieOf(guest)));
+        await failGuestRecordReads(auth);
+
+        const [link] = await queuedVerificationLinks();
+        const verified = await auth.handler(new Request(link!, { headers: { origin: SITE } }));
+        const signIn = await auth.handler(post("/sign-in/email", { email: EMAIL, password: PASSWORD }));
+
+        expect(verified.status).toBeLessThan(400);
+        expect(signIn.status).toBe(200);
+        expect(onGuestConverted).not.toHaveBeenCalled();
+        expect(db.verification!.some((row) => String(row.identifier).startsWith("guest-conversion:"))).toBe(true);
+    });
+
+    it("still refuses an unverified sign-in with EMAIL_NOT_VERIFIED when the guest record cannot be read", async () => {
+        expect.assertions(2);
+
+        const { auth } = await createTestAuth({ onGuestConverted: async () => undefined });
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+
+        await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, cookieOf(guest)));
+        await failGuestRecordReads(auth);
+
+        const signIn = await auth.handler(post("/sign-in/email", { email: EMAIL, password: PASSWORD }));
+
+        expect(signIn.status).toBe(403);
+        expect(((await signIn.json()) as { code?: string }).code).toBe("EMAIL_NOT_VERIFIED");
+    });
+
+    it("still answers a guest's sign-up when its session cannot be read", async () => {
+        expect.assertions(3);
+
+        const { auth, db } = await createTestAuth({ onGuestConverted: async () => undefined });
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+        const { internalAdapter } = await auth.$context;
+        let reads = 0;
+
+        // The only session read in a sign-up is the guest-conversion hook's, after the account exists.
+        vi.spyOn(internalAdapter, "findSession").mockImplementation(async () => {
+            reads += 1;
+
+            throw new Error("D1 unavailable");
+        });
+
+        // Without the signed session cache, so every session read goes to the store.
+        const tokenOnly = cookieOf(guest)
+            .split("; ")
+            .filter((cookie) => !cookie.includes("session_data"))
+            .join("; ");
+        const signUp = await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, tokenOnly));
+
+        expect(signUp.status).toBe(200);
+        expect(db.user!.some((row) => row.email === EMAIL)).toBe(true);
+        expect(reads).toBe(1);
+    });
 });
