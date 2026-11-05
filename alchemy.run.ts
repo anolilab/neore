@@ -333,7 +333,8 @@ if (accessEnabled && accessEmails.length === 0 && !destroying) {
 if (stage === "production" && !useEmailService && !destroying) {
     throw new Error(
         "Cannot deploy (stage: production) — no outbound mail. Set MAIL_FROM to a verified sender (a Cloudflare Email Service " +
-            "sending domain in this account) and MAIL_EMAIL_SERVICE=1. Without both, password resets and invitations are never sent.",
+            "sending domain in this account) and MAIL_EMAIL_SERVICE=1 (a GitHub environment variable under vars, not a secret). " +
+            "Without both, password resets and invitations are never sent.",
     );
 }
 

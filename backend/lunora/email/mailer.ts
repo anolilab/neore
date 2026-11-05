@@ -8,9 +8,9 @@
  *    Mail tab instead of going out. Recording it uses `LUNORA_ADMIN_TOKEN`, which
  *    `lunora dev` generates into `.dev.vars`.
  * 2. **Cloudflare Email Service** through the `EMAIL` `send_email` binding, which
- *    `alchemy.run.ts` binds whenever `MAIL_FROM` is set. No API token: the binding
- *    is the credential. Email Service rejects a sender off its verified domain
- *    (`E_SENDER_NOT_VERIFIED`).
+ *    `alchemy.run.ts` binds when `MAIL_FROM` is set and `MAIL_EMAIL_SERVICE=1`.
+ *    No API token: the binding is the credential. Email Service rejects a sender
+ *    off its verified domain (`E_SENDER_NOT_VERIFIED`).
  *
  * With neither, the mailer still queues, and `deliverEmail`'s send rejects,
  * so a deploy without a transport fills the jobs DLQ (logged there) instead of
