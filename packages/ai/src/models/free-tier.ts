@@ -8,8 +8,8 @@
 export const FREE_TIER_TEXT_MODELS: ReadonlySet<string> = new Set([
     "cf-gemma-3-12b",
     "cf-glm-4.7-flash",
-    "cf-gpt-oss-120b",
     "cf-gpt-oss-20b",
+    "cf-gpt-oss-120b",
     "cf-granite-4.0-micro",
     "cf-kimi-k2.5",
     "cf-llama-3.3-70b",

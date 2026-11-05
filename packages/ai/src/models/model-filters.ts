@@ -37,6 +37,12 @@ export interface ModelFilterRules {
 }
 
 /**
+ * The region of a model served wherever its provider has capacity (Workers AI), with no endpoint that keeps a call
+ * in one region. Any region rule refuses it: an allow-list cannot be honoured, and neither can a block-list.
+ */
+export const GLOBAL_REGION = "GLOBAL";
+
+/**
  * Check whether a single model candidate passes the filter rules.
  *
  * Returns `null` if allowed, or a human-readable rejection reason if blocked.
@@ -60,6 +66,13 @@ export const getModelRejectionReason = (candidate: FilterableModel, rules: Model
     // Provider block-list
     if (rules.blockedProviders && rules.blockedProviders.length > 0 && rules.blockedProviders.includes(candidate.provider)) {
         return `Provider "${candidate.provider}" is blocked`;
+    }
+
+    if (
+        candidate.regions?.includes(GLOBAL_REGION) &&
+        ((rules.allowedRegions && rules.allowedRegions.length > 0) || (rules.blockedRegions && rules.blockedRegions.length > 0))
+    ) {
+        return `Model "${candidate.modelId}" may be served from any region, so it cannot honour region rules`;
     }
 
     // Region allow-list: model must have at least one region that matches
@@ -147,7 +160,7 @@ export const deriveModelRegions = (model: { modelApiId: string; provider: string
 
     if (provider === "bfl") return ["EU", "US"]; // Black Forest Labs (Germany)
 
-    if (provider === "cloudflare") return ["US", "EU"]; // Workers AI, matching the gateway's routing candidates
+    if (provider === "cloudflare") return [GLOBAL_REGION]; // Workers AI runs a model wherever Cloudflare has capacity
 
     // OpenRouter/Requesty: derive from underlying model provider
     const apiPrefix = modelApiId.split("/", 1)[0]?.toLowerCase() ?? "";

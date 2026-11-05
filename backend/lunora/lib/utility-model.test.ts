@@ -79,7 +79,8 @@ describe("pickUtilityModelId", () => {
         // Every candidate is served in the US among other regions; "any region unblocked" would admit them all.
         expect(pickUtilityModelId({ blockedRegions: ["US"] })).toBeUndefined();
         expect(() => requireUtilityModelId({ blockedRegions: ["US"] })).toThrow(NoAllowedUtilityModelError);
-        expect(pickUtilityModelId({ blockedRegions: ["CN"] })).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+        // Any blocked region refuses the Workers AI models, which may be served from anywhere: the first left is US-only.
+        expect(pickUtilityModelId({ blockedRegions: ["CN"] })).toBe("openai/gpt-4.1-mini");
     });
 
     it("admits a multi-region candidate under blocked regions when the gateway pins it to the EU endpoint and EU is not blocked", () => {

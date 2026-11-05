@@ -73,6 +73,7 @@ export {
     type FilterableModel,
     filterModels,
     getModelRejectionReason,
+    GLOBAL_REGION,
     hasActiveFilters,
     isModelAllowed,
     type ModelFilterRules,

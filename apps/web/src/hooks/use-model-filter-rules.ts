@@ -1,6 +1,7 @@
 "use client";
 
 import type { GatewayModel } from "@neore/ai/models";
+import { GLOBAL_REGION } from "@neore/ai/models";
 import type { QueryClient } from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
@@ -61,6 +62,9 @@ const isModelAllowed = (model: GatewayModel, rules: ModelFilterRules): boolean =
 
     // Provider block-list
     if (rules.blockedProviders && rules.blockedProviders.length > 0 && rules.blockedProviders.includes(model.provider)) return false;
+
+    // Served from any region (Workers AI): no region rule can be honoured.
+    if (getModelRegions(model).includes(GLOBAL_REGION) && ((rules.allowedRegions?.length ?? 0) > 0 || (rules.blockedRegions?.length ?? 0) > 0)) return false;
 
     // Region allow-list
     if (rules.allowedRegions && rules.allowedRegions.length > 0) {
