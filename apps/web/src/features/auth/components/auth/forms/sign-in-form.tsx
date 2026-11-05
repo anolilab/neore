@@ -19,6 +19,7 @@ import useCaptcha from "@/features/auth/hooks/use-captcha";
 import useLastSignInMethod from "@/features/auth/hooks/use-last-signin-method";
 import useOnSuccessTransition from "@/features/auth/hooks/use-success-transition";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { authViewSearch } from "@/features/auth/lib/auth-view-paths";
 import { getLocalizedError, isValidEmail } from "@/features/auth/lib/utilities";
 import type { AuthClientWithUsernamePlugin } from "@/features/auth/types/auth-core-types";
 import type { PasswordValidation } from "@/features/auth/types/form-validation-types";
@@ -352,7 +353,7 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
                                 {credentials?.forgotPassword && (
                                     <Link
                                         className={cn("text-sm hover:underline", classNames?.forgotPasswordLink)}
-                                        to={`${basePath}/${viewPaths.FORGOT_PASSWORD}${isHydrated ? globalThis.location.search : ""}`}
+                                        to={`${basePath}/${viewPaths.FORGOT_PASSWORD}${isHydrated ? authViewSearch(redirectTo) : ""}`}
                                     >
                                         {t`Forgot password?`}
                                     </Link>

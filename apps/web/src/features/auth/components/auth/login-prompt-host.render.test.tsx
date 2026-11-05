@@ -11,7 +11,13 @@ import { savePendingSend } from "@/features/chat/core/utils/pending-send";
 import LoginPromptHost from "./login-prompt-host";
 
 const harness = vi.hoisted(() => {
-    return { user: undefined as { isAnonymous?: boolean } | undefined };
+    return { pathname: "/chat/abc", user: undefined as { isAnonymous?: boolean } | undefined };
+});
+
+vi.mock("@tanstack/react-router", () => {
+    return {
+        useLocation: ({ select }: { select: (location: { pathname: string }) => string }) => select({ pathname: harness.pathname }),
+    };
 });
 
 vi.mock("@/features/auth/hooks/use-is-anonymous", () => {
@@ -37,6 +43,7 @@ vi.mock("./login-modal", () => {
 
 describe("LoginPromptHost", () => {
     beforeEach(() => {
+        harness.pathname = "/chat/abc";
         harness.user = undefined;
         savePendingSend("hello");
         globalThis.history.replaceState(null, "", "/chat/abc?x=1");
@@ -82,5 +89,24 @@ describe("LoginPromptHost", () => {
         fireEvent.click(screen.getByRole("button", { name: "Close" }));
 
         expect(sessionStorage.getItem("neore:pending-send")).not.toBeNull();
+    });
+
+    it("closes when one of its links leaves the page, keeping the held message and the way back", async () => {
+        const view = render(<LoginPromptHost />);
+
+        act(() => {
+            openLoginPrompt();
+        });
+        await screen.findByRole("dialog");
+
+        // "Forgot password?" navigates to an auth page.
+        globalThis.history.replaceState(null, "", "/auth/forgot-password");
+        harness.pathname = "/auth/forgot-password";
+        view.rerender(<LoginPromptHost />);
+
+        expect(useLoginPromptStore.getState().isOpen).toBe(false);
+        expect(sessionStorage.getItem("neore:pending-send")).not.toBeNull();
+        // Sign-in from there still returns to the chat the prompt was opened on.
+        expect(useLoginPromptStore.getState().openedFrom).toBe("/chat/abc?x=1");
     });
 });

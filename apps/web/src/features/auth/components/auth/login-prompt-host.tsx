@@ -1,7 +1,8 @@
 "use client";
 
+import { useLocation } from "@tanstack/react-router";
 import type { FC } from "react";
-import { lazy, Suspense, useCallback, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useLoginPromptStore } from "@/features/auth/stores/login-prompt-store";
@@ -9,9 +10,10 @@ import { clearPendingSend } from "@/features/chat/core/utils/pending-send";
 
 const LoginModal = lazy(() => import("./login-modal"));
 
-/** The current URL, so a sign-in that leaves the page (OAuth, magic link) comes back to the chat it started from. */
-const currentUrl = (): string | undefined =>
-    globalThis.location === undefined ? undefined : `${globalThis.location.pathname}${globalThis.location.search}${globalThis.location.hash}`;
+const QUERY_OR_HASH = /[?#]/;
+
+/** The path part of a URL the store recorded. */
+const pathOf = (url: string | undefined): string | undefined => url?.split(QUERY_OR_HASH, 1)[0];
 
 /**
  * Renders the sign-in prompt that sending opens while the visitor may not chat
@@ -19,10 +21,23 @@ const currentUrl = (): string | undefined =>
  * (`pending-send.ts`) so it is not sent by surprise on a later sign-in; the
  * draft itself stays in the composer. A successful sign-in closes it too, and
  * then the pending message is kept for the composer to send.
+ *
+ * Following one of its links to another page (forgot password, magic link,
+ * email code) closes it without dropping the pending message: those flows come
+ * back to the chat it was opened on (`openedFrom`), which then sends it.
  */
 const LoginPromptHost: FC = () => {
     const isOpen = useLoginPromptStore((state) => state.isOpen);
+    const openedFrom = useLoginPromptStore((state) => state.openedFrom);
     const setOpen = useLoginPromptStore((state) => state.setOpen);
+    const pathname = useLocation({ select: (location) => location.pathname });
+
+    useEffect(() => {
+        if (isOpen && openedFrom !== undefined && pathname !== pathOf(openedFrom)) {
+            // Left for another page: not a dismissal, so the pending message stays.
+            setOpen(false);
+        }
+    }, [isOpen, openedFrom, pathname, setOpen]);
     const { isAnonymous, user } = useIsAnonymous();
     const isSignedIn = Boolean(user) && !isAnonymous;
 
@@ -50,7 +65,7 @@ const LoginPromptHost: FC = () => {
 
     return (
         <Suspense fallback={null}>
-            <LoginModal onOpenChange={handleOpenChange} open={isOpen} redirectTo={currentUrl()} />
+            <LoginModal onOpenChange={handleOpenChange} open={isOpen} redirectTo={openedFrom} />
         </Suspense>
     );
 };

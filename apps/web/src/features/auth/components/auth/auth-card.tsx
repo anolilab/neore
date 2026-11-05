@@ -79,12 +79,14 @@ const AuthFormSection: FC<AuthFormSectionProperties> = ({
 
             {magicLink &&
                 ((credentials && ["EMAIL_OTP", "FORGOT_PASSWORD", "MAGIC_LINK", "SIGN_IN", "SIGN_UP"].includes(view)) ||
-                    (emailOTP && view === "EMAIL_OTP")) && <MagicLinkButton classNames={classNames} isSubmitting={isSubmitting} view={view} />}
+                    (emailOTP && view === "EMAIL_OTP")) && (
+                    <MagicLinkButton classNames={classNames} isSubmitting={isSubmitting} redirectTo={redirectTo} view={view} />
+                )}
 
             {emailOTP &&
                 ((credentials && ["EMAIL_OTP", "FORGOT_PASSWORD", "MAGIC_LINK", "SIGN_IN", "SIGN_UP"].includes(view)) ||
                     (magicLink && ["MAGIC_LINK", "SIGN_IN"].includes(view))) && (
-                    <EmailOTPButton classNames={classNames} isSubmitting={isSubmitting} view={view} />
+                    <EmailOTPButton classNames={classNames} isSubmitting={isSubmitting} redirectTo={redirectTo} view={view} />
                 )}
         </div>
     );
