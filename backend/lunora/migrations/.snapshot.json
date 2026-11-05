@@ -135,25 +135,17 @@
             },
             "indexes": {
                 "accountId_providerId": {
-                    "fields": [
-                        "accountId",
-                        "providerId"
-                    ],
+                    "fields": ["accountId", "providerId"],
                     "name": "accountId_providerId",
                     "unique": false
                 },
                 "providerId_userId": {
-                    "fields": [
-                        "providerId",
-                        "userId"
-                    ],
+                    "fields": ["providerId", "userId"],
                     "name": "providerId_userId",
                     "unique": false
                 },
                 "userId": {
-                    "fields": [
-                        "userId"
-                    ],
+                    "fields": ["userId"],
                     "name": "userId",
                     "unique": false
                 }
@@ -205,23 +197,17 @@
             },
             "indexes": {
                 "by_key": {
-                    "fields": [
-                        "key"
-                    ],
+                    "fields": ["key"],
                     "name": "by_key",
                     "unique": false
                 },
                 "by_name": {
-                    "fields": [
-                        "name"
-                    ],
+                    "fields": ["name"],
                     "name": "by_name",
                     "unique": false
                 },
                 "by_expiresAt": {
-                    "fields": [
-                        "expiresAt"
-                    ],
+                    "fields": ["expiresAt"],
                     "name": "by_expiresAt",
                     "unique": false
                 }
@@ -443,23 +429,17 @@
             },
             "indexes": {
                 "configId": {
-                    "fields": [
-                        "configId"
-                    ],
+                    "fields": ["configId"],
                     "name": "configId",
                     "unique": false
                 },
                 "key": {
-                    "fields": [
-                        "key"
-                    ],
+                    "fields": ["key"],
                     "name": "key",
                     "unique": false
                 },
                 "referenceId": {
-                    "fields": [
-                        "referenceId"
-                    ],
+                    "fields": ["referenceId"],
                     "name": "referenceId",
                     "unique": false
                 }
@@ -551,30 +531,22 @@
             },
             "indexes": {
                 "adminId": {
-                    "fields": [
-                        "adminId"
-                    ],
+                    "fields": ["adminId"],
                     "name": "adminId",
                     "unique": false
                 },
                 "targetUserId": {
-                    "fields": [
-                        "targetUserId"
-                    ],
+                    "fields": ["targetUserId"],
                     "name": "targetUserId",
                     "unique": false
                 },
                 "action": {
-                    "fields": [
-                        "action"
-                    ],
+                    "fields": ["action"],
                     "name": "action",
                     "unique": false
                 },
                 "timestamp": {
-                    "fields": [
-                        "timestamp"
-                    ],
+                    "fields": ["timestamp"],
                     "name": "timestamp",
                     "unique": false
                 }
@@ -767,17 +739,12 @@
             },
             "indexes": {
                 "by_fileId_userId": {
-                    "fields": [
-                        "fileId",
-                        "userId"
-                    ],
+                    "fields": ["fileId", "userId"],
                     "name": "by_fileId_userId",
                     "unique": false
                 },
                 "by_userId": {
-                    "fields": [
-                        "userId"
-                    ],
+                    "fields": ["userId"],
                     "name": "by_userId",
                     "unique": false
                 }
@@ -1015,17 +982,12 @@
             },
             "indexes": {
                 "hash_filename": {
-                    "fields": [
-                        "hash",
-                        "filename"
-                    ],
+                    "fields": ["hash", "filename"],
                     "name": "hash_filename",
                     "unique": false
                 },
                 "refcount": {
-                    "fields": [
-                        "refcount"
-                    ],
+                    "fields": ["refcount"],
                     "name": "refcount",
                     "unique": false
                 }
@@ -1149,9 +1111,7 @@
             },
             "indexes": {
                 "by_runAt": {
-                    "fields": [
-                        "runAt"
-                    ],
+                    "fields": ["runAt"],
                     "name": "by_runAt",
                     "unique": false
                 }
@@ -1440,23 +1400,17 @@
             },
             "indexes": {
                 "by_slug": {
-                    "fields": [
-                        "slug"
-                    ],
+                    "fields": ["slug"],
                     "name": "by_slug",
                     "unique": false
                 },
                 "by_category": {
-                    "fields": [
-                        "category"
-                    ],
+                    "fields": ["category"],
                     "name": "by_category",
                     "unique": false
                 },
                 "by_status": {
-                    "fields": [
-                        "status"
-                    ],
+                    "fields": ["status"],
                     "name": "by_status",
                     "unique": false
                 }
@@ -1558,42 +1512,27 @@
             },
             "indexes": {
                 "by_table_ts": {
-                    "fields": [
-                        "tableName",
-                        "ts"
-                    ],
+                    "fields": ["tableName", "ts"],
                     "name": "by_table_ts",
                     "unique": false
                 },
                 "by_table_doc_ts": {
-                    "fields": [
-                        "tableName",
-                        "documentId",
-                        "ts"
-                    ],
+                    "fields": ["tableName", "documentId", "ts"],
                     "name": "by_table_doc_ts",
                     "unique": false
                 },
                 "by_user_ts": {
-                    "fields": [
-                        "userId",
-                        "ts"
-                    ],
+                    "fields": ["userId", "ts"],
                     "name": "by_user_ts",
                     "unique": false
                 },
                 "by_org_ts": {
-                    "fields": [
-                        "organizationId",
-                        "ts"
-                    ],
+                    "fields": ["organizationId", "ts"],
                     "name": "by_org_ts",
                     "unique": false
                 },
                 "by_ts": {
-                    "fields": [
-                        "ts"
-                    ],
+                    "fields": ["ts"],
                     "name": "by_ts",
                     "unique": false
                 }
@@ -1685,26 +1624,17 @@
             },
             "indexes": {
                 "email_organizationId_status": {
-                    "fields": [
-                        "email",
-                        "organizationId",
-                        "status"
-                    ],
+                    "fields": ["email", "organizationId", "status"],
                     "name": "email_organizationId_status",
                     "unique": false
                 },
                 "organizationId_status": {
-                    "fields": [
-                        "organizationId",
-                        "status"
-                    ],
+                    "fields": ["organizationId", "status"],
                     "name": "organizationId_status",
                     "unique": false
                 },
                 "status": {
-                    "fields": [
-                        "status"
-                    ],
+                    "fields": ["status"],
                     "name": "status",
                     "unique": false
                 }
@@ -1842,16 +1772,12 @@
             },
             "indexes": {
                 "by_userId": {
-                    "fields": [
-                        "userId"
-                    ],
+                    "fields": ["userId"],
                     "name": "by_userId",
                     "unique": false
                 },
                 "by_organizationId": {
-                    "fields": [
-                        "organizationId"
-                    ],
+                    "fields": ["organizationId"],
                     "name": "by_organizationId",
                     "unique": false
                 }
@@ -1903,25 +1829,17 @@
             },
             "indexes": {
                 "organizationId_userId": {
-                    "fields": [
-                        "organizationId",
-                        "userId"
-                    ],
+                    "fields": ["organizationId", "userId"],
                     "name": "organizationId_userId",
                     "unique": false
                 },
                 "organizationId_role": {
-                    "fields": [
-                        "organizationId",
-                        "role"
-                    ],
+                    "fields": ["organizationId", "role"],
                     "name": "organizationId_role",
                     "unique": false
                 },
                 "userId": {
-                    "fields": [
-                        "userId"
-                    ],
+                    "fields": ["userId"],
                     "name": "userId",
                     "unique": false
                 }
@@ -1993,17 +1911,12 @@
             },
             "indexes": {
                 "organizationId_userId": {
-                    "fields": [
-                        "organizationId",
-                        "userId"
-                    ],
+                    "fields": ["organizationId", "userId"],
                     "name": "organizationId_userId",
                     "unique": false
                 },
                 "memberId": {
-                    "fields": [
-                        "memberId"
-                    ],
+                    "fields": ["memberId"],
                     "name": "memberId",
                     "unique": false
                 }
@@ -2184,23 +2097,17 @@
             },
             "indexes": {
                 "creemPurchaserId": {
-                    "fields": [
-                        "creemPurchaserId"
-                    ],
+                    "fields": ["creemPurchaserId"],
                     "name": "creemPurchaserId",
                     "unique": false
                 },
                 "name": {
-                    "fields": [
-                        "name"
-                    ],
+                    "fields": ["name"],
                     "name": "name",
                     "unique": false
                 },
                 "slug": {
-                    "fields": [
-                        "slug"
-                    ],
+                    "fields": ["slug"],
                     "name": "slug",
                     "unique": false
                 }
@@ -2262,9 +2169,7 @@
             },
             "indexes": {
                 "organizationId": {
-                    "fields": [
-                        "organizationId"
-                    ],
+                    "fields": ["organizationId"],
                     "name": "organizationId",
                     "unique": false
                 }
@@ -2397,18 +2302,12 @@
             },
             "indexes": {
                 "by_page_and_user": {
-                    "fields": [
-                        "pageId",
-                        "userId"
-                    ],
+                    "fields": ["pageId", "userId"],
                     "name": "by_page_and_user",
                     "unique": false
                 },
                 "by_user_and_owner": {
-                    "fields": [
-                        "userId",
-                        "ownerId"
-                    ],
+                    "fields": ["userId", "ownerId"],
                     "name": "by_user_and_owner",
                     "unique": false
                 }
@@ -2574,16 +2473,12 @@
             },
             "indexes": {
                 "by_tokenHash": {
-                    "fields": [
-                        "tokenHash"
-                    ],
+                    "fields": ["tokenHash"],
                     "name": "by_tokenHash",
                     "unique": false
                 },
                 "by_page": {
-                    "fields": [
-                        "pageId"
-                    ],
+                    "fields": ["pageId"],
                     "name": "by_page",
                     "unique": false
                 }
@@ -2695,16 +2590,12 @@
             },
             "indexes": {
                 "userId": {
-                    "fields": [
-                        "userId"
-                    ],
+                    "fields": ["userId"],
                     "name": "userId",
                     "unique": false
                 },
                 "credentialID": {
-                    "fields": [
-                        "credentialID"
-                    ],
+                    "fields": ["credentialID"],
                     "name": "credentialID",
                     "unique": false
                 }
@@ -3161,71 +3052,47 @@
             },
             "indexes": {
                 "by_user_and_pinned": {
-                    "fields": [
-                        "userId",
-                        "pinnedAt"
-                    ],
+                    "fields": ["userId", "pinnedAt"],
                     "name": "by_user_and_pinned",
                     "unique": false
                 },
                 "by_user_and_type": {
-                    "fields": [
-                        "userId",
-                        "projectType"
-                    ],
+                    "fields": ["userId", "projectType"],
                     "name": "by_user_and_type",
                     "unique": false
                 },
                 "by_organization": {
-                    "fields": [
-                        "organizationId"
-                    ],
+                    "fields": ["organizationId"],
                     "name": "by_organization",
                     "unique": false
                 },
                 "by_public": {
-                    "fields": [
-                        "isPublic",
-                        "galleryPublishedAt"
-                    ],
+                    "fields": ["isPublic", "galleryPublishedAt"],
                     "name": "by_public",
                     "unique": false
                 },
                 "by_public_category": {
-                    "fields": [
-                        "isPublic",
-                        "galleryCategory"
-                    ],
+                    "fields": ["isPublic", "galleryCategory"],
                     "name": "by_public_category",
                     "unique": false
                 },
                 "by_public_featured": {
-                    "fields": [
-                        "isPublic",
-                        "galleryFeatured"
-                    ],
+                    "fields": ["isPublic", "galleryFeatured"],
                     "name": "by_public_featured",
                     "unique": false
                 },
                 "by_public_access_token": {
-                    "fields": [
-                        "publicAccessToken"
-                    ],
+                    "fields": ["publicAccessToken"],
                     "name": "by_public_access_token",
                     "unique": false
                 },
                 "by_public_fork_count": {
-                    "fields": [
-                        "isPublic",
-                        "galleryForkCount"
-                    ],
+                    "fields": ["isPublic", "galleryForkCount"],
                     "name": "by_public_fork_count",
                     "unique": false
                 },
                 "by_forkedFromId": {
-                    "fields": [
-                        "forkedFromId"
-                    ],
+                    "fields": ["forkedFromId"],
                     "name": "by_forkedFromId",
                     "unique": false
                 }
@@ -3412,10 +3279,7 @@
             },
             "indexes": {
                 "by_prompt_version": {
-                    "fields": [
-                        "promptId",
-                        "version"
-                    ],
+                    "fields": ["promptId", "version"],
                     "name": "by_prompt_version",
                     "unique": false
                 }
@@ -3621,18 +3485,12 @@
             },
             "indexes": {
                 "by_user_and_favorite": {
-                    "fields": [
-                        "userId",
-                        "isFavorite"
-                    ],
+                    "fields": ["userId", "isFavorite"],
                     "name": "by_user_and_favorite",
                     "unique": false
                 },
                 "by_organization_and_favorite": {
-                    "fields": [
-                        "organizationId",
-                        "isFavorite"
-                    ],
+                    "fields": ["organizationId", "isFavorite"],
                     "name": "by_organization_and_favorite",
                     "unique": false
                 }
@@ -3674,9 +3532,7 @@
             },
             "indexes": {
                 "key": {
-                    "fields": [
-                        "key"
-                    ],
+                    "fields": ["key"],
                     "name": "key",
                     "unique": false
                 }
@@ -3788,24 +3644,17 @@
             },
             "indexes": {
                 "expiresAt_userId": {
-                    "fields": [
-                        "expiresAt",
-                        "userId"
-                    ],
+                    "fields": ["expiresAt", "userId"],
                     "name": "expiresAt_userId",
                     "unique": false
                 },
                 "token": {
-                    "fields": [
-                        "token"
-                    ],
+                    "fields": ["token"],
                     "name": "token",
                     "unique": false
                 },
                 "userId": {
-                    "fields": [
-                        "userId"
-                    ],
+                    "fields": ["userId"],
                     "name": "userId",
                     "unique": false
                 }
@@ -3857,23 +3706,17 @@
             },
             "indexes": {
                 "by_shardKey": {
-                    "fields": [
-                        "shardKey"
-                    ],
+                    "fields": ["shardKey"],
                     "name": "by_shardKey",
                     "unique": false
                 },
                 "by_lastActiveAt": {
-                    "fields": [
-                        "lastActiveAt"
-                    ],
+                    "fields": ["lastActiveAt"],
                     "name": "by_lastActiveAt",
                     "unique": false
                 },
                 "by_nextDueAt": {
-                    "fields": [
-                        "nextDueAt"
-                    ],
+                    "fields": ["nextDueAt"],
                     "name": "by_nextDueAt",
                     "unique": false
                 }
@@ -3915,16 +3758,12 @@
             },
             "indexes": {
                 "by_key": {
-                    "fields": [
-                        "key"
-                    ],
+                    "fields": ["key"],
                     "name": "by_key",
                     "unique": false
                 },
                 "by_owner": {
-                    "fields": [
-                        "ownerId"
-                    ],
+                    "fields": ["ownerId"],
                     "name": "by_owner",
                     "unique": false
                 }
@@ -3996,16 +3835,12 @@
             },
             "indexes": {
                 "email": {
-                    "fields": [
-                        "email"
-                    ],
+                    "fields": ["email"],
                     "name": "email",
                     "unique": false
                 },
                 "expiresAt": {
-                    "fields": [
-                        "expiresAt"
-                    ],
+                    "fields": ["expiresAt"],
                     "name": "expiresAt",
                     "unique": false
                 }
@@ -4088,17 +3923,12 @@
             },
             "indexes": {
                 "by_skill_and_type": {
-                    "fields": [
-                        "skillId",
-                        "type"
-                    ],
+                    "fields": ["skillId", "type"],
                     "name": "by_skill_and_type",
                     "unique": false
                 },
                 "by_hash": {
-                    "fields": [
-                        "hash"
-                    ],
+                    "fields": ["hash"],
                     "name": "by_hash",
                     "unique": false
                 }
@@ -4161,17 +3991,12 @@
             },
             "indexes": {
                 "by_user_and_skill": {
-                    "fields": [
-                        "userId",
-                        "skillId"
-                    ],
+                    "fields": ["userId", "skillId"],
                     "name": "by_user_and_skill",
                     "unique": false
                 },
                 "by_skill": {
-                    "fields": [
-                        "skillId"
-                    ],
+                    "fields": ["skillId"],
                     "name": "by_skill",
                     "unique": false
                 }
@@ -4529,31 +4354,22 @@
             },
             "indexes": {
                 "by_user_and_slug": {
-                    "fields": [
-                        "userId",
-                        "slug"
-                    ],
+                    "fields": ["userId", "slug"],
                     "name": "by_user_and_slug",
                     "unique": false
                 },
                 "by_organization": {
-                    "fields": [
-                        "organizationId"
-                    ],
+                    "fields": ["organizationId"],
                     "name": "by_organization",
                     "unique": false
                 },
                 "by_category": {
-                    "fields": [
-                        "category"
-                    ],
+                    "fields": ["category"],
                     "name": "by_category",
                     "unique": false
                 },
                 "by_visibility": {
-                    "fields": [
-                        "visibility"
-                    ],
+                    "fields": ["visibility"],
                     "name": "by_visibility",
                     "unique": false
                 }
@@ -4616,16 +4432,12 @@
             },
             "indexes": {
                 "by_skillId": {
-                    "fields": [
-                        "skillId"
-                    ],
+                    "fields": ["skillId"],
                     "name": "by_skillId",
                     "unique": false
                 },
                 "by_usage": {
-                    "fields": [
-                        "usageCount"
-                    ],
+                    "fields": ["usageCount"],
                     "name": "by_usage",
                     "unique": false
                 }
@@ -4687,16 +4499,12 @@
             },
             "indexes": {
                 "organizationId": {
-                    "fields": [
-                        "organizationId"
-                    ],
+                    "fields": ["organizationId"],
                     "name": "organizationId",
                     "unique": false
                 },
                 "name": {
-                    "fields": [
-                        "name"
-                    ],
+                    "fields": ["name"],
                     "name": "name",
                     "unique": false
                 }
@@ -4774,32 +4582,22 @@
             },
             "indexes": {
                 "userId": {
-                    "fields": [
-                        "userId"
-                    ],
+                    "fields": ["userId"],
                     "name": "userId",
                     "unique": false
                 },
                 "teamId_userId": {
-                    "fields": [
-                        "teamId",
-                        "userId"
-                    ],
+                    "fields": ["teamId", "userId"],
                     "name": "teamId_userId",
                     "unique": false
                 },
                 "teamId_role": {
-                    "fields": [
-                        "teamId",
-                        "role"
-                    ],
+                    "fields": ["teamId", "role"],
                     "name": "teamId_role",
                     "unique": false
                 },
                 "membershipKey": {
-                    "fields": [
-                        "membershipKey"
-                    ],
+                    "fields": ["membershipKey"],
                     "name": "membershipKey",
                     "unique": false
                 }
@@ -4847,16 +4645,12 @@
             },
             "indexes": {
                 "teamId": {
-                    "fields": [
-                        "teamId"
-                    ],
+                    "fields": ["teamId"],
                     "name": "teamId",
                     "unique": false
                 },
                 "organizationId": {
-                    "fields": [
-                        "organizationId"
-                    ],
+                    "fields": ["organizationId"],
                     "name": "organizationId",
                     "unique": false
                 }
@@ -4962,18 +4756,12 @@
             },
             "indexes": {
                 "by_thread_and_user": {
-                    "fields": [
-                        "threadId",
-                        "userId"
-                    ],
+                    "fields": ["threadId", "userId"],
                     "name": "by_thread_and_user",
                     "unique": false
                 },
                 "by_user_and_owner": {
-                    "fields": [
-                        "userId",
-                        "ownerId"
-                    ],
+                    "fields": ["userId", "ownerId"],
                     "name": "by_user_and_owner",
                     "unique": false
                 }
@@ -5139,16 +4927,12 @@
             },
             "indexes": {
                 "by_thread": {
-                    "fields": [
-                        "threadId"
-                    ],
+                    "fields": ["threadId"],
                     "name": "by_thread",
                     "unique": false
                 },
                 "by_invite_token": {
-                    "fields": [
-                        "inviteToken"
-                    ],
+                    "fields": ["inviteToken"],
                     "name": "by_invite_token",
                     "unique": false
                 }
@@ -5220,9 +5004,7 @@
             },
             "indexes": {
                 "userId": {
-                    "fields": [
-                        "userId"
-                    ],
+                    "fields": ["userId"],
                     "name": "userId",
                     "unique": false
                 }
@@ -5410,38 +5192,27 @@
             },
             "indexes": {
                 "email_name": {
-                    "fields": [
-                        "email",
-                        "name"
-                    ],
+                    "fields": ["email", "name"],
                     "name": "email_name",
                     "unique": false
                 },
                 "name": {
-                    "fields": [
-                        "name"
-                    ],
+                    "fields": ["name"],
                     "name": "name",
                     "unique": false
                 },
                 "role": {
-                    "fields": [
-                        "role"
-                    ],
+                    "fields": ["role"],
                     "name": "role",
                     "unique": false
                 },
                 "userId": {
-                    "fields": [
-                        "userId"
-                    ],
+                    "fields": ["userId"],
                     "name": "userId",
                     "unique": false
                 },
                 "by_isAnonymous": {
-                    "fields": [
-                        "isAnonymous"
-                    ],
+                    "fields": ["isAnonymous"],
                     "name": "by_isAnonymous",
                     "unique": false
                 }
@@ -5513,17 +5284,12 @@
             },
             "indexes": {
                 "by_organization": {
-                    "fields": [
-                        "organizationId"
-                    ],
+                    "fields": ["organizationId"],
                     "name": "by_organization",
                     "unique": false
                 },
                 "by_user_and_organization": {
-                    "fields": [
-                        "userId",
-                        "organizationId"
-                    ],
+                    "fields": ["userId", "organizationId"],
                     "name": "by_user_and_organization",
                     "unique": false
                 }
@@ -5585,16 +5351,12 @@
             },
             "indexes": {
                 "expiresAt": {
-                    "fields": [
-                        "expiresAt"
-                    ],
+                    "fields": ["expiresAt"],
                     "name": "expiresAt",
                     "unique": false
                 },
                 "identifier": {
-                    "fields": [
-                        "identifier"
-                    ],
+                    "fields": ["identifier"],
                     "name": "identifier",
                     "unique": false
                 }
