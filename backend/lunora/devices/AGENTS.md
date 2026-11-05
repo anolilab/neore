@@ -6,7 +6,7 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
 ## INVARIANTS
 
 - **Chat status** comes from the device too: Rust emits a SIGNED
-  `neore:device-progress` report (domain `progress`: `prompting` when the
+  `neore:device:progress` report (domain `progress`: `prompting` when the
   approval window shows the call, `running` before it runs) that the relay
   forwards to `reportDeviceCallProgress` — forward-only on a `claimed` call,
   display only, it can never finish one. The chat's device row

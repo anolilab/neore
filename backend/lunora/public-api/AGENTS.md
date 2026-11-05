@@ -16,7 +16,7 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
   `userId` becomes `ctx.auth.userId` and `ctx.auth.getIdentity()` returns the
   OTHER claims without it — read both (`readApiKeyIdentity(claims, userId)`).
   The canonical key store is better-auth's `apikey` table (plugin rate limit
-  OFF — its default is 10/day); the older `saasApiKeys` table is gone.
+  OFF — its default is 10/day).
   `permissions` is server-only on `/api-key/create`, so scoped keys are minted by
   `auth_api_keys.createScopedApiKey`. `auth.api` is typed without plugin
   endpoints (`buildAuthOptions` returns plain `BetterAuthOptions`) — use

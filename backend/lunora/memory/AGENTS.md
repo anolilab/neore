@@ -7,13 +7,11 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
 
 - **User memory** — extraction runs as a background action after each AI
   response; retrieval runs before generation with multi-signal scoring
-  (semantic 0.40 / confidence 0.20 / importance 0.15 / recency 0.25, 30-day
+  (semantic 0.45 / confidence 0.18 / importance 0.12 / recency 0.25, 30-day
   half-life). Dedup threshold 0.85; conflicts go through belief revision
   (UPDATE/SUPERSEDE/IGNORE/ADD). **`memoryEnabled` on `userSettings` is OPT-IN —
   absent means off.** `isMemoryEnabled` is the authoritative gate; the settings
-  read and the UI fallback must agree with it. It defaulted to ON, which meant
-  extraction ran over every conversation for users who had never seen the
-  setting.
+  read and the UI fallback must agree with it.
   **Taxonomy** is `memory/taxonomy.ts` (identity / preference / context /
   activity / experience), a required `type` column.
   **Nightly reflection** (`memory/reflection*.ts`) uses NO cron: `afterRun`

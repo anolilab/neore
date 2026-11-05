@@ -7,7 +7,7 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
 
 - **Local models (Ollama / LM Studio)** — custom endpoint `type: "local-browser"`:
   the BROWSER calls the loopback server directly (`apps/web/src/features/local-models`),
-  then persists text only via `chat_local_models.saveLocalTurn` (no tools, no
+  then persists text only via `chat.local_models.saveLocalTurn` (no tools, no
   usage, `provider: "local-browser"`, not billed). The server never fetches it and
   `resolveRunModel` refuses it (`local-endpoint`). Regenerate and edit branch to
   the browser in `chat-context.tsx` when the current model is local, and

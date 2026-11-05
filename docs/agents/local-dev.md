@@ -45,7 +45,7 @@ error")` (any transport, including the SSRF-guarded tool
        `"<prefix>: <status> <statusText>"` message (`includeBody` keeps a
        truncated body on `.body` instead). Hand-written branches remain only
        where a failure returns a fallback rather than throwing.
-    2. **Concurrency on the `__root__` shard** (see above). Deterministic repro:
+    2. **Concurrency on the `__root__` shard** (see "Sharding and concurrency" in `backend/AGENTS.md`). Deterministic repro:
 
         ```bash
         for i in $(seq 1 10); do curl -s -o /dev/null -X POST localhost:8788/_lunora/rpc \
@@ -56,9 +56,9 @@ error")` (any transport, including the SSRF-guarded tool
 
     Wrangler escalating a recoverable blip to process exit is still an upstream
     defect, **fixed upstream in wrangler 4.129.1**: from there "Error inside
-    ProxyWorker" fails only the affected request and the dev server continues
-    (4.127.1, tried earlier, predates the fix). The catalog is on wrangler
-    4.145.0 + `@cloudflare/vite-plugin` 1.62.3 (workerd 1.20260930.2) (they move together — each
+    ProxyWorker" fails only the affected request and the dev server continues.
+    The catalog is on wrangler
+    4.151.2 + `@cloudflare/vite-plugin` 1.64.0 (workerd 1.20261019.1) (they move together — each
     plugin release peer-requires its wrangler). **Every such bump ships a new
     workerd binary**: on a machine with a per-app firewall (OpenSnitch) an
     unapproved workerd has every `connect()` time out — even to loopback — and
@@ -67,19 +67,12 @@ error")` (any transport, including the SSRF-guarded tool
     needs its own rule even when the main checkout's is allowed; the symptom is
     `Ready on http://localhost:8788` in `dev.log` while even `/_lunora/status`
     hangs. Verified after the
-    4.141 bump: the 10-concurrent repro below with 300ms client aborts ×3, and 10
+    4.141 bump: the 10-concurrent repro above with 300ms client aborts ×3, and 10
     browser contexts closed mid-first-paint, killed the backend 0 times (the
     same close killed 4.124 2 times in 6).
     The failure is INTERMITTENT, so a clean run proves nothing — judge over
     several. When `pnpm test:e2e` shows a run of `TypeError: fetch failed`,
     check whether the backend is still up before debugging them as test defects.
-    **`scripts/dev-backend-watchdog.sh`** restarts the backend when its worker
-    process is gone and archives the dying run's `dev.log` (which a restart
-    truncates) to `backend/.lunora/crashes/`; CI's e2e job runs the backend
-    under it. Wrangler's output stays in `dev.log` (`lunora dev`'s own stdout
-    has only its status lines), so the watchdog stamps a copy of it in
-    `dev-timed.log` and logs `/api/health`'s first 200 in `watchdog.log`. A
-    failed e2e shard uploads that directory as `backend-startup-log-<shard>`.
     **The mechanism, reproduced:** a client that ABANDONS a request
     the backend has already accepted — a timeout, a closed tab, a navigation —
     leaves a reply to be written to a closed socket, and that write is the
@@ -96,8 +89,7 @@ error")` (any transport, including the SSRF-guarded tool
     page (`trackBackendRequests` in `apps/web/e2e/chat-helpers.ts`). On 4.124
     those removals alone did not move the rate (~3 crashes per 100 non-health
     requests, several agents browsing): any browser navigating away from a slow
-    first paint is the same trigger — only the wrangler fix removed it. `WATCHDOG_RUNNER=wrangler` runs the worker
-    without `lunora dev`'s supervisor (no readiness probe, no `dev.log`).
+    first paint is the same trigger — only the wrangler fix removed it.
 
 - **Port 8788 belongs to the backend** — and to the services it binds, which
   run INSIDE its `lunora dev` session with no port of their own. The standalone
@@ -117,7 +109,7 @@ dev:<service>`, spec extraction). The gap at 8788 is deliberate, because
   9231 (document-parser), 9232 (browser-renderer), 9233 (embeddings), 9234
   (nsfw-checker); the backend session (with its in-session services) pins
   **9235** with `lunora dev --inspector-port 9235`, in `project.json`'s dev
-  target, `package.json`'s `dev` script and `scripts/dev-backend-watchdog.sh`.
+  target and `package.json`'s `dev` script.
   Any new way of starting it must pass the flag too. That pin matters because
   without it the backend
   takes wrangler's default 9229 and, finding it busy, walks UPWARD into the
@@ -157,7 +149,7 @@ dev:<service>`, spec extraction). The gap at 8788 is deliberate, because
   Workers AI binding is proxied to the real network by default, so plain
   `wrangler dev` opens a remote proxy session and dies demanding a
   `CLOUDFLARE_API_TOKEN` in any non-interactive shell. `services/llm-gateway`'s
-  `dev` script passes `-l`.
+  `dev` script passes `--local`.
 - **`scripts/dev-setup.js` is the only thing that writes `apps/web/.env`, and it
   must cover every REQUIRED var in `apps/web/src/lib/env.ts`.**
   `VITE_LUNORA_URL`, `VITE_SITE_URL` and `VITE_LLM_GATEWAY_URL` are bare

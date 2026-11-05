@@ -8,66 +8,23 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
 **Every defect from the migration audit is fixed or declined** — that batch is
 closed out. One of ours is open: [#687](https://github.com/anolilab/lunora/issues/687)
 (cloud spend cap prices 35 meters against one observed; non-blocking).
-Fixed upstream and retired here: [#1052](https://github.com/anolilab/lunora/issues/1052)
-(`cloudflareSend` needed a `SEND_EMAIL` binding), [#1054](https://github.com/anolilab/lunora/issues/1054)
-(`lunorash` lagged its siblings; the single-copy errors/server/values overrides are gone),
-[#1055](https://github.com/anolilab/lunora/issues/1055) (Creem dropped seat changes;
-`billing/seats.ts` goes through `ctx.payments.adapter`), [#1060](https://github.com/anolilab/lunora/issues/1060)
-(`lunora dev` dropped the preview `InternalApi` entrypoint), [#1037](https://github.com/anolilab/lunora/issues/1037)
+Fixed upstream, with a choice here still in force: [#1037](https://github.com/anolilab/lunora/issues/1037)
 (`lunoraTest` now takes `queues` / `notify`; `notifications/push.test.ts` still splices one
-shared facade, since `lunora/notify.ts` makes a fresh memory store per ctx) and
+shared facade, since `lunora/notify.ts` makes a fresh memory store per ctx),
 [#1053](https://github.com/anolilab/lunora/issues/1053) (`stateScope` exists, but
-`lib/upload-route.ts` builds per request anyway). [#690](https://github.com/anolilab/lunora/issues/690)
-(schema check for `lunoraD1Adapter`; see the Auth notes in `backend/lunora/auth/AGENTS.md`), [#934](https://github.com/anolilab/lunora/issues/934)
-(`lunora dev` ran a service's build in the app's cwd), [#810](https://github.com/anolilab/lunora/issues/810)
-(codegen alpha.199–206 emitted `unknown` for every `Infer<v.object(...)>`
-output; fixed in `@lunora/codegen@alpha.207`), [#797](https://github.com/anolilab/lunora/issues/797)
-(`ctx.db.<table>` facades behind `rls()`; `restoreTableFacades` removed after a
-runtime check on 8788, 2026-09-25), [#688](https://github.com/anolilab/lunora/issues/688)
-(a bare `v.any()` arg is now emitted optional), [#689](https://github.com/anolilab/lunora/issues/689)
-(the inspector pin moved to `lunora dev --inspector-port 9235`),
-[#793](https://github.com/anolilab/lunora/issues/793) (SchedulerDO drains up to 6
-due jobs at once since `@lunora/scheduler@alpha.79`, though it still never
-defaults a job's `shardKey`), [#796](https://github.com/anolilab/lunora/issues/796)
+`lib/upload-route.ts` builds per request anyway), [#796](https://github.com/anolilab/lunora/issues/796)
 (reconnect resubscribes are paced, but first-paint seeds are not, so
-`MAX_CONCURRENT_SEEDS` stays), [#822](https://github.com/anolilab/lunora/issues/822)
-(`rls()` dropped the SQL LIMIT on the legacy builder, so a guarded `take(5)` read
-the whole index range; fixed in `@lunora/server@alpha.145`: measured 5 rows for
-`take(5)`, 6 for `paginate(5)`. The ORM-facade reads and
-`agent/admitted-thread-db.ts` stay, as ordinary code, not as a workaround) and
-[#823](https://github.com/anolilab/lunora/issues/823) (codegen typed the
-advisories as one array literal, and past ~1,150 findings `_generated/shard.ts`
-failed with TS2590; since `@lunora/codegen@alpha.214` it emits `JSON.parse(...)`,
-so the count no longer matters to `tsc`).
-
-The launch work (2026-10) filed and saw fixed: [#951](https://github.com/anolilab/lunora/issues/951)
-(codegen skipped writes in non-exported helpers), [#990](https://github.com/anolilab/lunora/issues/990)
-(codegen read `*.test.ts`), [#991](https://github.com/anolilab/lunora/issues/991)
-(`owner_field_from_args_not_auth` on a ternary's condition), [#996](https://github.com/anolilab/lunora/issues/996)
-(error tracking: failed RPCs now carry code, name and stack; PostHog goes through
-`webhookSink`), [#997](https://github.com/anolilab/lunora/issues/997)–[#999](https://github.com/anolilab/lunora/issues/999)
-(Creem multi-reference customers, caller-aware `authorize`, lazy `ctx.payments`),
-[#1021](https://github.com/anolilab/lunora/issues/1021) (`payment_*` table rename and
-`paymentExtension`'s literal key) and [#1022](https://github.com/anolilab/lunora/issues/1022)
-(`lunora dev` scaffolds only the imported payment adapter's secrets). The six
-`owner_field_from_args_not_auth` ERRORs on guarded inserts are the equality-guard
-shape #991 left open on purpose.
+`MAX_CONCURRENT_SEEDS` stays) and [#822](https://github.com/anolilab/lunora/issues/822)
+(`rls()` dropped the SQL LIMIT on the legacy builder; fixed in `@lunora/server@alpha.145`.
+The ORM-facade reads and
+`agent/admitted-thread-db.ts` stay, as ordinary code, not as a workaround).
 
 Moving queue, mail, push and uploads onto Lunora (2026-10) filed and saw fixed,
 workarounds retired with `@lunora/cli@alpha.365`:
-[#1033](https://github.com/anolilab/lunora/issues/1033) (`doctor` flagged the
-optional vector metadata columns unfilterable: 20 false warnings),
 [#1036](https://github.com/anolilab/lunora/issues/1036) (a `-preview` queue routed
 to no handler — now aliased by the `env.preview` producers in `wrangler.jsonc`;
 `Queues` is keyed by name; `maxConcurrency` exists but stays in
-`lib/job-queue-config.ts` while `alchemy.run.ts` reads it there),
-[#1038](https://github.com/anolilab/lunora/issues/1038) (lazy mail renderer and
-transport, Message-ID on the sender's domain),
-[#1039](https://github.com/anolilab/lunora/issues/1039) (`@lunora/errors` by range,
-so `instanceof LunoraError` holds for notify's errors; per-message push urgency,
-`high` again for approvals and questions) and
-[#1040](https://github.com/anolilab/lunora/issues/1040) (typed upload provider
-options; `authorize` may answer a `Response`, so a rate-limited create is a 429).
+`lib/job-queue-config.ts` while `alchemy.run.ts` reads it there).
 The same window shipped [#1030](https://github.com/anolilab/lunora/pull/1030):
 `api.*` / `internal.*` nest by folder (`internal.lib.job_once.runJobOnce`), and
 `internal` is imported from `_generated/internal`.
@@ -87,7 +44,7 @@ generated output, run `tsc` per project: `vis run lint:types` re-runs the
 backend's `codegen` target first and silently overwrites any `_generated/`
 you are testing. **Build the packages first in a fresh checkout or worktree**
 (`pnpm build:packages`): `packages/*/dist` is git-ignored, and without it a
-return type imported from `@neore/service-sdk` degrades to `unknown` (36, not 35) with codegen still exiting 0.
+return type imported from `@neore/service-sdk` degrades to `unknown` with codegen still exiting 0.
 
 **Workflows are wrangler `exports`, keyed by class name** (since
 `@lunora/workflow@alpha.69` / codegen alpha.240): the runtime finds one as
@@ -104,8 +61,7 @@ binds it like `SHARD`. Declaring it does both halves: every shard registers its
 key on its first write to a `.shardBy()` table, and the generated worker builds
 the `queryCoordinator` over it — fan-outs (`admin/import`/`export`, cross-shard
 `rank()`, reverse relations, backups) reach the shards it lists (30s cache).
-Before, `queryCoordinator` pointed `createDynamicShardRegistry` at `env.SHARD`
-and no shard ever registered there. A shard written before the registry was
+A shard written before the registry was
 bound is listed only after its next write (no data exists yet).
 
 |                                                       |                                                                  |
@@ -151,12 +107,7 @@ usage backfill's re-arm (its cursor is the `usageBackfill` row), internal `owner
 tables written by the vector API / better-auth / the payment component, ordered reads the
 "redundant" indexes serve (and the schema-drift gate cannot drop an index while
 `agent/vector/index.ts` and `lib/rls/scope.ts` pass index names as variables), and secrets and
-tokens that must stay `crypto`-random. Until
-alpha.384 there were six `owner_field_from_args_not_auth` ERRORs on guarded inserts
-the lint could not see through (platform-admin `setMemberCreditOverride`, org-admin
-`addMember`/`addTeamMember`, the active-org equality checks in
-`createPrompt`/`createSkill`); alpha.384 reports none of them as ERROR, and the
-INFO count fell from 668 to 101. Advisories never fail codegen; test files
+tokens that must stay `crypto`-random. Advisories never fail codegen; test files
 (`*.test.ts`, `__tests__/`, …) are not analysed. **Piping codegen's output truncates that list** at wildly
 different points (one run printed 88 and looked like the whole set), so redirect
 to a file and count there:
@@ -174,7 +125,7 @@ Conventions that keep new code clear of the advisor:
 - **Time comes from `ctx.now`**, never `Date.now()`, in a query or mutation.
 - **Plain ids come from `ctx.newId()`**; only a token or secret takes `crypto`.
 
-`unbounded_string_arg` (was 418, now 26) is purely SYNTACTIC: it flags an
+`unbounded_string_arg` (now 26) is purely SYNTACTIC: it flags an
 inline `v.string()` in `.input({...})` with no `.max`/`.check`/`.length` chained
 on it, and a cap on a shared validator const does NOT count. Write
 `v.string().max(MAX_LENGTH.<kind>)` inline (`lib/validators.ts`; the kinds, and
@@ -205,15 +156,13 @@ Three rules are worth knowing by name:
   `vThreadDocFields`, `vProjectCreateFields` → `vProjectDocFields`,
   `streamingMessagesFieldsWithoutState` → `streamingMessagesFields`,
   `userSettingsFieldsWithoutUserId` → `userSettingsFields`. Clearing the last
-  four surfaced three real bugs the empty argument type had hidden (commit
-  `c8337ff9`); the worst was `streamingMessages.stateKind` being written by
+  four surfaced three real bugs the empty argument type had hidden; the worst was `streamingMessages.stateKind` being written by
   nothing while three index reads depended on it.
 
 ## Duplicate `@lunora/*` copies
 
-**All 34 `@lunora/*` packages plus `lunorash` resolve to ONE version each**,
-`@lunora/errors` included (2026-10-02, cli alpha.333 / lunorash alpha.335 —
-every meta-package pin matched the `alpha` dist-tag that day). That is not the
+**All 36 `@lunora/*` packages plus `lunorash` resolve to ONE version each**,
+`@lunora/errors` included. That is not the
 steady state: the meta-packages (`cli`,
 `codegen`, `lunorash`, `studio`, `react`, `agent`, `runtime`, `server`) pin their
 siblings _exactly_, so whenever they lag the `alpha` dist-tag by different
@@ -247,12 +196,6 @@ Forcing one version overrides the exact pins the meta-packages shipped with, so
 and since `codegen` emits `_generated/`, that trades a hypothetical type split
 for a real risk of wrong generated output. Align the _catalog_ to each
 dependency's consuming cluster instead.
-
-The one override that stays is `"@lunora/auth@*"` in `pnpm-workspace.yaml`. It
-collapses nothing today — keep it because better-auth's `User`/`Session` are
-branded and do cross into our handlers, so if any release starts peer-depending
-on auth at a different range, this is what stops the split surfacing as an
-inscrutable "separate declarations of a private property".
 
 Two traps when investigating:
 

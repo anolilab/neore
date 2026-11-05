@@ -1,0 +1,51 @@
+# TOOLING — REFERENCE
+
+Detail behind the pnpm and vis rules in the root `AGENTS.md`. Paths are repo-relative.
+
+## pnpm 12
+
+**pnpm is 12.x** (`packageManager`; a global pnpm switches to it per
+project). Settings live ONLY in `pnpm-workspace.yaml` — `.npmrc` is read for
+auth/registry alone, and since 12 an UNKNOWN key there fails every command
+(`ERR_PNPM_UNRECOGNIZED_WORKSPACE_SETTINGS`) instead of being ignored. Build
+scripts are allowed through the `allowBuilds` map (values must stay booleans)
+and `strictDepBuilds` is on, so a new dependency with an install script fails
+`pnpm install` until it is listed. `autoInstallPeers` is OFF: a REQUIRED peer
+(packem's `@visulima/packem-rollup`) must be declared by the package that uses
+it, and `pnpm peers check` lists what is missing — most of it optional in
+practice (framework adapters of `@visulima/storage-client`, `@lobehub/ui`/`antd`
+for `@lobehub/icons`). An UNDECLARED optional peer that some other package
+happens to provide can make `pnpm dedupe` flip-flop between two lockfiles on
+every run (packem's `rollup`, now declared), so `pnpm dedupe --check` never
+passes — run `pnpm dedupe` twice and compare hashes after a big bump.
+`minimumReleaseAgeStrict` is on by default in 12 (we set `minimumReleaseAge`),
+so a too-young version fails the install rather than falling back. pnpm 12 is a
+native (Rust) binary: on a machine with a per-app firewall (OpenSnitch) each
+release needs its own allow rule — unapproved, `install`/`audit`/`dedupe`/`view`
+hang until a DNS error while `pnpm run` still works. Corepack 0.34 cannot run
+it at all (it fetches no `@pnpm/exe.*` binary). CI's `pnpm/action-setup` v6.1
+does.
+
+## vis caching
+
+- `vis.config.ts` holds task defaults, `project.json` per-project metadata. In
+  `vis.config.ts`, `dependsOn` takes **target names only** — named inputs and
+  file globs belong in `inputs`, and vis silently drops them from `dependsOn`,
+  **disabling input tracking without saying so**. A cache hit restores files
+  only for declared `outputs`, written `{projectRoot}/dist/**/*` (a bare
+  `dist/**/*` restores nothing): without them `build:packages` said "read from
+  cache" and left a missing or stale `dist` in place. `ai` and `service-sdk`
+  declare theirs for `build` and `build:prod` in `project.json`.
+
+## Deploying by hand
+
+CI deploys; run this only when told to.
+
+```bash
+# Deployment (CI does this; do not run locally)
+# Since pnpm 11 a script named `deploy` (also `clean`, `setup`, `rebuild`)
+# SHADOWS the built-in, so bare `pnpm deploy` RUNS `alchemy deploy`.
+# Write `pnpm run deploy` anyway; `pnpm pm deploy` is the built-in. CI calls the
+# CLI itself: `alchemy deploy --stage "$DEPLOY_ENV" --yes` (deploy.yml).
+DEPLOY_ENV=preview pnpm run deploy
+```

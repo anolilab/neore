@@ -7,7 +7,7 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
 
 - **Alchemy is 2.0 (beta), pinned EXACTLY** in the `iac` catalog. The beta ships about
   weekly and each release can move APIs; `minimumReleaseAge` also holds back the newest
-  ones. Bump it deliberately, run `lint:types:deploy`, the three `deploy-*.test.ts`, then
+  ones. Bump it deliberately, run `lint:types:deploy`, the five `deploy-*.test.ts`, then
   a `Deploy` workflow run with `dry_run` on `preview` before a real one. It is an
   Effect-based rewrite: `alchemy.run.ts` default-exports an `Alchemy.Stack`, and a
   resource's attributes (`worker.url`) are lazy `Output`s — compose them with
@@ -72,13 +72,13 @@ Write`; without them the deploy fails, hence the switch.
   chunks.** The SSR output is one chunk per `import()` target: ~3,300 chunks, ~68 MiB of JS,
   and the spreadsheet editor alone is 12 MiB. `WEB_CLIENT_ONLY_CHUNKS` in
   `scripts/worker-bundle.ts` names the ones only a click or effect loads (univer, elk, xlsx,
-  jspdf, pptxgen); `WEB_UPLOAD_RULES` leaves them out (~52 MiB uploaded) and
+  jspdf, pptxgen, video-trim-encode); `WEB_UPLOAD_RULES` leaves them out (~52 MiB uploaded) and
   `scripts/check-web-size.ts` fails the deploy before the upload when the total passes 60 MiB.
   Excluding a chunk the server DOES import makes that lazy boundary fail on the server, and
   React renders it on the client instead; a new heavy lazy chunk goes in the list, not in the
   cap. Cloudflare's error names no file, only "exceeded the uncompressed size limit", and
   every Worker that depends on the website fails with the same message.
-- **Held back on purpose when the dependencies were last bumped (2026-10-13)**, each with a
+- **Held back on purpose**, each with a
   comment in `pnpm-workspace.yaml`: `typescript` 6.0.3 (packem's dts build cannot import TS 7),
   `@vercel/og` 1.0.1 (1.0.2 and 1.0.3 break `generate-og.mjs` with "Dynamic require of fs") and
   `@c15t/*` 2.3 (3.0 renames the provider, a migration). `alchemy` stays at beta.81 until a newer
@@ -87,15 +87,14 @@ Write`; without them the deploy fails, hence the switch.
   newest tags. The branded packages (`client`, `workflow`, `auth`) must resolve to one version
   each; a non-branded package may keep two copies when the meta-packages pin different versions,
   and that is not overridden.
-  `pnpm dedupe` also collapsed `@lunora/errors`, whose range dependencies had resolved to two
-  versions. A meta-package release lags the package it pins by one release wave
+  A meta-package release lags the package it pins by one release wave
   (`lunorash` 389 still pinned the `observability` that had the `ctx.db` facade bug when that was
   fixed), so wait until `npm view lunorash@alpha dependencies` shows the fixed version before
   bumping, rather than overriding.
 - **Source maps go to PostHog and are deleted before the deploy.** `vite build` writes a `.map`
   per chunk (`sourcemap: "hidden"`); `dist/client` alone had 2,700 of them (~118 MiB, two thirds
-  of the static-asset upload, all publicly served). `deploy.yml`'s "Upload the web source maps"
-  step runs `posthog-cli sourcemap process` on `dist/client` (it injects a `//# chunkId=`
+  of the static-asset upload, all publicly served). `deploy.yml`'s "Build the web app, ship its
+  source maps" step runs `scripts/upload-web-sourcemaps.sh`, which runs `posthog-cli sourcemap process` on `dist/client` (it injects a `//# chunkId=`
   comment into each chunk, which is how PostHog finds the map), then deletes every `.map`
   under `dist/`. One build produces both, so they cannot disagree; **never rebuild between
   upload and deploy**. Client only: a Worker stack trace has no chunk to look up, and the
@@ -103,7 +102,7 @@ Write`; without them the deploy fails, hence the switch.
   its SHA-256 (the npm package runs an unverified download script). Needs the environment
   secrets `POSTHOG_CLI_API_KEY` (a personal key with error-tracking write and organization
   read) and `VITE_POSTHOG_HOST`, and the variable `POSTHOG_PROJECT_ID`. The CLI wants the APP
-  host, so the step derives `eu.posthog.com` from the ingestion host `eu.i.posthog.com`; the
+  host, so the script derives `eu.posthog.com` from the ingestion host `eu.i.posthog.com`; the
   GDPR person-delete does the same (`gdpr/posthog-host.ts`). Without the key and project id
   the maps are deleted un-uploaded; a failed upload only warns. There are three different
   keys: the public project key (`VITE_POSTHOG_API_KEY`, events), the CI key above, and
@@ -131,7 +130,7 @@ check startup` profiles `lunora build`'s esbuild bundle, which is NOT what deplo
   `deploy.yml` keeps (also when the deploy fails) and run `pnpm exec tsx
 scripts/profile-worker-startup.ts <dir> <main>`. Local profiles swing ~100 ms (mostly GC): take
   the best of several.
-  Since codegen alpha.384 the generated app already loads `@lunora/auth` and the
+  The generated app already loads `@lunora/auth` and the
   OpenAPI/OpenRPC/architecture documents on the first event (`_generated/authModule.ts`), not at
   startup; an evaluation error there now 500s the first request instead of failing the upload.
   Lazy function mode (`codegen.lazyFunctions`, see "Functions load lazily" in `backend/AGENTS.md`) also defers the
@@ -148,29 +147,24 @@ scripts/profile-worker-startup.ts <dir> <main>`. Local profiles swing ~100 ms (m
   into the `dev` script is a trap: the dev manifest carries the **dev origin**,
   so it would overwrite the deploy input with localhost values.
   `backend/deploy-bindings.test.ts` guards the contract.
-- **Cloudflare enforces the UNCOMPRESSED Worker size: 64 MiB.** Since
-  2026-09-04 there is no gzip limit (the old 3 MB Free / 10 MB Paid gzip caps
+- **Cloudflare enforces the UNCOMPRESSED Worker size: 64 MiB.** There is
+  no gzip limit (the old 3 MB Free / 10 MB Paid gzip caps
   are gone), so a gzip figure a build prints is informational. `"minify": true`
   in `backend/wrangler.jsonc` stays — it is what kept the backend under the old
   gzip cap, and smaller still starts faster. Minify drops esbuild's `keepNames`,
-  but the five classes `wrangler.jsonc` binds by `class_name` still export under
+  but the classes `wrangler.jsonc` binds by `class_name` still export under
   their exact names — only internal identifiers mangle. The largest Worker is
   the Rust document-parser at 14.4 MiB.
 - **What deploys is NOT `lunora build`'s bundle.** Alchemy bundles every Worker
   itself (rolldown) from its `main`, ignores `wrangler.jsonc`, and defaults to an
-  unminified build (React's development builds, ~19.9 MB / 3051 KiB gzip for the backend
-  under Alchemy 0.x). The deploy's options live in `scripts/worker-bundle.ts` (minify,
+  unminified build (React's development builds). The deploy's options live in `scripts/worker-bundle.ts` (minify,
   `keepNames`, an English-only zod-locales rolldown plugin, `NODE_ENV=production` for the
   backend) and `backend/deploy-bundle.test.ts` pins that every bundled Worker passes them.
   The web app and the Rust parser are NOT bundled by Alchemy (`bundle: false`): they are
   built ahead and uploaded as built. The real bundle lands in
-  `.alchemy/bundles/<stack>-<stage>-<id>` after a run — re-measure the backend there; the
-  figure above is from the old bundler.
+  `.alchemy/bundles/<stack>-<stage>-<id>` after a run — measure the backend there.
 - **A barrel import can defeat tree-shaking even when every package says
-  `sideEffects: false`.** `@react-email/components` re-exports `Tailwind` and
-  `CodeBlock`, which were bundled at 435 + 555 KiB despite **zero** usages;
-  naming the components directly (`@react-email/heading`, …) drops them to 0.
-  pnpm does not hoist, so each must be a declared dependency. When a dependency
+  `sideEffects: false`.** When a dependency
   looks too big for what you use, check `backend/.lunora/build/bundle-meta.json`
   before assuming the bundler handled it.
 - **`lunora build --api-spec none` DELETES the git-tracked
@@ -184,4 +178,4 @@ scripts/profile-worker-startup.ts <dir> <main>`. Local profiles swing ~100 ms (m
   `SIGNING_SECRET`, for its calls back to the backend and the stream tokens.
   `embeddings` has no caller: private and unbound, and deployed with no
   `SIGNING_SECRET`, so its HMAC check fails closed. See
-  "Services" under SUBSYSTEMS; `deploy-env-bindings.test.ts` pins it.
+  "SERVICE BINDINGS" in `backend/AGENTS.md`; `deploy-env-bindings.test.ts` pins it.

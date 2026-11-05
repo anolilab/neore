@@ -10,10 +10,7 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
   origin, through a sandboxed preload; every IPC handler checks the sender's
   origin in the main process. Device execution sits behind `packages/device-core`. The web side is `apps/web/src/lib/native/bridge.ts`,
   a no-op outside the shell — call `notifyNative` from any long-running flow.
-  **The web CSP deliberately does not allow `ipc:`**: Tauri falls back to
-  `postMessage` IPC when the fetch is blocked, so do not "fix" the resulting
-  one-per-page console warning by loosening `connect-src`. `tauri dev`/debug runs
-  register `neore://` in `~/.local/share/applications` on Linux. Google sign-in
+  Google sign-in
   goes through the system browser on the EXTENSION grant (redirect
   `neore://auth/callback`, opt-in in `TRUSTED_EXTENSION_REDIRECT_URIS`) and ends
   at `/api/auth/client-grant/cookie`, which sets the normal session cookie — do
@@ -30,8 +27,7 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
   checkout, and `npmRebuild: false` keeps electron-builder from rebuilding it for the
   runner's arch alone (node-pty prefers `build/Release` over the right prebuild).
   Nothing about a terminal is stored: scrollback is xterm's buffer in the window
-  (`scrollback.ts`), main and host hold counters and one batch. Windows is
-  unavailable until S4. Quit signals every shell synchronously (`killNow`).
+  (`scrollback.ts`), main and host hold counters and one batch. Quit signals every shell synchronously (`killNow`).
 
 - **Registry installs** (`apps/desktop/src/acp/{registry,install}.ts`, `device-core/src/acp_install.rs`):
   the desktop reads the ACP registry (`cdn.agentclientprotocol.com/registry/v1/latest/registry.json`) only when
@@ -40,12 +36,12 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
   version; the main process takes archive, checksum and command from its own snapshot and words the native
   consent itself. Rust hashes, unpacks (no links, no `..`) and records the pin; there is no update path, by design.
 
-- **Desktop dictation** (`apps/desktop/src/dictation/`, desktop-dictation.md S2) is behind the build-time
-  flag `NEORE_DICTATION=1` until the settings switch (S3) exists; unset, no shortcut, window or channel is created.
-  Hold `CommandOrControl+Shift+D`: a `dictation` window opens in its OWN in-memory session (`webRequest` cancels
+- **Desktop dictation** (`apps/desktop/src/dictation/`, desktop-dictation.md S2) is off until the settings
+  switch turns it on (`DEFAULT_SETTINGS.enabled: false`); off, no shortcut is registered.
+  Hold `CommandOrControl+Shift+D` (`Y` on Windows arm64, `hold.ts`): a `dictation` window opens in its OWN in-memory session (`webRequest` cancels
   everything but its own files, so it has no network), captures 16 kHz mono in the page and sends chunks to the main
   process, which keeps them in memory and writes a WAV to the stdin of a pinned `whisper-cli` (whisper.cpp v1.9.5,
-  `scripts/build-dictation-helper.mjs`; static, Metal embedded; macOS arm64 only so far). Audio never touches disk.
+  `scripts/build-dictation-helper.mjs`; static, Metal embedded on Apple Silicon; not offered on Intel Macs, `catalog.ts#SUPPORTED`). Audio never touches disk.
   Non-obvious: `-f -` prints NOTHING without `-otxt` (upstream turns the output name into stdout and drops the segment
   callback), and the default language is `en`, so pass `-l auto`. **`globalShortcut` reports presses only**, so the
   release is the key-up the focused dictation window sees (`before-input-event`), with blur, a second press (ignored while

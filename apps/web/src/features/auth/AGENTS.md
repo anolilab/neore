@@ -47,7 +47,6 @@ apps/web/src/features/auth/
 ## CONVENTIONS
 
 - **Better Auth integration**: Use Better Auth factories and patterns
-- **Route guards**: Use `requireSession` from `@/lib/auth/route-guard` in `beforeLoad`, not a hand-written `isAuthenticated` check — only an answered "no session" may redirect (a failed session read must not sign the user out)
 - **Component isolation**: Separate auth flows by feature (login, settings, orgs)
 - **Security first**: All settings components follow security best practices
 - **Form-driven**: All auth inputs use proper validation schemas
@@ -74,7 +73,7 @@ apps/web/src/features/auth/
   429 as "nobody" (hiding `<Authenticated>`), and a 429 on `/api/auth/token`
   made the root route redirect to sign-in. Now: `get-session` is exempt
   (`AUTH_RATE_LIMIT_CUSTOM_RULES`, `auth.rate-limit.test.ts`); session reads
-  retry through `apps/web/src/lib/auth/session-read.ts` (the probe THROWS when
+  retry through `packages/client-runtime/src/session-read.ts` (the probe THROWS when
   exhausted, which Lunora settles as `unreachable` — gate open); the root route
   carries `authStatus`, and guards use `requireSession` (`lib/auth/route-guard.ts`),
   which redirects only on an ANSWERED "no session". A new guard must use it.

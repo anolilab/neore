@@ -12,7 +12,7 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
   `/v1/cache`, `/v1/events`…) are served ONLY to the backend's service binding —
   see "Services (service bindings)" in `backend/AGENTS.md`. The backend plugs in via `gateway-language-model.ts` /
   `gateway-embedding-model.ts`, which implement `LanguageModelV3` /
-  `EmbeddingModelV2` and serialise call options over the binding's `fetch` — so
+  `EmbeddingModelV3` and serialise call options over the binding's `fetch` — so
   every LLM call routes through the gateway with no change to tool execution,
   persistence or the agent loop. `LLM_GATEWAY_SIGNING_SECRET` is now only the
   gateway -> backend direction (chunk polling, usage reports, key validation,
