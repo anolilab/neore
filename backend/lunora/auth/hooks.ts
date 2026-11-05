@@ -163,7 +163,10 @@ export const deleteMergedGuest = internalMutation
     .input({ userId: v.string() })
     .output(v.object({ deleted: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
-        const user = (await ctx.db.user.findFirst({ where: { _id: args.userId as Id<"user"> } })) as { _id: Id<"user">; isAnonymous?: boolean | null } | null;
+        const user = (await ctx.db.user.findFirst({ where: { _id: ctx.db.asId("user", args.userId) } })) as {
+            _id: Id<"user">;
+            isAnonymous?: boolean | null;
+        } | null;
 
         if (user?.isAnonymous !== true) {
             return { deleted: false };
