@@ -11,8 +11,9 @@ import { KeyboardShortcutsManager } from "@/features/keyboard/components/keyboar
 import useKeyboardShortcutHandler from "@/features/keyboard/hooks/use-keyboard-shortcut-handler";
 import SidebarShortcut from "@/features/layout/components/sidebar-shortcut";
 
+// A live region, so a screen reader hears that the page is loading or on its way to sign-in.
 const ShortcutLoading = () => (
-    <div>
+    <div role="status">
         <Trans>Loading...</Trans>
     </div>
 );
