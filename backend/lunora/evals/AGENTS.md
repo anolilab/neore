@@ -1,8 +1,5 @@
 # EVALS — AGENT NOTES
 
-Scoped notes, moved from the root `AGENTS.md`: what is non-obvious and still true here. Paths are
-repo-relative. Project-wide rules stay in the root `AGENTS.md`.
-
 ## INVARIANTS
 
 - **Evals** (`backend/lunora/evals/`, `/evals`) — datasets of cases run against

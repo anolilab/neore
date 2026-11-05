@@ -71,7 +71,7 @@ Root Prettier covers only `*.{json,yml,yaml,js,mjs,cjs,ts}`: root markdown is no
 ## SCOPED KNOWLEDGE — READ BEFORE YOU TOUCH
 
 Each area's rules live in an `AGENTS.md` next to its code (with a `CLAUDE.md` symlink), and the long ones link a
-reference under `docs/agents/`. Claude Code loads a folder's file when it reads files there; other agents load only
+reference under `docs/agents/`; their paths are repo-relative unless noted. Claude Code loads a folder's file when it reads files there; other agents load only
 the files from the root down to their working directory, so **read the file for a path before changing code there**.
 
 | Working on                                                                          | Read                                                    |

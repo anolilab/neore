@@ -1,8 +1,5 @@
 # KNOWLEDGE — AGENT NOTES
 
-Scoped notes, moved from the root `AGENTS.md`: what is non-obvious and still true here. Paths are
-repo-relative. Project-wide rules stay in the root `AGENTS.md`.
-
 ## INVARIANTS
 
 - **Knowledge rerank** — `POST /internal/rerank` on the gateway wraps Workers AI

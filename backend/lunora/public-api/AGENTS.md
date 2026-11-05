@@ -1,8 +1,5 @@
 # PUBLIC API — AGENT NOTES
 
-Scoped notes, moved from the root `AGENTS.md`: what is non-obvious and still true here. Paths are
-repo-relative. Project-wide rules stay in the root `AGENTS.md`.
-
 ## INVARIANTS
 
 - **Public v1 API + `neore` CLI** (`backend/lunora/public-api/`, `apps/cli`) —
