@@ -317,6 +317,43 @@ describe("SignInForm", () => {
         await waitFor(() => expect(harness.onSuccess).toHaveBeenCalledTimes(1));
     });
 
+    it("sends a two-factor account to the second step when the new-link request signs it in", async () => {
+        harness.signInEmail.mockRejectedValueOnce({ error: { code: "EMAIL_NOT_VERIFIED" }, status: 403 });
+        // Verified in the meantime, and the account has a second factor.
+        harness.signInEmail.mockResolvedValueOnce({ twoFactorRedirect: true });
+        render(<SignInForm />);
+        fill("ada@example.com", "correct horse battery");
+        submit();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Send a new verification link" }));
+
+        await waitFor(() => {
+            expect(harness.navigate).toHaveBeenCalledTimes(1);
+        });
+
+        expect(String(harness.navigate.mock.calls[0]?.[0])).toContain("/auth/two-factor");
+        expect(harness.onSuccess).not.toHaveBeenCalled();
+        expect(harness.saveLastSignIn).toHaveBeenCalledWith("email", "ada@example.com");
+        expect(harness.trackEvent).toHaveBeenCalledWith("signed_in", { provider: "email" });
+    });
+
+    it("finishes like a normal sign-in when the new-link request signs the account in", async () => {
+        harness.signInEmail.mockRejectedValueOnce({ error: { code: "EMAIL_NOT_VERIFIED" }, status: 403 });
+        harness.signInEmail.mockResolvedValueOnce({});
+        render(<SignInForm />);
+        fill("ada@example.com", "correct horse battery");
+        submit();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Send a new verification link" }));
+
+        await waitFor(() => {
+            expect(harness.onSuccess).toHaveBeenCalledTimes(1);
+        });
+
+        expect(harness.navigate).not.toHaveBeenCalled();
+        expect(harness.saveLastSignIn).toHaveBeenCalledWith("email", "ada@example.com");
+    });
+
     it("does not call the server for an invalid email, and says why", async () => {
         render(<SignInForm />);
         fill("not-an-email", "correct horse battery");

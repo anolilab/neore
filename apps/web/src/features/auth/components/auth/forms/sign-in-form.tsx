@@ -270,16 +270,23 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
         setIsResending(true);
 
         try {
-            await authClient.signIn.email({
+            const response: Record<string, unknown> = await authClient.signIn.email({
                 email,
                 fetchOptions: { headers: await getCaptchaHeaders("/sign-in/email"), throw: true },
                 password,
                 rememberMe: form.getFieldValue("rememberMe"),
             });
 
-            // Verified in the meantime: this was a normal sign-in.
+            // Verified in the meantime: this was a normal sign-in, and finishes like one.
+            saveLastSignIn("email", email);
+            trackEvent("signed_in", { provider: "email" });
             setUnverifiedEmail(null);
-            await onSuccess();
+
+            if (response.twoFactorRedirect) {
+                navigate(`${basePath}/${viewPaths.TWO_FACTOR}${globalThis.location.search}`);
+            } else {
+                await onSuccess();
+            }
         } catch (error) {
             if ((error as { error?: { code?: unknown } } | null)?.error?.code === "EMAIL_NOT_VERIFIED") {
                 toast({ message: t`Verification email sent`, variant: "success" });
