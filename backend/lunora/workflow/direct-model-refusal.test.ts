@@ -52,8 +52,11 @@ describe(workflowModelRefusals, () => {
         expect(refusals[0]).toContain("Your model settings exclude this node's model.");
     });
 
-    it("leaves a model the registry does not know to the node itself", async () => {
-        await expect(workflowModelRefusals(withRules({ blockedModels: [AI_NODE_DEFAULT_MODEL] }), "user-1", [aiNode()])).resolves.toStrictEqual([]);
+    it("refuses a model the registry does not know while any rule is active, since it cannot be checked", async () => {
+        const [refusal] = await workflowModelRefusals(withRules({ blockedRegions: ["CN"] }), "user-1", [aiNode()]);
+
+        expect(refusal).toContain(AI_NODE_DEFAULT_MODEL);
+        await expect(workflowModelRefusals(withRules({}), "user-1", [aiNode()])).resolves.toStrictEqual([]);
     });
 
     it("passes a graph whose models the rules allow, and one with no AI node without reading the rules", async () => {

@@ -68,6 +68,12 @@ export const getModelRejectionReason = (candidate: FilterableModel, rules: Model
         return `Provider "${candidate.provider}" is blocked`;
     }
 
+    // Zero data retention and no data collection are enforced only through OpenRouter's provider routing. Workers AI
+    // offers no such control, so it cannot honour either flag.
+    if (candidate.provider === "cloudflare" && (rules.requireZDR === true || rules.denyDataCollection === true)) {
+        return `Model "${candidate.modelId}" cannot guarantee zero data retention or no data collection`;
+    }
+
     if (
         candidate.regions?.includes(GLOBAL_REGION) &&
         ((rules.allowedRegions && rules.allowedRegions.length > 0) || (rules.blockedRegions && rules.blockedRegions.length > 0))

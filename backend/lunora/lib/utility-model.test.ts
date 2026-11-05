@@ -31,6 +31,9 @@ const configOf = (model: unknown) => (model as { config: { modelFilterRules?: un
 /** A free OpenRouter model served in the US and EU, which the gateway pins to its EU endpoint for EU-only rules. */
 const EU_PINNED_MODEL = "google/gemini-2.5-flash-lite";
 
+/** The first background fallback not on Workers AI: what a privacy rule (ZDR, no data collection) leaves. */
+const FIRST_NON_WORKERS_AI_FALLBACK = UTILITY_FALLBACK_MODELS.find((id) => MODEL_LOOKUP.get(id)?.provider !== "cloudflare");
+
 describe("pickUtilityModelId", () => {
     it("keeps the default when the user set no rules", () => {
         expect(pickUtilityModelId(undefined)).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
@@ -118,13 +121,14 @@ describe("getUtilityModel", () => {
         const rules = { blockedModels: [DEFAULT_MEMORY_EXTRACTION_MODEL], requireZDR: true };
         const model = await getUtilityModel(gateway, { rules, userId: "user-1" });
 
-        expect(configOf(model)).toMatchObject({ modelFilterRules: rules, modelId: UTILITY_FALLBACK_MODELS[0], userId: "user-1" });
+        // The privacy rule also refuses the Workers AI fallbacks, so the first one left is on OpenRouter.
+        expect(configOf(model)).toMatchObject({ modelFilterRules: rules, modelId: FIRST_NON_WORKERS_AI_FALLBACK, userId: "user-1" });
     });
 
-    it("hands a privacy rule to the gateway even though it does not exclude the default", async () => {
+    it("moves off the Workers AI default under a privacy rule and hands the rule to the gateway", async () => {
         const model = await getUtilityModel(gateway, { rules: { denyDataCollection: true }, userId: "user-1" });
 
-        expect(configOf(model)).toMatchObject({ modelFilterRules: { denyDataCollection: true }, modelId: DEFAULT_MEMORY_EXTRACTION_MODEL });
+        expect(configOf(model)).toMatchObject({ modelFilterRules: { denyDataCollection: true }, modelId: FIRST_NON_WORKERS_AI_FALLBACK });
     });
 
     it("refuses with the typed error when the rules exclude every candidate", async () => {
@@ -145,7 +149,13 @@ describe("getUtilityModel", () => {
 describe("defaultModelUnderRules", () => {
     it("keeps the default when the user set no rules, or rules it passes", () => {
         expect(defaultModelUnderRules(DEFAULT_CHAT_MODEL, undefined, readsImagesAndCallsTools)).toBe(DEFAULT_CHAT_MODEL);
-        expect(defaultModelUnderRules(DEFAULT_CHAT_MODEL, { denyDataCollection: true }, readsImagesAndCallsTools)).toBe(DEFAULT_CHAT_MODEL);
+        expect(defaultModelUnderRules(DEFAULT_CHAT_MODEL, { blockedModels: ["openai/o3"] }, readsImagesAndCallsTools)).toBe(DEFAULT_CHAT_MODEL);
+    });
+
+    it("moves the Workers AI default off under a privacy rule, which only OpenRouter's routing can honour", () => {
+        const standIn = defaultModelUnderRules(DEFAULT_CHAT_MODEL, { requireZDR: true }, readsImagesAndCallsTools);
+
+        expect(MODEL_LOOKUP.get(standIn)?.provider).not.toBe("cloudflare");
     });
 
     it("moves the Workers AI default under a region rule to a model that keeps its capabilities", () => {

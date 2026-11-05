@@ -25,3 +25,14 @@ describe("region rules for a model served from any region", () => {
         expect(getModelRejectionReason(usAndEu, { blockedRegions: ["CN"] })).toBeNull();
     });
 });
+
+describe("data-handling rules for Workers AI", () => {
+    it("refuses it when the user requires zero data retention or no data collection", () => {
+        expect(getModelRejectionReason(workersAi, { requireZDR: true })).toContain("zero data retention");
+        expect(getModelRejectionReason(workersAi, { denyDataCollection: true })).toContain("zero data retention");
+    });
+
+    it("leaves those flags to OpenRouter's routing for its own models", () => {
+        expect(getModelRejectionReason(usAndEu, { denyDataCollection: true, requireZDR: true })).toBeNull();
+    });
+});

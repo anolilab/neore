@@ -118,9 +118,14 @@ const generateOnGateway = async (ctx: Pick<ActionContext, "runQuery">, gateway: 
 export const directModelRefusal = async (ctx: Pick<ActionContext, "runQuery">, userId: string, modelId: string): Promise<string | undefined> =>
     refusalUnder(await loadModelFilterRules(ctx, userId), modelId);
 
-/** Why `rules` exclude `modelId`, or `undefined` when they allow it (an unknown id is left to the node itself). */
+/** Why `rules` exclude `modelId`, or `undefined` when they allow it. An id the registry does not know cannot be checked, so it is refused while any rule is active. */
 const refusalUnder = (rules: ModelFilterRules, modelId: string): string | undefined => {
     const definition = MODEL_LOOKUP.get(modelId);
+
+    if (!definition && hasActiveFilters(rules)) {
+        return `Your model settings cannot be checked against this node's model ("${modelId}"). Pick a listed model.`;
+    }
+
     const refusal = definition ? backupFilterRejection(definition, rules) : null;
 
     return refusal === null ? undefined : `Your model settings exclude this node's model. ${refusal}`;
