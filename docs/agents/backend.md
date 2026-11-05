@@ -206,7 +206,9 @@ not nest, so `chat/group`, `chat/tags` etc. are all `chat`.
   no HTTP-route, queue-send or `invoke` edges: routes are a hono app, jobs are
   sent by function path (`lib/job-queue.ts`; the two `queues.ts` queues appear
   as nodes only), and services are reached through `lib/services.ts`.
-  `architecture.ts` is inlined into the Worker (~430 KiB raw, ~37 KiB gzip).
+  `architecture.ts` is inlined into the Worker (~430 KiB raw, ~37 KiB gzip) until
+  anolilab/lunora#1499, which moves it and the specs into Workers Static Assets
+  ("Studio's documents are static assets" in `build-and-deploy.md`).
 
 ## Validators: `v` vs zod
 
