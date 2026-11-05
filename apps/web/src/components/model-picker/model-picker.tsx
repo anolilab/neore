@@ -45,6 +45,7 @@ import {
     getModelModeName,
     getModelSearchText,
     groupModelsByCreator,
+    initialCreatorSlug,
     sortModels,
 } from "./utilities";
 
@@ -648,17 +649,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const isFavorite = useCallback((id: string) => favorites.includes(id), [favorites]);
     const toggleFavorite = useCallback((id: string, setFavorite: boolean) => onToggleFavorite?.(id, setFavorite), [onToggleFavorite]);
 
-    const [selectedProvider, setSelectedProvider] = useState<string | null>(() => {
-        if (initialModelId) {
-            const slug = initialModelId.split("/", 1)[0];
-
-            if (slug) {
-                return slug;
-            }
-        }
-
-        return null;
-    });
+    const [selectedProvider, setSelectedProvider] = useState<string | null>(() => initialCreatorSlug(sourceModels, initialModelId));
 
     const handleModelSelect = useCallback(
         (modelId: string) => {

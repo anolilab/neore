@@ -76,6 +76,17 @@ export const getCreatorSlug = (model: GatewayModel): string => {
 };
 
 /**
+ * The creator the picker opens scoped to: the one of the model already selected, by the same slug the creator
+ * sidebar uses, so the scope always names a sidebar entry. `null` (every creator) when the model is not in the list.
+ * The id's prefix is not the creator: `cf-kimi-k2.5` has none, and `moonshotai/…` belongs to `moonshot`.
+ */
+export const initialCreatorSlug = (models: ReadonlyArray<GatewayModel>, modelId: string | undefined): string | null => {
+    const model = modelId === undefined ? undefined : models.find((candidate) => candidate.id === modelId);
+
+    return model ? getCreatorSlug(model) : null;
+};
+
+/**
  * Drops the models of the labs the user hid from the picker (`blockedCreators` in
  * `modelFilterRules`). Picker-only: the other surfaces still resolve every model.
  */
