@@ -354,6 +354,29 @@ describe("SignInForm", () => {
         expect(harness.saveLastSignIn).toHaveBeenCalledWith("email", "ada@example.com");
     });
 
+    it("lets the next sign-in through when reporting a refused one throws", async () => {
+        harness.signInEmail.mockRejectedValueOnce({ error: { code: "INVALID_EMAIL_OR_PASSWORD" }, status: 401 });
+        // A custom toast renderer that throws while the refusal is reported.
+        harness.toast.mockImplementationOnce(() => {
+            throw new Error("toast renderer failed");
+        });
+        render(<SignInForm />);
+        fill("ada@example.com", "wrong password");
+        submit();
+
+        await waitFor(() => {
+            expect(harness.toast).toHaveBeenCalledTimes(1);
+        });
+
+        harness.signInEmail.mockResolvedValueOnce({});
+        fill("ada@example.com", "correct horse battery");
+        submit();
+
+        await waitFor(() => {
+            expect(harness.signInEmail).toHaveBeenCalledTimes(2);
+        });
+    });
+
     it("does not call the server for an invalid email, and says why", async () => {
         render(<SignInForm />);
         fill("not-an-email", "correct horse battery");

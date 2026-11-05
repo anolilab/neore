@@ -29,6 +29,11 @@ import { trackEvent } from "@/lib/analytics";
 import Captcha from "../../captcha/captcha";
 import type { AuthFormClassNames } from "../auth-form";
 
+/** A failure while a submit reports its own outcome (a throwing custom toast): logged, not left unhandled. */
+const reportSubmitFailure = (error: unknown): void => {
+    console.error("Sign-in form: reporting the outcome failed", error);
+};
+
 export interface SignInFormProperties {
     className?: string;
     classNames?: AuthFormClassNames;
@@ -209,6 +214,9 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
                 }
 
                 setUnverifiedEmail(null);
+                // Released before anything below can throw (no `finally`: it makes the React Compiler skip this
+                // component), so a failure never leaves every later submit refused.
+                inFlightRef.current = null;
 
                 if (response.twoFactorRedirect) {
                     navigate(`${basePath}/${viewPaths.TWO_FACTOR}${globalThis.location.search}`);
@@ -216,6 +224,8 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
                     await onSuccess();
                 }
             } catch (error) {
+                inFlightRef.current = null;
+
                 const unverified = (error as { error?: { code?: unknown } } | null)?.error?.code === "EMAIL_NOT_VERIFIED";
 
                 // `EMAIL_NOT_VERIFIED` means the password was right: keep it, so a new link can be asked for by
@@ -232,8 +242,6 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
                     variant: "error",
                 });
             }
-
-            inFlightRef.current = null;
         },
         validators: {
             onChange: formSchema,
@@ -310,7 +318,7 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
                 onSubmit={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
-                    form.handleSubmit();
+                    form.handleSubmit().catch(reportSubmitFailure);
                 }}
                 suppressHydrationWarning
             >
