@@ -36,6 +36,7 @@ import { ac, roles } from "./auth/permissions";
 import type { SignInMethods } from "./auth/sign-in-methods";
 import { signInMethods } from "./auth/sign-in-methods";
 import { sendEmailVerification, sendMagicLink, sendOrganizationInvite, sendOTPVerification, sendResetPassword } from "./email/functions";
+import { deliversMail } from "./email/mailer";
 import {
     AUTH_GITHUB_CLIENT_ID,
     AUTH_GITHUB_CLIENT_SECRET,
@@ -282,7 +283,10 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
         // Database adapter is set by the defineAuth runtime
         emailAndPassword: {
             enabled: true,
-            requireEmailVerification: false,
+            // An invitation link is a bearer credential: whoever it reaches could sign up as that address. Where mail
+            // reaches an inbox, a password sign-up gets no session until the address is verified. A stage that cannot
+            // deliver mail (dev capture, no transport) would lock every sign-up out, so it keeps the link as the check.
+            requireEmailVerification: deliversMail(),
             sendResetPassword: async ({ url, user }) => {
                 await sendResetPassword({
                     to: user.email,
@@ -291,6 +295,8 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
             },
         },
         emailVerification: {
+            autoSignInAfterVerification: true,
+            sendOnSignUp: deliversMail(),
             sendVerificationEmail: async ({ url, user }) => {
                 await sendEmailVerification({
                     to: user.email,
@@ -639,7 +645,7 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
                      * Gated on BOTH the `ADMIN` allowlist AND `emailVerified`.
                      * Without the second condition an attacker who learns an
                      * admin's address could pre-claim the role through the
-                     * email/password path (`requireEmailVerification` is false).
+                     * email/password path where `requireEmailVerification` is off.
                      * OAuth signups arrive verified, so real admin onboarding is
                      * unaffected; anyone else is promoted later by
                      * `promoteVerifiedAdmin`.

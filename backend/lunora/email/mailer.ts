@@ -29,7 +29,7 @@
  * mail, so `deliverEmail` does not claim the message's `idempotencyKey`.
  */
 import type { Mailer, MailEnv, QueueLike, SendOptions } from "@lunora/mail";
-import { createMailerFromEnv } from "@lunora/mail";
+import { createMailerFromEnv, shouldCaptureMail } from "@lunora/mail";
 import { env } from "cloudflare:workers";
 
 import { internal } from "../_generated/internal";
@@ -67,6 +67,21 @@ export const mailer = (): Mailer => {
         },
         queue: jobsQueue,
     });
+};
+
+/**
+ * Whether mail sent from here reaches an inbox: through Cloudflare Email Service (the `EMAIL` binding) or Resend
+ * (`RESEND_API_KEY`). Dev capture is not delivery, and neither is a deploy with no transport. Read from the live env,
+ * like {@link mailer}.
+ */
+export const deliversMail = (): boolean => {
+    const current = env as { EMAIL?: unknown; RESEND_API_KEY?: unknown };
+
+    if (shouldCaptureMail(Object.fromEntries(Object.entries(env)))) {
+        return false;
+    }
+
+    return current.EMAIL !== undefined || (typeof current.RESEND_API_KEY === "string" && current.RESEND_API_KEY.trim() !== "");
 };
 
 /** Render `react` now, deliver from the jobs queue. */

@@ -419,6 +419,12 @@ describe("passkeys", { timeout: 30_000 }, () => {
 
         vi.stubEnv("SIGNUP_INVITE_ONLY", "false");
 
+        // No mail transport: a password sign-up gets its session at once (`deliversMail`).
+        const { env: stubEnv } = await import("cloudflare:workers");
+        const workerEnv = stubEnv as { RESEND_API_KEY?: string };
+
+        workerEnv.RESEND_API_KEY = "";
+
         const { auth } = await createTestAuth();
         const signUp = await auth.handler(
             new Request(`${SITE}/api/auth/sign-up/email`, {
@@ -435,5 +441,28 @@ describe("passkeys", { timeout: 30_000 }, () => {
 
         expect(register.status).toBe(200);
         expect(((await register.json()) as { rp?: { id?: string } }).rp?.id).toBe("localhost");
+    });
+
+    it("gives a password sign-up no session until its address is verified, where mail is delivered", async () => {
+        expect.assertions(2);
+
+        vi.stubEnv("SIGNUP_INVITE_ONLY", "false");
+
+        const { env: stubEnv } = await import("cloudflare:workers");
+        const workerEnv = stubEnv as { RESEND_API_KEY?: string };
+
+        workerEnv.RESEND_API_KEY = "re_test";
+
+        const { auth } = await createTestAuth();
+        const signUp = await auth.handler(
+            new Request(`${SITE}/api/auth/sign-up/email`, {
+                body: JSON.stringify({ email: EMAIL, name: "Member", password: "a-long-enough-password" }), // secret-scanner:allow
+                headers: { "content-type": "application/json", origin: SITE },
+                method: "POST",
+            }),
+        );
+
+        expect(signUp.status).toBe(200);
+        expect(((await signUp.json()) as { token?: string | null }).token).toBeNull();
     });
 });

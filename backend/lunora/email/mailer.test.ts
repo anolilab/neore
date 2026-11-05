@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { env, jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import { sendMagicLink } from "./functions";
-import { mailer } from "./mailer";
+import { deliversMail, mailer } from "./mailer";
 
 vi.mock("cloudflare:email", () => {
     return {
@@ -50,6 +50,34 @@ describe("queued mail", () => {
             },
         });
         expect(body?.args?.["message"]).not.toHaveProperty("react");
+    });
+});
+
+describe(deliversMail, () => {
+    const stubEnv = env as typeof env & { LUNORA_MAIL_CAPTURE?: string };
+
+    afterEach(() => {
+        stubEnv.RESEND_API_KEY = "re_test";
+        delete stubEnv.LUNORA_MAIL_CAPTURE;
+    });
+
+    it("is true with the EMAIL binding (Cloudflare Email Service) or a Resend key", () => {
+        stubEnv.RESEND_API_KEY = "";
+        stubEnv.EMAIL = { send: vi.fn() };
+        expect(deliversMail()).toBe(true);
+
+        delete stubEnv.EMAIL;
+        stubEnv.RESEND_API_KEY = "re_key";
+        expect(deliversMail()).toBe(true);
+    });
+
+    it("is false with no transport, and while mail is captured", () => {
+        stubEnv.RESEND_API_KEY = "";
+        expect(deliversMail()).toBe(false);
+
+        stubEnv.EMAIL = { send: vi.fn() };
+        stubEnv.LUNORA_MAIL_CAPTURE = "1";
+        expect(deliversMail()).toBe(false);
     });
 });
 
