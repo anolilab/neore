@@ -68,10 +68,15 @@ export const mailer = (): Mailer => {
 };
 
 /**
- * Whether mail sent from here reaches an inbox: through Cloudflare Email Service (the `EMAIL` binding). Dev capture is
- * not delivery, and neither is a deploy with no binding. Read from the live env, like {@link mailer}.
+ * Whether mail sent from here reaches an inbox: through Cloudflare Email Service (the `EMAIL` binding), from a
+ * `MAIL_FROM` sender. Dev capture is not delivery, and neither is a deploy with no binding. Read from the live env,
+ * like {@link mailer}.
  */
-export const deliversMail = (): boolean => (env as { EMAIL?: unknown }).EMAIL !== undefined && !shouldCaptureMail(Object.fromEntries(Object.entries(env)));
+export const deliversMail = (): boolean => {
+    const current = env as { EMAIL?: SendEmail; MAIL_FROM?: string };
+
+    return current.EMAIL !== undefined && Boolean(current.MAIL_FROM?.trim()) && !shouldCaptureMail(Object.fromEntries(Object.entries(env)));
+};
 
 /** Render `react` now, deliver from the jobs queue. */
 export const queueEmail = async (options: Pick<SendOptions, "react" | "subject" | "to">): Promise<void> => {

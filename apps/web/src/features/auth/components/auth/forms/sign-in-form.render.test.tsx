@@ -151,7 +151,10 @@ describe("SignInForm", () => {
         submit();
 
         await waitFor(() => {
-            expect(harness.toast).toHaveBeenCalledWith({ message: "Email not verified", variant: "error" });
+            expect(harness.toast).toHaveBeenCalledWith({
+                message: "Verify your email address first: we have sent you a new verification link.",
+                variant: "error",
+            });
         });
     });
 

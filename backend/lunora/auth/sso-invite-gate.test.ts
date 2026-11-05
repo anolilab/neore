@@ -17,6 +17,8 @@ import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const SITE = "http://localhost:3000";
+/** A verify-email link in a queued mail's text. */
+const VERIFY_LINK = /https?:\/\/\S+\/verify-email\S+/;
 const EMAIL = "stranger@example.com";
 const MICROSOFT_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad";
 
@@ -122,10 +124,15 @@ const stubProviders = async (profile: { emailVerified: boolean }) => {
 };
 
 /** A better-auth instance from OUR options, on an in-memory store; returns the store for inspection. */
-const createTestAuth = async (options: { invited?: boolean } = {}) => {
+const createTestAuth = async (options: { invited?: boolean; onGuestConverted?: (guestId: string, userId: string) => Promise<void> } = {}) => {
     const { buildAuthOptions } = await import("../auth");
     const db: Record<string, Record<string, unknown>[]> = {};
-    const auth = betterAuth({ ...buildAuthOptions(), baseURL: SITE, database: memoryAdapter(db), secret: "s".repeat(48) });
+    const auth = betterAuth({
+        ...buildAuthOptions({ onGuestConverted: options.onGuestConverted }),
+        baseURL: SITE,
+        database: memoryAdapter(db),
+        secret: "s".repeat(48),
+    });
     const context = await auth.$context;
 
     for (const table of Object.values(context.tables)) {
@@ -437,27 +444,100 @@ describe("passkeys", { timeout: 30_000 }, () => {
         expect(register.status).toBe(200);
         expect(((await register.json()) as { rp?: { id?: string } }).rp?.id).toBe("localhost");
     });
+});
 
-    it("gives a password sign-up no session until its address is verified, where mail is delivered", async () => {
-        expect.assertions(2);
+describe("email verification where mail is delivered", { timeout: 30_000 }, () => {
+    const PASSWORD = "a-long-enough-password"; // secret-scanner:allow
 
+    beforeEach(async () => {
+        vi.resetModules();
+        vi.stubEnv("SITE_URL", SITE);
         vi.stubEnv("SIGNUP_INVITE_ONLY", "false");
 
         const { env: stubEnv } = await import("cloudflare:workers");
-        const workerEnv = stubEnv as { EMAIL?: unknown };
 
-        workerEnv.EMAIL = { send: vi.fn() };
+        (stubEnv as { EMAIL?: unknown }).EMAIL = { send: vi.fn() };
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
+    /** The verification links queued for delivery since the test began (`email/mailer.ts` → `deliverEmail`). */
+    const queuedVerificationLinks = async (): Promise<string[]> => {
+        const { jobsQueueMessages } = (await import("cloudflare:workers")) as unknown as {
+            jobsQueueMessages: { body: { args?: { message?: { subject?: string; text?: string } } } }[];
+        };
+
+        return jobsQueueMessages
+            .map((queued) => queued.body.args?.message)
+            .filter((message) => message?.subject === "Verify your email address")
+            .flatMap((message) => VERIFY_LINK.exec(message?.text ?? "")?.[0] ?? []);
+    };
+
+    const post = (path: string, body: object, cookie?: string) =>
+        new Request(`${SITE}/api/auth${path}`, {
+            body: JSON.stringify(body),
+            headers: { "content-type": "application/json", origin: SITE, ...(cookie && { cookie }) },
+            method: "POST",
+        });
+
+    const cookieOf = (response: Response): string =>
+        response.headers
+            .getSetCookie()
+            .map((value) => value.split(";", 1)[0])
+            .join("; ");
+
+    it("gives a password sign-up no session and sends the verification mail", async () => {
+        expect.assertions(3);
 
         const { auth } = await createTestAuth();
-        const signUp = await auth.handler(
-            new Request(`${SITE}/api/auth/sign-up/email`, {
-                body: JSON.stringify({ email: EMAIL, name: "Member", password: "a-long-enough-password" }), // secret-scanner:allow
-                headers: { "content-type": "application/json", origin: SITE },
-                method: "POST",
-            }),
-        );
+        const signUp = await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }));
 
         expect(signUp.status).toBe(200);
         expect(((await signUp.json()) as { token?: string | null }).token).toBeNull();
+        await expect(queuedVerificationLinks()).resolves.toHaveLength(1);
+    });
+
+    it("sends an account created before verification was required a link at its next sign-in", async () => {
+        expect.assertions(4);
+
+        const { auth, db } = await createTestAuth();
+        const context = await auth.$context;
+        const user = await context.internalAdapter.createUser({ email: EMAIL, emailVerified: false, name: "Earlier member" }, { method: "email" } as never);
+
+        await context.internalAdapter.linkAccount({
+            accountId: user.id,
+            password: await context.password.hash(PASSWORD),
+            providerId: "credential",
+            userId: user.id,
+        });
+
+        const signIn = await auth.handler(post("/sign-in/email", { email: EMAIL, password: PASSWORD }));
+
+        expect(signIn.status).toBe(403);
+        expect(((await signIn.json()) as { code?: string }).code).toBe("EMAIL_NOT_VERIFIED");
+        expect(db.user).toHaveLength(1);
+        await queuedVerificationLinks().then((links) => expect(links.length).toBeGreaterThan(0));
+    });
+
+    it("hands a converted guest's data over when the link is opened in another browser", async () => {
+        expect.assertions(3);
+
+        const onGuestConverted = vi.fn(async () => undefined);
+        const { auth, db } = await createTestAuth({ onGuestConverted });
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+        const guestId = ((await guest.json()) as { user: { id: string } }).user.id;
+
+        await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, cookieOf(guest)));
+
+        const [link] = await queuedVerificationLinks();
+        // No cookie: the link is opened somewhere the guest's session is not.
+        const verified = await auth.handler(new Request(link!, { headers: { origin: SITE } }));
+        const member = db.user!.find((row) => row.email === EMAIL);
+
+        expect(verified.status).toBeLessThan(400);
+        expect(onGuestConverted).toHaveBeenCalledExactlyOnceWith(guestId, member?.id);
+        expect(db.verification!.some((row) => String(row.identifier).startsWith("guest-conversion:"))).toBe(false);
     });
 });

@@ -27,6 +27,7 @@ import { createShardClient } from "lunorash/runtime";
 import { internal } from "./_generated/internal";
 import type { Id } from "./_generated/dataModel";
 import { clientGrantCookie } from "./auth/client-grant-cookie";
+import { guestConversion } from "./auth/guest-conversion";
 import { deletedOrganizationOf, queueOrganizationBillingCancel } from "./billing/gdpr";
 import { queueOrganizationPolicyErase } from "./auth/organization-policy-erase";
 import { organizationOfMemberChange, queueSeatSync } from "./billing/seats";
@@ -296,6 +297,9 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
         },
         emailVerification: {
             autoSignInAfterVerification: true,
+            // An account created before verification was required meets the requirement at its next password sign-in;
+            // the mail goes out then, so it is not locked out with no way to verify.
+            sendOnSignIn: deliversMail(),
             sendOnSignUp: deliversMail(),
             sendVerificationEmail: async ({ url, user }) => {
                 await sendEmailVerification({
@@ -352,6 +356,8 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
              * `auth/invitations.ts` exposes that to admins.
              */
             ...(SIGNUP_INVITE_ONLY ? [inviteOnly()] : []),
+            // A guest that converts and verifies in another browser keeps its data (`auth/guest-conversion.ts`).
+            ...(hooks.onGuestConverted ? [guestConversion(hooks.onGuestConverted)] : []),
             // `GET /sign-in-methods`, the verified-email rule for OAuth first
             // sign-in under the invite gate, and no passkeys for guests.
             signInMethods(resolveSignInMethods(), { inviteOnly: SIGNUP_INVITE_ONLY }),

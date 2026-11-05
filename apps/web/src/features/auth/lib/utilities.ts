@@ -22,7 +22,7 @@ const ERROR_TRANSLATIONS: Record<string, (t: TranslateFunction) => string> = {
     CREDENTIAL_ACCOUNT_NOT_FOUND: (t) => t`Credential account not found`,
     EMAIL_CAN_NOT_BE_UPDATED: (t) => t`Email cannot be updated`,
     EMAIL_IS_ALREADY_TAKEN: (t) => t`Email is already taken`,
-    EMAIL_NOT_VERIFIED: (t) => t`Email not verified`,
+    EMAIL_NOT_VERIFIED: (t) => t`Verify your email address first: we have sent you a new verification link.`,
     EMAIL_VERIFICATION_REQUIRED: (t) => t`Email verification is required before you can subscribe to a plan`,
     EXPIRES_IN_IS_TOO_LARGE: (t) => t`The expires in is larger than the predefined maximum value`,
     EXPIRES_IN_IS_TOO_SMALL: (t) => t`The expires in is smaller than the predefined minimum value`,

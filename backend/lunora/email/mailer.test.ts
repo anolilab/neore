@@ -65,6 +65,15 @@ describe(deliversMail, () => {
         expect(deliversMail()).toBe(true);
     });
 
+    it("is false without a sender, even with the binding", () => {
+        const sender = stubEnv.MAIL_FROM;
+
+        stubEnv.EMAIL = { send: vi.fn() };
+        stubEnv.MAIL_FROM = " ";
+        expect(deliversMail()).toBe(false);
+        stubEnv.MAIL_FROM = sender;
+    });
+
     it("is false without the binding, and while mail is captured", () => {
         expect(deliversMail()).toBe(false);
 
