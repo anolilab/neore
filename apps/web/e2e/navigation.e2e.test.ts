@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { isInviteOnly } from "./chat-helpers";
 import { AUTH_PATHS, PROTECTED_PATHS, PUBLIC_PATHS } from "./fixtures";
 
 const SIGN_IN_URL_RE = /\/auth\/sign-in/;
@@ -28,8 +29,8 @@ test.describe("Auth route navigation", () => {
 
     test("serves each auth page on direct navigation", async ({ page }) => {
         await page.goto(AUTH_PATHS.signUp);
-        // Without an invitation the sign-up page says how to get in instead of offering a form.
-        await expect(page.getByText("Sign-up needs an invitation")).toBeVisible();
+        // Without an invitation, under invite-only the sign-up page says how to get in instead of offering a form.
+        await expect(page.getByText((await isInviteOnly()) ? "Sign-up needs an invitation" : "Enter your information to create an account")).toBeVisible();
 
         await page.goto(AUTH_PATHS.forgotPassword);
         await expect(page.getByText("Enter your email to reset your password")).toBeVisible();

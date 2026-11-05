@@ -193,8 +193,15 @@ export const trackBackendRequests = (page: Page): ((timeoutMs?: number) => Promi
  */
 export const isInviteOnly = async (): Promise<boolean> => {
     const response = await fetch(`${APP_BASE_URL}/api/auth/sign-in-methods`, { headers: { accept: "application/json" } });
+    const body: unknown = response.ok ? await response.json() : await response.text();
+    const inviteOnly = (body as { inviteOnly?: unknown } | null)?.inviteOnly;
 
-    return ((await response.json()) as { inviteOnly?: boolean }).inviteOnly !== false;
+    // A refused or malformed answer (a 429, an error body) must not pick the suite's mode: fail loudly instead.
+    if (!response.ok || typeof inviteOnly !== "boolean") {
+        throw new Error(`[e2e] sign-in-methods answered ${String(response.status)} without an inviteOnly flag: ${JSON.stringify(body).slice(0, 200)}`);
+    }
+
+    return inviteOnly;
 };
 
 /** Open `/chat` as whoever the page is (signed out, or a guest when registration is open, unless signed in first). */
