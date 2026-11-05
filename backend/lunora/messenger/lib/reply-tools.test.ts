@@ -93,7 +93,9 @@ describe(chooseReplyModel, () => {
         expect(modelSupportsTools(model)).toBe(true);
         // It passes the rules the gateway enforces: not served from any region, and allowed with CN blocked.
         expect(deriveModelRegions(definition!)).not.toContain(GLOBAL_REGION);
-        expect(getModelRejectionReason({ modelId: model, provider: definition!.provider, regions: deriveModelRegions(definition!) }, { blockedRegions: ["CN"] })).toBeNull();
+        expect(
+            getModelRejectionReason({ modelId: model, provider: definition!.provider, regions: deriveModelRegions(definition!) }, { blockedRegions: ["CN"] }),
+        ).toBeNull();
         expect(chooseReplyModel({ hasMedia: false, rules: { blockedRegions: ["CN"] }, tools: false })).toBe(DEFAULT_CHAT_MODEL);
     });
 

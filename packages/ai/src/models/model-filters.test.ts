@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { deriveModelRegions, getModelRejectionReason, GLOBAL_REGION } from "./model-filters";
 
-const workersAi = { modelId: "cf-gpt-oss-20b", provider: "cloudflare", regions: deriveModelRegions({ modelApiId: "@cf/openai/gpt-oss-20b", provider: "cloudflare" }) };
+const workersAi = {
+    modelId: "cf-gpt-oss-20b",
+    provider: "cloudflare",
+    regions: deriveModelRegions({ modelApiId: "@cf/openai/gpt-oss-20b", provider: "cloudflare" }),
+};
 const usAndEu = { modelId: "google/gemini-2.5-flash-lite", provider: "openrouter", regions: ["US", "EU"] };
 
 describe("region rules for a model served from any region", () => {

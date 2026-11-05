@@ -140,11 +140,7 @@ export const AI_NODE_DEFAULT_MODEL = "claude-sonnet-4-20250514";
  * an earlier clip or image. Read fail-closed (`loadModelFilterRules`). The per-node checks stay: the rules may change
  * while a long run is in flight.
  */
-export const workflowModelRefusals = async (
-    ctx: Pick<ActionContext, "runQuery">,
-    userId: string,
-    nodes: ReadonlyArray<WorkflowNode>,
-): Promise<string[]> => {
+export const workflowModelRefusals = async (ctx: Pick<ActionContext, "runQuery">, userId: string, nodes: ReadonlyArray<WorkflowNode>): Promise<string[]> => {
     const models = [...new Set(nodes.filter((node) => node.type === "ai").map((node) => (node.data as { model?: string }).model ?? AI_NODE_DEFAULT_MODEL))];
 
     if (models.length === 0) {

@@ -43,7 +43,13 @@ vi.mock("@/hooks/use-model-filter-rules", () => {
 vi.mock("@/features/auth/lib/auth-ui-provider", () => {
     return {
         useAuth: () => {
-            return { hooks: { useSession: () => {return { data: null }} } };
+            return {
+                hooks: {
+                    useSession: () => {
+                        return { data: null };
+                    },
+                },
+            };
         },
     };
 });
@@ -82,9 +88,7 @@ beforeEach(() => {
 const kimi = { displayProvider: "Moonshot", id: "cf-kimi-k2.5", mode: "text", name: "Kimi K2.5 (Workers AI)", provider: "cloudflare" } as GatewayModel;
 const gpt = { displayProvider: "OpenAI", id: "openai/gpt-5", mode: "text", name: "GPT-5", provider: "openrouter" } as GatewayModel;
 
-const picker = (models: GatewayModel[]) => (
-    <ModelPicker defaultModeFilter="text" defaultTab="all" footer={null} initialModelId={kimi.id} models={models} />
-);
+const picker = (models: GatewayModel[]) => <ModelPicker defaultModeFilter="text" defaultTab="all" footer={null} initialModelId={kimi.id} models={models} />;
 
 describe("ModelPicker opening scope", () => {
     it("scopes to the selected model's creator when the catalog arrives after the picker opened", () => {

@@ -1060,7 +1060,9 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                 <button
                                     className={cn(
                                         "rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                        modeFilter === null ? "bg-primary/10 text-primary-text" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                        modeFilter === null
+                                            ? "bg-primary/10 text-primary-text"
+                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter(null)}
                                     type="button"

@@ -125,7 +125,10 @@ describe(ingestAttachments, () => {
         platform.downloads.set("pdf", BYTES("application/octet-stream"));
 
         const parser = { fetch: async () => Response.json({ content: "Q3 revenue rose 12%.", tables: [] }) };
-        const result = await ingest([{ kind: "file", name: "q3.pdf", ref: "pdf" }], undefined, { ...(context() as object), services: { documentParser: parser } } as never);
+        const result = await ingest([{ kind: "file", name: "q3.pdf", ref: "pdf" }], undefined, {
+            ...(context() as object),
+            services: { documentParser: parser },
+        } as never);
 
         expect(result.parts).toStrictEqual([]);
         expect(result.text).toBe("[Document: q3.pdf]\nQ3 revenue rose 12%.");
