@@ -201,6 +201,33 @@ describe("reassignGlobalRows", () => {
         expect(undecided).toStrictEqual([]);
     });
 
+    it("re-points every row, well past one page of a facade read", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+        const rows = 60;
+
+        try {
+            for (let index = 0; index < rows; index += 1) {
+                await harness.run(
+                    async (context: any) =>
+                        await context.db.insert("knowledgeCollections", {
+                            createdAt: index,
+                            name: `Notes ${String(index)}`,
+                            updatedAt: index,
+                            userId: "guest",
+                        }),
+                );
+            }
+
+            const { reassigned } = await harness.run(async (context: any) => await context.runMutation(reassignGlobalRows, { from: "guest", to: "user" }));
+            const left = await harness.run(async (context: any) => await context.db.knowledgeCollections.findMany({ where: { userId: "guest" } }));
+
+            expect(reassigned).toBe(rows);
+            expect(left.page).toStrictEqual([]);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("hands a guest's knowledge collection to the new account, so its moved files can still be filed into it", async () => {
         const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
 
