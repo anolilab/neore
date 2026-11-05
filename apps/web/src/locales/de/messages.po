@@ -506,7 +506,7 @@ msgstr "{0} aus {1} Bewertungen"
 
 #. placeholder {0}: formatPricePerMillion(model.pricing.input_per_million)
 #. placeholder {1}: formatPricePerMillion(model.pricing.output_per_million)
-#: src/components/model-picker/model-picker.tsx:319
+#: src/components/model-picker/model-picker.tsx:320
 msgid "{0} input, {1} output per 1M tokens"
 msgstr ""
 
@@ -599,7 +599,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "{0} von {1} Token verwendet ({2}%)"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1218
+#: src/components/model-picker/model-picker.tsx:1219
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} von {MAX_PARALLEL} ausgewählt"
 
@@ -1051,7 +1051,7 @@ msgid "{label} is not connected."
 msgstr ""
 
 #. placeholder {0}: ids.length
-#: src/components/model-picker/model-picker.tsx:910
+#: src/components/model-picker/model-picker.tsx:911
 msgid "{label} moved to position {position} of {0} in starred"
 msgstr "{label} auf Position {position} von {0} in Markierungen verschoben"
 
@@ -1274,7 +1274,7 @@ msgstr "{selectedCount, plural, one {# Prompt ausgewählt} other {# Prompts ausg
 msgid "{selectedCount, plural, one {# thread selected} other {# threads selected}}"
 msgstr "{selectedCount, plural, one {# Thread ausgewählt} other {# Threads ausgewählt}}"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:745
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "{selectedCount} von {MAX_PARALLEL} ausgewählt"
 
@@ -2301,8 +2301,8 @@ msgstr ""
 msgid "Add to review"
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:167
-#: src/components/model-picker/model-picker.tsx:340
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:168
+#: src/components/model-picker/model-picker.tsx:341
 msgid "Add to starred"
 msgstr "Zu Favoriten hinzufügen"
 
@@ -2892,10 +2892,10 @@ msgstr "Vertikal ausrichten"
 msgid "Align vertically (V)"
 msgstr "Vertikal ausrichten (V)"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:617
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:679
-#: src/components/model-picker/model-picker.tsx:1067
-#: src/components/model-picker/model-picker.tsx:1145
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:618
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:680
+#: src/components/model-picker/model-picker.tsx:1068
+#: src/components/model-picker/model-picker.tsx:1146
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:422
@@ -2980,8 +2980,8 @@ msgstr "Alle Installationsprogramme"
 msgid "All MCP servers active"
 msgstr "Alle MCP-Server aktiv"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:563
-#: src/components/model-picker/model-picker.tsx:1017
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:564
+#: src/components/model-picker/model-picker.tsx:1018
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "Alle Modelle"
@@ -3344,7 +3344,7 @@ msgstr "Anthropic API"
 msgid "Anthropic-compatible"
 msgstr "Anthropic-kompatibel"
 
-#: src/lib/model-descriptions.ts:30
+#: src/lib/model-descriptions.ts:31
 msgid "Anthropic's latest and greatest LLM with thinking"
 msgstr "Anthropics neuestes und bestes LLM mit Thinking"
 
@@ -3356,7 +3356,7 @@ msgstr "Anthropics neuestes und leistungsfähigstes Opus-Modell"
 msgid "Anthropic's latest Opus with full thinking transparency"
 msgstr "Anthropics neuestes Opus mit vollständig transparentem Denken"
 
-#: src/lib/model-descriptions.ts:31
+#: src/lib/model-descriptions.ts:30
 msgid "Anthropic's latest Sonnet LLM with thinking"
 msgstr "Anthropics neuestes Sonnet-LLM mit Thinking"
 
@@ -3880,8 +3880,8 @@ msgstr "Versuche: {0}"
 msgid "Auckland"
 msgstr "Auckland"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
-#: src/components/model-picker/model-picker.tsx:1119
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:668
+#: src/components/model-picker/model-picker.tsx:1120
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:123
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -4246,15 +4246,15 @@ msgstr "ausgewogen"
 msgid "Balanced"
 msgstr "Ausgewogen"
 
-#: src/lib/model-descriptions.ts:42
+#: src/lib/model-descriptions.ts:44
 msgid "Balanced 32B model from Alibaba"
 msgstr "Ausgewogenes 32B-Modell von Alibaba"
 
-#: src/lib/model-descriptions.ts:43
+#: src/lib/model-descriptions.ts:46
 msgid "Balanced frontier model from Anthropic"
 msgstr "Ausgewogenes Spitzenmodell von Anthropic"
 
-#: src/lib/model-descriptions.ts:44
+#: src/lib/model-descriptions.ts:45
 msgid "Balanced GPT-5 family model from OpenAI"
 msgstr "Ausgewogenes Modell der GPT-5-Familie von OpenAI"
 
@@ -4482,31 +4482,31 @@ msgstr "Bessere Prompt-Treue"
 msgid "Better speed-to-quality ratio than the full GPT-5"
 msgstr "Besseres Verhältnis von Geschwindigkeit zu Qualität als das volle GPT-5"
 
-#: src/lib/model-descriptions.ts:45
+#: src/lib/model-descriptions.ts:37
 msgid "BFL's frontier model for image editing"
 msgstr "BFLs Spitzenmodell für Bildbearbeitung"
 
-#: src/lib/model-descriptions.ts:46
+#: src/lib/model-descriptions.ts:38
 msgid "BFL's highest quality FLUX model via direct API"
 msgstr "BFLs hochwertigstes FLUX-Modell über die direkte API"
 
-#: src/lib/model-descriptions.ts:47
+#: src/lib/model-descriptions.ts:39
 msgid "BFL's highest quality model via Replicate"
 msgstr "BFLs hochwertigstes Modell über Replicate"
 
-#: src/lib/model-descriptions.ts:48
+#: src/lib/model-descriptions.ts:40
 msgid "BFL's highest quality text-to-image model — up to 2K resolution with improved photorealism"
 msgstr "BFLs hochwertigstes Text-zu-Bild-Modell — bis zu 2K-Auflösung mit verbessertem Fotorealismus"
 
-#: src/lib/model-descriptions.ts:49
+#: src/lib/model-descriptions.ts:41
 msgid "BFL's latest generation model via Replicate"
 msgstr "BFLs Modell der neuesten Generation über Replicate"
 
-#: src/lib/model-descriptions.ts:50
+#: src/lib/model-descriptions.ts:42
 msgid "BFL's maximum quality FLUX Kontext model"
 msgstr "BFLs FLUX-Kontext-Modell mit maximaler Qualität"
 
-#: src/lib/model-descriptions.ts:51
+#: src/lib/model-descriptions.ts:43
 msgid "BFL's professional FLUX model via direct API"
 msgstr "BFLs professionelles FLUX-Modell über die direkte API"
 
@@ -4989,7 +4989,7 @@ msgstr "ByteDance"
 msgid "ByteDance medium-pro quality tier"
 msgstr "ByteDance Qualitätsstufe Medium-Pro"
 
-#: src/lib/model-descriptions.ts:52
+#: src/lib/model-descriptions.ts:47
 msgid "ByteDance Seedance 2.0 — next-gen high-quality video with end-frame and reference support"
 msgstr "ByteDance Seedance 2.0 — hochwertiges Video der nächsten Generation mit Endframe- und Referenzunterstützung"
 
@@ -5005,7 +5005,7 @@ msgstr "ByteDances zugängliches Bildmodell"
 msgid "ByteDance's capable vision reasoning model"
 msgstr "ByteDances leistungsfähiges Vision-Reasoning-Modell"
 
-#: src/lib/model-descriptions.ts:53
+#: src/lib/model-descriptions.ts:49
 msgid "ByteDance's compact and efficient reasoning model"
 msgstr "ByteDances kompaktes und effizientes Reasoning-Modell"
 
@@ -5013,7 +5013,7 @@ msgstr "ByteDances kompaktes und effizientes Reasoning-Modell"
 msgid "ByteDance's compact reasoning model"
 msgstr "ByteDances kompaktes Reasoning-Modell"
 
-#: src/lib/model-descriptions.ts:54
+#: src/lib/model-descriptions.ts:50
 msgid "ByteDance's fast vision reasoning model"
 msgstr "ByteDances schnelles Vision-Reasoning-Modell"
 
@@ -5029,15 +5029,15 @@ msgstr "ByteDances hochwertige Seedance-Stufe"
 msgid "ByteDance's latest and most capable reasoning model"
 msgstr "ByteDances neuestes und leistungsfähigstes Reasoning-Modell"
 
-#: src/lib/model-descriptions.ts:55
+#: src/lib/model-descriptions.ts:51
 msgid "ByteDance's latest reasoning model"
 msgstr "ByteDances neuestes Reasoning-Modell"
 
-#: src/lib/model-descriptions.ts:56
+#: src/lib/model-descriptions.ts:52
 msgid "ByteDance's recent reasoning model"
 msgstr "ByteDances aktuelles Reasoning-Modell"
 
-#: src/lib/model-descriptions.ts:38
+#: src/lib/model-descriptions.ts:48
 msgid "ByteDance's Seedream 5.0 Pro text-to-image model, up to 2K output"
 msgstr "Text-zu-Bild-Modell Seedream 5.0 Pro von ByteDance, bis zu 2K-Ausgabe"
 
@@ -5057,7 +5057,7 @@ msgstr "Cache"
 msgid "Cache Hit Rate"
 msgstr "Cache-Trefferquote"
 
-#: src/components/model-picker/model-picker.tsx:210
+#: src/components/model-picker/model-picker.tsx:211
 #: src/features/chat/thread/message-cost-badge.tsx:56
 msgid "Cached input"
 msgstr "Gecachte Eingabe"
@@ -5300,11 +5300,11 @@ msgstr "Fähigkeiten"
 msgid "capable"
 msgstr "leistungsfähig"
 
-#: src/lib/model-descriptions.ts:57
+#: src/lib/model-descriptions.ts:53
 msgid "Capable balanced model from xAI with vision support"
 msgstr "Leistungsfähiges, ausgewogenes Modell von xAI mit Vision-Unterstützung"
 
-#: src/lib/model-descriptions.ts:58
+#: src/lib/model-descriptions.ts:54
 msgid "Capable open-source model from Meta"
 msgstr "Leistungsfähiges Open-Source-Modell von Meta"
 
@@ -5348,7 +5348,7 @@ msgstr "Testfälle in {0}"
 msgid "Cases with no reported cost used {0} of {1} budgeted tokens."
 msgstr "Testfälle ohne gemeldete Kosten haben {0} von {1} budgetierten Tokens verbraucht."
 
-#: src/lib/model-descriptions.ts:59
+#: src/lib/model-descriptions.ts:55
 msgid "Cassette AI text-to-music — up to 3-minute clips at 44.1kHz stereo."
 msgstr "Cassette AI Text-zu-Musik — Clips bis zu 3 Minuten in 44,1 kHz Stereo."
 
@@ -5624,7 +5624,7 @@ msgstr "Chats, die seine Modelle verwenden, funktionieren nicht mehr, bis du ein
 msgid "Chats with no activity for this long are archived. Archived chats stay searchable."
 msgstr ""
 
-#: src/lib/model-descriptions.ts:60
+#: src/lib/model-descriptions.ts:56
 msgid "Cheapest medium-quality Hailuo 2.3 tier — best cost-to-quality ratio"
 msgstr "Günstigste Hailuo-2.3-Stufe mit mittlerer Qualität — bestes Preis-Leistungs-Verhältnis"
 
@@ -5837,11 +5837,11 @@ msgstr "Filmische KI-Videos"
 msgid "Cinematic depth and visual flair"
 msgstr "Filmische Tiefe und visuelles Flair"
 
-#: src/lib/model-descriptions.ts:61
+#: src/lib/model-descriptions.ts:57
 msgid "Cinematic image model with references"
 msgstr "Cineastisches Bildmodell mit Referenzen"
 
-#: src/lib/model-descriptions.ts:62
+#: src/lib/model-descriptions.ts:58
 msgid "Cinematic quality with improved motion"
 msgstr "Kinoqualität mit verbesserter Bewegung"
 
@@ -6026,7 +6026,7 @@ msgstr "Klick"
 msgid "Click \"{selector}\""
 msgstr "Klick auf \"{selector}\""
 
-#: src/components/model-picker/model-picker.tsx:1177
+#: src/components/model-picker/model-picker.tsx:1178
 msgid "Click ★ on any model in All models to add it here."
 msgstr "Klicke auf ★ bei einem Modell unter Alle Modelle, um es hier hinzuzufügen."
 
@@ -6055,7 +6055,7 @@ msgstr "Klicke auf die Schaltfläche unten, um einen neuen Passkey mit deinem Ge
 msgid "Click the pin icon on any message to save it here."
 msgstr "Klicke auf das Pin-Symbol bei einer Nachricht, um sie hier zu speichern."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:705
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:706
 msgid "Click the star on any model in All models to add it here."
 msgstr "Klicke bei einem beliebigen Modell unter Alle Modelle auf den Stern, um es hier hinzuzufügen."
 
@@ -6316,15 +6316,15 @@ msgstr "Coding-Aufgaben, die Alibabas spezialisiertes 30B-Coding-Modell erforder
 msgid "Coding tasks requiring Mistral's specialized development-focused model"
 msgstr "Coding-Aufgaben, die Mistrals spezialisiertes, auf Entwicklung ausgerichtetes Modell erfordern"
 
-#: src/lib/model-descriptions.ts:63
+#: src/lib/model-descriptions.ts:59
 msgid "Coding-specialized model from Alibaba"
 msgstr "Auf Coding spezialisiertes Modell von Alibaba"
 
-#: src/lib/model-descriptions.ts:64
+#: src/lib/model-descriptions.ts:60
 msgid "Cohere's advanced command LLM"
 msgstr "Coheres fortschrittliches Command-LLM"
 
-#: src/lib/model-descriptions.ts:65
+#: src/lib/model-descriptions.ts:61
 msgid "Cohere's advanced command LLM with thinking"
 msgstr "Coheres fortschrittliches Command-LLM mit Thinking"
 
@@ -6585,7 +6585,7 @@ msgstr "Kompaktes Codex-Modell für schnellere Codegenerierung"
 msgid "Compact coding model from Mistral"
 msgstr "Kompaktes Coding-Modell von Mistral"
 
-#: src/lib/model-descriptions.ts:66
+#: src/lib/model-descriptions.ts:62
 msgid "Compact distilled reasoning model from DeepSeek"
 msgstr "Kompaktes destilliertes Reasoning-Modell von DeepSeek"
 
@@ -6870,9 +6870,9 @@ msgstr "Anwendungseinstellungen konfigurieren"
 msgid "Configured"
 msgstr "Konfiguriert"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:768
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1240
+#: src/components/model-picker/model-picker.tsx:1241
 msgid "Confirm"
 msgstr "Bestätigen"
 
@@ -7966,7 +7966,7 @@ msgstr "Die Einstellung für das Daily Brief konnte nicht gespeichert werden."
 msgid "Could not save the email setting."
 msgstr "Die E-Mail-Einstellung konnte nicht gespeichert werden."
 
-#: src/components/model-picker/model-picker.tsx:913
+#: src/components/model-picker/model-picker.tsx:914
 msgid "Could not save the new order for {label}"
 msgstr "Die neue Reihenfolge für {label} konnte nicht gespeichert werden"
 
@@ -8919,19 +8919,19 @@ msgstr "Tief, dokumentarische Klarheit"
 msgid "Deeper, more context"
 msgstr "Tiefer, mehr Kontext"
 
-#: src/lib/model-descriptions.ts:67
+#: src/lib/model-descriptions.ts:63
 msgid "DeepSeek V3.1 optimized for software engineering"
 msgstr "DeepSeek V3.1, optimiert für Softwareentwicklung"
 
-#: src/lib/model-descriptions.ts:68
+#: src/lib/model-descriptions.ts:64
 msgid "DeepSeek's advanced chat LLM with thinking"
 msgstr "DeepSeeks fortschrittliches Chat-LLM mit Thinking"
 
-#: src/lib/model-descriptions.ts:69
+#: src/lib/model-descriptions.ts:65
 msgid "DeepSeek's experimental advanced chat LLM"
 msgstr "DeepSeeks experimentelles fortschrittliches Chat-LLM"
 
-#: src/lib/model-descriptions.ts:70
+#: src/lib/model-descriptions.ts:66
 msgid "DeepSeek's experimental advanced chat LLM with thinking"
 msgstr "DeepSeeks experimentelles fortschrittliches Chat-LLM mit Thinking"
 
@@ -9035,7 +9035,7 @@ msgstr "Standardmodell aktualisiert"
 msgid "Default Models"
 msgstr "Standardmodelle"
 
-#: src/components/model-picker/model-picker.tsx:1130
+#: src/components/model-picker/model-picker.tsx:1131
 msgid "Default order"
 msgstr ""
 
@@ -9542,7 +9542,7 @@ msgstr "Beschreibe, was du möchtest. Der Builder fragt nach, wenn etwas unklar 
 msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it, then remove the background'"
 msgstr "Beschreibe deinen Workflow... z. B. „Ein Bild aus Text generieren, hochskalieren und dann den Hintergrund entfernen“"
 
-#: src/components/model-picker/model-picker.tsx:165
+#: src/components/model-picker/model-picker.tsx:166
 #: src/features/develop/components/pull-request-view.tsx:72
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
@@ -9641,7 +9641,7 @@ msgstr "Deterministisch, konsistent"
 msgid "Develop"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:232
+#: src/components/model-picker/model-picker.tsx:233
 #: src/features/marketing/components/tutorials-page.tsx:131
 msgid "Developer"
 msgstr "Entwickler"
@@ -9903,7 +9903,7 @@ msgstr "Gruppe auflösen und alle untergeordneten Elemente freigeben"
 msgid "distilled"
 msgstr "destilliert"
 
-#: src/lib/model-descriptions.ts:71
+#: src/lib/model-descriptions.ts:67
 msgid "Distilled and open sourced version of Krea 1"
 msgstr "Destillierte Open-Source-Version von Krea 1"
 
@@ -10753,8 +10753,8 @@ msgstr "Effiziente Reasoning-Aufgaben, bei denen OpenAIs kompaktes Reasoning-Mod
 msgid "Efficient reasoning with sparse activation"
 msgstr "Effizientes Reasoning mit sparsamer Aktivierung"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:153
-#: src/components/model-picker/model-picker.tsx:77
+#: ../../packages/chat-ui/src/model-picker/utils.ts:165
+#: src/components/model-picker/model-picker.tsx:78
 msgid "Effort Control"
 msgstr "Aufwandssteuerung"
 
@@ -11984,7 +11984,7 @@ msgstr "längere Dauer"
 msgid "extended thinking"
 msgstr "erweitertes Denken"
 
-#: src/components/model-picker/model-picker.tsx:81
+#: src/components/model-picker/model-picker.tsx:82
 msgid "Extended Thinking"
 msgstr "Erweitertes Denken"
 
@@ -12907,8 +12907,8 @@ msgstr "FAQ"
 msgid "fast"
 msgstr "schnell"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:141
-#: src/components/model-picker/model-picker.tsx:78
+#: ../../packages/chat-ui/src/model-picker/utils.ts:153
+#: src/components/model-picker/model-picker.tsx:79
 #: src/features/marketing/components/model-detail-page.tsx:33
 #: src/features/settings/components/chat/models-settings.tsx:30
 msgid "Fast"
@@ -13198,7 +13198,7 @@ msgstr "Empfohlen"
 msgid "Featured image"
 msgstr "Beitragsbild"
 
-#: src/components/model-picker/model-picker.tsx:177
+#: src/components/model-picker/model-picker.tsx:178
 #: src/features/marketing/components/gateway-footer.tsx:32
 #: src/features/marketing/components/gateway-landing-page.tsx:508
 #: src/features/marketing/components/gateway-navbar.tsx:53
@@ -13374,11 +13374,11 @@ msgstr "Filmemacher, die filmische Videos mit starkem Fokus auf visuelle Erzähl
 msgid "Filter by action"
 msgstr "Nach Aktion filtern"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:604
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:605
 msgid "Filter by mode"
 msgstr "Nach Modus filtern"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:675
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:676
 msgid "Filter by provider"
 msgstr "Nach Anbieter filtern"
 
@@ -13568,15 +13568,15 @@ msgstr "Vertikal spiegeln"
 msgid "fluid motion"
 msgstr "flüssige Bewegung"
 
-#: src/lib/model-descriptions.ts:88
+#: src/lib/model-descriptions.ts:68
 msgid "FLUX Kontext Max for highest quality editing via Fireworks"
 msgstr "FLUX Kontext Max für Bearbeitung in höchster Qualität über Fireworks"
 
-#: src/lib/model-descriptions.ts:89
+#: src/lib/model-descriptions.ts:69
 msgid "FLUX Kontext Pro for image editing via Fireworks"
 msgstr "FLUX Kontext Pro für Bildbearbeitung über Fireworks"
 
-#: src/lib/model-descriptions.ts:90
+#: src/lib/model-descriptions.ts:70
 msgid "FLUX.1 Dev model via Fireworks"
 msgstr "FLUX.1-Dev-Modell über Fireworks"
 
@@ -13584,7 +13584,7 @@ msgstr "FLUX.1-Dev-Modell über Fireworks"
 msgid "FLUX.2 architecture improvements"
 msgstr "Verbesserungen der FLUX.2-Architektur"
 
-#: src/lib/model-descriptions.ts:91
+#: src/lib/model-descriptions.ts:71
 msgid "FLUX.2 dev with enhanced realism and native editing"
 msgstr "FLUX.2 Dev mit verbessertem Realismus und nativer Bearbeitung"
 
@@ -13929,35 +13929,35 @@ msgstr "Frontier-Intelligenz"
 msgid "Frontier intelligence for complex scenes"
 msgstr "Frontier-Intelligenz für komplexe Szenen"
 
-#: src/lib/model-descriptions.ts:92
+#: src/lib/model-descriptions.ts:88
 msgid "Frontier model by Black Forest Labs"
 msgstr "Spitzenmodell von Black Forest Labs"
 
-#: src/lib/model-descriptions.ts:93
+#: src/lib/model-descriptions.ts:89
 msgid "Frontier model designed for image editing"
 msgstr "Spitzenmodell für Bildbearbeitung"
 
-#: src/lib/model-descriptions.ts:94
+#: src/lib/model-descriptions.ts:90
 msgid "Frontier model designed for image editing, optimized for Krea"
 msgstr "Spitzenmodell für Bildbearbeitung, optimiert für Krea"
 
-#: src/lib/model-descriptions.ts:95
+#: src/lib/model-descriptions.ts:91
 msgid "Frontier model for complex image references"
 msgstr "Spitzenmodell für komplexe Bildreferenzen"
 
-#: src/lib/model-descriptions.ts:96
+#: src/lib/model-descriptions.ts:92
 msgid "Frontier model from Kling with native audio"
 msgstr "Spitzenmodell von Kling mit nativem Audio"
 
-#: src/lib/model-descriptions.ts:97
+#: src/lib/model-descriptions.ts:93
 msgid "Frontier model with 1080p resolution"
 msgstr "Spitzenmodell mit 1080p-Auflösung"
 
-#: src/lib/model-descriptions.ts:98
+#: src/lib/model-descriptions.ts:94
 msgid "Frontier model with exceptional long context from Google"
 msgstr "Spitzenmodell mit außergewöhnlich langem Kontext von Google"
 
-#: src/lib/model-descriptions.ts:99
+#: src/lib/model-descriptions.ts:95
 msgid "Frontier model with extended thinking from Anthropic"
 msgstr "Spitzenmodell mit erweitertem Thinking von Anthropic"
 
@@ -14722,7 +14722,7 @@ msgstr "Google-Flaggschiff"
 msgid "Google Gemini"
 msgstr "Google Gemini"
 
-#: src/lib/model-descriptions.ts:100
+#: src/lib/model-descriptions.ts:96
 msgid "Google Lyria 2 — 30s text-to-music clips at 48kHz with negative-prompt support."
 msgstr "Google Lyria 2 — 30-Sekunden-Musikclips aus Text in 48 kHz mit Unterstützung für Negativ-Prompts."
 
@@ -14730,23 +14730,23 @@ msgstr "Google Lyria 2 — 30-Sekunden-Musikclips aus Text in 48 kHz mit Unterst
 msgid "Google reliability at budget pricing"
 msgstr "Google-Zuverlässigkeit zum Budgetpreis"
 
-#: src/lib/model-descriptions.ts:101
+#: src/lib/model-descriptions.ts:97
 msgid "Google Veo 2 — high-quality cinematic video generation"
 msgstr "Google Veo 2 — hochwertige, cineastische Videogenerierung"
 
-#: src/lib/model-descriptions.ts:102
+#: src/lib/model-descriptions.ts:98
 msgid "Google Veo 3 — frontier video generation with native audio"
 msgstr "Google Veo 3 — Spitzen-Videogenerierung mit nativem Audio"
 
-#: src/lib/model-descriptions.ts:103
+#: src/lib/model-descriptions.ts:101
 msgid "Google's advanced LLM with thinking"
 msgstr "Googles fortschrittliches LLM mit Thinking"
 
-#: src/lib/model-descriptions.ts:104
+#: src/lib/model-descriptions.ts:102
 msgid "Google's advanced small LLM with thinking"
 msgstr "Googles fortschrittliches kleines LLM mit Thinking"
 
-#: src/lib/model-descriptions.ts:105
+#: src/lib/model-descriptions.ts:103
 msgid "Google's current generation image model"
 msgstr "Googles Bildmodell der aktuellen Generation"
 
@@ -14758,15 +14758,19 @@ msgstr "Googles Qualität der aktuellen Generation"
 msgid "Google's fastest image generation"
 msgstr "Googles schnellste Bildgenerierung"
 
-#: src/lib/model-descriptions.ts:106
+#: src/lib/model-descriptions.ts:104
 msgid "Google's fastest image model"
 msgstr "Googles schnellstes Bildmodell"
 
-#: src/lib/model-descriptions.ts:40
+#: src/lib/model-descriptions.ts:99
 msgid "Google's Gemini Omni Flash 1.1 reference-to-video, guided by images and short reference videos"
 msgstr "Referenz-zu-Video mit Gemini Omni Flash 1.1 von Google, gesteuert durch Bilder und kurze Referenzvideos"
 
-#: src/lib/model-descriptions.ts:107
+#: src/lib/model-descriptions.ts:100
+msgid "Google's Gemma 3 on Workers AI, without tools"
+msgstr "Gemma 3 von Google auf Workers AI, ohne Tools"
+
+#: src/lib/model-descriptions.ts:105
 msgid "Google's highest quality image model"
 msgstr "Googles hochwertigstes Bildmodell"
 
@@ -14774,11 +14778,11 @@ msgstr "Googles hochwertigstes Bildmodell"
 msgid "Google's highest-quality image model"
 msgstr "Googles hochwertigstes Bildmodell"
 
-#: src/lib/model-descriptions.ts:108
+#: src/lib/model-descriptions.ts:106
 msgid "Google's latest small SOTA LLM with thinking"
 msgstr "Googles neuestes kleines SOTA-LLM mit Thinking"
 
-#: src/lib/model-descriptions.ts:109
+#: src/lib/model-descriptions.ts:107
 msgid "Google's most advanced AI video model with native audio and reference images"
 msgstr "Googles fortschrittlichstes KI-Videomodell mit nativem Audio und Referenzbildern"
 
@@ -14786,7 +14790,7 @@ msgstr "Googles fortschrittlichstes KI-Videomodell mit nativem Audio und Referen
 msgid "Google's most advanced image generation model"
 msgstr "Googles fortschrittlichstes Bildgenerierungsmodell"
 
-#: src/lib/model-descriptions.ts:110
+#: src/lib/model-descriptions.ts:108
 msgid "Google's new state-of-the-art fast image generation and editing model"
 msgstr "Googles neues hochmodernes, schnelles Modell zur Bildgenerierung und -bearbeitung"
 
@@ -14798,7 +14802,7 @@ msgstr "Googles neues schnelles Modell auf dem neuesten Stand der Technik"
 msgid "Google's newest flagship model with advanced reasoning"
 msgstr "Googles neuestes Flaggschiff-Modell mit fortgeschrittenem Reasoning"
 
-#: src/lib/model-descriptions.ts:111
+#: src/lib/model-descriptions.ts:109
 msgid "Google's newest flagship with advanced reasoning"
 msgstr "Googles neuestes Flaggschiff mit fortgeschrittenem Reasoning"
 
@@ -14810,7 +14814,7 @@ msgstr "Googles Flash der nächsten Generation mit transparentem Reasoning"
 msgid "Google's optimized performance-cost balance"
 msgstr "Googles optimierte Balance aus Leistung und Kosten"
 
-#: src/lib/model-descriptions.ts:112
+#: src/lib/model-descriptions.ts:110
 msgid "Google's previous generation image model"
 msgstr "Googles Bildmodell der vorherigen Generation"
 
@@ -14818,7 +14822,7 @@ msgstr "Googles Bildmodell der vorherigen Generation"
 msgid "Google's proven photorealism quality"
 msgstr "Googles bewährte fotorealistische Qualität"
 
-#: src/lib/model-descriptions.ts:113
+#: src/lib/model-descriptions.ts:111
 msgid "Google's state-of-the-art image generation and editing model"
 msgstr "Googles hochmodernes Modell zur Bildgenerierung und -bearbeitung"
 
@@ -14966,11 +14970,11 @@ msgstr "Gastkonto"
 msgid "Guest accounts"
 msgstr "Gastkonten"
 
-#: src/components/model-picker/model-picker.tsx:981
+#: src/components/model-picker/model-picker.tsx:982
 msgid "Guest accounts use free models only."
 msgstr "Gastkonten verwenden nur kostenlose Modelle."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:523
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:524
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "Gastkonten nutzen nur kostenlose Modelle. Registriere dich, um alle Modelle freizuschalten."
 
@@ -15122,7 +15126,7 @@ msgstr ""
 msgid "Hidden in Model Picker"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1154
+#: src/components/model-picker/model-picker.tsx:1155
 msgid "Hide {name} from model picker"
 msgstr ""
 
@@ -15255,15 +15259,15 @@ msgstr "Hochwertige Bildgenerierung mit Googles bewährten KI-Fähigkeiten für 
 msgid "High-quality image synthesis"
 msgstr "Hochwertige Bildsynthese"
 
-#: src/lib/model-descriptions.ts:114
+#: src/lib/model-descriptions.ts:112
 msgid "High-quality model with camera control"
 msgstr "Hochwertiges Modell mit Kamerasteuerung"
 
-#: src/lib/model-descriptions.ts:115
+#: src/lib/model-descriptions.ts:113
 msgid "High-quality model with great aesthetics"
 msgstr "Hochwertiges Modell mit großartiger Ästhetik"
 
-#: src/lib/model-descriptions.ts:116
+#: src/lib/model-descriptions.ts:114
 msgid "High-quality model with reference images support"
 msgstr "Hochwertiges Modell mit Unterstützung für Referenzbilder"
 
@@ -15347,7 +15351,7 @@ msgstr "Ausgabe in höchster Qualität von Black Forest Labs"
 msgid "Highly aesthetic visual output"
 msgstr "Visuelle Ausgabe mit hoher Ästhetik"
 
-#: src/lib/model-descriptions.ts:117
+#: src/lib/model-descriptions.ts:115
 msgid "Highly aesthetic, general-purpose model"
 msgstr "Sehr ästhetisches Allzweckmodell"
 
@@ -15538,6 +15542,10 @@ msgstr "Ich vertraue diesem Server"
 msgid "IAM access keys"
 msgstr "IAM-Zugriffsschlüssel"
 
+#: src/lib/model-descriptions.ts:116
+msgid "IBM's small, fast model on Workers AI"
+msgstr "Das kleine, schnelle Modell von IBM auf Workers AI"
+
 #: src/features/chat/core/utils/language-utilities.ts:367
 msgid "Iceland"
 msgstr "Island"
@@ -15607,12 +15615,12 @@ msgstr "Illustration"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
 #: ../../packages/chat-ui/src/chat/message-content.tsx:403
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:641
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:642
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: src/components/model-picker/model-picker.tsx:1093
+#: src/components/model-picker/model-picker.tsx:1094
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:121
 #: src/features/marketing/components/landing-footer.tsx:165
@@ -15654,12 +15662,12 @@ msgstr "Bildanhang (ausgeblendet)"
 msgid "image editing"
 msgstr "Bildbearbeitung"
 
-#: src/components/model-picker/model-picker.tsx:79
+#: src/components/model-picker/model-picker.tsx:80
 #: src/features/settings/components/chat/models-settings.tsx:34
 msgid "Image Gen"
 msgstr "Bildgenerierung"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:91
+#: ../../packages/chat-ui/src/model-picker/utils.ts:103
 #: src/features/settings/lib/settings-keywords.ts:74
 #: src/features/workflow/templates/index.ts:126
 msgid "image generation"
@@ -15671,7 +15679,7 @@ msgstr "Bildgenerierung"
 msgid "Image generation"
 msgstr "Bildgenerierung"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:165
+#: ../../packages/chat-ui/src/model-picker/utils.ts:177
 #: src/features/chat/thread/media-gallery-view.tsx:342
 #: src/features/marketing/components/landing-page.tsx:286
 #: src/features/marketing/components/model-detail-page.tsx:87
@@ -15954,11 +15962,11 @@ msgstr "Bessere Benchmark-Leistung bei komplexen Aufgaben"
 msgid "Improved detail over Imagen 3"
 msgstr "Mehr Details als Imagen 3"
 
-#: src/lib/model-descriptions.ts:118
+#: src/lib/model-descriptions.ts:117
 msgid "Improved fast multimodal model from Google"
 msgstr "Verbessertes schnelles multimodales Modell von Google"
 
-#: src/lib/model-descriptions.ts:119
+#: src/lib/model-descriptions.ts:118
 msgid "Improved general-purpose model from DeepSeek"
 msgstr "Verbessertes Allzweckmodell von DeepSeek"
 
@@ -16092,7 +16100,7 @@ msgstr ""
 msgid "Inbox sections"
 msgstr ""
 
-#: src/lib/model-descriptions.ts:120
+#: src/lib/model-descriptions.ts:119
 msgid "Inception's diffusion-based language model"
 msgstr "Inceptions diffusionsbasiertes Sprachmodell"
 
@@ -16161,7 +16169,7 @@ msgid "inpainting"
 msgstr "Inpainting"
 
 #: ../../packages/ui/src/components/ai-elements/context.tsx:237
-#: src/components/model-picker/model-picker.tsx:200
+#: src/components/model-picker/model-picker.tsx:201
 #: src/features/devices/components/device-tool-call.tsx:168
 #: src/features/evals/components/case-fields.tsx:69
 #: src/features/evals/components/dataset-panel.tsx:144
@@ -16310,7 +16318,7 @@ msgstr "intelligent"
 msgid "Intelligent scene composition"
 msgstr "Intelligente Szenenkomposition"
 
-#: src/lib/model-descriptions.ts:121
+#: src/lib/model-descriptions.ts:120
 msgid "Intelligent video model that thinks before generating"
 msgstr "Intelligentes Videomodell, das vor dem Generieren nachdenkt"
 
@@ -16825,7 +16833,7 @@ msgstr "Khmer"
 msgid "Khmer (Cambodia)"
 msgstr "Khmer (Kambodscha)"
 
-#: src/lib/model-descriptions.ts:122
+#: src/lib/model-descriptions.ts:121
 msgid "Kling 2.6 text-to-video with native audio via direct API"
 msgstr "Kling 2.6 Text-zu-Video mit nativem Audio über die direkte API"
 
@@ -16905,7 +16913,7 @@ msgstr "Kreas typische ästhetische Qualität"
 msgid "KV-backed rate limiting per user and tier. Configurable burst and sustained limits."
 msgstr "KV-basierte Ratenbegrenzung pro Nutzer und Tarif. Konfigurierbare Burst- und Dauerlimits."
 
-#: src/lib/model-descriptions.ts:123
+#: src/lib/model-descriptions.ts:122
 msgid "Kwaipilot's advanced coding LLM"
 msgstr "Kwaipilots fortschrittliches Coding-LLM"
 
@@ -17133,7 +17141,7 @@ msgstr "Neueste Codex-Generation mit verbesserten Fähigkeiten"
 msgid "Latest coding agent run"
 msgstr "Letzter Durchlauf des Coding-Agents"
 
-#: src/lib/model-descriptions.ts:124
+#: src/lib/model-descriptions.ts:126
 msgid "Latest flagship model from Anthropic"
 msgstr "Neuestes Flaggschiff-Modell von Anthropic"
 
@@ -17145,11 +17153,11 @@ msgstr "neueste Spitzenklasse"
 msgid "Latest frontier generation from Hailuo"
 msgstr "Neueste Spitzengeneration von Hailuo"
 
-#: src/lib/model-descriptions.ts:125
+#: src/lib/model-descriptions.ts:127
 msgid "Latest frontier Kling model with native audio and extended durations"
 msgstr "Neuestes Kling-Spitzenmodell mit nativem Audio und längerer Dauer"
 
-#: src/lib/model-descriptions.ts:126
+#: src/lib/model-descriptions.ts:128
 msgid "Latest frontier model from Runway with native text-to-video"
 msgstr "Neuestes Spitzenmodell von Runway mit nativem Text-zu-Video"
 
@@ -17161,7 +17169,7 @@ msgstr "Neueste Spitzen-Videoqualität von Kling"
 msgid "Latest general-purpose capabilities from DeepSeek"
 msgstr "Neueste Allzweck-Fähigkeiten von DeepSeek"
 
-#: src/lib/model-descriptions.ts:127
+#: src/lib/model-descriptions.ts:129
 msgid "Latest general-purpose model from DeepSeek"
 msgstr "Neuestes Allzweckmodell von DeepSeek"
 
@@ -17177,11 +17185,11 @@ msgstr "Neueste Generation von Alibaba"
 msgid "Latest generation from Runway"
 msgstr "Neueste Generation von Runway"
 
-#: src/lib/model-descriptions.ts:128
+#: src/lib/model-descriptions.ts:130
 msgid "Latest generation model from Alibaba"
 msgstr "Modell der neuesten Generation von Alibaba"
 
-#: src/lib/model-descriptions.ts:129
+#: src/lib/model-descriptions.ts:123
 msgid "Latest GPT-5 series model from OpenAI"
 msgstr "Neuestes Modell der GPT-5-Serie von OpenAI"
 
@@ -17189,19 +17197,19 @@ msgstr "Neuestes Modell der GPT-5-Serie von OpenAI"
 msgid "Latest in the GPT-5 family with continued improvements"
 msgstr "Das Neueste der GPT-5-Familie mit fortlaufenden Verbesserungen"
 
-#: src/lib/model-descriptions.ts:130
+#: src/lib/model-descriptions.ts:124
 msgid "Latest Kling image-to-video model via direct API"
 msgstr "Neuestes Kling-Bild-zu-Video-Modell über die direkte API"
 
-#: src/lib/model-descriptions.ts:131
+#: src/lib/model-descriptions.ts:125
 msgid "Latest Kling text-to-video model via direct API"
 msgstr "Neuestes Kling-Text-zu-Video-Modell über die direkte API"
 
-#: src/lib/model-descriptions.ts:132
+#: src/lib/model-descriptions.ts:131
 msgid "Latest medium quality model from Alibaba"
 msgstr "Neuestes Modell mittlerer Qualität von Alibaba"
 
-#: src/lib/model-descriptions.ts:133
+#: src/lib/model-descriptions.ts:132
 msgid "Latest medium quality model from ByteDance with audio generation and end frame support"
 msgstr "Neuestes Modell mittlerer Qualität von ByteDance mit Audiogenerierung und Endframe-Unterstützung"
 
@@ -17225,7 +17233,7 @@ msgstr "Neuestes Sonnet-Update mit besserer Befolgung von Anweisungen"
 msgid "Latest Sonnet with transparent reasoning for complex analytical tasks"
 msgstr "Neuestes Sonnet mit transparentem Reasoning für komplexe analytische Aufgaben"
 
-#: src/lib/model-descriptions.ts:134
+#: src/lib/model-descriptions.ts:133
 msgid "Latest updated Sonnet model from Anthropic"
 msgstr "Neuestes aktualisiertes Sonnet-Modell von Anthropic"
 
@@ -17392,7 +17400,7 @@ msgstr "Aufhellen"
 msgid "Lightning-fast inference at production scale"
 msgstr "Blitzschnelle Inferenz im Produktionsmaßstab"
 
-#: src/lib/model-descriptions.ts:135
+#: src/lib/model-descriptions.ts:134
 msgid "Lightricks LTX — fast open-source video model, low latency"
 msgstr "Lightricks LTX — schnelles Open-Source-Videomodell mit geringer Latenz"
 
@@ -17952,11 +17960,11 @@ msgid "Locked chat"
 msgstr ""
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1223
+#: src/components/model-picker/model-picker.tsx:1224
 msgid "Locked to {0} models"
 msgstr "Auf {0}-Modelle beschränkt"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:749
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:750
 msgid "Locked to {anchorModeName} models"
 msgstr "Auf {anchorModeName}-Modelle beschränkt"
 
@@ -18046,7 +18054,7 @@ msgstr ""
 msgid "Long video clips (up to 12 seconds) generated quickly at an affordable price point"
 msgstr "Lange Videoclips (bis zu 12 Sekunden), schnell und günstig generiert"
 
-#: src/lib/model-descriptions.ts:136
+#: src/lib/model-descriptions.ts:135
 msgid "Long-context model from Moonshot AI"
 msgstr "Modell mit langem Kontext von Moonshot AI"
 
@@ -18129,15 +18137,15 @@ msgstr "KI-Grundlage von Luma Labs"
 msgid "Luma's best-in-class video model"
 msgstr "Lumas erstklassiges Videomodell"
 
-#: src/lib/model-descriptions.ts:137
+#: src/lib/model-descriptions.ts:136
 msgid "Luma's Dream Machine image generation model"
 msgstr "Lumas Dream-Machine-Modell zur Bildgenerierung"
 
-#: src/lib/model-descriptions.ts:138
+#: src/lib/model-descriptions.ts:137
 msgid "Luma's fast image generation model"
 msgstr "Lumas schnelles Modell zur Bildgenerierung"
 
-#: src/lib/model-descriptions.ts:139
+#: src/lib/model-descriptions.ts:138
 msgid "Luma's second-generation video model — realistic visuals with natural, coherent motion"
 msgstr "Lumas Videomodell der zweiten Generation — realistische Bilder mit natürlicher, stimmiger Bewegung"
 
@@ -18414,7 +18422,7 @@ msgstr "Masken-URL (optional)"
 msgid "massive"
 msgstr "riesig"
 
-#: src/lib/model-descriptions.ts:140
+#: src/lib/model-descriptions.ts:139
 msgid "Massive 235B MoE model from Alibaba"
 msgstr "Riesiges 235B-MoE-Modell von Alibaba"
 
@@ -18460,8 +18468,8 @@ msgstr "Max. Größe: {size}"
 msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "Max. Größe: {size} • Max. {maxFiles} Dateien"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
-#: src/components/model-picker/model-picker.tsx:1217
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:745
+#: src/components/model-picker/model-picker.tsx:1218
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "Maximale Anzahl von {MAX_PARALLEL} Modellen erreicht"
 
@@ -18571,23 +18579,23 @@ msgstr "mittlere Qualität"
 msgid "Medium quality at manageable cost"
 msgstr "Mittlere Qualität zu überschaubaren Kosten"
 
-#: src/lib/model-descriptions.ts:141
+#: src/lib/model-descriptions.ts:140
 msgid "Medium quality model by Black Forest"
 msgstr "Modell mittlerer Qualität von Black Forest"
 
-#: src/lib/model-descriptions.ts:142
+#: src/lib/model-descriptions.ts:141
 msgid "Medium quality model for photorealism"
 msgstr "Modell mittlerer Qualität für Fotorealismus"
 
-#: src/lib/model-descriptions.ts:143
+#: src/lib/model-descriptions.ts:142
 msgid "Medium quality model for rendering text"
 msgstr "Modell mittlerer Qualität für Textdarstellung"
 
-#: src/lib/model-descriptions.ts:144
+#: src/lib/model-descriptions.ts:143
 msgid "Medium quality model with a focus on cinematic visuals"
 msgstr "Modell mittlerer Qualität mit Fokus auf cineastischer Optik"
 
-#: src/lib/model-descriptions.ts:145
+#: src/lib/model-descriptions.ts:144
 msgid "Medium quality model with reasoning and web search"
 msgstr "Modell mittlerer Qualität mit Reasoning und Websuche"
 
@@ -18840,6 +18848,14 @@ msgstr "Messenger-Schlüssel gespeichert"
 msgid "Meta's latest open-source model with multimodal vision"
 msgstr "Metas neuestes Open-Source-Modell mit multimodaler Bildverarbeitung"
 
+#: src/lib/model-descriptions.ts:145
+msgid "Meta's Llama 3.3 70B on Workers AI"
+msgstr "Llama 3.3 70B von Meta auf Workers AI"
+
+#: src/lib/model-descriptions.ts:147
+msgid "Meta's multimodal Llama 4 on Workers AI"
+msgstr "Das multimodale Llama 4 von Meta auf Workers AI"
+
 #: src/lib/model-descriptions.ts:146
 msgid "Meta's MusicGen text-to-music — medium / large / melody variants via passthrough."
 msgstr "Metas MusicGen Text-zu-Musik — Varianten medium / large / melody per Passthrough."
@@ -18900,7 +18916,7 @@ msgstr "Minimale Kosten für einfache Klassifizierung und Extraktion"
 msgid "Minimal cost for simple tasks"
 msgstr "Minimale Kosten für einfache Aufgaben"
 
-#: src/lib/model-descriptions.ts:147
+#: src/lib/model-descriptions.ts:148
 msgid "MiniMax Hailuo 02 frontier tier — dynamic motion, high fidelity"
 msgstr "MiniMax Hailuo 02 Spitzenstufe — dynamische Bewegung, hohe Wiedergabetreue"
 
@@ -18912,19 +18928,19 @@ msgstr "MiniMax Hailuo 02, Pro-Stufe"
 msgid "MiniMax Hailuo 02 standard tier"
 msgstr "MiniMax Hailuo 02, Standardstufe"
 
-#: src/lib/model-descriptions.ts:148
+#: src/lib/model-descriptions.ts:149
 msgid "MiniMax Hailuo 02 standard tier — balanced quality and speed"
 msgstr "MiniMax Hailuo 02 Standardstufe — ausgewogene Qualität und Geschwindigkeit"
 
-#: src/lib/model-descriptions.ts:149
+#: src/lib/model-descriptions.ts:150
 msgid "MiniMax Hailuo 2.3 frontier tier — dynamic motion, latest generation"
 msgstr "MiniMax Hailuo 2.3 Spitzenstufe — dynamische Bewegung, neueste Generation"
 
-#: src/lib/model-descriptions.ts:150
+#: src/lib/model-descriptions.ts:151
 msgid "MiniMax Hailuo 2.3 standard tier — strong motion, balanced cost"
 msgstr "MiniMax Hailuo 2.3 Standardstufe — starke Bewegung, ausgewogene Kosten"
 
-#: src/lib/model-descriptions.ts:151
+#: src/lib/model-descriptions.ts:153
 msgid "MiniMax video generation model via Replicate"
 msgstr "MiniMax-Videogenerierungsmodell über Replicate"
 
@@ -18936,7 +18952,7 @@ msgstr "MiniMax Video-01 Live — hochwertiges Modell, optimiert für die Animat
 msgid "MiniMax's advanced production model"
 msgstr "Das fortschrittliche Produktionsmodell von MiniMax"
 
-#: src/lib/model-descriptions.ts:153
+#: src/lib/model-descriptions.ts:154
 msgid "MiniMax's advanced reasoning LLM"
 msgstr "MiniMax' fortschrittliches Reasoning-LLM"
 
@@ -18944,7 +18960,7 @@ msgstr "MiniMax' fortschrittliches Reasoning-LLM"
 msgid "MiniMax's advanced reasoning model"
 msgstr "Das fortschrittliche Reasoning-Modell von MiniMax"
 
-#: src/lib/model-descriptions.ts:154
+#: src/lib/model-descriptions.ts:155
 msgid "MiniMax's fast advanced reasoning LLM"
 msgstr "MiniMax' schnelles, fortschrittliches Reasoning-LLM"
 
@@ -18953,7 +18969,7 @@ msgid "MiniMax's fastest model with reasoning capability"
 msgstr "Das schnellste Modell von MiniMax mit Reasoning-Fähigkeit"
 
 #: src/features/marketing/data/models-data.ts:1278
-#: src/lib/model-descriptions.ts:155
+#: src/lib/model-descriptions.ts:156
 msgid "MiniMax's most capable reasoning LLM"
 msgstr "Das leistungsfähigste Reasoning-LLM von MiniMax"
 
@@ -18991,7 +19007,7 @@ msgid "Mistral's balanced medium model"
 msgstr "Mistrals ausgewogenes mittleres Modell"
 
 #: src/features/marketing/data/models-data.ts:1338
-#: src/lib/model-descriptions.ts:156
+#: src/lib/model-descriptions.ts:157
 msgid "Mistral's coding-focused LLM"
 msgstr "Mistrals auf Programmierung fokussiertes LLM"
 
@@ -19003,27 +19019,27 @@ msgstr "Mistrals erstes dediziertes Reasoning-Modell"
 msgid "Mistral's largest Ministral model at 14B"
 msgstr "Mistrals größtes Ministral-Modell mit 14B"
 
-#: src/lib/model-descriptions.ts:157
+#: src/lib/model-descriptions.ts:158
 msgid "Mistral's latest and greatest large multi-modal LLM"
 msgstr "Mistrals neuestes und bestes großes multimodales LLM"
 
-#: src/lib/model-descriptions.ts:158
+#: src/lib/model-descriptions.ts:159
 msgid "Mistral's medium multi-modal LLM"
 msgstr "Mistrals mittleres multimodales LLM"
 
-#: src/lib/model-descriptions.ts:159
+#: src/lib/model-descriptions.ts:160
 msgid "Mistral's medium reasoning LLM"
 msgstr "Mistrals mittleres Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:160
+#: src/lib/model-descriptions.ts:161
 msgid "Mistral's mini-model 14B multi-modal LLM"
 msgstr "Mistrals 14B-Mini-Modell, multimodales LLM"
 
-#: src/lib/model-descriptions.ts:161
+#: src/lib/model-descriptions.ts:162
 msgid "Mistral's mini-model 3B multi-modal LLM"
 msgstr "Mistrals 3B-Mini-Modell, multimodales LLM"
 
-#: src/lib/model-descriptions.ts:162
+#: src/lib/model-descriptions.ts:163
 msgid "Mistral's mini-model 8B multi-modal LLM"
 msgstr "Mistrals 8B-Mini-Modell, multimodales LLM"
 
@@ -19031,11 +19047,15 @@ msgstr "Mistrals 8B-Mini-Modell, multimodales LLM"
 msgid "Mistral's most capable model with 675B total parameters"
 msgstr "Mistrals leistungsfähigstes Modell mit insgesamt 675B Parametern"
 
-#: src/lib/model-descriptions.ts:163
+#: src/lib/model-descriptions.ts:164
+msgid "Mistral's multimodal small model on Workers AI"
+msgstr "Das kleine multimodale Modell von Mistral auf Workers AI"
+
+#: src/lib/model-descriptions.ts:165
 msgid "Mistral's small coding-focused LLM"
 msgstr "Mistrals kleines, auf Programmierung fokussiertes LLM"
 
-#: src/lib/model-descriptions.ts:164
+#: src/lib/model-descriptions.ts:166
 msgid "Mistral's small reasoning LLM"
 msgstr "Mistrals kleines Reasoning-LLM"
 
@@ -19136,7 +19156,7 @@ msgstr "Modell aktiviert"
 msgid "Model filter"
 msgstr "Modellfilter"
 
-#: src/components/model-picker/model-picker.tsx:389
+#: src/components/model-picker/model-picker.tsx:390
 msgid "Model info"
 msgstr "Modellinfo"
 
@@ -19153,7 +19173,7 @@ msgstr "Modellbeschränkungen"
 msgid "Model server"
 msgstr "Modellserver"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:532
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:533
 msgid "Model tabs"
 msgstr "Modell-Tabs"
 
@@ -19288,7 +19308,7 @@ msgstr "Monatlich"
 msgid "Monthly cost (microdollars)"
 msgstr "Monatliche Kosten (Mikrodollar)"
 
-#: src/lib/model-descriptions.ts:165
+#: src/lib/model-descriptions.ts:169
 msgid "Moonshot AI's advanced base LLM"
 msgstr "Moonshot AIs fortschrittliches Basis-LLM"
 
@@ -19300,7 +19320,7 @@ msgstr "Das effiziente Basismodell von Moonshot AI"
 msgid "Moonshot AI's flagship conversation model"
 msgstr "Das Flaggschiff-Konversationsmodell von Moonshot AI"
 
-#: src/lib/model-descriptions.ts:166
+#: src/lib/model-descriptions.ts:167
 msgid "MoonShot AI's latest multi-modal LLM with thinking"
 msgstr "Moonshot AIs neuestes multimodales LLM mit Thinking"
 
@@ -19308,9 +19328,13 @@ msgstr "Moonshot AIs neuestes multimodales LLM mit Thinking"
 msgid "Moonshot AI's latest vision-enabled flagship"
 msgstr "Das neueste Flaggschiff von Moonshot AI mit Bildverständnis"
 
-#: src/lib/model-descriptions.ts:167
+#: src/lib/model-descriptions.ts:168
 msgid "MoonShot AI's latest vision-enabled LLM"
 msgstr "Moonshot AIs neuestes LLM mit Vision"
+
+#: src/lib/model-descriptions.ts:170
+msgid "Moonshot's multimodal Kimi K2.5 on Workers AI"
+msgstr "Das multimodale Kimi K2.5 von Moonshot auf Workers AI"
 
 #: ../../packages/ui/src/components/breadcrumb.tsx:68
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:232
@@ -19395,7 +19419,7 @@ msgstr "Wie viel der Testfall höchstens kosten darf, in US-Dollar"
 msgid "Most Used"
 msgstr "Am häufigsten verwendet"
 
-#: src/lib/model-descriptions.ts:168
+#: src/lib/model-descriptions.ts:171
 msgid "Most versatile intelligent model"
 msgstr "Vielseitigstes intelligentes Modell"
 
@@ -19431,11 +19455,11 @@ msgstr "{0} nach unten verschieben"
 msgid "Move {0} up"
 msgstr "{0} nach oben verschieben"
 
-#: src/components/model-picker/model-picker.tsx:372
+#: src/components/model-picker/model-picker.tsx:373
 msgid "Move {label} down in starred"
 msgstr "{label} in Markierungen nach unten verschieben"
 
-#: src/components/model-picker/model-picker.tsx:357
+#: src/components/model-picker/model-picker.tsx:358
 msgid "Move {label} up in starred"
 msgstr "{label} in Markierungen nach oben verschieben"
 
@@ -19562,7 +19586,7 @@ msgstr "multimodal"
 msgid "Multimodal analysis for images and documents"
 msgstr "Multimodale Analyse von Bildern und Dokumenten"
 
-#: src/lib/model-descriptions.ts:169
+#: src/lib/model-descriptions.ts:172
 msgid "Multimodal open-source model from Meta"
 msgstr "Multimodales Open-Source-Modell von Meta"
 
@@ -19661,7 +19685,7 @@ msgstr ""
 msgid "Name"
 msgstr "Name"
 
-#: src/components/model-picker/model-picker.tsx:1131
+#: src/components/model-picker/model-picker.tsx:1132
 msgid "Name (A to Z)"
 msgstr ""
 
@@ -19991,8 +20015,8 @@ msgstr "Läuft nie ab"
 msgid "Never used"
 msgstr "Nie verwendet"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:145
-#: src/components/model-picker/model-picker.tsx:326
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:146
+#: src/components/model-picker/model-picker.tsx:327
 #: src/features/settings/components/chat/models-settings.tsx:43
 #: src/features/settings/components/chat/models-settings.tsx:568
 msgid "New"
@@ -20059,7 +20083,7 @@ msgstr "Neuer Datensatz"
 msgid "New Export"
 msgstr "Neuer Export"
 
-#: src/components/model-picker/model-picker.tsx:1132
+#: src/components/model-picker/model-picker.tsx:1133
 msgid "New first"
 msgstr ""
 
@@ -20074,11 +20098,11 @@ msgstr "Neues Ziel"
 msgid "New group chat"
 msgstr "Neuer Gruppenchat"
 
-#: src/lib/model-descriptions.ts:170
+#: src/lib/model-descriptions.ts:174
 msgid "New high quality model for photorealism and text rendering"
 msgstr "Neues hochwertiges Modell für Fotorealismus und Textdarstellung"
 
-#: src/lib/model-descriptions.ts:171
+#: src/lib/model-descriptions.ts:175
 msgid "New model excelling at anime"
 msgstr "Neues Modell, das bei Anime glänzt"
 
@@ -20239,7 +20263,7 @@ msgstr "Next-Gen"
 msgid "Next-gen creative AI"
 msgstr "Kreative KI der nächsten Generation"
 
-#: src/lib/model-descriptions.ts:172
+#: src/lib/model-descriptions.ts:176
 msgid "Next-gen fast model preview from Google"
 msgstr "Vorschau auf Googles schnelles Modell der nächsten Generation"
 
@@ -20251,7 +20275,7 @@ msgstr "Schnelles Reasoning der nächsten Generation auf Googles neuester Flash-
 msgid "Next-gen Flux architecture at budget cost"
 msgstr "Flux-Architektur der nächsten Generation zum Sparpreis"
 
-#: src/lib/model-descriptions.ts:173
+#: src/lib/model-descriptions.ts:177
 msgid "Next-gen frontier model preview from Google"
 msgstr "Vorschau auf Googles Spitzenmodell der nächsten Generation"
 
@@ -20259,7 +20283,7 @@ msgstr "Vorschau auf Googles Spitzenmodell der nächsten Generation"
 msgid "Next-gen image generation"
 msgstr "Bildgenerierung der nächsten Generation"
 
-#: src/lib/model-descriptions.ts:174
+#: src/lib/model-descriptions.ts:178
 msgid "Next-gen model with improved dynamics and enhanced style adaptation"
 msgstr "Modell der nächsten Generation mit verbesserter Dynamik und besserer Stilanpassung"
 
@@ -20596,8 +20620,8 @@ msgstr "Keine Modelle verfügbar"
 msgid "No models found matching your filters."
 msgstr "Keine Modelle gefunden, die deinen Filtern entsprechen."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:711
-#: src/components/model-picker/model-picker.tsx:1183
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:712
+#: src/components/model-picker/model-picker.tsx:1184
 msgid "No models found."
 msgstr "Keine Modelle gefunden."
 
@@ -20809,8 +20833,8 @@ msgstr "Keine Sortierung angewendet"
 msgid "No speech detected. Hands-free mode stopped."
 msgstr "Keine Sprache erkannt. Freihandmodus beendet."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:703
-#: src/components/model-picker/model-picker.tsx:1175
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:704
+#: src/components/model-picker/model-picker.tsx:1176
 msgid "No starred models"
 msgstr "Keine markierten Modelle"
 
@@ -21226,6 +21250,10 @@ msgstr "Anzahl der Bilder"
 msgid "Number of messages"
 msgstr "Anzahl der Nachrichten"
 
+#: src/lib/model-descriptions.ts:173
+msgid "NVIDIA's Nemotron 3 on Workers AI"
+msgstr "Nemotron 3 von NVIDIA auf Workers AI"
+
 #: src/features/workflow/types/index.ts:559
 #: src/features/workflow/types/index.ts:563
 msgid "Object Editor"
@@ -21295,7 +21323,7 @@ msgstr "Offset: 0x{hoveredOffsetHex} ({hoveredByte}) = 0x{hoveredValueHex} ({hov
 msgid "Oil Painting"
 msgstr "Ölgemälde"
 
-#: src/lib/model-descriptions.ts:175
+#: src/lib/model-descriptions.ts:179
 msgid "Old generation cinematic model with higher consistency"
 msgstr "Cineastisches Modell der älteren Generation mit höherer Konsistenz"
 
@@ -21471,7 +21499,7 @@ msgid "Online"
 msgstr "Online"
 
 #. placeholder {0}: getModelModeName(anchorMode!)
-#: src/components/model-picker/model-picker.tsx:483
+#: src/components/model-picker/model-picker.tsx:484
 msgid "Only {0} models can be compared. Clear selection to switch types."
 msgstr "Nur {0}-Modelle können verglichen werden. Auswahl löschen, um Typen zu wechseln."
 
@@ -21499,7 +21527,7 @@ msgstr ""
 msgid "Only run when every filter matches the JSON body. Use dotted paths such as pull_request.user.login or labels.0.name. A delivery that does not match is accepted, shown as Skipped in the history, and does not run or count against your quota."
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:249
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:250
 msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "Nur Modelle desselben Typs können verglichen werden. Leere die Auswahl, um den Typ zu wechseln."
 
@@ -21857,7 +21885,7 @@ msgstr "Open-Source-Zugang zu modernster KI von Alibaba"
 msgid "Open-source AI deployments requiring capable, unrestricted access to Meta's Llama 3.3"
 msgstr "Open-Source-KI-Deployments, die leistungsfähigen, uneingeschränkten Zugang zu Metas Llama 3.3 erfordern"
 
-#: src/lib/model-descriptions.ts:176
+#: src/lib/model-descriptions.ts:180
 msgid "Open-source audio-video model with native sound, 4K output, and lip sync from Lightricks"
 msgstr "Open-Source-Audio-Video-Modell von Lightricks mit nativem Ton, 4K-Ausgabe und Lippensynchronisation"
 
@@ -21869,7 +21897,7 @@ msgstr "Open-Source-Deployments, die OpenAIs größeres, leistungsfähigeres OSS
 msgid "Open-source from Lightricks"
 msgstr "Open Source von Lightricks"
 
-#: src/lib/model-descriptions.ts:177
+#: src/lib/model-descriptions.ts:181
 msgid "Open-source frontier reasoning model from DeepSeek"
 msgstr "Open-Source-Spitzenmodell für Reasoning von DeepSeek"
 
@@ -21877,7 +21905,7 @@ msgstr "Open-Source-Spitzenmodell für Reasoning von DeepSeek"
 msgid "Open-source frontier-level reasoning model"
 msgstr "Open-Source-Reasoning-Modell auf Spitzenniveau"
 
-#: src/lib/model-descriptions.ts:178
+#: src/lib/model-descriptions.ts:182
 msgid "Open-source model competitive with top closed image models"
 msgstr "Open-Source-Modell, das mit den besten geschlossenen Bildmodellen mithält"
 
@@ -21949,15 +21977,15 @@ msgstr "Videokohärenz in OpenAI-Qualität"
 msgid "OpenAI's advanced 120B open-source model"
 msgstr "OpenAIs fortschrittliches 120B-Open-Source-Modell"
 
-#: src/lib/model-descriptions.ts:179
+#: src/lib/model-descriptions.ts:184
 msgid "OpenAI's advanced coding LLM"
 msgstr "OpenAIs fortschrittliches Coding-LLM"
 
-#: src/lib/model-descriptions.ts:180
+#: src/lib/model-descriptions.ts:185
 msgid "OpenAI's advanced instruction-following LLM"
 msgstr "OpenAIs fortschrittliches LLM für Anweisungsbefolgung"
 
-#: src/lib/model-descriptions.ts:181
+#: src/lib/model-descriptions.ts:186
 msgid "OpenAI's advanced open-source LLM"
 msgstr "OpenAIs fortschrittliches Open-Source-LLM"
 
@@ -21965,11 +21993,11 @@ msgstr "OpenAIs fortschrittliches Open-Source-LLM"
 msgid "OpenAI's advanced reasoning architecture"
 msgstr "OpenAIs fortschrittliche Reasoning-Architektur"
 
-#: src/lib/model-descriptions.ts:182
+#: src/lib/model-descriptions.ts:187
 msgid "OpenAI's advanced reasoning LLM"
 msgstr "OpenAIs fortschrittliches Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:183
+#: src/lib/model-descriptions.ts:188
 msgid "OpenAI's compact coding LLM"
 msgstr "OpenAIs kompaktes Coding-LLM"
 
@@ -21977,24 +22005,24 @@ msgstr "OpenAIs kompaktes Coding-LLM"
 msgid "OpenAI's efficient mini reasoning model"
 msgstr "OpenAIs effizientes Mini-Reasoning-Modell"
 
-#: src/lib/model-descriptions.ts:184
+#: src/lib/model-descriptions.ts:189
 msgid "OpenAI's flagship frontier model"
 msgstr "OpenAIs Flaggschiff-Spitzenmodell"
 
-#: src/lib/model-descriptions.ts:37
+#: src/lib/model-descriptions.ts:183
 msgid "OpenAI's GPT Image 2 text-to-image model"
 msgstr "Text-zu-Bild-Modell GPT Image 2 von OpenAI"
 
-#: src/lib/model-descriptions.ts:185
+#: src/lib/model-descriptions.ts:190
 msgid "OpenAI's latest advanced coding LLM"
 msgstr "OpenAIs neuestes fortschrittliches Coding-LLM"
 
-#: src/lib/model-descriptions.ts:186
+#: src/lib/model-descriptions.ts:191
 msgid "OpenAI's latest and greatest reasoning LLM"
 msgstr "OpenAIs neuestes und bestes Reasoning-LLM"
 
 #: src/features/marketing/data/models-data.ts:1050
-#: src/lib/model-descriptions.ts:187
+#: src/lib/model-descriptions.ts:192
 msgid "OpenAI's latest flagship reasoning LLM"
 msgstr "OpenAIs neuestes Flaggschiff-Reasoning-LLM"
 
@@ -22002,7 +22030,7 @@ msgstr "OpenAIs neuestes Flaggschiff-Reasoning-LLM"
 msgid "OpenAI's latest model with thinking transparency"
 msgstr "OpenAIs neuestes Modell mit transparentem Denkprozess"
 
-#: src/lib/model-descriptions.ts:188
+#: src/lib/model-descriptions.ts:193
 msgid "OpenAI's most advanced flagship video generation model"
 msgstr "OpenAIs fortschrittlichstes Flaggschiff-Modell zur Videogenerierung"
 
@@ -22014,7 +22042,7 @@ msgstr "OpenAIs fortschrittlichstes Spitzenmodell"
 msgid "OpenAI's most advanced video model"
 msgstr "OpenAIs fortschrittlichstes Videomodell"
 
-#: src/lib/model-descriptions.ts:189
+#: src/lib/model-descriptions.ts:194
 msgid "OpenAI's most capable coding LLM"
 msgstr "OpenAIs leistungsstärkstes Coding-LLM"
 
@@ -22026,15 +22054,15 @@ msgstr "OpenAIs leistungsfähigstes Coding-Modell"
 msgid "OpenAI's most capable model in the 5.2 family"
 msgstr "OpenAIs leistungsfähigstes Modell der 5.2-Familie"
 
-#: src/lib/model-descriptions.ts:190
+#: src/lib/model-descriptions.ts:195
 msgid "OpenAI's most capable premium model"
 msgstr "OpenAIs leistungsstärkstes Premium-Modell"
 
-#: src/lib/model-descriptions.ts:191
+#: src/lib/model-descriptions.ts:196
 msgid "OpenAI's new powerful video model. Rich world knowledge with very stable structure"
 msgstr "OpenAIs neues leistungsstarkes Videomodell. Umfangreiches Weltwissen mit sehr stabiler Struktur"
 
-#: src/lib/model-descriptions.ts:192
+#: src/lib/model-descriptions.ts:197
 msgid "OpenAI's newest coding LLM"
 msgstr "OpenAIs neuestes Coding-LLM"
 
@@ -22046,23 +22074,31 @@ msgstr "OpenAIs neuestes Coding-Modell"
 msgid "OpenAI's open-source 20B model"
 msgstr "OpenAIs Open-Source-Modell mit 20B"
 
-#: src/lib/model-descriptions.ts:193
+#: src/lib/model-descriptions.ts:198
+msgid "OpenAI's open-weight 120B model on Workers AI"
+msgstr "Das Open-Weight-120B-Modell von OpenAI auf Workers AI"
+
+#: src/lib/model-descriptions.ts:199
+msgid "OpenAI's open-weight 20B model on Workers AI"
+msgstr "Das Open-Weight-20B-Modell von OpenAI auf Workers AI"
+
+#: src/lib/model-descriptions.ts:200
 msgid "OpenAI's recent and smart reasoning LLM"
 msgstr "OpenAIs aktuelles, intelligentes Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:194
+#: src/lib/model-descriptions.ts:201
 msgid "OpenAI's recent mini reasoning LLM"
 msgstr "OpenAIs aktuelles Mini-Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:195
+#: src/lib/model-descriptions.ts:202
 msgid "OpenAI's small LLM"
 msgstr "OpenAIs kleines LLM"
 
-#: src/lib/model-descriptions.ts:196
+#: src/lib/model-descriptions.ts:203
 msgid "OpenAI's small open-source LLM"
 msgstr "OpenAIs kleines Open-Source-LLM"
 
-#: src/lib/model-descriptions.ts:197
+#: src/lib/model-descriptions.ts:204
 msgid "OpenAI's smallest LLM"
 msgstr "OpenAIs kleinstes LLM"
 
@@ -22342,7 +22378,7 @@ msgstr "Threads organisieren"
 msgid "Original"
 msgstr "Original"
 
-#: src/lib/model-descriptions.ts:198
+#: src/lib/model-descriptions.ts:205
 msgid "Original ChatGPT image model"
 msgstr "Ursprüngliches ChatGPT-Bildmodell"
 
@@ -22412,7 +22448,7 @@ msgstr "Outpainting"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:547
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
-#: src/components/model-picker/model-picker.tsx:204
+#: src/components/model-picker/model-picker.tsx:205
 #: src/features/devices/components/device-tool-call.tsx:174
 #: src/features/workflow/components/nodes/output-node.tsx:52
 #: src/features/workflow/types/index.ts:584
@@ -22607,8 +22643,8 @@ msgstr ""
 msgid "Paraguay"
 msgstr "Paraguay"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:595
-#: src/components/model-picker/model-picker.tsx:1047
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:596
+#: src/components/model-picker/model-picker.tsx:1048
 msgid "Parallel"
 msgstr "Parallel"
 
@@ -22862,7 +22898,7 @@ msgstr "Zahlungen, Bestellungen, Rechnungen und Abonnements über PayPal"
 msgid "Payments, subscriptions, and financial data"
 msgstr "Zahlungen, Abonnements und Finanzdaten"
 
-#: src/components/model-picker/model-picker.tsx:80
+#: src/components/model-picker/model-picker.tsx:81
 #: src/features/settings/components/chat/models-settings.tsx:35
 msgid "PDF"
 msgstr "PDF"
@@ -23097,7 +23133,7 @@ msgstr "Pika Labs"
 msgid "Pika Labs 2.2 — narrative-focused generation"
 msgstr "Pika Labs 2.2 – erzählorientierte Generierung"
 
-#: src/lib/model-descriptions.ts:199
+#: src/lib/model-descriptions.ts:206
 msgid "Pika Labs 2.2 — narrative-focused video model with strong storytelling and motion control"
 msgstr "Pika Labs 2.2 — erzählorientiertes Videomodell mit starkem Storytelling und Bewegungssteuerung"
 
@@ -23402,11 +23438,11 @@ msgstr "leistungsstark"
 msgid "Powerful 8B model with vision capabilities"
 msgstr "Leistungsstarkes 8B-Modell mit Bildverständnis"
 
-#: src/lib/model-descriptions.ts:200
+#: src/lib/model-descriptions.ts:207
 msgid "Powerful general-purpose model from Z.AI"
 msgstr "Leistungsstarkes Allzweckmodell von Z.AI"
 
-#: src/lib/model-descriptions.ts:201
+#: src/lib/model-descriptions.ts:208
 msgid "Powerful multimodal model from MiniMax"
 msgstr "Leistungsstarkes multimodales Modell von MiniMax"
 
@@ -23678,7 +23714,7 @@ msgstr "Vorheriger Branch"
 msgid "Previous export was cancelled"
 msgstr "Vorheriger Export wurde abgebrochen"
 
-#: src/lib/model-descriptions.ts:202
+#: src/lib/model-descriptions.ts:209
 msgid "Previous generation high-quality model for complex scenes"
 msgstr "Hochwertiges Modell der vorherigen Generation für komplexe Szenen"
 
@@ -23717,15 +23753,15 @@ msgstr "Vorherige Folie"
 msgid "Previous version"
 msgstr "Vorherige Version"
 
-#: src/components/model-picker/model-picker.tsx:196
+#: src/components/model-picker/model-picker.tsx:197
 msgid "Price per 1M tokens"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1134
+#: src/components/model-picker/model-picker.tsx:1135
 msgid "Price: high to low"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1133
+#: src/components/model-picker/model-picker.tsx:1134
 msgid "Price: low to high"
 msgstr ""
 
@@ -23804,8 +23840,8 @@ msgstr "Privat"
 msgid "Private by default"
 msgstr "Standardmäßig privat"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:140
-#: src/components/model-picker/model-picker.tsx:313
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:141
+#: src/components/model-picker/model-picker.tsx:314
 #: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:130
 #: src/features/marketing/components/landing-page.tsx:344
@@ -24164,7 +24200,7 @@ msgstr "Bewährte Kino-Ästhetik"
 msgid "Proven reliability from previous generation"
 msgstr "Bewährte Zuverlässigkeit der Vorgängergeneration"
 
-#: src/components/model-picker/model-picker.tsx:226
+#: src/components/model-picker/model-picker.tsx:227
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -24417,27 +24453,31 @@ msgstr ""
 msgid "Quoted in composer"
 msgstr ""
 
-#: src/lib/model-descriptions.ts:203
+#: src/lib/model-descriptions.ts:210
 msgid "Qwen's advanced instruct LLM"
 msgstr "Qwens fortschrittliches Instruct-LLM"
 
-#: src/lib/model-descriptions.ts:204
+#: src/lib/model-descriptions.ts:211
 msgid "Qwen's advanced instruct LLM preview"
 msgstr "Vorschau auf Qwens fortschrittliches Instruct-LLM"
 
-#: src/lib/model-descriptions.ts:205
+#: src/lib/model-descriptions.ts:212
 msgid "Qwen's advanced thinking LLM"
 msgstr "Qwens fortschrittliches Thinking-LLM"
 
-#: src/lib/model-descriptions.ts:206
+#: src/lib/model-descriptions.ts:213
 msgid "Qwen's advanced vision LLM"
 msgstr "Qwens fortschrittliches Vision-LLM"
 
-#: src/lib/model-descriptions.ts:207
+#: src/lib/model-descriptions.ts:214
 msgid "Qwen's advanced vision LLM with thinking"
 msgstr "Qwens fortschrittliches Vision-LLM mit Thinking"
 
-#: src/lib/model-descriptions.ts:208
+#: src/lib/model-descriptions.ts:215
+msgid "Qwen's mixture-of-experts model on Workers AI"
+msgstr "Das Mixture-of-Experts-Modell von Qwen auf Workers AI"
+
+#: src/lib/model-descriptions.ts:216
 msgid "Qwen's most advanced instruct LLM"
 msgstr "Qwens fortschrittlichstes Instruct-LLM"
 
@@ -24445,7 +24485,7 @@ msgstr "Qwens fortschrittlichstes Instruct-LLM"
 msgid "Qwen's most advanced reasoning capability"
 msgstr "Qwens fortschrittlichste Reasoning-Fähigkeit"
 
-#: src/lib/model-descriptions.ts:209
+#: src/lib/model-descriptions.ts:217
 msgid "Qwen's most advanced reasoning LLM"
 msgstr "Qwens fortschrittlichstes Reasoning-LLM"
 
@@ -24736,7 +24776,7 @@ msgstr "Grund (optional)"
 msgid "reasoning"
 msgstr "Reasoning"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:149
+#: ../../packages/chat-ui/src/model-picker/utils.ts:161
 #: ../../packages/ui/src/components/ai-elements/context.tsx:315
 #: src/features/chat/thread/message-cost-badge.tsx:64
 #: src/features/settings/components/chat/models-settings.tsx:32
@@ -24782,11 +24822,11 @@ msgstr "Reasoning-Aufgaben, die Alibabas 80B-MoE-Modell mit Denkfähigkeit erfor
 msgid "Reasoning toggle for flexible task handling"
 msgstr "Umschaltbares Reasoning für flexible Aufgabenbearbeitung"
 
-#: src/lib/model-descriptions.ts:210
+#: src/lib/model-descriptions.ts:218
 msgid "Reasoning version of Kimi K2 from Moonshot AI"
 msgstr "Reasoning-Version von Kimi K2 von Moonshot AI"
 
-#: src/lib/model-descriptions.ts:211
+#: src/lib/model-descriptions.ts:219
 msgid "Reasoning version of Qwen3 235B from Alibaba"
 msgstr "Reasoning-Version von Qwen3 235B von Alibaba"
 
@@ -24888,11 +24928,11 @@ msgstr "Konto wiederherstellen"
 msgid "Recover Account"
 msgstr "Konto wiederherstellen"
 
-#: src/lib/model-descriptions.ts:212
+#: src/lib/model-descriptions.ts:220
 msgid "Recraft V4 Pro — true visual taste for brand systems and production-ready workflows"
 msgstr "Recraft V4 Pro — echtes visuelles Gespür für Markensysteme und produktionsreife Workflows"
 
-#: src/lib/model-descriptions.ts:213
+#: src/lib/model-descriptions.ts:221
 msgid "Recraft's text-to-image model with long text generation, vector art, and brand-style images"
 msgstr "Recrafts Text-zu-Bild-Modell mit langer Textgenerierung, Vektorgrafiken und Bildern im Markenstil"
 
@@ -25022,7 +25062,7 @@ msgstr "verfeinert"
 msgid "Refined capabilities over Claude Sonnet 4"
 msgstr "Verfeinerte Fähigkeiten gegenüber Claude Sonnet 4"
 
-#: src/lib/model-descriptions.ts:214
+#: src/lib/model-descriptions.ts:223
 msgid "Refined flagship model from Anthropic"
 msgstr "Verfeinertes Flaggschiff-Modell von Anthropic"
 
@@ -25030,7 +25070,7 @@ msgstr "Verfeinertes Flaggschiff-Modell von Anthropic"
 msgid "Refined frontier capabilities over Claude Opus 4"
 msgstr "Verfeinerte Spitzenfähigkeiten gegenüber Claude Opus 4"
 
-#: src/lib/model-descriptions.ts:215
+#: src/lib/model-descriptions.ts:222
 msgid "Refined GPT-5 update from OpenAI"
 msgstr "Verfeinertes GPT-5-Update von OpenAI"
 
@@ -25337,8 +25377,8 @@ msgstr "Aus Favoriten entfernen"
 msgid "Remove from project"
 msgstr "Aus Projekt entfernen"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:167
-#: src/components/model-picker/model-picker.tsx:340
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:168
+#: src/components/model-picker/model-picker.tsx:341
 msgid "Remove from starred"
 msgstr "Aus Markierungen entfernen"
 
@@ -26785,8 +26825,8 @@ msgstr ""
 msgid "Search models by name, ID, or provider..."
 msgstr "Modelle nach Name, ID oder Anbieter suchen..."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:528
-#: src/components/model-picker/model-picker.tsx:988
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:529
+#: src/components/model-picker/model-picker.tsx:989
 msgid "Search models..."
 msgstr "Modelle suchen..."
 
@@ -27223,7 +27263,7 @@ msgstr ""
 msgid "Selection context"
 msgstr "Auswahlkontext"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:570
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:571
 msgid "Selection mode"
 msgstr "Auswahlmodus"
 
@@ -27235,7 +27275,7 @@ msgstr "Selektive Schärfeebene"
 msgid "semi-realistic"
 msgstr "halbrealistisch"
 
-#: src/lib/model-descriptions.ts:216
+#: src/lib/model-descriptions.ts:225
 msgid "Semi-realistic model with good prompt adherence"
 msgstr "Halbrealistisches Modell mit guter Prompt-Treue"
 
@@ -27951,8 +27991,8 @@ msgstr "Registriere dich und abonniere für 8 $/Monat, um alle Funktionen freizu
 msgid "Sign up successful"
 msgstr "Registrierung erfolgreich"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:246
-#: src/components/model-picker/model-picker.tsx:480
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:247
+#: src/components/model-picker/model-picker.tsx:481
 msgid "Sign up to unlock all models"
 msgstr "Registriere dich, um alle Modelle freizuschalten"
 
@@ -28021,8 +28061,8 @@ msgstr "inzwischen ersetzt"
 msgid "Singapore"
 msgstr "Singapur"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:582
-#: src/components/model-picker/model-picker.tsx:1035
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:583
+#: src/components/model-picker/model-picker.tsx:1036
 msgid "Single"
 msgstr "Einzeln"
 
@@ -28229,11 +28269,11 @@ msgstr "Slowenisch"
 msgid "Slovenian (Slovenia)"
 msgstr "Slowenisch (Slowenien)"
 
-#: src/lib/model-descriptions.ts:217
+#: src/lib/model-descriptions.ts:226
 msgid "Slow cinematic model with realistic textures"
 msgstr "Langsames cineastisches Modell mit realistischen Texturen"
 
-#: src/lib/model-descriptions.ts:218
+#: src/lib/model-descriptions.ts:227
 msgid "Slow model with high control and 10s duration"
 msgstr "Langsames Modell mit viel Kontrolle und 10 s Dauer"
 
@@ -28395,7 +28435,7 @@ msgstr "Daten sortieren"
 msgid "Sort desc"
 msgstr "Absteigend sortieren"
 
-#: src/components/model-picker/model-picker.tsx:1124
+#: src/components/model-picker/model-picker.tsx:1125
 msgid "Sort models"
 msgstr ""
 
@@ -28411,7 +28451,7 @@ msgstr "Sortierung"
 msgid "SOTA cost-efficiency with 2M token context"
 msgstr "Kosteneffizienz auf dem neuesten Stand mit 2M-Token-Kontext"
 
-#: src/lib/model-descriptions.ts:219
+#: src/lib/model-descriptions.ts:224
 msgid "SOTA with vector art and typography via Replicate"
 msgstr "SOTA mit Vektorgrafik und Typografie über Replicate"
 
@@ -28606,7 +28646,7 @@ msgstr "Spracherkennung wird von deinem Browser nicht unterstützt"
 msgid "Speech to Text"
 msgstr "Sprache zu Text"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:92
+#: ../../packages/chat-ui/src/model-picker/utils.ts:104
 msgid "speech-to-text"
 msgstr "Sprache-zu-Text"
 
@@ -28615,7 +28655,7 @@ msgstr "Sprache-zu-Text"
 msgid "Speed"
 msgstr "Geschwindigkeit"
 
-#: src/lib/model-descriptions.ts:39
+#: src/lib/model-descriptions.ts:228
 msgid "Speed tier of Nano Banana 2 for fast text-to-image generation"
 msgstr "Schnelle Stufe von Nano Banana 2 für rasche Text-zu-Bild-Generierung"
 
@@ -28682,7 +28722,7 @@ msgstr "SSO"
 msgid "SSO & team management"
 msgstr "SSO & Teamverwaltung"
 
-#: src/lib/model-descriptions.ts:220
+#: src/lib/model-descriptions.ts:229
 msgid "Stability AI's Stable Audio 2.5 — high-quality text-to-music, up to ~190s."
 msgstr "Stability AIs Stable Audio 2.5 — hochwertige Text-zu-Musik-Generierung, bis zu ca. 190 s."
 
@@ -28744,8 +28784,8 @@ msgstr ""
 msgid "starred"
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:547
-#: src/components/model-picker/model-picker.tsx:1004
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:548
+#: src/components/model-picker/model-picker.tsx:1005
 msgid "Starred"
 msgstr "Markiert"
 
@@ -29003,7 +29043,7 @@ msgstr "Schritt {0} von {totalSteps}: {title}"
 msgid "Step-by-step tutorials for getting the most out of Neore Chat"
 msgstr "Schritt-für-Schritt-Tutorials, um das Beste aus Neore Chat herauszuholen"
 
-#: src/lib/model-descriptions.ts:221
+#: src/lib/model-descriptions.ts:230
 msgid "StepFun's fast and efficient LLM"
 msgstr "StepFuns schnelles und effizientes LLM"
 
@@ -29250,7 +29290,7 @@ msgstr "Starke Ergebnisse in kommerzieller Qualität"
 msgid "Strong complex scene handling"
 msgstr "Souveräner Umgang mit komplexen Szenen"
 
-#: src/lib/model-descriptions.ts:222
+#: src/lib/model-descriptions.ts:231
 msgid "Strong general-purpose and coding model from DeepSeek"
 msgstr "Starkes Allzweck- und Coding-Modell von DeepSeek"
 
@@ -29552,7 +29592,7 @@ msgstr ""
 msgid "Submitting…"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:983
+#: src/components/model-picker/model-picker.tsx:984
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "Abonniere für 8 $/Monat, um alle Modelle freizuschalten."
 
@@ -30267,14 +30307,14 @@ msgstr "Teste deine Agenten, Modelle und deine Wissensdatenbank mit einem festen
 msgid "testing"
 msgstr "Testen"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:93
+#: ../../packages/chat-ui/src/model-picker/utils.ts:105
 msgid "text"
 msgstr "Text"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:629
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:630
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:1080
+#: src/components/model-picker/model-picker.tsx:1081
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:120
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -30400,7 +30440,7 @@ msgstr "Text zu Video"
 msgid "Text to Video"
 msgstr "Text zu Video"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:94
+#: ../../packages/chat-ui/src/model-picker/utils.ts:106
 msgid "text-to-speech"
 msgstr "Text-zu-Sprache"
 
@@ -32083,9 +32123,9 @@ msgstr "Tool-Aufruf fehlgeschlagen"
 msgid "tool calling"
 msgstr "Tool-Aufrufe"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:157
-#: ../../packages/chat-ui/src/model-picker/utils.ts:161
-#: src/components/model-picker/model-picker.tsx:82
+#: ../../packages/chat-ui/src/model-picker/utils.ts:169
+#: ../../packages/chat-ui/src/model-picker/utils.ts:173
+#: src/components/model-picker/model-picker.tsx:83
 #: src/features/settings/components/chat/models-settings.tsx:33
 msgid "Tool Calling"
 msgstr "Tool-Aufrufe"
@@ -32127,7 +32167,7 @@ msgstr "Coding-Leistung auf Spitzenniveau, die mit proprietären Modellen mithä
 msgid "Top-tier frontier performance with 4.6 generation improvements"
 msgstr "Spitzenleistung mit den Verbesserungen der Generation 4.6"
 
-#: src/lib/model-descriptions.ts:223
+#: src/lib/model-descriptions.ts:232
 msgid "Top-tier Kling text-to-video with unparalleled motion fluidity"
 msgstr "Erstklassiges Kling Text-zu-Video mit unübertroffen flüssiger Bewegung"
 
@@ -32570,8 +32610,8 @@ msgid "Two-factor authentication is currently enabled for your account. This add
 msgstr "Zwei-Faktor-Authentifizierung ist derzeit für dein Konto aktiviert. Dies fügt eine zusätzliche Sicherheitsebene hinzu."
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:606
-#: src/components/model-picker/model-picker.tsx:1058
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:607
+#: src/components/model-picker/model-picker.tsx:1059
 #: src/features/devices/components/device-tool-call.tsx:119
 msgid "Type"
 msgstr "Typ"
@@ -32656,7 +32696,7 @@ msgstr "ultraschnell"
 msgid "ultra quality"
 msgstr "Ultra-Qualität"
 
-#: src/lib/model-descriptions.ts:224
+#: src/lib/model-descriptions.ts:233
 msgid "Ultra-fast budget model from Google"
 msgstr "Ultraschnelles Budget-Modell von Google"
 
@@ -32672,7 +32712,7 @@ msgstr "Ultraschnelle Inferenz für Open-Source-Modelle wie Llama und Mixtral"
 msgid "Ultra-fast inference tasks requiring Inception's novel diffusion-based architecture"
 msgstr "Ultraschnelle Inferenzaufgaben, die Inceptions neuartige diffusionsbasierte Architektur erfordern"
 
-#: src/lib/model-descriptions.ts:225
+#: src/lib/model-descriptions.ts:234
 msgid "Ultra-fast lightweight GPT-5 model from OpenAI"
 msgstr "Ultraschnelles, leichtgewichtiges GPT-5-Modell von OpenAI"
 
@@ -33049,7 +33089,7 @@ msgstr "Aktualisiere die Galerie-Einstellungen deines Workflows oder ziehe die V
 msgid "updated"
 msgstr "aktualisiert"
 
-#: src/lib/model-descriptions.ts:226
+#: src/lib/model-descriptions.ts:235
 msgid "Updated balanced frontier model from Anthropic"
 msgstr "Aktualisiertes ausgewogenes Spitzenmodell von Anthropic"
 
@@ -33061,7 +33101,7 @@ msgstr "Aktualisierte Fähigkeiten gegenüber GLM 4.5"
 msgid "Updated Codex with improved code quality"
 msgstr "Aktualisiertes Codex mit verbesserter Codequalität"
 
-#: src/lib/model-descriptions.ts:227
+#: src/lib/model-descriptions.ts:236
 msgid "Updated general-purpose model from Z.AI"
 msgstr "Aktualisiertes Allzweckmodell von Z.AI"
 
@@ -33069,11 +33109,11 @@ msgstr "Aktualisiertes Allzweckmodell von Z.AI"
 msgid "Updated M2 architecture with improved capabilities"
 msgstr "Aktualisierte M2-Architektur mit verbesserten Fähigkeiten"
 
-#: src/lib/model-descriptions.ts:228
+#: src/lib/model-descriptions.ts:237
 msgid "Updated multimodal model from MiniMax"
 msgstr "Aktualisiertes multimodales Modell von MiniMax"
 
-#: src/lib/model-descriptions.ts:229
+#: src/lib/model-descriptions.ts:238
 msgid "Updated open-source reasoning model from DeepSeek"
 msgstr "Aktualisiertes Open-Source-Reasoning-Modell von DeepSeek"
 
@@ -33093,7 +33133,7 @@ msgstr "Folie aktualisiert"
 msgid "Updated slide {slideNumber}"
 msgstr "Folie {slideNumber} aktualisiert"
 
-#: src/lib/model-descriptions.ts:230
+#: src/lib/model-descriptions.ts:239
 msgid "Updated vision model from Z.AI"
 msgstr "Aktualisiertes Vision-Modell von Z.AI"
 
@@ -33687,11 +33727,11 @@ msgstr "Vektor-Embeddings für beliebigen Text"
 msgid "Venezuela"
 msgstr "Venezuela"
 
-#: src/lib/model-descriptions.ts:231
+#: src/lib/model-descriptions.ts:240
 msgid "Vercel's v0 1.0 model"
 msgstr "Vercels v0-1.0-Modell"
 
-#: src/lib/model-descriptions.ts:232
+#: src/lib/model-descriptions.ts:241
 msgid "Vercel's v0 1.5 model"
 msgstr "Vercels v0-1.5-Modell"
 
@@ -33859,7 +33899,7 @@ msgstr "Sehr tief, Landschaftstiefe"
 msgid "Very fast generation speed"
 msgstr "Sehr schnelle Generierung"
 
-#: src/lib/model-descriptions.ts:233
+#: src/lib/model-descriptions.ts:242
 msgid "Very intelligent model. Best for logos"
 msgstr "Sehr intelligentes Modell. Ideal für Logos"
 
@@ -33872,8 +33912,8 @@ msgstr "Sehr niedrige Kosten pro Generierung"
 msgid "video"
 msgstr "Video"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
-#: src/components/model-picker/model-picker.tsx:1106
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:654
+#: src/components/model-picker/model-picker.tsx:1107
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:122
 #: src/features/marketing/components/landing-footer.tsx:166
@@ -33916,7 +33956,7 @@ msgstr "Video-Creator, die ausdrucksstarke Bewegungen mit flexibler Stilanpassun
 msgid "Video Description"
 msgstr "Videobeschreibung"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:95
+#: ../../packages/chat-ui/src/model-picker/utils.ts:107
 #: src/features/settings/lib/settings-keywords.ts:77
 msgid "video generation"
 msgstr "Videogenerierung"
@@ -34180,8 +34220,8 @@ msgstr "Sichtbarkeit"
 msgid "vision"
 msgstr "Bildverständnis"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:145
-#: src/components/model-picker/model-picker.tsx:83
+#: ../../packages/chat-ui/src/model-picker/utils.ts:157
+#: src/components/model-picker/model-picker.tsx:84
 #: src/features/settings/components/chat/models-settings.tsx:31
 msgid "Vision"
 msgstr "Bildverständnis"
@@ -34244,7 +34284,7 @@ msgstr "Bildaufgaben, die Z.AIs aktualisierte und verbesserte multimodale Fähig
 msgid "Vision understanding alongside strong text capabilities"
 msgstr "Bildverständnis neben starken Textfähigkeiten"
 
-#: src/lib/model-descriptions.ts:234
+#: src/lib/model-descriptions.ts:243
 msgid "Vision-capable model from Z.AI"
 msgstr "Vision-fähiges Modell von Z.AI"
 
@@ -34976,11 +35016,11 @@ msgstr "X-Position"
 msgid "xAI"
 msgstr "xAI"
 
-#: src/lib/model-descriptions.ts:235
+#: src/lib/model-descriptions.ts:253
 msgid "xAI's advanced coding LLM"
 msgstr "xAIs fortschrittliches Coding-LLM"
 
-#: src/lib/model-descriptions.ts:236
+#: src/lib/model-descriptions.ts:251
 msgid "xAI's Aurora-based image generation model"
 msgstr "xAIs Aurora-basiertes Modell zur Bildgenerierung"
 
@@ -34993,7 +35033,7 @@ msgid "xAI's capable balanced model with vision support"
 msgstr "xAIs leistungsfähiges, ausgewogenes Modell mit Bildverständnis"
 
 #: src/features/marketing/data/models-data.ts:873
-#: src/lib/model-descriptions.ts:237
+#: src/lib/model-descriptions.ts:254
 msgid "xAI's flagship frontier model with advanced reasoning"
 msgstr "xAIs Flaggschiff-Spitzenmodell mit fortschrittlichem Reasoning"
 
@@ -35001,19 +35041,19 @@ msgstr "xAIs Flaggschiff-Spitzenmodell mit fortschrittlichem Reasoning"
 msgid "xAI's foundation model capabilities"
 msgstr "Fähigkeiten des xAI-Basismodells"
 
-#: src/lib/model-descriptions.ts:238
+#: src/lib/model-descriptions.ts:255
 msgid "xAI's greatest and fastest multimodel LLM"
 msgstr "xAIs bestes und schnellstes multimodales LLM"
 
-#: src/lib/model-descriptions.ts:239
+#: src/lib/model-descriptions.ts:256
 msgid "xAI's greatest and fastest multimodel reasoning LLM"
 msgstr "xAIs bestes und schnellstes multimodales Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:41
+#: src/lib/model-descriptions.ts:252
 msgid "xAI's Grok Imagine 1.5 image-to-video model"
 msgstr "Bild-zu-Video-Modell Grok Imagine 1.5 von xAI"
 
-#: src/lib/model-descriptions.ts:240
+#: src/lib/model-descriptions.ts:257
 msgid "xAI's image generation model"
 msgstr "xAIs Modell zur Bildgenerierung"
 
@@ -35021,15 +35061,15 @@ msgstr "xAIs Modell zur Bildgenerierung"
 msgid "xAI's most compact reasoning model"
 msgstr "xAIs kompaktestes Reasoning-Modell"
 
-#: src/lib/model-descriptions.ts:241
+#: src/lib/model-descriptions.ts:258
 msgid "xAI's previous fastest multimodel LLM"
 msgstr "xAIs vorheriges schnellstes multimodales LLM"
 
-#: src/lib/model-descriptions.ts:242
+#: src/lib/model-descriptions.ts:259
 msgid "xAI's previous fastest multimodel reasoning LLM"
 msgstr "xAIs vorheriges schnellstes multimodales Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:243
+#: src/lib/model-descriptions.ts:260
 msgid "xAI's recent smallest LLM"
 msgstr "xAIs aktuelles kleinstes LLM"
 
@@ -35577,6 +35617,10 @@ msgstr "YouTube-Thumbnail"
 msgid "Z.AI"
 msgstr "Z.AI"
 
+#: src/lib/model-descriptions.ts:246
+msgid "Z.ai's fast GLM model on Workers AI"
+msgstr "Das schnelle GLM-Modell von Z.ai auf Workers AI"
+
 #: src/features/marketing/data/models-data.ts:1309
 msgid "Z.AI's fastest vision model"
 msgstr "Z.AIs schnellstes Bildverständnis-Modell"
@@ -35618,19 +35662,19 @@ msgstr "Z.AIs Flaggschiff-Modell mit erweitertem Bildverständnis"
 msgid "Zero Data Retention (ZDR)"
 msgstr "Keine Datenspeicherung (ZDR)"
 
-#: src/lib/model-descriptions.ts:246
+#: src/lib/model-descriptions.ts:247
 msgid "Zhipu AI's fast vision reasoning LLM"
 msgstr "Zhipu AIs schnelles Vision-Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:247
+#: src/lib/model-descriptions.ts:248
 msgid "Zhipu AI's latest fast vision reasoning LLM"
 msgstr "Zhipu AIs neuestes schnelles Vision-Reasoning-LLM"
 
-#: src/lib/model-descriptions.ts:248
+#: src/lib/model-descriptions.ts:249
 msgid "Zhipu AI's most powerful LLM"
 msgstr "Zhipu AIs leistungsstärkstes LLM"
 
-#: src/lib/model-descriptions.ts:249
+#: src/lib/model-descriptions.ts:250
 msgid "Zhipu AI's most powerful reasoning LLM"
 msgstr "Zhipu AIs leistungsstärkstes Reasoning-LLM"
 
