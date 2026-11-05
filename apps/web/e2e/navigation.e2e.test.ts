@@ -6,8 +6,10 @@ const SIGN_IN_URL_RE = /\/auth\/sign-in/;
 const ADMIN_URL_RE = /\/admin$/;
 
 test.describe("Auth route navigation", () => {
-    test("moves between sign-in and sign-up in both directions", async ({ page }) => {
-        await page.goto(AUTH_PATHS.signIn);
+    // Registration is invite-only in this suite: sign-up is offered only on an invitation link (`?invite=`),
+    // which the links between the two pages carry along. The token is checked only when the form is submitted.
+    test("moves between sign-in and sign-up in both directions on an invitation link", async ({ page }) => {
+        await page.goto(`${AUTH_PATHS.signIn}?invite=e2e-navigation`);
 
         await page.getByRole("link", { exact: true, name: "Sign up" }).click();
         await expect(page.getByText("Enter your information to create an account")).toBeVisible();
@@ -26,7 +28,8 @@ test.describe("Auth route navigation", () => {
 
     test("serves each auth page on direct navigation", async ({ page }) => {
         await page.goto(AUTH_PATHS.signUp);
-        await expect(page.getByText("Enter your information to create an account")).toBeVisible();
+        // Without an invitation the sign-up page says how to get in instead of offering a form.
+        await expect(page.getByText("Sign-up needs an invitation")).toBeVisible();
 
         await page.goto(AUTH_PATHS.forgotPassword);
         await expect(page.getByText("Enter your email to reset your password")).toBeVisible();

@@ -17,9 +17,16 @@ test.describe("Sign-in page", () => {
         await expect(page.getByPlaceholder("Enter your password")).toBeVisible();
         await expect(page.getByRole("button", { exact: true, name: "Sign in" })).toBeVisible();
         // Cross-navigation out of the card is anchors, not buttons — the submit
-        // control is the only button on it.
-        await expect(page.getByRole("link", { exact: true, name: "Sign up" })).toBeVisible();
+        // control is the only button on it. Registration is invite-only here, so
+        // no sign-up is offered without an invitation.
         await expect(page.getByRole("link", { name: "Forgot password?" })).toBeVisible();
+        await expect(page.getByRole("link", { exact: true, name: "Sign up" })).toHaveCount(0);
+    });
+
+    test("offers sign-up on an invitation link", async ({ page }) => {
+        await page.goto(`${AUTH_PATHS.signIn}?invite=e2e-sign-in`);
+
+        await expect(page.getByRole("link", { exact: true, name: "Sign up" })).toBeVisible();
     });
 
     test("accepts typing into both credential fields", async ({ page }) => {
@@ -57,8 +64,17 @@ test.describe("Sign-in page", () => {
 });
 
 test.describe("Sign-up page", () => {
+    // The token is checked only on submit, so any value shows the form.
     test.beforeEach(async ({ page }) => {
+        await page.goto(`${AUTH_PATHS.signUp}?invite=e2e-sign-up`);
+    });
+
+    test("says registration is by invitation, with a way to sign in, without one", async ({ page }) => {
         await page.goto(AUTH_PATHS.signUp);
+
+        await expect(page.getByText("Sign-up needs an invitation")).toBeVisible();
+        await expect(page.getByPlaceholder("Enter your password")).toHaveCount(0);
+        await expect(page.getByRole("link", { exact: true, name: "Sign in" })).toBeVisible();
     });
 
     test("renders the registration form", async ({ page }) => {

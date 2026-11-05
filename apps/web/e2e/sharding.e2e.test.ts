@@ -10,6 +10,7 @@ import {
     expect,
     expectAssistantReply,
     freshUser,
+    isInviteOnly,
     openChat,
     sendMessage,
     settle,
@@ -20,7 +21,12 @@ import { signUpInvited } from "./seed";
 
 const THREAD_URL_RE = /\/chat\/[\w-]+$/;
 
-test.describe("Per-user shards", () => {
+test.describe("Per-user shards for a guest, registration open", () => {
+    test.beforeEach(async () => {
+        // Conditional, not a disabled test: under invite-only there are no guests to convert.
+        test.skip(await isInviteOnly(), "registration is invite-only on this backend, so there are no guests");
+    });
+
     test("a guest who converts keeps the thread they started as a guest", async ({ page }) => {
         await openChat(page);
         await sendMessage(page, "Keep me after sign-up");
@@ -42,7 +48,9 @@ test.describe("Per-user shards", () => {
             await expect(assistantMessages(page).filter({ hasText: "Mock reply: Keep me after sign-up" }).last()).toBeVisible({ timeout: 15_000 });
         }).toPass({ timeout: 120_000 });
     });
+});
 
+test.describe("Per-user shards", () => {
     test("a caller may address their own shard and no one else's", async ({ userPage: page }) => {
         await settle(page);
 
