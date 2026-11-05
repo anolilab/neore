@@ -22,6 +22,7 @@
 import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
+import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { ADMIN } from "../env";
 import { noteShardActivity } from "../lib/shard-housekeeping";
@@ -86,6 +87,12 @@ export const promoteVerifiedAdmin = internalMutation.input({ userId: v.id("user"
 
 /** Cascade-delete everything keyed to a user that better-auth does not own. */
 export const cascadeDeleteUser = internalMutation.input({ userId: v.id("user") }).mutation(async ({ args, ctx }) => {
+    await cascadeDelete(ctx, args.userId);
+});
+
+const cascadeDelete = async (ctx: MutationCtx, user: Id<"user">): Promise<void> => {
+    const args = { userId: user };
+
     const settings = await ctx.db
         .query("userSettings")
         .withIndex("by_userId", (q) => q.eq("userId", args.userId))
@@ -144,7 +151,29 @@ export const cascadeDeleteUser = internalMutation.input({ userId: v.id("user") }
     // `.global()` pointers at this user's shard: webhook/public-link routes and
     // the housekeeping census.
     await deleteShardRoutesOf(ctx, args.userId);
-});
+};
+
+/**
+ * Delete a guest whose rows have been moved to the account it converted to, the way the anonymous plugin deletes it
+ * when the conversion completes in the guest's own browser. The last step of `lib/account-merge.ts#runGuestMerge`,
+ * run on the guest's shard. Only ever an anonymous user: a missing or real one is left alone, so a second run (queue
+ * redelivery) or a wrong id does nothing.
+ */
+export const deleteMergedGuest = internalMutation
+    .input({ userId: v.string() })
+    .output(v.object({ deleted: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        const user = (await ctx.db.user.findFirst({ where: { _id: args.userId as Id<"user"> } })) as { _id: Id<"user">; isAnonymous?: boolean | null } | null;
+
+        if (user?.isAnonymous !== true) {
+            return { deleted: false };
+        }
+
+        await cascadeDelete(ctx, user._id);
+        await ctx.db.delete("user", user._id);
+
+        return { deleted: true };
+    });
 
 /**
  * Delete the `user` row itself — the last step of the admin cleanup of an

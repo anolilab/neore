@@ -146,6 +146,13 @@ const handOver = async (ctx: HandOverContext, onGuestConverted: (guestId: string
 
             return;
         }
+
+        // The guest's browser would otherwise keep using a guest whose data has moved; the merge deletes the guest.
+        try {
+            await adapter.deleteUserSessions(recorded.guest);
+        } catch (error) {
+            authLogger.error(`[auth] ending guest ${recorded.guest}'s sessions failed:`, error);
+        }
     }
 
     await adapter.deleteVerificationByIdentifier(pendingIdentifier(sessionUserId));

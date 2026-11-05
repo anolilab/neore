@@ -603,6 +603,28 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         expect(db.verification!.some((row) => String(row.identifier).startsWith("guest-conversion:"))).toBe(false);
     });
 
+    it("signs the guest's browser out once its data is handed over from another browser", async () => {
+        expect.assertions(3);
+
+        const { auth, db } = await createTestAuth({ onGuestConverted: async () => undefined });
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+        const guestId = ((await guest.json()) as { user: { id: string } }).user.id;
+        const guestCookie = cookieOf(guest)
+            .split("; ")
+            .filter((cookie) => !cookie.includes("session_data"))
+            .join("; ");
+
+        await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, cookieOf(guest)));
+
+        const [link] = await queuedVerificationLinks();
+        const verified = await auth.handler(new Request(link!, { headers: { origin: SITE } }));
+        const session = await auth.handler(new Request(`${SITE}/api/auth/get-session`, { headers: { cookie: guestCookie, origin: SITE } }));
+
+        expect(verified.status).toBeLessThan(400);
+        expect(await session.json()).toBeNull();
+        expect(db.session!.some((row) => row.userId === guestId)).toBe(false);
+    });
+
     it("keeps the guest when queueing the move fails, and hands it over at the next sign-in", async () => {
         expect.assertions(4);
 

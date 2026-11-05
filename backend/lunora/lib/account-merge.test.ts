@@ -6,6 +6,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it, vi } from "vitest";
 
+import { deleteMergedGuest } from "../auth/hooks";
 import { requireOwnCollectionId } from "../knowledge/documents-shared";
 import type { MergeReferences, ShardCall } from "./account-merge";
 import { GLOBAL_USER_COLUMNS, GLOBAL_USER_TABLES_NOT_REASSIGNED, mergeGuestInto, reassignGlobalRows, rewriteOwner, shardLocalTables } from "./account-merge";
@@ -16,6 +17,7 @@ const ref = (name: string) => {
 };
 
 const REFERENCES: MergeReferences = {
+    deleteGuest: { __lunoraRef: "auth_hooks:deleteMergedGuest" },
     deleteRows: ref("deleteShardRows"),
     importRows: ref("importShardRows"),
     list: ref("listShardRowsPage"),
@@ -29,6 +31,8 @@ type Row = Record<string, unknown> & { _id: string };
 const fakeShards = (seed: Record<string, Record<string, Row[]>>, pageSize = 2) => {
     const shards = new Map(Object.entries(seed).map(([key, tables]) => [key, new Map(Object.entries(tables).map(([table, rows]) => [table, [...rows]]))]));
     const reassigned: { from: string; to: string }[] = [];
+    /** Each guest deletion, with how many rows the guest's shard still held at that moment. */
+    const deletedGuests: { left: number; shardKey: string; userId: string }[] = [];
     const tableOf = (shardKey: string, table: string): Row[] => {
         const shard = shards.get(shardKey) ?? new Map<string, Row[]>();
 
@@ -46,6 +50,13 @@ const fakeShards = (seed: Record<string, Record<string, Row[]>>, pageSize = 2) =
         const table = args.table as string;
 
         switch (name) {
+            case "deleteMergedGuest": {
+                const left = [...(shards.get(shardKey)?.values() ?? [])].reduce((count, rows) => count + rows.length, 0);
+
+                deletedGuests.push({ left, shardKey, userId: args.userId as string });
+
+                return { deleted: true } as never;
+            }
             case "deleteShardRows": {
                 const shard = shards.get(shardKey) ?? new Map<string, Row[]>();
 
@@ -91,7 +102,7 @@ const fakeShards = (seed: Record<string, Record<string, Row[]>>, pageSize = 2) =
         }
     };
 
-    return { call, reassigned, shards };
+    return { call, deletedGuests, reassigned, shards };
 };
 
 describe("rewriteOwner", () => {
@@ -152,6 +163,22 @@ describe("mergeGuestInto", () => {
         expect(reassigned).toStrictEqual([{ from: "guest", to: "user" }]);
     });
 
+    it("deletes the guest once its shard is empty, on the guest's shard", async () => {
+        const { call, deletedGuests } = fakeShards({
+            guest: {
+                threads: [
+                    { _id: "t1", userId: "guest" },
+                    { _id: "t2", userId: "guest" },
+                    { _id: "t3", userId: "guest" },
+                ],
+            },
+        });
+
+        await mergeGuestInto(call, REFERENCES, "guest", "user");
+
+        expect(deletedGuests).toStrictEqual([{ left: 0, shardKey: "guest", userId: "guest" }]);
+    });
+
     it("is safe to run twice", async () => {
         const { call, shards } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } });
 
@@ -188,6 +215,68 @@ describe("reassignGlobalRows", () => {
                 await expect(requireOwnCollectionId(context.db, collectionId as never, "user")).resolves.toBeUndefined();
                 await expect(requireOwnCollectionId(context.db, collectionId as never, "guest")).rejects.toThrow();
             });
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("deleteMergedGuest", () => {
+    const harnessWithUsers = () =>
+        lunoraTest(schemaWithShardedTables(["user", "session", "account", "member", "twoFactor", "passkey", "shardRoutes", "shardActivity"]) as never);
+
+    const insertUser = async (harness: ReturnType<typeof harnessWithUsers>, isAnonymous: boolean) =>
+        (await harness.run(
+            async (context: any) =>
+                await context.db.insert("user", {
+                    createdAt: 0,
+                    email: `${String(Math.random())}@example.com`,
+                    emailVerified: false,
+                    isAnonymous,
+                    name: "U",
+                    updatedAt: 0,
+                }),
+        )) as string;
+
+    const userExists = async (harness: ReturnType<typeof harnessWithUsers>, id: string) =>
+        await harness.run(async (context: any) => (await context.db.user.findFirst({ where: { _id: id } })) !== null);
+
+    it("deletes a guest and its sessions", async () => {
+        const harness = harnessWithUsers();
+
+        try {
+            const guest = await insertUser(harness, true);
+
+            await harness.run(
+                async (context: any) =>
+                    await context.db.insert("session", { createdAt: 0, expiresAt: Date.now() + 60_000, token: "t", updatedAt: 0, userId: guest }),
+            );
+
+            const result = await harness.run(async (context: any) => await context.runMutation(deleteMergedGuest, { userId: guest }));
+
+            expect(result).toStrictEqual({ deleted: true });
+            await expect(userExists(harness, guest)).resolves.toBe(false);
+            const sessions = await harness.run(async (context: any) => await context.db.session.findMany({ where: { userId: guest } }));
+
+            expect(sessions.page).toStrictEqual([]);
+            // A second run (queue redelivery) finds nothing to do.
+            await expect(harness.run(async (context: any) => await context.runMutation(deleteMergedGuest, { userId: guest }))).resolves.toStrictEqual({
+                deleted: false,
+            });
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("never deletes an account that is not a guest", async () => {
+        const harness = harnessWithUsers();
+
+        try {
+            const member = await insertUser(harness, false);
+            const result = await harness.run(async (context: any) => await context.runMutation(deleteMergedGuest, { userId: member }));
+
+            expect(result).toStrictEqual({ deleted: false });
+            await expect(userExists(harness, member)).resolves.toBe(true);
         } finally {
             harness.close();
         }
