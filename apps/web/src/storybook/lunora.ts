@@ -28,14 +28,23 @@ import env from "@/lib/env";
 
 type Resolver<F extends FunctionReference> = ((args: ArgsOf<F>) => Promise<ReturnOf<F>> | ReturnOf<F>) | ReturnOf<F>;
 
-export interface LunoraFixture {
-    readonly functionPath: string;
-    readonly respond: (args: unknown) => Promise<Response>;
+/** What one call answers: the body the RPC endpoint returns for it, and its HTTP status. */
+interface Answer {
+    body: { error: { code: string; message: string } } | { result: unknown };
+    status: number;
 }
 
-interface RpcBody {
+export interface LunoraFixture {
+    readonly answer: (args: unknown) => Promise<Answer>;
+    readonly functionPath: string;
+    /** Never answers: left out of `lunoraIdle`, or every loading story would wait out the limit. */
+    readonly pending?: true;
+}
+
+interface RpcCall {
     args?: unknown;
     functionPath?: string;
+    id?: number;
 }
 
 const pathOf = (reference: FunctionReference): string => (reference as unknown as { __lunoraRef: string }).__lunoraRef;
@@ -43,36 +52,39 @@ const pathOf = (reference: FunctionReference): string => (reference as unknown a
 /** A procedure that answers with `value`, or with what `value(args)` returns. */
 export const lunora = <F extends FunctionReference>(reference: F, value: Resolver<F>, options: { delayMs?: number } = {}): LunoraFixture => {
     return {
-        functionPath: pathOf(reference),
-        respond: async (args) => {
+        answer: async (args) => {
             if (options.delayMs) {
                 await delay(options.delayMs);
             }
 
             const result = typeof value === "function" ? await (value as (args: ArgsOf<F>) => ReturnOf<F>)(args as ArgsOf<F>) : value;
 
-            return HttpResponse.json({ result: encodeWire(result) });
+            return { body: { result: encodeWire(result) }, status: 200 };
         },
+        functionPath: pathOf(reference),
     };
 };
 
 /** A procedure that fails with a Lunora error envelope (`code` as `LunoraError#code`). */
 export const lunoraError = (reference: FunctionReference, code: string, message = code, status = 400): LunoraFixture => {
     return {
+        answer: async () => {
+            return { body: { error: { code, message } }, status };
+        },
         functionPath: pathOf(reference),
-        respond: async () => HttpResponse.json({ error: { code, message } }, { status }),
     };
 };
 
 /** A procedure that never answers: the component's loading state. */
 export const lunoraPending = (reference: FunctionReference): LunoraFixture => {
     return {
-        functionPath: pathOf(reference),
-        respond: async () => {
+        answer: async () => {
             await delay("infinite");
 
-            return HttpResponse.json({});
+            return { body: { result: null }, status: 200 };
         },
+        functionPath: pathOf(reference),
+        pending: true,
     };
 };
 
@@ -80,9 +92,32 @@ export const lunoraPending = (reference: FunctionReference): LunoraFixture => {
 const answeredPaths = new Set<string>();
 const waiting = new Map<string, (() => void)[]>();
 
+/** Calls in flight, and when the last one was answered: what `lunoraIdle` waits on. */
+const traffic = { inFlight: 0, lastAnswerAt: 0 };
+
 /** Called by a preview loader before each story. */
 export const resetLunoraAnswers = (): void => {
     answeredPaths.clear();
+};
+
+const QUIET_MS = 300;
+const IDLE_LIMIT_MS = 5000;
+
+/**
+ * Resolves once no Lunora call has been in flight for `QUIET_MS`, or after `IDLE_LIMIT_MS`
+ * (polling and never-answering fixtures keep a page busy for good). The preview awaits it
+ * before axe runs, so the check sees the page with its data, not its loading state.
+ */
+export const lunoraIdle = async (): Promise<void> => {
+    const started = Date.now();
+
+    while (Date.now() - started < IDLE_LIMIT_MS) {
+        if (traffic.inFlight === 0 && Date.now() - traffic.lastAnswerAt >= QUIET_MS) {
+            return;
+        }
+
+        await delay(50);
+    }
 };
 
 const noteAnswered = (functionPath: string): void => {
@@ -116,27 +151,55 @@ export const lunoraAnswered = async (reference: FunctionReference): Promise<void
 };
 
 /**
- * The `/_lunora/rpc` handler for a set of fixtures. A procedure without one answers
- * `NOT_FOUND` and is logged, so a story shows what it is missing instead of hanging.
+ * The `/_lunora/rpc` and `/_lunora/rpc-batch` handlers for a set of fixtures (the batch endpoint
+ * is what live subscriptions poll on when there is no socket). A procedure without a fixture
+ * answers `NOT_FOUND` and is logged, so a story shows what it is missing instead of hanging.
  * Later fixtures win, which lets a story override one entry of a shared set.
  */
-export const lunoraHandlers = (...fixtures: ReadonlyArray<LunoraFixture>): HttpHandler => {
+export const lunoraHandlers = (...fixtures: ReadonlyArray<LunoraFixture>): HttpHandler[] => {
     const byPath = new Map(fixtures.map((fixture) => [fixture.functionPath, fixture]));
 
-    return http.post(`${env.VITE_LUNORA_URL}/_lunora/rpc`, async ({ request }) => {
-        const { args, functionPath = "" } = (await request.json()) as RpcBody;
+    const answerCall = async ({ args, functionPath = "" }: RpcCall): Promise<Answer> => {
         const fixture = byPath.get(functionPath);
 
         if (!fixture) {
             console.warn(`[storybook] no Lunora fixture for "${functionPath}"`, args);
 
-            return HttpResponse.json({ error: { code: "NOT_FOUND", message: `No Storybook fixture for ${functionPath}` } }, { status: 404 });
+            return { body: { error: { code: "NOT_FOUND", message: `No Storybook fixture for ${functionPath}` } }, status: 404 };
         }
 
-        const response = await fixture.respond(args);
+        if (fixture.pending) {
+            return await fixture.answer(args);
+        }
 
-        noteAnswered(functionPath);
+        traffic.inFlight += 1;
 
-        return response;
-    });
+        try {
+            return await fixture.answer(args);
+        } finally {
+            traffic.inFlight -= 1;
+            traffic.lastAnswerAt = Date.now();
+            noteAnswered(functionPath);
+        }
+    };
+
+    return [
+        http.post(`${env.VITE_LUNORA_URL}/_lunora/rpc`, async ({ request }) => {
+            const { body, status } = await answerCall((await request.json()) as RpcCall);
+
+            return HttpResponse.json(body, { status });
+        }),
+        http.post(`${env.VITE_LUNORA_URL}/_lunora/rpc-batch`, async ({ request }) => {
+            const { calls = [] } = (await request.json()) as { calls?: RpcCall[] };
+            const results = await Promise.all(
+                calls.map(async (call) => {
+                    const { body } = await answerCall(call);
+
+                    return { body, id: call.id };
+                }),
+            );
+
+            return HttpResponse.json({ results });
+        }),
+    ];
 };

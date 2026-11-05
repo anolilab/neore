@@ -22,6 +22,10 @@ export const pinClock = (at: number = STORY_NOW): void => {
     const offset = at - RealDate.now();
 
     class StoryDate extends RealDate {
+        static override now(): number {
+            return super.now() + offset;
+        }
+
         constructor(...args: ConstructorParameters<DateConstructor> | []) {
             if (args.length === 0) {
                 super(RealDate.now() + offset);
@@ -29,11 +33,9 @@ export const pinClock = (at: number = STORY_NOW): void => {
                 super(...(args as ConstructorParameters<DateConstructor>));
             }
         }
-
-        static override now(): number {
-            return RealDate.now() + offset;
-        }
     }
 
+    // Replacing the page's clock is the point of this helper.
+    // eslint-disable-next-line unicorn/no-global-object-property-assignment
     globalThis.Date = StoryDate as DateConstructor;
 };

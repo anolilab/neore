@@ -8,7 +8,8 @@ import { ACCENT_IDS } from "@/features/appearance/lib/accent-presets";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { locales } from "@/lib/intl/shared";
 import { pinClock, STORY_NOW } from "@/storybook/clock";
-import { lunoraHandlers, resetLunoraAnswers } from "@/storybook/lunora";
+import { lunoraHandlers, lunoraIdle, resetLunoraAnswers } from "@/storybook/lunora";
+import type { StoryConnection } from "@/storybook/providers";
 import { AppProviders, loadStoryLocale, settleSession, StoryRouter } from "@/storybook/providers";
 import type { Persona } from "@/storybook/session";
 import { setActivePersona } from "@/storybook/session";
@@ -79,6 +80,7 @@ const withApp: Decorator = (Story, context) => {
         // The router is outermost: the auth UI provider reads search params.
         <StoryRouter path={path}>
             <AppProviders
+                connection={(context.parameters.connection as StoryConnection | undefined) ?? "connected"}
                 direction={context.globals.direction as Direction}
                 featureFlags={(context.parameters.featureFlags as string[] | undefined) ?? NO_FLAGS}
                 persona={persona}
@@ -91,6 +93,11 @@ const withApp: Decorator = (Story, context) => {
 };
 
 const preview: Preview = {
+    // After the story's own `play`: let the mock backend go quiet, so axe (an `afterEach` of
+    // addon-a11y) checks the page with its data rather than its loading state.
+    afterEach: async () => {
+        await lunoraIdle();
+    },
     decorators: [withApp, withAppearance],
     globalTypes: {
         accent: {

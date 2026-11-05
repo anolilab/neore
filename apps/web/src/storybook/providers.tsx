@@ -14,6 +14,7 @@ import { createContext, use, useMemo } from "react";
 
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
+import ConnectionProvider from "@/features/connection/components/connection-provider";
 import { authClient } from "@/lib/auth/client";
 import { getSharedSessionRead } from "@/lib/auth/shared-session";
 import env from "@/lib/env";
@@ -35,8 +36,61 @@ export const loadStoryLocale = async (locale: string): Promise<void> => {
 
 const noop = (): void => {};
 
+/**
+ * A socket that never opens. Lunora's live subscriptions (`useQuery` from `@lunora/react`, the
+ * chat's delta streams) then fall back to polling the same `/_lunora/rpc` the fixtures answer,
+ * twice a second, so a stateful fixture shows up live without a socket protocol to mock.
+ */
+class NoSocket extends EventTarget {
+    static readonly CLOSED = 3;
+
+    static readonly CLOSING = 2;
+
+    static readonly CONNECTING = 0;
+
+    static readonly OPEN = 1;
+
+    onclose: ((event: CloseEvent) => void) | null = null;
+
+    onerror: ((event: Event) => void) | null = null;
+
+    onmessage: ((event: MessageEvent) => void) | null = null;
+
+    onopen: ((event: Event) => void) | null = null;
+
+    readyState = NoSocket.CONNECTING;
+
+    constructor() {
+        super();
+        queueMicrotask(() => {
+            this.readyState = NoSocket.CLOSED;
+
+            const error = new Event("error");
+            const close = new CloseEvent("close", { code: 1006, reason: "Storybook has no socket" });
+
+            this.onerror?.(error);
+            this.dispatchEvent(error);
+            this.onclose?.(close);
+            this.dispatchEvent(close);
+        });
+    }
+
+    close(): void {
+        this.readyState = NoSocket.CLOSED;
+    }
+
+    send(): void {
+        // Never open, so there is nothing to send: the client polls instead.
+        this.readyState = NoSocket.CLOSED;
+    }
+}
+
+/** What the connection banner sees (`useConnectionStatus`); a story sets `parameters.connection`. */
+export type StoryConnection = "connected" | "connecting" | "offline" | "polling";
+
 interface AppProvidersProps {
     children: ReactNode;
+    connection: StoryConnection;
     direction: "ltr" | "rtl";
     /** PostHog flags that are on, from the story's `parameters.featureFlags`. */
     featureFlags: ReadonlyArray<string>;
@@ -85,14 +139,29 @@ export const settleSession = async (persona: Persona): Promise<void> => {
  * per story (so no story sees another's cache), the persona's bearer on the Lunora client,
  * Lingui and a fake PostHog. Mirrors `routes/__root.tsx`.
  */
-export const AppProviders = ({ children, direction, featureFlags, persona, theme }: AppProvidersProps) => {
+export const AppProviders = ({ children, connection, direction, featureFlags, persona, theme }: AppProvidersProps) => {
     const clients = useMemo(() => {
         const queryClient = createQueryClient();
 
         // A missing fixture should show as an error state at once, not after the retry backoff.
         queryClient.setDefaultOptions({ mutations: { retry: false }, queries: { refetchOnWindowFocus: false, retry: false } });
 
-        const lunoraClient = new LunoraClient({ url: env.VITE_LUNORA_URL });
+        const lunoraClient = new LunoraClient({
+            pollingFallback: { afterFailedAttempts: 1, intervalMs: 500 },
+            // No read cache: IndexedDB would carry one story's data into the next.
+            queryCache: false,
+            url: env.VITE_LUNORA_URL,
+            // Only the members the client calls exist; it never reads the rest of the interface.
+            WebSocket: NoSocket as unknown as typeof WebSocket,
+        });
+
+        // The socket never opens here (`NoSocket`), so the real status would always read "reconnecting".
+        lunoraClient.onConnectionStatus = (listener) => {
+            listener(connection);
+
+            return noop;
+        };
+
         const session = sessionFor(persona);
 
         if (session) {
@@ -100,7 +169,7 @@ export const AppProviders = ({ children, direction, featureFlags, persona, theme
         }
 
         return { lunoraClient, queryClient };
-    }, [persona]);
+    }, [connection, persona]);
     const posthog = useMemo(() => fakePostHog(featureFlags), [featureFlags]);
 
     return (
@@ -113,7 +182,7 @@ export const AppProviders = ({ children, direction, featureFlags, persona, theme
                                 <AuthUIProviderTanstack authClient={authClient} navigate={noop} persistClient={false} replace={noop}>
                                     <ThemeProvider attribute="class" forcedTheme={theme}>
                                         <TooltipProvider>
-                                            {children}
+                                            <ConnectionProvider>{children}</ConnectionProvider>
                                             <Toaster />
                                         </TooltipProvider>
                                     </ThemeProvider>

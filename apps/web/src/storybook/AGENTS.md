@@ -38,7 +38,8 @@ from the root; CI runs the second (`test.yml`, job `storybook`).
 ## GOTCHAS
 
 - Run `pnpm build:packages` in a fresh checkout first: stories import `@neore/ai`, whose `dist` is gitignored.
-- A new story that brings new dependencies can make Vite re-optimize mid-run on a WARM cache and fail the run once
-  ("optimized dependencies changed. reloading"). Run again, or `rm -rf apps/web/node_modules/.cache/storybook`.
-  CI starts cold, and `optimizeDeps.entries` crawls every story up front.
+- Vite re-optimizing mid-run ("dependencies optimized: <name>" then "reloading") fails every test in flight, in
+  all four projects. The crawl (`optimizeDeps.entries`) misses packages reached only through a lazy import: add
+  `<name>` to `optimizeDeps.include` in `.storybook/vite.config.ts`. On a warm cache a new story can trigger it
+  once more; run again, or `rm -rf apps/web/node_modules/.cache/storybook`.
 - `.storybook/public/mockServiceWorker.js` is written by `msw` on install (`package.json#msw.workerDirectory`).

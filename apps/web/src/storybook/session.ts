@@ -86,6 +86,11 @@ export const sessionHandlers = (): HttpHandler[] => {
 
             return session ? HttpResponse.json({ token: session.session.token }) : HttpResponse.json(null, { status: 401 });
         }),
+        http.get("*/api/auth/organization/list", () => {
+            const session = current();
+
+            return HttpResponse.json(session?.session.activeOrganizationId ? [{ ...ORGANIZATION, createdAt: CREATED_AT }] : []);
+        }),
         // Only the `org-member` persona has an organization active.
         http.get("*/api/auth/organization/get-full-organization", () => {
             const session = current();

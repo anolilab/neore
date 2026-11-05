@@ -75,8 +75,9 @@ export default defineConfig({
         // reloads mid-run, which fails whatever tests were in flight (the Vitest run in CI).
         entries: [".storybook/preview.tsx", "src/**/*.stories.tsx", "../../packages/ui/src/**/*.stories.tsx", "../../packages/chat-ui/src/**/*.stories.tsx"],
         exclude: ["@lingui/react/macro", "@lingui/core/macro", "@silvia-odwyer/photon"],
-        // Reached only from Storybook's own runtime, which the crawl does not enter.
-        include: ["axe-core", "msw", "msw/browser", "storybook/test"],
+        // Reached only from Storybook's own runtime or a lazy import, which the crawl misses. When a
+        // run logs "dependencies optimized: <name>" and then reloads, add <name> here.
+        include: ["@onboardjs/posthog-plugin", "@onboardjs/react", "axe-core", "msw", "msw/browser", "storybook/test"],
     },
     plugins: [
         mockServerModules(),

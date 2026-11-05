@@ -263,7 +263,7 @@ const ComposerTiptapEditor = ({
         autofocus: autoFocus ? "end" : false,
         editable: !disabled,
         editorProps: {
-            attributes: composerEditorAttributes({ describedBy, invalid }),
+            attributes: composerEditorAttributes({ describedBy, invalid, label: t`Message` }),
         },
         extensions: [
             StarterKitExtension.configure({
@@ -405,9 +405,11 @@ const ComposerTiptapEditor = ({
     // The editor reads its attributes once, at creation: push a changed description or validity to the live element.
     useEffect(() => {
         if (editor && !editor.isDestroyed) {
-            editor.setOptions({ editorProps: { ...editor.options.editorProps, attributes: composerEditorAttributes({ describedBy, invalid }) } });
+            editor.setOptions({
+                editorProps: { ...editor.options.editorProps, attributes: composerEditorAttributes({ describedBy, invalid, label: t`Message` }) },
+            });
         }
-    }, [editor, describedBy, invalid]);
+    }, [editor, describedBy, invalid, t]);
 
     // Turning Vim on or off while the editor is open: the caret class and the mode label follow at once, not at the next keystroke.
     useEffect(() => {

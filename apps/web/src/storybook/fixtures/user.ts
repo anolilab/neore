@@ -26,6 +26,8 @@ export const settings = (overrides: Partial<Settings> = {}): Settings => {
     return {
         _creationTime: CREATED,
         _id: "settings_storybook" as Settings["_id"],
+        // The welcome tour would cover every page story; its own stories set this to false.
+        onboardingCompleted: true,
         userId: USER_ID,
         ...overrides,
     } as Settings;

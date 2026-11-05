@@ -21,7 +21,7 @@ const meta = {
     parameters: {
         // An app bug, not a Storybook gap: the dashboard nav uses `colorMode="dark"` (`text-white/80`), but the
         // light `--sidebar` token is white (`packages/ui/src/global.css`), so the nav is 1.1:1 in light mode.
-        // Dark mode reads fine.
+        // Dark mode reads fine. Tracked in #547.
         a11y: { test: "todo" },
         layout: "fullscreen",
         msw: {

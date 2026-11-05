@@ -4,7 +4,7 @@
  * error on every client render.
  */
 import type { ReactNode } from "react";
-import { createContext, use } from "react";
+import { createContext, use, useMemo } from "react";
 
 interface ThemeState {
     forcedTheme?: string;
@@ -17,12 +17,16 @@ interface ThemeState {
 
 const THEMES = ["light", "dark", "system"];
 
-const ThemeContext = createContext<ThemeState>({ setTheme: () => {}, themes: THEMES });
+const ThemeContext = createContext<ThemeState>({ setTheme: () => undefined, themes: THEMES });
 
-export const ThemeProvider = ({ children, forcedTheme }: { children: ReactNode; forcedTheme?: string }) => (
-    <ThemeContext value={{ forcedTheme, resolvedTheme: forcedTheme, setTheme: () => {}, systemTheme: "light", theme: forcedTheme, themes: THEMES }}>
-        {children}
-    </ThemeContext>
-);
+const noop = (): void => {};
+
+export const ThemeProvider = ({ children, forcedTheme }: { children: ReactNode; forcedTheme?: string }) => {
+    const value = useMemo<ThemeState>(() => {
+        return { forcedTheme, resolvedTheme: forcedTheme, setTheme: noop, systemTheme: "light", theme: forcedTheme, themes: THEMES };
+    }, [forcedTheme]);
+
+    return <ThemeContext value={value}>{children}</ThemeContext>;
+};
 
 export const useTheme = (): ThemeState => use(ThemeContext);
