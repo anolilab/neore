@@ -133,7 +133,7 @@ export const expectAssistantReply = async (page: Page, text: string | RegExp): P
  * Closing a page while the backend still owes it a response is what kills the
  * local backend: the response is later written to a closed socket, miniflare
  * reports "Network connection lost." and wrangler 4.124 treats that as fatal
- * (CLAUDE.md → Local dev; reproduced by closing a context mid-load — 2 of 6
+ * (`docs/agents/local-dev.md`; reproduced by closing a context mid-load — 2 of 6
  * closes took the backend down). A first paint's `/_lunora/rpc-batch` can take
  * 5-10s locally, so a spec's teardown lands inside that window routinely.
  */
@@ -267,7 +267,7 @@ const functionPathsIn = (payload: unknown): string[] => {
  * Record every backend function execution a page triggers, over HTTP and over
  * the live-query socket. Used to hold first paint to a budget: each execution
  * on first paint queues on the `__root__` shard, and a burst of them is what
- * makes the local backend slow enough to crash (CLAUDE.md → Local dev).
+ * makes the local backend slow enough to crash (`docs/agents/local-dev.md`).
  */
 export const recordBackendCalls = (page: Page): BackendCalls => {
     const record: BackendCalls = { calls: [], unauthorized: [] };

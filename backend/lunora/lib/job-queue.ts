@@ -2,7 +2,7 @@
  * Enqueue a job on the jobs queue instead of `ctx.scheduler`.
  *
  * `ctx.scheduler` hands every job to one SchedulerDO that runs them one at a
- * time, each awaited to the end (root AGENTS.md, "Scheduler"). Anything long or
+ * time, each awaited to the end (`backend/AGENTS.md`, "Scheduler lanes"). Anything long or
  * latency-critical — an agent run, a task round, an eval case — goes here, and
  * the `jobs` consumer (`lunora/queues.ts`) dispatches it through the same
  * `/_lunora/scheduler/dispatch` endpoint, many at once. Short timed jobs

@@ -43,7 +43,7 @@ const isProvisioned = async (exec: SqlExec, fingerprint: string): Promise<boolea
 
 const provision = async (exec: SqlExec): Promise<void> => {
     // `schema` is structurally the same shape, but the tree carries more than
-    // one `@lunora`/* copy (see AGENTS.md), so `TriggerDefinition` here and
+    // one `@lunora`/* copy (see `docs/agents/lunora-upstream.md`), so `TriggerDefinition` here and
     // `TriggerDefinitionLike` in the copy `@lunora/d1` was built against are
     // nominally distinct and the assignment is rejected. The cast is confined
     // to this one call rather than pushed out to the caller.

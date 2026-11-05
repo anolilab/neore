@@ -3,7 +3,7 @@
  * Run a `lunora` command, then ALWAYS re-run codegen, then exit with the
  * ORIGINAL command's status.
  *
- * Both halves matter, and the comment in AGENTS.md explains why: `lunora build`
+ * Both halves matter, and the Codegen notes in `backend/AGENTS.md` explain why: `lunora build`
  * and `lunora prepare` re-run codegen internally and overwrite `_generated/`
  * without the fixpoint loop, so the project's own `pnpm codegen` has to run
  * afterwards — but a failing build must still fail the script, or CI goes green

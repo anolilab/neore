@@ -84,7 +84,7 @@ test.describe("Public share (mock model)", () => {
         try {
             await openChat(guestPage);
             // Let /chat's first paint finish: abandoning it mid-flight is what
-            // drops local-dev backend requests (root AGENTS.md, "Local dev").
+            // drops local-dev backend requests (`docs/agents/local-dev.md`).
             await settle(guestPage);
             await guestPage.goto(threadPath);
             await guestPage.waitForURL(`**${new URL(url).pathname}`, { timeout: 60_000 });

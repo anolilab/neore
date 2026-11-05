@@ -13,7 +13,7 @@
  *   read has its own deadline and byte cap ({@link readCappedText}); a slow or
  *   endless body cannot hold the action.
  * - Every body this opens is consumed or cancelled, on success and failure
- *   alike (a leaked body kills local `wrangler dev`; see CLAUDE.md).
+ *   alike (a leaked body kills local `wrangler dev`; see `docs/agents/local-dev.md`).
  * - Linear issues are NOT fetched: their pages sit behind sign-in, so a fetch
  *   returns the login page's metadata. The card is built from the URL alone.
  */

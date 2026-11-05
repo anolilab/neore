@@ -72,7 +72,7 @@ export const getAuthUserIdentity = async (context: ReadContext): Promise<AuthUse
     }
 
     // `findFirst` on `_id`, not `get`: a `get` of a `.global()` id probes every
-    // global table, on every authenticated call (root AGENTS.md, "Database access").
+    // global table, on every authenticated call (`backend/AGENTS.md`, "Database access").
     const user = await context.db.user.findFirst({ where: { _id: userId } });
 
     if (!user) {

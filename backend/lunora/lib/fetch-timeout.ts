@@ -4,8 +4,8 @@
  * ## Why this is a security control, not a nicety
  *
  * Every unsharded procedure in this app runs on the ONE `__root__` Durable
- * Object, so they serialize app-wide (see "Sharding and concurrency" in the root
- * AGENTS.md). An outbound call with no deadline therefore holds that shard for as
+ * Object, so they serialize app-wide (see "Sharding and concurrency" in
+ * `backend/AGENTS.md`). An outbound call with no deadline therefore holds that shard for as
  * long as the remote end cares to stall — which makes a slow or hostile third
  * party into an app-wide denial of service, without needing to touch us directly.
  *
@@ -112,8 +112,8 @@ export interface AssertOkOptions {
  *
  * The body MUST be consumed or cancelled on every early return: a Worker that
  * leaves a failed response's stream unread holds a socket nobody drains, and
- * `wrangler dev` escalates that into a fatal `Network connection lost.` (root
- * AGENTS.md, "Local dev"). This is the one place that does it, so a call site
+ * `wrangler dev` escalates that into a fatal `Network connection lost.` (see
+ * `docs/agents/local-dev.md`). This is the one place that does it, so a call site
  * cannot forget. Transport-agnostic — it works on a response from
  * {@link fetchWithDeadline} or from the SSRF-guarded tool `fetchWithTimeout`.
  */

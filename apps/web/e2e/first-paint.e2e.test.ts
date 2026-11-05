@@ -6,8 +6,7 @@ import { composer, expect, recordBackendCalls, settle, test } from "./chat-helpe
 /**
  * Backend executions allowed on first paint of `/chat`.
  *
- * Every one queues on the single `__root__` Durable Object (CLAUDE.md → Local
- * dev), so first paint is only as fast as the queue — and a slow first paint is
+ * Every one queues on the single `__root__` Durable Object (`docs/agents/local-dev.md`), so first paint is only as fast as the queue — and a slow first paint is
  * what browsers abandon mid-flight, which is what used to crash the local
  * backend. First paint needs four (`getThreadListData`, `getUserSettings`,
  * `listProjects`, `getAIUserPreferences`); features had pushed it past fifteen.
