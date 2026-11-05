@@ -462,7 +462,7 @@ describe(useFilteredModels, () => {
 
         await waitFor(() => expect(result.current).toHaveLength(1));
 
-        return result.current.map((model) => model.id);
+        return result.current.map((model: GatewayModel) => model.id);
     };
 
     it("hides the Workers AI models under either privacy setting alone, as the gateway refuses them", async () => {

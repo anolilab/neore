@@ -903,7 +903,7 @@ export interface InternalApiTypes {
             pairConnection: FunctionReference<"mutation", { codeHash: string; connectionId: Id<"messengerConnections">; displayName?: string; platformChatId: string; platformUserId: string; platformUsername?: string }, boolean>;
             saveMessengerMessage: FunctionReference<"mutation", { fileIds?: Array<Id<"chatFiles">>; parts?: Array<{ image: string; mediaType: string; type: "image" } | { data: string; filename?: string; mediaType: string; type: "file" }>; pending?: boolean; text: string; threadId: Id<"threads">; userId: string }, { messageId: Id<"messages">; order: number }>;
             saveMessengerNotice: FunctionReference<"mutation", { text: string; threadId: Id<"threads">; userId: string }, null>;
-            threadHasRecentMedia: FunctionReference<"query", { threadId: Id<"threads"> }, boolean>;
+            threadRecentMedia: FunctionReference<"query", { threadId: Id<"threads"> }, "files" | "images" | "none">;
             touchConnection: FunctionReference<"mutation", { connectionId: Id<"messengerConnections"> }, void>;
         };
         respond: {
@@ -2119,7 +2119,7 @@ export const internal: InternalApiTypes = {
             pairConnection: { __lunoraRef: "messenger_functions:pairConnection" },
             saveMessengerMessage: { __lunoraRef: "messenger_functions:saveMessengerMessage" },
             saveMessengerNotice: { __lunoraRef: "messenger_functions:saveMessengerNotice" },
-            threadHasRecentMedia: { __lunoraRef: "messenger_functions:threadHasRecentMedia" },
+            threadRecentMedia: { __lunoraRef: "messenger_functions:threadRecentMedia" },
             touchConnection: { __lunoraRef: "messenger_functions:touchConnection" },
         },
         respond: {

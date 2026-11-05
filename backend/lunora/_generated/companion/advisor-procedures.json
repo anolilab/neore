@@ -23144,7 +23144,7 @@
       "usesRateLimit": false,
       "usesRls": false,
       "analyzableBody": true,
-      "exportName": "threadHasRecentMedia",
+      "exportName": "threadRecentMedia",
       "file": "messenger/functions",
       "hasEmailArg": false,
       "kind": "query",

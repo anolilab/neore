@@ -346,15 +346,10 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     const [activeTab, setActiveTab] = useState<ModelPickerTab>(defaultTab);
     const [selectionMode, setSelectionMode] = useState<"parallel" | "single">(() => ((initialModelIds?.length ?? 0) > 0 ? "parallel" : "single"));
     const [modeFilter, setModeFilter] = useState<ModelModeFilter>(defaultModeFilter);
-    const [selectedProvider, setSelectedProvider] = useState<string | null>(() => initialCreatorSlug(models, initialModelId));
-    // The catalog can arrive after the picker opens: the opening scope is decided once the list has models, unless
-    // the user picked a creator or a tab first.
-    const [isScopeSettled, setIsScopeSettled] = useState(() => models.length > 0);
-
-    if (!isScopeSettled && models.length > 0) {
-        setIsScopeSettled(true);
-        setSelectedProvider(initialCreatorSlug(models, initialModelId));
-    }
+    // `undefined` until the user picks a creator or "All": the scope then follows the selected model's creator, so it
+    // waits for the model to arrive in the list and clears itself when that creator is hidden.
+    const [chosenProvider, setChosenProvider] = useState<string | null | undefined>(undefined);
+    const selectedProvider = chosenProvider === undefined ? initialCreatorSlug(models, initialModelId) : chosenProvider;
 
     const onSelectRef = useRef(onSelect);
     const onSelectMultipleRef = useRef(onSelectMultiple);
@@ -404,8 +399,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     );
 
     const handleProviderSelect = useCallback((slug: string | null) => {
-        setIsScopeSettled(true);
-        setSelectedProvider(slug);
+        setChosenProvider(slug);
         setSearchQuery("");
     }, []);
 
@@ -413,8 +407,8 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
     const handleTabChange = useCallback((tab: ModelPickerTab) => {
         setActiveTab(tab);
-        setIsScopeSettled(true);
-        setSelectedProvider(null);
+        // Starred shows no scope, so leaving it keeps the opening scope; a creator the user picked is cleared.
+        setChosenProvider((current) => (current === undefined ? undefined : null));
         setSearchQuery("");
     }, []);
 

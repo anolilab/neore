@@ -11,8 +11,9 @@
  * connection's owner, with their quota and keys.
  */
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
-import type { ModelFilterRules } from "@neore/ai/models";
+import type { ModelDefinition, ModelFilterRules } from "@neore/ai/models";
 
+import { backupCapabilities } from "../../chat/lib/backup-model";
 import { callsTools, defaultModelUnderRules, readsImagesAndCallsTools } from "../../lib/utility-model";
 
 /** The groups an owner can allow, in the order the settings list them. */
@@ -58,16 +59,37 @@ export const MESSENGER_TEXT_REPLY_MAX_STEPS = 3;
 export const MESSENGER_MEDIA_MODEL = "cf-llama-4-scout";
 
 /**
- * Model for a reply: the media/tool model when either needs it, else the default chat model. The media model is a
- * Workers AI default, which no region rule allows, so under the owner's `rules` it may be a stand-in they allow.
+ * The model for a thread whose recent rows hold a file part. A PDF now reaches the reply as its text, but rows saved
+ * before that still carry the PDF itself, which the media model cannot read. No fallback reads files, so under rules
+ * that exclude it the gateway refuses the reply, as it would any excluded model.
  */
-export const chooseReplyModel = (options: { hasMedia: boolean; rules?: ModelFilterRules; tools: boolean }): string => {
-    if (!options.hasMedia && !options.tools) {
+export const MESSENGER_FILE_MODEL = "openai/gpt-4.1-mini";
+
+/** What a thread's recent rows carry for the model to read (`threadRecentMedia`): a file part outranks an image. */
+export type RecentMedia = "files" | "images" | "none";
+
+const readsFilesAndImagesAndCallsTools = (definition: ModelDefinition): boolean => {
+    const capabilities = backupCapabilities(definition);
+
+    return capabilities.files && capabilities.images && capabilities.tools;
+};
+
+/**
+ * Model for a reply: the file or media/tool model when the thread or the tools need it, else the default chat model.
+ * Under the owner's `rules` either may be a stand-in they allow that reads what the thread holds; the media model is a
+ * Workers AI default, which no region rule allows.
+ */
+export const chooseReplyModel = (options: { media: RecentMedia; rules?: ModelFilterRules; tools: boolean }): string => {
+    if (options.media === "files") {
+        return defaultModelUnderRules(MESSENGER_FILE_MODEL, options.rules, readsFilesAndImagesAndCallsTools);
+    }
+
+    if (options.media === "none" && !options.tools) {
         return DEFAULT_CHAT_MODEL;
     }
 
     // A stand-in must do what this reply needs the media model for: read images only when the thread has media.
-    return defaultModelUnderRules(MESSENGER_MEDIA_MODEL, options.rules, options.hasMedia ? readsImagesAndCallsTools : callsTools);
+    return defaultModelUnderRules(MESSENGER_MEDIA_MODEL, options.rules, options.media === "images" ? readsImagesAndCallsTools : callsTools);
 };
 
 /** A connection row's stored setting, as the schema holds it. */

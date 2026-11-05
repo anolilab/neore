@@ -1,5 +1,5 @@
 import type { GatewayModel } from "@neore/ai/models";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -102,6 +102,34 @@ describe("ModelPicker opening scope", () => {
 
     it("scopes to the creator straight away when the catalog is already there", () => {
         render(picker([kimi, gpt]));
+
+        expect(screen.getByText("Kimi K2.5 (Workers AI)")).toBeTruthy();
+        expect(screen.queryByText("GPT-5")).toBeNull();
+    });
+
+    it("waits for the selected model, not just any model, before scoping", () => {
+        const view = render(picker([gpt]));
+
+        expect(screen.getByText("GPT-5")).toBeTruthy();
+
+        view.rerender(picker([gpt, kimi]));
+
+        expect(screen.getByText("Kimi K2.5 (Workers AI)")).toBeTruthy();
+        expect(screen.queryByText("GPT-5")).toBeNull();
+    });
+
+    it("drops the scope when the selected model's creator leaves the list", () => {
+        const view = render(picker([kimi, gpt]));
+
+        view.rerender(picker([gpt]));
+
+        expect(screen.getByText("GPT-5")).toBeTruthy();
+    });
+
+    it("keeps the opening scope when leaving Starred for All models", () => {
+        render(<ModelPicker defaultModeFilter="text" footer={null} initialModelId={kimi.id} models={[kimi, gpt]} />);
+
+        fireEvent.click(screen.getByRole("button", { name: "All models" }));
 
         expect(screen.getByText("Kimi K2.5 (Workers AI)")).toBeTruthy();
         expect(screen.queryByText("GPT-5")).toBeNull();

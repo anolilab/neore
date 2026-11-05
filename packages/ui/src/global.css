@@ -47,7 +47,7 @@
     --primary: var(--brand-lime);
     --primary-foreground: var(--brand-obsidian);
     /* The accent as TEXT or an icon on the page. The lime is a fill: as text on white it is ~1.2:1. */
-    --primary-text: #4d7c0f;
+    --primary-text: #3f6212;
     --secondary: var(--brand-frost);
     --secondary-foreground: var(--brand-obsidian);
     --muted: var(--brand-frost);

@@ -186,8 +186,8 @@ const ctx = () =>
                 case "messenger_functions:listReplyMedia": {
                     return state.replyFiles;
                 }
-                case "messenger_functions:threadHasRecentMedia": {
-                    return false;
+                case "messenger_functions:threadRecentMedia": {
+                    return "none";
                 }
                 default: {
                     throw new Error(`unexpected query ${path}`);

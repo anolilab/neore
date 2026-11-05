@@ -649,15 +649,10 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const isFavorite = useCallback((id: string) => favorites.includes(id), [favorites]);
     const toggleFavorite = useCallback((id: string, setFavorite: boolean) => onToggleFavorite?.(id, setFavorite), [onToggleFavorite]);
 
-    const [selectedProvider, setSelectedProvider] = useState<string | null>(() => initialCreatorSlug(sourceModels, initialModelId));
-    // The catalog can arrive after the picker opens: the opening scope is decided once the list has models, unless
-    // the user picked a creator or a tab first.
-    const [isScopeSettled, setIsScopeSettled] = useState(() => sourceModels.length > 0);
-
-    if (!isScopeSettled && sourceModels.length > 0) {
-        setIsScopeSettled(true);
-        setSelectedProvider(initialCreatorSlug(sourceModels, initialModelId));
-    }
+    // `undefined` until the user picks a creator or "All": the scope then follows the selected model's creator, so it
+    // waits for the model to arrive in the list and clears itself when that creator is hidden.
+    const [chosenProvider, setChosenProvider] = useState<string | null | undefined>(undefined);
+    const selectedProvider = chosenProvider === undefined ? initialCreatorSlug(sourceModels, initialModelId) : chosenProvider;
 
     const handleModelSelect = useCallback(
         (modelId: string) => {
@@ -706,8 +701,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
     );
 
     const handleProviderSelect = useCallback((slug: string | null) => {
-        setIsScopeSettled(true);
-        setSelectedProvider(slug);
+        setChosenProvider(slug);
         setSearchQuery("");
     }, []);
 
@@ -746,8 +740,8 @@ const ModelPicker: FC<ModelPickerProps> = ({
 
     const handleTabChange = useCallback((tab: ModelPickerTab) => {
         setActiveTab(tab);
-        setIsScopeSettled(true);
-        setSelectedProvider(null);
+        // Starred shows no scope, so leaving it keeps the opening scope; a creator the user picked is cleared.
+        setChosenProvider((current) => (current === undefined ? undefined : null));
         setSearchQuery("");
         setInfoModelId(undefined);
     }, []);

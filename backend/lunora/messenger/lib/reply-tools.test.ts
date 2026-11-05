@@ -2,9 +2,17 @@ import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { deriveModelRegions, getModelRejectionReason, GLOBAL_REGION, MODEL_REGISTRY } from "@neore/ai/models";
 import { describe, expect, it } from "vitest";
 
+import { backupCapabilities } from "../../chat/lib/backup-model";
 import { listBuiltInTools, modelSupportsTools } from "../../chat/lib/tool-builder";
 import { applyToolPermissions, BUILTIN_TOOLS_ASK_BY_DEFAULT, BUILTIN_TOOLS_NEEDING_A_PERSON, toolPermissionKey } from "../../chat/lib/tool-permissions";
-import { chooseReplyModel, MESSENGER_MEDIA_MODEL, MESSENGER_REPLY_TOOL_GROUPS, normalizeReplyToolGroups, planReplyTools } from "./reply-tools";
+import {
+    chooseReplyModel,
+    MESSENGER_FILE_MODEL,
+    MESSENGER_MEDIA_MODEL,
+    MESSENGER_REPLY_TOOL_GROUPS,
+    normalizeReplyToolGroups,
+    planReplyTools,
+} from "./reply-tools";
 
 describe(planReplyTools, () => {
     it("gives no tools when the setting is absent, off, or has no known group", () => {
@@ -79,13 +87,13 @@ describe(normalizeReplyToolGroups, () => {
 
 describe(chooseReplyModel, () => {
     it("uses the media model for media threads and tool replies, the default otherwise", () => {
-        expect(chooseReplyModel({ hasMedia: false, tools: false })).toBe(DEFAULT_CHAT_MODEL);
-        expect(chooseReplyModel({ hasMedia: true, tools: false })).toBe(MESSENGER_MEDIA_MODEL);
-        expect(chooseReplyModel({ hasMedia: false, tools: true })).toBe(MESSENGER_MEDIA_MODEL);
+        expect(chooseReplyModel({ media: "none", tools: false })).toBe(DEFAULT_CHAT_MODEL);
+        expect(chooseReplyModel({ media: "images", tools: false })).toBe(MESSENGER_MEDIA_MODEL);
+        expect(chooseReplyModel({ media: "none", tools: true })).toBe(MESSENGER_MEDIA_MODEL);
     });
 
     it("moves the media model under a region rule to one the rules allow that still reads images and calls tools", () => {
-        const model = chooseReplyModel({ hasMedia: true, rules: { blockedRegions: ["CN"] }, tools: false });
+        const model = chooseReplyModel({ media: "images", rules: { blockedRegions: ["CN"] }, tools: false });
         const definition = MODEL_REGISTRY.find((candidate) => candidate.id === model);
 
         expect(model).not.toBe(MESSENGER_MEDIA_MODEL);
@@ -96,14 +104,22 @@ describe(chooseReplyModel, () => {
         expect(
             getModelRejectionReason({ modelId: model, provider: definition!.provider, regions: deriveModelRegions(definition!) }, { blockedRegions: ["CN"] }),
         ).toBeNull();
-        expect(chooseReplyModel({ hasMedia: false, rules: { blockedRegions: ["CN"] }, tools: false })).toBe(DEFAULT_CHAT_MODEL);
+        expect(chooseReplyModel({ media: "none", rules: { blockedRegions: ["CN"] }, tools: false })).toBe(DEFAULT_CHAT_MODEL);
     });
 
     it("needs only tool calling from a stand-in for a tool reply without media", () => {
         const rules = { allowedModels: [MESSENGER_MEDIA_MODEL, "cf-gpt-oss-120b"], blockedModels: [MESSENGER_MEDIA_MODEL] };
 
-        expect(chooseReplyModel({ hasMedia: false, rules, tools: true })).toBe("cf-gpt-oss-120b");
-        expect(chooseReplyModel({ hasMedia: true, rules, tools: true })).toBe(MESSENGER_MEDIA_MODEL);
+        expect(chooseReplyModel({ media: "none", rules, tools: true })).toBe("cf-gpt-oss-120b");
+        expect(chooseReplyModel({ media: "images", rules, tools: true })).toBe(MESSENGER_MEDIA_MODEL);
+    });
+
+    it("uses a file reader for a thread that still holds a PDF part", () => {
+        const definition = MODEL_REGISTRY.find((candidate) => candidate.id === MESSENGER_FILE_MODEL);
+
+        expect(chooseReplyModel({ media: "files", tools: false })).toBe(MESSENGER_FILE_MODEL);
+        expect(definition?.enabled).not.toBe(false);
+        expect(backupCapabilities(definition!)).toStrictEqual({ files: true, images: true, tools: true });
     });
 
     it("picks an enabled, image-reading registry model for tool replies", () => {
