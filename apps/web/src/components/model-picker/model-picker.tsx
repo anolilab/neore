@@ -24,6 +24,7 @@ import type { FC, ReactNode } from "react";
 import React, { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import useModelNicknames from "@/features/chat/core/hooks/use-model-nicknames";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
@@ -419,6 +420,8 @@ const ModelItemContent = memo<{
 
 const ModelGroupRenderer = memo<{
     anchorMode: string | null;
+    /** Whether a guest may be offered sign-up (registration open, or an invitation in the URL). */
+    canSignUp?: boolean;
     group: ModelGroup;
     infoModelId?: string;
     isAnonymous?: boolean;
@@ -437,6 +440,7 @@ const ModelGroupRenderer = memo<{
 }>(
     ({
         anchorMode,
+        canSignUp = true,
         group,
         infoModelId,
         isAnonymous = false,
@@ -478,7 +482,7 @@ const ModelGroupRenderer = memo<{
 
                         if (isLockedForAnonymous) {
                             stateClassName = "cursor-not-allowed opacity-40";
-                            lockedTitle = t`Sign up to unlock all models`;
+                            lockedTitle = canSignUp ? t`Sign up to unlock all models` : t`Sign in to unlock all models`;
                         } else if (isTypeMismatch) {
                             stateClassName = "cursor-not-allowed opacity-25";
                             lockedTitle = t`Only ${getModelModeName(anchorMode!)} models can be compared. Clear selection to switch types.`;
@@ -591,6 +595,8 @@ const ModelPicker: FC<ModelPickerProps> = ({
     panelClassName,
 }) => {
     const { i18n, t } = useLingui();
+    // Under invite-only a guest is pointed at sign-in, not sign-up, unless the URL carries an invitation.
+    const { canSignUp } = useInviteOnly();
 
     // Use provided models list or fall back to the feature-flagged gateway models
     const featureFlaggedModels = useFeatureFlaggedModels({ applyUserOverrides: true });
@@ -974,9 +980,15 @@ const ModelPicker: FC<ModelPickerProps> = ({
                             <Lock className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
                             <p className="text-[12px] leading-snug text-amber-700 dark:text-amber-300">
                                 {t`Guest accounts use free models only.`}{" "}
-                                <a className="font-semibold underline underline-offset-2" href="/auth/sign-up">
-                                    {t`Subscribe for $8/mo to unlock all models.`}
-                                </a>
+                                {canSignUp ? (
+                                    <a className="font-semibold underline underline-offset-2" href="/auth/sign-up">
+                                        {t`Subscribe for $8/mo to unlock all models.`}
+                                    </a>
+                                ) : (
+                                    <a className="font-semibold underline underline-offset-2" href="/auth/sign-in">
+                                        {t`Sign in to unlock all models.`}
+                                    </a>
+                                )}
                             </p>
                         </div>
                     )}
@@ -1182,6 +1194,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         {filteredGroupedItems.map((group) => (
                                             <ModelGroupRenderer
                                                 anchorMode={selectionMode === "parallel" ? anchorMode : null}
+                                                canSignUp={canSignUp}
                                                 group={group}
                                                 infoModelId={infoModelId}
                                                 isAnonymous={isAnonymous}

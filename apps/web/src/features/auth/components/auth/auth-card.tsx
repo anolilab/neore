@@ -11,6 +11,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { useEffect, useState } from "react";
 
+import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import useLastSignInMethod from "@/features/auth/hooks/use-last-signin-method";
 import useSignInMethods from "@/features/auth/hooks/use-sign-in-methods";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
@@ -278,6 +279,14 @@ const AuthCard: FC<AuthCardProperties> = ({
     // Which providers and whether passkeys exist is the backend's configuration, not a prop.
     const { findProvider, passkey, socialProviders } = useSignInMethods();
     const social = socialProviders.length > 0 ? { providers: socialProviders } : undefined;
+    // Sign-up is offered only when registration is open or the URL carries an invitation (`?invite=`).
+    const { canSignUp, inviteOnly } = useInviteOnly();
+    // Without an invitation the sign-up view explains that; until the backend has answered it shows nothing.
+    let signUpState: "closed" | "open" | "pending" = "open";
+
+    if (view === "SIGN_UP" && !canSignUp) {
+        signUpState = inviteOnly === undefined ? "pending" : "closed";
+    }
 
     // Determine social layout
     const autoSocialLayout = credentials && social?.providers && social.providers.length > 2 ? "horizontal" : "vertical";
@@ -357,6 +366,13 @@ const AuthCard: FC<AuthCardProperties> = ({
                 };
             }
             case "SIGN_UP": {
+                if (signUpState === "closed") {
+                    return {
+                        description: t`Registration is by invitation only. Open the link from your invitation, or sign in if you already have an account.`,
+                        title: t`Sign-up needs an invitation`,
+                    };
+                }
+
                 return {
                     description: t`Enter your information to create an account`,
                     title: t`Sign Up`,
@@ -435,27 +451,29 @@ const AuthCard: FC<AuthCardProperties> = ({
                 )}
             </CardHeader>
 
-            <CardContent className={cn("grid gap-6", classNames?.content)}>
-                <LastSignInMessage className="mb-2" classNames={LAST_SIGNIN_CLASSNAMES} />
+            {signUpState === "open" && (
+                <CardContent className={cn("grid gap-6", classNames?.content)}>
+                    <LastSignInMessage className="mb-2" classNames={LAST_SIGNIN_CLASSNAMES} />
 
-                {oneTap && ["EMAIL_OTP", "MAGIC_LINK", "SIGN_IN", "SIGN_UP"].includes(view) && <OneTap redirectTo={redirectTo} />}
+                    {oneTap && ["EMAIL_OTP", "MAGIC_LINK", "SIGN_IN", "SIGN_UP"].includes(view) && <OneTap redirectTo={redirectTo} />}
 
-                {shouldPrioritizeSocial ? (
-                    <>
-                        <SocialSection {...socialProperties} />
-                        {shouldShowSeparator && <SeparatorSection classNames={classNames} />}
-                        <AuthFormSection {...authFormProperties} />
-                    </>
-                ) : (
-                    <>
-                        <AuthFormSection {...authFormProperties} />
-                        {shouldShowSeparator && <SeparatorSection classNames={classNames} />}
-                        <SocialSection {...socialProperties} />
-                    </>
-                )}
-            </CardContent>
+                    {shouldPrioritizeSocial ? (
+                        <>
+                            <SocialSection {...socialProperties} />
+                            {shouldShowSeparator && <SeparatorSection classNames={classNames} />}
+                            <AuthFormSection {...authFormProperties} />
+                        </>
+                    ) : (
+                        <>
+                            <AuthFormSection {...authFormProperties} />
+                            {shouldShowSeparator && <SeparatorSection classNames={classNames} />}
+                            <SocialSection {...socialProperties} />
+                        </>
+                    )}
+                </CardContent>
+            )}
 
-            {credentials && signUp && (
+            {credentials && signUp && (!SIGN_IN_LIKE_VIEWS.has(view) || canSignUp) && (
                 <CardFooter className={cn("text-muted-foreground justify-center gap-1.5 text-sm", classNames?.footer)}>
                     {getFooterText()}
 
