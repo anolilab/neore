@@ -82,6 +82,16 @@ vi.mock("@/features/chat/core/hooks/use-runner-capabilities", () => {
     return { default: () => null };
 });
 
+// The upload path reads `VITE_LUNORA_URL` at import time (the env schema and the session-token server function),
+// and CI runs without one.
+vi.mock("@/lib/auth/server-functions", () => {
+    return { default: vi.fn() };
+});
+
+vi.mock("@/lib/env", () => {
+    return { default: { VITE_LUNORA_URL: "http://localhost:8788" } };
+});
+
 vi.mock("@/lib/lunora/crpc", () => {
     const proxy: unknown = new Proxy(() => undefined, {
         apply: () => {
