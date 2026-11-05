@@ -662,7 +662,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     );
 
     // Invite-only: a guest may not start a turn. Every path into one (composer, voice, the prompt queue, edit,
-    // regenerate) asks them to sign in instead; the composer checks first and keeps its draft.
+    // regenerate) asks them to sign in instead. A send keeps its draft and is held for after sign-in. Here rather than
+    // in the composer, which the landing page also renders over a provider that sends nothing.
     const { mustSignIn } = useInviteOnly();
 
     const sendMessage = useCallback(

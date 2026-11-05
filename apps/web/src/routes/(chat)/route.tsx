@@ -8,7 +8,6 @@ import { lazy, Suspense } from "react";
 import GlobalCommandPalette from "@/components/command-palette";
 import { ModelPickerPopup } from "@/components/model-picker";
 import ProgrammableSidebarProvider from "@/components/programmable-sidebar-provider";
-import LoginPromptHost from "@/features/auth/components/auth/login-prompt-host";
 import UnauthenticatedGate from "@/features/auth/components/unauthenticated-gate";
 import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import ChatLoadingSkeleton from "@/features/chat/loading/chat-loading-skeleton";
@@ -49,8 +48,6 @@ const RouteComponent = () => {
                     </ProgrammableSidebarProvider>
                 </KeyboardShortcutsManager>
             </Authenticated>
-            {/* Sending while signed out or as a guest under invite-only opens this (`openLoginPrompt`). */}
-            <LoginPromptHost />
         </>
     );
 };
