@@ -5,10 +5,11 @@ reasoning are in [docs/agents/backend-auth.md](../../../docs/agents/backend-auth
 
 ## INVITE-ONLY REGISTRATION
 
-- **INVITE-ONLY REGISTRATION**: sign-up needs an invitation (`inviteOnly()` plugin + `signUpInvitation` table); anonymous sign-in does not.
+- **INVITE-ONLY REGISTRATION**: sign-up needs an invitation (`inviteOnly()` plugin + `signUpInvitation` table), and anonymous (guest) sign-in is refused (`GUEST_SIGN_IN_DISABLED`, `auth/sign-in-methods.ts`). Off, guests work as before.
+- `GET /api/auth/sign-in-methods` reports `inviteOnly`; the web app reads it to drop guest chat and sign-up links (`features/auth/hooks/use-sign-in-methods.ts`).
 - `SIGNUP_INVITE_ONLY` turns it off only for `"false"`/`"0"`; anything else, including unset, keeps it on. Never make unset mean open.
 - Converting anonymous → real and social first sign-in ARE gated (conversion creates a new user); keep it that way.
-- Anonymous sign-in's exemption is upstream's (`user.create.before`, `isAnonymous`); only `invite-only.test.ts` (real plugin) guards it — keep that test.
+- `inviteOnly()` still exempts `isAnonymous` rows upstream; `invite-only.test.ts` (real plugin) pins that — keep it, it matters again if the guest refusal is ever relaxed.
 - The token reaches the browser only as `?invite=`, read at submit by `features/auth/lib/invite-token.ts`; never send it empty.
 - Bootstrap once after a deploy: `POST $BACKEND_PUBLIC_ORIGIN/admin/seed-invitations` with `Authorization: Bearer $LUNORA_ADMIN_TOKEN` (`auth/seed-invitations-http.ts`); idempotent, `?reissue=1` re-mints pending links.
 - That route compares the bearer in constant time, rate-limits per IP BEFORE the check, and answers 503 when `LUNORA_ADMIN_TOKEN` is unset — never open. `lunora run` cannot replace it.

@@ -255,6 +255,7 @@ describe("GET /api/auth/sign-in-methods", { timeout: 30_000 }, () => {
         await stubProviders({ emailVerified: true });
 
         expect(await readMethods()).toStrictEqual({
+            inviteOnly: true,
             oidc: { label: "Acme SSO", providerId: "oidc" },
             passkey: true,
             social: ["google", "github", "microsoft"],
@@ -272,7 +273,62 @@ describe("GET /api/auth/sign-in-methods", { timeout: 30_000 }, () => {
         vi.stubEnv("OIDC_ISSUER", "https://idp.example.com");
         vi.stubEnv("OIDC_CLIENT_ID", "");
 
-        expect(await readMethods()).toStrictEqual({ oidc: null, passkey: true, social: [] });
+        expect(await readMethods()).toStrictEqual({ inviteOnly: true, oidc: null, passkey: true, social: [] });
+    });
+
+    it.each([
+        ["unset", undefined, true],
+        ["false", "false", false],
+        ["0", "0", false],
+    ])("reports inviteOnly when SIGNUP_INVITE_ONLY is %s", async (_label, value, expected) => {
+        expect.assertions(1);
+
+        vi.stubEnv("SITE_URL", SITE);
+
+        if (value !== undefined) {
+            vi.stubEnv("SIGNUP_INVITE_ONLY", value);
+        }
+
+        expect(await readMethods()).toMatchObject({ inviteOnly: expected });
+    });
+});
+
+describe("guest sign-in", { timeout: 30_000 }, () => {
+    beforeEach(() => {
+        vi.resetModules();
+        vi.stubEnv("SITE_URL", SITE);
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
+    const signInAsGuest = async () => {
+        const { auth, db } = await createTestAuth();
+        const response = await auth.handler(new Request(`${SITE}/api/auth/sign-in/anonymous`, { headers: { origin: SITE }, method: "POST" }));
+
+        return { db, response };
+    };
+
+    it("is refused while registration is invite-only, and creates no user", async () => {
+        expect.assertions(3);
+
+        const { db, response } = await signInAsGuest();
+
+        expect(response.status).toBe(403);
+        expect(((await response.json()) as { code?: string }).code).toBe("GUEST_SIGN_IN_DISABLED");
+        expect(db.user).toStrictEqual([]);
+    });
+
+    it("still works when registration is open", async () => {
+        expect.assertions(2);
+
+        vi.stubEnv("SIGNUP_INVITE_ONLY", "false");
+
+        const { db, response } = await signInAsGuest();
+
+        expect(response.status).toBe(200);
+        expect(db.user?.map((user) => user.isAnonymous)).toStrictEqual([true]);
     });
 });
 
@@ -406,6 +462,9 @@ describe("passkeys", { timeout: 30_000 }, () => {
 
     it("refuses to register one for a guest session", async () => {
         expect.assertions(2);
+
+        // Guests exist only while registration is open.
+        vi.stubEnv("SIGNUP_INVITE_ONLY", "false");
 
         const { auth } = await createTestAuth();
         const guest = await auth.handler(new Request(`${SITE}/api/auth/sign-in/anonymous`, { headers: { origin: SITE }, method: "POST" }));

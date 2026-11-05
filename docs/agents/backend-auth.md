@@ -4,7 +4,7 @@ The rules are summarized in `backend/lunora/auth/AGENTS.md`, which agents load a
 
 ## INVITE-ONLY REGISTRATION
 
-Sign-up requires an invitation; anonymous sign-in does not. `@lunora/auth`'s
+Sign-up requires an invitation, and anonymous (guest) sign-in is refused. `@lunora/auth`'s
 `inviteOnly()` plugin plus the `signUpInvitation` table.
 
 - **`SIGNUP_INVITE_ONLY` only turns it OFF** — `"false"` or `"0"`. Anything
@@ -12,13 +12,17 @@ Sign-up requires an invitation; anonymous sign-in does not. `@lunora/auth`'s
   "anyone can register", so unset must not mean open.
 - **Converting anonymous → real IS gated**, deliberately: better-auth creates a
   NEW user and links the anonymous one afterwards, so conversion is
-  registration. Browse anonymously without an invitation; keep an account only
-  with one. Social first-sign-in is gated for the same reason.
-- **Anonymous sign-in is exempt upstream, and nothing of ours guards it.**
-  `inviteOnly()`'s `user.create.before` exempts rows carrying `isAnonymous` when
-  the `anonymous` plugin is installed. `invite-only.test.ts` drives the REAL
-  plugin and asserts that exemption — if upstream ever drops it, that test is the
-  only thing that notices.
+  registration. A guest session made before invite-only was switched on can
+  keep an account only with an invitation. Social first-sign-in is gated for the same reason.
+- **Guests are refused while invite-only is on.** `signInMethods`
+  (`auth/sign-in-methods.ts`) answers `/sign-in/anonymous` with 403
+  `GUEST_SIGN_IN_DISABLED`: a guest is an account that skipped the invitation.
+  `GET /sign-in-methods` reports `inviteOnly`, and the web app uses it to show
+  the chat signed out (sending asks for a sign-in) and to hide sign-up links
+  unless the URL carries `?invite=`. With the flag off, guests work as before.
+  `inviteOnly()`'s own `user.create.before` still exempts `isAnonymous` rows;
+  `invite-only.test.ts` drives the REAL plugin and pins that, which matters
+  again only if the refusal is relaxed.
 - **The token reaches the browser only as `?invite=`**, read at submit time by
   `features/auth/lib/invite-token.ts` — not threaded through auth-card props,
   because the anonymous-conversion dialog needs it too and is not a child of that

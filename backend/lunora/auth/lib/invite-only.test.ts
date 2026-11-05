@@ -9,9 +9,10 @@
  * a wrapper for it; `@lunora/auth@127` fixed it upstream and the wrapper is
  * gone.
  *
- * This drives the REAL plugin, so it fails if that exemption is ever dropped —
- * which is what the wrapper existed to prevent and is not something our own
- * code can guard any more.
+ * This drives the REAL plugin, so it fails if that exemption is ever dropped.
+ * Under invite-only our own `signInMethods` plugin now refuses guest sign-in
+ * outright (`GUEST_SIGN_IN_DISABLED`), so the exemption is reached only if that
+ * refusal is ever relaxed; keep this test for that day.
  */
 import { inviteOnly } from "@lunora/auth/plugins";
 import { describe, expect, it, vi } from "vitest";
