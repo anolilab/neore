@@ -7,11 +7,13 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import useSignInMethods from "./use-sign-in-methods";
+import useSignInMethods, { SIGN_IN_METHODS_STALE_MS } from "./use-sign-in-methods";
 
-const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } })}>{children}</QueryClientProvider>
-);
+const wrapperFor =
+    (client: QueryClient) =>
+    ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+
+const wrapper = ({ children }: { children: ReactNode }) => wrapperFor(new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } }))({ children });
 
 const answer = (response: () => Promise<Response>) => {
     vi.stubGlobal("fetch", vi.fn(response));
@@ -20,6 +22,7 @@ const answer = (response: () => Promise<Response>) => {
 describe("useSignInMethods().inviteOnly", () => {
     afterEach(() => {
         vi.unstubAllGlobals();
+        vi.restoreAllMocks();
     });
 
     it("is unknown until the backend answers", () => {
@@ -62,6 +65,30 @@ describe("useSignInMethods().inviteOnly", () => {
 
         await waitFor(() => {
             expect(result.current.inviteOnly).toBe(true);
+        });
+    });
+
+    it("reads the policy again once its answer is five minutes old", async () => {
+        let inviteOnly = true;
+
+        answer(async () => Response.json({ inviteOnly, oidc: null, passkey: true, social: [] }));
+
+        const client = new QueryClient();
+        const { result: firstResult, unmount } = renderHook(() => useSignInMethods(), { wrapper: wrapperFor(client) });
+
+        await waitFor(() => {
+            expect(firstResult.current.inviteOnly).toBe(true);
+        });
+        unmount();
+
+        // The operator opens registration; a later mount past the stale time sees it.
+        inviteOnly = false;
+        vi.spyOn(Date, "now").mockReturnValue(Date.now() + SIGN_IN_METHODS_STALE_MS + 1000);
+
+        const { result: secondResult } = renderHook(() => useSignInMethods(), { wrapper: wrapperFor(client) });
+
+        await waitFor(() => {
+            expect(secondResult.current.inviteOnly).toBe(false);
         });
     });
 });

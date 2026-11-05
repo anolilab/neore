@@ -18,6 +18,9 @@ export interface SignInMethods {
     social: string[];
 }
 
+/** How long an answer is used before it is read again. */
+export const SIGN_IN_METHODS_STALE_MS = 5 * 60 * 1000;
+
 const NO_METHODS: SignInMethods = { inviteOnly: true, oidc: null, passkey: false, social: [] };
 
 const isSignInMethods = (value: unknown): value is SignInMethods => {
@@ -51,7 +54,7 @@ const fetchSignInMethods = async (): Promise<SignInMethods> => {
  * signs in through the same `signIn.social`), whether passkeys are on, and a
  * resolver from provider id to its button config.
  *
- * Only queried where sign-in UI renders, and once per page load at most. Until
+ * Only queried where sign-in UI renders, and at most once per five minutes. Until
  * it answers (and during SSR) nothing but email is offered, which is also the
  * safe reading when the backend is unreachable.
  *
@@ -75,7 +78,9 @@ const useSignInMethods = (): {
         queryFn: fetchSignInMethods,
         queryKey: ["auth", "sign-in-methods"],
         retry: 1,
-        staleTime: Infinity,
+        // As long as the endpoint's own `cache-control` (5 min), so a policy change (`SIGNUP_INVITE_ONLY`) reaches an
+        // open tab at its next mount or focus instead of only after a reload.
+        staleTime: SIGN_IN_METHODS_STALE_MS,
     });
 
     const { oidc } = data;
