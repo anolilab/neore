@@ -133,8 +133,9 @@ const EMBEDDING_MODEL = { modelApiId: "@cf/baai/bge-m3", modelId: "bge-m3", prov
  * data collection), the gateway refuses it with `MODEL_BLOCKED`, so a caller can skip the call and use keyword search.
  */
 export const embeddingModelAllowed = (rules: ModelFilterRules | undefined): boolean =>
+    rules === undefined ||
     !hasActiveFilters(rules) ||
-    getModelRejectionReason({ modelId: EMBEDDING_MODEL.modelId, provider: EMBEDDING_MODEL.provider, regions: deriveModelRegions(EMBEDDING_MODEL) }, rules!) ===
+    getModelRejectionReason({ modelId: EMBEDDING_MODEL.modelId, provider: EMBEDDING_MODEL.provider, regions: deriveModelRegions(EMBEDDING_MODEL) }, rules) ===
         null;
 
 /**
