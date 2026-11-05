@@ -24,7 +24,7 @@ import {
     UserRound,
     Users,
 } from "lucide-react";
-import type { CSSProperties, FC, MouseEvent } from "react";
+import type { CSSProperties, FC } from "react";
 import { useCallback, useEffect, useState } from "react";
 
 import Neore from "@/assets/logo/neore.svg?react";
@@ -70,9 +70,11 @@ const SIDEBAR_ICON = "text-brand-black dark:text-brand-white hover:bg-sidebar-ac
 const TOOLBAR_BUTTON =
     "bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 hover:border-border dark:hover:border-sidebar-border/50 text-foreground h-7 dark:text-white";
 
-/** Opens the sign-in prompt from a control the visitor needs an account for. */
-const askToSignIn = (event?: MouseEvent<HTMLElement>): void => {
-    event?.currentTarget.blur();
+/**
+ * Opens the sign-in prompt from a control the visitor needs an account for. The control keeps focus, so closing the
+ * prompt returns focus to it (the dialog restores focus to what had it when it opened).
+ */
+export const askToSignIn = (): void => {
     openLoginPrompt();
 };
 

@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { useLoginPromptStore } from "@/features/auth/stores/login-prompt-store";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 
-import { SignedOutComposer } from "./signed-out-chat";
+import { askToSignIn, SignedOutComposer } from "./signed-out-chat";
 
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -118,5 +118,28 @@ describe("SignedOutComposer", () => {
         render(<SignedOutComposer />);
 
         expect(screen.getByRole("textbox", { name: "Message" }).dataset.suggestions).toBe("false");
+    });
+});
+
+describe("askToSignIn", () => {
+    afterEach(() => {
+        useLoginPromptStore.getState().setOpen(false);
+    });
+
+    it("leaves focus on the control that opened the prompt, so closing it returns there", () => {
+        render(
+            <button onClick={askToSignIn} type="button">
+                New Thread
+            </button>,
+        );
+
+        const trigger = screen.getByRole("button", { name: "New Thread" });
+
+        trigger.focus();
+        fireEvent.click(trigger);
+
+        expect(useLoginPromptStore.getState().isOpen).toBe(true);
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+        expect(document.activeElement).toBe(trigger);
     });
 });
