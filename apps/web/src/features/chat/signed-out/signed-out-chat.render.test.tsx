@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { useLoginPromptStore } from "@/features/auth/stores/login-prompt-store";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 
-import { askToSignIn, SignedOutComposer } from "./signed-out-chat";
+import SignedOutChat, { askToSignIn, SignedOutComposer } from "./signed-out-chat";
 
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -40,6 +40,18 @@ vi.mock("@/features/chat/thread/composer-search-mode", () => {
 });
 
 vi.mock("@/features/chat/thread/thread-welcome-suggestions", () => {
+    return { default: () => null };
+});
+
+vi.mock("@/features/layout/components/workspace-switch", () => {
+    return { default: () => null };
+});
+
+vi.mock("@/assets/logo/neore.svg?react", () => {
+    return { default: () => null };
+});
+
+vi.mock("@/features/chat/thread/thread-welcome", () => {
     return { default: () => null };
 });
 
@@ -141,5 +153,13 @@ describe("askToSignIn", () => {
         expect(useLoginPromptStore.getState().isOpen).toBe(true);
         // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
         expect(document.activeElement).toBe(trigger);
+    });
+});
+
+describe("SignedOutChat header", () => {
+    it("offers one sidebar toggle, the real one, and no right panel that opens a sign-in prompt instead", () => {
+        render(<SignedOutChat />);
+
+        expect(screen.getAllByRole("button", { name: "Toggle Sidebar" })).toHaveLength(1);
     });
 });

@@ -18,7 +18,6 @@ import {
     HourglassIcon,
     LogIn,
     MoreVertical,
-    PanelRightIcon,
     PlusIcon,
     Search,
     UserRound,
@@ -290,21 +289,10 @@ const SignedOutChat: FC = () => {
                 <SidebarInset className="dark:bg-brand-obsidian md:peer-data-[variant=inset]:m-1">
                     <SiteHeader
                         menu={
-                            <>
-                                <Button onClick={askToSignIn} size="icon" variant="ghost">
-                                    <DownloadIcon className="h-4 w-4" />
-                                    <span className="sr-only">{t`Export chat`}</span>
-                                </Button>
-                                <Button
-                                    aria-label={t`Toggle Sidebar`}
-                                    className="text-foreground size-6 dark:text-white"
-                                    onClick={askToSignIn}
-                                    size="icon"
-                                    variant="ghost"
-                                >
-                                    <PanelRightIcon />
-                                </Button>
-                            </>
+                            <Button onClick={askToSignIn} size="icon" variant="ghost">
+                                <DownloadIcon className="h-4 w-4" />
+                                <span className="sr-only">{t`Export chat`}</span>
+                            </Button>
                         }
                         themeToggle={
                             <>
