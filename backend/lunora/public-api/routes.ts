@@ -21,7 +21,6 @@ import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { isHostRunThread } from "../acp/lib/host-thread";
-import { runChatStart } from "../chat/http";
 import { verifyStreamToken } from "../chat/streaming/persistent/stream-token";
 import { isSelectableTextModel } from "../skills/builder-logic";
 import { PublicApiError } from "./errors";
@@ -230,6 +229,7 @@ const startChat = async (input: RouteInput, request: { model?: string; prompt: s
         throw new PublicApiError("service_unavailable", "Chat is not configured on this deployment.");
     }
 
+    const { runChatStart } = await import("../chat/http");
     const response = await runChatStart(
         input.ctx,
         {

@@ -11,7 +11,8 @@ import { internal } from "../_generated/internal";
 import { fakeBucket } from "../../test/fake-upload-bucket";
 import { stagingKeyFor, stagingPrefixFor, uploadStatePrefixFor } from "./chat-upload-staging";
 import { finalizeStagedReferenceMedia } from "./reference-media-upload";
-import { handleUploadRequest, refuseDeclaredPurpose, UPLOAD_PATH } from "./upload-route";
+import { UPLOAD_PATH } from "./upload-paths";
+import { handleUploadRequest, refuseDeclaredPurpose } from "./upload-route";
 
 const ORIGIN = "http://localhost:8788";
 const ALICE = "user-alice";

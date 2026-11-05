@@ -1,10 +1,41 @@
 // eslint-disable-next-line import/no-namespace
 import * as z from "zod/v4";
 
+/**
+ * Why `ENCRYPTION_KEY` cannot be used, or `undefined` when it can. Mirrors the
+ * check `lib/encryption.ts` makes when it loads.
+ *
+ * That module is loaded on the first request that needs it rather than at Worker
+ * startup, so its check alone would let a bad key deploy and pass every other
+ * request. Checked here as well, by `assertEnv()` on every request and by
+ * `alchemy.run.ts` before a deploy. A 32-character key is not enough: Base64
+ * decodes to three bytes for every four characters.
+ */
+export const encryptionKeyProblem = (value: string): string | undefined => {
+    let bytes: number;
+
+    try {
+        bytes = atob(value).length;
+    } catch {
+        return "ENCRYPTION_KEY is not valid Base64. Generate one with: openssl rand -base64 32";
+    }
+
+    return bytes < 32 ? `ENCRYPTION_KEY must decode to at least 32 bytes (got ${bytes}). Generate one with: openssl rand -base64 32` : undefined;
+};
+
 /* eslint-disable perfectionist/sort-objects */
 const coreEnvSchema = z.object({
     BETTER_AUTH_SECRET: z.string().trim().min(1, "BETTER_AUTH_SECRET is required"),
-    ENCRYPTION_KEY: z.string().trim().min(32, "ENCRYPTION_KEY must be at least 32 characters"),
+    ENCRYPTION_KEY: z
+        .string()
+        .trim()
+        .superRefine((value, context) => {
+            const problem = encryptionKeyProblem(value);
+
+            if (problem) {
+                context.addIssue({ code: "custom", message: problem });
+            }
+        }),
     SITE_URL: z.string().trim().min(1, "SITE_URL is required"),
 
     ADMIN: z.string().trim(),

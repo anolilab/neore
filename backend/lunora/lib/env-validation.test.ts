@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const CORE_ENV = {
     ADMIN: "admin@test.com",
     BETTER_AUTH_SECRET: "test-secret-that-is-long-enough",
-    ENCRYPTION_KEY: "a]V2x!9Kp#mN7Qw$rF4hJ8dL0sY6bE3c", // 32+ chars
+    ENCRYPTION_KEY: btoa("k".repeat(32)),
     ENVIRONMENT: "development",
     JWKS: '{"keys":[]}',
     SITE_URL: "http://localhost:5173",
@@ -107,6 +107,30 @@ describe("envValidation — tiered validation", () => {
         const { assertEnv } = await import("./env-validation");
 
         expect(() => assertEnv()).toThrow("Environment validation failed");
+    });
+
+    it("assertEnv should refuse an ENCRYPTION_KEY of 32 characters that decodes to fewer than 32 bytes", async () => {
+        const environment = Object.entries({ ...ALL_ENV, ENCRYPTION_KEY: btoa("k".repeat(24)), ENVIRONMENT: "production" });
+
+        for (const [key, value] of environment) {
+            vi.stubEnv(key, value);
+        }
+
+        const { assertEnv } = await import("./env-validation");
+
+        expect(() => assertEnv()).toThrow("ENCRYPTION_KEY must decode to at least 32 bytes (got 24)");
+    });
+
+    it("assertEnv should refuse an ENCRYPTION_KEY that is not Base64", async () => {
+        const environment = Object.entries({ ...ALL_ENV, ENCRYPTION_KEY: "not-base64!", ENVIRONMENT: "production" });
+
+        for (const [key, value] of environment) {
+            vi.stubEnv(key, value);
+        }
+
+        const { assertEnv } = await import("./env-validation");
+
+        expect(() => assertEnv()).toThrow("ENCRYPTION_KEY is not valid Base64");
     });
 
     it("assertEnv should memoize a successful validation across calls", async () => {
