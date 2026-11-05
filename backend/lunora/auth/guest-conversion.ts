@@ -7,7 +7,7 @@
  * another browser or device carries no guest cookie, so the guest's rows would stay behind.
  *
  * So the sign-up records which guest the new account came from, server-side, under better-auth's verification store,
- * and the first session the account gets, by any sign-in method, finishes the link. The guest id is only
+ * and the account's first password sign-in, or the verification link, finishes the link (see `HAND_OVER_PATHS`). The guest id is only
  * ever read from the request's resolved session, never from the body or the query. The record goes only once the move
  * is queued, so a failed hand-over is retried at the next sign-in; an unverified sign-in, which mails a new link,
  * renews it in place. If the record cannot be written at sign-up, the move is queued there and then, while the request
@@ -27,6 +27,14 @@ const pendingIdentifier = (userId: string): string => `guest-conversion:${userId
 
 /** The one refused request that still proves the password, and so mails a new link and renews the pending guest. */
 const PASSWORD_SIGN_IN_PATH = "/sign-in/email";
+
+/**
+ * The only sessions that finish a hand-over: the sign-up's own password, or the link mailed for that sign-up. A magic
+ * link, email code, passkey, social provider or admin impersonation proves the account's address or an operator, not
+ * whoever signed up with the guest's session, so a sign-up made with someone else's address could otherwise push its
+ * guest data into the real owner's account at their next sign-in. A record left pending waits for one of these two.
+ */
+const HAND_OVER_PATHS = new Set([PASSWORD_SIGN_IN_PATH, "/verify-email"]);
 
 interface SignUpReturn {
     token?: string | null;
@@ -128,9 +136,7 @@ export const guestConversion = (onGuestConverted: (guestId: string, userId: stri
 
                         await adapter.deleteVerificationByIdentifier(pendingIdentifier(sessionUserId));
                     }),
-                    // Every endpoint: a session from a magic link, an email code, a passkey, a social provider or a
-                    // second factor must finish a pending hand-over as much as one from a password or the link.
-                    matcher: () => true,
+                    matcher: (ctx) => HAND_OVER_PATHS.has(ctx.path ?? ""),
                 },
             ],
         },

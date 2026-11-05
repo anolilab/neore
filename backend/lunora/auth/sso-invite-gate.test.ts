@@ -564,13 +564,12 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         expect(pendingRows()).toHaveLength(0);
     });
 
-    it("finishes a hand-over left pending at the next session from any sign-in method, not only a password", async () => {
+    it("keeps a pending hand-over for a password sign-in when the next session comes from a magic link", async () => {
         expect.assertions(3);
 
         const onGuestConverted = vi.fn<(guestId: string, userId: string) => Promise<void>>().mockRejectedValueOnce(new Error("queue down"));
         const { auth, db } = await createTestAuth({ onGuestConverted });
         const guest = await auth.handler(post("/sign-in/anonymous", {}));
-        const guestId = ((await guest.json()) as { user: { id: string } }).user.id;
 
         await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, cookieOf(guest)));
 
@@ -595,8 +594,9 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
 
         await auth.handler(new Request(magicLink!, { headers: { origin: SITE } }));
 
-        expect(onGuestConverted).toHaveBeenLastCalledWith(guestId, db.user!.find((row) => row.email === EMAIL)?.id);
-        expect(pendingRows()).toHaveLength(0);
+        // A magic link proves the address, not whoever signed up with the guest's session: no merge, record kept.
+        expect(onGuestConverted).toHaveBeenCalledTimes(1);
+        expect(pendingRows()).toHaveLength(1);
     });
 
     it("queues the move at sign-up when the guest cannot be recorded, so verifying elsewhere loses nothing", async () => {
