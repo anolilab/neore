@@ -12,7 +12,7 @@ import { useStore } from "@tanstack/react-form";
 import { Link } from "@tanstack/react-router";
 import type { BetterFetchOption } from "better-auth/react";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as z from "zod";
 
 import useCaptcha from "@/features/auth/hooks/use-captcha";
@@ -45,6 +45,9 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
     // The address a sign-in was refused for as unverified: offered a new verification link without a session.
     const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
     const [isResending, setIsResending] = useState(false);
+    // The sign-in and the new-link request share one captcha response, which a request spends: one at a time. A ref,
+    // not state, so two clicks in one frame cannot both pass.
+    const inFlightRef = useRef<"resend" | "submit" | null>(null);
 
     const { authClient, basePath, credentials, navigate, toast, viewPaths } = useAuth();
 
@@ -158,6 +161,12 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
             rememberMe: !rememberMeEnabled,
         },
         onSubmit: async ({ value }) => {
+            if (inFlightRef.current) {
+                return;
+            }
+
+            inFlightRef.current = "submit";
+
             try {
                 let response: Record<string, unknown> = {};
 
@@ -222,6 +231,8 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
                     variant: "error",
                 });
             }
+
+            inFlightRef.current = null;
         },
         validators: {
             onChange: formSchema,
@@ -251,10 +262,11 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
         const email = form.getFieldValue("email");
         const password = form.getFieldValue("password");
 
-        if (!unverifiedEmail || email !== unverifiedEmail || !password) {
+        if (!unverifiedEmail || email !== unverifiedEmail || !password || inFlightRef.current) {
             return;
         }
 
+        inFlightRef.current = "resend";
         setIsResending(true);
 
         try {
@@ -278,6 +290,7 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
         } finally {
             resetCaptcha();
             setIsResending(false);
+            inFlightRef.current = null;
         }
     };
 
@@ -378,14 +391,25 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
 
                 <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting }) as unknown as typeof state}>
                     {({ canSubmit, isSubmitting: isSubmittingState }) => (
-                        <Button className={cn("w-full", classNames?.button, classNames?.primaryButton)} disabled={!canSubmit || isSubmitting} type="submit">
+                        <Button
+                            className={cn("w-full", classNames?.button, classNames?.primaryButton)}
+                            disabled={!canSubmit || isSubmitting || isResending}
+                            type="submit"
+                        >
                             {isSubmittingState || isSubmitting ? <Loader2 className="animate-spin" /> : t`Sign in`}
                         </Button>
                     )}
                 </form.Subscribe>
 
                 {unverifiedEmail ? (
-                    <Button aria-busy={isResending} className="w-full" disabled={isResending} onClick={resendVerification} type="button" variant="outline">
+                    <Button
+                        aria-busy={isResending}
+                        className="w-full"
+                        disabled={isResending || isFormSubmitting}
+                        onClick={resendVerification}
+                        type="button"
+                        variant="outline"
+                    >
                         {isResending ? <Loader2 aria-hidden="true" className="animate-spin" /> : null}
                         {t`Send a new verification link`}
                     </Button>
