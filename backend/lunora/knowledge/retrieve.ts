@@ -2,7 +2,7 @@
  * Knowledge Base Retrieval
  *
  * Hybrid search over user-uploaded knowledge base files: vector similarity
- * (Vectorize, Workers AI bge-base-en-v1.5) and BM25 keyword search (FTS5 `searchIndex`
+ * (Vectorize, Workers AI bge-m3) and BM25 keyword search (FTS5 `searchIndex`
  * on `knowledgeChunks`), fused with Reciprocal Rank Fusion. See `hybrid.ts`.
  */
 import { LunoraError, v } from "lunorash/server";
@@ -19,7 +19,7 @@ import { gatewayFetch, SERVICE_ORIGIN } from "../lib/services";
 import { reciprocalRankFusion } from "./hybrid";
 import { MAX_LENGTH } from "../lib/validators";
 
-const EMBEDDING_MODEL_NAME = "bge-base-en-v1.5";
+const EMBEDDING_MODEL_NAME = "bge-m3";
 const MAX_RESULTS = 5;
 
 /**

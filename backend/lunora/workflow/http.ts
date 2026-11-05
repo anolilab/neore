@@ -38,6 +38,7 @@ import { imageRequestArgs, runVideoNode, systemPromptFor, type VideoRunContext }
 import { imageCountOf, type MediaCharge, withMediaCharge } from "./media-billing";
 import { executeTextNode } from "./mention-targets";
 import { buildExecutionContext, resolveRunAccount, workflowRunErrors } from "./run-setup";
+import { runsOnGatewayOnly } from "./executor";
 
 let _agentsPromise: Promise<Record<string, AgentConfig>> | undefined;
 
@@ -224,7 +225,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                         }
 
                         case "ai": {
-                            const result = await executeAINodeStreaming(node, executionContext, userProviderKeys ?? undefined, sendEvent, nodeId);
+                            const result = await executeAINodeStreaming(node, executionContext, { actionContext: context, userId }, userProviderKeys ?? undefined, sendEvent, nodeId);
 
                             output = result.output;
                             usage = result.usage;
@@ -535,6 +536,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
 const executeAINodeStreaming = async (
     node: WorkflowNode,
     context: ExecutionContext,
+    run: { actionContext: HttpActionCtx; userId: string },
     userProviderKeys: Record<string, string> | undefined,
     sendEvent: (event: StreamEvent) => Promise<void>,
     nodeId: string,
@@ -548,6 +550,25 @@ const executeAINodeStreaming = async (
 
     const prompt = getLastOutputAsString(context);
     const modelId = (data.model ?? "claude-sonnet-4-20250514") as string;
+
+    // A gateway-only model is reached through an action (this route has no gateway binding), so its text arrives whole.
+    if (runsOnGatewayOnly(modelId)) {
+        const result = await run.actionContext.runAction(internal.workflow.executor.generateWorkflowText, {
+            maxTokens: data.maxTokens,
+            modelId,
+            prompt,
+            system: systemPromptFor(node, context),
+            temperature: data.temperature,
+            userId: run.userId,
+        });
+
+        await sendEvent({ nodeId, text: result.text, type: "text_chunk" });
+
+        return {
+            output: result.text,
+            usage: { completionTokens: result.outputTokens, promptTokens: result.inputTokens, totalTokens: result.inputTokens + result.outputTokens },
+        };
+    }
 
     const agents = await getAgents();
     const agent = agents[modelId] ?? agents["claude-sonnet-4-20250514" as string];

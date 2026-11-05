@@ -6,7 +6,7 @@ import type { AgentConfig } from "@neore/ai/providers";
  * Executes workflow nodes in topological order, passing data between nodes
  * via a shared execution context.
  */
-import { resolveWorkflowModel } from "@neore/ai/models";
+import { MODEL_LOOKUP, resolveWorkflowModel } from "@neore/ai/models";
 import { generateText, type LanguageModel } from "ai";
 import { LunoraError, v } from "lunorash/server";
 
@@ -14,7 +14,9 @@ import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx as ActionContext } from "../_generated/server";
-import { authAction, rateLimit } from "../lib/crpc";
+import { GatewayLanguageModel } from "../chat/lib/gateway-language-model";
+import { authAction, internalAction, rateLimit } from "../lib/crpc";
+import { gatewayFetch, type ServiceFetch } from "../lib/services";
 import {
     accumulateUsage,
     createEmptyUsage,
@@ -55,9 +57,66 @@ const getAgents = (): Promise<Record<string, AgentConfig>> => {
 };
 
 /**
+ * Whether `modelId` runs only behind the LLM gateway (Workers AI, on the gateway's `AI` binding). Such a model has
+ * no provider SDK the backend could call, so a node reaches it through the gateway binding: directly from an
+ * action, through {@link generateWorkflowText} from the streaming HTTP route, which has no binding.
+ */
+export const runsOnGatewayOnly = (modelId: string): boolean => MODEL_LOOKUP.get(modelId)?.provider === "cloudflare";
+
+interface GatewayTextRequest {
+    maxTokens?: number;
+    modelId: string;
+    prompt: string;
+    system?: string;
+    temperature?: number;
+    userId: string;
+}
+
+/** Generates a node's text on a gateway-only model, metered to the user who runs the workflow. */
+const generateOnGateway = async (gateway: ServiceFetch, request: GatewayTextRequest) => {
+    const definition = MODEL_LOOKUP.get(request.modelId)!;
+
+    return await generateText({
+        maxOutputTokens: request.maxTokens,
+        model: new GatewayLanguageModel({
+            gateway,
+            modelApiId: definition.modelApiId,
+            modelId: definition.id,
+            provider: definition.provider,
+            userId: request.userId,
+        }),
+        prompt: request.prompt,
+        system: request.system,
+        temperature: request.temperature,
+    });
+};
+
+/** {@link generateOnGateway} for the streaming workflow route: an HTTP action, which cannot reach the gateway itself. */
+export const generateWorkflowText = internalAction
+    .input({
+        maxTokens: v.optional(v.number()),
+        modelId: v.string(),
+        prompt: v.string(),
+        system: v.optional(v.string()),
+        temperature: v.optional(v.number()),
+        userId: v.string(),
+    })
+    .output(v.object({ inputTokens: v.number(), outputTokens: v.number(), text: v.string() }))
+    .action(async ({ args, ctx }) => {
+        const result = await generateOnGateway(gatewayFetch(ctx), args);
+
+        return { inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0, text: result.text };
+    });
+
+/**
  * Execute an AI node using the agent system.
  */
-const executeAINode = async (node: WorkflowNode, context: ExecutionContext, userProviderKeys?: Record<string, string>): Promise<NodeExecutionResult> => {
+const executeAINode = async (
+    node: WorkflowNode,
+    context: ExecutionContext,
+    run: { gateway: ServiceFetch; userId: string },
+    userProviderKeys?: Record<string, string>,
+): Promise<NodeExecutionResult> => {
     const data = node.data as {
         maxTokens?: number;
         model?: string;
@@ -74,6 +133,21 @@ const executeAINode = async (node: WorkflowNode, context: ExecutionContext, user
     const modelId = (data.model ?? "claude-sonnet-4-20250514") as string;
 
     try {
+        if (runsOnGatewayOnly(modelId)) {
+            const result = await generateOnGateway(run.gateway, {
+                maxTokens: data.maxTokens,
+                modelId,
+                prompt,
+                system: systemPromptFor(node, context),
+                temperature: data.temperature,
+                userId: run.userId,
+            });
+            const promptTokens = result.usage.inputTokens ?? 0;
+            const completionTokens = result.usage.outputTokens ?? 0;
+
+            return { output: result.text, success: true, usage: { completionTokens, promptTokens, totalTokens: promptTokens + completionTokens } };
+        }
+
         const agents = await getAgents();
         let agent = agents[modelId];
 
@@ -965,7 +1039,7 @@ export const executeWorkflow = authAction
                             break;
                         }
                         case "ai": {
-                            result = await executeAINode(node, executionContext, userProviderKeys ?? undefined);
+                            result = await executeAINode(node, executionContext, { gateway: gatewayFetch(context), userId }, userProviderKeys ?? undefined);
                             break;
                         }
                         case "audio": {

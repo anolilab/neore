@@ -59,7 +59,9 @@ import { generateSkillDraft } from "../skills/generate";
 // eslint-disable-next-line import/first
 import { improvePrompt, iteratePrompt, optimizeSystemPrompt } from "./functions";
 // eslint-disable-next-line import/first
-import { loadOptimizerModelRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, NO_ALLOWED_OPTIMIZER_MODEL_MESSAGE } from "./lib/optimizer-model-rules";
+import { UTILITY_FALLBACK_MODELS } from "../lib/utility-model";
+// eslint-disable-next-line import/first
+import { loadOptimizerModel, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, NO_ALLOWED_OPTIMIZER_MODEL_MESSAGE } from "./lib/optimizer-model-rules";
 
 const USER = "user-1";
 const RULES = { denyDataCollection: true, requireZDR: true };
@@ -134,8 +136,17 @@ describe.each(Object.keys(runs))("%s", (name) => {
         expect(getAgent).not.toHaveBeenCalled();
     });
 
-    it("refuses without a model call when the rules exclude the optimizer's model", async () => {
+    it("runs on a fallback the rules allow when they exclude the optimizer's default model", async () => {
         await saveRules({ blockedModels: [DEFAULT_PROMPT_IMPROVEMENT_MODEL] });
+        await runs[name]!().catch(() => undefined);
+
+        expect(getAgent).toHaveBeenCalledTimes(1);
+        expect(getAgent.mock.calls[0]![0]).not.toBe(DEFAULT_PROMPT_IMPROVEMENT_MODEL);
+        expect(UTILITY_FALLBACK_MODELS).toContain(getAgent.mock.calls[0]![0]);
+    });
+
+    it("refuses without a model call when the rules leave no model", async () => {
+        await saveRules({ allowedModels: ["some/other-model"] });
 
         const error = await failure(runs[name]!());
 
@@ -147,7 +158,8 @@ describe.each(Object.keys(runs))("%s", (name) => {
 
 describe.each(Object.keys(runs))("%s with a blocked region", (name) => {
     it("refuses a model that is reachable in a blocked region even though another of its regions is allowed", async () => {
-        // The optimizer model is served from the US and EU; blocking the US alone must refuse it, as the background models do.
+        // Every candidate is served from the US among other regions, or from any region (Workers AI): blocking the US alone
+        // must refuse them all, as the background models do.
         await saveRules({ blockedRegions: ["US"] });
 
         const error = await failure(runs[name]!());
@@ -158,14 +170,14 @@ describe.each(Object.keys(runs))("%s with a blocked region", (name) => {
     });
 });
 
-describe("loadOptimizerModelRules", () => {
+describe("loadOptimizerModel", () => {
     it("applies the thread owner's rules as well as the caller's on a shared thread", async () => {
-        const rulesOf: Record<string, unknown> = { owner: { blockedModels: [DEFAULT_PROMPT_IMPROVEMENT_MODEL] }, [USER]: {} };
+        const rulesOf: Record<string, unknown> = { owner: { allowedModels: ["some/other-model"] }, [USER]: {} };
         const runQuery = vi.fn(async (_reference: unknown, args: { userId: string }) => {
             return { modelFilterRules: rulesOf[args.userId] };
         });
 
-        const error = await failure(loadOptimizerModelRules({ runQuery } as never, USER, DEFAULT_PROMPT_IMPROVEMENT_MODEL, "owner"));
+        const error = await failure(loadOptimizerModel({ runQuery } as never, USER, DEFAULT_PROMPT_IMPROVEMENT_MODEL, "owner"));
 
         expect(error.code).toBe("BAD_REQUEST");
         expect(error.message).toContain(NO_ALLOWED_OPTIMIZER_MODEL_MESSAGE);
@@ -174,7 +186,7 @@ describe("loadOptimizerModelRules", () => {
     it("refuses when the owner's settings cannot be read", async () => {
         const runQuery = vi.fn(async (_reference: unknown, args: { userId: string }) => (args.userId === "owner" ? { readFailed: true } : {}));
 
-        const error = await failure(loadOptimizerModelRules({ runQuery } as never, USER, DEFAULT_PROMPT_IMPROVEMENT_MODEL, "owner"));
+        const error = await failure(loadOptimizerModel({ runQuery } as never, USER, DEFAULT_PROMPT_IMPROVEMENT_MODEL, "owner"));
 
         expect(error.code).toBe("BAD_REQUEST");
         expect(error.message).toContain(MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE);
@@ -184,7 +196,7 @@ describe("loadOptimizerModelRules", () => {
 
     it("refuses when the preferences read answers readFailed", async () => {
         const error = await failure(
-            loadOptimizerModelRules(
+            loadOptimizerModel(
                 withAnswer(() => {
                     return { readFailed: true };
                 }),
@@ -197,15 +209,15 @@ describe("loadOptimizerModelRules", () => {
         expect(error.message).toContain(MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE);
     });
 
-    it("answers no rules for a user who set none", async () => {
+    it("keeps the default model and answers no rules for a user who set none", async () => {
         await expect(
-            loadOptimizerModelRules(
+            loadOptimizerModel(
                 withAnswer(() => {
                     return {};
                 }),
                 USER,
                 DEFAULT_PROMPT_IMPROVEMENT_MODEL,
             ),
-        ).resolves.toStrictEqual({});
+        ).resolves.toStrictEqual({ model: DEFAULT_PROMPT_IMPROVEMENT_MODEL, modelFilterRules: {} });
     });
 });

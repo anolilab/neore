@@ -147,13 +147,16 @@ written here is what is not.
   `provider: "external"` is listed-only and skipped by agents.
   `IMAGE_CATALOG`/`VIDEO_CATALOG`/`TEXT_CATALOG` are derived via `deriveCatalog()`.
   **The text and embedding defaults run on Workers AI** (`provider: "cloudflare"`,
-  ids `cf-*`, embeddings `bge-base-en-v1.5`), through the gateway's `AI` binding, so
+  ids `cf-*`, embeddings `bge-m3`, 1024-dim, multilingual), through the gateway's `AI` binding, so
   no provider key is needed to chat; image, video and speech stay on FAL. The
   backend gives these rows a gateway-only stand-in (`gatewayOnlyModel`) — every
   registry model is swapped for a `GatewayLanguageModel` before it is called.
   A text model must be `listed: true` to be selectable for tasks, triggers, evals
-  and skills (`isSelectableTextModel`). Workers AI has no EU-only endpoint, so
-  EU-only model rules skip it (only OpenRouter calls are pinned to the EU).
+  and skills (`isSelectableTextModel`). Workers AI has no single-region endpoint, so
+  any region rule refuses it (`GLOBAL_REGION`): a run on a Workers AI DEFAULT moves to the
+  first fallback the user's rules allow (`defaultModelUnderRules`, `loadOptimizerModel`), a
+  model the user picked is never swapped. Workflow AI nodes call providers directly, so a
+  Workers AI node goes through the gateway (`generateWorkflowText` for the HTTP route).
 
 - **LLM Gateway** (`services/llm-gateway/`) proxies **all** LLM and embedding
   calls for token counting, cost tracking and smart routing. D1 for usage,

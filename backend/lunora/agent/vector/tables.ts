@@ -62,8 +62,8 @@ export const getVectorTableName = (dimension: VectorDimension) => `embeddings_${
  */
 export const getVectorIndexName = (dimension: VectorDimension) => `embeddings-${dimension}`;
 
-/** The dimensions in probe order: 768 first, the usual one, so most lookups cost a single read. */
-const PROBE_ORDER = [768, ...VectorDimensions.filter((dimension) => dimension !== 768)] as const;
+/** The dimensions in probe order: 1024 first (bge-m3, memory and knowledge), the usual one, so most lookups cost a single read. */
+const PROBE_ORDER = [1024, ...VectorDimensions.filter((dimension) => dimension !== 1024)] as const;
 
 /**
  * The `embeddings_*` table holding the row `id` and the row itself, or `null` when none does. An id carries

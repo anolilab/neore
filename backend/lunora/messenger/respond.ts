@@ -26,6 +26,7 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import type { Delivery } from "./lib/platform-media";
 import { requireKey } from "./lib/platform-media";
@@ -184,10 +185,13 @@ const resolveReplyTools = async (ctx: ActionCtx, threadId: Id<"threads">, userId
 const generateReply = async (ctx: ActionCtx, threadId: Id<"threads">, userId: string): Promise<{ replyTools: ReplyToolPlan | null; text: string }> => {
     const replyTools = await resolveReplyTools(ctx, threadId, userId);
     const hasMedia = await ctx.runQuery(internal.messenger.functions.threadHasRecentMedia, { threadId });
+    const tools = replyTools !== null;
+    // Only the media/tool model can move under the owner's rules (`chooseReplyModel`); the text model is the chat default.
+    const rules = hasMedia || tools ? await loadModelFilterRules(ctx, userId) : undefined;
     const result = await runHeadlessAgent(ctx, {
         maxSteps: replyTools ? MESSENGER_TOOL_REPLY_MAX_STEPS : MESSENGER_TEXT_REPLY_MAX_STEPS,
         memory: false,
-        model: chooseReplyModel({ hasMedia, tools: replyTools !== null }),
+        model: chooseReplyModel({ hasMedia, rules, tools }),
         origin: "messenger",
         personalization: "none",
         thread: { threadId },

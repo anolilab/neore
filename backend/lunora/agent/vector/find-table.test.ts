@@ -46,11 +46,11 @@ describe("findVectorTable", () => {
 });
 
 describe("findVectorRow", () => {
-    it("returns the table with the row, probing 768 first, and null for an id in no table", async () => {
+    it("returns the table with the row, probing 1024 first, and null for an id in no table", async () => {
         expect.assertions(4);
 
         const { found, missing, probes } = await run(async (ctx) => {
-            const id = await ctx.db.insert("embeddings_768", vector(768));
+            const id = await ctx.db.insert("embeddings_1024", vector(1024));
             const thread = await ctx.db.insert("threads", { status: "active", title: "T", userId: "u" });
             const get = vi.spyOn(ctx.db, "get");
             const row = await findVectorRow(ctx.db, id);
@@ -59,7 +59,7 @@ describe("findVectorRow", () => {
             return { found: row, missing: await findVectorRow(ctx.db, thread), probes: probed };
         });
 
-        expect(found?.table).toBe("embeddings_768");
+        expect(found?.table).toBe("embeddings_1024");
         expect(found?.row.model).toBe("m");
         expect(probes).toBe(1);
         expect(missing).toBeNull();

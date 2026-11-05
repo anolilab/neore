@@ -18,6 +18,7 @@
  *
  * The user's own provider keys and custom endpoints apply to every headless run.
  */
+import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { stripHiddenText } from "@neore/ai/utils";
 import { stepCountIs } from "ai";
 import { LunoraError } from "lunorash/server";
@@ -31,6 +32,7 @@ import type { HeadlessGoalOutcome } from "../goals/headless";
 import { reviewRound } from "../goals/review";
 import type { SkillConfig } from "../../skills/validators";
 import type { DispatchOrigin } from "../../sub-agents/logic";
+import { callsTools, defaultModelUnderRules } from "../../lib/utility-model";
 import {
     buildRunStreamArgs,
     loadModelFilterRules,
@@ -182,7 +184,10 @@ const withoutHiddenText = (options: HeadlessRunOptions): HeadlessRunOptions => {
 
 export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOptions): Promise<HeadlessRunResult> => {
     const options = withoutHiddenText(rawOptions);
-    const { model, prompt, skill, userId } = options;
+    const { prompt, skill, userId } = options;
+    // The Workers AI default cannot keep to a region rule: a user with one runs on a default their rules allow.
+    const model =
+        options.model === DEFAULT_CHAT_MODEL ? defaultModelUnderRules(options.model, await loadModelFilterRules(ctx, userId), callsTools) : options.model;
     const { allowTools, customProvider } = await resolveRunModel(ctx, model, userId);
     const [prefs, userProviderKeys] = await Promise.all([
         ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }),

@@ -14,6 +14,7 @@
  * continuation into `persistentChunks` exactly like the original run. What the
  * two share lives in `lib/agent-run.ts`.
  */
+import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { estimateTokensFromCharacters, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
@@ -57,6 +58,7 @@ import { isRunReplaced } from "./lib/run-epoch";
 import { gatewayFetch } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
+import { callsTools, defaultModelUnderRules } from "../lib/utility-model";
 import { injectsSkillText } from "./lib/low-risk-approval";
 import { closeMCPClientsThenSettle } from "./lib/mcp-tools";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
@@ -422,6 +424,11 @@ export const runStreamingAgent = internalAction
                 // An invoked skill's search mode is deliberate, so it beats the classifier.
                 if (invokedSkill?.config?.searchMode) {
                     effectiveSearchMode = invokedSkill.config.searchMode as SearchMode;
+                }
+
+                // The Workers AI default cannot keep to a region rule: a user with one runs on a default their rules allow.
+                if (model === DEFAULT_CHAT_MODEL) {
+                    model = defaultModelUnderRules(model, agentModulePrefs.modelFilterRules ?? undefined, callsTools);
                 }
 
                 // A custom endpoint gets no tools (built-in or MCP) unless the user

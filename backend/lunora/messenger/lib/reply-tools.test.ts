@@ -84,6 +84,16 @@ describe(chooseReplyModel, () => {
         expect(chooseReplyModel({ hasMedia: false, tools: true })).toBe(MESSENGER_MEDIA_MODEL);
     });
 
+    it("moves the media model under a region rule to one the rules allow that still reads images and calls tools", () => {
+        const model = chooseReplyModel({ hasMedia: true, rules: { blockedRegions: ["CN"] }, tools: false });
+        const definition = MODEL_REGISTRY.find((candidate) => candidate.id === model);
+
+        expect(model).not.toBe(MESSENGER_MEDIA_MODEL);
+        expect(definition?.supportsImages).toBe(true);
+        expect(modelSupportsTools(model)).toBe(true);
+        expect(chooseReplyModel({ hasMedia: false, rules: { blockedRegions: ["CN"] }, tools: false })).toBe(DEFAULT_CHAT_MODEL);
+    });
+
     it("picks an enabled, image-reading registry model for tool replies", () => {
         const model = MODEL_REGISTRY.find((candidate) => candidate.id === MESSENGER_MEDIA_MODEL);
 

@@ -33,7 +33,7 @@ import { documentToText, fetchUrlDocument, hasMarkdownStructure, isPagedMimeType
 
 ("use node");
 
-const EMBEDDING_MODEL_NAME = "bge-base-en-v1.5";
+const EMBEDDING_MODEL_NAME = "bge-m3";
 /**
  * A knowledge file is a document sent to extraction, so it shares the parser's
  * cap (`lib/document-limits.ts` — which carries the TODO for larger files).
@@ -298,7 +298,7 @@ export const ingestFile = internalAction
             });
 
             // 6. Store chunks and embeddings
-            const dimension = embeddings[0]?.length ?? 768;
+            const dimension = embeddings[0]?.length ?? 1024;
 
             validateVectorDimension(dimension);
 

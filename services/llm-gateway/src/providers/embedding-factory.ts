@@ -19,9 +19,9 @@ export interface EmbeddingModelInfo {
 }
 
 export const EMBEDDING_MODELS: Record<string, EmbeddingModelInfo> = {
-    // Cloudflare Workers AI ($0.067 per 1M tokens). The default for memory and
-    // knowledge: no provider key, and 768 dimensions like the vector tables.
-    "bge-base-en-v1.5": { costPer1MTokensMicrodollars: 67_000, dimensions: 768, modelApiId: "@cf/baai/bge-base-en-v1.5", provider: "cloudflare" },
+    // Cloudflare Workers AI ($0.012 per 1M tokens). The default for memory and
+    // knowledge: no provider key, and multilingual, where bge-base-en is English only.
+    "bge-m3": { costPer1MTokensMicrodollars: 12_000, dimensions: 1024, modelApiId: "@cf/baai/bge-m3", provider: "cloudflare" },
     "embedding-001": { costPer1MTokensMicrodollars: 0, dimensions: 768, modelApiId: "embedding-001", provider: "google" },
     // Groq (via OpenAI-compatible API)
     "nomic-embed-text-v1.5": { costPer1MTokensMicrodollars: 0, dimensions: 768, modelApiId: "nomic-embed-text-v1.5", provider: "groq" },

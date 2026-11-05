@@ -115,6 +115,7 @@ export const pickUtilityModelId = (
     rules: ModelFilterRules | undefined,
     preferred: string = DEFAULT_MEMORY_EXTRACTION_MODEL,
     strict = false,
+    accepts: (definition: ModelDefinition) => boolean = () => true,
 ): string | undefined => {
     const candidates = strict ? [preferred] : [preferred, ...UTILITY_FALLBACK_MODELS.filter((id) => id !== preferred)];
 
@@ -125,6 +126,7 @@ export const pickUtilityModelId = (
 
         return (
             definition !== undefined &&
+            accepts(definition) &&
             definition.enabled !== false &&
             (paidPlan || !requiresPaidPlan(definition)) &&
             avoidsBlockedRegions(definition, rules) &&
@@ -133,6 +135,18 @@ export const pickUtilityModelId = (
         );
     });
 };
+
+/** A stand-in for a chat default must call tools, as the default does. */
+export const callsTools = (definition: ModelDefinition): boolean => definition.supportsToolCalling !== false;
+
+/**
+ * The model a run on the platform default `model` uses under the user's rules: `model` when they allow it, else the
+ * first fallback they allow that `accepts` (`pickUtilityModelId`). The Workers AI defaults are served from any region,
+ * so every region rule refuses them; this keeps a user with one on a model their rules allow. With nothing allowed,
+ * `model` stays and the gateway's refusal stands. Only for a default: a model the user picked is never swapped.
+ */
+export const defaultModelUnderRules = (model: string, rules: ModelFilterRules | undefined, accepts?: (definition: ModelDefinition) => boolean): string =>
+    hasActiveFilters(rules) ? (pickUtilityModelId(rules, model, false, accepts) ?? model) : model;
 
 /** `pickUtilityModelId`, or the typed refusal. */
 export const requireUtilityModelId = (rules: ModelFilterRules | undefined, preferred?: string, strict = false): string => {
