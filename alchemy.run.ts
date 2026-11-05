@@ -8,7 +8,7 @@ import * as Redacted from "effect/Redacted";
 
 import backendBindings from "./backend/lunora-bindings.json" with { type: "json" };
 import { resolveDataJurisdiction } from "./backend/lunora/lib/data-jurisdiction";
-import { OPTIONAL_ENV_KEYS, REQUIRED_ENV_KEYS } from "./backend/lunora/lib/env-validation";
+import { encryptionKeyProblem, OPTIONAL_ENV_KEYS, REQUIRED_ENV_KEYS } from "./backend/lunora/lib/env-validation";
 import { JOBS_QUEUE_CONSUMER } from "./backend/lunora/lib/job-queue-config";
 import { jobs, jobsDeadLetters } from "./backend/lunora/queues";
 import { GATEWAY_CRONS } from "./services/llm-gateway/src/crons";
@@ -85,6 +85,14 @@ if (missingDeployEnv.length > 0 && !destroying) {
         `Cannot deploy (stage: ${stage}) — these are unset: ${missingDeployEnv.join(", ")}. ` +
             `Set them as repository secrets; there are deliberately no defaults, because a wrong or empty value here deploys a working-looking app with forgeable sessions.`,
     );
+}
+
+// `lib/encryption.ts` refuses a short key only when it first loads, on a request
+// that needs it, so a bad key would otherwise deploy green.
+const encryptionKeyError = destroying ? undefined :encryptionKeyProblem(process.env.ENCRYPTION_KEY?.trim() ?? "");
+
+if (encryptionKeyError) {
+    throw new Error(`Cannot deploy (stage: ${stage}) — ${encryptionKeyError}`);
 }
 
 // The document parser is a Rust Worker deployed from its prebuilt output
