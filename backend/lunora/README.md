@@ -112,7 +112,6 @@ Email sending and template management.
 **Files:**
 
 - `functions.ts` - Email sending functions
-- `schema.ts` - Email-related table schemas
 - `templates/` - React-based email templates
     - `baseEmail.tsx` - Base email component
     - `welcomeEmail.tsx` - Welcome email

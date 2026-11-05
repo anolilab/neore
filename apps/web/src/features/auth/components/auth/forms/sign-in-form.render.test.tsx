@@ -14,6 +14,7 @@ const harness = vi.hoisted(() => {
         onSuccess: vi.fn(),
         resetCaptcha: vi.fn(),
         saveLastSignIn: vi.fn(),
+        sendVerificationEmail: vi.fn(),
         signInEmail: vi.fn(),
         toast: vi.fn(),
         trackEvent: vi.fn(),
@@ -36,7 +37,7 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
     return {
         useAuth: () => {
             return {
-                authClient: { signIn: { email: harness.signInEmail } },
+                authClient: { sendVerificationEmail: harness.sendVerificationEmail, signIn: { email: harness.signInEmail } },
                 basePath: "/auth",
                 credentials: harness.credentials,
                 navigate: harness.navigate,
@@ -142,6 +143,31 @@ describe("SignInForm", () => {
         expect(emailInput().value).toBe("ada@example.com");
         expect(harness.onSuccess).not.toHaveBeenCalled();
         expect(harness.saveLastSignIn).not.toHaveBeenCalled();
+    });
+
+    it("offers an unverified visitor a new verification link without a session", async () => {
+        harness.signInEmail.mockRejectedValue({ error: { code: "EMAIL_NOT_VERIFIED" }, status: 403 });
+        harness.sendVerificationEmail.mockResolvedValue({ status: true });
+        render(<SignInForm />);
+        fill("ada@example.com", "correct horse battery");
+        submit();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Send a new verification link" }));
+
+        await waitFor(() => {
+            expect(harness.sendVerificationEmail).toHaveBeenCalledWith({ email: "ada@example.com", fetchOptions: { throw: true } });
+            expect(harness.toast).toHaveBeenLastCalledWith({ message: "Verification email sent", variant: "success" });
+        });
+    });
+
+    it("offers no new link for any other refusal", async () => {
+        harness.signInEmail.mockRejectedValue({ error: { code: "INVALID_EMAIL_OR_PASSWORD" }, status: 401 });
+        render(<SignInForm />);
+        fill("ada@example.com", "wrong");
+        submit();
+
+        await waitFor(() => expect(harness.toast).toHaveBeenCalled());
+        expect(screen.queryByRole("button", { name: "Send a new verification link" })).toBeNull();
     });
 
     it("tells the visitor an unverified email is the reason", async () => {

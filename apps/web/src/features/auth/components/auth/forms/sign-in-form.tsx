@@ -12,7 +12,7 @@ import { useStore } from "@tanstack/react-form";
 import { Link } from "@tanstack/react-router";
 import type { BetterFetchOption } from "better-auth/react";
 import { Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import * as z from "zod";
 
 import useCaptcha from "@/features/auth/hooks/use-captcha";
@@ -42,6 +42,9 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
     const isHydrated = useIsHydrated();
     const { captchaRef, getCaptchaHeaders, resetCaptcha } = useCaptcha();
     const { lastSignIn, saveLastSignIn } = useLastSignInMethod();
+    // The address a sign-in was refused for as unverified: offered a new verification link without a session.
+    const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+    const [isResending, setIsResending] = useState(false);
 
     const { authClient, basePath, credentials, navigate, toast, viewPaths } = useAuth();
 
@@ -204,6 +207,7 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
                 form.setFieldValue("password", "");
 
                 resetCaptcha();
+                setUnverifiedEmail((error as { error?: { code?: unknown } } | null)?.error?.code === "EMAIL_NOT_VERIFIED" ? value.email : null);
 
                 toast({
                     message: getLocalizedError({ error, t }),
@@ -230,6 +234,24 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
     useEffect(() => {
         setIsSubmitting?.(Boolean(isFormSubmitting || transitionPending));
     }, [isFormSubmitting, transitionPending, setIsSubmitting]);
+
+    const resendVerification = async (): Promise<void> => {
+        if (!unverifiedEmail) {
+            return;
+        }
+
+        setIsResending(true);
+
+        try {
+            await authClient.sendVerificationEmail({ email: unverifiedEmail, fetchOptions: { throw: true } });
+
+            toast({ message: t`Verification email sent`, variant: "success" });
+        } catch {
+            toast({ message: t`Failed to send verification email`, variant: "error" });
+        } finally {
+            setIsResending(false);
+        }
+    };
 
     return (
         <form.AppForm>
@@ -326,6 +348,12 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
                         </Button>
                     )}
                 </form.Subscribe>
+
+                {unverifiedEmail ? (
+                    <Button className="w-full" disabled={isResending} onClick={resendVerification} type="button" variant="outline">
+                        {isResending ? <Loader2 className="animate-spin" /> : t`Send a new verification link`}
+                    </Button>
+                ) : null}
             </form>
         </form.AppForm>
     );
