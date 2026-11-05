@@ -17,6 +17,7 @@ const CREATOR_DISPLAY_NAMES: Record<string, string> = {
     fal: "fal.ai",
     "fal-ai": "fal.ai",
     google: "Google",
+    ibm: "IBM",
     "ibm-granite": "IBM",
     inception: "Inception",
     inflection: "Inflection",

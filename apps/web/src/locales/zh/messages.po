@@ -1347,15 +1347,15 @@ msgstr "OpenRouter token 用量排名第一"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, other {# 个收藏}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:250
+#: src/features/settings/components/chat/agent-settings.tsx:240
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ 数据源：约 2,700 个 token（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:249
+#: src/features/settings/components/chat/agent-settings.tsx:239
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ 知识：约 2,600 个 token（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:248
+#: src/features/settings/components/chat/agent-settings.tsx:238
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ 任务规划：约 2,500 个 token（+200）"
 
@@ -1974,8 +1974,8 @@ msgid "active"
 msgstr "活跃"
 
 #: src/features/chat/thread/widgets/flight-widget.tsx:55
-#: src/features/settings/components/chat/model-filter-settings.tsx:178
-#: src/features/settings/components/chat/model-filter-settings.tsx:239
+#: src/features/settings/components/chat/model-filter-settings.tsx:180
+#: src/features/settings/components/chat/model-filter-settings.tsx:241
 #: src/features/settings/components/chat/trigger-settings.tsx:811
 #: src/features/tasks/components/goal-form-dialog.tsx:46
 #: src/features/tasks/components/goal-list.tsx:25
@@ -2964,7 +2964,7 @@ msgstr "所有文件（{0}）"
 msgid "All files removed from knowledge base"
 msgstr "已从知识库中移除所有文件"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:111
+#: src/features/settings/components/chat/model-filter-settings.tsx:112
 msgid "All filter rules cleared"
 msgstr "已清除所有筛选规则"
 
@@ -3108,11 +3108,11 @@ msgstr "允许的 AI 模型"
 msgid "Allowed for a limited time"
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:224
+#: src/features/settings/components/chat/model-filter-settings.tsx:226
 msgid "Allowed Providers"
 msgstr "允许的提供商"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:162
+#: src/features/settings/components/chat/model-filter-settings.tsx:164
 msgid "Allowed Regions"
 msgstr "允许的地区"
 
@@ -3944,6 +3944,7 @@ msgstr ""
 #: src/features/chat/thread/composer-image-settings.tsx:28
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
+#: src/features/chat/thread/composer-model-selector.tsx:120
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
@@ -4308,7 +4309,7 @@ msgstr "封禁"
 msgid "Base"
 msgstr "基础"
 
-#: src/features/settings/components/chat/agent-settings.tsx:247
+#: src/features/settings/components/chat/agent-settings.tsx:237
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "基础（仅智能体循环）：约 2,300 个 token"
 
@@ -4543,11 +4544,11 @@ msgstr ""
 msgid "Black"
 msgstr "黑色"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:332
+#: src/features/settings/components/chat/model-filter-settings.tsx:334
 msgid "Block"
 msgstr "屏蔽"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:391
+#: src/features/settings/components/chat/model-filter-settings.tsx:393
 msgid "Block providers that may use your data for training or collect usage data."
 msgstr "屏蔽可能使用你的数据进行训练或收集使用数据的提供商。"
 
@@ -4555,25 +4556,25 @@ msgstr "屏蔽可能使用你的数据进行训练或收集使用数据的提供
 msgid "Block requests"
 msgstr "阻止请求"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:311
+#: src/features/settings/components/chat/model-filter-settings.tsx:313
 msgid "Block specific models by their ID. These models will never be used."
 msgstr "按 ID 屏蔽特定模型。这些模型将永远不会被使用。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:204
-#: src/features/settings/components/chat/model-filter-settings.tsx:264
+#: src/features/settings/components/chat/model-filter-settings.tsx:206
+#: src/features/settings/components/chat/model-filter-settings.tsx:266
 #: src/features/tasks/components/task-status.tsx:15
 msgid "Blocked"
 msgstr "已屏蔽"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:310
+#: src/features/settings/components/chat/model-filter-settings.tsx:312
 msgid "Blocked Models"
 msgstr "已屏蔽的模型"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:249
+#: src/features/settings/components/chat/model-filter-settings.tsx:251
 msgid "Blocked Providers"
 msgstr "已屏蔽的提供商"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:188
+#: src/features/settings/components/chat/model-filter-settings.tsx:190
 msgid "Blocked Regions"
 msgstr "已屏蔽的地区"
 
@@ -5957,7 +5958,7 @@ msgstr "清除"
 msgid "Clear all"
 msgstr "全部清除"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:142
+#: src/features/settings/components/chat/model-filter-settings.tsx:143
 msgid "Clear All"
 msgstr "全部清除"
 
@@ -6181,6 +6182,10 @@ msgstr "面向 Web 应用、API 和数据库的云托管"
 #: src/features/settings/lib/settings-keywords.ts:67
 msgid "Cloud Provider Accounts"
 msgstr "云服务提供商账户"
+
+#: src/features/settings/components/chat/model-filter-settings.tsx:159
+msgid "Cloudflare Workers AI models run wherever Cloudflare has capacity, so any region rule hides them."
+msgstr "Cloudflare Workers AI 模型在 Cloudflare 有可用容量的任何地方运行，因此设置任何区域规则都会隐藏它们。"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:40
 #: src/features/canvas/canvas-panel.tsx:754
@@ -7335,7 +7340,7 @@ msgstr "对比度"
 msgid "Contrast updated"
 msgstr "对比度已更新"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:364
+#: src/features/settings/components/chat/model-filter-settings.tsx:366
 msgid "Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter."
 msgstr "控制 AI 提供商的数据处理和保留策略。隐私设置目前仅对通过 OpenRouter 路由的模型生效。"
 
@@ -7367,11 +7372,11 @@ msgstr "控制类型"
 msgid "Control when the ControlNet influence applies during generation"
 msgstr "控制 ControlNet 在生成过程中何时生效"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:136
+#: src/features/settings/components/chat/model-filter-settings.tsx:137
 msgid "Control which AI models and providers can be used based on geographic region, compliance requirements, and privacy preferences."
 msgstr "根据地理区域、合规要求和隐私偏好控制可使用的 AI 模型和提供商。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:220
+#: src/features/settings/components/chat/model-filter-settings.tsx:222
 msgid "Control which AI providers can serve your requests."
 msgstr "控制哪些 AI 提供商可以处理你的请求。"
 
@@ -7721,9 +7726,18 @@ msgstr ""
 msgid "Could not cancel the run."
 msgstr "无法取消运行。"
 
+#: src/features/chat/thread/composer-model-selector.tsx:127
+msgid "Could not change Auto. Please try again."
+msgstr ""
+
 #: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
 msgstr "无法更改推送通知，请重试。"
+
+#: src/features/chat/model-settings/use-model-combobox.ts:283
+#: src/features/chat/model-settings/use-model-combobox.ts:307
+msgid "Could not change the model. Please try again."
+msgstr ""
 
 #: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
@@ -8026,7 +8040,7 @@ msgstr ""
 msgid "Could not stop the worker."
 msgstr ""
 
-#: src/features/chat/model-settings/use-model-combobox.ts:148
+#: src/features/chat/model-settings/use-model-combobox.ts:161
 msgid "Could not switch the model. Please try again."
 msgstr ""
 
@@ -9414,8 +9428,8 @@ msgstr "拒绝"
 msgid "Deny {tool}"
 msgstr "拒绝 {tool}"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:390
-#: src/features/settings/components/chat/model-filter-settings.tsx:394
+#: src/features/settings/components/chat/model-filter-settings.tsx:392
+#: src/features/settings/components/chat/model-filter-settings.tsx:396
 msgid "Deny Data Collection"
 msgstr "拒绝数据收集"
 
@@ -11126,7 +11140,7 @@ msgstr "输入邮箱地址"
 msgid "Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:328
+#: src/features/settings/components/chat/model-filter-settings.tsx:330
 msgid "Enter model ID (e.g., \"llama-4-scout\")..."
 msgstr "输入模型 ID（例如“llama-4-scout”）..."
 
@@ -11429,7 +11443,7 @@ msgstr ""
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "预估提供商费用 {display}，计入你自己的 API 密钥"
 
-#: src/features/settings/components/chat/agent-settings.tsx:243
+#: src/features/settings/components/chat/agent-settings.tsx:233
 msgid "Estimated token cost per conversation"
 msgstr "每次对话的预估 token 成本"
 
@@ -12130,7 +12144,7 @@ msgstr "取消任务失败"
 msgid "Failed to change tag color"
 msgstr "更改标签颜色失败"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:113
+#: src/features/settings/components/chat/model-filter-settings.tsx:114
 msgid "Failed to clear filter rules"
 msgstr "清除筛选规则失败"
 
@@ -12714,8 +12728,8 @@ msgstr "更新收藏状态失败"
 
 #: src/components/model-picker/model-picker.tsx:729
 #: src/components/model-picker/model-picker.tsx:738
-#: src/features/settings/components/chat/model-filter-settings.tsx:56
-#: src/features/settings/components/chat/model-filter-settings.tsx:67
+#: src/features/settings/components/chat/model-filter-settings.tsx:57
+#: src/features/settings/components/chat/model-filter-settings.tsx:68
 msgid "Failed to update filter rules"
 msgstr "更新筛选规则失败"
 
@@ -13396,8 +13410,8 @@ msgstr "按类型筛选记忆"
 msgid "Filter path"
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:54
-#: src/features/settings/components/chat/model-filter-settings.tsx:65
+#: src/features/settings/components/chat/model-filter-settings.tsx:55
+#: src/features/settings/components/chat/model-filter-settings.tsx:66
 msgid "Filter rules updated"
 msgstr "筛选规则已更新"
 
@@ -15104,7 +15118,7 @@ msgstr "分享一些关于你的信息，帮助 AI 更好地了解你。这些�
 msgid "Here they are: planning, budget and next steps."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:276
+#: src/features/settings/components/chat/model-filter-settings.tsx:278
 msgid "Hidden in Model Picker"
 msgstr ""
 
@@ -16916,7 +16930,7 @@ msgstr "吉尔吉斯斯坦"
 msgid "Label"
 msgstr "标签"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:277
+#: src/features/settings/components/chat/model-filter-settings.tsx:279
 msgid "Labs hidden from the model picker only. Models already selected or set as defaults keep working."
 msgstr ""
 
@@ -19089,7 +19103,7 @@ msgstr "模式："
 msgid "Model"
 msgstr "模型"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:89
+#: src/features/settings/components/chat/model-filter-settings.tsx:90
 msgid "Model already blocked"
 msgstr "模型已被屏蔽"
 
@@ -19131,7 +19145,7 @@ msgid "Model pricing from models.dev, KV-cached for 24 hours. Automatic cost cal
 msgstr "模型价格来自 models.dev，KV 缓存 24 小时。以微美元自动计算成本。"
 
 #: src/features/layout/lib/dashboard-page-names.ts:30
-#: src/features/settings/components/chat/model-filter-settings.tsx:134
+#: src/features/settings/components/chat/model-filter-settings.tsx:135
 msgid "Model Restrictions"
 msgstr "模型限制"
 
@@ -19176,7 +19190,7 @@ msgstr "模型"
 msgid "Models enabled in your AWS account, in one region. Bedrock API key or IAM access keys."
 msgstr "在你的 AWS 账户中某一区域已启用的模型。使用 Bedrock API 密钥或 IAM 访问密钥。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:189
+#: src/features/settings/components/chat/model-filter-settings.tsx:191
 msgid "Models hosted exclusively in these regions will be unavailable."
 msgstr "仅托管在这些地区的模型将不可用。"
 
@@ -20520,7 +20534,7 @@ msgstr "无项目"
 msgid "No knowledge base files yet. Upload files in Settings."
 msgstr "还没有知识库文件。请在设置中上传文件。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:281
+#: src/features/settings/components/chat/model-filter-settings.tsx:283
 msgid "No labs are hidden."
 msgstr ""
 
@@ -21096,7 +21110,7 @@ msgstr "备注（可选）"
 msgid "Note for the next run (optional)"
 msgstr "给下次运行的备注（可选）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:253
+#: src/features/settings/components/chat/agent-settings.tsx:243
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "注意：模块按对话而非按消息应用。仅启用你需要的模块以优化 token 用量。"
 
@@ -21517,7 +21531,7 @@ msgstr ""
 msgid "Only this check is started again on {hostLabel}, not the rest of its workflow."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:372
+#: src/features/settings/components/chat/model-filter-settings.tsx:374
 msgid "Only use providers that guarantee zero data retention — your prompts are never stored."
 msgstr "仅使用保证零数据保留的提供商——你的提示词绝不会被存储。"
 
@@ -23756,7 +23770,7 @@ msgstr ""
 #: src/features/marketing/components/landing-footer.tsx:102
 #: src/features/marketing/components/landing-footer.tsx:272
 #: src/features/settings/components/account/account-settings.tsx:133
-#: src/features/settings/components/chat/model-filter-settings.tsx:361
+#: src/features/settings/components/chat/model-filter-settings.tsx:363
 #: src/features/settings/lib/settings-keywords.ts:26
 #: src/features/settings/lib/settings-navigation.ts:115
 msgid "Privacy"
@@ -24176,7 +24190,7 @@ msgstr "提供商健康状况"
 msgid "Provider removed"
 msgstr "已移除提供商"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:218
+#: src/features/settings/components/chat/model-filter-settings.tsx:220
 msgid "Provider Restrictions"
 msgstr "提供商限制"
 
@@ -25053,7 +25067,7 @@ msgstr "正则表达式"
 msgid "region"
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:154
+#: src/features/settings/components/chat/model-filter-settings.tsx:155
 msgid "Region Restrictions"
 msgstr "地区限制"
 
@@ -25244,7 +25258,7 @@ msgstr "移除 {label}"
 msgid "Remove {model}"
 msgstr "移除 {model}"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:342
+#: src/features/settings/components/chat/model-filter-settings.tsx:344
 msgid "Remove {modelId} from blocked list"
 msgstr "从屏蔽列表中移除 {modelId}"
 
@@ -25795,7 +25809,7 @@ msgstr "已恢复到版本 {0}"
 msgid "Restoring..."
 msgstr "正在恢复..."
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:157
+#: src/features/settings/components/chat/model-filter-settings.tsx:158
 msgid "Restrict which regions models can be hosted in. Useful for GDPR, data residency, and compliance requirements."
 msgstr "限制模型可以托管的地区。适用于 GDPR、数据驻留和合规要求。"
 
@@ -25873,7 +25887,7 @@ msgstr ""
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
-#: src/features/settings/components/chat/agent-settings.tsx:234
+#: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -27652,7 +27666,7 @@ msgstr ""
 msgid "Show {hidden} more lines"
 msgstr "再显示 {hidden} 行"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:291
+#: src/features/settings/components/chat/model-filter-settings.tsx:293
 msgid "Show {name} in model picker"
 msgstr ""
 
@@ -28356,7 +28370,7 @@ msgstr "我们这边出了点问题，请稍后重试。"
 msgid "Something went wrong. Nothing was changed. Try again."
 msgstr ""
 
-#: src/features/settings/components/chat/agent-settings.tsx:224
+#: src/features/settings/components/chat/agent-settings.tsx:220
 #: src/features/skills/components/skill-list.tsx:252
 msgid "Something went wrong. Try again."
 msgstr "出错了，请重试。"
@@ -30552,7 +30566,7 @@ msgstr ""
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr ""
 
-#: src/features/chat/thread/composer-model-selector.tsx:90
+#: src/features/chat/thread/composer-model-selector.tsx:135
 msgid "The bot sets the model for this chat."
 msgstr ""
 
@@ -31095,7 +31109,7 @@ msgstr ""
 msgid "These memories were added to the AI's context for this reply because they matched your message."
 msgstr "这些记忆因与你的消息相关，已被加入此回复的 AI 上下文。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:250
+#: src/features/settings/components/chat/model-filter-settings.tsx:252
 msgid "These providers will never be used for your requests."
 msgstr "这些提供商将永远不会用于处理你的请求。"
 
@@ -32002,7 +32016,7 @@ msgstr ""
 msgid "Token budget"
 msgstr "token 预算"
 
-#: src/features/settings/components/chat/agent-settings.tsx:242
+#: src/features/settings/components/chat/agent-settings.tsx:232
 msgid "Token Cost Impact"
 msgstr "Token 成本影响"
 
@@ -34712,11 +34726,11 @@ msgstr ""
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:163
+#: src/features/settings/components/chat/model-filter-settings.tsx:165
 msgid "When set, only models hosted in these regions will be available."
 msgstr "设置后，只有托管在这些地区的模型可用。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:225
+#: src/features/settings/components/chat/model-filter-settings.tsx:227
 msgid "When set, only these providers will be used. Leave empty to allow all."
 msgstr "设置后，只会使用这些提供商。留空则允许全部。"
 
@@ -35599,8 +35613,8 @@ msgstr "Z.AI 最强大的旗舰模型"
 msgid "Z.AI's vision-enhanced flagship model"
 msgstr "Z.AI 视觉增强的旗舰模型"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:370
-#: src/features/settings/components/chat/model-filter-settings.tsx:376
+#: src/features/settings/components/chat/model-filter-settings.tsx:372
+#: src/features/settings/components/chat/model-filter-settings.tsx:378
 msgid "Zero Data Retention (ZDR)"
 msgstr "零数据保留（ZDR）"
 

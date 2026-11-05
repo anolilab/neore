@@ -1346,15 +1346,15 @@ msgstr "#1 on OpenRouter by token usage"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, one {# favorite} other {# favorites}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:250
+#: src/features/settings/components/chat/agent-settings.tsx:240
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ Data Source: ~2,700 tokens (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:249
+#: src/features/settings/components/chat/agent-settings.tsx:239
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ Knowledge: ~2,600 tokens (+100)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:248
+#: src/features/settings/components/chat/agent-settings.tsx:238
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ Task Planning: ~2,500 tokens (+200)"
 
@@ -1973,8 +1973,8 @@ msgid "active"
 msgstr "active"
 
 #: src/features/chat/thread/widgets/flight-widget.tsx:55
-#: src/features/settings/components/chat/model-filter-settings.tsx:178
-#: src/features/settings/components/chat/model-filter-settings.tsx:239
+#: src/features/settings/components/chat/model-filter-settings.tsx:180
+#: src/features/settings/components/chat/model-filter-settings.tsx:241
 #: src/features/settings/components/chat/trigger-settings.tsx:811
 #: src/features/tasks/components/goal-form-dialog.tsx:46
 #: src/features/tasks/components/goal-list.tsx:25
@@ -2963,7 +2963,7 @@ msgstr "All files ({0})"
 msgid "All files removed from knowledge base"
 msgstr "All files removed from knowledge base"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:111
+#: src/features/settings/components/chat/model-filter-settings.tsx:112
 msgid "All filter rules cleared"
 msgstr "All filter rules cleared"
 
@@ -3107,11 +3107,11 @@ msgstr "Allowed AI Models"
 msgid "Allowed for a limited time"
 msgstr "Allowed for a limited time"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:224
+#: src/features/settings/components/chat/model-filter-settings.tsx:226
 msgid "Allowed Providers"
 msgstr "Allowed Providers"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:162
+#: src/features/settings/components/chat/model-filter-settings.tsx:164
 msgid "Allowed Regions"
 msgstr "Allowed Regions"
 
@@ -3943,6 +3943,7 @@ msgstr "auto"
 #: src/features/chat/thread/composer-image-settings.tsx:28
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
+#: src/features/chat/thread/composer-model-selector.tsx:120
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
@@ -4307,7 +4308,7 @@ msgstr "Bans"
 msgid "Base"
 msgstr "Base"
 
-#: src/features/settings/components/chat/agent-settings.tsx:247
+#: src/features/settings/components/chat/agent-settings.tsx:237
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "Base (agent loop only): ~2,300 tokens"
 
@@ -4542,11 +4543,11 @@ msgstr "bio"
 msgid "Black"
 msgstr "Black"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:332
+#: src/features/settings/components/chat/model-filter-settings.tsx:334
 msgid "Block"
 msgstr "Block"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:391
+#: src/features/settings/components/chat/model-filter-settings.tsx:393
 msgid "Block providers that may use your data for training or collect usage data."
 msgstr "Block providers that may use your data for training or collect usage data."
 
@@ -4554,25 +4555,25 @@ msgstr "Block providers that may use your data for training or collect usage dat
 msgid "Block requests"
 msgstr "Block requests"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:311
+#: src/features/settings/components/chat/model-filter-settings.tsx:313
 msgid "Block specific models by their ID. These models will never be used."
 msgstr "Block specific models by their ID. These models will never be used."
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:204
-#: src/features/settings/components/chat/model-filter-settings.tsx:264
+#: src/features/settings/components/chat/model-filter-settings.tsx:206
+#: src/features/settings/components/chat/model-filter-settings.tsx:266
 #: src/features/tasks/components/task-status.tsx:15
 msgid "Blocked"
 msgstr "Blocked"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:310
+#: src/features/settings/components/chat/model-filter-settings.tsx:312
 msgid "Blocked Models"
 msgstr "Blocked Models"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:249
+#: src/features/settings/components/chat/model-filter-settings.tsx:251
 msgid "Blocked Providers"
 msgstr "Blocked Providers"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:188
+#: src/features/settings/components/chat/model-filter-settings.tsx:190
 msgid "Blocked Regions"
 msgstr "Blocked Regions"
 
@@ -5956,7 +5957,7 @@ msgstr "Clear"
 msgid "Clear all"
 msgstr "Clear all"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:142
+#: src/features/settings/components/chat/model-filter-settings.tsx:143
 msgid "Clear All"
 msgstr "Clear All"
 
@@ -6180,6 +6181,10 @@ msgstr "Cloud hosting for web apps, APIs, and databases"
 #: src/features/settings/lib/settings-keywords.ts:67
 msgid "Cloud Provider Accounts"
 msgstr "Cloud Provider Accounts"
+
+#: src/features/settings/components/chat/model-filter-settings.tsx:159
+msgid "Cloudflare Workers AI models run wherever Cloudflare has capacity, so any region rule hides them."
+msgstr "Cloudflare Workers AI models run wherever Cloudflare has capacity, so any region rule hides them."
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:40
 #: src/features/canvas/canvas-panel.tsx:754
@@ -7334,7 +7339,7 @@ msgstr "Contrast Ratio"
 msgid "Contrast updated"
 msgstr "Contrast updated"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:364
+#: src/features/settings/components/chat/model-filter-settings.tsx:366
 msgid "Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter."
 msgstr "Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter."
 
@@ -7366,11 +7371,11 @@ msgstr "Control Type"
 msgid "Control when the ControlNet influence applies during generation"
 msgstr "Control when the ControlNet influence applies during generation"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:136
+#: src/features/settings/components/chat/model-filter-settings.tsx:137
 msgid "Control which AI models and providers can be used based on geographic region, compliance requirements, and privacy preferences."
 msgstr "Control which AI models and providers can be used based on geographic region, compliance requirements, and privacy preferences."
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:220
+#: src/features/settings/components/chat/model-filter-settings.tsx:222
 msgid "Control which AI providers can serve your requests."
 msgstr "Control which AI providers can serve your requests."
 
@@ -7720,9 +7725,18 @@ msgstr "Could not cancel the message. It is still queued."
 msgid "Could not cancel the run."
 msgstr "Could not cancel the run."
 
+#: src/features/chat/thread/composer-model-selector.tsx:127
+msgid "Could not change Auto. Please try again."
+msgstr "Could not change Auto. Please try again."
+
 #: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
 msgstr "Could not change push notifications. Try again."
+
+#: src/features/chat/model-settings/use-model-combobox.ts:283
+#: src/features/chat/model-settings/use-model-combobox.ts:307
+msgid "Could not change the model. Please try again."
+msgstr "Could not change the model. Please try again."
 
 #: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
@@ -8025,7 +8039,7 @@ msgstr "Could not stop the sub-agent."
 msgid "Could not stop the worker."
 msgstr "Could not stop the worker."
 
-#: src/features/chat/model-settings/use-model-combobox.ts:148
+#: src/features/chat/model-settings/use-model-combobox.ts:161
 msgid "Could not switch the model. Please try again."
 msgstr "Could not switch the model. Please try again."
 
@@ -9413,8 +9427,8 @@ msgstr "Deny"
 msgid "Deny {tool}"
 msgstr "Deny {tool}"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:390
-#: src/features/settings/components/chat/model-filter-settings.tsx:394
+#: src/features/settings/components/chat/model-filter-settings.tsx:392
+#: src/features/settings/components/chat/model-filter-settings.tsx:396
 msgid "Deny Data Collection"
 msgstr "Deny Data Collection"
 
@@ -11125,7 +11139,7 @@ msgstr "Enter email address"
 msgid "Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again."
 msgstr "Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again."
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:328
+#: src/features/settings/components/chat/model-filter-settings.tsx:330
 msgid "Enter model ID (e.g., \"llama-4-scout\")..."
 msgstr "Enter model ID (e.g., \"llama-4-scout\")..."
 
@@ -11428,7 +11442,7 @@ msgstr "Estimated cost"
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "Estimated provider cost {display}, billed to your own API key"
 
-#: src/features/settings/components/chat/agent-settings.tsx:243
+#: src/features/settings/components/chat/agent-settings.tsx:233
 msgid "Estimated token cost per conversation"
 msgstr "Estimated token cost per conversation"
 
@@ -12129,7 +12143,7 @@ msgstr "Failed to cancel the task"
 msgid "Failed to change tag color"
 msgstr "Failed to change tag color"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:113
+#: src/features/settings/components/chat/model-filter-settings.tsx:114
 msgid "Failed to clear filter rules"
 msgstr "Failed to clear filter rules"
 
@@ -12713,8 +12727,8 @@ msgstr "Failed to update favorite status"
 
 #: src/components/model-picker/model-picker.tsx:729
 #: src/components/model-picker/model-picker.tsx:738
-#: src/features/settings/components/chat/model-filter-settings.tsx:56
-#: src/features/settings/components/chat/model-filter-settings.tsx:67
+#: src/features/settings/components/chat/model-filter-settings.tsx:57
+#: src/features/settings/components/chat/model-filter-settings.tsx:68
 msgid "Failed to update filter rules"
 msgstr "Failed to update filter rules"
 
@@ -13395,8 +13409,8 @@ msgstr "Filter memories by type"
 msgid "Filter path"
 msgstr "Filter path"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:54
-#: src/features/settings/components/chat/model-filter-settings.tsx:65
+#: src/features/settings/components/chat/model-filter-settings.tsx:55
+#: src/features/settings/components/chat/model-filter-settings.tsx:66
 msgid "Filter rules updated"
 msgstr "Filter rules updated"
 
@@ -15103,7 +15117,7 @@ msgstr "Help the AI understand you better by sharing some information about your
 msgid "Here they are: planning, budget and next steps."
 msgstr "Here they are: planning, budget and next steps."
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:276
+#: src/features/settings/components/chat/model-filter-settings.tsx:278
 msgid "Hidden in Model Picker"
 msgstr "Hidden in Model Picker"
 
@@ -16915,7 +16929,7 @@ msgstr "Kyrgyzstan"
 msgid "Label"
 msgstr "Label"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:277
+#: src/features/settings/components/chat/model-filter-settings.tsx:279
 msgid "Labs hidden from the model picker only. Models already selected or set as defaults keep working."
 msgstr "Labs hidden from the model picker only. Models already selected or set as defaults keep working."
 
@@ -19088,7 +19102,7 @@ msgstr "Mode:"
 msgid "Model"
 msgstr "Model"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:89
+#: src/features/settings/components/chat/model-filter-settings.tsx:90
 msgid "Model already blocked"
 msgstr "Model already blocked"
 
@@ -19130,7 +19144,7 @@ msgid "Model pricing from models.dev, KV-cached for 24 hours. Automatic cost cal
 msgstr "Model pricing from models.dev, KV-cached for 24 hours. Automatic cost calculation in microdollars."
 
 #: src/features/layout/lib/dashboard-page-names.ts:30
-#: src/features/settings/components/chat/model-filter-settings.tsx:134
+#: src/features/settings/components/chat/model-filter-settings.tsx:135
 msgid "Model Restrictions"
 msgstr "Model Restrictions"
 
@@ -19175,7 +19189,7 @@ msgstr "Models"
 msgid "Models enabled in your AWS account, in one region. Bedrock API key or IAM access keys."
 msgstr "Models enabled in your AWS account, in one region. Bedrock API key or IAM access keys."
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:189
+#: src/features/settings/components/chat/model-filter-settings.tsx:191
 msgid "Models hosted exclusively in these regions will be unavailable."
 msgstr "Models hosted exclusively in these regions will be unavailable."
 
@@ -20519,7 +20533,7 @@ msgstr "No items"
 msgid "No knowledge base files yet. Upload files in Settings."
 msgstr "No knowledge base files yet. Upload files in Settings."
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:281
+#: src/features/settings/components/chat/model-filter-settings.tsx:283
 msgid "No labs are hidden."
 msgstr "No labs are hidden."
 
@@ -21095,7 +21109,7 @@ msgstr "Note (optional)"
 msgid "Note for the next run (optional)"
 msgstr "Note for the next run (optional)"
 
-#: src/features/settings/components/chat/agent-settings.tsx:253
+#: src/features/settings/components/chat/agent-settings.tsx:243
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 
@@ -21516,7 +21530,7 @@ msgstr "Only these projects"
 msgid "Only this check is started again on {hostLabel}, not the rest of its workflow."
 msgstr "Only this check is started again on {hostLabel}, not the rest of its workflow."
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:372
+#: src/features/settings/components/chat/model-filter-settings.tsx:374
 msgid "Only use providers that guarantee zero data retention — your prompts are never stored."
 msgstr "Only use providers that guarantee zero data retention — your prompts are never stored."
 
@@ -23755,7 +23769,7 @@ msgstr "privacy"
 #: src/features/marketing/components/landing-footer.tsx:102
 #: src/features/marketing/components/landing-footer.tsx:272
 #: src/features/settings/components/account/account-settings.tsx:133
-#: src/features/settings/components/chat/model-filter-settings.tsx:361
+#: src/features/settings/components/chat/model-filter-settings.tsx:363
 #: src/features/settings/lib/settings-keywords.ts:26
 #: src/features/settings/lib/settings-navigation.ts:115
 msgid "Privacy"
@@ -24175,7 +24189,7 @@ msgstr "Provider Health"
 msgid "Provider removed"
 msgstr "Provider removed"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:218
+#: src/features/settings/components/chat/model-filter-settings.tsx:220
 msgid "Provider Restrictions"
 msgstr "Provider Restrictions"
 
@@ -25052,7 +25066,7 @@ msgstr "Regex"
 msgid "region"
 msgstr "region"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:154
+#: src/features/settings/components/chat/model-filter-settings.tsx:155
 msgid "Region Restrictions"
 msgstr "Region Restrictions"
 
@@ -25243,7 +25257,7 @@ msgstr "Remove {label}"
 msgid "Remove {model}"
 msgstr "Remove {model}"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:342
+#: src/features/settings/components/chat/model-filter-settings.tsx:344
 msgid "Remove {modelId} from blocked list"
 msgstr "Remove {modelId} from blocked list"
 
@@ -25794,7 +25808,7 @@ msgstr "Restored to version {0}"
 msgid "Restoring..."
 msgstr "Restoring..."
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:157
+#: src/features/settings/components/chat/model-filter-settings.tsx:158
 msgid "Restrict which regions models can be hosted in. Useful for GDPR, data residency, and compliance requirements."
 msgstr "Restrict which regions models can be hosted in. Useful for GDPR, data residency, and compliance requirements."
 
@@ -25872,7 +25886,7 @@ msgstr "retry"
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
-#: src/features/settings/components/chat/agent-settings.tsx:234
+#: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -27651,7 +27665,7 @@ msgstr "shortcut"
 msgid "Show {hidden} more lines"
 msgstr "Show {hidden} more lines"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:291
+#: src/features/settings/components/chat/model-filter-settings.tsx:293
 msgid "Show {name} in model picker"
 msgstr "Show {name} in model picker"
 
@@ -28355,7 +28369,7 @@ msgstr "Something went wrong on our side. Please try again in a moment."
 msgid "Something went wrong. Nothing was changed. Try again."
 msgstr "Something went wrong. Nothing was changed. Try again."
 
-#: src/features/settings/components/chat/agent-settings.tsx:224
+#: src/features/settings/components/chat/agent-settings.tsx:220
 #: src/features/skills/components/skill-list.tsx:252
 msgid "Something went wrong. Try again."
 msgstr "Something went wrong. Try again."
@@ -30551,7 +30565,7 @@ msgstr "The assistant needs a secret"
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr "The bot and its computer are removed. Its chats stay, as plain chats."
 
-#: src/features/chat/thread/composer-model-selector.tsx:90
+#: src/features/chat/thread/composer-model-selector.tsx:135
 msgid "The bot sets the model for this chat."
 msgstr "The bot sets the model for this chat."
 
@@ -31094,7 +31108,7 @@ msgstr "These comments are too long to send as one message. Remove or shorten so
 msgid "These memories were added to the AI's context for this reply because they matched your message."
 msgstr "These memories were added to the AI's context for this reply because they matched your message."
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:250
+#: src/features/settings/components/chat/model-filter-settings.tsx:252
 msgid "These providers will never be used for your requests."
 msgstr "These providers will never be used for your requests."
 
@@ -32001,7 +32015,7 @@ msgstr "token"
 msgid "Token budget"
 msgstr "Token budget"
 
-#: src/features/settings/components/chat/agent-settings.tsx:242
+#: src/features/settings/components/chat/agent-settings.tsx:232
 msgid "Token Cost Impact"
 msgstr "Token Cost Impact"
 
@@ -34711,11 +34725,11 @@ msgstr "When"
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:163
+#: src/features/settings/components/chat/model-filter-settings.tsx:165
 msgid "When set, only models hosted in these regions will be available."
 msgstr "When set, only models hosted in these regions will be available."
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:225
+#: src/features/settings/components/chat/model-filter-settings.tsx:227
 msgid "When set, only these providers will be used. Leave empty to allow all."
 msgstr "When set, only these providers will be used. Leave empty to allow all."
 
@@ -35598,8 +35612,8 @@ msgstr "Z.AI's most powerful flagship model"
 msgid "Z.AI's vision-enhanced flagship model"
 msgstr "Z.AI's vision-enhanced flagship model"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:370
-#: src/features/settings/components/chat/model-filter-settings.tsx:376
+#: src/features/settings/components/chat/model-filter-settings.tsx:372
+#: src/features/settings/components/chat/model-filter-settings.tsx:378
 msgid "Zero Data Retention (ZDR)"
 msgstr "Zero Data Retention (ZDR)"
 

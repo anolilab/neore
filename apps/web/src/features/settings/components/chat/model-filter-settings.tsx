@@ -155,7 +155,8 @@ const ModelFilterSettings: FC = () => {
                         {t`Region Restrictions`}
                     </CardTitle>
                     <CardDescription className="text-xs">
-                        {t`Restrict which regions models can be hosted in. Useful for GDPR, data residency, and compliance requirements.`}
+                        {t`Restrict which regions models can be hosted in. Useful for GDPR, data residency, and compliance requirements.`}{" "}
+                        {t`Cloudflare Workers AI models run wherever Cloudflare has capacity, so any region rule hides them.`}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

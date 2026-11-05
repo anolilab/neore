@@ -1347,15 +1347,15 @@ msgstr "トークン使用量で OpenRouter 第 1 位"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, other {お気に入り # 件}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:250
+#: src/features/settings/components/chat/agent-settings.tsx:240
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ データソース: 約 2,700 トークン（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:249
+#: src/features/settings/components/chat/agent-settings.tsx:239
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ ナレッジ: 約 2,600 トークン（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:248
+#: src/features/settings/components/chat/agent-settings.tsx:238
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ タスク計画: 約 2,500 トークン（+200）"
 
@@ -1974,8 +1974,8 @@ msgid "active"
 msgstr "アクティブ"
 
 #: src/features/chat/thread/widgets/flight-widget.tsx:55
-#: src/features/settings/components/chat/model-filter-settings.tsx:178
-#: src/features/settings/components/chat/model-filter-settings.tsx:239
+#: src/features/settings/components/chat/model-filter-settings.tsx:180
+#: src/features/settings/components/chat/model-filter-settings.tsx:241
 #: src/features/settings/components/chat/trigger-settings.tsx:811
 #: src/features/tasks/components/goal-form-dialog.tsx:46
 #: src/features/tasks/components/goal-list.tsx:25
@@ -2964,7 +2964,7 @@ msgstr "すべてのファイル（{0}）"
 msgid "All files removed from knowledge base"
 msgstr "ナレッジベースからすべてのファイルを削除しました"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:111
+#: src/features/settings/components/chat/model-filter-settings.tsx:112
 msgid "All filter rules cleared"
 msgstr "すべてのフィルタールールをクリアしました"
 
@@ -3108,11 +3108,11 @@ msgstr "許可された AI モデル"
 msgid "Allowed for a limited time"
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:224
+#: src/features/settings/components/chat/model-filter-settings.tsx:226
 msgid "Allowed Providers"
 msgstr "許可されたプロバイダー"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:162
+#: src/features/settings/components/chat/model-filter-settings.tsx:164
 msgid "Allowed Regions"
 msgstr "許可されたリージョン"
 
@@ -3944,6 +3944,7 @@ msgstr ""
 #: src/features/chat/thread/composer-image-settings.tsx:28
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
+#: src/features/chat/thread/composer-model-selector.tsx:120
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
@@ -4308,7 +4309,7 @@ msgstr "利用停止"
 msgid "Base"
 msgstr "ベース"
 
-#: src/features/settings/components/chat/agent-settings.tsx:247
+#: src/features/settings/components/chat/agent-settings.tsx:237
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "ベース（エージェントループのみ）: 約 2,300 トークン"
 
@@ -4543,11 +4544,11 @@ msgstr ""
 msgid "Black"
 msgstr "黒"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:332
+#: src/features/settings/components/chat/model-filter-settings.tsx:334
 msgid "Block"
 msgstr "ブロック"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:391
+#: src/features/settings/components/chat/model-filter-settings.tsx:393
 msgid "Block providers that may use your data for training or collect usage data."
 msgstr "データをトレーニングに利用したり、利用データを収集したりする可能性のあるプロバイダーをブロックします。"
 
@@ -4555,25 +4556,25 @@ msgstr "データをトレーニングに利用したり、利用データを収
 msgid "Block requests"
 msgstr "リクエストをブロック"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:311
+#: src/features/settings/components/chat/model-filter-settings.tsx:313
 msgid "Block specific models by their ID. These models will never be used."
 msgstr "特定のモデルを ID でブロックします。これらのモデルは使用されません。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:204
-#: src/features/settings/components/chat/model-filter-settings.tsx:264
+#: src/features/settings/components/chat/model-filter-settings.tsx:206
+#: src/features/settings/components/chat/model-filter-settings.tsx:266
 #: src/features/tasks/components/task-status.tsx:15
 msgid "Blocked"
 msgstr "ブロック済み"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:310
+#: src/features/settings/components/chat/model-filter-settings.tsx:312
 msgid "Blocked Models"
 msgstr "ブロックしたモデル"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:249
+#: src/features/settings/components/chat/model-filter-settings.tsx:251
 msgid "Blocked Providers"
 msgstr "ブロックしたプロバイダー"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:188
+#: src/features/settings/components/chat/model-filter-settings.tsx:190
 msgid "Blocked Regions"
 msgstr "ブロックしたリージョン"
 
@@ -5957,7 +5958,7 @@ msgstr "クリア"
 msgid "Clear all"
 msgstr "すべてクリア"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:142
+#: src/features/settings/components/chat/model-filter-settings.tsx:143
 msgid "Clear All"
 msgstr "すべてクリア"
 
@@ -6181,6 +6182,10 @@ msgstr "Web アプリ、API、データベース向けのクラウドホステ�
 #: src/features/settings/lib/settings-keywords.ts:67
 msgid "Cloud Provider Accounts"
 msgstr "クラウドプロバイダーアカウント"
+
+#: src/features/settings/components/chat/model-filter-settings.tsx:159
+msgid "Cloudflare Workers AI models run wherever Cloudflare has capacity, so any region rule hides them."
+msgstr "Cloudflare Workers AI のモデルは Cloudflare に空きのある場所で実行されるため、リージョンのルールを設定すると表示されなくなります。"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:40
 #: src/features/canvas/canvas-panel.tsx:754
@@ -7335,7 +7340,7 @@ msgstr "コントラスト比"
 msgid "Contrast updated"
 msgstr "コントラストを更新しました"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:364
+#: src/features/settings/components/chat/model-filter-settings.tsx:366
 msgid "Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter."
 msgstr "AI プロバイダーのデータ取り扱いと保持ポリシーを管理します。プライバシー設定は現在、OpenRouter 経由のモデルに適用されます。"
 
@@ -7367,11 +7372,11 @@ msgstr "制御の種類"
 msgid "Control when the ControlNet influence applies during generation"
 msgstr "生成中に ControlNet の影響を適用するタイミングを制御します"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:136
+#: src/features/settings/components/chat/model-filter-settings.tsx:137
 msgid "Control which AI models and providers can be used based on geographic region, compliance requirements, and privacy preferences."
 msgstr "地域、コンプライアンス要件、プライバシー設定に基づいて、使用できる AI モデルとプロバイダーを管理します。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:220
+#: src/features/settings/components/chat/model-filter-settings.tsx:222
 msgid "Control which AI providers can serve your requests."
 msgstr "リクエストを処理できる AI プロバイダーを管理します。"
 
@@ -7721,9 +7726,18 @@ msgstr ""
 msgid "Could not cancel the run."
 msgstr "実行をキャンセルできませんでした。"
 
+#: src/features/chat/thread/composer-model-selector.tsx:127
+msgid "Could not change Auto. Please try again."
+msgstr ""
+
 #: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
 msgstr "プッシュ通知を変更できませんでした。もう一度お試しください。"
+
+#: src/features/chat/model-settings/use-model-combobox.ts:283
+#: src/features/chat/model-settings/use-model-combobox.ts:307
+msgid "Could not change the model. Please try again."
+msgstr ""
 
 #: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
@@ -8026,7 +8040,7 @@ msgstr ""
 msgid "Could not stop the worker."
 msgstr ""
 
-#: src/features/chat/model-settings/use-model-combobox.ts:148
+#: src/features/chat/model-settings/use-model-combobox.ts:161
 msgid "Could not switch the model. Please try again."
 msgstr ""
 
@@ -9414,8 +9428,8 @@ msgstr "拒否"
 msgid "Deny {tool}"
 msgstr "{tool} を拒否"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:390
-#: src/features/settings/components/chat/model-filter-settings.tsx:394
+#: src/features/settings/components/chat/model-filter-settings.tsx:392
+#: src/features/settings/components/chat/model-filter-settings.tsx:396
 msgid "Deny Data Collection"
 msgstr "データ収集を拒否"
 
@@ -11126,7 +11140,7 @@ msgstr "メールアドレスを入力"
 msgid "Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:328
+#: src/features/settings/components/chat/model-filter-settings.tsx:330
 msgid "Enter model ID (e.g., \"llama-4-scout\")..."
 msgstr "モデル ID を入力（例：\"llama-4-scout\"）..."
 
@@ -11429,7 +11443,7 @@ msgstr ""
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "推定プロバイダーコスト {display}（ご自身の API キーに課金）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:243
+#: src/features/settings/components/chat/agent-settings.tsx:233
 msgid "Estimated token cost per conversation"
 msgstr "会話あたりの推定トークンコスト"
 
@@ -12130,7 +12144,7 @@ msgstr "タスクをキャンセルできませんでした"
 msgid "Failed to change tag color"
 msgstr "タグの色を変更できませんでした"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:113
+#: src/features/settings/components/chat/model-filter-settings.tsx:114
 msgid "Failed to clear filter rules"
 msgstr "フィルタールールをクリアできませんでした"
 
@@ -12714,8 +12728,8 @@ msgstr "お気に入りの状態を更新できませんでした"
 
 #: src/components/model-picker/model-picker.tsx:729
 #: src/components/model-picker/model-picker.tsx:738
-#: src/features/settings/components/chat/model-filter-settings.tsx:56
-#: src/features/settings/components/chat/model-filter-settings.tsx:67
+#: src/features/settings/components/chat/model-filter-settings.tsx:57
+#: src/features/settings/components/chat/model-filter-settings.tsx:68
 msgid "Failed to update filter rules"
 msgstr "フィルタールールを更新できませんでした"
 
@@ -13396,8 +13410,8 @@ msgstr "種類でメモリを絞り込み"
 msgid "Filter path"
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:54
-#: src/features/settings/components/chat/model-filter-settings.tsx:65
+#: src/features/settings/components/chat/model-filter-settings.tsx:55
+#: src/features/settings/components/chat/model-filter-settings.tsx:66
 msgid "Filter rules updated"
 msgstr "フィルタールールを更新しました"
 
@@ -15104,7 +15118,7 @@ msgstr "あなたについての情報を共有して、AI があなたをより
 msgid "Here they are: planning, budget and next steps."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:276
+#: src/features/settings/components/chat/model-filter-settings.tsx:278
 msgid "Hidden in Model Picker"
 msgstr ""
 
@@ -16916,7 +16930,7 @@ msgstr "キルギス"
 msgid "Label"
 msgstr "ラベル"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:277
+#: src/features/settings/components/chat/model-filter-settings.tsx:279
 msgid "Labs hidden from the model picker only. Models already selected or set as defaults keep working."
 msgstr ""
 
@@ -19089,7 +19103,7 @@ msgstr "モード:"
 msgid "Model"
 msgstr "モデル"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:89
+#: src/features/settings/components/chat/model-filter-settings.tsx:90
 msgid "Model already blocked"
 msgstr "このモデルは既にブロックされています"
 
@@ -19131,7 +19145,7 @@ msgid "Model pricing from models.dev, KV-cached for 24 hours. Automatic cost cal
 msgstr "モデル料金は models.dev から取得し、KV に 24 時間キャッシュ。コストはマイクロドル単位で自動計算されます。"
 
 #: src/features/layout/lib/dashboard-page-names.ts:30
-#: src/features/settings/components/chat/model-filter-settings.tsx:134
+#: src/features/settings/components/chat/model-filter-settings.tsx:135
 msgid "Model Restrictions"
 msgstr "モデルの制限"
 
@@ -19176,7 +19190,7 @@ msgstr "モデル"
 msgid "Models enabled in your AWS account, in one region. Bedrock API key or IAM access keys."
 msgstr "AWS アカウントの 1 つのリージョンで有効化されたモデル。Bedrock API キーまたは IAM アクセスキーを使います。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:189
+#: src/features/settings/components/chat/model-filter-settings.tsx:191
 msgid "Models hosted exclusively in these regions will be unavailable."
 msgstr "これらのリージョンでのみホストされているモデルは利用できなくなります。"
 
@@ -20520,7 +20534,7 @@ msgstr "アイテムなし"
 msgid "No knowledge base files yet. Upload files in Settings."
 msgstr "ナレッジベースのファイルはまだありません。設定からファイルをアップロードしてください。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:281
+#: src/features/settings/components/chat/model-filter-settings.tsx:283
 msgid "No labs are hidden."
 msgstr ""
 
@@ -21096,7 +21110,7 @@ msgstr "メモ（任意）"
 msgid "Note for the next run (optional)"
 msgstr "次回の実行へのメモ（任意）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:253
+#: src/features/settings/components/chat/agent-settings.tsx:243
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "注: モジュールはメッセージ単位ではなく会話単位で適用されます。トークン使用量を最適化するため、必要なモジュールだけを有効にしてください。"
 
@@ -21517,7 +21531,7 @@ msgstr ""
 msgid "Only this check is started again on {hostLabel}, not the rest of its workflow."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:372
+#: src/features/settings/components/chat/model-filter-settings.tsx:374
 msgid "Only use providers that guarantee zero data retention — your prompts are never stored."
 msgstr "データを一切保持しないことを保証するプロバイダーのみを使用します。プロンプトが保存されることはありません。"
 
@@ -23756,7 +23770,7 @@ msgstr ""
 #: src/features/marketing/components/landing-footer.tsx:102
 #: src/features/marketing/components/landing-footer.tsx:272
 #: src/features/settings/components/account/account-settings.tsx:133
-#: src/features/settings/components/chat/model-filter-settings.tsx:361
+#: src/features/settings/components/chat/model-filter-settings.tsx:363
 #: src/features/settings/lib/settings-keywords.ts:26
 #: src/features/settings/lib/settings-navigation.ts:115
 msgid "Privacy"
@@ -24176,7 +24190,7 @@ msgstr "プロバイダーのヘルス"
 msgid "Provider removed"
 msgstr "プロバイダーを削除しました"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:218
+#: src/features/settings/components/chat/model-filter-settings.tsx:220
 msgid "Provider Restrictions"
 msgstr "プロバイダーの制限"
 
@@ -25053,7 +25067,7 @@ msgstr "正規表現"
 msgid "region"
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:154
+#: src/features/settings/components/chat/model-filter-settings.tsx:155
 msgid "Region Restrictions"
 msgstr "リージョンの制限"
 
@@ -25244,7 +25258,7 @@ msgstr "{label} を削除"
 msgid "Remove {model}"
 msgstr "{model} を削除"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:342
+#: src/features/settings/components/chat/model-filter-settings.tsx:344
 msgid "Remove {modelId} from blocked list"
 msgstr "{modelId} をブロックリストから削除"
 
@@ -25795,7 +25809,7 @@ msgstr "バージョン {0} に復元しました"
 msgid "Restoring..."
 msgstr "復元しています..."
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:157
+#: src/features/settings/components/chat/model-filter-settings.tsx:158
 msgid "Restrict which regions models can be hosted in. Useful for GDPR, data residency, and compliance requirements."
 msgstr "モデルをホストできるリージョンを制限します。GDPR、データ所在地、コンプライアンス要件に役立ちます。"
 
@@ -25873,7 +25887,7 @@ msgstr ""
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
-#: src/features/settings/components/chat/agent-settings.tsx:234
+#: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -27652,7 +27666,7 @@ msgstr ""
 msgid "Show {hidden} more lines"
 msgstr "さらに {hidden} 行を表示"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:291
+#: src/features/settings/components/chat/model-filter-settings.tsx:293
 msgid "Show {name} in model picker"
 msgstr ""
 
@@ -28356,7 +28370,7 @@ msgstr "当社側で問題が発生しました。しばらくしてからもう
 msgid "Something went wrong. Nothing was changed. Try again."
 msgstr ""
 
-#: src/features/settings/components/chat/agent-settings.tsx:224
+#: src/features/settings/components/chat/agent-settings.tsx:220
 #: src/features/skills/components/skill-list.tsx:252
 msgid "Something went wrong. Try again."
 msgstr "問題が発生しました。もう一度お試しください。"
@@ -30552,7 +30566,7 @@ msgstr ""
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr ""
 
-#: src/features/chat/thread/composer-model-selector.tsx:90
+#: src/features/chat/thread/composer-model-selector.tsx:135
 msgid "The bot sets the model for this chat."
 msgstr ""
 
@@ -31095,7 +31109,7 @@ msgstr ""
 msgid "These memories were added to the AI's context for this reply because they matched your message."
 msgstr "これらのメモリはメッセージに一致したため、この返信の AI のコンテキストに追加されました。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:250
+#: src/features/settings/components/chat/model-filter-settings.tsx:252
 msgid "These providers will never be used for your requests."
 msgstr "これらのプロバイダーがリクエストに使われることはありません。"
 
@@ -32002,7 +32016,7 @@ msgstr ""
 msgid "Token budget"
 msgstr "トークン予算"
 
-#: src/features/settings/components/chat/agent-settings.tsx:242
+#: src/features/settings/components/chat/agent-settings.tsx:232
 msgid "Token Cost Impact"
 msgstr "トークンコストへの影響"
 
@@ -34712,11 +34726,11 @@ msgstr ""
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:163
+#: src/features/settings/components/chat/model-filter-settings.tsx:165
 msgid "When set, only models hosted in these regions will be available."
 msgstr "設定すると、これらのリージョンでホストされているモデルのみ利用できます。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:225
+#: src/features/settings/components/chat/model-filter-settings.tsx:227
 msgid "When set, only these providers will be used. Leave empty to allow all."
 msgstr "設定すると、これらのプロバイダーのみ使用されます。すべて許可する場合は空欄のままにしてください。"
 
@@ -35599,8 +35613,8 @@ msgstr "Z.AI の最も強力なフラッグシップモデル"
 msgid "Z.AI's vision-enhanced flagship model"
 msgstr "ビジョンを強化した Z.AI のフラッグシップモデル"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:370
-#: src/features/settings/components/chat/model-filter-settings.tsx:376
+#: src/features/settings/components/chat/model-filter-settings.tsx:372
+#: src/features/settings/components/chat/model-filter-settings.tsx:378
 msgid "Zero Data Retention (ZDR)"
 msgstr "データ保持ゼロ（ZDR）"
 
