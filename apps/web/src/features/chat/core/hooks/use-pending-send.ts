@@ -3,6 +3,7 @@ import { useEffect, useEffectEvent } from "react";
 
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { openLoginPrompt } from "@/features/auth/stores/login-prompt-store";
+import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { currentPath, savePendingSend, takePendingSend } from "@/features/chat/core/utils/pending-send";
 import { useLunoraAuth } from "@/lib/lunora/crpc";
 
@@ -62,6 +63,9 @@ const usePendingSend = (enabled: boolean, send: (text: string) => void): void =>
         const pending = takePendingSend(currentPath());
 
         if (pending !== undefined) {
+            // Text only: a guest's attachments and references are the guest's files, which the account now signed in
+            // has no grant for, so sending them with it would fail the whole message.
+            useChatUIStore.getState().clearComposer();
             onSend(pending);
         }
     }, [canTake, enabled]);

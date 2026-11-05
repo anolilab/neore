@@ -6,6 +6,7 @@ import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useLoginPromptStore } from "@/features/auth/stores/login-prompt-store";
+import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { savePendingSend } from "@/features/chat/core/utils/pending-send";
 
 import usePendingSend, { holdForSignIn } from "./use-pending-send";
@@ -66,6 +67,21 @@ describe("usePendingSend", () => {
         renderHook(() => usePendingSend(true, send));
 
         expect(send).toHaveBeenCalledExactlyOnceWith("hello");
+    });
+
+    it("sends the text alone, without the guest's attachments and references", () => {
+        useChatUIStore.setState({
+            attachedReferences: [{ id: "ref-1" }] as never,
+            composerAttachments: [{ id: "file-1", status: "complete" }] as never,
+        });
+
+        const send = vi.fn();
+
+        renderHook(() => usePendingSend(true, send));
+
+        expect(send).toHaveBeenCalledExactlyOnceWith("hello");
+        expect(useChatUIStore.getState().composerAttachments).toStrictEqual([]);
+        expect(useChatUIStore.getState().attachedReferences).toStrictEqual([]);
     });
 
     it("never sends it as a guest", () => {
