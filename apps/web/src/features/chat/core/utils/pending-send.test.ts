@@ -41,7 +41,7 @@ describe("pending send", () => {
     });
 
     it("drops a blank or unreadable entry, wherever it is read", () => {
-        savePendingSend(' '.repeat(3), CHAT, 1000);
+        savePendingSend(" ".repeat(3), CHAT, 1000);
 
         expect(takePendingSend("/chat/other", 1000)).toBeUndefined();
         expect(sessionStorage.getItem("neore:pending-send")).toBeNull();

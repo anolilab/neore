@@ -20,13 +20,15 @@ interface LoginPromptStore {
 const currentUrl = (): string | undefined =>
     globalThis.location === undefined ? undefined : `${globalThis.location.pathname}${globalThis.location.search}${globalThis.location.hash}`;
 
-export const useLoginPromptStore = create<LoginPromptStore>()((set) => {return {
-    isOpen: false,
-    openedFrom: undefined,
-    setOpen: (isOpen) => {
-        set({ isOpen });
-    },
-}});
+export const useLoginPromptStore = create<LoginPromptStore>()((set) => {
+    return {
+        isOpen: false,
+        openedFrom: undefined,
+        setOpen: (isOpen) => {
+            set({ isOpen });
+        },
+    };
+});
 
 export const openLoginPrompt = (): void => {
     useLoginPromptStore.setState({ isOpen: true, openedFrom: currentUrl() });
