@@ -46,6 +46,7 @@ const jwtFor = (sub: string): string => `x.${btoa(JSON.stringify({ sub }))}.y`;
 
 describe("usePendingSend", () => {
     beforeEach(() => {
+        globalThis.history.replaceState(null, "", "/chat");
         harness.isAuthenticated = true;
         harness.token = jwtFor("member");
         harness.user = { id: "member" };
@@ -103,6 +104,17 @@ describe("usePendingSend", () => {
         renderHook(() => usePendingSend(true, send));
 
         expect(send).not.toHaveBeenCalled();
+    });
+
+    it("leaves it for the chat when the composer is on another page (the landing page)", () => {
+        globalThis.history.replaceState(null, "", "/");
+
+        const send = vi.fn();
+
+        renderHook(() => usePendingSend(true, send));
+
+        expect(send).not.toHaveBeenCalled();
+        expect(sessionStorage.getItem("neore:pending-send")).not.toBeNull();
     });
 
     it("leaves the message for a composer that takes it", () => {

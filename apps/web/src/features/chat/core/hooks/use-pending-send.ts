@@ -44,17 +44,20 @@ export const useCanTakePendingSend = (): boolean => {
     return Boolean(user && !isAnonymous && isAuthenticated && tokenSubject(token) === user.id);
 };
 
+/** The chat's own pages; the landing page renders the same composer over a provider that sends nothing. */
+const isChatPage = (): boolean => globalThis.location?.pathname.startsWith("/chat") === true;
+
 /**
  * Sends the message held for after sign-in (`pending-send.ts`) through `send`,
- * once, as soon as {@link useCanTakePendingSend} allows. Taking it removes it,
- * so a second composer or effect run finds nothing.
+ * once, as soon as {@link useCanTakePendingSend} allows, and only on a chat
+ * page. Taking it removes it, so a second composer or effect run finds nothing.
  */
 const usePendingSend = (enabled: boolean, send: (text: string) => void): void => {
     const canTake = useCanTakePendingSend();
     const onSend = useEffectEvent(send);
 
     useEffect(() => {
-        if (!enabled || !canTake) {
+        if (!enabled || !canTake || !isChatPage()) {
             return;
         }
 
