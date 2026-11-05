@@ -136,8 +136,17 @@ export interface IdentityTokenClient {
  * client already holds (the one whose probe failed). Clearing it first forces
  * the change; the client is unauthenticated at that point, so nothing is lost.
  */
-export const adoptSessionToken = async (client: IdentityTokenClient, fetchToken: () => Promise<string | null | undefined>): Promise<void> => {
+export const adoptSessionToken = async (
+    client: IdentityTokenClient,
+    fetchToken: () => Promise<string | null | undefined>,
+    signal?: AbortSignal,
+): Promise<void> => {
     const token = await fetchToken();
+
+    // The caller went away while the token was on its way (the gate opened): leave the client alone.
+    if (signal?.aborted) {
+        return;
+    }
 
     if (!token) {
         throw new Error("No RPC token for the current session");
@@ -202,16 +211,18 @@ export const adoptSessionTokenWhileShut = async (
 ): Promise<void> => {
     while (!signal.aborted) {
         await new Promise<void>((resolve) => {
-            const timer = setTimeout(resolve, nextAdoptionDelay());
+            const timers: { wait?: ReturnType<typeof setTimeout> } = {};
+            const onAbort = (): void => {
+                clearTimeout(timers.wait);
+                resolve();
+            };
 
-            signal.addEventListener(
-                "abort",
-                () => {
-                    clearTimeout(timer);
-                    resolve();
-                },
-                { once: true },
-            );
+            // One listener per wait, removed when the wait ends normally, so a long outage does not pile them up.
+            timers.wait = setTimeout(() => {
+                signal.removeEventListener("abort", onAbort);
+                resolve();
+            }, nextAdoptionDelay());
+            signal.addEventListener("abort", onAbort, { once: true });
         });
 
         if (signal.aborted) {
@@ -219,7 +230,7 @@ export const adoptSessionTokenWhileShut = async (
         }
 
         try {
-            await adoptSessionToken(client, fetchToken);
+            await adoptSessionToken(client, fetchToken, signal);
 
             return;
         } catch (error) {
