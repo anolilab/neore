@@ -358,11 +358,13 @@ jobs:
                   R2_ENDPOINT: "${{ secrets.R2_ENDPOINT }}"
                   STORAGE_SIGNING_SECRET: "${{ secrets.STORAGE_SIGNING_SECRET }}"
                   # Outbound mail (`email/mailer.ts`). MAIL_FROM is the sender and is
-                  # required in production. With RESEND_API_KEY unset, alchemy.run.ts
-                  # binds Cloudflare Email Service (MAIL_FROM must be on its verified
-                  # sending domain); set the key to send through Resend instead.
+                  # required in production; alchemy.run.ts binds Cloudflare Email
+                  # Service for it (MAIL_FROM must be on its verified sending domain).
                   MAIL_FROM: "${{ secrets.MAIL_FROM }}"
-                  RESEND_API_KEY: "${{ secrets.RESEND_API_KEY }}"
+                  # "1" binds Email Service for MAIL_FROM on this environment (a GitHub
+                  # environment variable). Only set it where MAIL_FROM's domain is an
+                  # Email Service sending domain; production requires it.
+                  MAIL_EMAIL_SERVICE: "${{ vars.MAIL_EMAIL_SERVICE }}"
                   SITE_URL: "${{ steps.origins.outputs.site }}"
                   # Optional, but paired with VITE_TURNSTILE_SITE_KEY in the
                   # build step above — set both or neither. Unset on both sides
@@ -409,7 +411,6 @@ jobs:
                   R2_BUCKET: "${{ secrets.R2_BUCKET }}"
                   R2_SECRET_ACCESS_KEY: "${{ secrets.R2_SECRET_ACCESS_KEY }}"
                   R2_TOKEN: "${{ secrets.R2_TOKEN }}"
-                  RESEND_WEBHOOK_SECRET: "${{ secrets.RESEND_WEBHOOK_SECRET }}"
                   # AI providers — the backend's own copies. The gateway is what
                   # actually calls the providers and takes its keys from the
                   # block further down; these satisfy the backend's schema and

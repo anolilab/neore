@@ -622,8 +622,6 @@ export interface InternalApiTypes {
     email: {
         functions: {
             deliverEmail: FunctionReference<"action", { message?: unknown }, null>;
-            handleEmailEvent: FunctionReference<"mutation", { event: { type: string }; id: string }, null>;
-            insertExpectation: FunctionReference<"mutation", { email: string; expectation: "delivered" | "bounced" | "complained" }, null>;
         };
     };
     evals: {
@@ -1838,8 +1836,6 @@ export const internal: InternalApiTypes = {
     email: {
         functions: {
             deliverEmail: { __lunoraRef: "email_functions:deliverEmail" },
-            handleEmailEvent: { __lunoraRef: "email_functions:handleEmailEvent" },
-            insertExpectation: { __lunoraRef: "email_functions:insertExpectation" },
         },
     },
     evals: {

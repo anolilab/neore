@@ -267,7 +267,7 @@ jobs:
                       # "development", and that variant is what turns the service,
                       # AI-provider and tool-API groups into optional-with-default.
                       # Without it the strict schema applies and the worker demands
-                      # all 37 keys (R2, Resend, every provider token) before it
+                      # every service key (R2, every provider token) before it
                       # will answer a request.
                       echo "ENVIRONMENT=\"development\""
 

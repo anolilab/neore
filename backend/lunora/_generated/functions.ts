@@ -753,8 +753,6 @@ export const LUNORA_FUNCTION_MANIFEST: Readonly<Record<string, FunctionManifestE
     "devices_internal:getDeviceToolContext": {"argumentDescriptors":[{"kind":"number","name":"now","optional":false},{"kind":"id","name":"threadId","optional":false,"table":"threads"},{"kind":"string","name":"userId","optional":false}],"exportName":"getDeviceToolContext","kind":"query","moduleId":"lunora_devices_internal_109","visibility":"internal"},
     "devices_internal:sweepDeviceCalls": {"argumentDescriptors":[],"exportName":"sweepDeviceCalls","kind":"mutation","moduleId":"lunora_devices_internal_109","visibility":"internal"},
     "email_functions:deliverEmail": {"argumentDescriptors":[{"kind":"any","name":"message","optional":false}],"exportName":"deliverEmail","kind":"action","moduleId":"lunora_email_functions_110","visibility":"internal"},
-    "email_functions:handleEmailEvent": {"argumentDescriptors":[{"kind":"object","name":"event","optional":false},{"kind":"string","name":"id","optional":false}],"exportName":"handleEmailEvent","kind":"mutation","moduleId":"lunora_email_functions_110","visibility":"internal"},
-    "email_functions:insertExpectation": {"argumentDescriptors":[{"kind":"string","name":"email","optional":false},{"kind":"union","name":"expectation","optional":false}],"exportName":"insertExpectation","kind":"mutation","moduleId":"lunora_email_functions_110","visibility":"internal"},
     "evals_execute:runEvalCase": {"argumentDescriptors":[{"kind":"number","name":"index","optional":false},{"kind":"id","name":"runId","optional":false,"table":"evalRuns"}],"exportName":"runEvalCase","kind":"action","moduleId":"lunora_evals_execute_111","visibility":"internal"},
     "evals_functions:cancelRun": {"argumentDescriptors":[{"kind":"id","name":"runId","optional":false,"table":"evalRuns"}],"exportName":"cancelRun","kind":"mutation","moduleId":"lunora_evals_functions_112","visibility":"public"},
     "evals_functions:compareModels": {"argumentDescriptors":[{"kind":"id","name":"datasetId","optional":false,"table":"evalDatasets"}],"exportName":"compareModels","kind":"query","moduleId":"lunora_evals_functions_112","visibility":"public"},
@@ -2428,8 +2426,6 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "devices_internal:getDeviceToolContext": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"number","name":"now","optional":false},{"kind":"id","name":"threadId","optional":false,"table":"threads"},{"kind":"string","name":"userId","optional":false}],"kind":"query","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "devices_internal:sweepDeviceCalls": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "email_functions:deliverEmail": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"any","name":"message","optional":false}],"kind":"action","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
-    "email_functions:handleEmailEvent": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"object","name":"event","optional":false},{"kind":"string","name":"id","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
-    "email_functions:insertExpectation": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"email","optional":false},{"kind":"union","name":"expectation","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "evals_execute:runEvalCase": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"number","name":"index","optional":false},{"kind":"id","name":"runId","optional":false,"table":"evalRuns"}],"kind":"action","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "evals_functions:cancelRun": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"id","name":"runId","optional":false,"table":"evalRuns"}],"kind":"mutation","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "evals_functions:compareModels": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"id","name":"datasetId","optional":false,"table":"evalDatasets"}],"kind":"query","visibility":"public" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
@@ -4089,8 +4085,6 @@ export interface Caller {
     email: {
         functions: {
             deliverEmail: (args: { message?: unknown }) => Promise<null>;
-            handleEmailEvent: (args: { event: { type: string }; id: string }) => Promise<null>;
-            insertExpectation: (args: { email: string; expectation: "delivered" | "bounced" | "complained" }) => Promise<null>;
         };
     };
     evals: {
@@ -6005,8 +5999,6 @@ export const createCaller = (context: CallerCtx): Caller => ({
     email: {
         functions: {
             deliverEmail: (args) => callRegistered(context, "email_functions:deliverEmail", args),
-            handleEmailEvent: (args) => callRegistered(context, "email_functions:handleEmailEvent", args),
-            insertExpectation: (args) => callRegistered(context, "email_functions:insertExpectation", args),
         },
     },
     evals: {

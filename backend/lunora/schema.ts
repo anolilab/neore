@@ -771,13 +771,6 @@ export const schema = defineSchema({
             };
         }),
 
-    emails: defineTable({
-        email: v.string(),
-        expectation: v.union(v.literal("delivered"), v.literal("bounced"), v.literal("complained")),
-    })
-        .global()
-        .index("by_email", ["email"]),
-
     embeddings_128: defineTable({
         model: v.string(),
         model_table_threadId: v.optional(v.string()),

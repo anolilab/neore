@@ -248,21 +248,15 @@ const requiredEnvPassthrough = Object.fromEntries(REQUIRED_ENV_KEYS.map((name) =
 const optionalEnvPassthrough = boundWhereSet(OPTIONAL_ENV_KEYS);
 
 /**
- * Cloudflare Email Service, bound only when it is the transport to use.
+ * Cloudflare Email Service, the only mail transport, bound only when a stage opts
+ * in with `MAIL_EMAIL_SERVICE=1` and sets `MAIL_FROM`. The binding is what turns
+ * on email verification (`email/mailer.ts#deliversMail`), and Email Service
+ * rejects an unverified sender domain (`E_SENDER_NOT_VERIFIED`). Following
+ * `MAIL_FROM` alone would lock out every password sign-up on a stage that kept an
+ * old `MAIL_FROM` (from Resend) but has no Email Service zone in THIS account.
+ * Without the opt-in the stage sends no mail and sign-up needs no verification.
  *
- * `email/mailer.ts` (`@lunora/mail`) prefers this binding whenever it exists, so
- * the deploy decides the transport. Email Service rejects an unverified sender
- * domain (`E_SENDER_NOT_VERIFIED`), so the binding is useless until a sending
- * subdomain exists on a zone in THIS account — and the product is in beta, so an
- * account without the entitlement could fail the deploy on a binding it cannot
- * create. Resend's key is therefore the switch, which makes the cutover a secret
- * change rather than a code change:
- *
- *   MAIL_FROM set, RESEND_API_KEY unset -> EMAIL bound -> Cloudflare Email Service
- *   MAIL_FROM set, RESEND_API_KEY set   -> no binding  -> Resend
- *
- * `MAIL_FROM` itself rides `requiredEnvPassthrough` (the mailer reads it for
- * every transport). `allowedSenderAddresses` pins the From to its address.
+ * `MAIL_FROM` itself rides `requiredEnvPassthrough` (the mailer reads it). `allowedSenderAddresses` pins the From to its address.
  * Destination is deliberately left unrestricted: `destinationAddress` /
  * `allowedDestinationAddresses` would cap delivery to verified addresses, and
  * this account sends signup and invitation mail to arbitrary users.
@@ -270,7 +264,16 @@ const optionalEnvPassthrough = boundWhereSet(OPTIONAL_ENV_KEYS);
 const mailFrom = process.env.MAIL_FROM?.trim() ?? "";
 /** `allowedSenderAddresses` takes the bare address of a `Name <addr@host>` sender. */
 const mailFromAddress = /<([^<>]+)>\s*$/u.exec(mailFrom)?.[1]?.trim() ?? mailFrom;
-const useEmailService = mailFrom !== "" && !process.env.RESEND_API_KEY?.trim();
+const emailServiceOptIn = process.env.MAIL_EMAIL_SERVICE?.trim() === "1";
+const useEmailService = mailFrom !== "" && emailServiceOptIn;
+
+if (mailFrom !== "" && !emailServiceOptIn && stage !== "production") {
+    // Not fatal: the stage still deploys, just without mail or required verification.
+    console.warn(
+        `[alchemy] stage ${stage}: MAIL_FROM is set but MAIL_EMAIL_SERVICE is not "1", so no EMAIL binding is created and ` +
+            "this stage sends no mail. Set MAIL_EMAIL_SERVICE=1 once MAIL_FROM's domain is an Email Service sending domain here.",
+    );
+}
 
 /**
  * Turnstile is two independent variables with nothing tying them together, and
@@ -325,13 +328,13 @@ if (accessEnabled && accessEmails.length === 0 && !destroying) {
 /**
  * Production must be able to send mail. `@lunora/mail` throws without a sender,
  * so with `MAIL_FROM` unset every sign-up, password reset and invitation that
- * sends mail fails. With it set there is always a transport: the EMAIL binding,
- * or Resend when its key is set (see above).
+ * sends mail fails. With it set, the EMAIL binding is the transport (see above).
  */
-if (stage === "production" && !mailFrom && !destroying) {
+if (stage === "production" && !useEmailService && !destroying) {
     throw new Error(
-        "Cannot deploy (stage: production) — no outbound mail. Set MAIL_FROM to a verified sender: a Cloudflare Email Service " +
-            "sending domain, or a Resend domain together with RESEND_API_KEY. Without it, password resets and invitations are never sent.",
+        "Cannot deploy (stage: production) — no outbound mail. Set MAIL_FROM to a verified sender (a Cloudflare Email Service " +
+            "sending domain in this account) and MAIL_EMAIL_SERVICE=1 (a GitHub environment variable under vars, not a secret). " +
+            "Without both, password resets and invitations are never sent.",
     );
 }
 
@@ -935,8 +938,8 @@ export default Alchemy.Stack(
                 // hosted Studio's advisor route to it. Unbound, that route answers 404 and
                 // the Studio says the companion is not deployed.
                 ADVISOR_COMPANION: AdvisorCompanion,
-                // `MAIL_FROM` and Resend's key ride `requiredEnvPassthrough` above; only
-                // the Email Service binding is decided here. See `email/mailer.ts`.
+                // `MAIL_FROM` rides `requiredEnvPassthrough` above; only the Email
+                // Service binding is decided here. See `email/mailer.ts`.
                 ...(useEmailService ? { EMAIL: Cloudflare.Email.SendEmail("EMAIL", { allowedSenderAddresses: [mailFromAddress] }) } : {}),
                 R2_ENDPOINT: requireEnv("R2_ENDPOINT"),
                 SITE_URL: requireEnv("SITE_URL"),

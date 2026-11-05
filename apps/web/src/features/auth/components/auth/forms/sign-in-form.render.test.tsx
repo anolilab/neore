@@ -14,6 +14,7 @@ const harness = vi.hoisted(() => {
         onSuccess: vi.fn(),
         resetCaptcha: vi.fn(),
         saveLastSignIn: vi.fn(),
+        sendVerificationEmail: vi.fn(),
         signInEmail: vi.fn(),
         toast: vi.fn(),
         trackEvent: vi.fn(),
@@ -36,7 +37,7 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
     return {
         useAuth: () => {
             return {
-                authClient: { signIn: { email: harness.signInEmail } },
+                authClient: { sendVerificationEmail: harness.sendVerificationEmail, signIn: { email: harness.signInEmail } },
                 basePath: "/auth",
                 credentials: harness.credentials,
                 navigate: harness.navigate,
@@ -144,6 +145,61 @@ describe("SignInForm", () => {
         expect(harness.saveLastSignIn).not.toHaveBeenCalled();
     });
 
+    it("gets an unverified visitor a new link by signing in again with the kept password", async () => {
+        harness.signInEmail.mockRejectedValue({ error: { code: "EMAIL_NOT_VERIFIED" }, status: 403 });
+        render(<SignInForm />);
+        fill("ada@example.com", "correct horse battery");
+        submit();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Send a new verification link" }));
+
+        await waitFor(() => {
+            expect(harness.toast).toHaveBeenLastCalledWith({ message: "Verification email sent", variant: "success" });
+        });
+
+        // Never the unauthenticated endpoint: only a proven sign-in mails a link and renews a guest hand-over.
+        expect(harness.sendVerificationEmail).not.toHaveBeenCalled();
+        expect(harness.signInEmail).toHaveBeenCalledTimes(2);
+        expect(harness.signInEmail).toHaveBeenLastCalledWith(expect.objectContaining({ email: "ada@example.com", password: "correct horse battery" }));
+        expect(passwordInput().value).toBe("correct horse battery");
+    });
+
+    it("withdraws the new-link button once the email is edited", async () => {
+        harness.signInEmail.mockRejectedValue({ error: { code: "EMAIL_NOT_VERIFIED" }, status: 403 });
+        render(<SignInForm />);
+        fill("ada@example.com", "correct horse battery");
+        submit();
+
+        await screen.findByRole("button", { name: "Send a new verification link" });
+        fireEvent.change(emailInput(), { target: { value: "grace@example.com" } });
+
+        expect(screen.queryByRole("button", { name: "Send a new verification link" })).toBeNull();
+    });
+
+    it("keeps the new-link button named and marks it busy while it works", async () => {
+        harness.signInEmail.mockRejectedValueOnce({ error: { code: "EMAIL_NOT_VERIFIED" }, status: 403 });
+        harness.signInEmail.mockReturnValueOnce(new Promise(() => {}));
+        render(<SignInForm />);
+        fill("ada@example.com", "correct horse battery");
+        submit();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Send a new verification link" }));
+
+        await waitFor(() => {
+            expect(screen.getByRole("button", { name: "Send a new verification link" }).getAttribute("aria-busy")).toBe("true");
+        });
+    });
+
+    it("offers no new link for any other refusal", async () => {
+        harness.signInEmail.mockRejectedValue({ error: { code: "INVALID_EMAIL_OR_PASSWORD" }, status: 401 });
+        render(<SignInForm />);
+        fill("ada@example.com", "wrong");
+        submit();
+
+        await waitFor(() => expect(harness.toast).toHaveBeenCalled());
+        expect(screen.queryByRole("button", { name: "Send a new verification link" })).toBeNull();
+    });
+
     it("tells the visitor an unverified email is the reason", async () => {
         harness.signInEmail.mockRejectedValue({ error: { code: "EMAIL_NOT_VERIFIED" }, status: 403 });
         render(<SignInForm />);
@@ -151,7 +207,10 @@ describe("SignInForm", () => {
         submit();
 
         await waitFor(() => {
-            expect(harness.toast).toHaveBeenCalledWith({ message: "Email not verified", variant: "error" });
+            expect(harness.toast).toHaveBeenCalledWith({
+                message: "Verify your email address first: we have sent you a new verification link.",
+                variant: "error",
+            });
         });
     });
 

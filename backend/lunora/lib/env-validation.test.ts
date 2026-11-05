@@ -22,8 +22,6 @@ const SERVICE_ENV = {
     R2_ENDPOINT: "https://test.r2.cloudflarestorage.com",
     R2_SECRET_ACCESS_KEY: "test-secret",
     R2_TOKEN: "test-token",
-    RESEND_API_KEY: "re_test_key",
-    RESEND_WEBHOOK_SECRET: "whsec_test",
     STORAGE_SIGNING_SECRET: "storage-signing-secret-at-least-32-chars",
 };
 
@@ -161,7 +159,7 @@ describe("envValidation — tiered validation", () => {
         expect(result.ENVIRONMENT).toBe("development");
 
         // Service, AI, and tool vars default to ""
-        expect(result.RESEND_API_KEY).toBe("");
+        expect(result.MAIL_FROM).toBe("");
         expect(result.OPENROUTER_API_KEY).toBe("");
         expect(result.TAVILY_API_KEY).toBe("");
         expect(result.GOOGLE_CLIENT_ID).toBe("");

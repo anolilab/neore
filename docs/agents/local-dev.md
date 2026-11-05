@@ -11,8 +11,8 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
   `ENVIRONMENT=development` / lunora dev's `WORKER_ENV`, not off a missing
   provider, and needs `MAIL_FROM` (dev-setup writes it) plus the
   `LUNORA_ADMIN_TOKEN` lunora dev generates. Sends ride the jobs queue, so a
-  mail shows up after the queue's ~1s batch window. `LUNORA_MAIL_CAPTURE=0`
-  delivers for real (set `RESEND_API_KEY`).
+  mail shows up after the queue's ~1s batch window. Nothing delivers locally:
+  the only transport is Cloudflare Email Service, which exists only in a deploy.
 - **Check the host firewall FIRST when local requests are slow or dropped.**
   On a machine running OpenSnitch, a `workerd` binary without an "allow
   always" rule gets its LOOPBACK connects held or denied. That is every call a

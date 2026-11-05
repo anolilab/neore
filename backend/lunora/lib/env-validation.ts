@@ -48,14 +48,10 @@ const serviceEnvSchema = z.object({
     GOOGLE_CLIENT_ID: z.string().trim(),
     GOOGLE_CLIENT_SECRET: z.string().trim(),
 
-    // Outbound mail (`email/mailer.ts`). `MAIL_FROM` is the sender for every
-    // transport, dev capture included. Resend is only the fallback for a
-    // deployment whose Email Service sending domain is not verified yet, so its
-    // key may be empty; `alchemy.run.ts` refuses a production deploy without
-    // `MAIL_FROM` rather than this failing every request.
+    // Outbound mail (`email/mailer.ts`). `MAIL_FROM` is the sender, dev capture
+    // included; Cloudflare Email Service delivers it. `alchemy.run.ts` refuses a
+    // production deploy without `MAIL_FROM` rather than this failing every request.
     MAIL_FROM: z.string().trim(),
-    RESEND_API_KEY: z.string().trim(),
-    RESEND_WEBHOOK_SECRET: z.string().trim(),
 
     R2_ACCESS_KEY_ID: z.string().trim(),
     R2_BUCKET: z.string().trim(),
