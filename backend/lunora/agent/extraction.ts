@@ -80,6 +80,17 @@ const isExtractable = (mimeType: string): boolean => {
     return EXTRACTABLE_MIME_TYPES.has(mimeType);
 };
 
+/** A parsed document as the model reads it: its main content, then its tables as markdown. */
+export const documentTextOf = (result: ExtractResponse): string => {
+    const content = result.content || "";
+    const tableMarkdown = (result.tables ?? [])
+        .map((table, index) => (table.markdown ? `\n\n### Table ${String(index + 1)}\n${table.markdown}` : ""))
+        .filter(Boolean)
+        .join("");
+
+    return tableMarkdown ? `${content}\n\n---\n## Extracted Tables${tableMarkdown}` : content;
+};
+
 export const extractDocumentText = internalAction
     .input({
         fileId: v.id("chatFiles"),
@@ -137,21 +148,7 @@ export const extractDocumentText = internalAction
                 throw new LunoraError("INTERNAL", `Parser returned ${response?.status ?? "no response"}: ${JSON.stringify(error)}`);
             }
 
-            const result: ExtractResponse = data;
-
-            // Build extracted text: main content + tables as markdown
-            let extractedText = result.content || "";
-
-            if (result.tables && result.tables.length > 0) {
-                const tableMarkdown = result.tables
-                    .map((table, index) => (table.markdown ? `\n\n### Table ${String(index + 1)}\n${table.markdown}` : ""))
-                    .filter(Boolean)
-                    .join("");
-
-                if (tableMarkdown) {
-                    extractedText += `\n\n---\n## Extracted Tables${tableMarkdown}`;
-                }
-            }
+            const extractedText = documentTextOf(data);
 
             if (!extractedText.trim()) {
                 await ctx.runMutation(internal.agent.files.markExtractionFailed, {

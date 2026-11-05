@@ -6,6 +6,7 @@
  * BYOK support, and rate limiting.
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { dataHandlingRules, deriveModelRegions } from "@neore/ai/models";
 import { embed, embedMany } from "ai";
 import { z } from "zod";
 
@@ -13,8 +14,9 @@ import type { HonoEnv } from "../../env.js";
 import { GatewayError, toSafeErrorPayload, toSafeValidationPayload } from "../../lib/errors.js";
 import { bearerAuth, internalAuth } from "../../middleware/auth.js";
 import { expensiveEndpointRateLimit } from "../../middleware/rate-limit.js";
-import { createEmbeddingModel, EMBEDDING_MODELS } from "../../providers/embedding-factory.js";
-import { resolveApiKey } from "../../providers/factory.js";
+import { createEmbeddingModel, EMBEDDING_MODELS, isTooLongForModel } from "../../providers/embedding-factory.js";
+import { resolveApiKey, resolveCloudflareOptions } from "../../providers/factory.js";
+import { getModelRejectionReason, hasActiveFilters } from "../../routing/filters.js";
 import { UsageReporter } from "../../usage/reporter.js";
 import { UsageTracker } from "../../usage/tracker.js";
 
@@ -65,6 +67,13 @@ embeddingsRouter.post("/v1/embeddings", async (c) => {
         );
     }
 
+    if (isTooLongForModel(modelInfo, typeof body.input === "string" ? [body.input] : body.input)) {
+        return c.json(
+            { error: { message: `Each input to '${body.model}' may be at most ${modelInfo.maxInputChars} characters.`, type: "invalid_request_error" } },
+            400,
+        );
+    }
+
     // Resolve API key (BYOK > platform env)
     let apiKey: string;
 
@@ -79,7 +88,7 @@ embeddingsRouter.post("/v1/embeddings", async (c) => {
     }
 
     try {
-        const model = await createEmbeddingModel(modelInfo.provider, modelInfo.modelApiId, apiKey);
+        const model = await createEmbeddingModel(modelInfo.provider, modelInfo.modelApiId, apiKey, resolveCloudflareOptions(c.env));
         const inputs = typeof body.input === "string" ? [body.input] : body.input;
 
         let embeddings: number[][];
@@ -216,6 +225,19 @@ const internalRequestSchema = z.object({
     dimensions: z.int().positive().optional(),
     input: z.union([z.string(), z.array(z.string())]),
     model: z.string(),
+    /** The user's model filter rules: the embedding model is refused when they exclude it, as a chat model is. */
+    modelFilterRules: z
+        .object({
+            allowedModels: z.array(z.string()).optional(),
+            allowedProviders: z.array(z.string()).optional(),
+            allowedRegions: z.array(z.string()).optional(),
+            blockedModels: z.array(z.string()).optional(),
+            blockedProviders: z.array(z.string()).optional(),
+            blockedRegions: z.array(z.string()).optional(),
+            denyDataCollection: z.boolean().optional(),
+            requireZDR: z.boolean().optional(),
+        })
+        .optional(),
     orgId: z.string().optional(),
     requestId: z.string(),
     threadId: z.string().optional(),
@@ -253,6 +275,25 @@ embeddingsRouter.post("/internal/embeddings", internalAuth, async (c) => {
         );
     }
 
+    // Workers AI embeddings are served from any region, so a region rule refuses them like any other model. Only the
+    // data-handling rules apply: a chat-model allow-list is not about this hidden model.
+    const dataRules = body.modelFilterRules && dataHandlingRules(body.modelFilterRules);
+
+    if (hasActiveFilters(dataRules)) {
+        const rejectionReason = getModelRejectionReason(
+            {
+                modelId: body.model,
+                provider: modelInfo.provider,
+                regions: deriveModelRegions({ modelApiId: modelInfo.modelApiId, provider: modelInfo.provider }),
+            },
+            dataRules,
+        );
+
+        if (rejectionReason) {
+            return c.json({ error: { code: "MODEL_BLOCKED", message: rejectionReason, type: "invalid_request_error" } }, 403);
+        }
+    }
+
     let apiKey: string;
 
     try {
@@ -274,7 +315,7 @@ embeddingsRouter.post("/internal/embeddings", internalAuth, async (c) => {
     }
 
     try {
-        const model = await createEmbeddingModel(modelInfo.provider, modelInfo.modelApiId, apiKey);
+        const model = await createEmbeddingModel(modelInfo.provider, modelInfo.modelApiId, apiKey, resolveCloudflareOptions(c.env));
         const inputs = typeof body.input === "string" ? [body.input] : body.input;
 
         let embeddings: number[][];

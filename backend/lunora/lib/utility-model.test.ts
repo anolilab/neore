@@ -3,13 +3,17 @@
  * reach the gateway (where `requireZDR` / `denyDataCollection` shape provider routing), and when no candidate is
  * allowed the call refuses with a typed error instead of falling back to a forbidden model.
  */
-import { DEFAULT_MEMORY_EXTRACTION_MODEL } from "@neore/ai/constants";
+import { DEFAULT_CHAT_MODEL, DEFAULT_MEMORY_EXTRACTION_MODEL } from "@neore/ai/constants";
+import { MODEL_LOOKUP } from "@neore/ai/models";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+    callsTools,
+    defaultModelUnderRules,
     getUtilityModel,
     NoAllowedUtilityModelError,
     pickUtilityModelId,
+    readsImagesAndCallsTools,
     requireUtilityModelId,
     UTILITY_FALLBACK_MODELS,
     withPaidPlanGrant,
@@ -23,6 +27,12 @@ vi.mock("@neore/ai/providers", async () => {
 
 const gateway = async () => new Response("{}");
 const configOf = (model: unknown) => (model as { config: { modelFilterRules?: unknown; modelId: string; userId: string } }).config;
+
+/** A free OpenRouter model served in the US and EU, which the gateway pins to its EU endpoint for EU-only rules. */
+const EU_PINNED_MODEL = "google/gemini-2.5-flash-lite";
+
+/** The first background fallback not on Workers AI: what a privacy rule (ZDR, no data collection) leaves. */
+const FIRST_NON_WORKERS_AI_FALLBACK = UTILITY_FALLBACK_MODELS.find((id) => MODEL_LOOKUP.get(id)?.provider !== "cloudflare");
 
 describe("pickUtilityModelId", () => {
     it("keeps the default when the user set no rules", () => {
@@ -40,9 +50,13 @@ describe("pickUtilityModelId", () => {
     it("keeps a free user on free-tier models, which chat runs would also allow them", () => {
         const rules = { blockedModels: [DEFAULT_MEMORY_EXTRACTION_MODEL, UTILITY_FALLBACK_MODELS[0]!] };
 
-        // The paid fallbacks (haiku, ministral) are skipped: the next free one is gemini-2.5-flash-lite.
-        expect(pickUtilityModelId(rules)).toBe("google/gemini-2.5-flash-lite");
-        expect(pickUtilityModelId(withPaidPlanGrant(rules, false))).toBe("google/gemini-2.5-flash-lite");
+        expect(pickUtilityModelId(rules)).toBe(UTILITY_FALLBACK_MODELS[1]);
+
+        // Past the Workers AI models and gpt-4.1-mini, the paid fallbacks (haiku, ministral) are skipped: the next free one is gemini-2.5-flash-lite.
+        const pastFree = { blockedModels: [DEFAULT_MEMORY_EXTRACTION_MODEL, ...UTILITY_FALLBACK_MODELS.slice(0, 5)] };
+
+        expect(pickUtilityModelId(pastFree)).toBe("google/gemini-2.5-flash-lite");
+        expect(pickUtilityModelId(withPaidPlanGrant(pastFree, false))).toBe("google/gemini-2.5-flash-lite");
     });
 
     it("refuses a free user whose rules leave only paid candidates, and serves a paid user", () => {
@@ -57,31 +71,33 @@ describe("pickUtilityModelId", () => {
         const picked = pickUtilityModelId({ allowedRegions: ["CN"] });
 
         expect(picked).toBeUndefined();
-        expect(pickUtilityModelId({ allowedRegions: ["EU"] })).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+        // Workers AI has no EU-only endpoint, so EU-only rules pass over it to the first free OpenRouter model the gateway pins to the EU.
+        expect(pickUtilityModelId({ allowedRegions: ["EU"] })).toBe(EU_PINNED_MODEL);
     });
 
     it("refuses a candidate served in a region the user did not allow, unless the gateway pins it to the only allowed one (EU)", () => {
-        // The default is served in the US and EU: with ["EU", "CH"] the gateway uses the default endpoint, so the US is reachable.
-        expect(pickUtilityModelId({ allowedRegions: ["EU", "CH"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBeUndefined();
-        expect(pickUtilityModelId({ allowedRegions: ["EU"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
-        expect(pickUtilityModelId({ allowedRegions: ["EU", "US"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+        // It is served in the US and EU: with ["EU", "CH"] the gateway uses the default endpoint, so the US is reachable.
+        expect(pickUtilityModelId({ allowedRegions: ["EU", "CH"] }, EU_PINNED_MODEL, true)).toBeUndefined();
+        expect(pickUtilityModelId({ allowedRegions: ["EU"] }, EU_PINNED_MODEL, true)).toBe(EU_PINNED_MODEL);
+        expect(pickUtilityModelId({ allowedRegions: ["EU", "US"] }, EU_PINNED_MODEL, true)).toBe(EU_PINNED_MODEL);
     });
 
     it("refuses a multi-region OpenRouter model when a blocked region is among its regions, since the gateway does not route around it", () => {
         // Every candidate is served in the US among other regions; "any region unblocked" would admit them all.
         expect(pickUtilityModelId({ blockedRegions: ["US"] })).toBeUndefined();
         expect(() => requireUtilityModelId({ blockedRegions: ["US"] })).toThrow(NoAllowedUtilityModelError);
-        expect(pickUtilityModelId({ blockedRegions: ["CN"] })).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+        // Any blocked region refuses the Workers AI models, which may be served from anywhere: the first left is US-only.
+        expect(pickUtilityModelId({ blockedRegions: ["CN"] })).toBe("openai/gpt-4.1-mini");
     });
 
     it("admits a multi-region candidate under blocked regions when the gateway pins it to the EU endpoint and EU is not blocked", () => {
         // Allowed exactly ["EU"]: the call is served from the EU alone, so the US block does not reach it.
         const rules = { allowedRegions: ["EU"], blockedRegions: ["US"] };
 
-        expect(pickUtilityModelId(rules, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+        expect(pickUtilityModelId(rules, EU_PINNED_MODEL, true)).toBe(EU_PINNED_MODEL);
         // EU itself blocked: nothing is left; and without the EU pin the US stays reachable.
-        expect(pickUtilityModelId({ allowedRegions: ["EU"], blockedRegions: ["EU"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBeUndefined();
-        expect(pickUtilityModelId({ allowedRegions: ["EU", "CH"], blockedRegions: ["US"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBeUndefined();
+        expect(pickUtilityModelId({ allowedRegions: ["EU"], blockedRegions: ["EU"] }, EU_PINNED_MODEL, true)).toBeUndefined();
+        expect(pickUtilityModelId({ allowedRegions: ["EU", "CH"], blockedRegions: ["US"] }, EU_PINNED_MODEL, true)).toBeUndefined();
     });
 
     it("answers nothing when the rules exclude every candidate", () => {
@@ -105,13 +121,14 @@ describe("getUtilityModel", () => {
         const rules = { blockedModels: [DEFAULT_MEMORY_EXTRACTION_MODEL], requireZDR: true };
         const model = await getUtilityModel(gateway, { rules, userId: "user-1" });
 
-        expect(configOf(model)).toMatchObject({ modelFilterRules: rules, modelId: UTILITY_FALLBACK_MODELS[0], userId: "user-1" });
+        // The privacy rule also refuses the Workers AI fallbacks, so the first one left is on OpenRouter.
+        expect(configOf(model)).toMatchObject({ modelFilterRules: rules, modelId: FIRST_NON_WORKERS_AI_FALLBACK, userId: "user-1" });
     });
 
-    it("hands a privacy rule to the gateway even though it does not exclude the default", async () => {
+    it("moves off the Workers AI default under a privacy rule and hands the rule to the gateway", async () => {
         const model = await getUtilityModel(gateway, { rules: { denyDataCollection: true }, userId: "user-1" });
 
-        expect(configOf(model)).toMatchObject({ modelFilterRules: { denyDataCollection: true }, modelId: DEFAULT_MEMORY_EXTRACTION_MODEL });
+        expect(configOf(model)).toMatchObject({ modelFilterRules: { denyDataCollection: true }, modelId: FIRST_NON_WORKERS_AI_FALLBACK });
     });
 
     it("refuses with the typed error when the rules exclude every candidate", async () => {
@@ -126,5 +143,32 @@ describe("getUtilityModel", () => {
                 strict: true,
             }),
         ).rejects.toBeInstanceOf(NoAllowedUtilityModelError);
+    });
+});
+
+describe("defaultModelUnderRules", () => {
+    it("keeps the default when the user set no rules, or rules it passes", () => {
+        expect(defaultModelUnderRules(DEFAULT_CHAT_MODEL, undefined, readsImagesAndCallsTools)).toBe(DEFAULT_CHAT_MODEL);
+        expect(defaultModelUnderRules(DEFAULT_CHAT_MODEL, { blockedModels: ["openai/o3"] }, readsImagesAndCallsTools)).toBe(DEFAULT_CHAT_MODEL);
+    });
+
+    it("moves the Workers AI default off under a privacy rule, which only OpenRouter's routing can honour", () => {
+        const standIn = defaultModelUnderRules(DEFAULT_CHAT_MODEL, { requireZDR: true }, readsImagesAndCallsTools);
+
+        expect(MODEL_LOOKUP.get(standIn)?.provider).not.toBe("cloudflare");
+    });
+
+    it("moves the Workers AI default under a region rule to a model that keeps its capabilities", () => {
+        const standIn = defaultModelUnderRules(DEFAULT_CHAT_MODEL, { blockedRegions: ["CN"] }, readsImagesAndCallsTools);
+
+        expect(standIn).not.toBe(DEFAULT_CHAT_MODEL);
+        expect(readsImagesAndCallsTools(MODEL_LOOKUP.get(standIn)!)).toBe(true);
+    });
+
+    it("offers a paid stand-in only with the plan grant", () => {
+        const rules = { allowedModels: [DEFAULT_CHAT_MODEL, "anthropic/claude-haiku-4.5"], blockedRegions: ["CN"] };
+
+        expect(defaultModelUnderRules(DEFAULT_CHAT_MODEL, rules, callsTools)).toBe(DEFAULT_CHAT_MODEL);
+        expect(defaultModelUnderRules(DEFAULT_CHAT_MODEL, withPaidPlanGrant(rules, true), callsTools)).toBe("anthropic/claude-haiku-4.5");
     });
 });

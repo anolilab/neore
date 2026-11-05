@@ -146,6 +146,8 @@ written here is what is not.
   in marketing catalogs; `enabled: false` hides it everywhere;
   `provider: "external"` is listed-only and skipped by agents.
   `IMAGE_CATALOG`/`VIDEO_CATALOG`/`TEXT_CATALOG` are derived via `deriveCatalog()`.
+  The text and embedding defaults are Workers AI (`cf-*`, `bge-m3`; `constants.ts`), which any region
+  rule refuses: a run on a default moves under the user's rules (`defaultModelUnderRules`).
 
 - **LLM Gateway** (`services/llm-gateway/`) proxies **all** LLM and embedding
   calls for token counting, cost tracking and smart routing. D1 for usage,
@@ -700,8 +702,7 @@ written here is what is not.
   every download through `lib/media.ts#fetchMedia` — per-platform host allowlist,
   a bot token never follows a redirect off-host, 20 MB, MIME allowlist). A media
   message is also SAVED there, so it is absent from the thread until the action
-  runs. The default chat model is text-only, so a thread whose recent rows carry
-  image/file parts replies on `MESSENGER_MEDIA_MODEL`; audio reaches the model only
+  runs. The reply model follows what the thread's recent rows carry (`chooseReplyModel`); audio reaches the model only
   as a transcript (`fileIds`, not a part — an audio part would fail most providers).
   Outbound media ships only when a reply's assistant rows carry file parts
   (`listReplyMedia`, owner-granted storage only) — so without reply tools

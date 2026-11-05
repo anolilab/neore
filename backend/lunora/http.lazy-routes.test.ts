@@ -37,8 +37,7 @@ afterAll(() => {
     vi.unstubAllEnvs();
 });
 
-const send = async (path: string, init: RequestInit): Promise<Response> =>
-    await httpApp.request(path, init, { __lunoraCtx: lunoraCtx, FILES: files });
+const send = async (path: string, init: RequestInit): Promise<Response> => await httpApp.request(path, init, { __lunoraCtx: lunoraCtx, FILES: files });
 
 describe("lazy HTTP routes", () => {
     it("loads the chat module on the first /chat/start and hands it the request", async () => {

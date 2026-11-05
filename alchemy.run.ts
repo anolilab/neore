@@ -89,7 +89,7 @@ if (missingDeployEnv.length > 0 && !destroying) {
 
 // `lib/encryption.ts` refuses a short key only when it first loads, on a request
 // that needs it, so a bad key would otherwise deploy green.
-const encryptionKeyError = destroying ? undefined :encryptionKeyProblem(process.env.ENCRYPTION_KEY?.trim() ?? "");
+const encryptionKeyError = destroying ? undefined : encryptionKeyProblem(process.env.ENCRYPTION_KEY?.trim() ?? "");
 
 if (encryptionKeyError) {
     throw new Error(`Cannot deploy (stage: ${stage}) — ${encryptionKeyError}`);

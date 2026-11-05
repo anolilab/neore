@@ -4,7 +4,9 @@ import { LunoraError } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
 import type { ActionCtx } from "../../_generated/server";
+import { callOnShard } from "../../lib/cross-shard";
 import type { ServiceFetch } from "../../lib/services";
+import { servesUser } from "../../lib/shard-context";
 import { getUtilityModel, NO_ALLOWED_UTILITY_MODEL_MESSAGE, NoAllowedUtilityModelError, withPaidPlanGrant } from "../../lib/utility-model";
 
 export const MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE = "Your model settings could not be read; try again.";
@@ -42,12 +44,19 @@ const settled = async <T>(read: () => Promise<T>): Promise<T | typeof FAILED> =>
  * `planUserId` names whose plan opens paid-plan models when that is not the rules' owner: a collaborator's call on
  * the owner's thread runs under the owner's filters (privacy) but is paid for, and so graded, as the caller.
  *
+ * The preferences are read on the user's OWN shard: a collaborator's turn on a shared thread runs on the owner's,
+ * which holds no preferences row for them, and reading there would find no rules.
+ *
  * Throws `ModelFilterRulesUnavailableError` when the read fails: that is not the same as "no rules". An unreadable
  * plan is just "free".
  */
 export const loadModelFilterRules = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, planUserId: string = userId): Promise<ModelFilterRules> => {
     const [preferences, plan] = await Promise.all([
-        settled(async () => await ctx.runQuery(internal.auth.functions.getAgentModulePreferencesQuery, { userId })),
+        settled(async () =>
+            servesUser(userId)
+                ? await ctx.runQuery(internal.auth.functions.getAgentModulePreferencesQuery, { userId })
+                : await callOnShard(internal.auth.functions.getAgentModulePreferencesQuery, { userId }, { shardKey: userId }),
+        ),
         settled(async () => await ctx.runQuery(internal.auth.functions.getUserRunPlanQuery, { userId: planUserId })),
     ]);
 

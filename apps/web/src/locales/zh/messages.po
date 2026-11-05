@@ -506,7 +506,7 @@ msgstr "{0}（{1} 个评分）"
 
 #. placeholder {0}: formatPricePerMillion(model.pricing.input_per_million)
 #. placeholder {1}: formatPricePerMillion(model.pricing.output_per_million)
-#: src/components/model-picker/model-picker.tsx:319
+#: src/components/model-picker/model-picker.tsx:320
 msgid "{0} input, {1} output per 1M tokens"
 msgstr ""
 
@@ -599,7 +599,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "已使用 {0}/{1} 个 token（{2}%）"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1218
+#: src/components/model-picker/model-picker.tsx:1221
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "已选择 {0}/{MAX_PARALLEL} 个"
 
@@ -1051,7 +1051,7 @@ msgid "{label} is not connected."
 msgstr ""
 
 #. placeholder {0}: ids.length
-#: src/components/model-picker/model-picker.tsx:910
+#: src/components/model-picker/model-picker.tsx:911
 msgid "{label} moved to position {position} of {0} in starred"
 msgstr "{label}已移至星标中的第{position}位（共{0}位）"
 
@@ -1274,7 +1274,7 @@ msgstr "{selectedCount, plural, other {已选择 # 个提示词}}"
 msgid "{selectedCount, plural, one {# thread selected} other {# threads selected}}"
 msgstr "{selectedCount, plural, other {已选中 # 个对话}}"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:745
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "已选择 {selectedCount}/{MAX_PARALLEL}"
 
@@ -1347,15 +1347,15 @@ msgstr "OpenRouter token 用量排名第一"
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, other {# 个收藏}}"
 
-#: src/features/settings/components/chat/agent-settings.tsx:250
+#: src/features/settings/components/chat/agent-settings.tsx:240
 msgid "+ Data Source: ~2,700 tokens (+100)"
 msgstr "+ 数据源：约 2,700 个 token（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:249
+#: src/features/settings/components/chat/agent-settings.tsx:239
 msgid "+ Knowledge: ~2,600 tokens (+100)"
 msgstr "+ 知识：约 2,600 个 token（+100）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:248
+#: src/features/settings/components/chat/agent-settings.tsx:238
 msgid "+ Task Planning: ~2,500 tokens (+200)"
 msgstr "+ 任务规划：约 2,500 个 token（+200）"
 
@@ -1974,8 +1974,8 @@ msgid "active"
 msgstr "活跃"
 
 #: src/features/chat/thread/widgets/flight-widget.tsx:55
-#: src/features/settings/components/chat/model-filter-settings.tsx:178
-#: src/features/settings/components/chat/model-filter-settings.tsx:239
+#: src/features/settings/components/chat/model-filter-settings.tsx:180
+#: src/features/settings/components/chat/model-filter-settings.tsx:241
 #: src/features/settings/components/chat/trigger-settings.tsx:811
 #: src/features/tasks/components/goal-form-dialog.tsx:46
 #: src/features/tasks/components/goal-list.tsx:25
@@ -2301,8 +2301,8 @@ msgstr ""
 msgid "Add to review"
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:167
-#: src/components/model-picker/model-picker.tsx:340
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:168
+#: src/components/model-picker/model-picker.tsx:341
 msgid "Add to starred"
 msgstr "添加到星标"
 
@@ -2892,10 +2892,10 @@ msgstr "垂直对齐"
 msgid "Align vertically (V)"
 msgstr "垂直对齐（V）"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:617
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:679
-#: src/components/model-picker/model-picker.tsx:1067
-#: src/components/model-picker/model-picker.tsx:1145
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:618
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:680
+#: src/components/model-picker/model-picker.tsx:1070
+#: src/components/model-picker/model-picker.tsx:1148
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:422
@@ -2964,7 +2964,7 @@ msgstr "所有文件（{0}）"
 msgid "All files removed from knowledge base"
 msgstr "已从知识库中移除所有文件"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:111
+#: src/features/settings/components/chat/model-filter-settings.tsx:112
 msgid "All filter rules cleared"
 msgstr "已清除所有筛选规则"
 
@@ -2980,8 +2980,8 @@ msgstr "所有安装包"
 msgid "All MCP servers active"
 msgstr "所有 MCP 服务器已启用"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:563
-#: src/components/model-picker/model-picker.tsx:1017
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:564
+#: src/components/model-picker/model-picker.tsx:1018
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "所有模型"
@@ -3108,11 +3108,11 @@ msgstr "允许的 AI 模型"
 msgid "Allowed for a limited time"
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:224
+#: src/features/settings/components/chat/model-filter-settings.tsx:226
 msgid "Allowed Providers"
 msgstr "允许的提供商"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:162
+#: src/features/settings/components/chat/model-filter-settings.tsx:164
 msgid "Allowed Regions"
 msgstr "允许的地区"
 
@@ -3344,7 +3344,7 @@ msgstr "Anthropic API"
 msgid "Anthropic-compatible"
 msgstr "兼容 Anthropic"
 
-#: src/lib/model-descriptions.ts:30
+#: src/lib/model-descriptions.ts:31
 msgid "Anthropic's latest and greatest LLM with thinking"
 msgstr "Anthropic 支持思考的最新最强 LLM"
 
@@ -3356,7 +3356,7 @@ msgstr "Anthropic 最新、能力最强的 Opus 模型"
 msgid "Anthropic's latest Opus with full thinking transparency"
 msgstr "Anthropic 最新 Opus，思考过程完全透明"
 
-#: src/lib/model-descriptions.ts:31
+#: src/lib/model-descriptions.ts:30
 msgid "Anthropic's latest Sonnet LLM with thinking"
 msgstr "Anthropic 支持思考的最新 Sonnet LLM"
 
@@ -3880,8 +3880,8 @@ msgstr "尝试次数：{0}"
 msgid "Auckland"
 msgstr "奥克兰"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
-#: src/components/model-picker/model-picker.tsx:1119
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:668
+#: src/components/model-picker/model-picker.tsx:1122
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:123
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -3944,6 +3944,7 @@ msgstr ""
 #: src/features/chat/thread/composer-image-settings.tsx:28
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
+#: src/features/chat/thread/composer-model-selector.tsx:120
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
@@ -4245,15 +4246,15 @@ msgstr "均衡"
 msgid "Balanced"
 msgstr "均衡"
 
-#: src/lib/model-descriptions.ts:42
+#: src/lib/model-descriptions.ts:44
 msgid "Balanced 32B model from Alibaba"
 msgstr "Alibaba 的均衡型 32B 模型"
 
-#: src/lib/model-descriptions.ts:43
+#: src/lib/model-descriptions.ts:46
 msgid "Balanced frontier model from Anthropic"
 msgstr "Anthropic 的均衡型前沿模型"
 
-#: src/lib/model-descriptions.ts:44
+#: src/lib/model-descriptions.ts:45
 msgid "Balanced GPT-5 family model from OpenAI"
 msgstr "OpenAI 的均衡型 GPT-5 系列模型"
 
@@ -4308,7 +4309,7 @@ msgstr "封禁"
 msgid "Base"
 msgstr "基础"
 
-#: src/features/settings/components/chat/agent-settings.tsx:247
+#: src/features/settings/components/chat/agent-settings.tsx:237
 msgid "Base (agent loop only): ~2,300 tokens"
 msgstr "基础（仅智能体循环）：约 2,300 个 token"
 
@@ -4481,31 +4482,31 @@ msgstr "更好地遵循提示词"
 msgid "Better speed-to-quality ratio than the full GPT-5"
 msgstr "速度与质量之比优于完整版 GPT-5"
 
-#: src/lib/model-descriptions.ts:45
+#: src/lib/model-descriptions.ts:37
 msgid "BFL's frontier model for image editing"
 msgstr "BFL 用于图像编辑的前沿模型"
 
-#: src/lib/model-descriptions.ts:46
+#: src/lib/model-descriptions.ts:38
 msgid "BFL's highest quality FLUX model via direct API"
 msgstr "通过直接 API 提供的 BFL 最高质量 FLUX 模型"
 
-#: src/lib/model-descriptions.ts:47
+#: src/lib/model-descriptions.ts:39
 msgid "BFL's highest quality model via Replicate"
 msgstr "通过 Replicate 提供的 BFL 最高质量模型"
 
-#: src/lib/model-descriptions.ts:48
+#: src/lib/model-descriptions.ts:40
 msgid "BFL's highest quality text-to-image model — up to 2K resolution with improved photorealism"
 msgstr "BFL 最高质量的文生图模型 — 最高 2K 分辨率，照片级真实感更强"
 
-#: src/lib/model-descriptions.ts:49
+#: src/lib/model-descriptions.ts:41
 msgid "BFL's latest generation model via Replicate"
 msgstr "通过 Replicate 提供的 BFL 最新一代模型"
 
-#: src/lib/model-descriptions.ts:50
+#: src/lib/model-descriptions.ts:42
 msgid "BFL's maximum quality FLUX Kontext model"
 msgstr "BFL 最高质量的 FLUX Kontext 模型"
 
-#: src/lib/model-descriptions.ts:51
+#: src/lib/model-descriptions.ts:43
 msgid "BFL's professional FLUX model via direct API"
 msgstr "通过直接 API 提供的 BFL 专业版 FLUX 模型"
 
@@ -4543,11 +4544,11 @@ msgstr ""
 msgid "Black"
 msgstr "黑色"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:332
+#: src/features/settings/components/chat/model-filter-settings.tsx:334
 msgid "Block"
 msgstr "屏蔽"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:391
+#: src/features/settings/components/chat/model-filter-settings.tsx:394
 msgid "Block providers that may use your data for training or collect usage data."
 msgstr "屏蔽可能使用你的数据进行训练或收集使用数据的提供商。"
 
@@ -4555,25 +4556,25 @@ msgstr "屏蔽可能使用你的数据进行训练或收集使用数据的提供
 msgid "Block requests"
 msgstr "阻止请求"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:311
+#: src/features/settings/components/chat/model-filter-settings.tsx:313
 msgid "Block specific models by their ID. These models will never be used."
 msgstr "按 ID 屏蔽特定模型。这些模型将永远不会被使用。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:204
-#: src/features/settings/components/chat/model-filter-settings.tsx:264
+#: src/features/settings/components/chat/model-filter-settings.tsx:206
+#: src/features/settings/components/chat/model-filter-settings.tsx:266
 #: src/features/tasks/components/task-status.tsx:15
 msgid "Blocked"
 msgstr "已屏蔽"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:310
+#: src/features/settings/components/chat/model-filter-settings.tsx:312
 msgid "Blocked Models"
 msgstr "已屏蔽的模型"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:249
+#: src/features/settings/components/chat/model-filter-settings.tsx:251
 msgid "Blocked Providers"
 msgstr "已屏蔽的提供商"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:188
+#: src/features/settings/components/chat/model-filter-settings.tsx:190
 msgid "Blocked Regions"
 msgstr "已屏蔽的地区"
 
@@ -4988,7 +4989,7 @@ msgstr "ByteDance"
 msgid "ByteDance medium-pro quality tier"
 msgstr "字节跳动中高端品质档"
 
-#: src/lib/model-descriptions.ts:52
+#: src/lib/model-descriptions.ts:47
 msgid "ByteDance Seedance 2.0 — next-gen high-quality video with end-frame and reference support"
 msgstr "ByteDance Seedance 2.0 — 支持尾帧和参考的新一代高质量视频"
 
@@ -5004,7 +5005,7 @@ msgstr "字节跳动的实惠图像模型"
 msgid "ByteDance's capable vision reasoning model"
 msgstr "字节跳动能力出色的视觉推理模型"
 
-#: src/lib/model-descriptions.ts:53
+#: src/lib/model-descriptions.ts:49
 msgid "ByteDance's compact and efficient reasoning model"
 msgstr "ByteDance 紧凑高效的推理模型"
 
@@ -5012,7 +5013,7 @@ msgstr "ByteDance 紧凑高效的推理模型"
 msgid "ByteDance's compact reasoning model"
 msgstr "字节跳动的紧凑型推理模型"
 
-#: src/lib/model-descriptions.ts:54
+#: src/lib/model-descriptions.ts:50
 msgid "ByteDance's fast vision reasoning model"
 msgstr "ByteDance 的快速视觉推理模型"
 
@@ -5028,15 +5029,15 @@ msgstr "字节跳动的高品质 Seedance 档"
 msgid "ByteDance's latest and most capable reasoning model"
 msgstr "字节跳动最新、能力最强的推理模型"
 
-#: src/lib/model-descriptions.ts:55
+#: src/lib/model-descriptions.ts:51
 msgid "ByteDance's latest reasoning model"
 msgstr "ByteDance 最新的推理模型"
 
-#: src/lib/model-descriptions.ts:56
+#: src/lib/model-descriptions.ts:52
 msgid "ByteDance's recent reasoning model"
 msgstr "ByteDance 近期的推理模型"
 
-#: src/lib/model-descriptions.ts:38
+#: src/lib/model-descriptions.ts:48
 msgid "ByteDance's Seedream 5.0 Pro text-to-image model, up to 2K output"
 msgstr "字节跳动的文生图模型 Seedream 5.0 Pro，最高支持 2K 输出"
 
@@ -5056,7 +5057,7 @@ msgstr "缓存"
 msgid "Cache Hit Rate"
 msgstr "缓存命中率"
 
-#: src/components/model-picker/model-picker.tsx:210
+#: src/components/model-picker/model-picker.tsx:211
 #: src/features/chat/thread/message-cost-badge.tsx:56
 msgid "Cached input"
 msgstr "缓存输入"
@@ -5299,11 +5300,11 @@ msgstr "能力"
 msgid "capable"
 msgstr "能力出色"
 
-#: src/lib/model-descriptions.ts:57
+#: src/lib/model-descriptions.ts:53
 msgid "Capable balanced model from xAI with vision support"
 msgstr "xAI 支持视觉的强大均衡型模型"
 
-#: src/lib/model-descriptions.ts:58
+#: src/lib/model-descriptions.ts:54
 msgid "Capable open-source model from Meta"
 msgstr "Meta 的强大开源模型"
 
@@ -5347,7 +5348,7 @@ msgstr "{0} 中的用例"
 msgid "Cases with no reported cost used {0} of {1} budgeted tokens."
 msgstr "未报告费用的用例使用了 {0}/{1} 个预算 token。"
 
-#: src/lib/model-descriptions.ts:59
+#: src/lib/model-descriptions.ts:55
 msgid "Cassette AI text-to-music — up to 3-minute clips at 44.1kHz stereo."
 msgstr "Cassette AI 文生音乐 — 最长 3 分钟、44.1kHz 立体声片段。"
 
@@ -5623,7 +5624,7 @@ msgstr "使用其模型的聊天将无法工作，直到你选择其他模型。
 msgid "Chats with no activity for this long are archived. Archived chats stay searchable."
 msgstr ""
 
-#: src/lib/model-descriptions.ts:60
+#: src/lib/model-descriptions.ts:56
 msgid "Cheapest medium-quality Hailuo 2.3 tier — best cost-to-quality ratio"
 msgstr "Hailuo 2.3 最便宜的中等质量档 — 最佳性价比"
 
@@ -5836,11 +5837,11 @@ msgstr "电影级 AI 视频"
 msgid "Cinematic depth and visual flair"
 msgstr "电影般的纵深与视觉风格"
 
-#: src/lib/model-descriptions.ts:61
+#: src/lib/model-descriptions.ts:57
 msgid "Cinematic image model with references"
 msgstr "支持参考的电影感图像模型"
 
-#: src/lib/model-descriptions.ts:62
+#: src/lib/model-descriptions.ts:58
 msgid "Cinematic quality with improved motion"
 msgstr "动态改进的电影级质量"
 
@@ -5957,7 +5958,7 @@ msgstr "清除"
 msgid "Clear all"
 msgstr "全部清除"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:142
+#: src/features/settings/components/chat/model-filter-settings.tsx:143
 msgid "Clear All"
 msgstr "全部清除"
 
@@ -6025,7 +6026,7 @@ msgstr "点击"
 msgid "Click \"{selector}\""
 msgstr "点击“{selector}”"
 
-#: src/components/model-picker/model-picker.tsx:1177
+#: src/components/model-picker/model-picker.tsx:1180
 msgid "Click ★ on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型上的 ★ 即可添加到这里。"
 
@@ -6054,7 +6055,7 @@ msgstr "点击下方按钮，在你的设备上注册新的通行密钥。"
 msgid "Click the pin icon on any message to save it here."
 msgstr "点击任意消息上的图钉图标即可保存到这里。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:705
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:706
 msgid "Click the star on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型的星标即可将其添加到这里。"
 
@@ -6181,6 +6182,10 @@ msgstr "面向 Web 应用、API 和数据库的云托管"
 #: src/features/settings/lib/settings-keywords.ts:67
 msgid "Cloud Provider Accounts"
 msgstr "云服务提供商账户"
+
+#: src/features/settings/components/chat/model-filter-settings.tsx:159
+msgid "Cloudflare Workers AI models run wherever Cloudflare has capacity, so any region rule hides them."
+msgstr "Cloudflare Workers AI 模型在 Cloudflare 有可用容量的任何地方运行，因此设置任何区域规则都会隐藏它们。"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:40
 #: src/features/canvas/canvas-panel.tsx:754
@@ -6311,15 +6316,15 @@ msgstr "需要阿里巴巴 30B 编程专用模型的编程任务"
 msgid "Coding tasks requiring Mistral's specialized development-focused model"
 msgstr "需要 Mistral 开发专用模型的编程任务"
 
-#: src/lib/model-descriptions.ts:63
+#: src/lib/model-descriptions.ts:59
 msgid "Coding-specialized model from Alibaba"
 msgstr "Alibaba 的编程专用模型"
 
-#: src/lib/model-descriptions.ts:64
+#: src/lib/model-descriptions.ts:60
 msgid "Cohere's advanced command LLM"
 msgstr "Cohere 的高级指令 LLM"
 
-#: src/lib/model-descriptions.ts:65
+#: src/lib/model-descriptions.ts:61
 msgid "Cohere's advanced command LLM with thinking"
 msgstr "Cohere 支持思考的高级指令 LLM"
 
@@ -6580,7 +6585,7 @@ msgstr "更快生成代码的紧凑型 Codex 模型"
 msgid "Compact coding model from Mistral"
 msgstr "来自 Mistral 的紧凑型编程模型"
 
-#: src/lib/model-descriptions.ts:66
+#: src/lib/model-descriptions.ts:62
 msgid "Compact distilled reasoning model from DeepSeek"
 msgstr "DeepSeek 的紧凑蒸馏推理模型"
 
@@ -6865,9 +6870,9 @@ msgstr "配置你的应用设置"
 msgid "Configured"
 msgstr "已配置"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:768
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1240
+#: src/components/model-picker/model-picker.tsx:1243
 msgid "Confirm"
 msgstr "确认"
 
@@ -7335,7 +7340,7 @@ msgstr "对比度"
 msgid "Contrast updated"
 msgstr "对比度已更新"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:364
+#: src/features/settings/components/chat/model-filter-settings.tsx:366
 msgid "Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter."
 msgstr "控制 AI 提供商的数据处理和保留策略。隐私设置目前仅对通过 OpenRouter 路由的模型生效。"
 
@@ -7367,11 +7372,11 @@ msgstr "控制类型"
 msgid "Control when the ControlNet influence applies during generation"
 msgstr "控制 ControlNet 在生成过程中何时生效"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:136
+#: src/features/settings/components/chat/model-filter-settings.tsx:137
 msgid "Control which AI models and providers can be used based on geographic region, compliance requirements, and privacy preferences."
 msgstr "根据地理区域、合规要求和隐私偏好控制可使用的 AI 模型和提供商。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:220
+#: src/features/settings/components/chat/model-filter-settings.tsx:222
 msgid "Control which AI providers can serve your requests."
 msgstr "控制哪些 AI 提供商可以处理你的请求。"
 
@@ -7721,9 +7726,18 @@ msgstr ""
 msgid "Could not cancel the run."
 msgstr "无法取消运行。"
 
+#: src/features/chat/thread/composer-model-selector.tsx:127
+msgid "Could not change Auto. Please try again."
+msgstr ""
+
 #: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
 msgstr "无法更改推送通知，请重试。"
+
+#: src/features/chat/model-settings/use-model-combobox.ts:283
+#: src/features/chat/model-settings/use-model-combobox.ts:307
+msgid "Could not change the model. Please try again."
+msgstr ""
 
 #: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
@@ -7952,7 +7966,7 @@ msgstr "无法保存每日简报设置。"
 msgid "Could not save the email setting."
 msgstr "无法保存邮件设置。"
 
-#: src/components/model-picker/model-picker.tsx:913
+#: src/components/model-picker/model-picker.tsx:914
 msgid "Could not save the new order for {label}"
 msgstr "无法保存{label}的新顺序"
 
@@ -8026,7 +8040,7 @@ msgstr ""
 msgid "Could not stop the worker."
 msgstr ""
 
-#: src/features/chat/model-settings/use-model-combobox.ts:148
+#: src/features/chat/model-settings/use-model-combobox.ts:161
 msgid "Could not switch the model. Please try again."
 msgstr ""
 
@@ -8905,19 +8919,19 @@ msgstr "深景深，纪录片般清晰"
 msgid "Deeper, more context"
 msgstr "更深，更多背景"
 
-#: src/lib/model-descriptions.ts:67
+#: src/lib/model-descriptions.ts:63
 msgid "DeepSeek V3.1 optimized for software engineering"
 msgstr "为软件工程优化的 DeepSeek V3.1"
 
-#: src/lib/model-descriptions.ts:68
+#: src/lib/model-descriptions.ts:64
 msgid "DeepSeek's advanced chat LLM with thinking"
 msgstr "DeepSeek 支持思考的高级聊天 LLM"
 
-#: src/lib/model-descriptions.ts:69
+#: src/lib/model-descriptions.ts:65
 msgid "DeepSeek's experimental advanced chat LLM"
 msgstr "DeepSeek 的实验性高级聊天 LLM"
 
-#: src/lib/model-descriptions.ts:70
+#: src/lib/model-descriptions.ts:66
 msgid "DeepSeek's experimental advanced chat LLM with thinking"
 msgstr "DeepSeek 支持思考的实验性高级聊天 LLM"
 
@@ -9021,7 +9035,7 @@ msgstr "默认模型已更新"
 msgid "Default Models"
 msgstr "默认模型"
 
-#: src/components/model-picker/model-picker.tsx:1130
+#: src/components/model-picker/model-picker.tsx:1133
 msgid "Default order"
 msgstr ""
 
@@ -9414,8 +9428,8 @@ msgstr "拒绝"
 msgid "Deny {tool}"
 msgstr "拒绝 {tool}"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:390
-#: src/features/settings/components/chat/model-filter-settings.tsx:394
+#: src/features/settings/components/chat/model-filter-settings.tsx:393
+#: src/features/settings/components/chat/model-filter-settings.tsx:397
 msgid "Deny Data Collection"
 msgstr "拒绝数据收集"
 
@@ -9528,7 +9542,7 @@ msgstr "描述你想要什么。构建器会在不清楚时提问，然后提出
 msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it, then remove the background'"
 msgstr "描述你的工作流……例如“根据文本生成图片，放大后再移除背景”"
 
-#: src/components/model-picker/model-picker.tsx:165
+#: src/components/model-picker/model-picker.tsx:166
 #: src/features/develop/components/pull-request-view.tsx:72
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
@@ -9627,7 +9641,7 @@ msgstr "确定、一致"
 msgid "Develop"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:232
+#: src/components/model-picker/model-picker.tsx:233
 #: src/features/marketing/components/tutorials-page.tsx:131
 msgid "Developer"
 msgstr "开发者"
@@ -9889,7 +9903,7 @@ msgstr "解散分组并释放所有子节点"
 msgid "distilled"
 msgstr "蒸馏"
 
-#: src/lib/model-descriptions.ts:71
+#: src/lib/model-descriptions.ts:67
 msgid "Distilled and open sourced version of Krea 1"
 msgstr "Krea 1 的蒸馏开源版本"
 
@@ -10739,14 +10753,18 @@ msgstr "OpenAI 紧凑推理模型可提供出色结果的高效推理任务"
 msgid "Efficient reasoning with sparse activation"
 msgstr "稀疏激活的高效推理"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:153
-#: src/components/model-picker/model-picker.tsx:77
+#: ../../packages/chat-ui/src/model-picker/utils.ts:165
+#: src/components/model-picker/model-picker.tsx:78
 msgid "Effort Control"
 msgstr "推理强度控制"
 
 #: src/features/chat/core/utils/language-utilities.ts:350
 msgid "Egypt"
 msgstr "埃及"
+
+#: src/features/settings/components/chat/model-filter-settings.tsx:367
+msgid "Either setting also hides the Cloudflare Workers AI models, which cannot guarantee it."
+msgstr "任一设置也会隐藏无法保证这一点的 Cloudflare Workers AI 模型。"
 
 #: src/features/chat/core/utils/language-utilities.ts:400
 msgid "El Salvador"
@@ -11126,7 +11144,7 @@ msgstr "输入邮箱地址"
 msgid "Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:328
+#: src/features/settings/components/chat/model-filter-settings.tsx:330
 msgid "Enter model ID (e.g., \"llama-4-scout\")..."
 msgstr "输入模型 ID（例如“llama-4-scout”）..."
 
@@ -11429,7 +11447,7 @@ msgstr ""
 msgid "Estimated provider cost {display}, billed to your own API key"
 msgstr "预估提供商费用 {display}，计入你自己的 API 密钥"
 
-#: src/features/settings/components/chat/agent-settings.tsx:243
+#: src/features/settings/components/chat/agent-settings.tsx:233
 msgid "Estimated token cost per conversation"
 msgstr "每次对话的预估 token 成本"
 
@@ -11970,7 +11988,7 @@ msgstr "更长时长"
 msgid "extended thinking"
 msgstr "扩展思考"
 
-#: src/components/model-picker/model-picker.tsx:81
+#: src/components/model-picker/model-picker.tsx:82
 msgid "Extended Thinking"
 msgstr "扩展思考"
 
@@ -12130,7 +12148,7 @@ msgstr "取消任务失败"
 msgid "Failed to change tag color"
 msgstr "更改标签颜色失败"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:113
+#: src/features/settings/components/chat/model-filter-settings.tsx:114
 msgid "Failed to clear filter rules"
 msgstr "清除筛选规则失败"
 
@@ -12714,8 +12732,8 @@ msgstr "更新收藏状态失败"
 
 #: src/components/model-picker/model-picker.tsx:729
 #: src/components/model-picker/model-picker.tsx:738
-#: src/features/settings/components/chat/model-filter-settings.tsx:56
-#: src/features/settings/components/chat/model-filter-settings.tsx:67
+#: src/features/settings/components/chat/model-filter-settings.tsx:57
+#: src/features/settings/components/chat/model-filter-settings.tsx:68
 msgid "Failed to update filter rules"
 msgstr "更新筛选规则失败"
 
@@ -12893,8 +12911,8 @@ msgstr "常见问题"
 msgid "fast"
 msgstr "快速"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:141
-#: src/components/model-picker/model-picker.tsx:78
+#: ../../packages/chat-ui/src/model-picker/utils.ts:153
+#: src/components/model-picker/model-picker.tsx:79
 #: src/features/marketing/components/model-detail-page.tsx:33
 #: src/features/settings/components/chat/models-settings.tsx:30
 msgid "Fast"
@@ -13184,7 +13202,7 @@ msgstr "精选"
 msgid "Featured image"
 msgstr "特色图片"
 
-#: src/components/model-picker/model-picker.tsx:177
+#: src/components/model-picker/model-picker.tsx:178
 #: src/features/marketing/components/gateway-footer.tsx:32
 #: src/features/marketing/components/gateway-landing-page.tsx:508
 #: src/features/marketing/components/gateway-navbar.tsx:53
@@ -13360,11 +13378,11 @@ msgstr "专注视觉叙事和故事品质、制作电影感视频的电影人"
 msgid "Filter by action"
 msgstr "按操作筛选"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:604
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:605
 msgid "Filter by mode"
 msgstr "按模式筛选"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:675
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:676
 msgid "Filter by provider"
 msgstr "按提供商筛选"
 
@@ -13396,8 +13414,8 @@ msgstr "按类型筛选记忆"
 msgid "Filter path"
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:54
-#: src/features/settings/components/chat/model-filter-settings.tsx:65
+#: src/features/settings/components/chat/model-filter-settings.tsx:55
+#: src/features/settings/components/chat/model-filter-settings.tsx:66
 msgid "Filter rules updated"
 msgstr "筛选规则已更新"
 
@@ -13554,15 +13572,15 @@ msgstr "垂直翻转"
 msgid "fluid motion"
 msgstr "流畅运动"
 
-#: src/lib/model-descriptions.ts:88
+#: src/lib/model-descriptions.ts:68
 msgid "FLUX Kontext Max for highest quality editing via Fireworks"
 msgstr "通过 Fireworks 提供的最高质量编辑 FLUX Kontext Max"
 
-#: src/lib/model-descriptions.ts:89
+#: src/lib/model-descriptions.ts:69
 msgid "FLUX Kontext Pro for image editing via Fireworks"
 msgstr "通过 Fireworks 提供的图像编辑 FLUX Kontext Pro"
 
-#: src/lib/model-descriptions.ts:90
+#: src/lib/model-descriptions.ts:70
 msgid "FLUX.1 Dev model via Fireworks"
 msgstr "通过 Fireworks 提供的 FLUX.1 Dev 模型"
 
@@ -13570,7 +13588,7 @@ msgstr "通过 Fireworks 提供的 FLUX.1 Dev 模型"
 msgid "FLUX.2 architecture improvements"
 msgstr "FLUX.2 架构改进"
 
-#: src/lib/model-descriptions.ts:91
+#: src/lib/model-descriptions.ts:71
 msgid "FLUX.2 dev with enhanced realism and native editing"
 msgstr "增强写实感并支持原生编辑的 FLUX.2 dev"
 
@@ -13915,35 +13933,35 @@ msgstr "前沿智能"
 msgid "Frontier intelligence for complex scenes"
 msgstr "应对复杂场景的前沿智能"
 
-#: src/lib/model-descriptions.ts:92
+#: src/lib/model-descriptions.ts:88
 msgid "Frontier model by Black Forest Labs"
 msgstr "Black Forest Labs 的前沿模型"
 
-#: src/lib/model-descriptions.ts:93
+#: src/lib/model-descriptions.ts:89
 msgid "Frontier model designed for image editing"
 msgstr "专为图像编辑设计的前沿模型"
 
-#: src/lib/model-descriptions.ts:94
+#: src/lib/model-descriptions.ts:90
 msgid "Frontier model designed for image editing, optimized for Krea"
 msgstr "专为图像编辑设计、针对 Krea 优化的前沿模型"
 
-#: src/lib/model-descriptions.ts:95
+#: src/lib/model-descriptions.ts:91
 msgid "Frontier model for complex image references"
 msgstr "适用于复杂参考图像的前沿模型"
 
-#: src/lib/model-descriptions.ts:96
+#: src/lib/model-descriptions.ts:92
 msgid "Frontier model from Kling with native audio"
 msgstr "Kling 支持原生音频的前沿模型"
 
-#: src/lib/model-descriptions.ts:97
+#: src/lib/model-descriptions.ts:93
 msgid "Frontier model with 1080p resolution"
 msgstr "1080p 分辨率的前沿模型"
 
-#: src/lib/model-descriptions.ts:98
+#: src/lib/model-descriptions.ts:94
 msgid "Frontier model with exceptional long context from Google"
 msgstr "Google 拥有出色长上下文能力的前沿模型"
 
-#: src/lib/model-descriptions.ts:99
+#: src/lib/model-descriptions.ts:95
 msgid "Frontier model with extended thinking from Anthropic"
 msgstr "Anthropic 支持扩展思考的前沿模型"
 
@@ -14708,7 +14726,7 @@ msgstr "Google 旗舰"
 msgid "Google Gemini"
 msgstr "Google Gemini"
 
-#: src/lib/model-descriptions.ts:100
+#: src/lib/model-descriptions.ts:96
 msgid "Google Lyria 2 — 30s text-to-music clips at 48kHz with negative-prompt support."
 msgstr "Google Lyria 2 — 48kHz、30 秒的文生音乐片段，支持负面提示词。"
 
@@ -14716,23 +14734,23 @@ msgstr "Google Lyria 2 — 48kHz、30 秒的文生音乐片段，支持负面提
 msgid "Google reliability at budget pricing"
 msgstr "经济价格下的 Google 可靠性"
 
-#: src/lib/model-descriptions.ts:101
+#: src/lib/model-descriptions.ts:97
 msgid "Google Veo 2 — high-quality cinematic video generation"
 msgstr "Google Veo 2 — 高质量电影级视频生成"
 
-#: src/lib/model-descriptions.ts:102
+#: src/lib/model-descriptions.ts:98
 msgid "Google Veo 3 — frontier video generation with native audio"
 msgstr "Google Veo 3 — 支持原生音频的前沿视频生成"
 
-#: src/lib/model-descriptions.ts:103
+#: src/lib/model-descriptions.ts:101
 msgid "Google's advanced LLM with thinking"
 msgstr "Google 支持思考的高级 LLM"
 
-#: src/lib/model-descriptions.ts:104
+#: src/lib/model-descriptions.ts:102
 msgid "Google's advanced small LLM with thinking"
 msgstr "Google 支持思考的高级小型 LLM"
 
-#: src/lib/model-descriptions.ts:105
+#: src/lib/model-descriptions.ts:103
 msgid "Google's current generation image model"
 msgstr "Google 当前一代的图像模型"
 
@@ -14744,15 +14762,19 @@ msgstr "Google 当前一代品质"
 msgid "Google's fastest image generation"
 msgstr "Google 最快的图像生成"
 
-#: src/lib/model-descriptions.ts:106
+#: src/lib/model-descriptions.ts:104
 msgid "Google's fastest image model"
 msgstr "Google 最快的图像模型"
 
-#: src/lib/model-descriptions.ts:40
+#: src/lib/model-descriptions.ts:99
 msgid "Google's Gemini Omni Flash 1.1 reference-to-video, guided by images and short reference videos"
 msgstr "谷歌的 Gemini Omni Flash 1.1 参考生视频模型，由图片和简短参考视频引导"
 
-#: src/lib/model-descriptions.ts:107
+#: src/lib/model-descriptions.ts:100
+msgid "Google's Gemma 3 on Workers AI, without tools"
+msgstr "Workers AI 上的 Google Gemma 3（不支持工具）"
+
+#: src/lib/model-descriptions.ts:105
 msgid "Google's highest quality image model"
 msgstr "Google 最高质量的图像模型"
 
@@ -14760,11 +14782,11 @@ msgstr "Google 最高质量的图像模型"
 msgid "Google's highest-quality image model"
 msgstr "Google 最高品质的图像模型"
 
-#: src/lib/model-descriptions.ts:108
+#: src/lib/model-descriptions.ts:106
 msgid "Google's latest small SOTA LLM with thinking"
 msgstr "Google 支持思考的最新小型 SOTA LLM"
 
-#: src/lib/model-descriptions.ts:109
+#: src/lib/model-descriptions.ts:107
 msgid "Google's most advanced AI video model with native audio and reference images"
 msgstr "Google 最先进的 AI 视频模型，支持原生音频和参考图像"
 
@@ -14772,7 +14794,7 @@ msgstr "Google 最先进的 AI 视频模型，支持原生音频和参考图像"
 msgid "Google's most advanced image generation model"
 msgstr "Google 最先进的图像生成模型"
 
-#: src/lib/model-descriptions.ts:110
+#: src/lib/model-descriptions.ts:108
 msgid "Google's new state-of-the-art fast image generation and editing model"
 msgstr "Google 全新的最先进快速图像生成与编辑模型"
 
@@ -14784,7 +14806,7 @@ msgstr "Google 全新最先进的快速模型"
 msgid "Google's newest flagship model with advanced reasoning"
 msgstr "Google 具备先进推理的最新旗舰模型"
 
-#: src/lib/model-descriptions.ts:111
+#: src/lib/model-descriptions.ts:109
 msgid "Google's newest flagship with advanced reasoning"
 msgstr "Google 最新的旗舰模型，具备高级推理能力"
 
@@ -14796,7 +14818,7 @@ msgstr "Google 推理过程透明的新一代 Flash"
 msgid "Google's optimized performance-cost balance"
 msgstr "Google 优化的性能与成本平衡"
 
-#: src/lib/model-descriptions.ts:112
+#: src/lib/model-descriptions.ts:110
 msgid "Google's previous generation image model"
 msgstr "Google 上一代的图像模型"
 
@@ -14804,7 +14826,7 @@ msgstr "Google 上一代的图像模型"
 msgid "Google's proven photorealism quality"
 msgstr "Google 久经验证的照片级真实感品质"
 
-#: src/lib/model-descriptions.ts:113
+#: src/lib/model-descriptions.ts:111
 msgid "Google's state-of-the-art image generation and editing model"
 msgstr "Google 最先进的图像生成与编辑模型"
 
@@ -14952,11 +14974,11 @@ msgstr "访客账号"
 msgid "Guest accounts"
 msgstr "访客账号"
 
-#: src/components/model-picker/model-picker.tsx:981
+#: src/components/model-picker/model-picker.tsx:982
 msgid "Guest accounts use free models only."
 msgstr "访客账号只能使用免费模型。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:523
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:524
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "访客账号仅可使用免费模型。注册即可解锁所有模型。"
 
@@ -15104,11 +15126,11 @@ msgstr "分享一些关于你的信息，帮助 AI 更好地了解你。这些�
 msgid "Here they are: planning, budget and next steps."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:276
+#: src/features/settings/components/chat/model-filter-settings.tsx:278
 msgid "Hidden in Model Picker"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1154
+#: src/components/model-picker/model-picker.tsx:1157
 msgid "Hide {name} from model picker"
 msgstr ""
 
@@ -15241,15 +15263,15 @@ msgstr "借助 Google 成熟 AI 能力生成照片级真实效果的高品质图
 msgid "High-quality image synthesis"
 msgstr "高品质图像合成"
 
-#: src/lib/model-descriptions.ts:114
+#: src/lib/model-descriptions.ts:112
 msgid "High-quality model with camera control"
 msgstr "支持镜头控制的高质量模型"
 
-#: src/lib/model-descriptions.ts:115
+#: src/lib/model-descriptions.ts:113
 msgid "High-quality model with great aesthetics"
 msgstr "美感出色的高质量模型"
 
-#: src/lib/model-descriptions.ts:116
+#: src/lib/model-descriptions.ts:114
 msgid "High-quality model with reference images support"
 msgstr "支持参考图像的高质量模型"
 
@@ -15333,7 +15355,7 @@ msgstr "来自 Black Forest Labs 的最高品质输出"
 msgid "Highly aesthetic visual output"
 msgstr "极具美感的视觉输出"
 
-#: src/lib/model-descriptions.ts:117
+#: src/lib/model-descriptions.ts:115
 msgid "Highly aesthetic, general-purpose model"
 msgstr "美感极佳的通用模型"
 
@@ -15524,6 +15546,10 @@ msgstr "我信任此服务器"
 msgid "IAM access keys"
 msgstr "IAM 访问密钥"
 
+#: src/lib/model-descriptions.ts:116
+msgid "IBM's small, fast model on Workers AI"
+msgstr "Workers AI 上的 IBM 小型快速模型"
+
 #: src/features/chat/core/utils/language-utilities.ts:367
 msgid "Iceland"
 msgstr "冰岛"
@@ -15593,12 +15619,12 @@ msgstr "插画"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
 #: ../../packages/chat-ui/src/chat/message-content.tsx:403
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:641
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:642
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: src/components/model-picker/model-picker.tsx:1093
+#: src/components/model-picker/model-picker.tsx:1096
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:121
 #: src/features/marketing/components/landing-footer.tsx:165
@@ -15640,12 +15666,12 @@ msgstr "图片附件（已隐藏）"
 msgid "image editing"
 msgstr "图像编辑"
 
-#: src/components/model-picker/model-picker.tsx:79
+#: src/components/model-picker/model-picker.tsx:80
 #: src/features/settings/components/chat/models-settings.tsx:34
 msgid "Image Gen"
 msgstr "图像生成"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:91
+#: ../../packages/chat-ui/src/model-picker/utils.ts:103
 #: src/features/settings/lib/settings-keywords.ts:74
 #: src/features/workflow/templates/index.ts:126
 msgid "image generation"
@@ -15657,7 +15683,7 @@ msgstr "图像生成"
 msgid "Image generation"
 msgstr "图像生成"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:165
+#: ../../packages/chat-ui/src/model-picker/utils.ts:177
 #: src/features/chat/thread/media-gallery-view.tsx:342
 #: src/features/marketing/components/landing-page.tsx:286
 #: src/features/marketing/components/model-detail-page.tsx:87
@@ -15940,11 +15966,11 @@ msgstr "在复杂任务上的基准表现提升"
 msgid "Improved detail over Imagen 3"
 msgstr "细节优于 Imagen 3"
 
-#: src/lib/model-descriptions.ts:118
+#: src/lib/model-descriptions.ts:117
 msgid "Improved fast multimodal model from Google"
 msgstr "Google 改进的快速多模态模型"
 
-#: src/lib/model-descriptions.ts:119
+#: src/lib/model-descriptions.ts:118
 msgid "Improved general-purpose model from DeepSeek"
 msgstr "DeepSeek 改进的通用模型"
 
@@ -16078,7 +16104,7 @@ msgstr ""
 msgid "Inbox sections"
 msgstr ""
 
-#: src/lib/model-descriptions.ts:120
+#: src/lib/model-descriptions.ts:119
 msgid "Inception's diffusion-based language model"
 msgstr "Inception 基于扩散的语言模型"
 
@@ -16147,7 +16173,7 @@ msgid "inpainting"
 msgstr "局部重绘"
 
 #: ../../packages/ui/src/components/ai-elements/context.tsx:237
-#: src/components/model-picker/model-picker.tsx:200
+#: src/components/model-picker/model-picker.tsx:201
 #: src/features/devices/components/device-tool-call.tsx:168
 #: src/features/evals/components/case-fields.tsx:69
 #: src/features/evals/components/dataset-panel.tsx:144
@@ -16296,7 +16322,7 @@ msgstr "智能"
 msgid "Intelligent scene composition"
 msgstr "智能场景构图"
 
-#: src/lib/model-descriptions.ts:121
+#: src/lib/model-descriptions.ts:120
 msgid "Intelligent video model that thinks before generating"
 msgstr "先思考再生成的智能视频模型"
 
@@ -16811,7 +16837,7 @@ msgstr "高棉语"
 msgid "Khmer (Cambodia)"
 msgstr "高棉语（柬埔寨）"
 
-#: src/lib/model-descriptions.ts:122
+#: src/lib/model-descriptions.ts:121
 msgid "Kling 2.6 text-to-video with native audio via direct API"
 msgstr "通过直接 API 提供的支持原生音频的 Kling 2.6 文生视频"
 
@@ -16891,7 +16917,7 @@ msgstr "Krea 标志性的美学品质"
 msgid "KV-backed rate limiting per user and tier. Configurable burst and sustained limits."
 msgstr "基于 KV 的按用户和套餐等级限流，可配置突发与持续限额。"
 
-#: src/lib/model-descriptions.ts:123
+#: src/lib/model-descriptions.ts:122
 msgid "Kwaipilot's advanced coding LLM"
 msgstr "Kwaipilot 的高级编程 LLM"
 
@@ -16916,7 +16942,7 @@ msgstr "吉尔吉斯斯坦"
 msgid "Label"
 msgstr "标签"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:277
+#: src/features/settings/components/chat/model-filter-settings.tsx:279
 msgid "Labs hidden from the model picker only. Models already selected or set as defaults keep working."
 msgstr ""
 
@@ -17119,7 +17145,7 @@ msgstr "能力更强的最新一代 Codex"
 msgid "Latest coding agent run"
 msgstr "最近一次编程智能体运行"
 
-#: src/lib/model-descriptions.ts:124
+#: src/lib/model-descriptions.ts:126
 msgid "Latest flagship model from Anthropic"
 msgstr "Anthropic 最新的旗舰模型"
 
@@ -17131,11 +17157,11 @@ msgstr "最新前沿"
 msgid "Latest frontier generation from Hailuo"
 msgstr "海螺最新一代前沿模型"
 
-#: src/lib/model-descriptions.ts:125
+#: src/lib/model-descriptions.ts:127
 msgid "Latest frontier Kling model with native audio and extended durations"
 msgstr "支持原生音频和更长时长的最新前沿 Kling 模型"
 
-#: src/lib/model-descriptions.ts:126
+#: src/lib/model-descriptions.ts:128
 msgid "Latest frontier model from Runway with native text-to-video"
 msgstr "Runway 最新的前沿模型，支持原生文生视频"
 
@@ -17147,7 +17173,7 @@ msgstr "Kling 最新前沿级视频质量"
 msgid "Latest general-purpose capabilities from DeepSeek"
 msgstr "DeepSeek 最新通用能力"
 
-#: src/lib/model-descriptions.ts:127
+#: src/lib/model-descriptions.ts:129
 msgid "Latest general-purpose model from DeepSeek"
 msgstr "DeepSeek 最新的通用模型"
 
@@ -17163,11 +17189,11 @@ msgstr "阿里巴巴最新一代模型"
 msgid "Latest generation from Runway"
 msgstr "Runway 最新一代模型"
 
-#: src/lib/model-descriptions.ts:128
+#: src/lib/model-descriptions.ts:130
 msgid "Latest generation model from Alibaba"
 msgstr "Alibaba 最新一代模型"
 
-#: src/lib/model-descriptions.ts:129
+#: src/lib/model-descriptions.ts:123
 msgid "Latest GPT-5 series model from OpenAI"
 msgstr "OpenAI 最新的 GPT-5 系列模型"
 
@@ -17175,19 +17201,19 @@ msgstr "OpenAI 最新的 GPT-5 系列模型"
 msgid "Latest in the GPT-5 family with continued improvements"
 msgstr "GPT-5 系列最新成员，持续改进"
 
-#: src/lib/model-descriptions.ts:130
+#: src/lib/model-descriptions.ts:124
 msgid "Latest Kling image-to-video model via direct API"
 msgstr "通过直接 API 提供的最新 Kling 图生视频模型"
 
-#: src/lib/model-descriptions.ts:131
+#: src/lib/model-descriptions.ts:125
 msgid "Latest Kling text-to-video model via direct API"
 msgstr "通过直接 API 提供的最新 Kling 文生视频模型"
 
-#: src/lib/model-descriptions.ts:132
+#: src/lib/model-descriptions.ts:131
 msgid "Latest medium quality model from Alibaba"
 msgstr "Alibaba 最新的中等质量模型"
 
-#: src/lib/model-descriptions.ts:133
+#: src/lib/model-descriptions.ts:132
 msgid "Latest medium quality model from ByteDance with audio generation and end frame support"
 msgstr "ByteDance 最新的中等质量模型，支持音频生成和尾帧"
 
@@ -17211,7 +17237,7 @@ msgstr "最新 Sonnet 更新，指令遵循能力提升"
 msgid "Latest Sonnet with transparent reasoning for complex analytical tasks"
 msgstr "最新 Sonnet，具备透明推理，适合复杂分析任务"
 
-#: src/lib/model-descriptions.ts:134
+#: src/lib/model-descriptions.ts:133
 msgid "Latest updated Sonnet model from Anthropic"
 msgstr "Anthropic 最新更新的 Sonnet 模型"
 
@@ -17378,7 +17404,7 @@ msgstr "变亮"
 msgid "Lightning-fast inference at production scale"
 msgstr "生产级规模的极速推理"
 
-#: src/lib/model-descriptions.ts:135
+#: src/lib/model-descriptions.ts:134
 msgid "Lightricks LTX — fast open-source video model, low latency"
 msgstr "Lightricks LTX — 快速开源视频模型，低延迟"
 
@@ -17938,11 +17964,11 @@ msgid "Locked chat"
 msgstr ""
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1223
+#: src/components/model-picker/model-picker.tsx:1226
 msgid "Locked to {0} models"
 msgstr "已锁定为{0}模型"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:749
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:750
 msgid "Locked to {anchorModeName} models"
 msgstr "已锁定为 {anchorModeName} 模型"
 
@@ -18032,7 +18058,7 @@ msgstr ""
 msgid "Long video clips (up to 12 seconds) generated quickly at an affordable price point"
 msgstr "以实惠价格快速生成长视频片段（最长 12 秒）"
 
-#: src/lib/model-descriptions.ts:136
+#: src/lib/model-descriptions.ts:135
 msgid "Long-context model from Moonshot AI"
 msgstr "Moonshot AI 的长上下文模型"
 
@@ -18115,15 +18141,15 @@ msgstr "Luma Labs AI 基础模型"
 msgid "Luma's best-in-class video model"
 msgstr "Luma 同类最佳的视频模型"
 
-#: src/lib/model-descriptions.ts:137
+#: src/lib/model-descriptions.ts:136
 msgid "Luma's Dream Machine image generation model"
 msgstr "Luma 的 Dream Machine 图像生成模型"
 
-#: src/lib/model-descriptions.ts:138
+#: src/lib/model-descriptions.ts:137
 msgid "Luma's fast image generation model"
 msgstr "Luma 的快速图像生成模型"
 
-#: src/lib/model-descriptions.ts:139
+#: src/lib/model-descriptions.ts:138
 msgid "Luma's second-generation video model — realistic visuals with natural, coherent motion"
 msgstr "Luma 第二代视频模型 — 画面写实，动作自然连贯"
 
@@ -18400,7 +18426,7 @@ msgstr "蒙版 URL（可选）"
 msgid "massive"
 msgstr "超大规模"
 
-#: src/lib/model-descriptions.ts:140
+#: src/lib/model-descriptions.ts:139
 msgid "Massive 235B MoE model from Alibaba"
 msgstr "Alibaba 的超大 235B MoE 模型"
 
@@ -18446,8 +18472,8 @@ msgstr "最大大小：{size}"
 msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "最大大小：{size} • 最多 {maxFiles} 个文件"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
-#: src/components/model-picker/model-picker.tsx:1217
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:745
+#: src/components/model-picker/model-picker.tsx:1220
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "已达到 {MAX_PARALLEL} 个模型的上限"
 
@@ -18557,23 +18583,23 @@ msgstr "中等质量"
 msgid "Medium quality at manageable cost"
 msgstr "成本可控的中等质量"
 
-#: src/lib/model-descriptions.ts:141
+#: src/lib/model-descriptions.ts:140
 msgid "Medium quality model by Black Forest"
 msgstr "Black Forest 的中等质量模型"
 
-#: src/lib/model-descriptions.ts:142
+#: src/lib/model-descriptions.ts:141
 msgid "Medium quality model for photorealism"
 msgstr "用于照片级写实的中等质量模型"
 
-#: src/lib/model-descriptions.ts:143
+#: src/lib/model-descriptions.ts:142
 msgid "Medium quality model for rendering text"
 msgstr "用于文字渲染的中等质量模型"
 
-#: src/lib/model-descriptions.ts:144
+#: src/lib/model-descriptions.ts:143
 msgid "Medium quality model with a focus on cinematic visuals"
 msgstr "注重电影感画面的中等质量模型"
 
-#: src/lib/model-descriptions.ts:145
+#: src/lib/model-descriptions.ts:144
 msgid "Medium quality model with reasoning and web search"
 msgstr "支持推理和网页搜索的中等质量模型"
 
@@ -18826,6 +18852,14 @@ msgstr "消息平台密钥已保存"
 msgid "Meta's latest open-source model with multimodal vision"
 msgstr "Meta 最新的开源多模态视觉模型"
 
+#: src/lib/model-descriptions.ts:145
+msgid "Meta's Llama 3.3 70B on Workers AI"
+msgstr "Workers AI 上的 Meta Llama 3.3 70B"
+
+#: src/lib/model-descriptions.ts:147
+msgid "Meta's multimodal Llama 4 on Workers AI"
+msgstr "Workers AI 上的 Meta 多模态 Llama 4"
+
 #: src/lib/model-descriptions.ts:146
 msgid "Meta's MusicGen text-to-music — medium / large / melody variants via passthrough."
 msgstr "Meta 的 MusicGen 文生音乐 — 通过透传提供 medium / large / melody 变体。"
@@ -18886,7 +18920,7 @@ msgstr "以极低成本完成简单分类与提取"
 msgid "Minimal cost for simple tasks"
 msgstr "以极低成本完成简单任务"
 
-#: src/lib/model-descriptions.ts:147
+#: src/lib/model-descriptions.ts:148
 msgid "MiniMax Hailuo 02 frontier tier — dynamic motion, high fidelity"
 msgstr "MiniMax Hailuo 02 前沿档 — 动态运动，高保真"
 
@@ -18898,19 +18932,19 @@ msgstr "MiniMax 海螺 02 专业版"
 msgid "MiniMax Hailuo 02 standard tier"
 msgstr "MiniMax 海螺 02 标准版"
 
-#: src/lib/model-descriptions.ts:148
+#: src/lib/model-descriptions.ts:149
 msgid "MiniMax Hailuo 02 standard tier — balanced quality and speed"
 msgstr "MiniMax Hailuo 02 标准档 — 质量与速度均衡"
 
-#: src/lib/model-descriptions.ts:149
+#: src/lib/model-descriptions.ts:150
 msgid "MiniMax Hailuo 2.3 frontier tier — dynamic motion, latest generation"
 msgstr "MiniMax Hailuo 2.3 前沿档 — 动态运动，最新一代"
 
-#: src/lib/model-descriptions.ts:150
+#: src/lib/model-descriptions.ts:151
 msgid "MiniMax Hailuo 2.3 standard tier — strong motion, balanced cost"
 msgstr "MiniMax Hailuo 2.3 标准档 — 运动表现强，成本均衡"
 
-#: src/lib/model-descriptions.ts:151
+#: src/lib/model-descriptions.ts:153
 msgid "MiniMax video generation model via Replicate"
 msgstr "通过 Replicate 提供的 MiniMax 视频生成模型"
 
@@ -18922,7 +18956,7 @@ msgstr "MiniMax Video-01 Live — 针对人物动画优化的高质量模型"
 msgid "MiniMax's advanced production model"
 msgstr "MiniMax 的先进生产模型"
 
-#: src/lib/model-descriptions.ts:153
+#: src/lib/model-descriptions.ts:154
 msgid "MiniMax's advanced reasoning LLM"
 msgstr "MiniMax 的高级推理 LLM"
 
@@ -18930,7 +18964,7 @@ msgstr "MiniMax 的高级推理 LLM"
 msgid "MiniMax's advanced reasoning model"
 msgstr "MiniMax 的先进推理模型"
 
-#: src/lib/model-descriptions.ts:154
+#: src/lib/model-descriptions.ts:155
 msgid "MiniMax's fast advanced reasoning LLM"
 msgstr "MiniMax 的快速高级推理 LLM"
 
@@ -18939,7 +18973,7 @@ msgid "MiniMax's fastest model with reasoning capability"
 msgstr "MiniMax 具备推理能力的最快模型"
 
 #: src/features/marketing/data/models-data.ts:1278
-#: src/lib/model-descriptions.ts:155
+#: src/lib/model-descriptions.ts:156
 msgid "MiniMax's most capable reasoning LLM"
 msgstr "MiniMax 最强的推理大模型"
 
@@ -18977,7 +19011,7 @@ msgid "Mistral's balanced medium model"
 msgstr "Mistral 均衡的中型模型"
 
 #: src/features/marketing/data/models-data.ts:1338
-#: src/lib/model-descriptions.ts:156
+#: src/lib/model-descriptions.ts:157
 msgid "Mistral's coding-focused LLM"
 msgstr "Mistral 专注编程的大模型"
 
@@ -18989,27 +19023,27 @@ msgstr "Mistral 首个专用推理模型"
 msgid "Mistral's largest Ministral model at 14B"
 msgstr "Mistral 最大的 Ministral 模型（14B）"
 
-#: src/lib/model-descriptions.ts:157
+#: src/lib/model-descriptions.ts:158
 msgid "Mistral's latest and greatest large multi-modal LLM"
 msgstr "Mistral 最新最强的大型多模态 LLM"
 
-#: src/lib/model-descriptions.ts:158
+#: src/lib/model-descriptions.ts:159
 msgid "Mistral's medium multi-modal LLM"
 msgstr "Mistral 的中型多模态 LLM"
 
-#: src/lib/model-descriptions.ts:159
+#: src/lib/model-descriptions.ts:160
 msgid "Mistral's medium reasoning LLM"
 msgstr "Mistral 的中型推理 LLM"
 
-#: src/lib/model-descriptions.ts:160
+#: src/lib/model-descriptions.ts:161
 msgid "Mistral's mini-model 14B multi-modal LLM"
 msgstr "Mistral 的 14B 迷你多模态 LLM"
 
-#: src/lib/model-descriptions.ts:161
+#: src/lib/model-descriptions.ts:162
 msgid "Mistral's mini-model 3B multi-modal LLM"
 msgstr "Mistral 的 3B 迷你多模态 LLM"
 
-#: src/lib/model-descriptions.ts:162
+#: src/lib/model-descriptions.ts:163
 msgid "Mistral's mini-model 8B multi-modal LLM"
 msgstr "Mistral 的 8B 迷你多模态 LLM"
 
@@ -19017,11 +19051,15 @@ msgstr "Mistral 的 8B 迷你多模态 LLM"
 msgid "Mistral's most capable model with 675B total parameters"
 msgstr "Mistral 最强模型，总参数 675B"
 
-#: src/lib/model-descriptions.ts:163
+#: src/lib/model-descriptions.ts:164
+msgid "Mistral's multimodal small model on Workers AI"
+msgstr "Workers AI 上的 Mistral 多模态小型模型"
+
+#: src/lib/model-descriptions.ts:165
 msgid "Mistral's small coding-focused LLM"
 msgstr "Mistral 专注编程的小型 LLM"
 
-#: src/lib/model-descriptions.ts:164
+#: src/lib/model-descriptions.ts:166
 msgid "Mistral's small reasoning LLM"
 msgstr "Mistral 的小型推理 LLM"
 
@@ -19089,7 +19127,7 @@ msgstr "模式："
 msgid "Model"
 msgstr "模型"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:89
+#: src/features/settings/components/chat/model-filter-settings.tsx:90
 msgid "Model already blocked"
 msgstr "模型已被屏蔽"
 
@@ -19122,7 +19160,7 @@ msgstr "模型已启用"
 msgid "Model filter"
 msgstr "模型筛选"
 
-#: src/components/model-picker/model-picker.tsx:389
+#: src/components/model-picker/model-picker.tsx:390
 msgid "Model info"
 msgstr "模型信息"
 
@@ -19131,7 +19169,7 @@ msgid "Model pricing from models.dev, KV-cached for 24 hours. Automatic cost cal
 msgstr "模型价格来自 models.dev，KV 缓存 24 小时。以微美元自动计算成本。"
 
 #: src/features/layout/lib/dashboard-page-names.ts:30
-#: src/features/settings/components/chat/model-filter-settings.tsx:134
+#: src/features/settings/components/chat/model-filter-settings.tsx:135
 msgid "Model Restrictions"
 msgstr "模型限制"
 
@@ -19139,7 +19177,7 @@ msgstr "模型限制"
 msgid "Model server"
 msgstr "模型服务器"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:532
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:533
 msgid "Model tabs"
 msgstr "模型标签页"
 
@@ -19176,7 +19214,7 @@ msgstr "模型"
 msgid "Models enabled in your AWS account, in one region. Bedrock API key or IAM access keys."
 msgstr "在你的 AWS 账户中某一区域已启用的模型。使用 Bedrock API 密钥或 IAM 访问密钥。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:189
+#: src/features/settings/components/chat/model-filter-settings.tsx:191
 msgid "Models hosted exclusively in these regions will be unavailable."
 msgstr "仅托管在这些地区的模型将不可用。"
 
@@ -19274,7 +19312,7 @@ msgstr "按月"
 msgid "Monthly cost (microdollars)"
 msgstr "月度成本（微美元）"
 
-#: src/lib/model-descriptions.ts:165
+#: src/lib/model-descriptions.ts:169
 msgid "Moonshot AI's advanced base LLM"
 msgstr "Moonshot AI 的高级基础 LLM"
 
@@ -19286,7 +19324,7 @@ msgstr "Moonshot AI 的高效基础模型"
 msgid "Moonshot AI's flagship conversation model"
 msgstr "Moonshot AI 的旗舰对话模型"
 
-#: src/lib/model-descriptions.ts:166
+#: src/lib/model-descriptions.ts:167
 msgid "MoonShot AI's latest multi-modal LLM with thinking"
 msgstr "MoonShot AI 支持思考的最新多模态 LLM"
 
@@ -19294,9 +19332,13 @@ msgstr "MoonShot AI 支持思考的最新多模态 LLM"
 msgid "Moonshot AI's latest vision-enabled flagship"
 msgstr "Moonshot AI 最新的视觉旗舰模型"
 
-#: src/lib/model-descriptions.ts:167
+#: src/lib/model-descriptions.ts:168
 msgid "MoonShot AI's latest vision-enabled LLM"
 msgstr "MoonShot AI 最新的支持视觉的 LLM"
+
+#: src/lib/model-descriptions.ts:170
+msgid "Moonshot's multimodal Kimi K2.5 on Workers AI"
+msgstr "Workers AI 上的 Moonshot 多模态 Kimi K2.5"
 
 #: ../../packages/ui/src/components/breadcrumb.tsx:68
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:232
@@ -19381,7 +19423,7 @@ msgstr "此用例允许的最高费用，单位为美元"
 msgid "Most Used"
 msgstr "最常用"
 
-#: src/lib/model-descriptions.ts:168
+#: src/lib/model-descriptions.ts:171
 msgid "Most versatile intelligent model"
 msgstr "最通用的智能模型"
 
@@ -19417,11 +19459,11 @@ msgstr "下移 {0}"
 msgid "Move {0} up"
 msgstr "上移 {0}"
 
-#: src/components/model-picker/model-picker.tsx:372
+#: src/components/model-picker/model-picker.tsx:373
 msgid "Move {label} down in starred"
 msgstr "将{label}在星标中下移"
 
-#: src/components/model-picker/model-picker.tsx:357
+#: src/components/model-picker/model-picker.tsx:358
 msgid "Move {label} up in starred"
 msgstr "将{label}在星标中上移"
 
@@ -19548,7 +19590,7 @@ msgstr "多模态"
 msgid "Multimodal analysis for images and documents"
 msgstr "图像与文档的多模态分析"
 
-#: src/lib/model-descriptions.ts:169
+#: src/lib/model-descriptions.ts:172
 msgid "Multimodal open-source model from Meta"
 msgstr "Meta 的多模态开源模型"
 
@@ -19647,7 +19689,7 @@ msgstr ""
 msgid "Name"
 msgstr "名称"
 
-#: src/components/model-picker/model-picker.tsx:1131
+#: src/components/model-picker/model-picker.tsx:1134
 msgid "Name (A to Z)"
 msgstr ""
 
@@ -19977,8 +20019,8 @@ msgstr "永不过期"
 msgid "Never used"
 msgstr "从未使用"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:145
-#: src/components/model-picker/model-picker.tsx:326
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:146
+#: src/components/model-picker/model-picker.tsx:327
 #: src/features/settings/components/chat/models-settings.tsx:43
 #: src/features/settings/components/chat/models-settings.tsx:568
 msgid "New"
@@ -20045,7 +20087,7 @@ msgstr "新建数据集"
 msgid "New Export"
 msgstr "新建导出"
 
-#: src/components/model-picker/model-picker.tsx:1132
+#: src/components/model-picker/model-picker.tsx:1135
 msgid "New first"
 msgstr ""
 
@@ -20060,11 +20102,11 @@ msgstr "新建目标"
 msgid "New group chat"
 msgstr "新建群聊"
 
-#: src/lib/model-descriptions.ts:170
+#: src/lib/model-descriptions.ts:174
 msgid "New high quality model for photorealism and text rendering"
 msgstr "擅长照片级写实和文字渲染的新款高质量模型"
 
-#: src/lib/model-descriptions.ts:171
+#: src/lib/model-descriptions.ts:175
 msgid "New model excelling at anime"
 msgstr "擅长动漫的新模型"
 
@@ -20225,7 +20267,7 @@ msgstr "新一代"
 msgid "Next-gen creative AI"
 msgstr "新一代创意 AI"
 
-#: src/lib/model-descriptions.ts:172
+#: src/lib/model-descriptions.ts:176
 msgid "Next-gen fast model preview from Google"
 msgstr "Google 新一代快速模型预览版"
 
@@ -20237,7 +20279,7 @@ msgstr "基于 Google 最新 Flash 架构的新一代快速推理，支持思考
 msgid "Next-gen Flux architecture at budget cost"
 msgstr "以经济成本使用新一代 Flux 架构"
 
-#: src/lib/model-descriptions.ts:173
+#: src/lib/model-descriptions.ts:177
 msgid "Next-gen frontier model preview from Google"
 msgstr "Google 新一代前沿模型预览版"
 
@@ -20245,7 +20287,7 @@ msgstr "Google 新一代前沿模型预览版"
 msgid "Next-gen image generation"
 msgstr "新一代图像生成"
 
-#: src/lib/model-descriptions.ts:174
+#: src/lib/model-descriptions.ts:178
 msgid "Next-gen model with improved dynamics and enhanced style adaptation"
 msgstr "动态表现改进、风格适应增强的新一代模型"
 
@@ -20520,7 +20562,7 @@ msgstr "无项目"
 msgid "No knowledge base files yet. Upload files in Settings."
 msgstr "还没有知识库文件。请在设置中上传文件。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:281
+#: src/features/settings/components/chat/model-filter-settings.tsx:283
 msgid "No labs are hidden."
 msgstr ""
 
@@ -20582,8 +20624,8 @@ msgstr "没有可用的模型"
 msgid "No models found matching your filters."
 msgstr "未找到符合筛选条件的模型。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:711
-#: src/components/model-picker/model-picker.tsx:1183
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:712
+#: src/components/model-picker/model-picker.tsx:1186
 msgid "No models found."
 msgstr "未找到模型。"
 
@@ -20795,8 +20837,8 @@ msgstr "未应用排序"
 msgid "No speech detected. Hands-free mode stopped."
 msgstr "未检测到语音。免提模式已停止。"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:703
-#: src/components/model-picker/model-picker.tsx:1175
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:704
+#: src/components/model-picker/model-picker.tsx:1178
 msgid "No starred models"
 msgstr "没有星标模型"
 
@@ -21096,7 +21138,7 @@ msgstr "备注（可选）"
 msgid "Note for the next run (optional)"
 msgstr "给下次运行的备注（可选）"
 
-#: src/features/settings/components/chat/agent-settings.tsx:253
+#: src/features/settings/components/chat/agent-settings.tsx:243
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "注意：模块按对话而非按消息应用。仅启用你需要的模块以优化 token 用量。"
 
@@ -21212,6 +21254,10 @@ msgstr "图片数量"
 msgid "Number of messages"
 msgstr "消息数量"
 
+#: src/lib/model-descriptions.ts:173
+msgid "NVIDIA's Nemotron 3 on Workers AI"
+msgstr "Workers AI 上的 NVIDIA Nemotron 3"
+
 #: src/features/workflow/types/index.ts:559
 #: src/features/workflow/types/index.ts:563
 msgid "Object Editor"
@@ -21281,7 +21327,7 @@ msgstr "偏移：0x{hoveredOffsetHex}（{hoveredByte}）= 0x{hoveredValueHex}（
 msgid "Oil Painting"
 msgstr "油画"
 
-#: src/lib/model-descriptions.ts:175
+#: src/lib/model-descriptions.ts:179
 msgid "Old generation cinematic model with higher consistency"
 msgstr "一致性更高的上一代电影感模型"
 
@@ -21457,7 +21503,7 @@ msgid "Online"
 msgstr "在线"
 
 #. placeholder {0}: getModelModeName(anchorMode!)
-#: src/components/model-picker/model-picker.tsx:483
+#: src/components/model-picker/model-picker.tsx:484
 msgid "Only {0} models can be compared. Clear selection to switch types."
 msgstr "只能比较{0}模型。清除选择以切换类型。"
 
@@ -21485,7 +21531,7 @@ msgstr ""
 msgid "Only run when every filter matches the JSON body. Use dotted paths such as pull_request.user.login or labels.0.name. A delivery that does not match is accepted, shown as Skipped in the history, and does not run or count against your quota."
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:249
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:250
 msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "只能对比同类型的模型。清除选择以切换类型。"
 
@@ -21517,7 +21563,7 @@ msgstr ""
 msgid "Only this check is started again on {hostLabel}, not the rest of its workflow."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:372
+#: src/features/settings/components/chat/model-filter-settings.tsx:375
 msgid "Only use providers that guarantee zero data retention — your prompts are never stored."
 msgstr "仅使用保证零数据保留的提供商——你的提示词绝不会被存储。"
 
@@ -21843,7 +21889,7 @@ msgstr "以开源方式使用阿里巴巴最先进的 AI"
 msgid "Open-source AI deployments requiring capable, unrestricted access to Meta's Llama 3.3"
 msgstr "需要能力强、无限制地使用 Meta Llama 3.3 的开源 AI 部署"
 
-#: src/lib/model-descriptions.ts:176
+#: src/lib/model-descriptions.ts:180
 msgid "Open-source audio-video model with native sound, 4K output, and lip sync from Lightricks"
 msgstr "Lightricks 的开源音视频模型，支持原生声音、4K 输出和口型同步"
 
@@ -21855,7 +21901,7 @@ msgstr "需要 OpenAI 更大、更强开源模型的开源部署"
 msgid "Open-source from Lightricks"
 msgstr "来自 Lightricks 的开源模型"
 
-#: src/lib/model-descriptions.ts:177
+#: src/lib/model-descriptions.ts:181
 msgid "Open-source frontier reasoning model from DeepSeek"
 msgstr "DeepSeek 的开源前沿推理模型"
 
@@ -21863,7 +21909,7 @@ msgstr "DeepSeek 的开源前沿推理模型"
 msgid "Open-source frontier-level reasoning model"
 msgstr "开源的前沿级推理模型"
 
-#: src/lib/model-descriptions.ts:178
+#: src/lib/model-descriptions.ts:182
 msgid "Open-source model competitive with top closed image models"
 msgstr "可与顶级闭源图像模型媲美的开源模型"
 
@@ -21935,15 +21981,15 @@ msgstr "OpenAI 级的视频连贯性"
 msgid "OpenAI's advanced 120B open-source model"
 msgstr "OpenAI 先进的 120B 开源模型"
 
-#: src/lib/model-descriptions.ts:179
+#: src/lib/model-descriptions.ts:184
 msgid "OpenAI's advanced coding LLM"
 msgstr "OpenAI 的高级编程 LLM"
 
-#: src/lib/model-descriptions.ts:180
+#: src/lib/model-descriptions.ts:185
 msgid "OpenAI's advanced instruction-following LLM"
 msgstr "OpenAI 的高级指令遵循 LLM"
 
-#: src/lib/model-descriptions.ts:181
+#: src/lib/model-descriptions.ts:186
 msgid "OpenAI's advanced open-source LLM"
 msgstr "OpenAI 的高级开源 LLM"
 
@@ -21951,11 +21997,11 @@ msgstr "OpenAI 的高级开源 LLM"
 msgid "OpenAI's advanced reasoning architecture"
 msgstr "OpenAI 先进的推理架构"
 
-#: src/lib/model-descriptions.ts:182
+#: src/lib/model-descriptions.ts:187
 msgid "OpenAI's advanced reasoning LLM"
 msgstr "OpenAI 的高级推理 LLM"
 
-#: src/lib/model-descriptions.ts:183
+#: src/lib/model-descriptions.ts:188
 msgid "OpenAI's compact coding LLM"
 msgstr "OpenAI 的紧凑型编程 LLM"
 
@@ -21963,24 +22009,24 @@ msgstr "OpenAI 的紧凑型编程 LLM"
 msgid "OpenAI's efficient mini reasoning model"
 msgstr "OpenAI 高效的 mini 推理模型"
 
-#: src/lib/model-descriptions.ts:184
+#: src/lib/model-descriptions.ts:189
 msgid "OpenAI's flagship frontier model"
 msgstr "OpenAI 的旗舰前沿模型"
 
-#: src/lib/model-descriptions.ts:37
+#: src/lib/model-descriptions.ts:183
 msgid "OpenAI's GPT Image 2 text-to-image model"
 msgstr "OpenAI 的文生图模型 GPT Image 2"
 
-#: src/lib/model-descriptions.ts:185
+#: src/lib/model-descriptions.ts:190
 msgid "OpenAI's latest advanced coding LLM"
 msgstr "OpenAI 最新的高级编程 LLM"
 
-#: src/lib/model-descriptions.ts:186
+#: src/lib/model-descriptions.ts:191
 msgid "OpenAI's latest and greatest reasoning LLM"
 msgstr "OpenAI 最新最强的推理 LLM"
 
 #: src/features/marketing/data/models-data.ts:1050
-#: src/lib/model-descriptions.ts:187
+#: src/lib/model-descriptions.ts:192
 msgid "OpenAI's latest flagship reasoning LLM"
 msgstr "OpenAI 最新的旗舰推理大模型"
 
@@ -21988,7 +22034,7 @@ msgstr "OpenAI 最新的旗舰推理大模型"
 msgid "OpenAI's latest model with thinking transparency"
 msgstr "OpenAI 最新模型，思考过程透明"
 
-#: src/lib/model-descriptions.ts:188
+#: src/lib/model-descriptions.ts:193
 msgid "OpenAI's most advanced flagship video generation model"
 msgstr "OpenAI 最先进的旗舰视频生成模型"
 
@@ -22000,7 +22046,7 @@ msgstr "OpenAI 最先进的前沿模型"
 msgid "OpenAI's most advanced video model"
 msgstr "OpenAI 最先进的视频模型"
 
-#: src/lib/model-descriptions.ts:189
+#: src/lib/model-descriptions.ts:194
 msgid "OpenAI's most capable coding LLM"
 msgstr "OpenAI 能力最强的编程 LLM"
 
@@ -22012,15 +22058,15 @@ msgstr "OpenAI 最强的编程模型"
 msgid "OpenAI's most capable model in the 5.2 family"
 msgstr "OpenAI 5.2 系列中最强的模型"
 
-#: src/lib/model-descriptions.ts:190
+#: src/lib/model-descriptions.ts:195
 msgid "OpenAI's most capable premium model"
 msgstr "OpenAI 能力最强的高级模型"
 
-#: src/lib/model-descriptions.ts:191
+#: src/lib/model-descriptions.ts:196
 msgid "OpenAI's new powerful video model. Rich world knowledge with very stable structure"
 msgstr "OpenAI 全新的强大视频模型。丰富的世界知识，结构非常稳定"
 
-#: src/lib/model-descriptions.ts:192
+#: src/lib/model-descriptions.ts:197
 msgid "OpenAI's newest coding LLM"
 msgstr "OpenAI 最新的编程 LLM"
 
@@ -22032,23 +22078,31 @@ msgstr "OpenAI 最新的编程模型"
 msgid "OpenAI's open-source 20B model"
 msgstr "OpenAI 的 20B 开源模型"
 
-#: src/lib/model-descriptions.ts:193
+#: src/lib/model-descriptions.ts:198
+msgid "OpenAI's open-weight 120B model on Workers AI"
+msgstr "Workers AI 上的 OpenAI 开放权重 120B 模型"
+
+#: src/lib/model-descriptions.ts:199
+msgid "OpenAI's open-weight 20B model on Workers AI"
+msgstr "Workers AI 上的 OpenAI 开放权重 20B 模型"
+
+#: src/lib/model-descriptions.ts:200
 msgid "OpenAI's recent and smart reasoning LLM"
 msgstr "OpenAI 近期的智能推理 LLM"
 
-#: src/lib/model-descriptions.ts:194
+#: src/lib/model-descriptions.ts:201
 msgid "OpenAI's recent mini reasoning LLM"
 msgstr "OpenAI 近期的迷你推理 LLM"
 
-#: src/lib/model-descriptions.ts:195
+#: src/lib/model-descriptions.ts:202
 msgid "OpenAI's small LLM"
 msgstr "OpenAI 的小型 LLM"
 
-#: src/lib/model-descriptions.ts:196
+#: src/lib/model-descriptions.ts:203
 msgid "OpenAI's small open-source LLM"
 msgstr "OpenAI 的小型开源 LLM"
 
-#: src/lib/model-descriptions.ts:197
+#: src/lib/model-descriptions.ts:204
 msgid "OpenAI's smallest LLM"
 msgstr "OpenAI 最小的 LLM"
 
@@ -22328,7 +22382,7 @@ msgstr "整理对话"
 msgid "Original"
 msgstr "原图"
 
-#: src/lib/model-descriptions.ts:198
+#: src/lib/model-descriptions.ts:205
 msgid "Original ChatGPT image model"
 msgstr "初代 ChatGPT 图像模型"
 
@@ -22398,7 +22452,7 @@ msgstr "扩图"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:547
 #: ../../packages/ui/src/components/ai-elements/context.tsx:276
-#: src/components/model-picker/model-picker.tsx:204
+#: src/components/model-picker/model-picker.tsx:205
 #: src/features/devices/components/device-tool-call.tsx:174
 #: src/features/workflow/components/nodes/output-node.tsx:52
 #: src/features/workflow/types/index.ts:584
@@ -22593,8 +22647,8 @@ msgstr ""
 msgid "Paraguay"
 msgstr "巴拉圭"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:595
-#: src/components/model-picker/model-picker.tsx:1047
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:596
+#: src/components/model-picker/model-picker.tsx:1048
 msgid "Parallel"
 msgstr "并行"
 
@@ -22848,7 +22902,7 @@ msgstr "通过 PayPal 处理付款、订单、发票和订阅"
 msgid "Payments, subscriptions, and financial data"
 msgstr "付款、订阅和财务数据"
 
-#: src/components/model-picker/model-picker.tsx:80
+#: src/components/model-picker/model-picker.tsx:81
 #: src/features/settings/components/chat/models-settings.tsx:35
 msgid "PDF"
 msgstr "PDF"
@@ -23083,7 +23137,7 @@ msgstr "Pika Labs"
 msgid "Pika Labs 2.2 — narrative-focused generation"
 msgstr "Pika Labs 2.2——专注叙事的生成"
 
-#: src/lib/model-descriptions.ts:199
+#: src/lib/model-descriptions.ts:206
 msgid "Pika Labs 2.2 — narrative-focused video model with strong storytelling and motion control"
 msgstr "Pika Labs 2.2 — 注重叙事的视频模型，具备出色的故事表现力和运动控制"
 
@@ -23388,11 +23442,11 @@ msgstr "强大"
 msgid "Powerful 8B model with vision capabilities"
 msgstr "具备视觉能力的强大 8B 模型"
 
-#: src/lib/model-descriptions.ts:200
+#: src/lib/model-descriptions.ts:207
 msgid "Powerful general-purpose model from Z.AI"
 msgstr "Z.AI 的强大通用模型"
 
-#: src/lib/model-descriptions.ts:201
+#: src/lib/model-descriptions.ts:208
 msgid "Powerful multimodal model from MiniMax"
 msgstr "MiniMax 的强大多模态模型"
 
@@ -23664,7 +23718,7 @@ msgstr "上一个分支"
 msgid "Previous export was cancelled"
 msgstr "上次导出已取消"
 
-#: src/lib/model-descriptions.ts:202
+#: src/lib/model-descriptions.ts:209
 msgid "Previous generation high-quality model for complex scenes"
 msgstr "适用于复杂场景的上一代高质量模型"
 
@@ -23703,15 +23757,15 @@ msgstr "上一张幻灯片"
 msgid "Previous version"
 msgstr "上一个版本"
 
-#: src/components/model-picker/model-picker.tsx:196
+#: src/components/model-picker/model-picker.tsx:197
 msgid "Price per 1M tokens"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1134
+#: src/components/model-picker/model-picker.tsx:1137
 msgid "Price: high to low"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1133
+#: src/components/model-picker/model-picker.tsx:1136
 msgid "Price: low to high"
 msgstr ""
 
@@ -23756,7 +23810,7 @@ msgstr ""
 #: src/features/marketing/components/landing-footer.tsx:102
 #: src/features/marketing/components/landing-footer.tsx:272
 #: src/features/settings/components/account/account-settings.tsx:133
-#: src/features/settings/components/chat/model-filter-settings.tsx:361
+#: src/features/settings/components/chat/model-filter-settings.tsx:363
 #: src/features/settings/lib/settings-keywords.ts:26
 #: src/features/settings/lib/settings-navigation.ts:115
 msgid "Privacy"
@@ -23790,8 +23844,8 @@ msgstr "私有"
 msgid "Private by default"
 msgstr "默认私密"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:140
-#: src/components/model-picker/model-picker.tsx:313
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:141
+#: src/components/model-picker/model-picker.tsx:314
 #: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:130
 #: src/features/marketing/components/landing-page.tsx:344
@@ -24150,7 +24204,7 @@ msgstr "久经验证的电影美学"
 msgid "Proven reliability from previous generation"
 msgstr "上一代久经验证的可靠性"
 
-#: src/components/model-picker/model-picker.tsx:226
+#: src/components/model-picker/model-picker.tsx:227
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -24176,7 +24230,7 @@ msgstr "提供商健康状况"
 msgid "Provider removed"
 msgstr "已移除提供商"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:218
+#: src/features/settings/components/chat/model-filter-settings.tsx:220
 msgid "Provider Restrictions"
 msgstr "提供商限制"
 
@@ -24403,27 +24457,31 @@ msgstr ""
 msgid "Quoted in composer"
 msgstr ""
 
-#: src/lib/model-descriptions.ts:203
+#: src/lib/model-descriptions.ts:210
 msgid "Qwen's advanced instruct LLM"
 msgstr "Qwen 的高级指令 LLM"
 
-#: src/lib/model-descriptions.ts:204
+#: src/lib/model-descriptions.ts:211
 msgid "Qwen's advanced instruct LLM preview"
 msgstr "Qwen 的高级指令 LLM 预览版"
 
-#: src/lib/model-descriptions.ts:205
+#: src/lib/model-descriptions.ts:212
 msgid "Qwen's advanced thinking LLM"
 msgstr "Qwen 的高级思考 LLM"
 
-#: src/lib/model-descriptions.ts:206
+#: src/lib/model-descriptions.ts:213
 msgid "Qwen's advanced vision LLM"
 msgstr "Qwen 的高级视觉 LLM"
 
-#: src/lib/model-descriptions.ts:207
+#: src/lib/model-descriptions.ts:214
 msgid "Qwen's advanced vision LLM with thinking"
 msgstr "Qwen 支持思考的高级视觉 LLM"
 
-#: src/lib/model-descriptions.ts:208
+#: src/lib/model-descriptions.ts:215
+msgid "Qwen's mixture-of-experts model on Workers AI"
+msgstr "Workers AI 上的 Qwen 混合专家模型"
+
+#: src/lib/model-descriptions.ts:216
 msgid "Qwen's most advanced instruct LLM"
 msgstr "Qwen 最先进的指令 LLM"
 
@@ -24431,7 +24489,7 @@ msgstr "Qwen 最先进的指令 LLM"
 msgid "Qwen's most advanced reasoning capability"
 msgstr "Qwen 最先进的推理能力"
 
-#: src/lib/model-descriptions.ts:209
+#: src/lib/model-descriptions.ts:217
 msgid "Qwen's most advanced reasoning LLM"
 msgstr "Qwen 最先进的推理 LLM"
 
@@ -24722,7 +24780,7 @@ msgstr "原因（可选）"
 msgid "reasoning"
 msgstr "推理"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:149
+#: ../../packages/chat-ui/src/model-picker/utils.ts:161
 #: ../../packages/ui/src/components/ai-elements/context.tsx:315
 #: src/features/chat/thread/message-cost-badge.tsx:64
 #: src/features/settings/components/chat/models-settings.tsx:32
@@ -24768,11 +24826,11 @@ msgstr "需要阿里巴巴带思考能力的 80B MoE 模型的推理任务"
 msgid "Reasoning toggle for flexible task handling"
 msgstr "推理开关，灵活处理任务"
 
-#: src/lib/model-descriptions.ts:210
+#: src/lib/model-descriptions.ts:218
 msgid "Reasoning version of Kimi K2 from Moonshot AI"
 msgstr "Moonshot AI 的 Kimi K2 推理版"
 
-#: src/lib/model-descriptions.ts:211
+#: src/lib/model-descriptions.ts:219
 msgid "Reasoning version of Qwen3 235B from Alibaba"
 msgstr "Alibaba 的 Qwen3 235B 推理版"
 
@@ -24874,11 +24932,11 @@ msgstr "恢复账号"
 msgid "Recover Account"
 msgstr "恢复账号"
 
-#: src/lib/model-descriptions.ts:212
+#: src/lib/model-descriptions.ts:220
 msgid "Recraft V4 Pro — true visual taste for brand systems and production-ready workflows"
 msgstr "Recraft V4 Pro — 面向品牌系统和生产级工作流的真正视觉品味"
 
-#: src/lib/model-descriptions.ts:213
+#: src/lib/model-descriptions.ts:221
 msgid "Recraft's text-to-image model with long text generation, vector art, and brand-style images"
 msgstr "Recraft 的文生图模型，支持长文本生成、矢量图和品牌风格图像"
 
@@ -25008,7 +25066,7 @@ msgstr "精炼"
 msgid "Refined capabilities over Claude Sonnet 4"
 msgstr "相比 Claude Sonnet 4 的能力进一步完善"
 
-#: src/lib/model-descriptions.ts:214
+#: src/lib/model-descriptions.ts:223
 msgid "Refined flagship model from Anthropic"
 msgstr "Anthropic 精炼的旗舰模型"
 
@@ -25016,7 +25074,7 @@ msgstr "Anthropic 精炼的旗舰模型"
 msgid "Refined frontier capabilities over Claude Opus 4"
 msgstr "相比 Claude Opus 4 的前沿能力进一步完善"
 
-#: src/lib/model-descriptions.ts:215
+#: src/lib/model-descriptions.ts:222
 msgid "Refined GPT-5 update from OpenAI"
 msgstr "OpenAI 对 GPT-5 的精炼更新"
 
@@ -25053,7 +25111,7 @@ msgstr "正则表达式"
 msgid "region"
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:154
+#: src/features/settings/components/chat/model-filter-settings.tsx:155
 msgid "Region Restrictions"
 msgstr "地区限制"
 
@@ -25244,7 +25302,7 @@ msgstr "移除 {label}"
 msgid "Remove {model}"
 msgstr "移除 {model}"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:342
+#: src/features/settings/components/chat/model-filter-settings.tsx:344
 msgid "Remove {modelId} from blocked list"
 msgstr "从屏蔽列表中移除 {modelId}"
 
@@ -25323,8 +25381,8 @@ msgstr "从收藏中移除"
 msgid "Remove from project"
 msgstr "从项目中移除"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:167
-#: src/components/model-picker/model-picker.tsx:340
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:168
+#: src/components/model-picker/model-picker.tsx:341
 msgid "Remove from starred"
 msgstr "从星标中移除"
 
@@ -25795,7 +25853,7 @@ msgstr "已恢复到版本 {0}"
 msgid "Restoring..."
 msgstr "正在恢复..."
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:157
+#: src/features/settings/components/chat/model-filter-settings.tsx:158
 msgid "Restrict which regions models can be hosted in. Useful for GDPR, data residency, and compliance requirements."
 msgstr "限制模型可以托管的地区。适用于 GDPR、数据驻留和合规要求。"
 
@@ -25873,7 +25931,7 @@ msgstr ""
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
-#: src/features/settings/components/chat/agent-settings.tsx:234
+#: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -26771,8 +26829,8 @@ msgstr ""
 msgid "Search models by name, ID, or provider..."
 msgstr "按名称、ID 或提供商搜索模型..."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:528
-#: src/components/model-picker/model-picker.tsx:988
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:529
+#: src/components/model-picker/model-picker.tsx:989
 msgid "Search models..."
 msgstr "搜索模型..."
 
@@ -27209,7 +27267,7 @@ msgstr ""
 msgid "Selection context"
 msgstr "选区上下文"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:570
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:571
 msgid "Selection mode"
 msgstr "选择模式"
 
@@ -27221,7 +27279,7 @@ msgstr "选择性焦平面"
 msgid "semi-realistic"
 msgstr "半写实"
 
-#: src/lib/model-descriptions.ts:216
+#: src/lib/model-descriptions.ts:225
 msgid "Semi-realistic model with good prompt adherence"
 msgstr "提示词遵循度高的半写实模型"
 
@@ -27652,7 +27710,7 @@ msgstr ""
 msgid "Show {hidden} more lines"
 msgstr "再显示 {hidden} 行"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:291
+#: src/features/settings/components/chat/model-filter-settings.tsx:293
 msgid "Show {name} in model picker"
 msgstr ""
 
@@ -27937,8 +27995,8 @@ msgstr "注册并以 $8/月订阅，解锁全部功能。"
 msgid "Sign up successful"
 msgstr "注册成功"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:246
-#: src/components/model-picker/model-picker.tsx:480
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:247
+#: src/components/model-picker/model-picker.tsx:481
 msgid "Sign up to unlock all models"
 msgstr "注册以解锁所有模型"
 
@@ -28007,8 +28065,8 @@ msgstr "已被替换"
 msgid "Singapore"
 msgstr "新加坡"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:582
-#: src/components/model-picker/model-picker.tsx:1035
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:583
+#: src/components/model-picker/model-picker.tsx:1036
 msgid "Single"
 msgstr "单个"
 
@@ -28215,11 +28273,11 @@ msgstr "斯洛文尼亚语"
 msgid "Slovenian (Slovenia)"
 msgstr "斯洛文尼亚语（斯洛文尼亚）"
 
-#: src/lib/model-descriptions.ts:217
+#: src/lib/model-descriptions.ts:226
 msgid "Slow cinematic model with realistic textures"
 msgstr "质感写实的慢速电影感模型"
 
-#: src/lib/model-descriptions.ts:218
+#: src/lib/model-descriptions.ts:227
 msgid "Slow model with high control and 10s duration"
 msgstr "控制力强、时长 10 秒的慢速模型"
 
@@ -28356,7 +28414,7 @@ msgstr "我们这边出了点问题，请稍后重试。"
 msgid "Something went wrong. Nothing was changed. Try again."
 msgstr ""
 
-#: src/features/settings/components/chat/agent-settings.tsx:224
+#: src/features/settings/components/chat/agent-settings.tsx:220
 #: src/features/skills/components/skill-list.tsx:252
 msgid "Something went wrong. Try again."
 msgstr "出错了，请重试。"
@@ -28381,7 +28439,7 @@ msgstr "排序数据"
 msgid "Sort desc"
 msgstr "降序"
 
-#: src/components/model-picker/model-picker.tsx:1124
+#: src/components/model-picker/model-picker.tsx:1127
 msgid "Sort models"
 msgstr ""
 
@@ -28397,7 +28455,7 @@ msgstr "排序"
 msgid "SOTA cost-efficiency with 2M token context"
 msgstr "SOTA 级性价比，支持 2M token 上下文"
 
-#: src/lib/model-descriptions.ts:219
+#: src/lib/model-descriptions.ts:224
 msgid "SOTA with vector art and typography via Replicate"
 msgstr "通过 Replicate 提供的支持矢量图和排版的 SOTA"
 
@@ -28592,7 +28650,7 @@ msgstr "你的浏览器不支持语音识别"
 msgid "Speech to Text"
 msgstr "语音转文字"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:92
+#: ../../packages/chat-ui/src/model-picker/utils.ts:104
 msgid "speech-to-text"
 msgstr "语音转文字"
 
@@ -28601,7 +28659,7 @@ msgstr "语音转文字"
 msgid "Speed"
 msgstr "语速"
 
-#: src/lib/model-descriptions.ts:39
+#: src/lib/model-descriptions.ts:228
 msgid "Speed tier of Nano Banana 2 for fast text-to-image generation"
 msgstr "Nano Banana 2 的极速档，用于快速文生图"
 
@@ -28668,7 +28726,7 @@ msgstr "SSO"
 msgid "SSO & team management"
 msgstr "SSO 与团队管理"
 
-#: src/lib/model-descriptions.ts:220
+#: src/lib/model-descriptions.ts:229
 msgid "Stability AI's Stable Audio 2.5 — high-quality text-to-music, up to ~190s."
 msgstr "Stability AI 的 Stable Audio 2.5 — 高质量文生音乐，最长约 190 秒。"
 
@@ -28730,8 +28788,8 @@ msgstr ""
 msgid "starred"
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:547
-#: src/components/model-picker/model-picker.tsx:1004
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:548
+#: src/components/model-picker/model-picker.tsx:1005
 msgid "Starred"
 msgstr "星标"
 
@@ -28989,7 +29047,7 @@ msgstr "第 {0}/{totalSteps} 步：{title}"
 msgid "Step-by-step tutorials for getting the most out of Neore Chat"
 msgstr "充分利用 Neore Chat 的分步教程"
 
-#: src/lib/model-descriptions.ts:221
+#: src/lib/model-descriptions.ts:230
 msgid "StepFun's fast and efficient LLM"
 msgstr "StepFun 的快速高效 LLM"
 
@@ -29236,7 +29294,7 @@ msgstr "出色的商业级输出"
 msgid "Strong complex scene handling"
 msgstr "出色的复杂场景处理能力"
 
-#: src/lib/model-descriptions.ts:222
+#: src/lib/model-descriptions.ts:231
 msgid "Strong general-purpose and coding model from DeepSeek"
 msgstr "DeepSeek 的强大通用与编程模型"
 
@@ -29538,7 +29596,7 @@ msgstr ""
 msgid "Submitting…"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:983
+#: src/components/model-picker/model-picker.tsx:984
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "以 $8/月订阅，解锁所有模型。"
 
@@ -30253,14 +30311,14 @@ msgstr "用一组固定的用例测试你的智能体、模型和知识库，为
 msgid "testing"
 msgstr "测试"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:93
+#: ../../packages/chat-ui/src/model-picker/utils.ts:105
 msgid "text"
 msgstr "文本"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:629
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:630
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:1080
+#: src/components/model-picker/model-picker.tsx:1083
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:120
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -30386,7 +30444,7 @@ msgstr "文本转视频"
 msgid "Text to Video"
 msgstr "文本转视频"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:94
+#: ../../packages/chat-ui/src/model-picker/utils.ts:106
 msgid "text-to-speech"
 msgstr "文本转语音"
 
@@ -30552,7 +30610,7 @@ msgstr ""
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr ""
 
-#: src/features/chat/thread/composer-model-selector.tsx:90
+#: src/features/chat/thread/composer-model-selector.tsx:135
 msgid "The bot sets the model for this chat."
 msgstr ""
 
@@ -31095,7 +31153,7 @@ msgstr ""
 msgid "These memories were added to the AI's context for this reply because they matched your message."
 msgstr "这些记忆因与你的消息相关，已被加入此回复的 AI 上下文。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:250
+#: src/features/settings/components/chat/model-filter-settings.tsx:252
 msgid "These providers will never be used for your requests."
 msgstr "这些提供商将永远不会用于处理你的请求。"
 
@@ -32002,7 +32060,7 @@ msgstr ""
 msgid "Token budget"
 msgstr "token 预算"
 
-#: src/features/settings/components/chat/agent-settings.tsx:242
+#: src/features/settings/components/chat/agent-settings.tsx:232
 msgid "Token Cost Impact"
 msgstr "Token 成本影响"
 
@@ -32069,9 +32127,9 @@ msgstr "工具调用失败"
 msgid "tool calling"
 msgstr "工具调用"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:157
-#: ../../packages/chat-ui/src/model-picker/utils.ts:161
-#: src/components/model-picker/model-picker.tsx:82
+#: ../../packages/chat-ui/src/model-picker/utils.ts:169
+#: ../../packages/chat-ui/src/model-picker/utils.ts:173
+#: src/components/model-picker/model-picker.tsx:83
 #: src/features/settings/components/chat/models-settings.tsx:33
 msgid "Tool Calling"
 msgstr "工具调用"
@@ -32113,7 +32171,7 @@ msgstr "顶级编程表现，媲美闭源模型"
 msgid "Top-tier frontier performance with 4.6 generation improvements"
 msgstr "顶级前沿表现，带来 4.6 代改进"
 
-#: src/lib/model-descriptions.ts:223
+#: src/lib/model-descriptions.ts:232
 msgid "Top-tier Kling text-to-video with unparalleled motion fluidity"
 msgstr "顶级 Kling 文生视频，运动流畅度无与伦比"
 
@@ -32556,8 +32614,8 @@ msgid "Two-factor authentication is currently enabled for your account. This add
 msgstr "你的账号当前已启用双重验证，为账号增加了一层额外的安全保护。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:606
-#: src/components/model-picker/model-picker.tsx:1058
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:607
+#: src/components/model-picker/model-picker.tsx:1059
 #: src/features/devices/components/device-tool-call.tsx:119
 msgid "Type"
 msgstr "类型"
@@ -32642,7 +32700,7 @@ msgstr "超快"
 msgid "ultra quality"
 msgstr "超高质量"
 
-#: src/lib/model-descriptions.ts:224
+#: src/lib/model-descriptions.ts:233
 msgid "Ultra-fast budget model from Google"
 msgstr "Google 的超快速经济型模型"
 
@@ -32658,7 +32716,7 @@ msgstr "为 Llama、Mixtral 等开源模型提供超快推理"
 msgid "Ultra-fast inference tasks requiring Inception's novel diffusion-based architecture"
 msgstr "需要 Inception 新颖扩散架构的超快推理任务"
 
-#: src/lib/model-descriptions.ts:225
+#: src/lib/model-descriptions.ts:234
 msgid "Ultra-fast lightweight GPT-5 model from OpenAI"
 msgstr "OpenAI 的超快速轻量 GPT-5 模型"
 
@@ -33035,7 +33093,7 @@ msgstr "更新工作流的画廊设置或取消发布。"
 msgid "updated"
 msgstr "已更新"
 
-#: src/lib/model-descriptions.ts:226
+#: src/lib/model-descriptions.ts:235
 msgid "Updated balanced frontier model from Anthropic"
 msgstr "Anthropic 更新的均衡型前沿模型"
 
@@ -33047,7 +33105,7 @@ msgstr "相比 GLM 4.5 能力更新"
 msgid "Updated Codex with improved code quality"
 msgstr "更新版 Codex，代码质量提升"
 
-#: src/lib/model-descriptions.ts:227
+#: src/lib/model-descriptions.ts:236
 msgid "Updated general-purpose model from Z.AI"
 msgstr "Z.AI 更新的通用模型"
 
@@ -33055,11 +33113,11 @@ msgstr "Z.AI 更新的通用模型"
 msgid "Updated M2 architecture with improved capabilities"
 msgstr "更新的 M2 架构，能力提升"
 
-#: src/lib/model-descriptions.ts:228
+#: src/lib/model-descriptions.ts:237
 msgid "Updated multimodal model from MiniMax"
 msgstr "MiniMax 更新的多模态模型"
 
-#: src/lib/model-descriptions.ts:229
+#: src/lib/model-descriptions.ts:238
 msgid "Updated open-source reasoning model from DeepSeek"
 msgstr "DeepSeek 更新的开源推理模型"
 
@@ -33079,7 +33137,7 @@ msgstr "已更新幻灯片"
 msgid "Updated slide {slideNumber}"
 msgstr "已更新第 {slideNumber} 张幻灯片"
 
-#: src/lib/model-descriptions.ts:230
+#: src/lib/model-descriptions.ts:239
 msgid "Updated vision model from Z.AI"
 msgstr "Z.AI 更新的视觉模型"
 
@@ -33673,11 +33731,11 @@ msgstr "为任意文本生成向量嵌入"
 msgid "Venezuela"
 msgstr "委内瑞拉"
 
-#: src/lib/model-descriptions.ts:231
+#: src/lib/model-descriptions.ts:240
 msgid "Vercel's v0 1.0 model"
 msgstr "Vercel 的 v0 1.0 模型"
 
-#: src/lib/model-descriptions.ts:232
+#: src/lib/model-descriptions.ts:241
 msgid "Vercel's v0 1.5 model"
 msgstr "Vercel 的 v0 1.5 模型"
 
@@ -33845,7 +33903,7 @@ msgstr "非常深的景深，风景纵深"
 msgid "Very fast generation speed"
 msgstr "生成速度非常快"
 
-#: src/lib/model-descriptions.ts:233
+#: src/lib/model-descriptions.ts:242
 msgid "Very intelligent model. Best for logos"
 msgstr "非常智能的模型。最适合 Logo"
 
@@ -33858,8 +33916,8 @@ msgstr "单次生成成本极低"
 msgid "video"
 msgstr "视频"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:653
-#: src/components/model-picker/model-picker.tsx:1106
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:654
+#: src/components/model-picker/model-picker.tsx:1109
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:122
 #: src/features/marketing/components/landing-footer.tsx:166
@@ -33902,7 +33960,7 @@ msgstr "适合需要富有表现力的运动、灵活视觉风格适配和新一
 msgid "Video Description"
 msgstr "视频描述"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:95
+#: ../../packages/chat-ui/src/model-picker/utils.ts:107
 #: src/features/settings/lib/settings-keywords.ts:77
 msgid "video generation"
 msgstr "视频生成"
@@ -34166,8 +34224,8 @@ msgstr "可见性"
 msgid "vision"
 msgstr "视觉"
 
-#: ../../packages/chat-ui/src/model-picker/utils.ts:145
-#: src/components/model-picker/model-picker.tsx:83
+#: ../../packages/chat-ui/src/model-picker/utils.ts:157
+#: src/components/model-picker/model-picker.tsx:84
 #: src/features/settings/components/chat/models-settings.tsx:31
 msgid "Vision"
 msgstr "视觉"
@@ -34230,7 +34288,7 @@ msgstr "需要 Z.AI 更新改进的多模态能力的视觉任务"
 msgid "Vision understanding alongside strong text capabilities"
 msgstr "视觉理解与强大文本能力兼备"
 
-#: src/lib/model-descriptions.ts:234
+#: src/lib/model-descriptions.ts:243
 msgid "Vision-capable model from Z.AI"
 msgstr "Z.AI 支持视觉的模型"
 
@@ -34712,11 +34770,11 @@ msgstr ""
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr ""
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:163
+#: src/features/settings/components/chat/model-filter-settings.tsx:165
 msgid "When set, only models hosted in these regions will be available."
 msgstr "设置后，只有托管在这些地区的模型可用。"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:225
+#: src/features/settings/components/chat/model-filter-settings.tsx:227
 msgid "When set, only these providers will be used. Leave empty to allow all."
 msgstr "设置后，只会使用这些提供商。留空则允许全部。"
 
@@ -34962,11 +35020,11 @@ msgstr "X 坐标"
 msgid "xAI"
 msgstr "xAI"
 
-#: src/lib/model-descriptions.ts:235
+#: src/lib/model-descriptions.ts:253
 msgid "xAI's advanced coding LLM"
 msgstr "xAI 的高级编程 LLM"
 
-#: src/lib/model-descriptions.ts:236
+#: src/lib/model-descriptions.ts:251
 msgid "xAI's Aurora-based image generation model"
 msgstr "xAI 基于 Aurora 的图像生成模型"
 
@@ -34979,7 +35037,7 @@ msgid "xAI's capable balanced model with vision support"
 msgstr "xAI 支持视觉的强大均衡模型"
 
 #: src/features/marketing/data/models-data.ts:873
-#: src/lib/model-descriptions.ts:237
+#: src/lib/model-descriptions.ts:254
 msgid "xAI's flagship frontier model with advanced reasoning"
 msgstr "xAI 具备高级推理的旗舰前沿模型"
 
@@ -34987,19 +35045,19 @@ msgstr "xAI 具备高级推理的旗舰前沿模型"
 msgid "xAI's foundation model capabilities"
 msgstr "xAI 的基础模型能力"
 
-#: src/lib/model-descriptions.ts:238
+#: src/lib/model-descriptions.ts:255
 msgid "xAI's greatest and fastest multimodel LLM"
 msgstr "xAI 最强最快的多模态 LLM"
 
-#: src/lib/model-descriptions.ts:239
+#: src/lib/model-descriptions.ts:256
 msgid "xAI's greatest and fastest multimodel reasoning LLM"
 msgstr "xAI 最强最快的多模态推理 LLM"
 
-#: src/lib/model-descriptions.ts:41
+#: src/lib/model-descriptions.ts:252
 msgid "xAI's Grok Imagine 1.5 image-to-video model"
 msgstr "xAI 的图生视频模型 Grok Imagine 1.5"
 
-#: src/lib/model-descriptions.ts:240
+#: src/lib/model-descriptions.ts:257
 msgid "xAI's image generation model"
 msgstr "xAI 的图像生成模型"
 
@@ -35007,15 +35065,15 @@ msgstr "xAI 的图像生成模型"
 msgid "xAI's most compact reasoning model"
 msgstr "xAI 最紧凑的推理模型"
 
-#: src/lib/model-descriptions.ts:241
+#: src/lib/model-descriptions.ts:258
 msgid "xAI's previous fastest multimodel LLM"
 msgstr "xAI 上一代最快的多模态 LLM"
 
-#: src/lib/model-descriptions.ts:242
+#: src/lib/model-descriptions.ts:259
 msgid "xAI's previous fastest multimodel reasoning LLM"
 msgstr "xAI 上一代最快的多模态推理 LLM"
 
-#: src/lib/model-descriptions.ts:243
+#: src/lib/model-descriptions.ts:260
 msgid "xAI's recent smallest LLM"
 msgstr "xAI 近期最小的 LLM"
 
@@ -35563,6 +35621,10 @@ msgstr "YouTube 缩略图"
 msgid "Z.AI"
 msgstr "Z.AI"
 
+#: src/lib/model-descriptions.ts:246
+msgid "Z.ai's fast GLM model on Workers AI"
+msgstr "Workers AI 上的 Z.ai 快速 GLM 模型"
+
 #: src/features/marketing/data/models-data.ts:1309
 msgid "Z.AI's fastest vision model"
 msgstr "Z.AI 最快的视觉模型"
@@ -35599,24 +35661,24 @@ msgstr "Z.AI 最强大的旗舰模型"
 msgid "Z.AI's vision-enhanced flagship model"
 msgstr "Z.AI 视觉增强的旗舰模型"
 
-#: src/features/settings/components/chat/model-filter-settings.tsx:370
-#: src/features/settings/components/chat/model-filter-settings.tsx:376
+#: src/features/settings/components/chat/model-filter-settings.tsx:373
+#: src/features/settings/components/chat/model-filter-settings.tsx:379
 msgid "Zero Data Retention (ZDR)"
 msgstr "零数据保留（ZDR）"
 
-#: src/lib/model-descriptions.ts:246
+#: src/lib/model-descriptions.ts:247
 msgid "Zhipu AI's fast vision reasoning LLM"
 msgstr "Zhipu AI 的快速视觉推理 LLM"
 
-#: src/lib/model-descriptions.ts:247
+#: src/lib/model-descriptions.ts:248
 msgid "Zhipu AI's latest fast vision reasoning LLM"
 msgstr "Zhipu AI 最新的快速视觉推理 LLM"
 
-#: src/lib/model-descriptions.ts:248
+#: src/lib/model-descriptions.ts:249
 msgid "Zhipu AI's most powerful LLM"
 msgstr "Zhipu AI 最强大的 LLM"
 
-#: src/lib/model-descriptions.ts:249
+#: src/lib/model-descriptions.ts:250
 msgid "Zhipu AI's most powerful reasoning LLM"
 msgstr "Zhipu AI 最强大的推理 LLM"
 

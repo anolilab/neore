@@ -903,7 +903,7 @@ export interface InternalApiTypes {
             pairConnection: FunctionReference<"mutation", { codeHash: string; connectionId: Id<"messengerConnections">; displayName?: string; platformChatId: string; platformUserId: string; platformUsername?: string }, boolean>;
             saveMessengerMessage: FunctionReference<"mutation", { fileIds?: Array<Id<"chatFiles">>; parts?: Array<{ image: string; mediaType: string; type: "image" } | { data: string; filename?: string; mediaType: string; type: "file" }>; pending?: boolean; text: string; threadId: Id<"threads">; userId: string }, { messageId: Id<"messages">; order: number }>;
             saveMessengerNotice: FunctionReference<"mutation", { text: string; threadId: Id<"threads">; userId: string }, null>;
-            threadHasRecentMedia: FunctionReference<"query", { threadId: Id<"threads"> }, boolean>;
+            threadRecentMedia: FunctionReference<"query", { threadId: Id<"threads"> }, "files" | "images" | "none">;
             touchConnection: FunctionReference<"mutation", { connectionId: Id<"messengerConnections"> }, void>;
         };
         respond: {
@@ -1201,6 +1201,9 @@ export interface InternalApiTypes {
         };
     };
     workflow: {
+        executor: {
+            generateWorkflowText: FunctionReference<"action", { maxTokens?: number; modelId: string; orgId?: string; prompt: string; system?: string; temperature?: number; userId: string }, { inputTokens: number; outputTokens: number; text: string }>;
+        };
         fork: {
             completeFork: FunctionReference<"mutation", { sourceProjectId: string; userId: string; vaultRows: Array<{ isGenerated?: boolean; key: string; name: string; nsfwScores?: { drawing: number; hentai: number; neutral: number; porn: number; sexy: number }; nsfwStatus?: "pending" | "checking" | "safe" | "blocked" | "failed"; size: number; type: string }> }, { projectId: string }>;
             getAuthorVaultRows: FunctionReference<"query", { authorId: string; sourceProjectId: string }, Array<{ isGenerated?: boolean; key: string; name: string; nsfwScores?: { drawing: number; hentai: number; neutral: number; porn: number; sexy: number }; nsfwStatus?: "pending" | "checking" | "safe" | "blocked" | "failed"; size: number; type: string }>>;
@@ -2116,7 +2119,7 @@ export const internal: InternalApiTypes = {
             pairConnection: { __lunoraRef: "messenger_functions:pairConnection" },
             saveMessengerMessage: { __lunoraRef: "messenger_functions:saveMessengerMessage" },
             saveMessengerNotice: { __lunoraRef: "messenger_functions:saveMessengerNotice" },
-            threadHasRecentMedia: { __lunoraRef: "messenger_functions:threadHasRecentMedia" },
+            threadRecentMedia: { __lunoraRef: "messenger_functions:threadRecentMedia" },
             touchConnection: { __lunoraRef: "messenger_functions:touchConnection" },
         },
         respond: {
@@ -2414,6 +2417,9 @@ export const internal: InternalApiTypes = {
         },
     },
     workflow: {
+        executor: {
+            generateWorkflowText: { __lunoraRef: "workflow_executor:generateWorkflowText" },
+        },
         fork: {
             completeFork: { __lunoraRef: "workflow_fork:completeFork" },
             getAuthorVaultRows: { __lunoraRef: "workflow_fork:getAuthorVaultRows" },
