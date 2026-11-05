@@ -488,7 +488,7 @@ const SectionBadge = ({ className, index, light = false, title }: { className?: 
 const LandingPage: FC = () => {
     const { i18n, t } = useLingui();
     // Registration is invite-only unless the backend says otherwise: the plans' "Sign up" then reads "Sign in".
-    const { signUpTarget } = useInviteOnly();
+    const { canSignUp, signUpHref } = useInviteOnly();
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const [scrollContainerMounted, setScrollContainerMounted] = useState(false);
     const { isAnonymous, isSessionUnknown, user } = useIsAnonymous();
@@ -1052,10 +1052,10 @@ const LandingPage: FC = () => {
                                         <LinkButton
                                             className="w-full"
                                             size="marketing"
-                                            to={tier.href === "/auth/sign-up" ? signUpTarget : tier.href}
+                                            to={tier.href === "/auth/sign-up" ? signUpHref : tier.href}
                                             variant={tier.popular ? "marketing" : "marketing-ghost"}
                                         >
-                                            {tier.href === "/auth/sign-up" && signUpTarget !== tier.href ? t`Sign in` : i18n._(tier.cta)}
+                                            {tier.href === "/auth/sign-up" && !canSignUp ? t`Sign in` : i18n._(tier.cta)}
                                         </LinkButton>
                                     )}
                                 </motion.div>

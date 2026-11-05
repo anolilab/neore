@@ -55,13 +55,13 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
 });
 
 const inviteOnly = vi.hoisted(() => {
-    return { canSignUp: true };
+    return { canSignUp: true, signUpHref: "/auth/sign-up" };
 });
 
 vi.mock("@/features/auth/hooks/use-invite-only", () => {
     return {
         default: () => {
-            return { canSignUp: inviteOnly.canSignUp, inviteOnly: !inviteOnly.canSignUp, mustSignIn: false };
+            return { canSignUp: inviteOnly.canSignUp, inviteOnly: !inviteOnly.canSignUp, mustSignIn: false, signUpHref: inviteOnly.signUpHref };
         },
     };
 });
@@ -86,6 +86,7 @@ vi.mock("@tanstack/react-router", () => {
 // constructor, so this one is set after it.
 beforeEach(() => {
     inviteOnly.canSignUp = true;
+    inviteOnly.signUpHref = "/auth/sign-up";
     vi.stubGlobal(
         "ResizeObserver",
         class {
@@ -156,6 +157,14 @@ describe("ModelPicker guest banner", () => {
         render(guestPicker());
 
         expect(screen.getByRole("link", { name: "Subscribe for $8/mo to unlock all models." }).getAttribute("href")).toBe("/auth/sign-up");
+    });
+
+    it("keeps the visitor's invitation on the sign-up link", () => {
+        inviteOnly.signUpHref = "/auth/sign-up?invite=tok";
+
+        render(guestPicker());
+
+        expect(screen.getByRole("link", { name: "Subscribe for $8/mo to unlock all models." }).getAttribute("href")).toBe("/auth/sign-up?invite=tok");
     });
 
     it("offers sign-in, not sign-up, under invite-only without an invitation", () => {

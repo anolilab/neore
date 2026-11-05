@@ -138,7 +138,7 @@ const SettingsTabError: FC<{ error: Error; onRetry: () => void }> = ({ error, on
 const AnonymousUpgradeGate: FC<{ label: string }> = ({ label }) => {
     const { t } = useLingui();
     // Under invite-only an account comes from an invitation, so a visitor without one is sent to sign in instead.
-    const { canSignUp } = useInviteOnly();
+    const { canSignUp, signUpHref } = useInviteOnly();
 
     return (
         <div className="flex h-64 flex-col items-center justify-center gap-4 p-6 text-center">
@@ -155,7 +155,7 @@ const AnonymousUpgradeGate: FC<{ label: string }> = ({ label }) => {
             </div>
             {/* A link styled as a button: it navigates, so it keeps link semantics. */}
             {canSignUp ? (
-                <a className={buttonVariants({ size: "sm" })} href="/auth/sign-up">
+                <a className={buttonVariants({ size: "sm" })} href={signUpHref}>
                     {t`Create an account`}
                 </a>
             ) : (

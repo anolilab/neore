@@ -596,7 +596,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
 }) => {
     const { i18n, t } = useLingui();
     // Under invite-only a guest is pointed at sign-in, not sign-up, unless the URL carries an invitation.
-    const { canSignUp } = useInviteOnly();
+    const { canSignUp, signUpHref } = useInviteOnly();
 
     // Use provided models list or fall back to the feature-flagged gateway models
     const featureFlaggedModels = useFeatureFlaggedModels({ applyUserOverrides: true });
@@ -981,7 +981,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                             <p className="text-[12px] leading-snug text-amber-700 dark:text-amber-300">
                                 {t`Guest accounts use free models only.`}{" "}
                                 {canSignUp ? (
-                                    <a className="font-semibold underline underline-offset-2" href="/auth/sign-up">
+                                    <a className="font-semibold underline underline-offset-2" href={signUpHref}>
                                         {t`Subscribe for $8/mo to unlock all models.`}
                                     </a>
                                 ) : (

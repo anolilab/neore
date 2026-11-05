@@ -51,7 +51,7 @@ const categoryLabels: Record<keyof typeof footerLinks, MessageDescriptor> = {
 const GatewayFooter: FC = () => {
     const { i18n, t } = useLingui();
     // Registration is invite-only unless the backend says otherwise: "Get API Key" then leads to sign-in.
-    const { signUpTarget } = useInviteOnly();
+    const { signUpHref } = useInviteOnly();
 
     return (
         <footer className="bg-brand-obsidian text-brand-frost">
@@ -116,7 +116,7 @@ const GatewayFooter: FC = () => {
                                         ) : (
                                             <Link
                                                 className="text-sm text-white/60 transition-colors hover:text-white"
-                                                to={link.to === "/auth/sign-up" ? signUpTarget : link.to}
+                                                to={link.to === "/auth/sign-up" ? signUpHref : link.to}
                                             >
                                                 {i18n._(link.label)}
                                             </Link>
