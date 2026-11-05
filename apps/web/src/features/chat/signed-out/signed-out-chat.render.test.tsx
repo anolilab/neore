@@ -63,22 +63,13 @@ vi.mock("@/features/chat/thread/composer-base", () => {
     return { ComposerBase: ({ children }: { children: ReactNode }) => children };
 });
 
-// The real input row is a tiptap editor; this stands in with the same contract.
+// The real input row is a tiptap editor; this stands in with the same contract. That the real editor opens no
+// suggestion popup here is `composer-tiptap-editor.suggestions.render.test.tsx`.
 vi.mock("@/features/chat/thread/composer-input-area", () => {
     return {
-        default: ({
-            onChange,
-            onSubmit,
-            suggestions,
-            value,
-        }: {
-            onChange: (text: string) => void;
-            onSubmit: () => void;
-            suggestions?: boolean;
-            value: string;
-        }) => (
+        default: ({ onChange, onSubmit, value }: { onChange: (text: string) => void; onSubmit: () => void; value: string }) => (
             <div>
-                <textarea aria-label="Message" data-suggestions={String(suggestions)} onChange={(event) => onChange(event.target.value)} value={value} />
+                <textarea aria-label="Message" onChange={(event) => onChange(event.target.value)} value={value} />
                 <button onClick={onSubmit} type="button">
                     Send message
                 </button>
@@ -124,12 +115,6 @@ describe("SignedOutComposer", () => {
 
         expect(useLoginPromptStore.getState().isOpen).toBe(false);
         expect(sessionStorage.getItem("neore:pending-send")).toBeNull();
-    });
-
-    it("turns off slash commands and @ mentions, which read account data", () => {
-        render(<SignedOutComposer />);
-
-        expect(screen.getByRole("textbox", { name: "Message" }).dataset.suggestions).toBe("false");
     });
 });
 
