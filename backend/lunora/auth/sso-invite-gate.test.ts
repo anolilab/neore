@@ -19,6 +19,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const SITE = "http://localhost:3000";
 /** A verify-email link in a queued mail's text. */
 const VERIFY_LINK = /https?:\/\/\S+\/verify-email\S+/;
+/** A magic-link sign-in link in a queued mail's text. */
+const MAGIC_LINK = /https?:\/\/\S+\/magic-link\/verify\S+/;
 /** The token in a reset-password mail's link (`/reset-password/<token>?callbackURL=…`). */
 const RESET_TOKEN = /\/reset-password\/([\w-]+)/;
 const EMAIL = "stranger@example.com";
@@ -673,7 +675,7 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         const magicLink = jobsQueueMessages
             .map((queued) => queued.body.args?.message)
             .filter((message) => message?.subject === "Sign in to your account")
-            .flatMap((message) => /https?:\/\/\S+\/magic-link\/verify\S+/.exec(message?.text ?? "")?.[0] ?? [])
+            .flatMap((message) => MAGIC_LINK.exec(message?.text ?? "")?.[0] ?? [])
             .at(-1);
 
         await auth.handler(new Request(magicLink!, { headers: { origin: SITE } }));

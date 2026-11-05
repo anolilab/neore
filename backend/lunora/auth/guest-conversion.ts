@@ -40,7 +40,7 @@ const PASSWORD_SIGN_IN_PATH = "/sign-in/email";
  * whoever signed up with the guest's session, so a sign-up made with someone else's address could otherwise push its
  * guest data into the real owner's account at their next sign-in. A record left pending waits for one of these two.
  */
-const HAND_OVER_PATHS = new Set([PASSWORD_SIGN_IN_PATH, "/verify-email"]);
+const HAND_OVER_PATHS = new Set(["/verify-email", PASSWORD_SIGN_IN_PATH]);
 
 interface SignUpReturn {
     token?: string | null;
