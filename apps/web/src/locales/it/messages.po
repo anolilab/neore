@@ -4932,6 +4932,7 @@ msgstr "Bulgaro"
 msgid "Bulgarian (Bulgaria)"
 msgstr "Bulgaro (Bulgaria)"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:155
 #: src/features/chat/thread-list/thread-list-header.tsx:167
 #: src/features/chat/thread-list/thread-list-header.tsx:178
 msgid "Bulk actions"
@@ -7273,6 +7274,7 @@ msgstr "Recall del contesto"
 msgid "Context that never resets"
 msgstr "Un contesto che non si azzera mai"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:196
 #: src/features/chat/thread/composer-context-count.tsx:116
 msgid "Context Usage"
 msgstr "Utilizzo del contesto"
@@ -8261,6 +8263,7 @@ msgstr "Crea organizzazione"
 msgid "Create PR"
 msgstr "Crea PR"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:146
 #: src/features/chat/thread-list/thread-list-header.tsx:127
 #: src/features/chat/thread-list/thread-list-header.tsx:137
 msgid "Create project"
@@ -11040,6 +11043,7 @@ msgid "English (UK)"
 msgstr "Inglese (Regno Unito)"
 
 #: src/features/chat/core/utils/language-utilities.ts:151
+#: src/features/chat/signed-out/signed-out-chat.tsx:177
 #: src/features/chat/thread/composer-language-selector.tsx:102
 msgid "English (US)"
 msgstr "Inglese (USA)"
@@ -11920,6 +11924,7 @@ msgstr "Esportazione annullata"
 
 #: src/features/chat/header/thread-download-button.tsx:103
 #: src/features/chat/header/thread-download-button.tsx:140
+#: src/features/chat/signed-out/signed-out-chat.tsx:294
 msgid "Export chat"
 msgstr "Esporta chat"
 
@@ -14486,7 +14491,7 @@ msgid "Global analyst research, market analysis, and investment data"
 msgstr "Ricerche di analisti globali, analisi di mercato e dati sugli investimenti"
 
 #: ../../packages/chat-ui/src/chat/chat-view.tsx:96
-#: src/features/auth/components/auth/auth-card.tsx:494
+#: src/features/auth/components/auth/auth-card.tsx:495
 msgid "Go back"
 msgstr "Torna indietro"
 
@@ -15104,6 +15109,7 @@ msgstr "Altezza"
 msgid "Hello {0}! What would you like to do today?"
 msgstr "Ciao {0}! Cosa vuoi fare oggi?"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:115
 #: src/features/layout/components/mobile-section-nav.tsx:72
 #: src/features/layout/components/sidebar-shortcut.tsx:301
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:113
@@ -16789,6 +16795,7 @@ msgid "Key file (optional, absolute path)"
 msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
+#: src/features/chat/signed-out/signed-out-chat.tsx:152
 #: src/features/chat/thread-list/thread-list-header.tsx:146
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:122
 #: src/features/workflow/components/canvas/workflow-controls.tsx:374
@@ -17981,7 +17988,7 @@ msgid "Log out"
 msgstr "Esci"
 
 #: src/features/auth/components/auth/login-modal.tsx:46
-#: src/features/chat/signed-out/signed-out-chat.tsx:94
+#: src/features/chat/signed-out/signed-out-chat.tsx:283
 #: src/features/layout/components/app-sidebar.tsx:54
 #: src/features/layout/components/app-sidebar.tsx:67
 #: src/features/marketing/components/gateway-navbar.tsx:90
@@ -19883,7 +19890,7 @@ msgstr "neore"
 msgid "Neore"
 msgstr "Neore"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:75
+#: src/features/chat/signed-out/signed-out-chat.tsx:89
 #: src/features/layout/components/sidebar-shortcut.tsx:238
 #: src/features/marketing/components/navbar-menu.tsx:44
 msgid "Neore - AI Text & Video & Audio & Image & Documents Generation Platform"
@@ -19893,7 +19900,6 @@ msgstr "Neore - Piattaforma di generazione con IA di testo, video, audio, immagi
 msgid "Neore (timestamped)"
 msgstr ""
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:48
 #: src/features/chat/thread/composer.tsx:652
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore può commettere errori. Verifica le informazioni importanti."
@@ -20058,7 +20064,7 @@ msgstr "Nuova chat"
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:46
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
 #: src/features/chat/header/chat-header.tsx:30
-#: src/features/chat/signed-out/signed-out-chat.tsx:102
+#: src/features/chat/signed-out/signed-out-chat.tsx:315
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:239
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:115
 #: src/features/settings/lib/settings-keywords.ts:37
@@ -20103,6 +20109,7 @@ msgstr "Nuovo obiettivo"
 #: src/features/chat/group/create-group-chat-button.tsx:115
 #: src/features/chat/group/create-group-chat-button.tsx:120
 #: src/features/chat/group/create-group-chat-button.tsx:129
+#: src/features/chat/signed-out/signed-out-chat.tsx:149
 msgid "New group chat"
 msgstr "Nuova chat di gruppo"
 
@@ -20178,6 +20185,7 @@ msgstr "Nuovi questa settimana"
 msgid "New thread"
 msgstr "Nuova conversazione"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:140
 #: src/features/chat/thread-list/thread-list-header.tsx:99
 msgid "New Thread"
 msgstr "Nuova conversazione"
@@ -20895,6 +20903,7 @@ msgstr "Nessuna conversazione in questo gruppo"
 msgid "No threads were active in that date range."
 msgstr ""
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:272
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1065
 msgid "No threads yet"
 msgstr "Ancora nessuna conversazione"
@@ -21758,6 +21767,7 @@ msgstr "Apri ricerca"
 msgid "Open settings"
 msgstr "Apri impostazioni"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:112
 #: src/features/layout/components/sidebar-shortcut.tsx:282
 msgid "Open Settings"
 msgstr "Apri Impostazioni"
@@ -21860,6 +21870,7 @@ msgstr ""
 msgid "Open thread"
 msgstr "Apri conversazione"
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:118
 #: src/features/layout/components/sidebar-shortcut.tsx:221
 #: src/features/layout/components/sidebar-shortcut.tsx:328
 msgid "Open user menu"
@@ -26934,6 +26945,7 @@ msgstr ""
 msgid "Search thread titles..."
 msgstr "Cerca nei titoli delle conversazioni..."
 
+#: src/features/chat/signed-out/signed-out-chat.tsx:143
 #: src/features/chat/thread-list/thread-list-header.tsx:70
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:78
 msgid "Search threads"
@@ -27903,7 +27915,7 @@ msgstr "Barra laterale destra"
 #: ../../packages/chat-ui/src/auth/login-form.tsx:43
 #: src/components/not-found.tsx:12
 #: src/components/settings/settings-modal.tsx:163
-#: src/features/auth/components/auth/auth-card.tsx:490
+#: src/features/auth/components/auth/auth-card.tsx:491
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:406
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/marketing/components/landing-page.tsx:1058
@@ -27943,7 +27955,7 @@ msgstr ""
 msgid "Sign in to fork this workflow"
 msgstr "Accedi per duplicare questo workflow"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:82
+#: src/features/chat/signed-out/signed-out-chat.tsx:273
 msgid "Sign in to see your chats."
 msgstr "Accedi per vedere le tue chat."
 
@@ -28005,7 +28017,7 @@ msgstr "Esci"
 msgid "Sign out of {0}"
 msgstr "Esci da {0}"
 
-#: src/features/auth/components/auth/auth-card.tsx:490
+#: src/features/auth/components/auth/auth-card.tsx:491
 #: src/features/marketing/components/landing-page.tsx:332
 #: src/features/marketing/components/landing-page.tsx:350
 msgid "Sign up"
@@ -30264,6 +30276,7 @@ msgid "Temporary chat"
 msgstr "Chat temporanea"
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:293
+#: src/features/chat/signed-out/signed-out-chat.tsx:309
 msgid "Temporary Chat"
 msgstr "Chat temporanea"
 
@@ -32070,6 +32083,7 @@ msgstr "Mostra/nascondi barra laterale destra ({0})"
 #: ../../packages/ui/src/components/sidebar.tsx:358
 #: ../../packages/ui/src/components/sidebar.tsx:380
 #: ../../packages/ui/src/components/sidebar.tsx:394
+#: src/features/chat/signed-out/signed-out-chat.tsx:297
 msgid "Toggle Sidebar"
 msgstr "Mostra/nascondi barra laterale"
 
@@ -32679,7 +32693,7 @@ msgstr "Digita per cercare"
 msgid "Type your answer…"
 msgstr "Scrivi la tua risposta…"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:50
+#: src/features/chat/signed-out/signed-out-chat.tsx:248
 #: src/features/chat/thread/composer-input.tsx:1515
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:182
 msgid "Type your message..."
