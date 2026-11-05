@@ -12,6 +12,7 @@
  * `pnpm lint:types:deploy` only type-checks it, so this module is where the
  * options live and `backend/deploy-bundle.test.ts` is what pins their values.
  */
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 /** The slice of rolldown's plugin API used here, so this file needs no rolldown import. */
@@ -132,3 +133,48 @@ export const WEB_UPLOAD_RULES = [
 
 /** The file extensions {@link WEB_UPLOAD_RULES} uploads. */
 export const WEB_UPLOAD_EXTENSIONS = [".js", ".mjs", ".wasm", ".txt", ".html", ".sql", ".bin"] as const;
+
+/** Where `lunora codegen` writes Studio's documents, relative to the repository root (`.lunora/studio-assets` from `backend/`). */
+const BACKEND_STUDIO_ASSETS = "./backend/.lunora/studio-assets";
+
+/**
+ * The backend's Studio documents, as Workers Static Assets (anolilab/lunora#1499, anolilab/neore#494).
+ *
+ * `lunora codegen` writes the architecture manifest and the OpenAPI and OpenRPC specs to
+ * `backend/.lunora/studio-assets/_lunora/studio/<name>.json`, and the generated app reads
+ * them through an `ASSETS` binding (`loadStudioDocument`) on Studio's admin routes only, after
+ * the admin-token check. `lunora deploy` gets the binding from the `assets` block reconcile
+ * writes into `wrangler.jsonc`; Alchemy ignores that file, so `alchemy.run.ts` binds it here.
+ *
+ * `runWorkerFirst` is the literal `true`, never a path list: every request reaches the Worker
+ * before the asset layer, so the files are served only through the binding. A path list
+ * would leave `/_lunora/studio/*` assets-first and make the documents, which describe the whole
+ * app, public. Alchemy names the binding `ASSETS` itself.
+ *
+ * The binding follows the directory, which Alchemy reads at plan time: codegen creates it
+ * exactly when it chose asset mode, so a Lunora release without #1499 deploys with neither.
+ * Mirroring codegen's decision with a version check would duplicate rules that also depend
+ * on the project's shape. {@link backendStudioAssetsProblem} catches the one state that
+ * cannot be right.
+ *
+ * `root` is the repository root; `alchemy.run.ts` passes `"."`, as Alchemy resolves the
+ * relative `directory` against the working directory too.
+ */
+export const backendStudioAssets = (root: string): { directory: string; runWorkerFirst: true } | undefined =>
+    existsSync(path.join(root, BACKEND_STUDIO_ASSETS)) ? { directory: path.join(root, BACKEND_STUDIO_ASSETS), runWorkerFirst: true } : undefined;
+
+/**
+ * A generated app that reads Studio's documents from `ASSETS` with no directory to bind:
+ * Studio would show empty documents without an error anywhere, so the deploy refuses it.
+ */
+export const backendStudioAssetsProblem = (root: string): string | undefined => {
+    if (backendStudioAssets(root) !== undefined) {
+        return undefined;
+    }
+
+    const generatedApp = readFileSync(path.join(root, "backend/lunora/_generated/app.ts"), "utf8");
+
+    return generatedApp.includes("loadStudioDocument")
+        ? "backend/lunora/_generated/app.ts reads Studio's documents from the ASSETS binding, but backend/.lunora/studio-assets is missing. Run `pnpm --filter @neore/backend run codegen` first."
+        : undefined;
+};
