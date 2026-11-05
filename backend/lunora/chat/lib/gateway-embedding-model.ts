@@ -125,7 +125,7 @@ export const createGatewayEmbeddingModel = (
 ): GatewayEmbeddingModel =>
     new GatewayEmbeddingModel({
         gateway,
-        modelId: "text-embedding-004",
+        modelId: "bge-base-en-v1.5",
         threadId: options?.threadId,
         traceparent: options?.traceparent,
         userId: options?.userId,

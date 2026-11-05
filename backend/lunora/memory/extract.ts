@@ -8,7 +8,7 @@ import type { LanguageModelV3 } from "@ai-sdk/provider";
  * user-specific facts from the conversation. Uses LLM-based extraction
  * with hybrid vector+text deduplication and belief revision.
  *
- * Embedding generation routes through the LLM Gateway (text-embedding-004,
+ * Embedding generation routes through the LLM Gateway (Workers AI bge-base-en-v1.5,
  * 768-dim vectors). The gateway is mandatory — there is no local fallback.
  *
  * Key features:
@@ -53,9 +53,9 @@ const WHITESPACE_RE = /\s+/;
  * Model name string stored in the vector table for memory embeddings.
  * Must be consistent between extraction and retrieval.
  *
- * The LLM Gateway routes to text-embedding-004 (768-dim vectors).
+ * The LLM Gateway routes to Workers AI bge-base-en-v1.5 (768-dim vectors).
  */
-export const MEMORY_EMBEDDING_MODEL_NAME = "text-embedding-004";
+export const MEMORY_EMBEDDING_MODEL_NAME = "bge-base-en-v1.5";
 
 // ============================================================================
 // Embedding Model Factory
@@ -65,7 +65,7 @@ export const MEMORY_EMBEDDING_MODEL_NAME = "text-embedding-004";
  * Create an embedding model instance via the LLM Gateway.
  *
  * The gateway is mandatory — produces 768-dimensional vectors
- * (text-embedding-004) for compatibility with the vector table. `gateway` is
+ * (bge-base-en-v1.5) for compatibility with the vector table. `gateway` is
  * the calling action's binding, `gatewayFetch(ctx)`.
  */
 export const getMemoryEmbeddingModel = async (gateway: ServiceFetch) => {
@@ -664,7 +664,7 @@ export const regenerateMemoryEmbedding = internalAction
                 await ctx.runMutation(internal.agent.vector.deleteBatch, {
                     // `memories.embeddingId` is a plain `v.string()` column, so the row id has
                     // to be re-branded here. Memory embeddings are always 768-dim
-                    // (text-embedding-004 — see MEMORY_EMBEDDING_MODEL_NAME), so the vector
+                    // (bge-base-en-v1.5 — see MEMORY_EMBEDDING_MODEL_NAME), so the vector
                     // row lives in `embeddings_768`. `ctx.db.asId` is not usable: this runs in
                     // an action context.
                     ids: [memory.embeddingId as Id<"embeddings_768">],

@@ -14,7 +14,7 @@ import { GatewayError, toSafeErrorPayload, toSafeValidationPayload } from "../..
 import { bearerAuth, internalAuth } from "../../middleware/auth.js";
 import { expensiveEndpointRateLimit } from "../../middleware/rate-limit.js";
 import { createEmbeddingModel, EMBEDDING_MODELS } from "../../providers/embedding-factory.js";
-import { resolveApiKey } from "../../providers/factory.js";
+import { resolveApiKey, resolveCloudflareOptions } from "../../providers/factory.js";
 import { UsageReporter } from "../../usage/reporter.js";
 import { UsageTracker } from "../../usage/tracker.js";
 
@@ -79,7 +79,7 @@ embeddingsRouter.post("/v1/embeddings", async (c) => {
     }
 
     try {
-        const model = await createEmbeddingModel(modelInfo.provider, modelInfo.modelApiId, apiKey);
+        const model = await createEmbeddingModel(modelInfo.provider, modelInfo.modelApiId, apiKey, resolveCloudflareOptions(c.env));
         const inputs = typeof body.input === "string" ? [body.input] : body.input;
 
         let embeddings: number[][];
@@ -274,7 +274,7 @@ embeddingsRouter.post("/internal/embeddings", internalAuth, async (c) => {
     }
 
     try {
-        const model = await createEmbeddingModel(modelInfo.provider, modelInfo.modelApiId, apiKey);
+        const model = await createEmbeddingModel(modelInfo.provider, modelInfo.modelApiId, apiKey, resolveCloudflareOptions(c.env));
         const inputs = typeof body.input === "string" ? [body.input] : body.input;
 
         let embeddings: number[][];

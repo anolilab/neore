@@ -276,7 +276,7 @@ const logDevelopmentEnvSummary = (): void => {
     if (configuredAI.length > 0) {
         lines.push(`[ENV] AI providers: ${configuredAI.length}/${AI_PROVIDER_KEYS.length} configured (${configuredAI.join(", ")})`);
     } else {
-        lines.push(`[ENV] WARNING: No AI provider keys configured — chat will not work. Set at least OPENROUTER_API_KEY.`);
+        lines.push(`[ENV] AI providers: none configured — only the Workers AI models (the defaults) will answer.`);
     }
 
     if (missingAI.length > 0 && configuredAI.length > 0) {

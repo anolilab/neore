@@ -24,6 +24,9 @@ vi.mock("@neore/ai/providers", async () => {
 const gateway = async () => new Response("{}");
 const configOf = (model: unknown) => (model as { config: { modelFilterRules?: unknown; modelId: string; userId: string } }).config;
 
+/** A free OpenRouter model served in the US and EU, which the gateway pins to its EU endpoint for EU-only rules. */
+const EU_PINNED_MODEL = "google/gemini-2.5-flash-lite";
+
 describe("pickUtilityModelId", () => {
     it("keeps the default when the user set no rules", () => {
         expect(pickUtilityModelId(undefined)).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
@@ -40,9 +43,13 @@ describe("pickUtilityModelId", () => {
     it("keeps a free user on free-tier models, which chat runs would also allow them", () => {
         const rules = { blockedModels: [DEFAULT_MEMORY_EXTRACTION_MODEL, UTILITY_FALLBACK_MODELS[0]!] };
 
-        // The paid fallbacks (haiku, ministral) are skipped: the next free one is gemini-2.5-flash-lite.
-        expect(pickUtilityModelId(rules)).toBe("google/gemini-2.5-flash-lite");
-        expect(pickUtilityModelId(withPaidPlanGrant(rules, false))).toBe("google/gemini-2.5-flash-lite");
+        expect(pickUtilityModelId(rules)).toBe(UTILITY_FALLBACK_MODELS[1]);
+
+        // Past the Workers AI models and gpt-4.1-mini, the paid fallbacks (haiku, ministral) are skipped: the next free one is gemini-2.5-flash-lite.
+        const pastFree = { blockedModels: [DEFAULT_MEMORY_EXTRACTION_MODEL, ...UTILITY_FALLBACK_MODELS.slice(0, 5)] };
+
+        expect(pickUtilityModelId(pastFree)).toBe("google/gemini-2.5-flash-lite");
+        expect(pickUtilityModelId(withPaidPlanGrant(pastFree, false))).toBe("google/gemini-2.5-flash-lite");
     });
 
     it("refuses a free user whose rules leave only paid candidates, and serves a paid user", () => {
@@ -57,14 +64,15 @@ describe("pickUtilityModelId", () => {
         const picked = pickUtilityModelId({ allowedRegions: ["CN"] });
 
         expect(picked).toBeUndefined();
-        expect(pickUtilityModelId({ allowedRegions: ["EU"] })).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+        // Workers AI has no EU-only endpoint, so EU-only rules pass over it to the first free OpenRouter model the gateway pins to the EU.
+        expect(pickUtilityModelId({ allowedRegions: ["EU"] })).toBe(EU_PINNED_MODEL);
     });
 
     it("refuses a candidate served in a region the user did not allow, unless the gateway pins it to the only allowed one (EU)", () => {
-        // The default is served in the US and EU: with ["EU", "CH"] the gateway uses the default endpoint, so the US is reachable.
-        expect(pickUtilityModelId({ allowedRegions: ["EU", "CH"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBeUndefined();
-        expect(pickUtilityModelId({ allowedRegions: ["EU"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
-        expect(pickUtilityModelId({ allowedRegions: ["EU", "US"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+        // It is served in the US and EU: with ["EU", "CH"] the gateway uses the default endpoint, so the US is reachable.
+        expect(pickUtilityModelId({ allowedRegions: ["EU", "CH"] }, EU_PINNED_MODEL, true)).toBeUndefined();
+        expect(pickUtilityModelId({ allowedRegions: ["EU"] }, EU_PINNED_MODEL, true)).toBe(EU_PINNED_MODEL);
+        expect(pickUtilityModelId({ allowedRegions: ["EU", "US"] }, EU_PINNED_MODEL, true)).toBe(EU_PINNED_MODEL);
     });
 
     it("refuses a multi-region OpenRouter model when a blocked region is among its regions, since the gateway does not route around it", () => {
@@ -78,10 +86,10 @@ describe("pickUtilityModelId", () => {
         // Allowed exactly ["EU"]: the call is served from the EU alone, so the US block does not reach it.
         const rules = { allowedRegions: ["EU"], blockedRegions: ["US"] };
 
-        expect(pickUtilityModelId(rules, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBe(DEFAULT_MEMORY_EXTRACTION_MODEL);
+        expect(pickUtilityModelId(rules, EU_PINNED_MODEL, true)).toBe(EU_PINNED_MODEL);
         // EU itself blocked: nothing is left; and without the EU pin the US stays reachable.
-        expect(pickUtilityModelId({ allowedRegions: ["EU"], blockedRegions: ["EU"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBeUndefined();
-        expect(pickUtilityModelId({ allowedRegions: ["EU", "CH"], blockedRegions: ["US"] }, DEFAULT_MEMORY_EXTRACTION_MODEL, true)).toBeUndefined();
+        expect(pickUtilityModelId({ allowedRegions: ["EU"], blockedRegions: ["EU"] }, EU_PINNED_MODEL, true)).toBeUndefined();
+        expect(pickUtilityModelId({ allowedRegions: ["EU", "CH"], blockedRegions: ["US"] }, EU_PINNED_MODEL, true)).toBeUndefined();
     });
 
     it("answers nothing when the rules exclude every candidate", () => {

@@ -147,6 +147,8 @@ export const deriveModelRegions = (model: { modelApiId: string; provider: string
 
     if (provider === "bfl") return ["EU", "US"]; // Black Forest Labs (Germany)
 
+    if (provider === "cloudflare") return ["US", "EU"]; // Workers AI, matching the gateway's routing candidates
+
     // OpenRouter/Requesty: derive from underlying model provider
     const apiPrefix = modelApiId.split("/", 1)[0]?.toLowerCase() ?? "";
     const prefixRegionMap: Record<string, string[]> = {

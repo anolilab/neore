@@ -19,6 +19,10 @@ let _agentsPromise: Promise<Record<string, AgentConfig>> | undefined;
  * region or provider rule that excludes the default usually leaves one of them standing.
  */
 export const UTILITY_FALLBACK_MODELS: ReadonlyArray<string> = [
+    "cf-gpt-oss-120b",
+    "cf-llama-3.3-70b",
+    "cf-mistral-small-3.1",
+    "cf-qwen3-30b-a3b",
     "openai/gpt-4.1-mini",
     "anthropic/claude-haiku-4.5",
     "mistralai/ministral-8b-2501",

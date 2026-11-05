@@ -147,8 +147,8 @@ describe.each(Object.keys(runs))("%s", (name) => {
 
 describe.each(Object.keys(runs))("%s with a blocked region", (name) => {
     it("refuses a model that is reachable in a blocked region even though another of its regions is allowed", async () => {
-        // The optimizer model is served from CN and US; blocking CN alone must refuse it, as the background models do.
-        await saveRules({ blockedRegions: ["CN"] });
+        // The optimizer model is served from the US and EU; blocking the US alone must refuse it, as the background models do.
+        await saveRules({ blockedRegions: ["US"] });
 
         const error = await failure(runs[name]!());
 

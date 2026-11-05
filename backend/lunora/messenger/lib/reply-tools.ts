@@ -46,12 +46,13 @@ export const MESSENGER_TEXT_REPLY_MAX_STEPS = 3;
 
 /**
  * The model for a thread that holds images or PDFs, and for any reply with
- * tools. The default chat model reads text only, and a media thread's context
- * carries its media for several turns after the one that sent it; tool calls
+ * tools. A media thread's context carries its media for several turns after
+ * the one that sent it, so it is pinned to an image reader whatever the default
+ * chat model is; tool calls
  * need a model that reliably calls tools. `respond.test.ts` pins that the
  * registry lists it as enabled and image-capable.
  */
-export const MESSENGER_MEDIA_MODEL = "google/gemini-2.5-flash";
+export const MESSENGER_MEDIA_MODEL = "cf-llama-4-scout";
 
 /** Model for a reply: the media/tool model when either needs it, else the default chat model. */
 export const chooseReplyModel = (options: { hasMedia: boolean; tools: boolean }): string =>

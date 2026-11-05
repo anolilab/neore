@@ -37,6 +37,7 @@ const PROVIDERS = [
     { id: "xai", label: "xAI" },
     { id: "openai", label: "OpenAI" },
     { id: "requesty", label: "Requesty" },
+    { id: "cloudflare", label: "Cloudflare Workers AI" },
 ] as const;
 
 const ModelFilterSettings: FC = () => {

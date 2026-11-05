@@ -6,6 +6,7 @@
 import type { EmbeddingModelV4 } from "@ai-sdk/provider";
 
 import { GatewayError } from "../lib/errors.js";
+import type { CloudflareProviderOptions } from "./factory.js";
 
 /** Supported embedding models and their provider mapping */
 export interface EmbeddingModelInfo {
@@ -18,6 +19,9 @@ export interface EmbeddingModelInfo {
 }
 
 export const EMBEDDING_MODELS: Record<string, EmbeddingModelInfo> = {
+    // Cloudflare Workers AI ($0.067 per 1M tokens). The default for memory and
+    // knowledge: no provider key, and 768 dimensions like the vector tables.
+    "bge-base-en-v1.5": { costPer1MTokensMicrodollars: 67_000, dimensions: 768, modelApiId: "@cf/baai/bge-base-en-v1.5", provider: "cloudflare" },
     "embedding-001": { costPer1MTokensMicrodollars: 0, dimensions: 768, modelApiId: "embedding-001", provider: "google" },
     // Groq (via OpenAI-compatible API)
     "nomic-embed-text-v1.5": { costPer1MTokensMicrodollars: 0, dimensions: 768, modelApiId: "nomic-embed-text-v1.5", provider: "groq" },
@@ -32,8 +36,26 @@ export const EMBEDDING_MODELS: Record<string, EmbeddingModelInfo> = {
 /**
  * Create an AI SDK embedding model instance for the given provider and model.
  */
-export const createEmbeddingModel = async (provider: string, modelApiId: string, apiKey: string): Promise<EmbeddingModelV4> => {
+export const createEmbeddingModel = async (
+    provider: string,
+    modelApiId: string,
+    apiKey: string,
+    cloudflare?: CloudflareProviderOptions,
+): Promise<EmbeddingModelV4> => {
     switch (provider) {
+        case "cloudflare": {
+            const { createWorkersAI } = await import("workers-ai-provider");
+
+            if (cloudflare?.aiBinding) {
+                return createWorkersAI({ binding: cloudflare.aiBinding }).textEmbedding(modelApiId);
+            }
+
+            if (apiKey && cloudflare?.accountId) {
+                return createWorkersAI({ accountId: cloudflare.accountId, apiKey }).textEmbedding(modelApiId);
+            }
+
+            throw new GatewayError("PROVIDER_NOT_CONFIGURED", "Cloudflare embeddings need either an AI binding or accountId + apiKey");
+        }
         case "google": {
             const { createGoogleGenerativeAI } = await import("@ai-sdk/google");
 

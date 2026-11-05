@@ -33,7 +33,7 @@ import { documentToText, fetchUrlDocument, hasMarkdownStructure, isPagedMimeType
 
 ("use node");
 
-const EMBEDDING_MODEL_NAME = "text-embedding-004";
+const EMBEDDING_MODEL_NAME = "bge-base-en-v1.5";
 /**
  * A knowledge file is a document sent to extraction, so it shares the parser's
  * cap (`lib/document-limits.ts` — which carries the TODO for larger files).
