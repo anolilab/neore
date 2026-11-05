@@ -66,6 +66,7 @@ jobs:
               uses: "actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3" # v9.0.0
               env:
                   WEBSITE_URL: "${{ needs.deploy.outputs.website-url }}"
+                  STORYBOOK_URL: "${{ needs.deploy.outputs.storybook-url }}"
                   RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
               with:
                   script: |
@@ -78,6 +79,7 @@ jobs:
                       const body = [
                           marker,
                           `**Preview** for \`${sha}\`: ${url ? url : "deployed (the run did not report a URL)"}`,
+                          ...(process.env.STORYBOOK_URL ? [`**Storybook**: ${process.env.STORYBOOK_URL} (every component and page on fake data)`] : []),
                           "",
                           "It is a full copy of the stack in the preview account with its own data. Registration is invite-only, so seed an invitation with the preview's admin token (`POST <backend>/admin/seed-invitations`).",
                           "",

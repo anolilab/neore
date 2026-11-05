@@ -74,6 +74,9 @@ on: # yamllint disable-line rule:truthy
             website-url:
                 description: "The deployed web app's URL"
                 value: "${{ jobs.deploy-cloudflare.outputs.website-url }}"
+            storybook-url:
+                description: "The deployed Storybook's URL (preview stages only)"
+                value: "${{ jobs.deploy-cloudflare.outputs.storybook-url }}"
 
 # Keyed on the stage, not the ref: two tags (or a tag and a manual run) would
 # otherwise run two Alchemy deploys against the same state at once, while two pull
@@ -157,6 +160,7 @@ jobs:
             deployments: "write"
         outputs:
             website-url: "${{ steps.alchemy.outputs.website-url }}"
+            storybook-url: "${{ steps.alchemy.outputs.storybook-url }}"
         environment:
             name: "${{ needs.resolve-env.outputs.deploy-env }}"
             url: "${{ steps.alchemy.outputs.website-url }}"
@@ -544,6 +548,8 @@ jobs:
                   # Extract website URL from Alchemy output for GitHub environment
                   url=$(echo "$output" | grep -oP "website: ['\"]?\Khttps?://[^'\"}\s]+" || true)
                   echo "website-url=${url}" >> "$GITHUB_OUTPUT"
+                  storybook=$(echo "$output" | grep -oP "storybook: ['\"]?\Khttps?://[^'\"}\s]+" || true)
+                  echo "storybook-url=${storybook}" >> "$GITHUB_OUTPUT"
 
             # Alchemy bundles every Worker itself (rolldown), so this is the script Cloudflare
             # actually validates; `lunora build`'s bundle is a different one. Kept on failure too,
