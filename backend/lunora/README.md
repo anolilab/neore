@@ -395,7 +395,7 @@ Environment variables are exported from `env.ts`. Required variables include:
 
 - `SITE_URL` - Application site URL
 - `PUBLIC_ORIGIN` - this Worker's own public origin
-- `MAIL_FROM` - sender for all mail; Cloudflare Email Service delivers it
+- `MAIL_FROM` - sender for all mail; Cloudflare Email Service delivers it once the deploy sets `MAIL_EMAIL_SERVICE=1` (a GitHub environment variable, required in production)
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - Google OAuth credentials
 - API keys for AI providers (OpenAI, Anthropic, Google, Groq, FAL)
 - R2 storage credentials (if using R2)

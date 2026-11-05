@@ -361,6 +361,10 @@ jobs:
                   # required in production; alchemy.run.ts binds Cloudflare Email
                   # Service for it (MAIL_FROM must be on its verified sending domain).
                   MAIL_FROM: "${{ secrets.MAIL_FROM }}"
+                  # "1" binds Email Service for MAIL_FROM on this environment (a GitHub
+                  # environment variable). Only set it where MAIL_FROM's domain is an
+                  # Email Service sending domain; production requires it.
+                  MAIL_EMAIL_SERVICE: "${{ vars.MAIL_EMAIL_SERVICE }}"
                   SITE_URL: "${{ steps.origins.outputs.site }}"
                   # Optional, but paired with VITE_TURNSTILE_SITE_KEY in the
                   # build step above — set both or neither. Unset on both sides

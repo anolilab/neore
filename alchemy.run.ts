@@ -248,11 +248,13 @@ const requiredEnvPassthrough = Object.fromEntries(REQUIRED_ENV_KEYS.map((name) =
 const optionalEnvPassthrough = boundWhereSet(OPTIONAL_ENV_KEYS);
 
 /**
- * Cloudflare Email Service, the only mail transport, bound whenever `MAIL_FROM`
- * is set. Email Service rejects an unverified sender domain
- * (`E_SENDER_NOT_VERIFIED`), so `MAIL_FROM` must be on a sending domain of a zone
- * in THIS account; a stage without one leaves `MAIL_FROM` unset and sends no mail
- * (sign-up then needs no email verification, `email/mailer.ts#deliversMail`).
+ * Cloudflare Email Service, the only mail transport, bound only when a stage opts
+ * in with `MAIL_EMAIL_SERVICE=1` and sets `MAIL_FROM`. The binding is what turns
+ * on email verification (`email/mailer.ts#deliversMail`), and Email Service
+ * rejects an unverified sender domain (`E_SENDER_NOT_VERIFIED`). Following
+ * `MAIL_FROM` alone would lock out every password sign-up on a stage that kept an
+ * old `MAIL_FROM` (from Resend) but has no Email Service zone in THIS account.
+ * Without the opt-in the stage sends no mail and sign-up needs no verification.
  *
  * `MAIL_FROM` itself rides `requiredEnvPassthrough` (the mailer reads it). `allowedSenderAddresses` pins the From to its address.
  * Destination is deliberately left unrestricted: `destinationAddress` /
@@ -262,7 +264,16 @@ const optionalEnvPassthrough = boundWhereSet(OPTIONAL_ENV_KEYS);
 const mailFrom = process.env.MAIL_FROM?.trim() ?? "";
 /** `allowedSenderAddresses` takes the bare address of a `Name <addr@host>` sender. */
 const mailFromAddress = /<([^<>]+)>\s*$/u.exec(mailFrom)?.[1]?.trim() ?? mailFrom;
-const useEmailService = mailFrom !== "";
+const emailServiceOptIn = process.env.MAIL_EMAIL_SERVICE?.trim() === "1";
+const useEmailService = mailFrom !== "" && emailServiceOptIn;
+
+if (mailFrom !== "" && !emailServiceOptIn && stage !== "production") {
+    // Not fatal: the stage still deploys, just without mail or required verification.
+    console.warn(
+        `[alchemy] stage ${stage}: MAIL_FROM is set but MAIL_EMAIL_SERVICE is not "1", so no EMAIL binding is created and ` +
+            "this stage sends no mail. Set MAIL_EMAIL_SERVICE=1 once MAIL_FROM's domain is an Email Service sending domain here.",
+    );
+}
 
 /**
  * Turnstile is two independent variables with nothing tying them together, and
@@ -319,10 +330,10 @@ if (accessEnabled && accessEmails.length === 0 && !destroying) {
  * so with `MAIL_FROM` unset every sign-up, password reset and invitation that
  * sends mail fails. With it set, the EMAIL binding is the transport (see above).
  */
-if (stage === "production" && !mailFrom && !destroying) {
+if (stage === "production" && !useEmailService && !destroying) {
     throw new Error(
-        "Cannot deploy (stage: production) — no outbound mail. Set MAIL_FROM to a verified sender: a Cloudflare Email Service " +
-            "sending domain in this account. Without it, password resets and invitations are never sent.",
+        "Cannot deploy (stage: production) — no outbound mail. Set MAIL_FROM to a verified sender (a Cloudflare Email Service " +
+            "sending domain in this account) and MAIL_EMAIL_SERVICE=1. Without both, password resets and invitations are never sent.",
     );
 }
 
