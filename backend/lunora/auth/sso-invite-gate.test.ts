@@ -545,7 +545,7 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         expect.assertions(4);
 
         const onGuestConverted = vi.fn<(guestId: string, userId: string) => Promise<void>>().mockRejectedValueOnce(new Error("queue down"));
-        const { auth, db } = await createTestAuth({ onGuestConverted: async (guestId, userId) => await onGuestConverted(guestId, userId) });
+        const { auth, db } = await createTestAuth({ onGuestConverted });
         const guest = await auth.handler(post("/sign-in/anonymous", {}));
         const guestId = ((await guest.json()) as { user: { id: string } }).user.id;
 
