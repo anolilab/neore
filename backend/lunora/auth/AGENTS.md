@@ -17,7 +17,7 @@ reasoning are in [docs/agents/backend-auth.md](../../../docs/agents/backend-auth
 - E2E seeds via `POST /e2e/invitations` (`auth/e2e-seed-http.ts`), 404 unless `ENVIRONMENT=development`, loopback `PUBLIC_ORIGIN` AND `E2E_SEED_TOKEN`; that token lives only in `backend/.dev.vars`, never the deploy. Restart the backend after adding it.
 - The plaintext token is never stored (SHA-256 only): a lost link is reissued, not recovered.
 - A password sign-up must verify its address wherever mail reaches an inbox: `requireEmailVerification` follows `deliversMail()` (`email/mailer.ts`: the Cloudflare `EMAIL` binding, never dev capture). Do not hard-code it.
-- A guest that converts by password sign-up keeps its data even when it verifies in another browser: `auth/guest-conversion.ts` records the guest at sign-up (from the server session only) and hands the move over at `/verify-email`. Keep it beside the anonymous plugin's `onLinkAccount`.
+- A guest that converts by password sign-up keeps its data even when it verifies in another browser: `auth/guest-conversion.ts` records the guest at sign-up (from the server session only) and hands the move over at `/verify-email`. Keep it beside the anonymous plugin's `onLinkAccount`. The record carries a digest of the sign-up's password hash; a hand-over needs it unchanged, so a reset or change by the address's owner (any path) drops it. Never key the hand-over on request paths.
 - Admin surface is `crpc.auth.invitations.*`, all `adminAction`; nothing sends mail (`createInvitation` returns the URL).
 
 ## Auth

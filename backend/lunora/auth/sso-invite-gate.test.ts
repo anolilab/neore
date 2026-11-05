@@ -19,6 +19,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const SITE = "http://localhost:3000";
 /** A verify-email link in a queued mail's text. */
 const VERIFY_LINK = /https?:\/\/\S+\/verify-email\S+/;
+/** The token in a reset-password mail's link (`/reset-password/<token>?callbackURL=…`). */
+const RESET_TOKEN = /\/reset-password\/([\w-]+)/;
 const EMAIL = "stranger@example.com";
 const MICROSOFT_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad";
 
@@ -507,6 +509,7 @@ describe("passkeys", { timeout: 30_000 }, () => {
 
 describe("email verification where mail is delivered", { timeout: 30_000 }, () => {
     const PASSWORD = "a-long-enough-password"; // secret-scanner:allow
+    const OWNER_PASSWORD = "the-real-owners-password"; // secret-scanner:allow
 
     beforeEach(async () => {
         vi.resetModules();
@@ -710,7 +713,7 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         const pending = db.verification!.find((row) => String(row.identifier).startsWith("guest-conversion:"));
 
         expect(signIn.status).toBe(403);
-        expect(pending?.value).toBe(guestId);
+        expect(JSON.parse(String(pending?.value))).toMatchObject({ guest: guestId });
 
         const [, link] = await queuedVerificationLinks();
         const verified = await auth.handler(new Request(link!, { headers: { origin: SITE } }));
@@ -741,6 +744,44 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
 
         expect(signIn.status).toBe(403);
         expect((pending()!.expiresAt as Date).getTime()).toBeGreaterThan(nearlyExpired.getTime() + 24 * 60 * 60 * 1000);
+    });
+
+    /** The password-reset tokens queued for delivery since the test began. */
+    const queuedResetTokens = async (): Promise<string[]> => {
+        const { jobsQueueMessages } = (await import("cloudflare:workers")) as unknown as {
+            jobsQueueMessages: { body: { args?: { message?: { subject?: string; text?: string } } } }[];
+        };
+
+        return jobsQueueMessages.map((queued) => queued.body.args?.message?.text ?? "").flatMap((text) => RESET_TOKEN.exec(text)?.[1] ?? []);
+    };
+
+    it("does not hand a stranger's guest over to the owner who reset the password", async () => {
+        expect.assertions(4);
+
+        const onGuestConverted = vi.fn(async () => undefined);
+        const { auth, db } = await createTestAuth({ onGuestConverted });
+
+        // A stranger signs up, from a guest session, with the owner's address.
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+
+        await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Stranger", password: PASSWORD }, cookieOf(guest)));
+
+        // The owner resets the password, signs in (mailing a new verification link) and verifies.
+        await auth.handler(post("/request-password-reset", { email: EMAIL, redirectTo: "/auth/reset-password" }));
+
+        const [token] = await queuedResetTokens();
+        const reset = await auth.handler(post("/reset-password", { newPassword: OWNER_PASSWORD, token: token! }));
+
+        expect(reset.status).toBe(200);
+
+        await auth.handler(post("/sign-in/email", { email: EMAIL, password: OWNER_PASSWORD }));
+
+        const links = await queuedVerificationLinks();
+        const verified = await auth.handler(new Request(links.at(-1)!, { headers: { origin: SITE } }));
+
+        expect(verified.status).toBeLessThan(400);
+        expect(onGuestConverted).not.toHaveBeenCalled();
+        expect(db.verification!.some((row) => String(row.identifier).startsWith("guest-conversion:"))).toBe(false);
     });
 
     /** Makes every read of a guest-conversion record fail, as a D1 error would; other verification reads still work. */

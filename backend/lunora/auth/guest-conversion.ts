@@ -11,13 +11,19 @@
  * ever read from the request's resolved session, never from the body or the query. The record goes only once the move
  * is queued, so a failed hand-over is retried at the next sign-in; an unverified sign-in, which mails a new link,
  * renews it in place. If the record cannot be written at sign-up, the move is queued there and then, while the request
- * still holds the guest's session: the email is now taken, so no later request could rebuild the record. Verifying in
+ * still holds the guest's session: the email is now taken, so no later request could rebuild the record. The record
+ * also holds a digest of the sign-up's password hash ({@link credentialFingerprint}); a hand-over happens only while the
+ * account still has that password. Someone can sign up as a guest with another person's address; when the real owner
+ * resets the password and verifies, the digest no longer matches and the stranger's data stays out of their account.
+ * That holds for every way a password is replaced, including ones added later, which hooks on request paths would
+ * miss. Verifying in
  * the same browser also runs `onLinkAccount`; every path queues the same move, which is safe to run twice
  * (`lib/account-merge.ts`).
  */
 import type { BetterAuthPlugin } from "better-auth";
 import { createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 
+import { sha256Hex, timingSafeEqual } from "../lib/crypto";
 import { authLogger } from "../lib/logger";
 
 /** How long a recorded guest waits for its account's first session; renewed by every unverified sign-in. */
@@ -42,6 +48,39 @@ interface SignUpReturn {
 }
 
 const pendingExpiry = (): Date => new Date(Date.now() + PENDING_GUEST_LINK_TTL_MS);
+
+type ConversionAdapter = {
+    findAccounts: (userId: string) => Promise<{ password?: string | null; providerId: string }[]>;
+};
+
+/**
+ * Which password the account holds, as a digest of its stored hash. A hash is salted, so any change of password (a
+ * reset by the address's owner, a change, an admin setting one, a path added later) gives a new digest, even to the
+ * same password. `undefined` without a password.
+ */
+const credentialFingerprint = async (adapter: ConversionAdapter, userId: string): Promise<string | undefined> => {
+    const accounts = await adapter.findAccounts(userId);
+    const hash = accounts.find((account) => account.providerId === "credential")?.password;
+
+    return hash ? await sha256Hex(hash) : undefined;
+};
+
+/** What a record holds: the guest, and the sign-up's password as {@link credentialFingerprint} saw it. */
+interface PendingGuest {
+    credential: string;
+    guest: string;
+}
+
+/** A record written before it carried the credential (a bare guest id) reads as `undefined`: never handed over. */
+const parsePending = (value: string): PendingGuest | undefined => {
+    try {
+        const parsed = JSON.parse(value) as Partial<PendingGuest> | null;
+
+        return typeof parsed?.guest === "string" && typeof parsed.credential === "string" ? { credential: parsed.credential, guest: parsed.guest } : undefined;
+    } catch {
+        return undefined;
+    }
+};
 
 type HandOverContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0];
 
@@ -70,7 +109,7 @@ const handOver = async (ctx: HandOverContext, onGuestConverted: (guestId: string
                 // One in-place write: a failed renewal leaves the record and its expiry as they were.
                 await adapter.updateVerificationByIdentifier(pendingIdentifier(account.user.id), { expiresAt: pendingExpiry() });
             } catch (error) {
-                authLogger.error(`[auth] renewing guest ${pending.value} for ${account.user.id} failed:`, error);
+                authLogger.error(`[auth] renewing the guest record for ${account.user.id} failed:`, error);
             }
         }
 
@@ -83,15 +122,27 @@ const handOver = async (ctx: HandOverContext, onGuestConverted: (guestId: string
         return;
     }
 
+    const recorded = parsePending(pending.value);
+    const credential = await credentialFingerprint(adapter as unknown as ConversionAdapter, sessionUserId);
+
+    // The password is no longer the one the guest signed up with (the address's owner reset or changed it), or the
+    // record predates the check: whoever signs in now did not sign up with the guest's session. No hand-over.
+    if (!recorded || !credential || !timingSafeEqual(recorded.credential, credential)) {
+        authLogger.warn(`[auth] the guest record for ${sessionUserId} does not match the account's password; dropped without a hand-over`);
+        await adapter.deleteVerificationByIdentifier(pendingIdentifier(sessionUserId));
+
+        return;
+    }
+
     // Only a guest that still exists, and is still a guest, hands its rows over.
-    const guest = (await adapter.findUserById(pending.value)) as { isAnonymous?: boolean | null } | null;
+    const guest = (await adapter.findUserById(recorded.guest)) as { isAnonymous?: boolean | null } | null;
 
     if (guest?.isAnonymous === true) {
         try {
-            await onGuestConverted(pending.value, sessionUserId);
+            await onGuestConverted(recorded.guest, sessionUserId);
         } catch (error) {
             // Kept, so the next sign-in tries again; the session itself must not fail.
-            authLogger.error(`[auth] handing guest ${pending.value} over to ${sessionUserId} failed:`, error);
+            authLogger.error(`[auth] handing guest ${recorded.guest} over to ${sessionUserId} failed:`, error);
 
             return;
         }
@@ -122,10 +173,16 @@ export const guestConversion = (onGuestConverted: (guestId: string, userId: stri
                         }
 
                         try {
+                            const credential = await credentialFingerprint(ctx.context.internalAdapter as unknown as ConversionAdapter, userId);
+
+                            if (!credential) {
+                                throw new Error("the new account has no password to bind the record to");
+                            }
+
                             await ctx.context.internalAdapter.createVerificationValue({
                                 expiresAt: pendingExpiry(),
                                 identifier: pendingIdentifier(userId),
-                                value: guest.id,
+                                value: JSON.stringify({ credential, guest: guest.id } satisfies PendingGuest),
                             });
                         } catch (error) {
                             authLogger.error(`[auth] recording guest ${guest.id} for ${userId} failed; queueing the move now:`, error);
