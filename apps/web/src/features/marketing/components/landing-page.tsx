@@ -27,6 +27,7 @@ import type { ComponentType, FC, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { LinkButton } from "@/components/link-button";
+import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import useCheckout from "@/features/billing/hooks/use-checkout";
 import Composer from "@/features/chat/thread/composer";
@@ -486,6 +487,8 @@ const SectionBadge = ({ className, index, light = false, title }: { className?: 
 
 const LandingPage: FC = () => {
     const { i18n, t } = useLingui();
+    // Registration is invite-only unless the backend says otherwise: the plans' "Sign up" then reads "Sign in".
+    const { signUpTarget } = useInviteOnly();
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const [scrollContainerMounted, setScrollContainerMounted] = useState(false);
     const { isAnonymous, isSessionUnknown, user } = useIsAnonymous();
@@ -1046,8 +1049,13 @@ const LandingPage: FC = () => {
                                         </Button>
                                     )}
                                     {(!(tier.id === "pro" || tier.id === "team") || (!isSignedIn && !isSessionUnknown)) && (
-                                        <LinkButton className="w-full" size="marketing" to={tier.href} variant={tier.popular ? "marketing" : "marketing-ghost"}>
-                                            {i18n._(tier.cta)}
+                                        <LinkButton
+                                            className="w-full"
+                                            size="marketing"
+                                            to={tier.href === "/auth/sign-up" ? signUpTarget : tier.href}
+                                            variant={tier.popular ? "marketing" : "marketing-ghost"}
+                                        >
+                                            {tier.href === "/auth/sign-up" && signUpTarget !== tier.href ? t`Sign in` : i18n._(tier.cta)}
                                         </LinkButton>
                                     )}
                                 </motion.div>

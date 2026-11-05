@@ -19,20 +19,30 @@ export const mustSignInToChat = (inviteOnly: boolean | undefined, user: { isAnon
  * - `canSignUp`: offer sign-up only when registration is open, or the visitor
  *   arrived on an invitation link (`?invite=`). Hidden while unknown, so an
  *   invite-only deployment never flashes a sign-up link.
+ * - `signUpTarget`: where a "sign up" call to action should go: the sign-up
+ *   page when it is offered, else sign-in (also while unknown).
  * - `mustSignIn`: see {@link mustSignInToChat}; only once the session read has
  *   answered, so a signed-in user whose session is still loading is not asked.
  */
-const useInviteOnly = (): { canSignUp: boolean; inviteOnly: boolean | undefined; mustSignIn: boolean } => {
+const useInviteOnly = (): {
+    canSignUp: boolean;
+    inviteOnly: boolean | undefined;
+    mustSignIn: boolean;
+    signUpTarget: "/auth/sign-in" | "/auth/sign-up";
+} => {
     const { inviteOnly } = useSignInMethods();
     const { hooks } = useAuth();
     const { data: sessionData, error: sessionError, isPending: isSessionPending } = hooks.useSession();
     const isHydrated = useIsHydrated();
     const hasInvitation = isHydrated && readInviteToken() !== undefined;
 
+    const canSignUp = hasInvitation || inviteOnly === false;
+
     return {
-        canSignUp: hasInvitation || inviteOnly === false,
+        canSignUp,
         inviteOnly,
         mustSignIn: !isSessionPending && !sessionError && mustSignInToChat(inviteOnly, sessionData?.user),
+        signUpTarget: canSignUp ? "/auth/sign-up" : "/auth/sign-in",
     };
 };
 

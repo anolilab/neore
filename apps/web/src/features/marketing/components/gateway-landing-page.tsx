@@ -18,6 +18,7 @@ import type { FC } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { LinkButton } from "@/components/link-button";
+import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 
 import GatewayFooter from "./gateway-footer";
 import type { NavTheme } from "./gateway-navbar";
@@ -338,6 +339,8 @@ for await (const chunk of response) {
 
 const GatewayLandingPage: FC = () => {
     const { i18n, t } = useLingui();
+    // Registration is invite-only unless the backend says otherwise: the calls to action then lead to sign-in.
+    const { signUpTarget } = useInviteOnly();
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const [scrollContainerMounted, setScrollContainerMounted] = useState(false);
     const [isAnnual, setIsAnnual] = useState(true);
@@ -432,7 +435,7 @@ const GatewayLandingPage: FC = () => {
                             </pre>
                         </div>
                         <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                            <LinkButton size="marketing" to="/auth/sign-up" variant="marketing">
+                            <LinkButton size="marketing" to={signUpTarget} variant="marketing">
                                 {t`Get API key`} <ArrowRight className="ml-2 size-4" />
                             </LinkButton>
                             <Button size="marketing" variant="marketing-ghost">
@@ -555,7 +558,7 @@ const GatewayLandingPage: FC = () => {
                                                 {i18n._(feature.description)}
                                             </p>
                                             <div>
-                                                <LinkButton size="marketing" to="/auth/sign-up" variant="marketing">
+                                                <LinkButton size="marketing" to={signUpTarget} variant="marketing">
                                                     {t`Get started`} <ArrowRight className="ml-2 size-4" />
                                                 </LinkButton>
                                             </div>
@@ -635,7 +638,7 @@ const GatewayLandingPage: FC = () => {
                                 {t`One API key, one SDK, one dashboard. Smart routing handles the rest.`}
                             </p>
                             <motion.div className="inline-block" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                                <LinkButton size="marketing" to="/auth/sign-up" variant="marketing">
+                                <LinkButton size="marketing" to={signUpTarget} variant="marketing">
                                     {t`Get your API key`} <ArrowRight className="ml-2 size-4" />
                                 </LinkButton>
                             </motion.div>
@@ -698,7 +701,7 @@ const GatewayLandingPage: FC = () => {
                         </motion.div>
 
                         <div className="border-brand-silver flex flex-col items-center justify-center gap-3 px-4 py-8 sm:flex-row sm:px-6 sm:py-10 lg:px-10">
-                            <LinkButton size="marketing" to="/auth/sign-up" variant="marketing">
+                            <LinkButton size="marketing" to={signUpTarget} variant="marketing">
                                 {t`Get API key`} <ArrowRight className="ml-2 size-4" />
                             </LinkButton>
                             <Button size="marketing" variant="marketing-ghost">
@@ -812,7 +815,12 @@ const GatewayLandingPage: FC = () => {
                                         ))}
                                     </ul>
 
-                                    <LinkButton className="w-full" size="marketing" to={tier.href} variant={tier.popular ? "marketing" : "marketing-ghost"}>
+                                    <LinkButton
+                                        className="w-full"
+                                        size="marketing"
+                                        to={tier.href === "/auth/sign-up" ? signUpTarget : tier.href}
+                                        variant={tier.popular ? "marketing" : "marketing-ghost"}
+                                    >
                                         {i18n._(tier.cta)}
                                     </LinkButton>
                                 </motion.div>
@@ -843,7 +851,7 @@ const GatewayLandingPage: FC = () => {
                             </p>
                             <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
                                 <motion.div className="w-full sm:w-auto" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                                    <LinkButton size="marketing" to="/auth/sign-up" variant="marketing">
+                                    <LinkButton size="marketing" to={signUpTarget} variant="marketing">
                                         {t`Get API key`} <ArrowRight className="ml-2 size-4" />
                                     </LinkButton>
                                 </motion.div>
@@ -895,7 +903,7 @@ const GatewayLandingPage: FC = () => {
                         </div>
 
                         <div className="border-brand-silver flex flex-col items-center justify-center gap-3 border-t px-4 py-8 sm:flex-row sm:px-6 sm:py-10 lg:px-10">
-                            <LinkButton size="marketing" to="/auth/sign-up" variant="marketing">
+                            <LinkButton size="marketing" to={signUpTarget} variant="marketing">
                                 {t`Get API key`} <ArrowRight className="ml-2 size-4" />
                             </LinkButton>
                             <Button size="marketing" variant="marketing-ghost">

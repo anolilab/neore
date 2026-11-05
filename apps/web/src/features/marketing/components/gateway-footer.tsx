@@ -9,6 +9,7 @@ import { motion } from "motion/react";
 import type { FC } from "react";
 
 import { Github, Linkedin, Twitter } from "@/components/brand-icons";
+import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 
 import SectionSeperator from "./section-seperator";
 
@@ -49,6 +50,8 @@ const categoryLabels: Record<keyof typeof footerLinks, MessageDescriptor> = {
 
 const GatewayFooter: FC = () => {
     const { i18n, t } = useLingui();
+    // Registration is invite-only unless the backend says otherwise: "Get API Key" then leads to sign-in.
+    const { signUpTarget } = useInviteOnly();
 
     return (
         <footer className="bg-brand-obsidian text-brand-frost">
@@ -111,7 +114,10 @@ const GatewayFooter: FC = () => {
                                                 {i18n._(link.label)}
                                             </a>
                                         ) : (
-                                            <Link className="text-sm text-white/60 transition-colors hover:text-white" to={link.to}>
+                                            <Link
+                                                className="text-sm text-white/60 transition-colors hover:text-white"
+                                                to={link.to === "/auth/sign-up" ? signUpTarget : link.to}
+                                            >
                                                 {i18n._(link.label)}
                                             </Link>
                                         )}
