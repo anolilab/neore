@@ -441,7 +441,8 @@ const AuthCard: FC<AuthCardProperties> = ({
     };
 
     return (
-        <Card className={cn("w-full max-w-sm", className, classNames?.base)}>
+        // Without the form, nothing gives the card its width: hold it at the sign-up form's (about 290px), within the screen.
+        <Card className={cn("w-full max-w-sm", signUpState !== "open" && "min-w-72", className, classNames?.base)}>
             <CardHeader className={classNames?.header}>
                 {cardHeader || (
                     <>
