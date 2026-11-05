@@ -17,7 +17,7 @@ The rules for working in `packages/ai/`. The detail and reasoning (including the
 
 ### Adding a model
 
-```ts
+```text
 // In models/registry.ts, add to MODEL_REGISTRY array:
 {
     id: "my-model-id",         // unique internal key
