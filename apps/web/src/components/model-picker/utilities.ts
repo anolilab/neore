@@ -81,7 +81,7 @@ export const getCreatorSlug = (model: GatewayModel): string => {
  * The id's prefix is not the creator: `cf-kimi-k2.5` has none, and `moonshotai/…` belongs to `moonshot`.
  */
 export const initialCreatorSlug = (models: ReadonlyArray<GatewayModel>, modelId: string | undefined): string | null => {
-    const model = modelId === undefined ? undefined : models.find((candidate) => candidate.id === modelId);
+    const model = modelId === undefined ? undefined : models.find((candidate: GatewayModel) => candidate.id === modelId);
 
     return model ? getCreatorSlug(model) : null;
 };
