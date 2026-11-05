@@ -711,8 +711,10 @@ written here is what is not.
   every download through `lib/media.ts#fetchMedia` — per-platform host allowlist,
   a bot token never follows a redirect off-host, 20 MB, MIME allowlist). A media
   message is also SAVED there, so it is absent from the thread until the action
-  runs. A thread whose recent rows carry image/file parts replies on
-  `MESSENGER_MEDIA_MODEL`, an image reader whatever the default chat model is; audio reaches the model only
+  runs. A PDF reaches the reply as its extracted text when that fits; a longer or unreadable one stays a
+  `file` part. A thread whose recent rows carry an image replies on `MESSENGER_MEDIA_MODEL` (an image reader
+  whatever the default chat model is), one with a file part on `MESSENGER_FILE_MODEL` (`threadRecentMedia`,
+  `chooseReplyModel`); audio reaches the model only
   as a transcript (`fileIds`, not a part — an audio part would fail most providers).
   Outbound media ships only when a reply's assistant rows carry file parts
   (`listReplyMedia`, owner-granted storage only) — so without reply tools
