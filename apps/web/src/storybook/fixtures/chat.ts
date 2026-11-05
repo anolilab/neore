@@ -41,8 +41,8 @@ export const thread = (overrides: Partial<Thread> & { _id: string }): Thread => 
 export const THREADS = {
     main: thread({ _id: THREAD_IDS.main, title: "Plan the Q1 product launch" }),
     older: thread({ _id: THREAD_IDS.older, lastReplyAt: ago(9 * DAY), title: "Rust lifetimes, explained", updatedAt: ago(9 * DAY) }),
-    pinned: thread({ _id: THREAD_IDS.pinned, pinned: true, title: "Weekly team update draft" } as Partial<Thread> & { _id: string }),
-    project: thread({ _id: THREAD_IDS.project, projectId: "project_launch", title: "Pricing page copy" } as Partial<Thread> & { _id: string }),
+    pinned: thread({ _id: THREAD_IDS.pinned, pinnedAt: ago(DAY), title: "Weekly team update draft" }),
+    project: thread({ _id: THREAD_IDS.project, projectId: "project_launch", title: "Pricing page copy" }),
     recent: thread({ _id: THREAD_IDS.recent, lastReplyAt: ago(26 * HOUR), title: "Fix flaky Playwright test", updatedAt: ago(26 * HOUR) }),
 } satisfies Record<string, Thread>;
 
@@ -103,7 +103,7 @@ const listItem = (value: Thread): ThreadListItem => value as unknown as ThreadLi
 /** The sidebar's thread list: pinned, today, yesterday and older, plus one project thread. */
 export const threadList = (threads: Thread[] = Object.values(THREADS)): ThreadList => {
     return {
-        pinnedThreads: threads.filter((item) => (item as { pinned?: boolean }).pinned).map(listItem),
+        pinnedThreads: threads.filter((item) => item.pinnedAt !== undefined).map(listItem),
         relationships: [],
         tags: [],
         temporaryThreads: pageOf([]),
