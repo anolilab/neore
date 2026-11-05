@@ -10,8 +10,10 @@
  * and the first session the account gets (from the link, or a later sign-in) finishes the link. The guest id is only
  * ever read from the request's resolved session, never from the body or the query. The record goes only once the move
  * is queued, so a failed hand-over is retried at the next sign-in; an unverified sign-in, which mails a new link,
- * renews it. Verifying in the same browser also runs `onLinkAccount`; both queue the same move, which is safe to run
- * twice (`lib/account-merge.ts`).
+ * renews it in place. If the record cannot be written at sign-up, the move is queued there and then, while the request
+ * still holds the guest's session: the email is now taken, so no later request could rebuild the record. Verifying in
+ * the same browser also runs `onLinkAccount`; every path queues the same move, which is safe to run twice
+ * (`lib/account-merge.ts`).
  */
 import type { BetterAuthPlugin } from "better-auth";
 import { createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
@@ -31,16 +33,7 @@ interface SignUpReturn {
     user?: { id?: string };
 }
 
-type InternalAdapter = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0]["context"]["internalAdapter"];
-
-const remember = async (adapter: InternalAdapter, userId: string, guestId: string): Promise<void> => {
-    await adapter.deleteVerificationByIdentifier(pendingIdentifier(userId));
-    await adapter.createVerificationValue({
-        expiresAt: new Date(Date.now() + PENDING_GUEST_LINK_TTL_MS),
-        identifier: pendingIdentifier(userId),
-        value: guestId,
-    });
-};
+const pendingExpiry = (): Date => new Date(Date.now() + PENDING_GUEST_LINK_TTL_MS);
 
 export const guestConversion = (onGuestConverted: (guestId: string, userId: string) => Promise<void>) =>
     ({
@@ -59,8 +52,25 @@ export const guestConversion = (onGuestConverted: (guestId: string, userId: stri
                         const session = await getSessionFromCtx(ctx);
                         const guest = session?.user as { id: string; isAnonymous?: boolean | null } | undefined;
 
-                        if (guest?.isAnonymous === true) {
-                            await remember(ctx.context.internalAdapter, userId, guest.id);
+                        if (guest?.isAnonymous !== true) {
+                            return;
+                        }
+
+                        try {
+                            await ctx.context.internalAdapter.createVerificationValue({
+                                expiresAt: pendingExpiry(),
+                                identifier: pendingIdentifier(userId),
+                                value: guest.id,
+                            });
+                        } catch (error) {
+                            authLogger.error(`[auth] recording guest ${guest.id} for ${userId} failed; queueing the move now:`, error);
+
+                            try {
+                                await onGuestConverted(guest.id, userId);
+                            } catch (queueError) {
+                                // The account exists already, so the sign-up must still answer; only this log is left.
+                                authLogger.error(`[auth] handing guest ${guest.id} over to ${userId} failed:`, queueError);
+                            }
                         }
                     }),
                     matcher: (ctx) => ctx.path === "/sign-up/email",
@@ -81,7 +91,12 @@ export const guestConversion = (onGuestConverted: (guestId: string, userId: stri
                                 account && !account.user.emailVerified ? await adapter.findVerificationValue(pendingIdentifier(account.user.id)) : null;
 
                             if (account && pending) {
-                                await remember(adapter, account.user.id, pending.value);
+                                try {
+                                    // One in-place write: a failed renewal leaves the record and its expiry as they were.
+                                    await adapter.updateVerificationByIdentifier(pendingIdentifier(account.user.id), { expiresAt: pendingExpiry() });
+                                } catch (error) {
+                                    authLogger.error(`[auth] renewing guest ${pending.value} for ${account.user.id} failed:`, error);
+                                }
                             }
 
                             return;

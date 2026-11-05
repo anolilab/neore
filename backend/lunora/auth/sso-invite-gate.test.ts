@@ -564,6 +564,67 @@ describe("email verification where mail is delivered", { timeout: 30_000 }, () =
         expect(pendingRows()).toHaveLength(0);
     });
 
+    it("queues the move at sign-up when the guest cannot be recorded, so verifying elsewhere loses nothing", async () => {
+        expect.assertions(3);
+
+        const onGuestConverted = vi.fn(async () => undefined);
+        const { auth, db } = await createTestAuth({ onGuestConverted });
+        const { internalAdapter } = await auth.$context;
+        const create = internalAdapter.createVerificationValue.bind(internalAdapter);
+
+        vi.spyOn(internalAdapter, "createVerificationValue").mockImplementation(async (data) => {
+            if (String(data.identifier).startsWith("guest-conversion:")) {
+                throw new Error("store down");
+            }
+
+            return create(data);
+        });
+
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+        const guestId = ((await guest.json()) as { user: { id: string } }).user.id;
+        const signUp = await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, cookieOf(guest)));
+
+        expect(signUp.status).toBe(200);
+        expect(onGuestConverted).toHaveBeenCalledExactlyOnceWith(guestId, db.user!.find((row) => row.email === EMAIL)?.id);
+        expect(db.verification!.some((row) => String(row.identifier).startsWith("guest-conversion:"))).toBe(false);
+    });
+
+    it("keeps the recorded guest when renewing it fails", async () => {
+        expect.assertions(4);
+
+        const onGuestConverted = vi.fn(async () => undefined);
+        const { auth, db } = await createTestAuth({ onGuestConverted });
+        const guest = await auth.handler(post("/sign-in/anonymous", {}));
+        const guestId = ((await guest.json()) as { user: { id: string } }).user.id;
+
+        await auth.handler(post("/sign-up/email", { email: EMAIL, name: "Member", password: PASSWORD }, cookieOf(guest)));
+
+        const { internalAdapter } = await auth.$context;
+        const create = internalAdapter.createVerificationValue.bind(internalAdapter);
+
+        // Every write that would replace the recorded guest fails; the record must survive that.
+        vi.spyOn(internalAdapter, "updateVerificationByIdentifier").mockRejectedValue(new Error("store down"));
+        vi.spyOn(internalAdapter, "createVerificationValue").mockImplementation(async (data) => {
+            if (String(data.identifier).startsWith("guest-conversion:")) {
+                throw new Error("store down");
+            }
+
+            return create(data);
+        });
+
+        const signIn = await auth.handler(post("/sign-in/email", { email: EMAIL, password: PASSWORD }));
+        const pending = db.verification!.find((row) => String(row.identifier).startsWith("guest-conversion:"));
+
+        expect(signIn.status).toBe(403);
+        expect(pending?.value).toBe(guestId);
+
+        const [, link] = await queuedVerificationLinks();
+        const verified = await auth.handler(new Request(link!, { headers: { origin: SITE } }));
+
+        expect(verified.status).toBeLessThan(400);
+        expect(onGuestConverted).toHaveBeenCalledExactlyOnceWith(guestId, db.user!.find((row) => row.email === EMAIL)?.id);
+    });
+
     it("renews the recorded guest when an unverified sign-in mails a new link, never on a wrong password", async () => {
         expect.assertions(4);
 
