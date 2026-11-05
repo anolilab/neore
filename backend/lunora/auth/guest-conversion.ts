@@ -123,7 +123,7 @@ const handOver = async (ctx: HandOverContext, onGuestConverted: (guestId: string
     }
 
     const recorded = parsePending(pending.value);
-    const credential = await credentialFingerprint(adapter as unknown as ConversionAdapter, sessionUserId);
+    const credential = await credentialFingerprint(adapter, sessionUserId);
 
     // The password is no longer the one the guest signed up with (the address's owner reset or changed it), or the
     // record predates the check: whoever signs in now did not sign up with the guest's session. No hand-over.
@@ -180,7 +180,7 @@ export const guestConversion = (onGuestConverted: (guestId: string, userId: stri
                         }
 
                         try {
-                            const credential = await credentialFingerprint(ctx.context.internalAdapter as unknown as ConversionAdapter, userId);
+                            const credential = await credentialFingerprint(ctx.context.internalAdapter, userId);
 
                             if (!credential) {
                                 throw new Error("the new account has no password to bind the record to");
