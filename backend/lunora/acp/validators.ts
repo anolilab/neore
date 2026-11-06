@@ -198,6 +198,34 @@ export const vHostEvent = v.union(
         title: v.string().max(500),
         toolKind: v.string().max(64),
     }),
+    // The agent's plan for the turn, whole: each `plan` replaces the one before it. Shown live while the turn runs and never
+    // kept on the saved reply, like the tool rows.
+    v.object({
+        entries: v
+            .array(
+                v.object({
+                    content: v.string().max(500),
+                    priority: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+                    status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed")),
+                }),
+            )
+            .check((entries) => entries.length <= 50, { message: "Too many plan entries" }),
+        kind: v.literal("plan"),
+    }),
+    // What a tool call printed (its text output, or its terminal's): the tail, masked on the desktop, and, once a terminal the
+    // call ran in has exited, its exit code or the signal that ended it. An event of its own, posted only when it changed, so
+    // the `tool` event keeps the shape its stored chunks were written in.
+    v.object({
+        exit: v.optional(
+            v.object({
+                code: v.optional(v.number().check((code) => Number.isSafeInteger(code), { message: "Invalid exit code" })),
+                signal: v.optional(v.string().max(32)),
+            }),
+        ),
+        id: v.string().max(128),
+        kind: v.literal("tool_output"),
+        output: v.string().max(2000),
+    }),
     // `command` and `target` may carry paths and file contents' names: §4.4 shows the request in full to its owner.
     v.object({
         command: v.optional(v.string().max(10_000)),

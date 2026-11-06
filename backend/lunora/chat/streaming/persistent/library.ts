@@ -13,6 +13,7 @@ import { patchThread } from "../../../agent/table-writes";
 import { internal } from "../../../_generated/internal";
 import type { Doc, Id } from "../../../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../../../_generated/server";
+import { type HostActivity, hostActivityOf } from "../../../acp/lib/activity";
 import { stopHostTurn } from "../../../acp/lib/finish";
 import { enqueueJob } from "../../../lib/job-queue";
 import { endActiveGoals } from "../../goals/rows";
@@ -498,6 +499,45 @@ export const getStreamText = internalQuery
     })
     .output(
         v.object({
+            /** A coding agent's running turn only (`acp/lib/activity.ts`): its latest plan and its tool calls. Live only. */
+            hostActivity: v.optional(
+                v.object({
+                    plan: v.optional(
+                        v.array(
+                            v.object({
+                                content: v.string().max(500),
+                                priority: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+                                status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed")),
+                            }),
+                        ),
+                    ),
+                    tools: v.array(
+                        v.object({
+                            exit: v.optional(
+                                v.object({
+                                    // Spelled out inline, however deep: codegen reads only an inline validator.
+                                    // eslint-disable-next-line unicorn/max-nested-calls
+                                    code: v.optional(v.number()),
+                                    // eslint-disable-next-line unicorn/max-nested-calls
+                                    signal: v.optional(v.string().max(32)),
+                                }),
+                            ),
+                            id: v.string().max(128),
+                            output: v.optional(v.string().max(2000)),
+                            status: v.union(
+                                v.literal("pending"),
+                                v.literal("in_progress"),
+                                v.literal("completed"),
+                                v.literal("failed"),
+                                v.literal("cancelled"),
+                                v.literal("declined"),
+                            ),
+                            title: v.string().max(500),
+                            toolKind: v.string().max(64),
+                        }),
+                    ),
+                }),
+            ),
             /** A coding agent's turn only (`acp/`). */
             hostState: v.optional(v.union(v.literal("accepted"), v.literal("received"), v.literal("running"), v.literal("ended"))),
             messageId: v.optional(v.string()),
@@ -547,6 +587,7 @@ export const getStreamText = internalQuery
         let reasoning = "";
         let speaker: { name: string; skillId: string } | undefined;
         let toolProgress: OpenToolProgress[] = [];
+        let hostActivity: HostActivity | undefined;
 
         if (stream.status !== "pending") {
             const { page: allChunks } = await ctx.db.persistentChunks.findMany({
@@ -564,6 +605,7 @@ export const getStreamText = internalQuery
             // Only the newest report per call goes out, from the chunks of the current reply; a settled stream runs no call.
             if (stream.status === "streaming") {
                 toolProgress = openToolProgress(chunks);
+                hostActivity = stream.producer === "host" ? hostActivityOf(allChunks) : undefined;
             }
 
             // A steer delivered whose marker is not written yet (the next step never started: a stop or a failure came
@@ -577,6 +619,7 @@ export const getStreamText = internalQuery
         }
 
         return {
+            ...(hostActivity !== undefined && { hostActivity }),
             ...(stream.hostState !== undefined && { hostState: stream.hostState }),
             messageId: stream.messageId,
             reasoning,

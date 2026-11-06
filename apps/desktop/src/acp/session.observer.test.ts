@@ -105,6 +105,60 @@ describe("a session's observer", () => {
         expect(reported).toEqual([{ usage: { cost: { amount: 0.42, currency: "USD" }, size: 200_000, used: 12_345 } }]);
     });
 
+    it("is told the tail of what a command tool printed, masked, and keeps it when a later update carries no content", async () => {
+        const { calls, observer } = recorder();
+        const secret = { scrub: (text: string) => text.replaceAll("TOKEN-123", "***"), secretLength: 9 };
+        const { player, session, steps } = await start(refuse, observer, secret, undefined, "tool-output-and-prompt");
+
+        session.send("say hi");
+        await player.play(steps.slice(4));
+        await expect.poll(() => session.snapshot().status).toBe("idle");
+
+        expect(calls.filter(([name]) => name === "tool").map((call) => call[2])).toEqual([
+            { id: "call_1", kind: "execute", status: "in_progress", title: "Run tests" },
+            // While the call runs, the last eight characters are held back: they may start the value (see `outputTail`).
+            { id: "call_1", kind: "execute", output: "3 pa", status: "in_progress", title: "Run tests" },
+            { id: "call_1", kind: "execute", output: "3 passed ***", status: "completed", title: "Run tests" },
+        ]);
+        // The window's transcript never carries what the call printed.
+        expect(JSON.stringify(session.snapshot())).not.toContain("passed");
+    });
+
+    it("is told each plan the agent sends for the turn, whole", async () => {
+        const { observer } = recorder();
+        const plans: unknown[] = [];
+        const watched: SessionObserver = {
+            ...observer,
+            plan: (_id, turnId, entries) => {
+                plans.push([turnId, entries]);
+            },
+        };
+        const { player, session, steps } = await start(refuse, watched, undefined, undefined, "plan-and-prompt");
+
+        session.send("say hi");
+        await player.play(steps.slice(4));
+        await expect.poll(() => session.snapshot().status).toBe("idle");
+
+        const [turn] = session.snapshot().turns;
+
+        expect(plans).toEqual([
+            [
+                turn?.id,
+                [
+                    { content: "Read the code", priority: "high", status: "in_progress" },
+                    { content: "Write the fix", priority: "medium", status: "pending" },
+                ],
+            ],
+            [
+                turn?.id,
+                [
+                    { content: "Read the code", priority: "high", status: "completed" },
+                    { content: "Write the fix", priority: "medium", status: "in_progress" },
+                ],
+            ],
+        ]);
+    });
+
     it("is told the session opened, the turn, its text and its end, in order", async () => {
         const { calls, observer } = recorder();
         const { player, session, steps } = await start(refuse, observer);
@@ -542,5 +596,60 @@ describe("a change asked for from the web or the phone", () => {
         // The legacy mode state (no option id) is a mode, refused before the session's own checks.
         await expect(session.setRemoteOption(undefined, "code")).rejects.toThrow("a mode is changed on the computer");
         expect(agent.written).toEqual([]);
+    });
+});
+
+describe("a running call's output", () => {
+    it("never shows the start of a configured value its text ends with, and shows the masked result once it completes", async () => {
+        const { calls, observer } = recorder();
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer,
+            onChange: () => {},
+            process: { ...agent.process, scrub: (text: string) => text.replaceAll("TOKEN-123", "***"), secretLength: 9 },
+        });
+        const written = async (method: string): Promise<Record<string, unknown>> => {
+            await expect.poll(() => agent.written.some((frame) => frame.method === method)).toBe(true);
+
+            return agent.written.find((frame) => frame.method === method) ?? {};
+        };
+        const reports = () => calls.filter(([name]) => name === "tool").map((call) => call[2] as { output?: string; status: string });
+        const update = (status: string, text: string) => {
+            agent.say({
+                method: "session/update",
+                params: {
+                    sessionId: "sess_1",
+                    update: { content: [{ content: { text, type: "text" }, type: "content" }], kind: "execute", sessionUpdate: "tool_call", status, title: "Build", toolCallId: "call_1" },
+                },
+            });
+        };
+
+        const started = session.start();
+        const initialize = await written("initialize");
+
+        agent.say({ id: initialize.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+
+        const opened = await written("session/new");
+
+        agent.say({ id: opened.id, result: { sessionId: "sess_1" } });
+        await started;
+
+        session.send("build it");
+        await written("session/prompt");
+
+        // The command's output so far ends in the first part of the value; the next update completes it.
+        update("in_progress", "building TOKEN-");
+        await expect.poll(() => reports().some((report) => report.output !== undefined)).toBe(true);
+        expect(reports().filter((report) => report.output !== undefined)).toEqual([expect.objectContaining({ output: "buildin", status: "in_progress" })]);
+
+        update("completed", "building TOKEN-123 done");
+        await expect.poll(() => reports().some((report) => report.status === "completed")).toBe(true);
+        expect(reports().at(-1)).toMatchObject({ output: "building *** done", status: "completed" });
     });
 });

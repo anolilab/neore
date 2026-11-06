@@ -24,16 +24,19 @@
  * - **A turn cut off by a restart** is recorded on disk while it runs. On the next start each such turn is ended
  * with the reason `interrupted`, at the `seq` the backend says is next.
  */
+import { createHash } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { ChildEvent } from "./children";
-import type { AgentUsage, HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver, SessionStatePatch, TurnSummary } from "./host-events";
-import { capPermissionRequest, capPrompt, capRequestId, capSessionInfo, childHostEvents, endReasonOf } from "./host-events";
+import type { AgentUsage, HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver, SessionStatePatch, ToolReport, TurnSummary } from "./host-events";
+import { capExit, capPermissionRequest, capPrompt, capRequestId, capSessionInfo, childHostEvents, endReasonOf } from "./host-events";
 import type { ImportIo } from "./import-post";
 import type { MediaOptions } from "./media";
 import { collectMedia, imageReferences } from "./media";
+import type { PlanEntry } from "./plan";
 import { SessionLink } from "./session-link";
+import { MAX_TOOL_OUTPUT_CHARS } from "./tool-output";
 import type { ChannelHost } from "./turn-channel";
 import { TurnChannel } from "./turn-channel";
 import type { StopReason } from "./types";
@@ -132,6 +135,18 @@ export interface RunningTurn {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
+/**
+ * A call id the backend accepts (at most 128 bytes). A longer id is cut and followed by a hash of the whole, so two ids that share a
+ * prefix stay two calls. The cut is at 24 characters, so the result stays under the byte limit for any characters.
+ */
+const boundedCallId = (id: string): string => {
+    if (Buffer.byteLength(id) <= 128) {
+        return id;
+    }
+
+    return `${id.slice(0, 24)}#${createHash("sha256").update(id).digest("hex").slice(0, 32)}`;
+};
+
 export class HostPoster implements SessionObserver {
     private readonly channelHost: ChannelHost;
 
@@ -147,6 +162,9 @@ export class HostPoster implements SessionObserver {
 
     /** The agent's own reports not yet posted, by session: the newest value of each field (`sessionState`). */
     private readonly pendingState = new Map<string, PendingState>();
+
+    /** The last observation time handed out. A later report never gets an earlier one, even if the desktop clock went back. */
+    private lastObservedAt = 0;
 
     private stateTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -164,6 +182,9 @@ export class HostPoster implements SessionObserver {
 
     /** When a session last posted its report: its next one waits out `STATE_DEBOUNCE_MS` from it, whichever pass runs. */
     private readonly stateSentAt = new Map<string, number>();
+
+    /** What each running turn's calls last posted as their output (`tool_output`), by turn and call id. */
+    private readonly postedOutput = new Map<string, string>();
 
     /** The option fields of a report that was dropped: the session's next report carries them, since they are sent only on change. */
     private readonly heldOptions = new Map<string, SessionStatePatch>();
@@ -191,6 +212,13 @@ export class HostPoster implements SessionObserver {
             finished: (channel) => {
                 this.channels.delete(channel.turnId);
                 this.texts.delete(channel.turnId);
+
+                for (const key of this.postedOutput.keys()) {
+                    if (key.startsWith(`${channel.turnId}\u{0}`)) {
+                        this.postedOutput.delete(key);
+                    }
+                }
+
                 this.persist();
                 this.closeWhenDrained(channel.sessionId);
             },
@@ -245,8 +273,12 @@ export class HostPoster implements SessionObserver {
         // Options held by a dropped report go out with this one; a newer options report in the patch replaces them.
         const held = this.heldOptions.get(sessionId);
 
+        // Never earlier than the last one: the backend drops a report older than the stored one, and keeps an equal one.
+        const at = Math.max(this.now(), this.lastObservedAt);
+
+        this.lastObservedAt = at;
         this.heldOptions.delete(sessionId);
-        this.pendingState.set(sessionId, { ...held, ...pending, ...patch, ...usage !== undefined && { usage }, at: this.now() });
+        this.pendingState.set(sessionId, { ...held, ...pending, ...patch, ...usage !== undefined && { usage }, at });
         // A fresh report is the newest value, so it does not wait out its own session's backoff: the next flush sends it.
         this.stateRetryAt.delete(sessionId);
         this.stateAttempts.delete(sessionId);
@@ -341,16 +373,53 @@ export class HostPoster implements SessionObserver {
         this.channels.get(turnId)?.append("reasoning", delta);
     }
 
-    public tool(_sessionId: string, turnId: string, tool: { id: string; kind: string; status: string; title: string }): void {
-        this.channels
-            .get(turnId)
-            ?.enqueue({ id: tool.id.slice(0, 128), kind: "tool", status: tool.status, title: tool.title.slice(0, 500), toolKind: tool.kind.slice(0, 64) });
+    /**
+     * A call's state, and, in a `tool_output` event of its own, what it printed and how its terminal ended, posted only
+     * when that changed: a status update does not resend the output, and the `tool` event keeps its stored shape.
+     */
+    public tool(_sessionId: string, turnId: string, tool: ToolReport): void {
+        const channel = this.channels.get(turnId);
+
+        if (channel === undefined) {
+            return;
+        }
+
+        const id = boundedCallId(tool.id);
+
+        channel.enqueue({ id, kind: "tool", status: tool.status, title: tool.title.slice(0, 500), toolKind: tool.kind.slice(0, 64) });
+
+        if (tool.output === undefined && tool.exit === undefined) {
+            return;
+        }
+
+        const printed = {
+            id,
+            kind: "tool_output" as const,
+            output: (tool.output ?? "").slice(-MAX_TOOL_OUTPUT_CHARS),
+            ...tool.exit !== undefined && { exit: capExit(tool.exit) },
+        };
+        const key = `${turnId}\u{0}${id}`;
+        const signature = JSON.stringify(printed);
+
+        // An empty output with nothing posted before it and no exit has nothing to clear.
+        if (printed.output === "" && !this.postedOutput.has(key) && tool.exit === undefined) {
+            return;
+        }
+
+        // Recorded only once the channel takes it: a dropped output (its queue over the cap) is sent again by the next report.
+        if (this.postedOutput.get(key) !== signature && channel.enqueue(printed)) {
+            this.postedOutput.set(key, signature);
+        }
     }
 
     public child(_sessionId: string, turnId: string, spawnId: string, event: ChildEvent): void {
         for (const posted of childHostEvents(spawnId, event)) {
             this.channels.get(turnId)?.enqueue(posted);
         }
+    }
+
+    public plan(_sessionId: string, turnId: string, entries: PlanEntry[]): void {
+        this.channels.get(turnId)?.enqueue({ entries, kind: "plan" });
     }
 
     public permissionRequested(_sessionId: string, turnId: string, request: PermissionRequestEvent): void {

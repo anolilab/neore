@@ -8,6 +8,7 @@ import { v } from "lunorash/server";
 
 import { internal } from "../../../_generated/internal";
 import type { Id } from "../../../_generated/dataModel";
+import type { HostActivity } from "../../../acp/lib/activity";
 import type { StreamStatus } from "./schema";
 
 /**
@@ -19,6 +20,8 @@ import type { StreamStatus } from "./schema";
 export type StreamId = Id<"persistentStreams">;
 export const StreamIdValidator = v.string();
 export type StreamBody = {
+    /** A coding agent's running turn only: its latest plan and its tool calls (`acp/lib/activity.ts`). */
+    hostActivity?: HostActivity;
     /** A coding agent's turn only: where the host is with it (`acp/`). */
     hostState?: "accepted" | "ended" | "received" | "running";
     reasoning: string;
@@ -91,9 +94,10 @@ export class PersistentTextStreaming {
      * @returns The body of the stream including text, reasoning, and status.
      */
     async getStreamBody(ctx: RunQueryContext, streamId: StreamId): Promise<StreamBody> {
-        const { hostState, reasoning, speaker, status, text, toolProgress } = await ctx.runQuery(this.api.getStreamText, { streamId });
+        const { hostActivity, hostState, reasoning, speaker, status, text, toolProgress } = await ctx.runQuery(this.api.getStreamText, { streamId });
 
         return {
+            ...(hostActivity && { hostActivity }),
             ...(hostState !== undefined && { hostState }),
             reasoning: reasoning ?? "",
             ...(speaker && { speaker }),

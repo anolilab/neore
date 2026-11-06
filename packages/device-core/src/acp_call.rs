@@ -837,6 +837,7 @@ mod tests {
                 details: "{}".into(),
                 details_complete: true,
                 folder: "neore".into(),
+                local_only: false,
                 options: vec![OfferedOption {
                     kind: "allow_once".into(),
                     name: "Yes".into(),

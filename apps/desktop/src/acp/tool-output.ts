@@ -1,0 +1,83 @@
+/**
+ * What a tool call printed, as the backend shows it on the call's row: the text blocks of its content (the agent's own
+ * shell or command tools), or the output of a terminal it ran in (`terminals.ts`). Pure, so the cut is pinned.
+ */
+import { isRecord, text } from "./child-updates";
+
+/** The most of a call's output the row shows: its tail, in characters (`backend/lunora/acp/validators.ts`). */
+export const MAX_TOOL_OUTPUT_CHARS = 2000;
+
+/**
+ * The most of a call's raw text kept until it is posted. Masking runs on all of it before the tail is cut, so a value is
+ * never half shown at the cut; a value would have to be longer than this, less the tail, to straddle where it is kept.
+ */
+const MAX_KEPT_CHARS = 64 * 1024;
+
+/**
+ * The last `max` characters of `raw`. When that cuts something, the first `secretLength - 1` characters kept go too: a
+ * value cut in half at the edge would no longer match the exact-value masking, and what remains of it is at most that long.
+ */
+export const cutEdge = (raw: string, max: number, secretLength: number): string => {
+    if (raw.length <= max) {
+        return raw;
+    }
+
+    return raw.slice(-max).slice(Math.max(0, secretLength - 1));
+};
+
+/**
+ * The text of a call's `content`, joined, or undefined when the update carries no content at all (an update without it
+ * keeps what the call printed before). Only text blocks count: a diff, an image or a terminal is not printed output.
+ */
+export const toolTextOf = (content: unknown, secretLength = 0): string | undefined => {
+    if (!Array.isArray(content)) {
+        return undefined;
+    }
+
+    const joined = content
+        .map((entry: unknown) => isRecord(entry) && entry.type === "content" && isRecord(entry.content) && entry.content.type === "text" ? text(entry.content.text) : "")
+        .filter((piece) => piece !== "")
+        .join("\n");
+
+    return cutEdge(joined, MAX_KEPT_CHARS, secretLength);
+};
+
+/** The terminal a call's content refers to (`{ type: "terminal", terminalId }`), the first one if there are several. */
+export const terminalIdOf = (content: unknown): string | undefined => {
+    if (!Array.isArray(content)) {
+        return undefined;
+    }
+
+    for (const entry of content as unknown[]) {
+        if (isRecord(entry) && entry.type === "terminal" && typeof entry.terminalId === "string" && entry.terminalId !== "") {
+            return entry.terminalId;
+        }
+    }
+
+    return undefined;
+};
+
+/** What a terminal printed, less the edge the core cut when it kept only the end (see {@link cutEdge}). */
+export const cutTerminal = (ended: { output: string; truncated: boolean }, secretLength: number): string =>
+    ended.truncated ? ended.output.slice(Math.max(0, secretLength - 1)) : ended.output;
+
+/** A lone low surrogate at the start: the second half of a character the cut split. */
+const LOW_SURROGATE = /^[\uDC00-\uDFFF]/u;
+/** A lone high surrogate at the end: the first half of a character the holdback split. */
+const HIGH_SURROGATE = /[\uD800-\uDBFF]$/u;
+
+/**
+ * The tail a row shows: masked whole first, then cut, so the cut never leaves part of a masked value. While a call still runs,
+ * `holdback` characters at the end are not shown: they may be the start of a configured value that the next update completes
+ * (the reply text is held back the same way, `observeDelta`). The cut counts UTF-16 units, so it can fall between the halves of
+ * a character outside the basic plane; the tail then starts, or the held-back edge ends, without a lone surrogate, and is at most
+ * one unit shorter than the limit.
+ */
+export const outputTail = (raw: string, scrub: (value: string) => string, holdback = 0): string => {
+    const scrubbed = scrub(raw);
+    const shown = scrubbed.slice(0, Math.max(0, scrubbed.length - holdback));
+    const tail = shown.slice(-MAX_TOOL_OUTPUT_CHARS);
+    const start = LOW_SURROGATE.test(tail) ? tail.slice(1) : tail;
+
+    return HIGH_SURROGATE.test(start) ? start.slice(0, -1) : start;
+};

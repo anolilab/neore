@@ -691,6 +691,74 @@ describe("a turn", () => {
         expect(backend.texts("t1")).toBe("Hello world!!");
     });
 
+    it("posts the agent's plan as one event, and a plan still waiting is replaced by the next", async () => {
+        const host = poster();
+        const first = [{ content: "Read", priority: "high" as const, status: "in_progress" as const }];
+        const second = [{ content: "Read", priority: "high" as const, status: "completed" as const }];
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.plan("s1", "t1", first);
+        host.text("s1", "t1", "ok");
+        host.plan("s1", "t1", first);
+        host.plan("s1", "t1", second);
+        await settle(POST_INTERVAL_MS);
+
+        // The three plan updates wait in one batch: the first and the repeat are replaced by the latest, which sits where the
+        // last one was sent, after the text.
+        expect(backend.chunks.get("t1")).toEqual([
+            { kind: "turn_start", text: "go" },
+            { kind: "text", text: "ok" },
+            { entries: second, kind: "plan" },
+        ]);
+    });
+
+    it("posts a call's output tail and its terminal's exit as an event of their own, cut, and only when they changed", async () => {
+        const host = poster();
+        const done = { exit: { code: 2, signal: "S".repeat(40) }, id: "c1", kind: "execute", output: `${"x".repeat(3000)}END`, status: "completed", title: "Run" };
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.tool("s1", "t1", { id: "c1", kind: "execute", status: "in_progress", title: "Run" });
+        host.tool("s1", "t1", done);
+        host.tool("s1", "t1", done);
+        await settle(POST_INTERVAL_MS);
+
+        const events = backend.chunks.get("t1") ?? [];
+
+        expect(events.map((event) => event.kind)).toEqual(["turn_start", "tool", "tool", "tool_output", "tool"]);
+        expect(events[2]).toEqual({ id: "c1", kind: "tool", status: "completed", title: "Run", toolKind: "execute" });
+
+        const printed = events.find((event) => event.kind === "tool_output");
+
+        expect(printed).toMatchObject({ exit: { code: 2, signal: "S".repeat(32) }, id: "c1" });
+        expect(printed && "output" in printed ? printed.output : "").toHaveLength(2000);
+        expect(printed && "output" in printed ? printed.output.endsWith("END") : false).toBe(true);
+    });
+
+    it("keeps two calls whose ids share their first 128 characters as two calls, each with its own output", async () => {
+        const host = poster();
+        const shared = "c".repeat(128);
+        const first = { exit: { code: 0 }, id: `${shared}-a`, kind: "execute", output: "one", status: "completed", title: "A" };
+        const second = { exit: { code: 0 }, id: `${shared}-b`, kind: "execute", output: "two", status: "completed", title: "B" };
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.tool("s1", "t1", first);
+        host.tool("s1", "t1", second);
+        await settle(POST_INTERVAL_MS);
+
+        const tools = (backend.chunks.get("t1") ?? []).filter((event) => event.kind === "tool");
+        const ids = tools.map((event) => (event as { id: string }).id);
+
+        expect(new Set(ids).size).toBe(2);
+        expect(ids.every((id) => Buffer.byteLength(id) <= 128)).toBe(true);
+        const outputs = (backend.chunks.get("t1") ?? []).filter((event) => event.kind === "tool_output").map((event) => (event as { output: string }).output);
+
+        expect(outputs).toHaveLength(2);
+        expect(outputs).toEqual(expect.arrayContaining(["one", "two"]));
+    });
+
     it("never posts twice inside the interval", async () => {
         const host = poster();
 
@@ -1272,6 +1340,30 @@ describe("what the agent reports about itself", () => {
     // The state posts the backend received, in order. A state report is not a turn event (`HostEvent`), so its kind is read off the raw event.
     const statePosts = () => backend.posts.filter((entry) => (entry.post.events[0] as { kind?: string } | undefined)?.kind === "session_state");
 
+    it("does not hold one session's report behind another session's stalled post", async () => {
+        const host = poster();
+        let release = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the supported Node range starts before it exists
+        const stalled = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+
+        await open(host, "s1");
+        await open(host, "s2");
+        backend.gate = (post) => post.sessionId === "s1" ? stalled : undefined;
+
+        host.sessionState("s1", { usage: usage(10) });
+        host.sessionState("s2", { usage: usage(20) });
+        await settle(2000);
+
+        // s1's post is still waiting for its answer; s2's report is posted all the same.
+        expect(statePosts().map((entry) => entry.post.sessionId)).toEqual(expect.arrayContaining(["s1", "s2"]));
+
+        release();
+        backend.gate = undefined;
+        await settle(2000);
+    });
+
     it("posts a report as a turn-less session post, signed, once the session has its thread", async () => {
         const host = poster();
 
@@ -1406,30 +1498,6 @@ describe("what the agent reports about itself", () => {
 
         expect(statePosts()).toHaveLength(2);
         expect(statePosts()[1]?.post.events[0]).toMatchObject({ usage: usage(11) });
-    });
-
-    it("does not hold one session's report behind another session's stalled post", async () => {
-        const host = poster();
-        let release = () => {};
-        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the supported Node range starts before it exists
-        const stalled = new Promise<void>((resolve) => {
-            release = resolve;
-        });
-
-        await open(host, "s1");
-        await open(host, "s2");
-        backend.gate = (post) => post.sessionId === "s1" ? stalled : undefined;
-
-        host.sessionState("s1", { usage: usage(10) });
-        host.sessionState("s2", { usage: usage(20) });
-        await settle(2000);
-
-        // s1's post is still waiting for its answer; s2's report is posted all the same.
-        expect(statePosts().map((entry) => entry.post.sessionId)).toEqual(expect.arrayContaining(["s1", "s2"]));
-
-        release();
-        backend.gate = undefined;
-        await settle(2000);
     });
 
     it("does not retry one session's failed report early because another session reported", async () => {
@@ -1579,6 +1647,27 @@ describe("what the agent reports about itself", () => {
         await settle(2000);
 
         expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ configOptions: [option], usage: usage(12) });
+    });
+
+    it("keeps the order of reports when the desktop clock moves back between them", async () => {
+        const host = poster();
+
+        await open(host);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        clock -= 60_000;
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(2000);
+
+        const [first, second] = statePosts();
+
+        expect(statePosts()).toHaveLength(2);
+        expect(second?.post.events[0]).toMatchObject({ usage: usage(11) });
+        // The later report carries a later observation time, so the backend keeps it.
+        const atOf = (post: Post | undefined) => (post?.events[0] as unknown as { at: number } | undefined)?.at ?? 0;
+
+        expect(atOf(second?.post)).toBeGreaterThanOrEqual(atOf(first?.post));
     });
 
     it("forgets the bookkeeping of a session that ended once its last report is posted", async () => {

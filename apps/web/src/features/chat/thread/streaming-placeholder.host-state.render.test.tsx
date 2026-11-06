@@ -6,7 +6,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -20,7 +20,7 @@ vi.mock("@lingui/react/macro", () => {
     return {
         Trans: ({ children }: { children: unknown }) => children,
         useLingui: () => {
-            return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+            return { i18n: { locale: "en" }, t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
         },
     };
 });
@@ -91,5 +91,94 @@ describe("a coding agent's turn", () => {
         expect(screen.queryByText("Working…")).toBeNull();
         expect(screen.queryByText("Sending…")).toBeNull();
         expect(screen.queryByText("Waiting for the agent…")).toBeNull();
+    });
+
+    it("shows the agent's latest plan as a task list, each entry with its status in words", async () => {
+        mount({
+            hostActivity: {
+                plan: [
+                    { content: "Read the code", priority: "high", status: "completed" },
+                    { content: "Write the fix", priority: "medium", status: "in_progress" },
+                    { content: "Run the tests", priority: "low", status: "pending" },
+                ],
+                tools: [],
+            },
+            hostState: "running",
+            reasoning: "",
+            status: "streaming",
+            text: "",
+        });
+
+        const list = await screen.findByRole("list");
+        const items = within(list).getAllByRole("listitem");
+
+        expect(items.map((item) => item.textContent)).toEqual(["Read the codeDone", "Write the fixIn progress", "Run the testsTo do"]);
+    });
+
+    it("shows no plan once the turn has ended", async () => {
+        mount({
+            hostActivity: { plan: [{ content: "Read the code", priority: "high", status: "completed" }], tools: [] },
+            hostState: "ended",
+            reasoning: "",
+            status: "done",
+            text: "partial",
+        });
+
+        expect(await screen.findByTestId("content")).toBeTruthy();
+        expect(screen.queryByRole("list")).toBeNull();
+    });
+
+    it("shows a compact host turn's plan too, in a comparison column as in the thread", async () => {
+        harness.body = {
+            hostActivity: {
+                plan: [
+                    { content: "Read the code", priority: "high", status: "completed" },
+                    { content: "Write the fix", priority: "medium", status: "in_progress" },
+                ],
+                tools: [],
+            },
+            hostState: "running",
+            reasoning: "",
+            status: "streaming",
+            text: "",
+        };
+
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <StreamingPlaceholder compact streamId="stream-1" />
+            </QueryClientProvider>,
+        );
+
+        const list = await screen.findByRole("list");
+
+        expect(
+            within(list)
+                .getAllByRole("listitem")
+                .map((item) => item.textContent),
+        ).toEqual(["Read the codeDone", "Write the fixIn progress"]);
+    });
+
+    it("shows each tool call with its status in words and the tail of what it printed in a labelled region", async () => {
+        mount({
+            hostActivity: {
+                tools: [
+                    { exit: { code: 1 }, id: "c1", output: "1 failed", status: "failed", title: "Run tests", toolKind: "execute" },
+                    { id: "c2", status: "in_progress", title: "Read a.ts", toolKind: "read" },
+                ],
+            },
+            hostState: "running",
+            reasoning: "",
+            status: "streaming",
+            text: "",
+        });
+
+        const output = await screen.findByRole("region", { name: "Output of Run tests" });
+
+        expect(output.textContent).toBe("1 failed");
+        expect(output.getAttribute("tabindex")).toBe("0");
+        expect(screen.getByText("Failed")).toBeTruthy();
+        expect(screen.getByText("Exited with code 1")).toBeTruthy();
+        expect(screen.getByText("Running")).toBeTruthy();
+        expect(screen.queryByRole("region", { name: "Output of Read a.ts" })).toBeNull();
     });
 });

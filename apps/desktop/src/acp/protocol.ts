@@ -8,9 +8,12 @@
  * host sends a handful of frames and must control each one (a consent gate before spawn, a permission answer
  * that only Rust may fill in), so a ~150-line JSON-RPC client (`jsonrpc.ts`) is smaller than the SDK's
  * connection layer, and keeps zod and 8 MB of package out of the main-process bundle.
- * - **No client-side file system or terminal.** The host advertises `fs.readTextFile`, `fs.writeTextFile` and
- * `terminal` as false (plan §10 Q5), so an agent runs its own tools beside the device sandbox under its own
- * permission prompts. Any `fs/*` or `terminal/*` request is answered "method not found".
+ * - **No client-side file system.** The host advertises `fs.readTextFile` and `fs.writeTextFile` as false, so an
+ * agent runs its own file tools under its own permission prompts. Any `fs/*` request is answered "method not found".
+ * - **Terminals only in the device sandbox, and only on this computer.** A session whose folder is on this computer
+ * advertises `terminal` and serves `terminal/*` from the main process, each command a once-only permission request
+ * run by the Rust core in the `shell_run` sandbox (`terminals.ts`). A session on a server advertises `terminal` as
+ * false: its commands would otherwise run here, not there.
  * - **No `authenticate`.** Neore stores no credential for an agent. An agent that needs a login is told so in
  * plain words; the user signs in with the agent's own tool.
  */
@@ -42,6 +45,11 @@ export const METHOD = {
     sessionUpdate: "session/update",
     setConfigOption: "session/set_config_option",
     setMode: "session/set_mode",
+    terminalCreate: "terminal/create",
+    terminalKill: "terminal/kill",
+    terminalOutput: "terminal/output",
+    terminalRelease: "terminal/release",
+    terminalWaitForExit: "terminal/wait_for_exit",
 } as const;
 
 /** `AUTH_REQUIRED` in the ACP error codes. */
@@ -106,9 +114,9 @@ export interface Handshake {
     protocolVersion: number;
 }
 
-export const initialize = async (connection: JsonRpcConnection, appVersion: string, timeoutMs = STARTUP_TIMEOUT_MS): Promise<Handshake> => {
+export const initialize = async (connection: JsonRpcConnection, appVersion: string, timeoutMs = STARTUP_TIMEOUT_MS, offers: { terminal?: boolean } = {}): Promise<Handshake> => {
     const params: InitializeRequest = {
-        clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+        clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: offers.terminal === true },
         clientInfo: { name: "neore-desktop", title: "Neore", version: appVersion },
         protocolVersion: PROTOCOL_VERSION,
     };

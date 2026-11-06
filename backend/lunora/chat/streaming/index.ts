@@ -52,6 +52,42 @@ export const persistentTextStreaming = new PersistentTextStreaming({
  * Query to get stream body - required by useStream hook on client
  */
 const vStreamBody = v.object({
+    /** A coding agent's running turn only: its latest plan and its tool calls (`acp/lib/activity.ts`). Never for a public viewer. */
+    hostActivity: v.optional(
+        v.object({
+            plan: v.optional(
+                v.array(
+                    v.object({
+                        content: v.string().max(500),
+                        priority: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+                        status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed")),
+                    }),
+                ),
+            ),
+            tools: v.array(
+                v.object({
+                    exit: v.optional(
+                        v.object({
+                            code: v.optional(v.number()),
+                            signal: v.optional(v.string().max(32)),
+                        }),
+                    ),
+                    id: v.string().max(128),
+                    output: v.optional(v.string().max(2000)),
+                    status: v.union(
+                        v.literal("pending"),
+                        v.literal("in_progress"),
+                        v.literal("completed"),
+                        v.literal("failed"),
+                        v.literal("cancelled"),
+                        v.literal("declined"),
+                    ),
+                    title: v.string().max(500),
+                    toolKind: v.string().max(64),
+                }),
+            ),
+        }),
+    ),
     /** A coding agent's turn only (`acp/`): "Sending" until `received`, "Working" from `running`. */
     hostState: v.optional(vHostState),
     reasoning: v.string(),
@@ -126,6 +162,8 @@ export const getStreamBody = optionalAuthQuery
         const visible = { ...body, reasoning: "" };
 
         delete visible.toolProgress;
+        // What a coding agent runs and prints is its owner's: a public viewer sees the reply's text only.
+        delete visible.hostActivity;
 
         return visible;
     });

@@ -54,6 +54,16 @@ describe("readHostTranscript", () => {
         expect(new Set(reads)).toEqual(new Set(["asc"]));
     });
 
+    it("keeps nothing of the agent's plan or its tool rows on the saved reply", async () => {
+        const { ctx } = chunkTable([
+            { event: { entries: [{ content: "Read the code", priority: "high", status: "completed" }], kind: "plan" }, seq: 0, text: "" },
+            { event: { id: "t1", kind: "tool", status: "completed", title: "Run tests", toolKind: "execute" }, seq: 1, text: "" },
+            { seq: 2, text: "Done." },
+        ]);
+
+        expect(await read(ctx)).toEqual({ children: [], media: [], reasoning: "", text: "Done." });
+    });
+
     it("stops the front read at its page budget when the text never fills", async () => {
         const { ctx, reads } = chunkTable(
             events(200 * (MAX_TRANSCRIPT_PAGES + MAX_TAIL_PAGES + 1)).map((chunk) => {

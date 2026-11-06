@@ -381,6 +381,8 @@ const requestLine = (request: PermissionView): HTMLElement => {
     full.tabIndex = 0;
     full.textContent = request.command === null ? request.details : `${request.command}\n\n${request.details}`;
     details.append(summary, full);
+    // The command is what the person is allowing: it is shown without a click, not folded behind the summary.
+    details.open = request.command !== null;
     actions.className = "row";
 
     for (const option of request.options) {

@@ -25167,6 +25167,128 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "hostActivity": {
+                      "properties": {
+                        "plan": {
+                          "items": {
+                            "properties": {
+                              "content": {
+                                "type": "string"
+                              },
+                              "priority": {
+                                "anyOf": [
+                                  {
+                                    "const": "high",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "medium",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "low",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "status": {
+                                "anyOf": [
+                                  {
+                                    "const": "pending",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "in_progress",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "completed",
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "content",
+                              "priority",
+                              "status"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "tools": {
+                          "items": {
+                            "properties": {
+                              "exit": {
+                                "properties": {
+                                  "code": {
+                                    "type": "number"
+                                  },
+                                  "signal": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [],
+                                "type": "object"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "output": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "anyOf": [
+                                  {
+                                    "const": "pending",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "in_progress",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "completed",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "failed",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "cancelled",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "declined",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "toolKind": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "status",
+                              "title",
+                              "toolKind"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "tools"
+                      ],
+                      "type": "object"
+                    },
                     "hostState": {
                       "anyOf": [
                         {

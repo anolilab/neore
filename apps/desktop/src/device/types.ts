@@ -230,6 +230,13 @@ export interface DeviceCore {
     acpReadMedia: (agentKey: string, folder: string, reference: string) => Promise<MediaRead>;
     acpSign: (envelope: string, signature: string, outcome: string) => string;
     acpSpawnPlan: (agentKey: string, folder: string | null) => string;
+    /** A coding agent's terminals (`acp/terminals.ts`), run by Rust in the shell sandbox; JSON strings. */
+    acpTerminalAvailable: (folder: string) => boolean;
+    acpTerminalKill: (handle: number) => void;
+    acpTerminalOutput: (handle: number) => string;
+    acpTerminalRelease: (handle: number) => void;
+    acpTerminalStart: (request: string) => Promise<number>;
+    acpTerminalWait: (handle: number) => Promise<string>;
     acpUpdate: (update: string) => string;
     acpView: () => string;
     auditTail: () => string[];

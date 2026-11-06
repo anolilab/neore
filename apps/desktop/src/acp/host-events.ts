@@ -2,6 +2,7 @@
 import type { CapabilityReport } from "@neore/ai/capabilities";
 
 import type { ChildEvent } from "./children";
+import type { PlanEntry } from "./plan";
 import type { StopReason } from "./types";
 
 export interface PermissionOption {
@@ -90,8 +91,30 @@ export interface TurnEndEvent {
     summary?: TurnSummary;
 }
 
+/** How a terminal's command ended: its exit code, or the signal that ended it. */
+export interface TerminalExit {
+    code?: number;
+    signal?: string;
+}
+
+/** A tool call as the session reports it. */
+export interface ToolReport {
+    exit?: TerminalExit;
+    id: string;
+    kind: string;
+    output?: string;
+    status: string;
+    title: string;
+}
+
+/** The agent's plan for the turn, whole (`plan.ts`): each one replaces the one before. */
+export interface PlanEvent {
+    entries: PlanEntry[];
+    kind: "plan";
+}
+
 export type HostEvent
-    = MediaEvent | PermissionRequestEvent | (HostSessionInfo & { kind: "session_open" }) | TurnEndEvent | { kind: "child_end"; spawnId: string; status: "cancelled" | "completed" | "failed"; text?: string } | { id: string; kind: "child_tool"; spawnId: string; status: string; title: string; toolKind: string } | { field: "reasoning" | "text"; kind: "child_text"; spawnId: string; text: string } | { id: string; kind: "tool"; status: string; title: string; toolKind: string } | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string } | { kind: "reasoning" | "text" | "turn_start"; text: string };
+    = MediaEvent | PlanEvent | PermissionRequestEvent | (HostSessionInfo & { kind: "session_open" }) | TurnEndEvent | { kind: "child_end"; spawnId: string; status: "cancelled" | "completed" | "failed"; text?: string } | { id: string; kind: "child_tool"; spawnId: string; status: string; title: string; toolKind: string } | { field: "reasoning" | "text"; kind: "child_text"; spawnId: string; text: string } | { exit?: TerminalExit; id: string; kind: "tool_output"; output: string } | { id: string; kind: "tool"; status: string; title: string; toolKind: string } | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string } | { kind: "reasoning" | "text" | "turn_start"; text: string };
 
 export interface HostSessionInfo {
     agentKey: string;
@@ -112,6 +135,8 @@ export interface SessionObserver {
     child?: (sessionId: string, turnId: string, spawnId: string, event: ChildEvent) => void;
     permissionRequested: (sessionId: string, turnId: string, request: PermissionRequestEvent) => void;
     permissionResolved: (sessionId: string, turnId: string, requestId: string, outcome: PermissionOutcomeKind) => void;
+    /** The agent's plan for the turn changed; `entries` is the whole list, already scrubbed and cut (`plan.ts`). */
+    plan?: (sessionId: string, turnId: string, entries: PlanEntry[]) => void;
     sessionEnded: (sessionId: string) => void;
     /** `threadId` is known when the backend started the session (`acp_start`); otherwise opening it makes the thread. */
     sessionOpened: (sessionId: string, info: HostSessionInfo, threadId?: string) => void;
@@ -119,7 +144,8 @@ export interface SessionObserver {
     sessionState?: (sessionId: string, patch: SessionStatePatch) => void;
     text: (sessionId: string, turnId: string, delta: string) => void;
     thought: (sessionId: string, turnId: string, delta: string) => void;
-    tool: (sessionId: string, turnId: string, tool: { id: string; kind: string; status: string; title: string }) => void;
+    /** `output` is the tail of what the call printed, masked and cut (`tool-output.ts`); `exit` is set once its terminal has exited. */
+    tool: (sessionId: string, turnId: string, tool: ToolReport) => void;
     turnEnded: (sessionId: string, turnId: string, reason: StopReason | "failed", error?: string, summary?: TurnSummary) => void;
     /** A prompt the backend queued (`acp_send`) is in this computer's hands, running or waiting its turn: the turn is `received`. */
     turnReceived?: (sessionId: string, turnId: string, user: string) => void;
@@ -168,6 +194,14 @@ export const capPermissionRequest = (request: PermissionRequestEvent): Permissio
 };
 
 export const capRequestId = (requestId: string): string => requestId.slice(0, 128);
+
+/** An exit status the backend takes: a whole exit code, a signal name of at most 32 characters. */
+export const capExit = (exit: TerminalExit): TerminalExit => {
+    return {
+        ...exit.code !== undefined && Number.isSafeInteger(exit.code) && { code: exit.code },
+        ...exit.signal !== undefined && { signal: exit.signal.slice(0, 32) },
+    };
+};
 
 /**
  * What an event adds to the body of a post, in UTF-8 bytes: the payload is JSON inside a JSON string, so quotes
