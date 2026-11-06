@@ -223,6 +223,7 @@ const FIELD_TYPES: Record<string, (value: unknown) => boolean> = {
     parentThreadId: (value) => typeof value === "string",
     projectId: (value) => typeof value === "string",
     source: (value) => typeof value === "string",
+    runner: (value) => typeof value === "string",
     statelessMode: (value) => typeof value === "boolean",
     status: (value) => typeof value === "string",
     tagIds: isStringArray,
