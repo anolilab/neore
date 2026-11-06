@@ -1,8 +1,7 @@
 const SMALL_AMOUNT_DIGITS = { maximumSignificantDigits: 2 } as const;
 
 /** An amount below one minor unit keeps two significant digits; the currency's own digits would round it to zero. */
-const digitsFor = (amount: number, minorUnit: number): { maximumSignificantDigits?: number } =>
-    amount > 0 && amount < minorUnit ? SMALL_AMOUNT_DIGITS : {};
+const digitsFor = (amount: number, minorUnit: number): { maximumSignificantDigits?: number } => (amount > 0 && amount < minorUnit ? SMALL_AMOUNT_DIGITS : {});
 
 /**
  * A cost an agent reported, as money in the person's language. Agents report cumulative costs that are often fractions of a
