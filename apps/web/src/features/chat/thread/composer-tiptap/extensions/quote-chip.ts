@@ -14,6 +14,8 @@ import { formatQuote } from "@/features/chat/core/utils/quote-selection";
 import { scrollToMessage } from "@/features/chat/core/utils/scroll-to-message";
 import { showWarning } from "@/lib/toast";
 
+import { plainTextToHtml } from "../plain-text";
+
 const EXCERPT_CHARS = 120;
 
 const excerptOf = (text: string): string => {
@@ -116,6 +118,13 @@ export const insertQuoteChip = (editor: Editor, quote: { messageId: string; text
 export const quoteRestoreDraft = (editor: Editor | null, quote: { messageId: string; text: string }, draft: string): string => {
     if (!editor) {
         return textAfterRestore(draft, { append: true, files: [], text: formatQuote(quote.text) });
+    }
+
+    // The draft can be newer than the editor: an outside change (dictation) reaches the store before the composer's sync
+    // copies it into the editor. Bring the editor up to the draft first, so the quote is added to what the user sees
+    // rather than to stale editor content that would then replace the newer text.
+    if (editor.getText({ blockSeparator: "\n" }) !== draft) {
+        editor.commands.setContent(plainTextToHtml(draft), { emitUpdate: false });
     }
 
     insertQuoteChip(editor, quote);

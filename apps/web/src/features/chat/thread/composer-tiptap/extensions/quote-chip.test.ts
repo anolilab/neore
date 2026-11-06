@@ -92,3 +92,67 @@ describe("quoteRestoreDraft", () => {
         expect(draft).toBe(mounted.getText({ blockSeparator: "\n" }));
     });
 });
+
+describe("the link back to the quoted reply", () => {
+    let editor: Editor | undefined;
+
+    afterEach(() => {
+        editor?.destroy();
+        editor = undefined;
+        document.body.replaceChildren();
+    });
+
+    it("moves focus to the quoted reply when the link is activated", () => {
+        const reply = document.createElement("div");
+
+        reply.dataset.messageId = "msg-7";
+        reply.scrollIntoView = vi.fn();
+        document.body.appendChild(reply);
+
+        editor = new Editor({
+            content: { content: [{ attrs: { messageId: "msg-7", text: "A line" }, type: "quoteChip" }], type: "doc" },
+            extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })],
+        });
+
+        editor.view.dom.querySelector<HTMLButtonElement>(":scope [data-quote-chip] button")?.click();
+
+        expect(document.activeElement).toBe(reply);
+    });
+});
+
+describe("quoteRestoreDraft when the draft changed before the editor synced", () => {
+    let editor: Editor | undefined;
+
+    afterEach(() => {
+        editor?.destroy();
+        editor = undefined;
+    });
+
+    it("adds the quote to the newer draft, not to the editor's stale text", () => {
+        editor = new Editor({
+            content: plainTextToHtml("Stale editor text"),
+            extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })],
+        });
+
+        // Dictation wrote this to the draft store; the editor's sync has not run yet.
+        const draft = "Dictated words the editor has not seen";
+        const result = quoteRestoreDraft(editor, quoted, draft);
+
+        expect(result.startsWith(`${draft}\n`)).toBe(true);
+        expect(result).not.toContain("Stale editor text");
+        expect(result).toContain(formatQuote(quoted.text).trimEnd());
+        expect(editor.getJSON().content?.map((node) => node.type)).toEqual(["paragraph", "quoteChip", "paragraph"]);
+    });
+
+    it("leaves an editor that already matches the draft, chips included, as it is", () => {
+        editor = new Editor({
+            content: { content: [{ attrs: { messageId: "msg-1", text: "Earlier" }, type: "quoteChip" }, { type: "paragraph" }], type: "doc" },
+            extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })],
+        });
+        const draft = editor.getText({ blockSeparator: "\n" });
+
+        quoteRestoreDraft(editor, quoted, draft);
+
+        expect(editor.getJSON().content?.map((node) => node.type)).toEqual(["quoteChip", "paragraph", "quoteChip", "paragraph"]);
+    });
+});
