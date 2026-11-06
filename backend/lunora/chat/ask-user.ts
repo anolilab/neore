@@ -17,16 +17,31 @@ import { authMutation, rateLimit } from "../lib/crpc";
 import { isThreadLocked } from "../lib/thread-lock";
 import { claimAskUserAnswer } from "./lib/ask-user-claim";
 import { resumeClaimedRun } from "./lib/tool-approval-resume";
+import type { AskUserQuestionReply, AskUserReply } from "./lib/ask-user-claim";
 import { ASK_USER_ANSWER_MAX, ASK_USER_DISMISSED_REASON, ASK_USER_MAX_FILES } from "./tools/ask-user-constants";
+import { vAskUserReplies } from "./tools/ask-user-validators";
+
+/** The one reply a request carries: text for a single question, a list for several, `null` to dismiss. */
+const askUserReply = (answer: string | null | undefined, answers: AskUserQuestionReply[] | undefined): AskUserReply => {
+    if (answers) {
+        return { answers, kind: "answers" };
+    }
+
+    return typeof answer === "string" ? { answer, kind: "answer" } : { kind: "dismiss" };
+};
 
 export const answerAskUser = authMutation
     .use(rateLimit("chat/stream"))
     .input({
-        /** `null` dismisses the question without answering. */
-        answer: v.union(
-            v.string().check((value) => value.length <= ASK_USER_ANSWER_MAX * 2, { message: "Answer too long" }),
-            v.null(),
+        /** The text answer to a single question; `null` dismisses the question (or the whole card) without answering. */
+        answer: v.optional(
+            v.union(
+                v.string().check((value) => value.length <= ASK_USER_ANSWER_MAX * 2, { message: "Answer too long" }),
+                v.null(),
+            ),
         ),
+        /** The answers to a multi-question card, one per question in the model's order; sent instead of `answer`. */
+        answers: v.optional(vAskUserReplies),
         approvalId: v.string().check((value) => value.length > 0 && value.length <= 256, { message: "Invalid approval id" }),
         /** Files to answer with, checked by the continuation as the owner (`lib/ask-user-files.ts`); none on a dismiss. */
         fileIds: v.optional(v.array(v.string().max(MAX_LENGTH.id)).check((value) => value.length <= ASK_USER_MAX_FILES, { message: "Too many files" })),
@@ -34,7 +49,12 @@ export const answerAskUser = authMutation
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ alreadyResolved: v.boolean(), streamId: v.union(v.string(), v.null()) }))
-    .mutation(async ({ args: { answer, approvalId, fileIds, threadId, unlockProof }, ctx }) => {
+    .mutation(async ({ args: { answer, answers, approvalId, fileIds, threadId, unlockProof }, ctx }) => {
+        // One form per request: text for a single question, a list for several, `null` to dismiss either.
+        if ((answer === undefined) === (answers === undefined)) {
+            throw new LunoraError("BAD_REQUEST", "Send either `answer` or `answers`");
+        }
+
         // A malformed id is not a file: it is dropped here, so it cannot fail the run that answers the question.
         const answerFileIds = (fileIds ?? []).filter((id) => ctx.db.normalizeId("chatFiles", id) !== null);
 
@@ -60,7 +80,7 @@ export const answerAskUser = authMutation
         const claim = await claimAskUserAnswer(ctx, {
             approvalId,
             callerId: ctx.user.userId,
-            reply: answer === null ? { kind: "dismiss" } : { answer, kind: "answer" },
+            reply: askUserReply(answer, answers),
             threadId,
             unlockProof,
         });
@@ -71,17 +91,24 @@ export const answerAskUser = authMutation
 
         const streamId = await resumeClaimedRun(ctx, {
             approvalId,
-            approved: claim.answer !== undefined,
+            approved: claim.answer !== undefined || claim.answers !== undefined,
             config: claim.config,
             ownerId: claim.ownerId,
             runId: claim.runId,
             threadId,
-            ...(claim.answer === undefined
+            ...(claim.answer === undefined && claim.answers === undefined
                 ? { denyReason: ASK_USER_DISMISSED_REASON }
-                : { answer: claim.answer, ...(answerFileIds.length > 0 && { answerFileIds }) }),
+                : {
+                      ...(claim.answer === undefined ? { answers: claim.answers } : { answer: claim.answer }),
+                      ...(answerFileIds.length > 0 && { answerFileIds }),
+                  }),
         });
 
-        ctx.log.event("chat.answer_ask_user", { alreadyResolved: false, dismissed: claim.answer === undefined, resumed: streamId !== null });
+        ctx.log.event("chat.answer_ask_user", {
+            alreadyResolved: false,
+            dismissed: claim.answer === undefined && claim.answers === undefined,
+            resumed: streamId !== null,
+        });
 
         return { alreadyResolved: false, streamId };
     });
