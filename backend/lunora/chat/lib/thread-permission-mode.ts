@@ -19,39 +19,11 @@ export const isThreadPermissionMode = (value: unknown): value is ThreadPermissio
     typeof value === "string" && (THREAD_PERMISSION_MODES as ReadonlyArray<string>).includes(value);
 
 /**
- * Built-ins that only look something up and change nothing, spend nothing and start nothing. `supervised` and
- * `auto-edit` leave these at their own mode. An allowlist: a built-in not named here (a new one included) asks.
+ * Built-ins that answer from data the app already holds, with no outbound call: they spend nothing, start nothing and send nothing
+ * the model chose to a third party. `supervised` and `auto-edit` leave these at their own mode. An allowlist: a built-in not named
+ * here asks, including every search and lookup that sends its query or a location to a provider.
  */
-export const BUILTIN_TOOLS_READ_ONLY: ReadonlySet<string> = new Set([
-    "academicSearch",
-    "codeSearch",
-    "coinData",
-    "coinDataByContract",
-    "coinOhlc",
-    "companySearch",
-    "currencyConverter",
-    "dateTime",
-    "findPlace",
-    "flightTracker",
-    "githubSearch",
-    "imageSearch",
-    "listCurrencies",
-    "listLanguages",
-    "movieTvSearch",
-    "nearbyPlacesSearch",
-    "peopleSearch",
-    "redditSearch",
-    "searchMemory",
-    "spotifySearch",
-    "stockChart",
-    "trendingMovies",
-    "trendingTv",
-    "videoSearch",
-    "weather",
-    "wolframAlpha",
-    "xSearch",
-    "youtubeSearch",
-]);
+export const BUILTIN_TOOLS_READ_ONLY: ReadonlySet<string> = new Set(["dateTime", "listCurrencies", "listLanguages", "searchMemory"]);
 
 /**
  * Built-ins that write files or artifacts with no outward reach, which `auto-edit` may let run. Empty for now: the document

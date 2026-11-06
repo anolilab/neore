@@ -68,7 +68,7 @@ const withoutHeaderValues = (servers: unknown): unknown => {
 };
 
 /** A shallow copy with the secret-shaped fields removed. */
-const redact = (document: Row): Record<string, unknown> | undefined => {
+export const redact = (document: Row): Record<string, unknown> | undefined => {
     if (!document) {
         return undefined;
     }

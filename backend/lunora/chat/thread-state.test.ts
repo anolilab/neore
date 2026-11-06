@@ -216,6 +216,22 @@ describe("setThreadPermissionMode", () => {
         expect(rows[0].oldDoc.permissionMode).toBeUndefined();
     });
 
+    it("keeps a shared thread's sharing token out of the history snapshots the mode change writes", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.patch("threads", threadId, { publicAccessToken: "tok-secret-value" });
+        });
+
+        await as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never);
+
+        const history: any[] = await harness.run(async (context: any) => await context.db.query("documentHistory").collect());
+        const row = history.find((entry) => entry.documentId === threadId);
+
+        expect(row).toBeDefined();
+        expect(JSON.stringify(row)).not.toContain("tok-secret-value");
+        expect(row.doc).not.toHaveProperty("publicAccessToken");
+        expect(row.oldDoc).not.toHaveProperty("publicAccessToken");
+    });
+
     it("refuses a stranger, an unknown mode and a host thread", async () => {
         await expect(as(STRANGER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never)).rejects.toThrow(NOT_FOUND_PATTERN);
         await expect(as(OWNER).mutation(setThreadPermissionMode as never, { mode: "yolo", threadId } as never)).rejects.toThrow();

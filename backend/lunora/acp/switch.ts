@@ -53,6 +53,7 @@ import {
 } from "../chat/agent-switch";
 import { getModelContextWindow } from "../chat/lib/auto-continue";
 import { assertPaidModel, requireEnabledModel } from "../chat/lib/enabled-model";
+import { modeOfThread } from "../chat/tool-permissions";
 import { loadEligibleThread } from "../devices/internal";
 import { isDeviceInScope, resolveThreadProject } from "../devices/lib/scope";
 import { isDeviceOnline } from "../devices/lib/state";
@@ -600,6 +601,8 @@ const startOn = async (
 
 const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> => {
     const { current, handoff, leaf, native, now, taintedBy, target, thread, to, userId } = args;
+    // The mode the thread runs under: its own, or its comparison parent's when it has none (`modeOfThread`).
+    const inheritedMode = await modeOfThread(ctx, thread, userId);
 
     // Host to host: the thread and its runner stay; the session it ran in ends and the next one opens in it.
     if (target.kind === "host" && isHostRunThread(thread)) {
@@ -668,7 +671,7 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
                   activeAgent: { kind: "model", model: target.model },
                   createdBy: userId,
                   // A handoff to a cloud agent keeps the mode of the thread it takes over from (a host thread has none).
-                  ...(thread.permissionMode && { permissionMode: thread.permissionMode }),
+                  ...(inheritedMode && { permissionMode: inheritedMode }),
                   // A thread that took over from a coding agent is marked even when the agent said nothing in words: what it read
                   // and ran is in none of this thread's rows (`threadHandoffTaint`).
                   ...((handoff || current.agent.kind === "host") && { hasHandoff: true }),

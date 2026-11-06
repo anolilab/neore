@@ -11,6 +11,7 @@ import { requireOwnedThreadIgnoringLock } from "../agent/thread-read-access";
 import { internalMutation } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { throwBadRequest } from "../lib/error-helpers";
+import { redact } from "../lib/audit-triggers";
 import { appendDocumentHistory } from "../lib/document-history";
 import { isSnoozeInRange } from "./lib/thread-state-logic";
 import { modeOfThread } from "./tool-permissions";
@@ -108,12 +109,13 @@ export const setThreadPermissionMode = authMutation
         if (thread.permissionMode !== mode) {
             await patchThread(context.db, thread._id, { permissionMode: mode });
             // Access changes are audited: the mode decides whether the thread's tools ask, so the owner'"'"'s history records it.
+            // The same redaction as the audit triggers: the sharing token and other secrets never reach a snapshot.
             await appendDocumentHistory(context.db, context.now, {
                 attribution: { action: "update", source: "manual" },
-                doc: { ...thread, permissionMode: mode },
+                doc: redact({ ...thread, permissionMode: mode }) ?? {},
                 documentId: thread._id,
                 isDeleted: false,
-                oldDoc: thread,
+                oldDoc: redact(thread),
                 organizationId: thread.organizationId ?? undefined,
                 tableName: "threads",
                 userId: context.user.userId,
