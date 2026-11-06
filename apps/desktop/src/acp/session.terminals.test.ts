@@ -21,6 +21,7 @@ const fakeHost = () => {
         finish = resolve;
     });
     const host = {
+        available: vi.fn(() => true),
         kill: vi.fn(),
         output: vi.fn(() => {
             return { exitStatus: null, output: "building...\nok", truncated: false };
@@ -107,6 +108,12 @@ describe("a session's terminals", () => {
         await busy(server.agent, server.session);
         create(server.agent, 5);
         expect(await answerTo(server.agent, 5)).toMatchObject({ error: { code: -32_601 } });
+    });
+
+    it("are not offered where the computer could not start one", async () => {
+        const unavailable = await open({ gate: allow([]), host: { ...fakeHost().host, available: () => false } });
+
+        expect(unavailable.initialize).toMatchObject({ params: { clientCapabilities: { terminal: false } } });
     });
 
     it("asks once, in this window only, with the exact line and only allow-once or decline, then runs it through the core", async () => {
@@ -215,6 +222,41 @@ describe("a session's terminals", () => {
 
         agent.say({ id: 6, method: "terminal/wait_for_exit", params: { sessionId: "sess_1", terminalId } });
         expect(await answerTo(agent, 6)).toMatchObject({ result: { exitCode: 0, signal: null } });
+    });
+
+    it("releases a command that finishes starting after its turn was cancelled and a queued turn began", async () => {
+        let startedWith: (id: number) => void = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` is not in this package's TypeScript lib
+        const starting = new Promise<number>((resolve) => {
+            startedWith = resolve;
+        });
+        const host = {
+            available: vi.fn(() => true),
+            kill: vi.fn(),
+            output: vi.fn(() => {
+                return { exitStatus: null, output: "", truncated: false };
+            }),
+            release: vi.fn(),
+            start: vi.fn(async () => await starting),
+            wait: vi.fn(async () => await new Promise<TerminalExitStatus>(() => {})),
+        } satisfies TerminalHost;
+        const { agent, session } = await open({ gate: allow([]), host });
+
+        const first = await busy(agent, session);
+
+        create(agent, 5);
+        await expect.poll(() => host.start.mock.calls.length).toBe(1);
+
+        // The asking turn is cancelled and ends; the queued turn starts and resets the session's cancel flag.
+        session.cancel();
+        agent.say({ id: first.id, result: { stopReason: "cancelled" } });
+        session.send("second");
+        await expect.poll(() => agent.written.filter((frame) => frame.method === "session/prompt").length).toBe(2);
+
+        startedWith(41);
+
+        expect(await answerTo(agent, 5)).toMatchObject({ error: {} });
+        expect(host.release).toHaveBeenCalledWith(41);
     });
 
     it("are killed when the turn is cancelled and released when the session ends", async () => {

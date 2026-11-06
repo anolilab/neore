@@ -231,6 +231,7 @@ export interface DeviceCore {
     acpSign: (envelope: string, signature: string, outcome: string) => string;
     acpSpawnPlan: (agentKey: string, folder: string | null) => string;
     /** A coding agent's terminals (`acp/terminals.ts`), run by Rust in the shell sandbox; JSON strings. */
+    acpTerminalAvailable: (folder: string) => boolean;
     acpTerminalKill: (handle: number) => void;
     acpTerminalOutput: (handle: number) => string;
     acpTerminalRelease: (handle: number) => void;

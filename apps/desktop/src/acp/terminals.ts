@@ -62,6 +62,8 @@ export interface TerminalStart {
 
 /** The core's terminals, as a session uses them (`coreTerminals`). */
 export interface TerminalHost {
+    /** Whether a terminal could start in `folder` here; the capability is offered only when it could. */
+    available: (folder: string) => boolean;
     kill: (handle: number) => void;
     output: (handle: number) => TerminalOutput;
     release: (handle: number) => void;
@@ -71,6 +73,7 @@ export interface TerminalHost {
 
 /** The core's `acpTerminal*` methods. */
 export interface TerminalCore {
+    acpTerminalAvailable: (folder: string) => boolean;
     acpTerminalKill: (handle: number) => void;
     acpTerminalOutput: (handle: number) => string;
     acpTerminalRelease: (handle: number) => void;
@@ -89,6 +92,7 @@ const exitOf = (value: unknown): TerminalExitStatus => {
 
 export const coreTerminals = (core: TerminalCore): TerminalHost => {
     return {
+        available: (folder) => core.acpTerminalAvailable(folder),
         kill: (handle) => core.acpTerminalKill(handle),
         output: (handle) => {
             const parsed: unknown = JSON.parse(core.acpTerminalOutput(handle));

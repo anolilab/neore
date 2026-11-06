@@ -214,11 +214,14 @@ export class AgentSession {
             scrub: options.process.scrub,
             secretLength: options.process.secretLength,
         });
-        // Windows has no sandbox to run a terminal in (`device-core`), so the capability is not offered there: the agent runs its
-        // commands itself rather than being asked to approve a command that cannot start. Elsewhere the core still refuses a terminal
-        // whose sandbox is missing (no Landlock), since the desktop cannot tell that from here.
+        // The capability is offered only where the core could start a terminal here (a sandbox, and the folder shared with this
+        // computer's tools). Otherwise the agent runs its commands itself rather than being asked to approve a command that cannot
+        // start. Windows is out too: a terminal's working folder is a POSIX path here.
         this.terminals
-            = options.terminals === undefined || options.folderIsRemote === true || process.platform === "win32"
+            = options.terminals === undefined
+                || options.folderIsRemote === true
+                || process.platform === "win32"
+                || !options.terminals.available(options.folder)
                 ? undefined
                 : new SessionTerminals(options.terminals, (terminalId) => this.onTerminalEnded(terminalId));
         this.connection = new JsonRpcConnection(options.process.stdout, options.process.stdin, {
@@ -977,6 +980,15 @@ export class AgentSession {
 
     // ─── From the agent ────────────────────────────────────────────────────
 
+    /** The plan rides the turn to the backend, which shows it live in the thread; the window does not show it. */
+    private observePlan(turn: Turn | undefined, update: Parameters<typeof planOf>[0]): void {
+        const entries = planOf(update, this.options.process.scrub);
+
+        if (turn !== undefined && entries !== undefined) {
+            this.observe((observer) => observer.plan?.(this.id, turn.id, entries));
+        }
+    }
+
     private onNotification(method: string, params: unknown): void {
         // While the session opens its id is not known yet, and an agent may send its options before it answers. They are
         // kept, older than the answer, so the answer's own fields replace them.
@@ -1030,20 +1042,15 @@ export class AgentSession {
 
                 return;
             }
-            case "plan": {
-                // Not the window's business either: the plan rides the turn to the backend, which shows it live in the thread.
-                const entries = planOf(update, this.options.process.scrub);
-
-                if (turn !== undefined && entries !== undefined) {
-                    this.observe((observer) => observer.plan?.(this.id, turn.id, entries));
-                }
-
-                return;
-            }
             case "current_mode_update": {
                 this.offered = withCurrentMode(this.offered, update.currentModeId, this.options.process.scrub);
                 this.modeVersion += 1;
                 this.reportOptions();
+
+                return;
+            }
+            case "plan": {
+                this.observePlan(turn, update);
 
                 return;
             }
@@ -1287,6 +1294,9 @@ export class AgentSession {
             throw new RpcError(INVALID_PARAMS, `at most ${String(MAX_SESSION_TERMINALS)} terminals at once; release one first`);
         }
 
+        // The turn that asked: a cancel of it must end this command even if a queued turn has since reset `cancelRequested`.
+        const requester = this.current;
+
         // The host's own options, never the agent's: only "allow once" and "decline" can be chosen.
         const request = {
             options: [
@@ -1315,13 +1325,14 @@ export class AgentSession {
                 line,
                 ...cwd !== undefined && { cwd },
                 ...outputByteLimit !== undefined && { outputByteLimit },
-            }, this.current?.id);
+            }, requester?.id);
 
-            // The turn was cancelled while the command was starting: killAll missed it, so it ends here.
-            if (this.cancelRequested) {
+            // The asking turn was cancelled while the command was starting, and `killTurn` ran before it existed: it ends here.
+            // Once the turn has ended, a queued turn is current, and a reset `cancelRequested` no longer says anything about it.
+            if (this.current !== requester || this.cancelRequested) {
                 terminals.release(terminalId);
 
-                throw new Error("the turn was cancelled");
+                throw new Error("the turn ended before the command started");
             }
 
             return terminalId;
