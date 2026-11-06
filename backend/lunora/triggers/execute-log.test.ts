@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cutOnCodePoint } from "./execute";
+import { cutOnCodePoint, promptForLog } from "./execute";
 
 const TRAILING_HIGH_SURROGATE = /[\uD800-\uDBFF]$/u;
 
@@ -22,5 +22,19 @@ describe("cutOnCodePoint", () => {
         const text = `${"x".repeat(1998)}\u{1F600}more`;
 
         expect(cutOnCodePoint(text, 2000)).toBe(`${"x".repeat(1998)}\u{1F600}`);
+    });
+});
+
+describe("promptForLog", () => {
+    it("logs a whitespace-only prompt, which the agent accepts", () => {
+        expect(promptForLog(" ".repeat(3))).toBe(" ".repeat(3));
+    });
+
+    it("refuses a prompt that is only hidden characters, as the headless run does", () => {
+        expect(promptForLog("\u{E0041}\u{202E}")).toBeUndefined();
+    });
+
+    it("logs visible text with its hidden characters removed", () => {
+        expect(promptForLog("a\u{202E}b")).toBe("ab");
     });
 });

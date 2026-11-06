@@ -30,6 +30,18 @@ const ADMISSION_RETRY_DELAYS_MS = [100, 400];
 /** The most of a run's prompt the run log keeps; the run itself gets the whole prompt. */
 const MAX_LOGGED_PROMPT_LENGTH = 2000;
 
+/**
+ * The text a run logs: what the agent is given. It has the same hidden-character strip as the headless run, with the same
+ * refusal (hidden characters removed and nothing left), so a refused prompt never reaches the agent and logs nothing.
+ * Ordinary whitespace is a prompt the agent accepts, so it is logged.
+ */
+export const promptForLog = (input: string): string | undefined => {
+    const agentInput = stripHiddenText(input);
+    const refused = agentInput.removed > 0 && agentInput.text.trim() === "";
+
+    return refused ? undefined : cutOnCodePoint(agentInput.text, MAX_LOGGED_PROMPT_LENGTH);
+};
+
 /** The first `max` UTF-16 units, without a surrogate pair cut in two: a lone high surrogate at the end is dropped. */
 /** A high surrogate at the end of a string: the first half of a pair that a cut would split. */
 const TRAILING_HIGH_SURROGATE = /[\uD800-\uDBFF]$/u;
@@ -337,12 +349,7 @@ export const executeTrigger = internalAction
                 inputMessage = sanitizedPayload || "Trigger activated.";
             }
 
-            // The log keeps what the agent is given: the same hidden-character strip the headless run applies, with the same
-            // refusal (hidden characters removed and nothing left). A refused prompt never reaches the agent, so it logs nothing.
-            const agentInput = stripHiddenText(inputMessage);
-            const refused = agentInput.removed > 0 && agentInput.text.trim() === "";
-
-            loggedPrompt = refused ? undefined : cutOnCodePoint(agentInput.text, MAX_LOGGED_PROMPT_LENGTH);
+            loggedPrompt = promptForLog(inputMessage);
 
             // 4. Run the agent in a new thread (auto-continue: up to 25 steps)
             // A scheduled bot routine may use the bot's shell and file tools, and only those.
