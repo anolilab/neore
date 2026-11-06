@@ -53,6 +53,7 @@ import { lastPromptId } from "./minimap-items";
 import SubAgentParentBreadcrumb from "./sub-agent-parent-breadcrumb";
 import TextSelectionMenu from "./text-selection-menu";
 import ThreadMinimap from "./thread-minimap";
+import ThreadShortcutsListener from "./thread-shortcuts-listener";
 import type { ThreadViewportRef } from "./thread-viewport";
 import ThreadViewport from "./thread-viewport";
 import ThreadWelcome from "./thread-welcome";
@@ -276,6 +277,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
             <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
             <ComposerEffortShortcuts />
             <CopyLastCodeBlockListener />
+            <ThreadShortcutsListener />
             <AskAsideShortcutListener />
             <div
                 className={cn("relative h-[calc(100%-40px)]", className)}

@@ -39,10 +39,12 @@ const shortcutIdentity = (value: string): string => {
 
 const keyboardShortcutSchema = z
     .strictObject({
+        archiveThread: shortcutValueSchema,
         askAside: shortcutValueSchema,
         commandPalette: shortcutValueSchema,
         copyLastCodeBlock: shortcutValueSchema,
         decreaseEffort: shortcutValueSchema,
+        deleteThread: shortcutValueSchema,
         escape: shortcutValueSchema,
         findInThread: shortcutValueSchema,
         focusSearch: shortcutValueSchema,
@@ -103,10 +105,12 @@ const KeyboardShortcutsSettings: FC = () => {
     const { t } = useLingui();
 
     const shortcutLabels: Record<keyof KeyboardShortcutForm, string> = {
+        archiveThread: t`Archive Open Thread`,
         askAside: t`Ask a Side Question`,
         commandPalette: t`Command Palette`,
         copyLastCodeBlock: t`Copy Last Code Block`,
         decreaseEffort: t`Decrease Reasoning Effort`,
+        deleteThread: t`Delete Open Thread`,
         escape: t`Escape`,
         findInThread: t`Find in Thread`,
         focusSearch: t`Focus Search`,
@@ -120,10 +124,12 @@ const KeyboardShortcutsSettings: FC = () => {
     };
 
     const shortcutDescriptions: Record<keyof KeyboardShortcutForm, string> = {
+        archiveThread: t`Archive the open thread, or restore it when it is archived (${defaultShortcut("archiveThread")})`,
         askAside: t`Open the side-question panel without interrupting a running reply (${defaultShortcut("askAside")})`,
         commandPalette: t`Open the command palette and global search (${defaultShortcut("commandPalette")})`,
         copyLastCodeBlock: t`Copy the last code block of the latest assistant reply (${defaultShortcut("copyLastCodeBlock")})`,
         decreaseEffort: t`Lower the composer's reasoning effort by one step. Not bound by default.`,
+        deleteThread: t`Delete the open thread after you confirm (${defaultShortcut("deleteThread")})`,
         escape: t`Close dialogs and menus`,
         findInThread: t`Search the open thread's messages and highlight the matches. Leave it unbound to keep the browser's find (${defaultShortcut("findInThread")})`,
         focusSearch: t`Open the thread list search and focus it (${defaultShortcut("focusSearch")})`,

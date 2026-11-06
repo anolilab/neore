@@ -43,6 +43,8 @@ export type AppearanceSettings = {
 };
 
 export type KeyboardShortcuts = {
+    /** Archives the open thread, or restores it when archived (`thread-shortcuts-listener.tsx`). */
+    archiveThread: string;
     /** Opens the side-question panel beside the thread (`askAside`). */
     askAside: string;
     audioRecord: string;
@@ -50,6 +52,8 @@ export type KeyboardShortcuts = {
     copyLastCodeBlock: string;
     /** Steps the composer's reasoning effort down (`composer.decreaseEffort`). Unbound until the user sets it. */
     decreaseEffort?: string;
+    /** Deletes the open thread after the owner confirms (`thread-shortcuts-listener.tsx`). */
+    deleteThread: string;
     escape: string;
     /** Opens the find bar over the open thread's messages. Absent in settings saved before it existed. */
     findInThread: string;
@@ -88,10 +92,12 @@ export type UserPreferences = {
 
 /** What "Reset to Defaults" restores. */
 export const defaultKeyboardShortcuts: KeyboardShortcuts = {
+    archiveThread: `${platformModifier}+shift+a`,
     askAside: `${platformModifier}+shift+e`,
     audioRecord: `${platformModifier}+shift+r`,
     commandPalette: `${platformModifier}+k`,
     copyLastCodeBlock: `${platformModifier}+shift+x`,
+    deleteThread: `${platformModifier}+shift+backspace`,
     escape: "escape",
     findInThread: `${platformModifier}+f`,
     firstItem: "home",

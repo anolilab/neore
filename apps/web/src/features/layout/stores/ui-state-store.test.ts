@@ -4,7 +4,7 @@ import { defaultKeyboardShortcuts, mergeKeyboardShortcuts, useUIStateStore } fro
 
 describe("default keyboard shortcuts", () => {
     it("carry no binding that nothing registers", () => {
-        for (const key of ["archiveThread", "createBranch", "deleteThread", "pinThread", "search"]) {
+        for (const key of ["createBranch", "pinThread", "search"]) {
             expect(defaultKeyboardShortcuts).not.toHaveProperty(key);
         }
     });
