@@ -361,7 +361,9 @@ describe("importShardRows for userSettings", () => {
     });
 
     it("finds the new account's row among more settings rows than a merge page holds, and adds no second one", async () => {
-        const others = Array.from({ length: MERGE_PAGE_SIZE + 20 }, (_, index) => {return { userId: `other-${index}` }});
+        const others = Array.from({ length: MERGE_PAGE_SIZE + 20 }, (_, index) => {
+            return { userId: `other-${index}` };
+        });
         const rows = await run([{ _id: "g1", setupStepsSkipped: ["agent"], userId: "guest" }], { language: "de-DE", userId: "user" }, others);
 
         expect(rows).toHaveLength(1);
