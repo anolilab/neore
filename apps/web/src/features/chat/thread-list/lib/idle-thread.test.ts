@@ -13,6 +13,7 @@ const finished = (extra: Partial<BranchNode> = {}): BranchNode => {
         createdAt: 1,
         depth: 0,
         lastReplyAt: 500,
+        scheduled: false,
         status: "active",
         threadId: "t",
         title: "t",
@@ -54,6 +55,18 @@ describe("isIdleThread", () => {
 
     it("does not mark a thread that never got a reply", () => {
         expect(isIdleThread(finished({ lastReplyAt: undefined }), NOW)).toBe(false);
+    });
+
+    it("does not mark a thread whose schedule the list does not report, since an absent flag is not evidence", () => {
+        expect(isIdleThread(finished({ scheduled: undefined }), NOW)).toBe(false);
+    });
+
+    it("does not mark a thread whose newest person message has no reply yet, such as an interrupted turn", () => {
+        expect(isIdleThread(finished({ lastReplyAt: 500, lastUserMessageAt: 600 }), NOW)).toBe(false);
+    });
+
+    it("marks a thread whose reply came after the newest person message", () => {
+        expect(isIdleThread(finished({ lastReplyAt: 500, lastUserMessageAt: 400 }), NOW)).toBe(true);
     });
 
     it("does not mark a thread that is snoozed, and marks it again once the snooze has ended", () => {

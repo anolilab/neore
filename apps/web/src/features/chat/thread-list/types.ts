@@ -15,6 +15,7 @@ export interface BranchNode {
     isIdle?: boolean;
     isPinned?: boolean;
     lastReplyAt?: number; // When the thread last got a reply (owned threads only)
+    lastUserMessageAt?: number; // When a person last sent a message past the thread's first (owned threads only)
     lastViewedAt?: number; // When its owner last opened it after a reply (owned threads only)
     lockedAt?: number | null; // Present while the chat has a passcode (`isThreadLocked`)
     model?: string;

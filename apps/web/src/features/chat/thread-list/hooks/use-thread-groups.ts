@@ -220,7 +220,7 @@ const useThreadGroups = (
             const optimisticPin = optimisticPins.get(threadId);
             const optimisticStatus = optimisticStatuses.get(threadId);
             const status = optimisticStatus === undefined ? thread.status || "active" : optimisticStatus;
-            const scheduled = thread.scheduled;
+            const { scheduled } = thread;
 
             return {
                 awaitingInput: thread.awaitingInput,
@@ -228,7 +228,14 @@ const useThreadGroups = (
                 branchType: "branch",
                 category: thread.category,
                 isIdle: isIdleThread(
-                    { awaitingInput: thread.awaitingInput, lastReplyAt: thread.lastReplyAt, scheduled, snoozedUntil: thread.snoozedUntil, status },
+                    {
+                        awaitingInput: thread.awaitingInput,
+                        lastReplyAt: thread.lastReplyAt,
+                        lastUserMessageAt: thread.lastUserMessageAt,
+                        scheduled,
+                        snoozedUntil: thread.snoozedUntil,
+                        status,
+                    },
                     now,
                 ),
                 lockedAt: thread.lockedAt,
@@ -375,8 +382,12 @@ const useThreadGroups = (
         return { heldProjectThreads, map, threadsWithoutProject };
     }, [hierarchyData, holdProjectThreads, projects, searchQuery]);
 
-    // Snoozes end on their own: one timer to the next wake, none while nothing is snoozed.
-    const nextWake = useMemo(() => (hierarchyData ? nextSnoozeWake(hierarchyData.regularThreads, now) : undefined), [hierarchyData, now]);
+    // Snoozes end on their own: one timer to the next wake, none while nothing is snoozed. Every root counts, since an idle
+    // marker reads the clock too, and stateless and temporary roots sit outside the regular list.
+    const nextWake = useMemo(
+        () => (hierarchyData ? nextSnoozeWake([...hierarchyData.allThreadsList, ...hierarchyData.temporaryThreadsList], now) : undefined),
+        [hierarchyData, now],
+    );
 
     useEffect(() => {
         const delay = nextWake === undefined ? 0 : Math.min(Math.max(nextWake - Date.now(), 0) + 25, MAX_TIMEOUT_MS);

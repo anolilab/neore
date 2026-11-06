@@ -1,4 +1,4 @@
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupType } from "../types";
@@ -184,5 +184,34 @@ describe("derived sections", () => {
 
         expect(view.map((group) => group.title)).toEqual(["Work", "Today"]);
         expect(titles(view, "Today")).toEqual(["Back"]);
+    });
+
+    it("marks a snoozed stateless root idle when its snooze ends, with no regular snoozed root to wake the timer", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(NOW);
+        composite.threads.page = [
+            {
+                _id: "s",
+                _creationTime: NOW,
+                createdAt: NOW,
+                lastReplyAt: NOW - 10,
+                scheduled: false,
+                snoozedUntil: NOW + 60_000,
+                statelessMode: true,
+                status: "active",
+                title: "Stateless",
+            },
+        ] as never;
+        const { result } = renderHook(() => useThreadGroups(new Set<GroupType>(), new Set<string>(), "", "threads", undefined, [], undefined, undefined));
+        const idleOf = () => result.current.threadGroups.find((group) => group.title === "Stateless")?.threads[0]?.isIdle;
+
+        expect(idleOf()).toBe(false);
+
+        act(() => {
+            vi.advanceTimersByTime(60_100);
+        });
+
+        expect(idleOf()).toBe(true);
+        vi.useRealTimers();
     });
 });
