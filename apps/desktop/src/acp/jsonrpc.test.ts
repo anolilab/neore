@@ -6,6 +6,29 @@ import { JsonRpcConnection } from "./jsonrpc";
 
 const frame = (method: string): string => `${JSON.stringify({ jsonrpc: "2.0", method, params: {} })}\n`;
 
+describe("an agent whose input is gone", () => {
+    it("rejects a pending request with the agent-closed message, and keeps the write error as its cause", async () => {
+        const output = new PassThrough();
+        const connection = new JsonRpcConnection(new PassThrough(), output, { notification: vi.fn(), request: async () => 1 });
+        const epipe = Object.assign(new Error("write EPIPE"), { code: "EPIPE" });
+        const pending = connection.request("initialize", {});
+
+        output.emit("error", epipe);
+
+        let error: unknown;
+
+        try {
+            await pending;
+        } catch (error_) {
+            error = error_;
+        }
+
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toBe("the agent closed its output");
+        expect((error as Error).cause).toBe(epipe);
+    });
+});
+
 describe("a closed connection", () => {
     it("reads nothing more, so a line that never ends cannot keep growing", () => {
         const input = new PassThrough();
