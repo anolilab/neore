@@ -29,6 +29,7 @@ export interface PdfThumbnailProps {
 const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url }) => {
     const { t } = useLingui();
     const [pages, setPages] = useState(0);
+    const [rendered, setRendered] = useState(false);
     const [failed, setFailed] = useState(false);
     // Each progress report restarts the deadline, so a large file that is still arriving is not failed. A URL the page may not
     // fetch is refused before any request, the way the text previews refuse it.
@@ -36,7 +37,8 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
     const origins = useFetchableOrigins();
     const refused = !isFetchableUrl(url, origins);
     const unavailable = failed || refused;
-    const loading = !unavailable && pages === 0;
+    // Loading ends when the first page has rendered, not when the page count arrives: a page that never renders is failed too.
+    const loading = !unavailable && !rendered;
 
     useEffect(() => {
         if (!loading) {
@@ -78,6 +80,7 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
                     <Page
                         onLoadError={() => setFailed(true)}
                         onRenderError={() => setFailed(true)}
+                        onRenderSuccess={() => setRendered(true)}
                         pageNumber={1}
                         renderAnnotationLayer={false}
                         renderTextLayer={false}

@@ -19,7 +19,8 @@ const PANEL_ORIGINS = originsOf(import.meta.env.VITE_LUNORA_URL as string | unde
 /** How long a downloaded PDF's object URL stays valid: long enough for the browser to start the download. */
 const DOWNLOAD_URL_LIFETIME_MS = 60_000;
 
-const ICON_LINK = "hover:bg-accent rounded p-2";
+// 32px, and 44px on a touch screen (WCAG 2.5.5 asks for 44px; the controls keep 8px between them).
+const ICON_LINK = "hover:bg-accent inline-flex items-center justify-center rounded p-2 pointer-coarse:size-11";
 
 interface PdfPreviewPanelProps {
     className?: string;
