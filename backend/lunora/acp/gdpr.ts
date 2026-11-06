@@ -18,8 +18,12 @@ import { vAcpAgentState, vAcpOptionResult, vAcpSessionStatus, vHostEvent } from 
 
 const BATCH = 200;
 
-/** Sessions read per export page. A page is also cut by bytes (`SESSION_PAGE_BYTES`): a row can hold up to 128 KiB of agent state. */
-const SESSION_PAGE = 500;
+/**
+ * Sessions read per export page. Lunora charges a page's reads against a 32 MiB transaction limit, and a row's agent state is the
+ * largest part of it (the desktop's report, up to about 128 KiB as sent): 50 rows keep one read far below that limit, where 500
+ * could exceed it before the byte budget (`SESSION_PAGE_BYTES`) cut the page.
+ */
+const SESSION_PAGE = 50;
 
 /** The JSON a page of sessions may take, so a page stays far under the 1 MiB a step may keep. */
 const SESSION_PAGE_BYTES = 400_000;
