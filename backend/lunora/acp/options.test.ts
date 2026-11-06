@@ -217,6 +217,13 @@ describe("setHostOption", () => {
         expect(await rows("deviceCalls", { toolName: "acp_set_config" })).toHaveLength(1);
     });
 
+    it("refuses a mode option whatever the case of its category, as the computer does", async () => {
+        const { threadId } = await readySession({ configOptions: [{ ...MODE_OPTION, category: "Mode" }, MODEL] });
+
+        await expect(setOption(threadId, { optionId: "mode", valueId: "auto" })).rejects.toThrow(MODE_REFUSAL);
+        expect(await rows("deviceCalls", { toolName: "acp_set_config" })).toHaveLength(0);
+    });
+
     it("refuses a legacy mode while the agent sends options, and a session that reported nothing", async () => {
         const both = await readySession({ configOptions: [MODEL], modes: MODES });
 

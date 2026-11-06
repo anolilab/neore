@@ -254,6 +254,12 @@ describe("a change the agent reports", () => {
         expect(next.configOptions?.[0]?.currentValue).toBe("code");
     });
 
+    it("moves a mode option whose category the agent capitalises, as the computer and the web read it", () => {
+        const capitalised = optionsOf({ configOptions: [select("mode", { category: "Mode", currentValue: "ask", options: [{ name: "Ask", value: "ask" }, { name: "Code", value: "code" }] })] }, plain);
+
+        expect(withCurrentMode(capitalised, "code", plain).configOptions?.[0]?.currentValue).toBe("code");
+    });
+
     it("ignores a current mode that is not an id, and leaves a mode option that lacks the choice", () => {
         expect(withCurrentMode(raw, 3, plain)).toBe(raw);
         expect(withCurrentMode(raw, "other", plain).configOptions?.[0]?.currentValue).toBe("a");

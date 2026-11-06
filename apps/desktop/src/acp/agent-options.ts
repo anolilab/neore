@@ -262,7 +262,7 @@ export const withCurrentMode = (raw: RawOptions, modeId: unknown, scrub: Scrub):
         ...raw.modes !== undefined && { modes: { ...raw.modes, current: id } },
         ...raw.configOptions !== undefined && {
             configOptions: raw.configOptions.map((option) =>
-                option.category === "mode" && option.choices.some((choice) => choice.value === id) ? { ...option, currentValue: id } : option,
+                option.category?.toLowerCase() === "mode" && option.choices.some((choice) => choice.value === id) ? { ...option, currentValue: id } : option,
             ),
         },
     };

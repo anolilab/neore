@@ -359,6 +359,25 @@ describe("the options the agent offers", () => {
         expect(screen.getByRole("list", { name: "Agent options" })).toBeTruthy();
     });
 
+    it("shows a mode option read-only whatever the case of its category, since the computer refuses to change it", async () => {
+        const MODE = {
+            category: "Mode",
+            choices: [
+                { name: "Ask", value: "ask" },
+                { name: "Code", value: "code" },
+            ],
+            currentValue: "ask",
+            id: "mode",
+            name: "Mode",
+        };
+
+        mountWith({ agentState: { configOptions: [MODE] } });
+
+        await screen.findByRole("list", { name: "Agent options" });
+        expect(screen.queryByLabelText("Mode")).toBeNull();
+        expect(screen.getByText("Ask")).toBeTruthy();
+    });
+
     it("renders no options row for an agent that reported none", async () => {
         mountWith({});
 
