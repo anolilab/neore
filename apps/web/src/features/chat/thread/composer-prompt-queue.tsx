@@ -40,6 +40,8 @@ import { decideAutoSend, deliveredSteerItems, takeNextToSend } from "@/features/
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
+import { usePermissionModeSaving } from "./composer-permission-mode";
+
 /**
  * `sendMessage` clears the composer synchronously (before its first await) —
  * right for a typed message, wrong for a queued one, because the composer now
@@ -79,10 +81,12 @@ const useQueueActions = () => {
     const { threadId: currentThreadId } = useChatThread();
     const { isStreaming } = useChatIsStreaming();
     const { error } = useChatError();
+    // A prompt sent while the thread's permission mode is saving would run under the old mode: it waits for the save.
+    const modeSaving = usePermissionModeSaving(currentThreadId);
     const { mutateAsync: withdrawSteer } = useMutation(crpc.chat.steering.withdrawSteer.mutationOptions());
     const busyRef = useRef(false);
     // What an `await` in here must re-read afterwards, not close over.
-    const latestRef = useRef({ hasError: Boolean(error), isStreaming, threadId: currentThreadId });
+    const latestRef = useRef({ hasError: Boolean(error), isStreaming, modeSaving, threadId: currentThreadId });
     // A thread whose send was asked for while a removal held `busyRef`; `explicit` is the Send next button, which outranks a reply's error.
     const sendRequestedRef = useRef<{ explicit: boolean; threadId: string } | undefined>(undefined);
     // Chips whose removal was asked for while another call held `busyRef`.
@@ -91,8 +95,8 @@ const useQueueActions = () => {
     const sendNextPromptRef = useRef<(threadId: string, options?: { explicit?: boolean }) => Promise<void>>(async () => {});
 
     useEffect(() => {
-        latestRef.current = { hasError: Boolean(error), isStreaming, threadId: currentThreadId };
-    }, [currentThreadId, error, isStreaming]);
+        latestRef.current = { hasError: Boolean(error), isStreaming, modeSaving, threadId: currentThreadId };
+    }, [currentThreadId, error, isStreaming, modeSaving]);
 
     /** Once `busyRef` is free: runs the removals asked for meanwhile, one after the other (each re-queues the rest while it holds the flag). */
     const removeRequestedMeanwhile = useCallback(() => {
@@ -142,7 +146,13 @@ const useQueueActions = () => {
                     canSend: () => {
                         const latest = latestRef.current;
 
-                        return latest.threadId === threadId && !latest.isStreaming && (explicit || !latest.hasError) && !useChatUIStore.getState().isSubmitting;
+                        return (
+                            latest.threadId === threadId &&
+                            !latest.isStreaming &&
+                            !latest.modeSaving &&
+                            (explicit || !latest.hasError) &&
+                            !useChatUIStore.getState().isSubmitting
+                        );
                     },
                     peek: () => usePromptQueueStore.getState().queues[threadId]?.items[0],
                     plain: ({ steer }) => {
@@ -297,6 +307,8 @@ const ComposerPromptQueue: FC = () => {
     const { error } = useChatError();
     const queue = usePromptQueueStore(selectThreadQueue(threadId));
     const { removePrompt, sendNextPrompt } = useQueueActions();
+    const modeSaving = usePermissionModeSaving(threadId);
+    const wasModeSaving = useRef(modeSaving);
     const crpc = useCRPC();
     // The same query (and key) the chat context reads, so no second subscription.
     const { data: activeStream } = useQuery(
@@ -390,6 +402,17 @@ const ComposerPromptQueue: FC = () => {
         }
     }, [error, isStreaming, queue.items, queue.paused, sendNextPrompt, threadId]);
 
+    // A save that ends releases the prompts that waited for it, unless the thread is busy, failed, or paused.
+    useEffect(() => {
+        const ended = wasModeSaving.current && !modeSaving;
+
+        wasModeSaving.current = modeSaving;
+
+        if (ended && threadId && !isStreaming && !error && !queue.paused && queue.items.length > 0) {
+            void sendNextPrompt(threadId);
+        }
+    }, [error, isStreaming, modeSaving, queue.items.length, queue.paused, sendNextPrompt, threadId]);
+
     const handleRemove = useCallback(
         (id: string) => {
             if (threadId) {
@@ -433,7 +456,7 @@ const ComposerPromptQueue: FC = () => {
                 ))}
             </ol>
             {!isStreaming && (
-                <Button className="h-6 gap-1 px-2 text-xs" onClick={handleSendNext} size="sm" type="button" variant="outline">
+                <Button className="h-6 gap-1 px-2 text-xs" disabled={modeSaving} onClick={handleSendNext} size="sm" type="button" variant="outline">
                     <SendIcon aria-hidden="true" className="size-3" />
                     {t`Send next`}
                 </Button>

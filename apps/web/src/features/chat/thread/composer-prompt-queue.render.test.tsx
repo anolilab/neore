@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
@@ -8,7 +8,7 @@ import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-st
 import ComposerPromptQueue from "./composer-prompt-queue";
 
 const chat = vi.hoisted(() => {
-    return { error: undefined as Error | undefined, isStreaming: false, sendMessage: vi.fn(), threadId: "thread-1" };
+    return { error: undefined as Error | undefined, isStreaming: false, saving: false, sendMessage: vi.fn(), threadId: "thread-1" };
 });
 const withdrawSteer = vi.hoisted(() => vi.fn());
 
@@ -23,6 +23,7 @@ vi.mock("@lingui/react/macro", () => {
 vi.mock("@tanstack/react-query", () => {
     return {
         skipToken: Symbol("skipToken"),
+        useIsMutating: () => (chat.saving ? 1 : 0),
         useMutation: () => {
             return { mutateAsync: withdrawSteer };
         },
@@ -78,6 +79,25 @@ describe("composer prompt queue", () => {
         usePromptQueueStore.setState({ queues: {} });
         // Marks the thread as hydrated, so the (empty) stored queue is not read over ours.
         usePromptQueueStore.getState().hydrate(chat.threadId);
+    });
+
+    it("holds a queued prompt while the thread's mode is saving, and sends it once the save has ended", async () => {
+        chat.error = undefined;
+        chat.saving = true;
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+
+        const view = render(<ComposerPromptQueue />);
+
+        // A prompt the queue would send now must wait: it would run under the mode being replaced.
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+
+        chat.saving = false;
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
     });
 
     it("sends on Send next clicked while a chip removal settles, though the reply ended in an error", async () => {

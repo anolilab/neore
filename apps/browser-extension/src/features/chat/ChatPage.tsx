@@ -33,7 +33,8 @@ interface ChatPageProps {
 const FETCHABLE_ORIGINS = originsOf(LUNORA_URL);
 
 // MCP App proxy calls go to the backend's HTTP routes on the Lunora Worker. They name the thread the app is shown in: the proxy
-// applies that thread's permission mode, and a call that names none runs as if the thread were supervised.
+// applies that thread's permission mode. A call that names none has no thread mode: it gets the tool defaults, so a read-only
+// tool runs and one that would ask is refused.
 const componentsFor = (threadId: string | null) => {
     return {
         DocumentArtifact,
