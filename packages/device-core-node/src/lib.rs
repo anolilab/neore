@@ -12,7 +12,7 @@
 //! rejects it.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -126,6 +126,8 @@ pub struct DeviceCore {
     terminals: Terminals,
     /// Set by `stop` before it drains the terminals. A start that spawned after that is killed, not added to the map.
     stopping: Arc<AtomicBool>,
+    /// Starts that have reserved a place and are still spawning: they count against the cap like a running terminal.
+    starting: Arc<AtomicUsize>,
 }
 
 #[napi]
@@ -171,6 +173,7 @@ impl DeviceCore {
         Ok(DeviceCore {
             next_terminal: AtomicU64::new(1),
             state,
+            starting: Arc::default(),
             stopping: Arc::default(),
             terminals: Arc::default(),
         })
@@ -757,15 +760,29 @@ impl DeviceCore {
         let state = Arc::clone(&self.state);
         let terminals = Arc::clone(&self.terminals);
         let stopping = Arc::clone(&self.stopping);
+        let starting = Arc::clone(&self.starting);
         let handle = self.next_terminal.fetch_add(1, Ordering::Relaxed);
 
         blocking(env, move || {
-            if terminals.lock().unwrap().len() >= MAX_TERMINALS {
-                return Err("too many terminals are running".into());
+            // The place is reserved under the map's lock, before the spawn: starts that run together count each other, so they
+            // cannot all pass the check and spawn past the cap.
+            {
+                let running = terminals.lock().unwrap();
+
+                if running.len() + starting.load(Ordering::SeqCst) >= MAX_TERMINALS {
+                    return Err("too many terminals are running".into());
+                }
+
+                starting.fetch_add(1, Ordering::SeqCst);
             }
 
-            let terminal = state.acp_terminal_start(&request)?;
+            let started = state.acp_terminal_start(&request);
+            // The reservation is given up under the same lock that inserts the terminal, so no other start sees the place free twice.
             let mut running = terminals.lock().unwrap();
+
+            starting.fetch_sub(1, Ordering::SeqCst);
+
+            let terminal = started?;
 
             // Shutdown has begun (`stop` drains under this lock, after setting the flag): the command just started is killed here,
             // since nothing else will reach it.
@@ -773,11 +790,6 @@ impl DeviceCore {
                 terminal.kill();
 
                 return Err("the app is shutting down".into());
-            }
-
-            // Checked again: another start may have filled the last place while this one was planned.
-            if running.len() >= MAX_TERMINALS {
-                return Err("too many terminals are running".into());
             }
 
             running.insert(handle, Arc::new(terminal));
