@@ -39,6 +39,16 @@ const evidenceOf = (prompt: string): Record<string, unknown> => {
 };
 
 describe("buildCloudGuidePrompt", () => {
+    it("shows a hidden character in a diff as an escape, and keeps the diff's line breaks", () => {
+        const { prompt } = buildCloudGuidePrompt(input({ files: [file("src/a.ts", { patch: "@@ -1,1 +1,2 @@\n a\n+b\u{200B}c\u{E0041}" })] }));
+
+        expect(prompt).not.toContain("\u{200B}");
+        expect(prompt).not.toContain("\u{E0041}");
+        // The patch is quoted as JSON in the prompt, so each escape's backslash is doubled there.
+        expect(prompt).toContain(String.raw`+b\\u200Bc\\u{E0041}`);
+        expect(prompt).toContain(String.raw`@@ -1,1 +1,2 @@\n a\n+b`);
+    });
+
     it("carries every host-supplied string as a JSON string of the evidence, round-tripped exactly", () => {
         const { prompt } = buildCloudGuidePrompt(input());
         const evidence = evidenceOf(prompt) as { pullRequest: { body: string; title: string }; threads: { comments: { body: string }[] }[] };

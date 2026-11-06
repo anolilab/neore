@@ -195,6 +195,24 @@ const UNSHOWN_IN_PATH = /[\p{Cc}\p{Cf}\p{Co}\p{Cs}\p{Zl}\p{Zp}\u{FE00}-\u{FE0F}]
  */
 const removedByCleaner = (char: string): boolean => hasHiddenText(char, { strict: true }) || stripHiddenText(char).removed > 0;
 
+/** Characters that need a look to be classed: anything outside printable ASCII, and the line breaks and tabs a patch keeps. */
+const NEEDS_LOOK = /[^\n\t\u{20}-\u{7E}]/u;
+
+/**
+ * `text` with each hidden character written as an escape, so a reader sees that it is there. Line breaks and tabs stay as
+ * they are, so a patch keeps its shape. A patch's text is evidence for the model: it is shown, not removed.
+ */
+export const showHiddenText = (value: string): string =>
+    [...value]
+        .map((char) => {
+            if (!NEEDS_LOOK.test(char)) {
+                return char;
+            }
+
+            return UNSHOWN_IN_PATH.test(char) || removedByCleaner(char) ? escapeChar(char) : char;
+        })
+        .join("");
+
 /** A character escaped as `\uXXXX`, or `\u{XXXXX}` past the BMP. */
 const escapeChar = (char: string): string => {
     const hex = (char.codePointAt(0) ?? 0).toString(16).toUpperCase();

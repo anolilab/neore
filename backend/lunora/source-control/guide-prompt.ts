@@ -13,7 +13,7 @@ import { stripHiddenText } from "@neore/ai/utils";
 import { MAX_DEVICE_INPUT_BYTES } from "../devices/lib/constants";
 import { utf8Length } from "../devices/lib/signing";
 import type { GuideFile } from "./guide-logic";
-import { encodePath, isMechanicalFile } from "./guide-logic";
+import { encodePath, isMechanicalFile, showHiddenText } from "./guide-logic";
 
 export interface GuidePromptInput {
     baseBranch: string;
@@ -82,6 +82,9 @@ const cleanedInput = (input: GuidePromptInput): GuidePromptInput => {
         body: clean(input.body),
         commits: input.commits.map((commit) => {
             return { ...commit, message: clean(commit.message) };
+        }),
+        files: input.files.map((file) => {
+            return { ...file, patch: file.patch === null ? null : showHiddenText(file.patch) };
         }),
         headBranch: encodePath(input.headBranch),
         instructions: clean(input.instructions),
