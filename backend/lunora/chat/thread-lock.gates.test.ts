@@ -44,6 +44,8 @@ beforeAll(async () => {
     registerModule(registry, "agent_branches", await import("../agent/branches"));
     registerModule(registry, "agent_thread_lock", await import("../agent/thread-lock"));
     registerModule(registry, "lib_document_history", await import("../lib/document-history"));
+    registerModule(registry, "chat_tool_permissions", await import("./tool-permissions"));
+    registerModule(registry, "chat_thread_state", await import("./thread-state"));
 }, 30_000);
 
 // Same identity seam as `thread-read-paths.test.ts`: the session reads come off the harness identity.
