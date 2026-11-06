@@ -6,6 +6,7 @@ import { Download, ExternalLink, X } from "lucide-react";
 import type { FC } from "react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
+import { ErrorBoundary } from "@/components/error-boundary";
 import type { PreviewFile } from "@/features/chat/core/stores/chat-ui-store";
 import { useCanvasState } from "@/features/chat/core/stores/chat-ui-store";
 import { showError } from "@/lib/toast";
@@ -113,18 +114,26 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
                 </p>
             )}
             <div className="flex min-h-0 flex-1 flex-col p-2">
-                <Suspense fallback={<span className="text-muted-foreground text-sm" role="status">{t`Loading preview…`}</span>}>
-                    {/* A new file is a new viewer: the page and zoom of the last one do not carry over. */}
-                    <FetchableOriginsProvider origins={PANEL_ORIGINS}>
-                        <PdfViewer
-                            className="my-0 min-h-0 max-w-none flex-1 rounded-none border-0"
-                            filename={file.filename}
-                            fill
-                            key={file.url}
-                            url={file.url}
-                        />
-                    </FetchableOriginsProvider>
-                </Suspense>
+                <ErrorBoundary
+                    fallback={() => (
+                        <p className="text-muted-foreground text-sm" role="alert">
+                            {t`This preview could not be loaded.`}
+                        </p>
+                    )}
+                >
+                    <Suspense fallback={<span className="text-muted-foreground text-sm" role="status">{t`Loading preview…`}</span>}>
+                        {/* A new file is a new viewer: the page and zoom of the last one do not carry over. */}
+                        <FetchableOriginsProvider origins={PANEL_ORIGINS}>
+                            <PdfViewer
+                                className="my-0 min-h-0 max-w-none flex-1 rounded-none border-0"
+                                filename={file.filename}
+                                fill
+                                key={file.url}
+                                url={file.url}
+                            />
+                        </FetchableOriginsProvider>
+                    </Suspense>
+                </ErrorBoundary>
             </div>
         </div>
     );

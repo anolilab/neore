@@ -75,7 +75,14 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
                     // Like the viewer: its own loading and error UI, not the nearest Suspense boundary.
                     suspense={false}
                 >
-                    <Page pageNumber={1} renderAnnotationLayer={false} renderTextLayer={false} width={THUMBNAIL_WIDTH} />
+                    <Page
+                        onLoadError={() => setFailed(true)}
+                        onRenderError={() => setFailed(true)}
+                        pageNumber={1}
+                        renderAnnotationLayer={false}
+                        renderTextLayer={false}
+                        width={THUMBNAIL_WIDTH}
+                    />
                 </Document>
             )}
             {pages > 0 && (

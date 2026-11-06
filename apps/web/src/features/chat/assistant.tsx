@@ -2,6 +2,7 @@
  * Assistant - Main chat entry point using ChatProvider
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@neore/ui/components/resizable";
 import { SidebarInset } from "@neore/ui/components/sidebar";
 import type { OpenPdfPreviewDetail } from "@neore/ui/utils/pdf-preview-event";
@@ -17,6 +18,7 @@ import type { ModelId } from "@/features/chat/core/stores/model-store";
 import AppSidebar from "@/features/layout/components/app-sidebar";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import usePromptLoader from "@/features/prompts/hooks/use-prompt-loader";
+import { showWarning } from "@/lib/toast";
 
 import ChatSiteHeader from "./header/chat-header";
 import ThreadSidebar from "./sidebar/thread-sidebar";
@@ -54,6 +56,8 @@ const AssistantContent: FC<{
     promptId?: string;
     threadId?: string;
 }> = ({ initialMessage, promptId, threadId }) => {
+    const { t } = useLingui();
+
     // Load prompt if promptId is provided (must be inside ChatProvider)
     usePromptLoader(promptId);
     const { isCanvasOpen, openPreviewFile, previewFile: openedPreview } = useCanvasState();
@@ -64,22 +68,25 @@ const AssistantContent: FC<{
     // A chat PDF's thumbnail asks for the side panel; this takes the request (see `packages/ui/src/utils/pdf-preview-event.ts`).
     useEffect(() => {
         const onOpenPdf = (event: Event) => {
-            // A document with unsaved edits keeps the panel: opening a PDF would unmount its editor, edits and all. Unhandled,
-            // the thumbnail shows the file inline instead.
+            const { detail } = event as CustomEvent<OpenPdfPreviewDetail>;
+
+            // Handled either way, so the thumbnail stays a thumbnail: opening a PDF over a document with unsaved edits would
+            // unmount its editor, edits and all. The reader is told why, and can open it once the edits are saved or discarded.
+            event.preventDefault();
+
             if (useChatUIStore.getState().canvasDirty) {
+                showWarning(t`Save or discard your edits to open this PDF in the panel.`);
+
                 return;
             }
 
-            const { detail } = event as CustomEvent<OpenPdfPreviewDetail>;
-
-            event.preventDefault();
             openPreviewFile({ filename: detail.filename, threadId, url: detail.url });
         };
 
         globalThis.addEventListener(OPEN_PDF_PREVIEW_EVENT, onOpenPdf);
 
         return () => globalThis.removeEventListener(OPEN_PDF_PREVIEW_EVENT, onOpenPdf);
-    }, [openPreviewFile, threadId]);
+    }, [openPreviewFile, t, threadId]);
 
     // A PDF belongs to the thread it was opened in: leaving that thread closes its preview, so it does not come back on return.
     useEffect(
