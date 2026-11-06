@@ -21,6 +21,8 @@ const SettingsScreen = () => {
     // On by default: a launch reopens the last chat unless this was switched off.
     const [isReopenOn, setIsReopenOn] = useState(true);
     const [isReopenLoaded, setIsReopenLoaded] = useState(false);
+    // One change at a time: the switch is held until the save in progress settles.
+    const [isReopenChanging, setIsReopenChanging] = useState(false);
     const [reopenFailure, setReopenFailure] = useState<string | null>(null);
     const isConfigured = loadConfig().posthog !== undefined;
 
@@ -89,14 +91,17 @@ const SettingsScreen = () => {
     const changeReopenLastChat = async (isOn: boolean) => {
         setReopenFailure(null);
         setIsReopenOn(isOn);
+        setIsReopenChanging(true);
 
         try {
             await writeReopenLastChat(isOn);
         } catch (writeError) {
             console.warn("Could not save the reopen setting.", writeError);
             setReopenFailure(REOPEN_SAVE_FAILED_MESSAGE);
-            // The save did not happen, so the switch goes back to the value that is still stored.
+            // The switch is held while a save runs, so the value before this change is still the one stored.
             setIsReopenOn(!isOn);
+        } finally {
+            setIsReopenChanging(false);
         }
     };
 
@@ -106,7 +111,7 @@ const SettingsScreen = () => {
                 <Text style={{ flex: 1 }}>Reopen the last chat on launch</Text>
                 <Switch
                     accessibilityLabel="Reopen the last chat on launch"
-                    disabled={!isReopenLoaded}
+                    disabled={!isReopenLoaded || isReopenChanging}
                     onValueChange={(isOn) => {
                         changeReopenLastChat(isOn);
                     }}

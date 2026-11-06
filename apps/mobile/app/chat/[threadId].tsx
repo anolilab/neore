@@ -516,10 +516,17 @@ const Chat = () => {
         }
     };
 
+    // The last known geometry of the list. The end is recomputed whenever any of it changes, not only on a scroll.
+    const metrics = useRef({ contentHeight: 0, layoutHeight: 0, offsetY: 0 });
+    const updateIsAtEnd = () => {
+        setIsAtEnd(isScrolledToEnd(metrics.current));
+    };
+
     const onListScroll = (event: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }) => {
         const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
 
-        setIsAtEnd(isScrolledToEnd({ contentHeight: contentSize.height, layoutHeight: layoutMeasurement.height, offsetY: contentOffset.y }));
+        metrics.current = { contentHeight: contentSize.height, layoutHeight: layoutMeasurement.height, offsetY: contentOffset.y };
+        updateIsAtEnd();
     };
 
     const olderHeader
@@ -563,12 +570,22 @@ const Chat = () => {
         <View onLayout={measureTopOffset} ref={rootRef} style={{ flex: 1 }}>
             <OfflineBanner syncedAt={syncedAt} />
             <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={topOffset} style={{ flex: 1 }}>
-                <View style={{ flex: 1 }}>
+                <View
+                    onLayout={(event) => {
+                        metrics.current = { ...metrics.current, layoutHeight: event.nativeEvent.layout.height };
+                        updateIsAtEnd();
+                    }}
+                    style={{ flex: 1 }}
+                >
                     <LegendList
                         data={rows}
                         estimatedItemSize={72}
                         keyExtractor={(row) => row.id}
                         ListHeaderComponent={olderHeader}
+                        onContentSizeChange={(_width, height) => {
+                            metrics.current = { ...metrics.current, contentHeight: height };
+                            updateIsAtEnd();
+                        }}
                         onScroll={onListScroll}
                         ref={listRef}
                         renderItem={({ item }) => {
