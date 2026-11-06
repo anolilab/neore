@@ -16,13 +16,14 @@ import type { CapabilityReport } from "@neore/ai/capabilities";
 import { capabilityOf, isAvailable } from "@neore/ai/capabilities";
 
 import type { RawOptions } from "./agent-options";
-import { configOptionsOf, isOffered, optionsOf, resolveOptions, withCurrentMode, withOptionValue } from "./agent-options";
+import { configOptionsOf, idOf, isOffered, optionsOf, resolveOptions, withCurrentMode, withOptionValue } from "./agent-options";
 import { usageOf } from "./agent-state";
 import { reportFromHandshake, withOptionCapabilities } from "./capabilities";
 import { TurnChanges } from "./changes";
 import { childEventOf, childParentOf, completionText, contentText, isRecord, text, toolIdOf } from "./child-updates";
 import type { ChildEvent } from "./children";
 import { ChildLedger } from "./children";
+import type { AgentOption, AgentUsage } from "./host-events";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate, PermissionOutcome } from "./permission";
@@ -85,6 +86,41 @@ interface StartupUpdate {
     sessionId: unknown;
     update: Record<string, unknown>;
 }
+
+/**
+ * The most agent session ids a fresh session's startup keeps updates for while it waits for its own id. An agent that names more
+ * ids than this loses the oldest ones' updates, so a chatty agent cannot grow the desktop's memory without limit.
+ */
+const MAX_STARTUP_SESSIONS = 4;
+
+/** What startup keeps of an update it can use, already read: its effect is applied in arrival order once the session answers. */
+type StartupRead = { configOptions: AgentOption[]; kind: "config" } | { kind: "mode"; modeId: string } | { kind: "usage"; usage: AgentUsage };
+
+/**
+ * Reads an update startup can use. Any other kind, and a malformed update (which changes nothing), reads as `undefined`, so it is
+ * never kept. The mode id is read with the same check the mode change applies, so a kept id is one it would apply.
+ */
+const startupReadOf = (update: Record<string, unknown>, scrub: (text: string) => string): StartupRead | undefined => {
+    if (update.sessionUpdate === "config_option_update") {
+        const configOptions = configOptionsOf(update.configOptions, scrub);
+
+        return configOptions === undefined ? undefined : { configOptions, kind: "config" };
+    }
+
+    if (update.sessionUpdate === "current_mode_update") {
+        const modeId = idOf(update.currentModeId, scrub);
+
+        return modeId === undefined ? undefined : { kind: "mode", modeId };
+    }
+
+    if (update.sessionUpdate === "usage_update") {
+        const usage = usageOf(update, scrub);
+
+        return usage === undefined ? undefined : { kind: "usage", usage };
+    }
+
+    return undefined;
+};
 
 export interface SessionOptions {
     agentKey: string;
@@ -188,8 +224,11 @@ export class AgentSession {
     /** The newest usage report sent before the session answered, reported once it has opened. */
     private startupUsage: StartupUpdate | undefined;
 
-    /** A fresh session's updates sent before its answer: its id is known only then, so they count once it has answered (`openFresh`). */
-    private readonly startupUpdates: StartupUpdate[] = [];
+    /**
+     * What a fresh session's startup kept of the updates sent before its answer, per agent session id: the latest of each kind, in
+     * arrival order. Only the id the answer names counts (`openFresh`); the others are dropped then, and on a failed start.
+     */
+    private readonly startupReads = new Map<string, StartupRead[]>();
 
     /** What happened to the saved session the backend asked to load; unset when it asked for none. */
     private reattach: HostSessionInfo["reattach"];
@@ -248,6 +287,9 @@ export class AgentSession {
                 throw new Error(this.endReason ?? "the agent ended during startup");
             }
         } catch (error) {
+            // A failed start keeps nothing it read before its answer.
+            this.startupReads.clear();
+            this.startupUsage = undefined;
             await this.exitStatus();
 
             const stderr = this.options.process.stderrTail().trim();
@@ -573,14 +615,12 @@ export class AgentSession {
         const { response, sessionId } = await openNewSession(this.connection, folder, timeoutMs);
 
         // What the agent sent for this session before its answer is older than the answer, which wins below.
-        const startups = [...this.startupUpdates];
+        const reads = this.startupReads.get(sessionId) ?? [];
 
-        this.startupUpdates.length = 0;
+        this.startupReads.clear();
 
-        for (const startup of startups) {
-            if (startup.sessionId === sessionId) {
-                this.takeOwnStartupUpdate(startup);
-            }
+        for (const read of reads) {
+            this.applyStartupRead(sessionId, read);
         }
 
         this.offered = { ...this.offered, ...optionsOf(response, this.options.process.scrub) };
@@ -588,18 +628,35 @@ export class AgentSession {
         return sessionId;
     }
 
-    private takeStartupOptions(update: Record<string, unknown>): void {
-        const { scrub } = this.options.process;
-
-        if (update.sessionUpdate === "config_option_update") {
-            const configOptions = configOptionsOf(update.configOptions, scrub);
-
-            if (configOptions !== undefined) {
-                this.offered = { ...this.offered, configOptions };
-            }
-        } else if (update.sessionUpdate === "current_mode_update") {
-            this.offered = withCurrentMode(this.offered, update.currentModeId, scrub);
+    /** Applies one update startup kept: an option list or mode is taken now, and the newest valid usage report is kept for `start` to report. */
+    private applyStartupRead(sessionId: string, read: StartupRead): void {
+        if (read.kind === "config") {
+            this.offered = { ...this.offered, configOptions: read.configOptions };
+        } else if (read.kind === "mode") {
+            this.offered = withCurrentMode(this.offered, read.modeId, this.options.process.scrub);
+        } else {
+            this.startupUsage = { sessionId, update: { sessionUpdate: "usage_update", ...read.usage } };
         }
+    }
+
+    /**
+     * Keeps one read for a fresh session, whose id is not known yet. A newer read of the same kind for the same id replaces the older
+     * one (only the latest counts), and the ids are capped: the most recently updated ones stay.
+     */
+    private retainStartupRead(sessionId: string, read: StartupRead): void {
+        const kept = (this.startupReads.get(sessionId) ?? []).filter((entry) => entry.kind !== read.kind);
+
+        this.startupReads.delete(sessionId);
+
+        if (this.startupReads.size >= MAX_STARTUP_SESSIONS) {
+            const [oldest] = this.startupReads.keys();
+
+            if (oldest !== undefined) {
+                this.startupReads.delete(oldest);
+            }
+        }
+
+        this.startupReads.set(sessionId, [...kept, read]);
     }
 
     /** Tells the backend what the agent offers now (it keeps the newest of each field and sends them in one post). */
@@ -965,32 +1022,25 @@ export class AgentSession {
      * its updates count. A fresh session's id is known only once it answers, so its updates wait for that (`openFresh`).
      */
     private takeStartupUpdate(params: Record<string, unknown>): void {
-        if (!isRecord(params.update)) {
+        if (!isRecord(params.update) || typeof params.sessionId !== "string") {
+            return;
+        }
+
+        // Only the kinds startup uses, and only the ones it can read, are kept; anything else is dropped as it arrives.
+        const read = startupReadOf(params.update, this.options.process.scrub);
+
+        if (read === undefined) {
             return;
         }
 
         if (this.startupPhase !== "loading") {
-            this.startupUpdates.push({ sessionId: params.sessionId, update: params.update });
+            this.retainStartupRead(params.sessionId, read);
 
             return;
         }
 
         if (params.sessionId === this.options.resumeSessionId) {
-            this.takeOwnStartupUpdate({ sessionId: params.sessionId, update: params.update });
-        }
-    }
-
-    /** An update of this session: an option change is taken now, and the newest valid usage report is kept for `start` to report. */
-    private takeOwnStartupUpdate(startup: StartupUpdate): void {
-        if (startup.update.sessionUpdate !== "usage_update") {
-            this.takeStartupOptions(startup.update);
-
-            return;
-        }
-
-        // A malformed report does not replace a valid one sent before it.
-        if (usageOf(startup.update, this.options.process.scrub) !== undefined) {
-            this.startupUsage = startup;
+            this.applyStartupRead(params.sessionId, read);
         }
     }
 
