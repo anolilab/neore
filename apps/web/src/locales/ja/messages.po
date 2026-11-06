@@ -3320,7 +3320,7 @@ msgstr "WeChat 公式アカウント（安全モード）へのメッセージ�
 msgid "Answer ready"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:120
+#: src/features/chat/thread/ask-user-prompt.tsx:134
 msgid "Answer sent — continuing"
 msgstr "回答を送信しました — 続行中"
 
@@ -3328,7 +3328,7 @@ msgstr "回答を送信しました — 続行中"
 msgid "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 msgstr "WhatsApp Business 番号（Meta Cloud API）経由で WhatsApp メッセージに応答します。返信は WhatsApp の 24 時間ルールに従います。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:116
+#: src/features/chat/thread/ask-user-prompt.tsx:130
 msgid "Answered"
 msgstr "回答済み"
 
@@ -3861,13 +3861,33 @@ msgstr ""
 msgid "Attach as file"
 msgstr ""
 
+#: src/features/chat/thread/ask-user-prompt.tsx:262
+msgid "Attach file"
+msgstr "ファイルを添付"
+
 #: src/features/chat/header/kb-attachment-button.tsx:187
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "この会話で AI が参照・引用できるように、ファイルまたはコレクション全体を添付します。"
 
+#: src/features/chat/thread/ask-user-prompt.tsx:219
+msgid "Attached files"
+msgstr "添付ファイル"
+
 #: ../../packages/chat-ui/src/chat/message-item.tsx:121
 msgid "Attached image"
 msgstr "添付画像"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:175
+msgid "Attached:"
+msgstr "添付:"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:250
+msgid "Attaching files…"
+msgstr "ファイルを添付しています…"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:262
+msgid "Attaching…"
+msgstr "添付しています…"
 
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 msgid "Attachment"
@@ -7739,6 +7759,16 @@ msgstr ""
 msgid "Could not apply the changes"
 msgstr "変更を適用できませんでした"
 
+#. placeholder {0}: failed.join(", ")
+#: src/features/chat/thread/use-ask-user-attachments.ts:186
+msgid "Could not attach {0}. The other files were attached; try those again."
+msgstr "{0} を添付できませんでした。ほかのファイルは添付されました。それらは再度お試しください。"
+
+#. placeholder {0}: failed.join(", ")
+#: src/features/chat/thread/use-ask-user-attachments.ts:187
+msgid "Could not attach {0}. Try those again."
+msgstr "{0} を添付できませんでした。もう一度お試しください。"
+
 #: src/features/chat/thread/composer-input.tsx:1349
 msgid "Could not attach the chat"
 msgstr "チャットを添付できませんでした"
@@ -7757,7 +7787,7 @@ msgstr "実行をキャンセルできませんでした。"
 
 #: src/features/chat/thread/composer-model-selector.tsx:127
 msgid "Could not change Auto. Please try again."
-msgstr ""
+msgstr "Autoを変更できませんでした。もう一度お試しください。"
 
 #: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
@@ -7766,7 +7796,7 @@ msgstr "プッシュ通知を変更できませんでした。もう一度お試
 #: src/features/chat/model-settings/use-model-combobox.ts:283
 #: src/features/chat/model-settings/use-model-combobox.ts:307
 msgid "Could not change the model. Please try again."
-msgstr ""
+msgstr "モデルを変更できませんでした。もう一度お試しください。"
 
 #: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
@@ -8021,7 +8051,7 @@ msgstr ""
 msgid "Could not send your answer."
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:83
+#: src/features/chat/thread/ask-user-prompt.tsx:97
 #: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "回答を送信できませんでした。もう一度お試しください。"
@@ -9883,7 +9913,7 @@ msgstr "Discord 公開鍵"
 
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:54
 #: src/features/changelog/components/changelog-card.tsx:59
-#: src/features/chat/thread/ask-user-prompt.tsx:191
+#: src/features/chat/thread/ask-user-prompt.tsx:270
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:203
@@ -9919,7 +9949,7 @@ msgstr "Webhook シークレットを閉じる"
 msgid "Dismissed"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:118
+#: src/features/chat/thread/ask-user-prompt.tsx:132
 msgid "Dismissed — continuing without an answer"
 msgstr "閉じました — 回答なしで続行中"
 
@@ -11241,7 +11271,7 @@ msgstr ""
 msgid "Enter the endpoint URL first"
 msgstr "先にエンドポイント URL を入力してください"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:182
+#: src/features/chat/thread/ask-user-prompt.tsx:236
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "Enter で送信、Shift+Enter で改行。"
 
@@ -13378,6 +13408,10 @@ msgstr "ファイル名を空にすることはできません"
 #: src/features/develop/components/pull-request-view.tsx:72
 msgid "Files"
 msgstr ""
+
+#: src/features/chat/thread/ask-user-prompt.tsx:252
+msgid "Files cannot be attached in a locked chat."
+msgstr "ロックされたチャットではファイルを添付できません。"
 
 #: src/features/chat/thread/host-changes.tsx:50
 msgid "Files changed by this turn"
@@ -21189,6 +21223,11 @@ msgstr ""
 msgid "Not set"
 msgstr "未設定"
 
+#. placeholder {0}: unreadFiles.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:179
+msgid "Not shown to this model: {0}"
+msgstr "このモデルには表示されていません: {0}"
+
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:75
 msgid "Not started"
 msgstr "未開始"
@@ -21601,6 +21640,10 @@ msgstr "請求設定を管理できるのは組織のオーナーのみです"
 #: src/features/chat/group/group-mode.ts:66
 msgid "Only participants you @mention answer."
 msgstr "@メンションした参加者のみが回答します。"
+
+#: src/features/chat/thread/use-ask-user-attachments.ts:96
+msgid "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
+msgstr "添付できるのは PNG・JPEG・WEBP・GIF の画像と、10 MB までの PDF です。合計 20 MB まで、最大 4 つまでです。"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:263
 msgid "Only post when there is something to report"
@@ -22374,7 +22417,7 @@ msgstr ""
 msgid "Or from a terminal:"
 msgstr "またはターミナルから："
 
-#: src/features/chat/thread/ask-user-prompt.tsx:176
+#: src/features/chat/thread/ask-user-prompt.tsx:208
 msgid "Or type your own answer…"
 msgstr "または自分で回答を入力…"
 
@@ -23619,7 +23662,7 @@ msgstr "プレミアムクラスの推論と指示追従"
 msgid "Premium-tier reasoning transparency"
 msgstr "プレミアムクラスの推論の透明性"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:122
+#: src/features/chat/thread/ask-user-prompt.tsx:136
 msgid "Preparing a question…"
 msgstr "質問を準備中…"
 
@@ -25363,10 +25406,11 @@ msgstr "「{0}」を削除しますか？"
 msgid "Remove “{0}”?"
 msgstr "「{0}」を削除しますか？"
 
+#. placeholder {0}: file.name
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
-#. placeholder {0}: variable.name
 #: src/features/chat/group/group-participant-bar.tsx:210
+#: src/features/chat/thread/ask-user-prompt.tsx:224
 #: src/features/prompts/components/thread-variables-config.tsx:232
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
@@ -27406,7 +27450,7 @@ msgstr "メッセージを送信して始めましょう"
 msgid "Send a new verification link"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:187
+#: src/features/chat/thread/ask-user-prompt.tsx:266
 msgid "Send answer"
 msgstr "回答を送信"
 
@@ -29773,7 +29817,7 @@ msgstr "テック系 YouTube チャンネルの動画アイデアを提案する
 msgid "Suggested"
 msgstr "おすすめ"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:159
+#: src/features/chat/thread/ask-user-prompt.tsx:184
 #: src/features/skills/components/skill-builder-dialog.tsx:235
 msgid "Suggested answers"
 msgstr "回答の候補"
@@ -30737,7 +30781,7 @@ msgstr "アーカイブに安全でないファイルパスが含まれていま
 msgid "The archive holds too many files."
 msgstr "アーカイブに含まれるファイルが多すぎます。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:141
+#: src/features/chat/thread/ask-user-prompt.tsx:158
 msgid "The assistant has a question"
 msgstr "アシスタントから質問があります"
 
@@ -32272,6 +32316,11 @@ msgstr ""
 msgid "too large"
 msgstr "大きすぎます"
 
+#. placeholder {0}: tooLarge.join(", ")
+#: src/features/chat/thread/use-ask-user-attachments.ts:180
+msgid "Too large to attach: {0}. Reduce the file and attach it again."
+msgstr "大きすぎて添付できません: {0}。ファイルを小さくしてから、もう一度添付してください。"
+
 #: src/features/workflow/components/nodes/text-node.tsx:78
 msgid "Too long to check as JSON"
 msgstr "JSON として確認するには長すぎます"
@@ -32822,7 +32871,7 @@ msgstr ""
 msgid "Type to search"
 msgstr "入力して検索"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:176
+#: src/features/chat/thread/ask-user-prompt.tsx:208
 msgid "Type your answer…"
 msgstr "回答を入力…"
 
@@ -34578,7 +34627,7 @@ msgstr ""
 msgid "Waiting for the owner"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:124
+#: src/features/chat/thread/ask-user-prompt.tsx:138
 msgid "Waiting for the owner to answer"
 msgstr "オーナーの回答を待っています"
 
@@ -34599,7 +34648,7 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
-#: src/features/chat/thread/ask-user-prompt.tsx:124
+#: src/features/chat/thread/ask-user-prompt.tsx:138
 msgid "Waiting for your answer"
 msgstr "あなたの回答を待っています"
 
@@ -35559,7 +35608,7 @@ msgstr "アカウントと関連するすべてのデータを削除していま
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "あなたの AI ワークスペースは<0>ここから始まります。</0>"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:168
+#: src/features/chat/thread/ask-user-prompt.tsx:200
 msgid "Your answer"
 msgstr "あなたの回答"
 
@@ -35567,7 +35616,7 @@ msgstr "あなたの回答"
 msgid "Your answer in Neore has finished."
 msgstr "Neore での回答が完了しました。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:151
+#: src/features/chat/thread/ask-user-prompt.tsx:168
 msgid "Your answer:"
 msgstr "あなたの回答："
 

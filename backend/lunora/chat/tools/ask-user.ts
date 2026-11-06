@@ -22,7 +22,7 @@ import z from "zod/v4";
 
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
-import type { AskUserInput, AskUserOutput } from "./ask-user-constants";
+import type { AskUserFile, AskUserInput, AskUserOutput } from "./ask-user-constants";
 import { ASK_USER_CHOICE_MAX, ASK_USER_MAX_CHOICES, ASK_USER_QUESTION_MAX } from "./ask-user-constants";
 
 const inputSchema = z
@@ -57,19 +57,35 @@ const askUserTool = createTool<AskUserInput, AskUserOutput, ToolContext>({
     title: "Ask User",
 });
 
-/** The same tool for one resumed run, answering with `answer`. */
-export const createAnsweredAskUserTool = (answer: string) =>
-    createTool<AskUserInput, AskUserOutput, ToolContext>({
+/**
+ * The same tool for one resumed run, answering with `answer`. The stored output is the answer object, with every
+ * attached file named in it, so the card can show it after a reload and no bytes reach the row. The readable files
+ * are handed to the model separately (`answerFilesMessage`, on the continuation's first step). A file the model
+ * cannot read is listed in `unreadFiles`, so the answer says it was not shown.
+ */
+export const createAnsweredAskUserTool = (answer: string, files: ReadonlyArray<AskUserFile> = [], readableFiles: ReadonlyArray<AskUserFile> = files) => {
+    const attachedFiles = files.map(({ filename, mediaType }) => {
+        return { filename, mediaType };
+    });
+    const unreadFiles = files.filter((file) => !readableFiles.includes(file)).map((file) => file.filename);
+
+    return createTool<AskUserInput, AskUserOutput, ToolContext>({
         description: DESCRIPTION,
         execute: async () => {
-            return { answer, answered: true };
+            return {
+                answer,
+                answered: true,
+                ...(attachedFiles.length > 0 && { attachedFiles }),
+                ...(unreadFiles.length > 0 && { unreadFiles }),
+            };
         },
         inputSchema,
         needsApproval: true,
         title: "Ask User",
     });
+};
 
-export type { AskUserInput, AskUserOutput } from "./ask-user-constants";
+export type { AskUserFile, AskUserInput, AskUserOutput } from "./ask-user-constants";
 export { ASK_USER_ANSWER_MAX, ASK_USER_DISMISSED_REASON, ASK_USER_TOOL_NAME } from "./ask-user-constants";
 
 export default askUserTool;

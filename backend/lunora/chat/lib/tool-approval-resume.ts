@@ -18,6 +18,8 @@ import type { ToolRunConfig } from "./tool-run-config";
 export interface ResumeClaimedRunArgs {
     /** The user's answer for an approved `askUser` call, or the reference of a saved `requestSecret` — becomes the tool result. Never a secret value. */
     answer?: string;
+    /** The files an answer carries (`lib/ask-user-files.ts`), read by the continuation as the owner. */
+    answerFileIds?: string[];
     approvalId: string;
     approved: boolean;
     config: ToolRunConfig;
@@ -30,7 +32,7 @@ export interface ResumeClaimedRunArgs {
 
 /** Returns the new stream's id, which the claimed row now records. */
 export const resumeClaimedRun = async (ctx: MutationCtx, args: ResumeClaimedRunArgs): Promise<string> => {
-    const { answer, approvalId, approved, config, denyReason, ownerId, runId, threadId } = args;
+    const { answer, answerFileIds, approvalId, approved, config, denyReason, ownerId, runId, threadId } = args;
     const streamId = await persistentTextStreaming.createStream(ctx, {
         messageId: approvalId,
         streamingConfig: {
@@ -48,6 +50,7 @@ export const resumeClaimedRun = async (ctx: MutationCtx, args: ResumeClaimedRunA
     // On the jobs queue, like the run it resumes (`lib/job-queue.ts`); it claims its stream first.
     await enqueueJob(internal.chat.execute.continueAfterToolApproval, {
         ...(answer !== undefined && { answer }),
+        ...(answerFileIds !== undefined && answerFileIds.length > 0 && { answerFileIds }),
         approvalId,
         approved,
         config,
