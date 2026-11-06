@@ -1194,6 +1194,13 @@ describe("run prompts", () => {
 
         await expect(collectAllTriggers(async () => page, 50)).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
     });
+
+    it("counts a page by its UTF-8 bytes, so non-ASCII text cannot pass the limit by its character count", async () => {
+        // 40 two-byte characters: 53 characters of JSON, 93 bytes. The limit of 60 lies between the two.
+        const page = { triggers: [{ name: "é".repeat(40) }] };
+
+        await expect(collectAllTriggers(async () => page, 60)).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+    });
 });
 
 describe("deleteTrigger", () => {

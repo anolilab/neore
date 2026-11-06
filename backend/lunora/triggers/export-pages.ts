@@ -19,7 +19,7 @@ export const collectAllTriggers = async (readPage: (cursor: string | null) => Pr
         const result = (await readPage(cursor)) as TriggersPage;
         const page = result.triggers ?? [];
 
-        bytes += JSON.stringify(page).length;
+        bytes += new TextEncoder().encode(JSON.stringify(page)).byteLength;
 
         if (bytes > maxBytes) {
             throw new LunoraError("PAYLOAD_TOO_LARGE", "The trigger history is larger than the export limit");
