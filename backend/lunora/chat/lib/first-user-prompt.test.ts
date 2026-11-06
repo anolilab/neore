@@ -44,4 +44,11 @@ describe("firstUserPromptText", () => {
         expect(firstUserPromptText([])).toBeUndefined();
         expect(firstUserPromptText([{ message: { content: "a".repeat(5000), role: "user" } }])).toHaveLength(2000);
     });
+
+    it("cuts by code point, so a surrogate pair is never split at the limit", () => {
+        const text = firstUserPromptText([{ message: { content: "🙂".repeat(2500), role: "user" } }]);
+
+        expect([...(text ?? "")]).toHaveLength(2000);
+        expect([...(text ?? "")].every((character) => character === "🙂")).toBe(true);
+    });
 });

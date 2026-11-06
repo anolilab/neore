@@ -26,6 +26,24 @@ const textOf = (content: unknown): string => {
 };
 
 /**
+ * The first `MAX_PROMPT_CHARS` characters of `text`, by code point, so a cut never splits a surrogate pair. It stops at the limit: a
+ * long prompt (extracted document text, say) is not split into an array of every character first.
+ */
+const capCharacters = (text: string): string => {
+    const kept: string[] = [];
+
+    for (const character of text) {
+        if (kept.length === MAX_PROMPT_CHARS) {
+            break;
+        }
+
+        kept.push(character);
+    }
+
+    return kept.join("");
+};
+
+/**
  * The first user message on a context window that has any text: its text, trimmed and capped, and the id of the message it came
  * from. Returns `undefined` when the window holds no user text (a thread that only has tool output or nothing yet).
  */
@@ -38,8 +56,7 @@ export const firstUserPrompt = (rows: ReadonlyArray<ContextRow>): { id: string |
         const text = textOf(row.message.content).trim();
 
         if (text) {
-            // Cut by characters, not UTF-16 units: a cut inside a surrogate pair would leave half an emoji.
-            return { id: row._id, text: [...text].slice(0, MAX_PROMPT_CHARS).join("") };
+            return { id: row._id, text: capCharacters(text) };
         }
     }
 
