@@ -137,12 +137,22 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
     const [change, setChange] = useState<{ callId?: string; name: string; rowId: string; valueId: string; valueName: string } | undefined>(undefined);
     const [failure, setFailure] = useState<string | undefined>(undefined);
     // Offline, the default network mode would pause the call before the Lunora client sees it, and the client is what queues a write.
-    // Offline, the default network mode would pause the call before the Lunora client sees it, and the client is what queues a write.
     const set = useMutation({ ...crpc.acp.remote.setHostOption.mutationOptions(), networkMode: "always" });
     // The call whose confirmed value never showed in the options, so the wait for it ended.
     const [gaveUp, setGaveUp] = useState<string | undefined>(undefined);
     const rows = rowsOf(state, { mode: t`Mode`, model: t`Model` });
-    const answered = change?.callId !== undefined && optionResult?.callId === change.callId ? optionResult : undefined;
+    // The answer to this page's change, kept once it has been seen: the session keeps only its latest result, which another client's
+    // change can replace. Without this, the page would wait for the answer again.
+    const [ownAnswer, setOwnAnswer] = useState<OptionResult | undefined>(undefined);
+    const changeCallId = change?.callId;
+
+    useEffect(() => {
+        if (changeCallId !== undefined && optionResult !== undefined && optionResult.callId === changeCallId) {
+            setOwnAnswer(optionResult);
+        }
+    }, [changeCallId, optionResult]);
+
+    const answered = changeCallId === undefined ? undefined : [optionResult, ownAnswer].find((result) => result?.callId === changeCallId);
     const changed = change === undefined ? undefined : rows.find((row) => row.id === change.rowId);
     // The agent's answer reaches the page before the options it changed (the state is posted a moment later): the controls stay
     // off until the option shows the new value, so the row never says "confirmed" over the old one. A bounded wait.

@@ -314,6 +314,8 @@ describe("what the agent reports about itself", () => {
     });
 });
 
+const WAITING_STATUS = /^Waiting/u;
+
 describe("the options the agent offers", () => {
     const MODEL = {
         category: "model",
@@ -376,6 +378,35 @@ describe("the options the agent offers", () => {
         await screen.findByRole("list", { name: "Agent options" });
         expect(screen.queryByLabelText("Mode")).toBeNull();
         expect(screen.getByText("Ask")).toBeTruthy();
+    });
+
+    it("keeps the answer to this page's change when another client's result replaces the session's one, and does not wait again", async () => {
+        const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+        await waitFor(() => expect(mutations()).toHaveLength(1));
+
+        const key = ["acp.functions.getHostSession", { threadId: "thread-1" }];
+
+        client.setQueryData(key, {
+            _id: "session-1",
+            agentState: { configOptions: [{ ...MODEL, currentValue: "deep" }] },
+            optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+            status: "idle",
+        });
+        await screen.findByText("The agent confirmed: Model is now Deep.");
+
+        // Another client then changes the option: the session's one result is theirs now, and this page's answer must stand.
+        client.setQueryData(key, {
+            _id: "session-1",
+            agentState: { configOptions: [{ ...MODEL, currentValue: "fast" }] },
+            optionResult: { callId: "call-2", optionId: "model", outcome: "refused", reason: "the agent did not accept the change", valueId: "fast" },
+            status: "idle",
+        });
+
+        await waitFor(() => expect((screen.getByLabelText("Model") as unknown as HTMLSelectElement).disabled).toBe(false));
+        expect(screen.queryByText(WAITING_STATUS)).toBeNull();
     });
 
     it("says what the agent confirmed when the option it changed is no longer among its options", async () => {
