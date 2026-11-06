@@ -15,7 +15,9 @@ interface PdfPartProps {
  * listens (a shared view, say) the click shows the inline viewer instead.
  */
 const PdfPart: FC<PdfPartProps> = ({ filename, url }) => {
-    const [inline, setInline] = useState(false);
+    // The inline viewer belongs to the URL it was chosen for: a refreshed URL is a new attachment, and starts as a thumbnail.
+    const [inlineUrl, setInlineUrl] = useState<string | undefined>(undefined);
+    const inline = inlineUrl === url;
 
     if (inline) {
         return <PdfViewer filename={filename} url={url} />;
@@ -23,7 +25,7 @@ const PdfPart: FC<PdfPartProps> = ({ filename, url }) => {
 
     const open = () => {
         if (!requestPdfPreview({ filename, url })) {
-            setInline(true);
+            setInlineUrl(url);
         }
     };
 
