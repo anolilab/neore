@@ -1083,6 +1083,21 @@ export class AgentSession {
         }
     }
 
+    /**
+     * The terminal a call shows is the one its content names. A whole content without a terminal block stops showing the terminal it
+     * showed before, so that terminal's output (or its exit) does not replace the call's current text. A terminal still running is
+     * released by its own owner, not through this association.
+     */
+    private showTerminalOf(id: string, content: unknown): void {
+        const terminalId = terminalIdOf(content);
+
+        if (terminalId !== undefined) {
+            this.toolTerminal.set(id, terminalId);
+        } else if (content !== undefined) {
+            this.toolTerminal.delete(id);
+        }
+    }
+
     private upsertTool(turn: Turn | undefined, update: Record<string, unknown>): void {
         const id = toolIdOf(update.toolCallId);
 
@@ -1123,11 +1138,7 @@ export class AgentSession {
             this.toolOutput.set(id, printed);
         }
 
-        const terminalId = terminalIdOf(update.content);
-
-        if (terminalId !== undefined) {
-            this.toolTerminal.set(id, terminalId);
-        }
+        this.showTerminalOf(id, update.content);
 
         // A call we ended as cancelled or declined stays that way: a late `in_progress` must not bring it back.
         if (!isFinal(tool) && TOOL_STATUSES.has(update.status as ToolStatus)) {
