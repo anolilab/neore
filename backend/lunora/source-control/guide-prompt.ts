@@ -144,7 +144,11 @@ const instructionsOf = (instructions: string): string => (instructions.trim() ==
  * at a time and stops when the next character would not fit, so a large diff costs no more than the budget.
  */
 const boundedPatch = (patch: string, budget: number): string => {
-    if (budget <= 0) {
+    // The cap is on the escaped text, and a file takes at most its own cap, so one hidden-heavy file cannot use up the
+    // budget that the other files need.
+    const limit = Math.min(PATCH_FILE_MAX_CHARS, budget);
+
+    if (limit <= 0) {
         return "";
     }
 
@@ -153,7 +157,7 @@ const boundedPatch = (patch: string, budget: number): string => {
     for (const char of patch.slice(0, PATCH_FILE_MAX_CHARS)) {
         const piece = showHiddenText(char);
 
-        if (shown.length + piece.length > budget) {
+        if (shown.length + piece.length > limit) {
             break;
         }
 

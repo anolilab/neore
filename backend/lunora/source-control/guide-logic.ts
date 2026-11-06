@@ -197,8 +197,12 @@ const removedByCleaner = (char: string): boolean => hasHiddenText(char, { strict
 
 /** Characters that need a look to be classed: anything outside printable ASCII, and the line breaks and tabs a patch keeps. */
 const NEEDS_LOOK = /[^\n\t\u{20}-\u{7E}]/u;
-/** A letter is never hidden: the hidden classes are controls, formats, private use, surrogates, separators and selectors. */
-const LETTER = /\p{L}/u;
+/**
+ * A visible letter needs no look. An invisible letter (a Hangul filler is category Lo) is default-ignorable, so it is not
+ * taken for granted: it is checked like any other character.
+ */
+const VISIBLE_LETTER = /\p{L}/u;
+const DEFAULT_IGNORABLE = /\p{Default_Ignorable_Code_Point}/u;
 
 /**
  * `text` with each hidden character written as an escape, so a reader sees that it is there. A backslash is doubled, so an
@@ -212,7 +216,7 @@ export const showHiddenText = (value: string): string =>
                 return BACKSLASH + BACKSLASH;
             }
 
-            if (!NEEDS_LOOK.test(char) || LETTER.test(char)) {
+            if (!NEEDS_LOOK.test(char) || (VISIBLE_LETTER.test(char) && !DEFAULT_IGNORABLE.test(char))) {
                 return char;
             }
 

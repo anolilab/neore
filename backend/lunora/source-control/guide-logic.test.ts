@@ -168,6 +168,11 @@ describe("assembleGuide", () => {
         expect(written).not.toBe(real);
     });
 
+    it("escapes an invisible letter such as a Hangul filler, which is a letter but is not shown", () => {
+        expect(showHiddenText("a\u{3164}b")).toBe(String.raw`a\u3164b`);
+        expect(showHiddenText("a\u{115F}b")).toBe(String.raw`a\u115Fb`);
+    });
+
     it("reads back every path it writes, so two files never share a spelling", () => {
         const paths = ["plain.ts", "src/a\u{200C}b.ts", String.raw`src/a\u200Cb.ts`, String.raw`dir\\x`, "x\u{E0100}y", "a\u{34F}b"];
 

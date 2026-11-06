@@ -45,6 +45,22 @@ describe("buildCloudGuidePrompt", () => {
         expect(prompt.length).toBeLessThan(200_000);
     });
 
+    it("keeps a hidden-heavy file from using up the budget the other files need", () => {
+        const heavy = "\u{200B}".repeat(6000);
+        const { prompt } = buildCloudGuidePrompt(
+            input({
+                files: [
+                    file("src/a.ts", { patch: heavy }),
+                    file("src/b.ts", { patch: heavy }),
+                    file("src/c.ts", { patch: heavy }),
+                    file("src/d.ts", { patch: "@@ -1 +1 @@\n+kept line" }),
+                ],
+            }),
+        );
+
+        expect(prompt).toContain("+kept line");
+    });
+
     it("shows a hidden character in a diff as an escape, and keeps the diff's line breaks", () => {
         const { prompt } = buildCloudGuidePrompt(input({ files: [file("src/a.ts", { patch: "@@ -1,1 +1,2 @@\n a\n+b\u{200B}c\u{E0041}" })] }));
 
