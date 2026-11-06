@@ -13,7 +13,10 @@ import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import type { SetupStepId, SkipVariables } from "../lib/setup-steps";
-import { deriveSetupSteps, SETUP_STEP_IDS, toggleSkipped } from "../lib/setup-steps";
+import { deriveSetupSteps, detectSetupDone, SETUP_STEP_IDS, toggleSkipped } from "../lib/setup-steps";
+
+/** How often the device list is read again while no computer is paired. */
+const PAIRING_POLL_MS = 5000;
 
 /** Where each step's action goes: the control on this page, or the guide for the part that happens in the desktop app. */
 const STEP_TARGET: Record<SetupStepId, string> = {
@@ -40,7 +43,13 @@ const SetupChecklist: FC = () => {
     useEffect(() => {
         signedInRef.current = session?.user?.id;
     }, [session?.user?.id]);
-    const devicesQuery = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
+    // Pairing happens in the desktop app, outside this page, and the list can be a one-shot read that nothing pushes to:
+    // while the pairing step is still open the list is read again on focus and every few seconds, then left alone.
+    const devicesQuery = useQuery({
+        ...crpc.devices.functions.listDevices.queryOptions({}),
+        refetchInterval: (query) => (detectSetupDone(query.state.data).pair ? false : PAIRING_POLL_MS),
+        refetchOnWindowFocus: "always",
+    });
     const settingsQuery = useUserSettings();
     const settingsKey = crpc.auth.functions.getUserSettings.queryOptions({}).queryKey;
     // One step per call: the server applies it to the list it holds, so another tab's skip is never overwritten. The
@@ -59,17 +68,22 @@ const SetupChecklist: FC = () => {
             return;
         }
 
+        // The account the read is for: a read that finishes after another account signed in must not write into its cache.
+        const reader = signedInRef.current;
+
         try {
             const stored = (await (storedSettings.queryFn as (() => Promise<unknown>) | undefined)?.()) as { setupStepsSkipped?: string[] } | null;
             const cached = queryClient.getQueryData<{ setupStepsSkipped?: string[] } | null>(settingsKey);
 
-            if (unsettledSaves.current === 0) {
+            if (reader === signedInRef.current && unsettledSaves.current === 0) {
                 // Only the skip list is taken from the read: the cached row may hold other edits still on their way to the server.
                 queryClient.setQueryData(settingsKey, cached && stored ? { ...cached, setupStepsSkipped: stored.setupStepsSkipped } : (stored ?? null));
             }
         } catch {
             // Say so through the query's own error state, which has the retry.
-            await queryClient.invalidateQueries({ queryKey: settingsKey });
+            if (reader === signedInRef.current) {
+                await queryClient.invalidateQueries({ queryKey: settingsKey });
+            }
         }
     };
     const saveStep = crpc.auth.setup_steps.setSetupStepSkipped.mutationOptions();

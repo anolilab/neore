@@ -2,7 +2,7 @@
  * The first-run setup checklist: state follows the device list, and skip / resume go through the server and show on screen.
  */
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -374,6 +374,51 @@ describe("<SetupChecklist>", () => {
 
         expect(await screen.findByText("(Skipped)")).toBeTruthy();
         expect(server.skipped).toEqual(["ssh"]);
+    });
+
+    it("does not write a stored-settings read into the cache of an account that signed in after it started", async () => {
+        const client = newClient();
+        const view = renderChecklist(client);
+
+        await screen.findAllByText("(To do)");
+
+        let release = () => {};
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` is newer than the supported runtimes
+        server.readHold = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        fireEvent.click(screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }));
+        await waitFor(() => expect(server.skipped).toEqual(["ssh"]));
+
+        // Another account signs in while the read of the first account's list is on its way.
+        account.id = "user-b";
+        client.setQueryData(["getUserSettings"], { setupStepsSkipped: undefined });
+        view.rerender(
+            <QueryClientProvider client={client}>
+                <SetupChecklist />
+            </QueryClientProvider>,
+        );
+        server.readHold = undefined;
+        release();
+        await new Promise((resolve) => {
+            setTimeout(resolve, 50);
+        });
+
+        expect(client.getQueryData(["getUserSettings"])).toEqual({ setupStepsSkipped: undefined });
+        expect(screen.queryByText("(Skipped)")).toBeNull();
+    });
+
+    it("shows the pairing step done once the list is read again after a computer was paired elsewhere", async () => {
+        renderChecklist();
+        await screen.findAllByText("(To do)");
+
+        devices.current = [{ _id: "paired-laptop", name: "Laptop" }];
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+
+        expect(await screen.findAllByText("(Done)")).not.toHaveLength(0);
+        expect(screen.queryByRole("link", { name: GO_TO_PAIRING })).toBeNull();
     });
 
     it("lets the latest click win when Resume follows a Skip that has not been saved yet", async () => {

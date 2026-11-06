@@ -5,7 +5,7 @@ import { v } from "lunorash/server";
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { userSettingsFieldsWithoutUserId } from "./fields";
+import { userSettingsFields } from "./fields";
 import { getUserSettings, updateUserSettings } from "./functions";
 import { MAX_SKIPPED_SETUP_STEPS } from "./lib/setup-step-limits";
 import { applyStepSkip, setSetupStepSkipped } from "./setup-steps";
@@ -92,19 +92,32 @@ describe("setSetupStepSkipped", () => {
     });
 
     it("never stores more than eight entries: a ninth drops the oldest", async () => {
-        await asUser().mutation(updateUserSettings as never, { setupStepsSkipped: ["a", "b", "c", "d", "e", "f", "g", "h"] } as never);
+        await harness.run(async (context: any) => {
+            await context.db.insert("userSettings", { setupStepsSkipped: ["a", "b", "c", "d", "e", "f", "g", "h"], userId: USER });
+        });
         await toggle("ssh", true);
 
         expect(await stored()).toEqual(["b", "c", "d", "e", "f", "g", "h", "ssh"]);
     });
 
     it("shares one limit between the column validator and the skip", () => {
-        const settings = v.object(userSettingsFieldsWithoutUserId);
+        const settings = v.object(userSettingsFields);
         const ids = Array.from({ length: MAX_SKIPPED_SETUP_STEPS + 1 }, (_, index) => `id${index}`);
 
-        expect(validate(settings, { setupStepsSkipped: ids.slice(0, MAX_SKIPPED_SETUP_STEPS) })).toBe(true);
-        expect(validate(settings, { setupStepsSkipped: ids })).toBe(false);
+        expect(validate(settings, { setupStepsSkipped: ids.slice(0, MAX_SKIPPED_SETUP_STEPS), userId: USER })).toBe(true);
+        expect(validate(settings, { setupStepsSkipped: ids, userId: USER })).toBe(false);
         expect(applyStepSkip(ids.slice(0, MAX_SKIPPED_SETUP_STEPS), "ssh", true)).toHaveLength(MAX_SKIPPED_SETUP_STEPS);
+    });
+
+    it("cannot be set or erased through the generic settings update", async () => {
+        await toggle("ssh", true);
+        await asUser().mutation(updateUserSettings as never, { language: "de-DE", setupStepsSkipped: [] } as never);
+
+        expect(await stored()).toEqual(["ssh"]);
+
+        await asUser().mutation(updateUserSettings as never, { setupStepsSkipped: ["pair"] } as never);
+
+        expect(await stored()).toEqual(["ssh"]);
     });
 
     it("refuses an unknown step", async () => {

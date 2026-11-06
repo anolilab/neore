@@ -120,9 +120,6 @@ export const userSettingsFieldsWithoutUserId = {
         }),
     ), // Hostnames the web search tool never returns (subdomains too). Normalised server-side in `settingsUpsert`.
     sendBehavior: v.optional(v.union(v.literal("enter"), v.literal("shiftEnter"), v.literal("button"))),
-    setupStepsSkipped: v.optional(
-        v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= MAX_SKIPPED_SETUP_STEPS, { message: "Too many skipped setup steps" }),
-    ), // First-run setup steps the user skipped. Absent means none.
     taskEmailEnabled: v.optional(v.boolean()), // Opt-in email when a task or trigger run finishes with a result. OPT-IN: absent means off.
     temporaryChatRetentionHours: v.optional(v.number()), // Default: 24 hours
     threadSummariesEnabled: v.optional(v.boolean()), // Summarise a long thread's older turns while it sits idle. OPT-IN: absent means off.
@@ -133,6 +130,11 @@ export const userSettingsFieldsWithoutUserId = {
 
 export const userSettingsFields = {
     ...userSettingsFieldsWithoutUserId,
+    // Not writable through `updateUserSettings` (it takes the fields above): `setSetupStepSkipped` is the one writer, one
+    // step at a time, so a whole-list write from a stale client cannot erase a saved skip. The row still carries it.
+    setupStepsSkipped: v.optional(
+        v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= MAX_SKIPPED_SETUP_STEPS, { message: "Too many skipped setup steps" }),
+    ), // First-run setup steps the user skipped. Absent means none.
     userId: v.string(),
 };
 
