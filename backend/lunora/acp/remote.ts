@@ -353,6 +353,14 @@ export const setHostOption = authMutation
             throw new LunoraError("BAD_REQUEST", "The agent did not offer that option.");
         }
 
+        // A mode can grant standing permissions (edits, every tool, without asking), and a remote answer may only allow once or
+        // decline: so a mode is changed on the computer, where the person sees what it grants. Only other options change from here.
+        const option = args.optionId === undefined ? undefined : session.agentState?.configOptions?.find((entry) => entry.id === args.optionId);
+
+        if (args.optionId === undefined || option?.category === "mode") {
+            throw new LunoraError("BAD_REQUEST", "A mode is changed on the computer, not from here.");
+        }
+
         // One change at a time: a double tap, or the phone and the web at once, finds the first still on its way.
         const queued = await countOpenCalls(
             ctx,

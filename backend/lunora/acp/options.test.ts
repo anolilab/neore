@@ -107,6 +107,17 @@ const MODEL = {
     id: "model",
     name: "Model",
 };
+const MODE_OPTION = {
+    category: "mode",
+    choices: [
+        { name: "Ask", value: "ask" },
+        { name: "Auto", value: "auto" },
+    ],
+    currentValue: "ask",
+    id: "mode",
+    name: "Mode",
+};
+const MODE_REFUSAL = /computer, not from here/u;
 const MODES = {
     available: [
         { id: "ask", name: "Ask" },
@@ -191,15 +202,19 @@ describe("setHostOption", () => {
         expect(await rows("deviceCalls", { toolName: "acp_set_config" })).toHaveLength(0);
     });
 
-    it("changes a mode of the legacy state only when the agent sent no options", async () => {
+    it("refuses a mode of the legacy state from the web, since a mode can grant standing permissions", async () => {
         const legacy = await readySession({ modes: MODES });
 
-        await expect(setOption(legacy.threadId, { valueId: "code" })).resolves.toMatchObject({ sent: true });
-        await expect(setOption(legacy.threadId, { valueId: "plan" })).rejects.toThrow(NOT_OFFERED);
+        await expect(setOption(legacy.threadId, { valueId: "code" })).rejects.toThrow(MODE_REFUSAL);
+        expect(await rows("deviceCalls", { toolName: "acp_set_config" })).toHaveLength(0);
+    });
 
-        const [call] = await rows("deviceCalls", { toolName: "acp_set_config" });
+    it("refuses an option of the mode category from the web, and still changes the other options", async () => {
+        const { threadId } = await readySession({ configOptions: [MODE_OPTION, MODEL] });
 
-        expect(JSON.parse(call?.envelope as string).input).toEqual({ sessionId: "host-s1", valueId: "code" });
+        await expect(setOption(threadId, { optionId: "mode", valueId: "auto" })).rejects.toThrow(MODE_REFUSAL);
+        await expect(setOption(threadId, { optionId: "model", valueId: "deep" })).resolves.toMatchObject({ sent: true });
+        expect(await rows("deviceCalls", { toolName: "acp_set_config" })).toHaveLength(1);
     });
 
     it("refuses a legacy mode while the agent sends options, and a session that reported nothing", async () => {
