@@ -319,8 +319,8 @@ export const answerHostPermission = authMutation
  * Changes one of the agent's options (its model, reasoning effort, mode ...) from the web or the phone. The owner's
  * alone, and only for a value the agent itself listed in the state it reported (`acpSessions.agentState`): the option
  * and the value are read back from that state, so neither can be invented here. Queues `acp_set_config`; the computer
- * asks the agent and the session row records the answer (`optionResult`, `acp/lib/calls.ts`). With no `optionId` the
- * value names a mode of the legacy mode state, used only when the agent sent no options.
+ * asks the agent and the session row records the answer (`optionResult`, `acp/lib/calls.ts`). A mode is never changed from here:
+ * a call with no `optionId` (the legacy mode state) or naming a mode option is refused.
  */
 export const setHostOption = authMutation
     .use(rateLimit("hosts/answer"))
