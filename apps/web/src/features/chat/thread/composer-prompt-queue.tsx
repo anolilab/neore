@@ -463,11 +463,38 @@ const ComposerPromptQueue: FC = () => {
     // The announcement names the thread it was made in, so a move in one chat is never read out in another.
     const [announcement, setAnnouncement] = useState<{ text: string; threadId: string | undefined }>({ text: "", threadId: undefined });
 
+    // The frame that would set the next announcement, so emptying the queue can cancel it.
+    const announceFrame = useRef<number | null>(null);
+
     // Cleared first and set on the next frame, so the same text said twice in a row is announced again.
     const announce = useCallback((text: string, announcedThreadId: string | undefined) => {
         setAnnouncement({ text: "", threadId: announcedThreadId });
-        globalThis.requestAnimationFrame(() => setAnnouncement({ text, threadId: announcedThreadId }));
+
+        if (announceFrame.current !== null) {
+            globalThis.cancelAnimationFrame(announceFrame.current);
+        }
+
+        announceFrame.current = globalThis.requestAnimationFrame(() => {
+            announceFrame.current = null;
+            setAnnouncement({ text, threadId: announcedThreadId });
+        });
     }, []);
+
+    // An emptied queue has nothing to announce, and a later queue in the thread must not repeat the old move.
+    const queueIsEmpty = queue.items.length === 0;
+
+    useEffect(() => {
+        if (!queueIsEmpty) {
+            return;
+        }
+
+        if (announceFrame.current !== null) {
+            globalThis.cancelAnimationFrame(announceFrame.current);
+            announceFrame.current = null;
+        }
+
+        setAnnouncement({ text: "", threadId: undefined });
+    }, [queueIsEmpty]);
 
     useEffect(() => {
         const focus = pendingFocus.current;

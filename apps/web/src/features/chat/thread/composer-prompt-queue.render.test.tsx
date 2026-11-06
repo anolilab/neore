@@ -69,6 +69,16 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
     };
 });
 
+const nextFrame = async () => {
+    await act(async () => {
+        await new Promise<void>((resolve) => {
+            globalThis.requestAnimationFrame(() => {
+                resolve();
+            });
+        });
+    });
+};
+
 describe("composer prompt queue", () => {
     beforeEach(() => {
         // jsdom has none, and the drag-and-drop context observes sizes with it.
@@ -118,6 +128,32 @@ describe("composer prompt queue", () => {
 
         expect(chat.sendMessage).toHaveBeenCalledTimes(1);
         expect(chat.sendMessage).toHaveBeenCalledWith("queued", []);
+    });
+
+    it("does not repeat a move's announcement in a later queue of the same thread", async () => {
+        const { enqueue, remove, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+        fireEvent.click(screen.getByLabelText("Move queued message 2 up"));
+        await nextFrame();
+        expect(screen.getByText("Moved to position 1")).toBeTruthy();
+
+        // The queue empties, then a new message arrives in the same thread: the old move is not read out again.
+        const queued = usePromptQueueStore.getState().queues[chat.threadId]?.items ?? [];
+
+        for (const item of queued) {
+            remove(chat.threadId, item.id);
+        }
+
+        await nextFrame();
+        enqueue(chat.threadId, { attachments: [], text: "three" });
+
+        expect(screen.queryByText("Moved to position 1")).toBeNull();
     });
 
     it("keeps keyboard focus on the moved message's button, so the next move needs no mouse", () => {
