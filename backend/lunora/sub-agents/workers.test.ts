@@ -158,6 +158,13 @@ describe("dispatching to a worker", () => {
         expect(threads).toHaveLength(2);
     });
 
+    it("keeps the worker's organization on a follow-up that names none, so the follow-up is capped as the first run was", async () => {
+        const first = await dispatch({ organizationId: "org-x", toolCallId: "call-org-1" });
+        const second = await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-org-2" });
+
+        expect(second).toMatchObject({ run: { organizationId: "org-x" } });
+    });
+
     it("returns the same run for a redelivered tool call and consumes nothing more", async () => {
         const first = await create();
         const usedKeys = await rateLimitKeys();

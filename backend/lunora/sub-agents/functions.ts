@@ -831,7 +831,8 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         depth,
         dispatchedBy: args.dispatchedBy ?? "lead",
         mode: "worker",
-        organizationId: parent.organizationId ?? args.organizationId,
+        // An existing worker keeps the organization its thread was stamped with, so a follow-up is capped as the first run was.
+        organizationId: child?.organizationId ?? parent.organizationId ?? args.organizationId,
         parentModel: args.parentModel,
         parentThreadId: parent._id,
         runner: origin?.runner ?? (host ? { deviceId: host.device._id, kind: "host" } : { kind: "headless" }),
