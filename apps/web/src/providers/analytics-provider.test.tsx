@@ -53,9 +53,12 @@ describe("AnalyticsProvider", () => {
 
         expect(posthog.init).toHaveBeenCalledTimes(1);
 
-        const options = vi.mocked(posthog.init).mock.calls[0]?.[1] as { before_send?: (event: unknown) => unknown } | undefined;
+        const options = vi.mocked(posthog.init).mock.calls[0]?.[1] as { before_send?: (event: unknown) => unknown; session_recording?: unknown } | undefined;
 
         expect(typeof options?.before_send).toBe("function");
+
+        // The composer's draft is masked in session replay: the selector names the attribute the editor sets.
+        expect(options?.session_recording).toEqual({ maskTextSelector: "[data-ph-mask]" });
 
         const event = {
             event: "$pageview",
