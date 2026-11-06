@@ -67,6 +67,12 @@ export interface HostRequestOptions {
     /** `GET` unless a write says otherwise. */
     method?: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
     query?: Record<string, number | string>;
+    /**
+     * `return`: a redirect of this GET is answered as it is (status and `location`, body cancelled), not followed. For a
+     * host that hands a large download to another origin through a signed address: the caller fetches that address
+     * itself, without the token. Unset, a redirect is followed on the origin only.
+     */
+    redirect?: "return";
 }
 
 /** Resolves with an OK response, or throws {@link HostApiError}. */
@@ -171,6 +177,10 @@ export const createBoundRequester = ({
 
             // A body that fails to cancel is already gone: the redirect is judged on its headers alone.
             await response.body?.cancel().catch(() => undefined);
+
+            if (method === "GET" && options.redirect === "return") {
+                return new Response(null, { headers: location === null ? {} : { location }, status: response.status });
+            }
 
             if (method !== "GET") {
                 // The request reached the host, which may have acted before it redirected: the caller must not retry blind.

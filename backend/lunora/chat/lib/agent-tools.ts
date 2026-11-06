@@ -28,7 +28,7 @@ import type { ToolProgressSink } from "./mcp-progress";
 import type { SearchMode } from "./tool-builder";
 import { ToolName } from "../tools";
 import { admittedKnowledgeSearchTool } from "../tools/knowledge-search";
-import { getToolsForModelAndMode, listBuiltInTools } from "./tool-builder";
+import { getToolsForModelAndMode, listBuiltInTools, PULL_REQUEST_TOOLS } from "./tool-builder";
 import type { ToolDescriptor, ToolPermissionOverrides } from "./tool-permissions";
 import type { RunOrigin } from "./tool-run-config";
 import { applyToolPermissions, toolPermissionKey } from "./tool-permissions";
@@ -139,14 +139,9 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
     // skill's extra tool is not in the mode's set, and the narrowing below keeps
     // this from ever exceeding the snapshot). Unavailable tools are never added.
     const availableBuiltIns = new Set(listBuiltInTools().flatMap((tool) => (tool.available ? [tool.name as string] : [])));
-    const extraBuiltIns = (snapshot ? snapshot.toolNames : (skillTools?.additionalTools ?? [])).filter((name) => availableBuiltIns.has(name));
-
-    const builtInTools = withAdmittedBuiltIns(
-        getToolsForModelAndMode(model, searchMode, extraBuiltIns.length > 0 ? { additionalTools: extraBuiltIns } : undefined, { autoMediaEnrichment }),
-        admittedRun,
-    );
-
-    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers] = await Promise.all([
+    const baseExtraBuiltIns = snapshot ? snapshot.toolNames : (skillTools?.additionalTools ?? []);
+    const linkThreadId = threadId ?? deviceThreadId;
+    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers, pullRequestTools] = await Promise.all([
         ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),
         ctx.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId }),
         // A run nobody is at inherits no time-boxed allow, so it does not even read them.
@@ -168,7 +163,24 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
             return [];
         }),
+        // The pull request tools join only a thread with a linked pull request; a snapshot rebuild already names them.
+        snapshot || linkThreadId === undefined
+            ? []
+            : ctx
+                  .runQuery(internal.source_control.pr_agent.linkedPullRequestsOfThread, { threadId: linkThreadId, userId })
+                  .then((linked) => (Array.isArray(linked) && linked.length > 0 ? PULL_REQUEST_TOOLS : []))
+                  .catch((error: unknown) => {
+                      toolsLogger.warn("[TOOLS] Pull request links unavailable:", error);
+
+                      return [];
+                  }),
     ]);
+
+    const extraBuiltIns = [...baseExtraBuiltIns, ...pullRequestTools].filter((name) => availableBuiltIns.has(name));
+    const builtInTools = withAdmittedBuiltIns(
+        getToolsForModelAndMode(model, searchMode, extraBuiltIns.length > 0 ? { additionalTools: extraBuiltIns } : undefined, { autoMediaEnrichment }),
+        admittedRun,
+    );
 
     // Bearer tokens for servers the user signed in to. The FULL list, so a grant
     // whose server was removed is recognised as orphaned and revoked.

@@ -135,6 +135,17 @@ export interface CheckSummary {
     total: number;
 }
 
+/** Where a check's log excerpt came from: the job's own log, the check's reported output, or nothing the host offers. */
+export type CheckLogSource = "check_output" | "job_log" | "none";
+
+export interface CheckLog {
+    /** Lines around the failure, cut to a cap; untrusted text. Empty when the host has none. */
+    excerpt: string;
+    source: CheckLogSource;
+    /** Whether the excerpt leaves part of the log out. */
+    truncated: boolean;
+}
+
 // ─── Merge ──────────────────────────────────────────────────────────────────
 
 export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
@@ -195,6 +206,17 @@ export interface ReviewSubmission {
 export interface SubmittedReview {
     id: string;
     url: string | null;
+}
+
+export type ReviewState = "approved" | "changes_requested" | "commented" | "dismissed" | "pending";
+
+/** One submitted review: its verdict and its top-level text. Line comments are in the review threads. */
+export interface PullRequestReview {
+    authorLogin: string;
+    body: string;
+    id: string;
+    state: ReviewState;
+    submittedAt: number;
 }
 
 export interface ThreadComment {

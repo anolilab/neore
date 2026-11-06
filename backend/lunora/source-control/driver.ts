@@ -10,6 +10,7 @@
 import type { HostKind } from "./identity";
 import type { HostRequest } from "./origin-fetch";
 import type {
+    CheckLog,
     CheckSummary,
     CommitPage,
     CursorPage,
@@ -23,6 +24,7 @@ import type {
     MergeStatus,
     PullRequestDetail,
     PullRequestRef,
+    PullRequestReview,
     RepoPoll,
     ReviewSubmission,
     ReviewThread,
@@ -68,6 +70,8 @@ export interface HostDriver {
     listCommits: (request: HostRequest, ref: PullRequestRef, page: number) => Promise<CommitPage>;
     listFiles: (request: HostRequest, ref: PullRequestRef, page: number) => Promise<FilePage>;
     listInbox: (request: HostRequest, section: InboxSection, page: number) => Promise<InboxPage>;
+    /** The submitted reviews (verdict and top-level text), oldest first, one bounded page. */
+    listReviews: (request: HostRequest, ref: PullRequestRef) => Promise<PullRequestReview[]>;
     /** The review conversation: threads of line comments, with their replies. */
     listThreads: (request: HostRequest, ref: PullRequestRef, after: string | null) => Promise<CursorPage<ReviewThread>>;
     /** Which files the reviewer has marked viewed on the host. */
@@ -85,6 +89,8 @@ export interface HostDriver {
      * spares the call that finds out who is signed in.
      */
     pollReviewRequests: (request: HostRequest, repo: string, known: { etag: string | null; login: string | null }) => Promise<RepoPoll>;
+    /** The part of one check's log that says why it failed, cut to `maxChars`. The caller picks the check from `listChecks` of the head it read. */
+    readCheckLog: (request: HostRequest, ref: PullRequestRef, checkId: string, maxChars: number) => Promise<CheckLog>;
     /** Posts a reply to the thread `commentId` belongs to, at once. */
     replyToThread: (request: HostRequest, ref: PullRequestRef, commentId: string, body: string) => Promise<{ id: string }>;
     /** Re-runs the narrowest scope the host offers for one check: a single job, not its whole workflow. */

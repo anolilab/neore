@@ -8,13 +8,16 @@
 import z from "zod/v4";
 
 import type { HostCapabilityReport } from "../capabilities";
+import { excerptLog, isLogAddress, readTail } from "../check-log";
 import { requirementOf } from "../checks-logic";
 import type { CreatePullRequestInput, CreatedPullRequest, HostDriver } from "../driver";
 import { graphqlRequest } from "../graphql";
+import { fetchWithDeadline } from "../../lib/fetch-timeout";
 import { HostApiError } from "../origin-fetch";
 import type { HostRequest } from "../origin-fetch";
 import { discard, parse, readJson } from "../response";
 import type {
+    CheckLog,
     CheckRun,
     CheckState,
     CheckSummary,
@@ -33,9 +36,11 @@ import type {
     PullRequestDetail,
     PullRequestFile,
     PullRequestRef,
+    PullRequestReview,
     PullRequestSummary,
     RepoPoll,
     RequiredChecks,
+    ReviewState,
     ReviewSubmission,
     ReviewThread,
     SubmittedReview,
@@ -655,6 +660,52 @@ const replyToThread = async (request: HostRequest, ref: PullRequestRef, commentI
     return { id: String(reply.id) };
 };
 
+const REVIEW_PAGE_SIZE = 100;
+const REVIEW_BODY_MAX_CHARS = 20_000;
+
+const submittedReviewSchema = z.object({
+    body: z.string().nullable().optional(),
+    id: z.number(),
+    state: z.string(),
+    submitted_at: z.string().nullable().optional(),
+    user: z.object({ login: z.string() }).nullable().optional(),
+});
+
+const REVIEW_STATES: Record<string, ReviewState> = {
+    APPROVED: "approved",
+    CHANGES_REQUESTED: "changes_requested",
+    COMMENTED: "commented",
+    DISMISSED: "dismissed",
+    PENDING: "pending",
+};
+
+const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<PullRequestReview[]> => {
+    const values = parse(
+        z.array(z.unknown()),
+        await readJson(await request(`${repoPath(ref)}/pulls/${ref.number}/reviews`, { query: { per_page: REVIEW_PAGE_SIZE } })),
+    );
+
+    return values.flatMap((value) => {
+        const review = submittedReviewSchema.safeParse(value);
+        const state = review.success ? REVIEW_STATES[review.data.state] : undefined;
+
+        // Someone's own unsubmitted review is not a review anyone else has read.
+        if (!review.success || state === undefined || state === "pending") {
+            return [];
+        }
+
+        return [
+            {
+                authorLogin: review.data.user?.login ?? "",
+                body: (review.data.body ?? "").slice(0, REVIEW_BODY_MAX_CHARS),
+                id: String(review.data.id),
+                state,
+                submittedAt: toMs(review.data.submitted_at),
+            },
+        ];
+    });
+};
+
 const RESOLVE_MUTATION = `mutation ($threadId: ID!) { resolveReviewThread(input: { threadId: $threadId }) { thread { id isResolved } } }`;
 const UNRESOLVE_MUTATION = `mutation ($threadId: ID!) { unresolveReviewThread(input: { threadId: $threadId }) { thread { id isResolved } } }`;
 
@@ -1116,6 +1167,75 @@ const rerunCheck = async (request: HostRequest, ref: PullRequestRef, checkId: st
     }
 };
 
+const checkOutputSchema = z.object({
+    app: z.object({ slug: z.string() }).nullable().optional(),
+    output: z
+        .object({ summary: z.string().nullable().optional(), text: z.string().nullable().optional(), title: z.string().nullable().optional() })
+        .nullable()
+        .optional(),
+});
+
+/** A job log: the API answers with a redirect to a signed address on a storage origin, read there without the token. */
+const jobLog = async (request: HostRequest, ref: PullRequestRef, checkId: string, maxChars: number): Promise<CheckLog | undefined> => {
+    const answer = await request(`${repoPath(ref)}/actions/jobs/${checkId}/logs`, { redirect: "return" });
+    const location = answer.headers.get("location");
+
+    if (answer.status < 300 || answer.status >= 400) {
+        // A host that answers the log in place: read it here, it came from the API's own origin.
+        const { partial, text } = await readTail(answer);
+
+        return excerptLog(text, maxChars, partial);
+    }
+
+    if (location === null || !isLogAddress(location)) {
+        return undefined;
+    }
+
+    const response = await fetchWithDeadline(location, { redirect: "error" }).catch(() => {
+        throw new HostApiError("The log could not be fetched", 0);
+    });
+
+    if (!response.ok) {
+        await discard(response);
+
+        // A log that has expired, or is not written yet, is a check without one.
+        return undefined;
+    }
+
+    const { partial, text } = await readTail(response).catch(() => {
+        throw new HostApiError("The log could not be read", 0);
+    });
+
+    return excerptLog(text, maxChars, partial);
+};
+
+const readCheckLog = async (request: HostRequest, ref: PullRequestRef, checkId: string, maxChars: number): Promise<CheckLog> => {
+    if (!COMMENT_ID.test(checkId)) {
+        throw new HostApiError("Not a check id", 404);
+    }
+
+    const run = parse(checkOutputSchema, await readJson(await request(`${repoPath(ref)}/check-runs/${checkId}`)));
+
+    if (run.app?.slug === ACTIONS_APP) {
+        const log = await jobLog(request, ref, checkId, maxChars);
+
+        if (log && log.excerpt !== "") {
+            return log;
+        }
+    }
+
+    // Any other app reports what failed in the check's own output.
+    const output = [run.output?.title, run.output?.summary, run.output?.text]
+        .filter((part): part is string => typeof part === "string" && part.trim() !== "")
+        .join("\n\n");
+
+    if (output === "") {
+        return { excerpt: "", source: "none", truncated: false };
+    }
+
+    return { ...excerptLog(output, maxChars), source: "check_output" };
+};
+
 // ─── Merge ──────────────────────────────────────────────────────────────────
 
 const mergeSettingsSchema = z.object({
@@ -1269,11 +1389,13 @@ export const githubDriver: HostDriver = {
     listCommits,
     listFiles,
     listInbox,
+    listReviews,
     listThreads,
     listViewed,
     mergePullRequest,
     normalizeRepository: normalizeRepo,
     pollReviewRequests,
+    readCheckLog,
     replyToThread,
     rerunCheck,
     setAutoMerge,
