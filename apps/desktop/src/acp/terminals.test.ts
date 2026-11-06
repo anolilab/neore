@@ -107,6 +107,40 @@ describe(SessionTerminals, () => {
         expect(host.kill).toHaveBeenCalledWith(11);
     });
 
+    it("frees the slot of a command a cancelled turn killed, and keeps what it printed for its row", async () => {
+        const ends = new Map<number, (exit: { exitCode: number | null; signal: string | null }) => void>();
+        let next = 10;
+        const host = {
+            kill: vi.fn((handle: number) => {
+                ends.get(handle)?.({ exitCode: null, signal: "SIGKILL" });
+            }),
+            output: vi.fn(() => {
+                return { output: "partial", truncated: false };
+            }),
+            release: vi.fn(),
+            start: vi.fn(async () => {
+                next += 1;
+
+                return next - 1;
+            }),
+            wait: vi.fn(
+                async (handle: number) =>
+                    await new Promise((resolve) => {
+                        ends.set(handle, resolve);
+                    }),
+            ),
+        };
+        const terminals = new SessionTerminals(host as never, () => {});
+        const id = await terminals.create(request, "turn-2");
+
+        terminals.killTurn("turn-2");
+
+        await expect.poll(() => terminals.result(id)).toBeDefined();
+        expect(terminals.result(id)?.output).toBe("partial");
+        expect(host.release).toHaveBeenCalledWith(10);
+        expect(terminals.live).toBe(0);
+    });
+
     it("holds a slot while a command is starting", async () => {
         const { host, resolvers } = deferredHost();
         const terminals = new SessionTerminals(host as never, () => {});

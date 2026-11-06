@@ -150,9 +150,12 @@ fn store_tail(buffer: &Mutex<(Vec<u8>, bool)>, chunk: &[u8], cap: usize) {
 /// replacement. Invalid bytes decode to U+FFFD, three bytes each, so the decoded text can outgrow `cap`; then its front
 /// is cut at a character boundary. Returns whether anything was cut, beyond the bytes already dropped.
 fn tail_text(bytes: &[u8], truncated: bool, cap: usize) -> (String, bool) {
+    // A cut can split one character, which leaves at most three of its continuation bytes at the front. More than that is output
+    // that never was a character (binary or Latin-1), and it decodes to replacement characters like the rest.
     let start = if truncated {
         bytes
             .iter()
+            .take(3)
             .take_while(|byte| (**byte & 0xC0) == 0x80)
             .count()
     } else {
@@ -1395,6 +1398,16 @@ mod tests {
         assert!(text.len() <= 6, "{text:?} is {} bytes", text.len());
         assert!(cut);
         assert_eq!(text, "\u{FFFD}\u{FFFD}");
+    }
+
+    #[test]
+    fn a_truncated_tail_of_continuation_bytes_is_not_dropped_whole() {
+        // Binary output: a run of bytes that are continuation bytes but no character. Only the three a cut can split are skipped;
+        // the rest decodes to replacement characters instead of vanishing.
+        let bytes = [0x80_u8; 10];
+        let (text, _) = tail_text(&bytes, true, 64);
+
+        assert!(text.contains('\u{FFFD}'), "the output was lost: {text:?}");
     }
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]

@@ -195,6 +195,8 @@ export const createRequestOf = (params: Record<string, unknown>): { cwd?: string
 };
 
 interface OpenTerminal {
+    /** Killed because its turn was cancelled: once it has ended and its result is kept, nothing else needs its slot. */
+    cancelled?: boolean;
     /** Set once the command ended: what it printed (raw) and how it ended, for the tool row that shows it. */
     ended?: { exit: TerminalExitStatus; output: string; truncated: boolean };
     handle: number;
@@ -321,9 +323,12 @@ export class SessionTerminals {
     /** The turn was cancelled: the commands that turn started and are still running are killed, and no other turn's. */
     public killTurn(turnId: string): void {
         for (const terminal of this.open.values()) {
-            if (!terminal.released && terminal.ended === undefined && terminal.turnId === turnId) {
-                this.host.kill(terminal.handle);
+            if (terminal.released || terminal.ended !== undefined || terminal.turnId !== turnId) {
+                continue;
             }
+
+            terminal.cancelled = true;
+            this.host.kill(terminal.handle);
         }
     }
 
@@ -384,6 +389,12 @@ export class SessionTerminals {
 
             if (current !== undefined) {
                 current.ended = { exit, output, truncated };
+
+                // A cancelled turn may never release what it started: its result is kept for the row, and its slot is freed here.
+                if (current.cancelled) {
+                    this.release(terminalId);
+                }
+
                 this.ended(terminalId);
                 this.prune();
             }
