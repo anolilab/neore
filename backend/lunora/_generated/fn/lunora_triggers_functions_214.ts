@@ -2,17 +2,10 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_triggers_functions_212.ts
-import * as lunora_triggers_functions_212 from "../../triggers/functions.js";
+import * as lunora_triggers_functions_214 from "../../triggers/functions.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_triggers_functions_212.createExecution.args, (source) => {
-========
-import * as lunora_triggers_functions_213 from "../../triggers/functions.js";
-
-/** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_triggers_functions_213.createExecution.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_triggers_functions_213.ts
+installCompiledValidatorMap(lunora_triggers_functions_214.createExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -32,41 +25,25 @@ __has2 = true;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { ...(__has1 ? { "firing": __val1 } : {}), ...(__has2 ? { "payload": __val2 } : {}), "triggerId": source["triggerId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_triggers_functions_212.ts
-installCompiledValidatorMap(lunora_triggers_functions_212.deleteTrigger.args, (source) => {
-========
-installCompiledValidatorMap(lunora_triggers_functions_213.deleteTrigger.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_triggers_functions_213.ts
+installCompiledValidatorMap(lunora_triggers_functions_214.deleteTrigger.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "triggerId": source["triggerId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_triggers_functions_212.ts
-installCompiledValidatorMap(lunora_triggers_functions_212.getDueScheduleTriggers.args, (source) => {
-========
-installCompiledValidatorMap(lunora_triggers_functions_213.getDueScheduleTriggers.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_triggers_functions_213.ts
+installCompiledValidatorMap(lunora_triggers_functions_214.getDueScheduleTriggers.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["now"] !== "number" || !Number.isFinite(source["now"])) return DEFER;
 return { "now": source["now"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_triggers_functions_212.ts
-installCompiledValidatorMap(lunora_triggers_functions_212.getTriggerInternal.args, (source) => {
-========
-installCompiledValidatorMap(lunora_triggers_functions_213.getTriggerInternal.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_triggers_functions_213.ts
+installCompiledValidatorMap(lunora_triggers_functions_214.getTriggerInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "triggerId": source["triggerId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_triggers_functions_212.ts
-installCompiledValidatorMap(lunora_triggers_functions_212.releaseQuietWindow.args, (source) => {
-========
-installCompiledValidatorMap(lunora_triggers_functions_213.releaseQuietWindow.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_triggers_functions_213.ts
+installCompiledValidatorMap(lunora_triggers_functions_214.releaseQuietWindow.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -79,11 +56,7 @@ __has1 = true;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { ...(__has1 ? { "expected": __val1 } : {}), "triggerId": source["triggerId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_triggers_functions_212.ts
-installCompiledValidatorMap(lunora_triggers_functions_212.reserveQuietWindow.args, (source) => {
-========
-installCompiledValidatorMap(lunora_triggers_functions_213.reserveQuietWindow.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_triggers_functions_213.ts
+installCompiledValidatorMap(lunora_triggers_functions_214.reserveQuietWindow.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -97,11 +70,7 @@ if (typeof source["triggerId"] !== "string") return DEFER;
 if (typeof source["windowStart"] !== "number" || !Number.isFinite(source["windowStart"])) return DEFER;
 return { ...(__has1 ? { "expected": __val1 } : {}), "triggerId": source["triggerId"], "windowStart": source["windowStart"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_triggers_functions_212.ts
-installCompiledValidatorMap(lunora_triggers_functions_212.rotateWebhookSecret.args, (source) => {
-========
-installCompiledValidatorMap(lunora_triggers_functions_213.rotateWebhookSecret.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_triggers_functions_213.ts
+installCompiledValidatorMap(lunora_triggers_functions_214.rotateWebhookSecret.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -114,33 +83,21 @@ __has1 = true;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { ...(__has1 ? { "keepOldFor24h": __val1 } : {}), "triggerId": source["triggerId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_triggers_functions_212.ts
-installCompiledValidatorMap(lunora_triggers_functions_212.setTriggerEnabled.args, (source) => {
-========
-installCompiledValidatorMap(lunora_triggers_functions_213.setTriggerEnabled.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_triggers_functions_213.ts
+installCompiledValidatorMap(lunora_triggers_functions_214.setTriggerEnabled.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["enabled"] !== "boolean") return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "enabled": source["enabled"], "triggerId": source["triggerId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_triggers_functions_212.ts
-installCompiledValidatorMap(lunora_triggers_functions_212.setTriggerEnabledInternal.args, (source) => {
-========
-installCompiledValidatorMap(lunora_triggers_functions_213.setTriggerEnabledInternal.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_triggers_functions_213.ts
+installCompiledValidatorMap(lunora_triggers_functions_214.setTriggerEnabledInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["enabled"] !== "boolean") return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "enabled": source["enabled"], "triggerId": source["triggerId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_triggers_functions_212.ts
-installCompiledValidatorMap(lunora_triggers_functions_212.updateExecution.args, (source) => {
-========
-installCompiledValidatorMap(lunora_triggers_functions_213.updateExecution.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_triggers_functions_213.ts
+installCompiledValidatorMap(lunora_triggers_functions_214.updateExecution.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -168,11 +125,7 @@ __has3 = true;
 }
 return { ...(__has1 ? { "error": __val1 } : {}), "executionId": source["executionId"], "status": source["status"], ...(__has2 ? { "threadId": __val2 } : {}), ...(__has3 ? { "userFixable": __val3 } : {}) };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_triggers_functions_212.ts
-installCompiledValidatorMap(lunora_triggers_functions_212.updateTriggerStats.args, (source) => {
-========
-installCompiledValidatorMap(lunora_triggers_functions_213.updateTriggerStats.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_triggers_functions_213.ts
+installCompiledValidatorMap(lunora_triggers_functions_214.updateTriggerStats.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;

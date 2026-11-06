@@ -173,7 +173,7 @@ export interface InternalApiTypes {
             timeoutStream: FunctionReference<"mutation", { streamId: Id<"streamingMessages"> }, null>;
         };
         thread_compaction: {
-            prepareThreadCompaction: FunctionReference<"mutation", { anchorMessageId?: Id<"messages">; minTokens?: number; threadId: Id<"threads">; userId: string }, { job?: { coveredCount: number; coveredUpToMessageId: Id<"messages">; epoch: number; cutClaimedAt: number; foldClaimedAt: number; previousSummary?: string; previousSummaryId?: Id<"threadContextSummaries">; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; transcript: string; userId: string }; reason?: "busy" | "failed" | "nothing" | "not_owner" | "too_long" | "unavailable" | "within_threshold" }>;
+            prepareThreadCompaction: FunctionReference<"mutation", { anchorMessageId?: Id<"messages">; minTokens?: number; threadId: Id<"threads">; userId: string }, { job?: { coveredCount: number; coveredUpToMessageId: Id<"messages">; cutClaimedAt: number; epoch: number; foldClaimedAt: number; previousSummary?: string; previousSummaryId?: Id<"threadContextSummaries">; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; transcript: string; userId: string }; reason?: "busy" | "failed" | "nothing" | "not_owner" | "too_long" | "unavailable" | "within_threshold" }>;
         };
         thread_lock: {
             dropThreadPasscodeRows: FunctionReference<"mutation", { threadId: Id<"threads"> }, null>;
@@ -181,10 +181,10 @@ export interface InternalApiTypes {
         };
         thread_summaries: {
             eraseUserThreadSummaries: FunctionReference<"mutation", { batch?: number; before: number; userId: string }, boolean>;
-            finishThreadSummary: FunctionReference<"mutation", { coveredCount: number; coveredUpToMessageId: Id<"messages">; epoch: number; cutClaimedAt?: number; foldClaimedAt?: number; kind?: "compact"; previousSummaryId?: Id<"threadContextSummaries">; summary?: string; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: Id<"threads"> }, boolean>;
+            finishThreadSummary: FunctionReference<"mutation", { coveredCount: number; coveredUpToMessageId: Id<"messages">; cutClaimedAt?: number; epoch: number; foldClaimedAt?: number; kind?: "compact"; previousSummaryId?: Id<"threadContextSummaries">; summary?: string; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: Id<"threads"> }, boolean>;
             getThreadSummaryForContext: FunctionReference<"query", { promptMessageId?: Id<"messages">; threadId: Id<"threads"> }, { boundary?: { messageId: string; order: number; stepOrder: number }; branched: boolean; summary: string } | null>;
             listThreadSummariesForExport: FunctionReference<"query", { threadId: Id<"threads"> }, Array<{ coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string }>>;
-            prepareThreadSummary: FunctionReference<"mutation", { afterMessageId: Id<"messages">; threadId: Id<"threads"> }, { coveredCount: number; coveredUpToMessageId: Id<"messages">; epoch: number; cutClaimedAt: number; foldClaimedAt: number; previousSummary?: string; previousSummaryId?: Id<"threadContextSummaries">; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; transcript: string; userId: string } | null>;
+            prepareThreadSummary: FunctionReference<"mutation", { afterMessageId: Id<"messages">; threadId: Id<"threads"> }, { coveredCount: number; coveredUpToMessageId: Id<"messages">; cutClaimedAt: number; epoch: number; foldClaimedAt: number; previousSummary?: string; previousSummaryId?: Id<"threadContextSummaries">; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; transcript: string; userId: string } | null>;
             runThreadSummary: FunctionReference<"action", { afterMessageId: Id<"messages">; threadId: Id<"threads"> }, null>;
         };
         threads: {

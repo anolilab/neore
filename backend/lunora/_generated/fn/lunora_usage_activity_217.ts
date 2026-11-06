@@ -2,17 +2,10 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_usage_activity_215.ts
-import * as lunora_usage_activity_215 from "../../usage/activity.js";
+import * as lunora_usage_activity_217 from "../../usage/activity.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_usage_activity_215.recordReplyUsage.args, (source) => {
-========
-import * as lunora_usage_activity_216 from "../../usage/activity.js";
-
-/** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_usage_activity_216.recordReplyUsage.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_usage_activity_216.ts
+installCompiledValidatorMap(lunora_usage_activity_217.recordReplyUsage.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["at"] !== "number" || !Number.isFinite(source["at"])) return DEFER;

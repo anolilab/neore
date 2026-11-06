@@ -733,7 +733,7 @@ msgstr "{activeCount, plural, other {你已连接 # 个即时通讯平台}}"
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{activeCount}/{0} 个 MCP 服务器已启用"
 
-#: src/features/develop/components/thread-pull-requests.tsx:121
+#: src/features/develop/components/thread-pull-requests.tsx:131
 msgid "{address}: {reason}"
 msgstr ""
 
@@ -1318,7 +1318,7 @@ msgstr "{star, plural, other {# 星}}"
 msgid "{stateLabel} Stop hands-free voice mode"
 msgstr "{stateLabel} 停止免提语音模式"
 
-#: src/features/develop/components/thread-pull-requests.tsx:215
+#: src/features/develop/components/thread-pull-requests.tsx:233
 msgid "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
 msgstr ""
 
@@ -2244,7 +2244,7 @@ msgstr ""
 msgid "Add Provider"
 msgstr "添加提供商"
 
-#: src/features/develop/components/thread-pull-requests.tsx:193
+#: src/features/develop/components/thread-pull-requests.tsx:211
 msgid "Add pull requests that already exist to this thread. Each one is read from the host with your own connection first."
 msgstr ""
 
@@ -3168,7 +3168,7 @@ msgstr "按字母顺序"
 msgid "Already have an account?"
 msgstr "已有账号？"
 
-#: src/features/develop/components/thread-pull-requests.tsx:63
+#: src/features/develop/components/thread-pull-requests.tsx:65
 msgid "Already linked to this thread."
 msgstr ""
 
@@ -6195,7 +6195,7 @@ msgstr ""
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:818
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
-#: src/features/develop/components/thread-pull-requests.tsx:238
+#: src/features/develop/components/thread-pull-requests.tsx:256
 #: src/features/evals/components/save-eval-case-action.tsx:95
 #: src/features/prompts/components/prompt-history-dialog.tsx:195
 #: src/features/settings/components/chat/custom-providers-settings.tsx:441
@@ -7151,7 +7151,7 @@ msgstr "连接 WhatsApp"
 msgid "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
 msgstr ""
 
-#: src/features/develop/components/thread-pull-requests.tsx:68
+#: src/features/develop/components/thread-pull-requests.tsx:70
 msgid "Connect your Git host in settings to link a pull request."
 msgstr ""
 
@@ -7971,7 +7971,7 @@ msgstr "无法生成草稿，请重试。"
 msgid "Could not import the workflow"
 msgstr "无法导入工作流"
 
-#: src/features/develop/components/thread-pull-requests.tsx:136
+#: src/features/develop/components/thread-pull-requests.tsx:147
 msgid "Could not link. Try again."
 msgstr ""
 
@@ -7983,7 +7983,7 @@ msgstr "无法加载图片"
 msgid "Could not load statistics for this thread."
 msgstr ""
 
-#: src/features/develop/components/thread-pull-requests.tsx:151
+#: src/features/develop/components/thread-pull-requests.tsx:165
 msgid "Could not load the linked pull requests."
 msgstr ""
 
@@ -11309,7 +11309,7 @@ msgstr "输入组织名称"
 msgid "Enter organization slug"
 msgstr "输入组织 slug"
 
-#: src/features/develop/components/thread-pull-requests.tsx:87
+#: src/features/develop/components/thread-pull-requests.tsx:89
 msgid "Enter pull requests as owner/name#123."
 msgstr ""
 
@@ -17688,11 +17688,11 @@ msgid "Lines that are not valid JSON"
 msgstr ""
 
 #: src/features/auth/components/settings/providers/provider-cell.tsx:111
-#: src/features/develop/components/thread-pull-requests.tsx:240
+#: src/features/develop/components/thread-pull-requests.tsx:258
 msgid "Link"
 msgstr "关联"
 
-#: src/features/develop/components/thread-pull-requests.tsx:99
+#: src/features/develop/components/thread-pull-requests.tsx:101
 msgid "Link at most {MAX_PULL_REQUESTS_PER_ATTACH} pull requests at a time."
 msgstr ""
 
@@ -17710,11 +17710,11 @@ msgstr "链接预览"
 msgid "Link previews"
 msgstr "链接预览"
 
-#: src/features/develop/components/thread-pull-requests.tsx:177
+#: src/features/develop/components/thread-pull-requests.tsx:191
 msgid "Link pull request"
 msgstr ""
 
-#: src/features/develop/components/thread-pull-requests.tsx:192
+#: src/features/develop/components/thread-pull-requests.tsx:210
 msgid "Link pull requests"
 msgstr ""
 
@@ -17726,7 +17726,7 @@ msgstr ""
 msgid "Linked pull requests: {linkedPullRequests}"
 msgstr ""
 
-#: src/features/develop/components/thread-pull-requests.tsx:64
+#: src/features/develop/components/thread-pull-requests.tsx:66
 msgid "Linked to this thread."
 msgstr ""
 
@@ -17734,8 +17734,8 @@ msgstr ""
 msgid "LinkedIn Post"
 msgstr "LinkedIn 帖子"
 
-#: src/features/develop/components/thread-pull-requests.tsx:221
-#: src/features/develop/components/thread-pull-requests.tsx:240
+#: src/features/develop/components/thread-pull-requests.tsx:239
+#: src/features/develop/components/thread-pull-requests.tsx:258
 msgid "Linking…"
 msgstr ""
 
@@ -18040,7 +18040,7 @@ msgstr "正在加载任务…"
 msgid "Loading the guide"
 msgstr ""
 
-#: src/features/develop/components/thread-pull-requests.tsx:146
+#: src/features/develop/components/thread-pull-requests.tsx:160
 msgid "Loading the linked pull requests…"
 msgstr ""
 
@@ -21288,7 +21288,7 @@ msgstr ""
 msgid "Not found"
 msgstr ""
 
-#: src/features/develop/components/thread-pull-requests.tsx:226
+#: src/features/develop/components/thread-pull-requests.tsx:244
 msgid "Not linked"
 msgstr ""
 
@@ -22068,7 +22068,7 @@ msgstr ""
 
 #. placeholder {0}: link.repository
 #. placeholder {1}: link.number
-#: src/features/develop/components/thread-pull-requests.tsx:162
+#: src/features/develop/components/thread-pull-requests.tsx:176
 msgid "Open the pull request {0}#{1}"
 msgstr ""
 
@@ -24567,7 +24567,7 @@ msgid "Pull request settings updated"
 msgstr "拉取请求设置已更新"
 
 #: src/features/code/components/code-shell.tsx:95
-#: src/features/develop/components/thread-pull-requests.tsx:196
+#: src/features/develop/components/thread-pull-requests.tsx:214
 msgid "Pull requests"
 msgstr ""
 
@@ -25148,7 +25148,7 @@ msgstr "重新连接"
 msgid "Reconnect {0}"
 msgstr "重新连接 {0}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:67
+#: src/features/develop/components/thread-pull-requests.tsx:69
 msgid "Reconnect your Git host in settings to link a pull request."
 msgstr ""
 
@@ -31128,7 +31128,7 @@ msgstr "目前质量最高的 AI 视频模型"
 msgid "The host"
 msgstr ""
 
-#: src/features/develop/components/thread-pull-requests.tsx:66
+#: src/features/develop/components/thread-pull-requests.tsx:68
 msgid "The host did not answer. Try again."
 msgstr ""
 
@@ -31136,11 +31136,11 @@ msgstr ""
 msgid "The host did not answer. Trying again later."
 msgstr ""
 
-#: src/features/develop/components/thread-pull-requests.tsx:69
+#: src/features/develop/components/thread-pull-requests.tsx:71
 msgid "The host has no pull request at that address."
 msgstr ""
 
-#: src/features/develop/components/thread-pull-requests.tsx:71
+#: src/features/develop/components/thread-pull-requests.tsx:73
 msgid "The host is limiting requests. Try again shortly."
 msgstr ""
 
@@ -31971,7 +31971,7 @@ msgstr "此提示词将用于每条消息。每条消息都独立处理，不带
 msgid "This prompt will configure:"
 msgstr "此提示词将配置："
 
-#: src/features/develop/components/thread-pull-requests.tsx:70
+#: src/features/develop/components/thread-pull-requests.tsx:72
 msgid "This pull request already has as many threads linked as it can keep."
 msgstr ""
 
@@ -32056,7 +32056,7 @@ msgstr "此任务尚未运行。"
 msgid "This thread"
 msgstr "此对话"
 
-#: src/features/develop/components/thread-pull-requests.tsx:72
+#: src/features/develop/components/thread-pull-requests.tsx:74
 msgid "This thread already has as many pull requests linked as it can keep."
 msgstr ""
 
@@ -32841,7 +32841,7 @@ msgstr "尝试调整搜索词。"
 #: src/components/error-component.tsx:40
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
-#: src/features/develop/components/thread-pull-requests.tsx:153
+#: src/features/develop/components/thread-pull-requests.tsx:167
 #: src/features/home/components/home-page.tsx:144
 msgid "Try again"
 msgstr "重试"
@@ -35590,7 +35590,7 @@ msgstr "你可以查看此页面，但不能编辑。"
 msgid "You cannot ask a side question in this chat."
 msgstr ""
 
-#: src/features/develop/components/thread-pull-requests.tsx:65
+#: src/features/develop/components/thread-pull-requests.tsx:67
 msgid "You cannot see that pull request on the host."
 msgstr ""
 

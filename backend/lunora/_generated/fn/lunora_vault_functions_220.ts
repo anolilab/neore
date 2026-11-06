@@ -2,17 +2,10 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_vault_functions_218.ts
-import * as lunora_vault_functions_218 from "../../vault/functions.js";
+import * as lunora_vault_functions_220 from "../../vault/functions.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_vault_functions_218.applyFileMetadata.args, (source) => {
-========
-import * as lunora_vault_functions_219 from "../../vault/functions.js";
-
-/** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_vault_functions_219.applyFileMetadata.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_vault_functions_219.ts
+installCompiledValidatorMap(lunora_vault_functions_220.applyFileMetadata.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["key"] !== "string") return DEFER;
@@ -21,31 +14,19 @@ if (typeof source["type"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "key": source["key"], "size": source["size"], "type": source["type"], "userId": source["userId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_vault_functions_218.ts
-installCompiledValidatorMap(lunora_vault_functions_218.getAttachment.args, (source) => {
-========
-installCompiledValidatorMap(lunora_vault_functions_219.getAttachment.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_vault_functions_219.ts
+installCompiledValidatorMap(lunora_vault_functions_220.getAttachment.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["attachmentId"] !== "string") return DEFER;
 return { "attachmentId": source["attachmentId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_vault_functions_218.ts
-installCompiledValidatorMap(lunora_vault_functions_218.getDownloadUrl.args, (source) => {
-========
-installCompiledValidatorMap(lunora_vault_functions_219.getDownloadUrl.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_vault_functions_219.ts
+installCompiledValidatorMap(lunora_vault_functions_220.getDownloadUrl.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["attachmentId"] !== "string") return DEFER;
 return { "attachmentId": source["attachmentId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_vault_functions_218.ts
-installCompiledValidatorMap(lunora_vault_functions_218.insertVaultFile.args, (source) => {
-========
-installCompiledValidatorMap(lunora_vault_functions_219.insertVaultFile.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_vault_functions_219.ts
+installCompiledValidatorMap(lunora_vault_functions_220.insertVaultFile.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["key"] !== "string") return DEFER;
@@ -62,11 +43,7 @@ if (typeof source["type"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "key": source["key"], "name": source["name"], ...(__has1 ? { "organizationId": __val1 } : {}), "size": source["size"], "type": source["type"], "userId": source["userId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_vault_functions_218.ts
-installCompiledValidatorMap(lunora_vault_functions_218.internalSaveGenerated.args, (source) => {
-========
-installCompiledValidatorMap(lunora_vault_functions_219.internalSaveGenerated.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_vault_functions_219.ts
+installCompiledValidatorMap(lunora_vault_functions_220.internalSaveGenerated.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["chatId"] !== "string") return DEFER;
@@ -84,31 +61,19 @@ __has1 = true;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "chatId": source["chatId"], "fileName": source["fileName"], "fileSize": source["fileSize"], "fileType": source["fileType"], "key": source["key"], ...(__has1 ? { "url": __val1 } : {}), "userId": source["userId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_vault_functions_218.ts
-installCompiledValidatorMap(lunora_vault_functions_218.markNsfwChecking.args, (source) => {
-========
-installCompiledValidatorMap(lunora_vault_functions_219.markNsfwChecking.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_vault_functions_219.ts
+installCompiledValidatorMap(lunora_vault_functions_220.markNsfwChecking.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["fileId"] !== "string") return DEFER;
 return { "fileId": source["fileId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_vault_functions_218.ts
-installCompiledValidatorMap(lunora_vault_functions_218.markNsfwFailed.args, (source) => {
-========
-installCompiledValidatorMap(lunora_vault_functions_219.markNsfwFailed.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_vault_functions_219.ts
+installCompiledValidatorMap(lunora_vault_functions_220.markNsfwFailed.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["fileId"] !== "string") return DEFER;
 return { "fileId": source["fileId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_vault_functions_218.ts
-installCompiledValidatorMap(lunora_vault_functions_218.saveNsfwResult.args, (source) => {
-========
-installCompiledValidatorMap(lunora_vault_functions_219.saveNsfwResult.args, (source) => {
->>>>>>>> a8ad3dc8 (feat(chat): compact a thread's model context on demand and by threshold):backend/lunora/_generated/fn/lunora_vault_functions_219.ts
+installCompiledValidatorMap(lunora_vault_functions_220.saveNsfwResult.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["fileId"] !== "string") return DEFER;
