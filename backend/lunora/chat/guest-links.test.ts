@@ -214,7 +214,7 @@ describe("a guest message", () => {
         expect((await hold(linkToken, "one too many", "fresh-browser-token")).reason).toBe("full");
     });
 
-    it("is refused on a lapsed link, an archived thread and an unknown link", async () => {
+    it("is refused on a lapsed link and on an unknown link", async () => {
         const { linkToken } = await createLink();
 
         expect((await hold("not-a-link", "hi")).reason).toBe("closed");
@@ -225,6 +225,14 @@ describe("a guest message", () => {
             await ctx.db.patch("threadGuestLinks", link._id, { expiresAt: Date.now() - 1 });
         });
         expect((await hold(linkToken, "late")).reason).toBe("closed");
+    });
+
+    it("is refused on a live link once its thread is archived, so the check itself is exercised", async () => {
+        const { linkToken } = await createLink();
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId as never, { status: "archived" }));
+
+        expect((await hold(linkToken, "hi")).reason).toBe("closed");
     });
 });
 
