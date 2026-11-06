@@ -201,12 +201,17 @@ const NEEDS_LOOK = /[^\n\t\u{20}-\u{7E}]/u;
 const LETTER = /\p{L}/u;
 
 /**
- * `text` with each hidden character written as an escape, so a reader sees that it is there. Line breaks and tabs stay as
- * they are, so a patch keeps its shape. A patch's text is evidence for the model: it is shown, not removed.
+ * `text` with each hidden character written as an escape, so a reader sees that it is there. A backslash is doubled, so an
+ * escape already written in the source reads differently from the character it spells. Line breaks and tabs stay as they
+ * are, so a patch keeps its shape. A patch's text is evidence for the model: it is shown, not removed.
  */
 export const showHiddenText = (value: string): string =>
     [...value]
         .map((char) => {
+            if (char === BACKSLASH) {
+                return BACKSLASH + BACKSLASH;
+            }
+
             if (!NEEDS_LOOK.test(char) || LETTER.test(char)) {
                 return char;
             }

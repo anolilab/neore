@@ -159,6 +159,15 @@ describe("assembleGuide", () => {
         expect(showHiddenText("a\u{200B}b")).toBe(String.raw`a\u200Bb`);
     });
 
+    it("shows a real hidden character and the same characters written as an escape in source differently", () => {
+        const real = showHiddenText("\u{200B}");
+        const written = showHiddenText(String.raw`\u200B`);
+
+        expect(real).toBe(String.raw`\u200B`);
+        expect(written).toBe(String.raw`\\u200B`);
+        expect(written).not.toBe(real);
+    });
+
     it("reads back every path it writes, so two files never share a spelling", () => {
         const paths = ["plain.ts", "src/a\u{200C}b.ts", String.raw`src/a\u200Cb.ts`, String.raw`dir\\x`, "x\u{E0100}y", "a\u{34F}b"];
 
