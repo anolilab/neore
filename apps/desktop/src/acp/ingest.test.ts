@@ -1643,6 +1643,31 @@ describe("what the agent reports about itself", () => {
         expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ configOptions: [option], usage: usage(12) });
     });
 
+    it("sends the command list of a dropped report with the session's next report, since the agent sends it once at its start", async () => {
+        const host = poster();
+        const commands = [{ description: "Compact the context", name: "compact" }];
+        let failing = true;
+
+        await open(host);
+        backend.respond = (post) => {
+            if (failing && (post.events[0] as { kind?: string } | undefined)?.kind === "session_state") {
+                return Response.json({ error: "x" }, { status: 503 });
+            }
+
+            return undefined;
+        };
+        host.sessionState("s1", { availableCommands: commands, usage: usage(10) });
+        await settleInSteps(10 * 60_000);
+
+        expect(statePosts()).toHaveLength(MAX_STATE_ATTEMPTS);
+
+        failing = false;
+        host.sessionState("s1", { usage: usage(12) });
+        await settle(2000);
+
+        expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ availableCommands: commands, usage: usage(12) });
+    });
+
     it("forgets the bookkeeping of a session that ended once its last report is posted", async () => {
         const host = poster();
 

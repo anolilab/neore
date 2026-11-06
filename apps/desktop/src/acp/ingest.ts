@@ -86,9 +86,14 @@ const mergeUsage = (older: AgentUsage | undefined, newer: AgentUsage | undefined
 
     return { size: newer.size, used: newer.used, ...cost !== undefined && { cost } };
 };
-/** The option fields of a report: the agent's options and its legacy states, which the desktop reports only when they change. */
-const optionFieldsOf = (state: SessionStatePatch): SessionStatePatch => {
+
+/**
+ * The fields a report sends only on change: the agent's options, its legacy states and its command list. A dropped report hands these
+ * on to the session's next report, so the agent's one-time list is not lost with the usage.
+ */
+const changeOnlyFieldsOf = (state: SessionStatePatch): SessionStatePatch => {
     return {
+        ...state.availableCommands !== undefined && { availableCommands: state.availableCommands },
         ...state.configOptions !== undefined && { configOptions: state.configOptions },
         ...state.models !== undefined && { models: state.models },
         ...state.modes !== undefined && { modes: state.modes },
@@ -168,7 +173,7 @@ export class HostPoster implements SessionObserver {
     /** When a session last posted its report: its next one waits out `STATE_DEBOUNCE_MS` from it, whichever pass runs. */
     private readonly stateSentAt = new Map<string, number>();
 
-    /** The option fields of a report that was dropped: the session's next report carries them, since they are sent only on change. */
+    /** The change-only fields (options, legacy states, command list) of a report that was dropped: the next report carries them. */
     private readonly heldOptions = new Map<string, SessionStatePatch>();
 
     /** The text of each running turn, kept for the references its reply makes (capped). */
@@ -770,15 +775,16 @@ export class HostPoster implements SessionObserver {
 
             if (waiting === undefined && attempts >= MAX_STATE_ATTEMPTS) {
                 // Nothing newer replaces it, and it has failed this many times: its usage is dropped, not written back (the agent's
-                // next report carries the usage again). The options are sent only on change, so they are held for the next report.
+                // next report carries the usage again). The options and the command list are sent only on change, so they are held
+                // for the next report.
                 this.pendingState.delete(sessionId);
                 this.stateAttempts.delete(sessionId);
                 this.stateRetryAt.delete(sessionId);
 
-                const options = optionFieldsOf(pending);
+                const changeOnly = changeOnlyFieldsOf(pending);
 
-                if (Object.keys(options).length > 0) {
-                    this.heldOptions.set(sessionId, options);
+                if (Object.keys(changeOnly).length > 0) {
+                    this.heldOptions.set(sessionId, changeOnly);
                 }
             } else {
                 this.pendingState.set(sessionId, newerPending(pending, waiting));
