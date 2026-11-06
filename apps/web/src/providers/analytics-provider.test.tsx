@@ -74,5 +74,13 @@ describe("AnalyticsProvider", () => {
         const onSignIn = options?.before_send?.({ event: "$pageview", properties: { $current_url: signIn.href } }) as typeof event;
 
         expect(JSON.stringify(onSignIn)).not.toContain("merger");
+
+        // A recording snapshot of a prompt link's page is not sent at all: PostHog's hook returns null for it.
+        const recording = options?.before_send?.({
+            event: "$snapshot",
+            properties: { $current_url: "https://app.example.com/chat?prompt=Summarise%20the%20merger%20plan", $snapshot_data: {} },
+        });
+
+        expect(recording).toBeNull();
     });
 });

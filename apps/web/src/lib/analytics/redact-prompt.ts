@@ -96,5 +96,52 @@ const redactDeep = (value: unknown): unknown => {
     return value;
 };
 
-/** The PostHog `before_send` hook: the event as it would be sent, with no prompt text left in any URL it carries. */
-export const redactPromptFromEvent = <T>(event: T): T => redactDeep(event) as T;
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+    if (value === null || typeof value !== "object") {
+        return false;
+    }
+
+    const prototype = Object.getPrototypeOf(value);
+
+    return prototype === Object.prototype || prototype === null;
+};
+
+/** Whether any string in `value`, at any depth, names a prompt. */
+const namesPrompt = (value: unknown): boolean => {
+    if (typeof value === "string") {
+        return PROMPT_MARKER.test(value);
+    }
+
+    if (Array.isArray(value)) {
+        return value.some((item) => namesPrompt(item));
+    }
+
+    return isPlainObject(value) && Object.values(value).some((item) => namesPrompt(item));
+};
+
+/**
+ * A session recording snapshot is not scrubbed in its compressed parts: the recorder gzips a page's full DOM and its text, so a
+ * prompt in them is not readable here. A snapshot is therefore dropped when its page URL names a prompt, or when any plain string
+ * in it does (the page's own address, recorded in a plain meta event, is one of them).
+ */
+const isPromptSnapshot = (event: unknown): boolean => {
+    if (!isPlainObject(event) || event.event !== "$snapshot") {
+        return false;
+    }
+
+    const properties = isPlainObject(event.properties) ? event.properties : {};
+
+    return namesPrompt(properties.$current_url) || namesPrompt(properties.$snapshot_data);
+};
+
+/**
+ * The PostHog `before_send` hook: the event as it would be sent, with no prompt text left in any URL it carries. Returns `null`
+ * for an event that must not be sent at all (a recording snapshot of a prompt link's page), which PostHog then drops.
+ */
+export const redactPromptFromEvent = <T>(event: T): T | null => {
+    if (isPromptSnapshot(event)) {
+        return null;
+    }
+
+    return redactDeep(event) as T;
+};

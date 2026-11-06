@@ -45,9 +45,9 @@ describe(redactPromptFromEvent, () => {
 
         expect(payload).not.toContain(SECRET);
         expect(payload).not.toContain("confidential");
-        expect(redacted.properties.$current_url).toBe("https://app.example.com/chat?model=gpt-4o");
-        expect(redacted.properties.$pathname).toBe("/chat");
-        expect(redacted.properties.distinct_id).toBe("user-1");
+        expect(redacted?.properties.$current_url).toBe("https://app.example.com/chat?model=gpt-4o");
+        expect(redacted?.properties.$pathname).toBe("/chat");
+        expect(redacted?.properties.distinct_id).toBe("user-1");
     });
 
     it("keeps the prompt text out of an error report's URL, wherever the report puts it", () => {
@@ -66,7 +66,7 @@ describe(redactPromptFromEvent, () => {
         expect(payload).toContain("boom");
     });
 
-    it("keeps the prompt text out of a session-replay snapshot, which records the page's href", () => {
+    it("drops a session-replay snapshot that records a prompt link's href, rather than sending it", () => {
         const event = {
             event: "$snapshot",
             properties: {
@@ -77,10 +77,7 @@ describe(redactPromptFromEvent, () => {
             },
         };
 
-        const payload = JSON.stringify(redactPromptFromEvent(event));
-
-        expect(payload).not.toContain(SECRET);
-        expect(payload).toContain('"type":3');
+        expect(redactPromptFromEvent(event)).toBeNull();
     });
 
     it("does not change the event it was given", () => {
@@ -150,5 +147,44 @@ describe("the exact sign-in inputs from the review", () => {
         ["email code, with the model after", "/auth/email-otp?redirectTo=%2Fchat%3Fprompt%3D%2522hi%2522&model=x", "/auth/email-otp?redirectTo=%2Fchat"],
     ])("removes the nested prompt from a %s sign-in URL", (_name, input, expected) => {
         expect(redactPromptFromUrl(input)).toBe(expected);
+    });
+});
+
+describe("a session recording snapshot of a prompt link", () => {
+    it("is dropped when its page URL names the prompt, so no compressed part of it is sent", () => {
+        const snapshot = {
+            event: "$snapshot",
+            properties: {
+                $current_url: linkOpened,
+                $snapshot_bytes: 1200,
+                $snapshot_data: { data: "H4sIAAAAAAAAA...compressed...", type: 2 },
+            },
+        };
+
+        expect(redactPromptFromEvent(snapshot)).toBeNull();
+    });
+
+    it("is dropped when a plain part of it, the meta event's href, names the prompt", () => {
+        const snapshot = {
+            event: "$snapshot",
+            properties: {
+                $current_url: "https://app.example.com/chat",
+                $snapshot_data: [{ data: { href: linkOpened, height: 800, width: 1200 }, type: 4 }],
+            },
+        };
+
+        expect(redactPromptFromEvent(snapshot)).toBeNull();
+    });
+
+    it("keeps a snapshot of a page that names no prompt, unchanged", () => {
+        const snapshot = {
+            event: "$snapshot",
+            properties: {
+                $current_url: "https://app.example.com/chat?model=gpt-4o",
+                $snapshot_data: [{ data: { href: "https://app.example.com/chat?model=gpt-4o", type: 4 }, type: 4 }],
+            },
+        };
+
+        expect(redactPromptFromEvent(snapshot)).toEqual(snapshot);
     });
 });
