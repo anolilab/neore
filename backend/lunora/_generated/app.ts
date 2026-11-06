@@ -763,6 +763,8 @@ class AppBuilder<Env extends object> {
             ["threadAccess", { mode: { kind: "global" } }],
             ["threadContextSummaries", { mode: { field: "userId", kind: "shardBy" } }],
             ["threadGoals", { mode: { field: "userId", kind: "shardBy" } }],
+            ["threadGuestLinks", { mode: { field: "userId", kind: "shardBy" } }],
+            ["threadGuestMessages", { mode: { field: "userId", kind: "shardBy" } }],
             ["threadInvites", { mode: { kind: "global" } }],
             ["threadKnowledge", { mode: { kind: "root" } }],
             ["threadPasscodes", { mode: { field: "userId", kind: "shardBy" } }],

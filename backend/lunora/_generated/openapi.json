@@ -21715,6 +21715,672 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#chat_guest_links:confirmGuestMessageSent": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_guest_links:confirmGuestMessageSent` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_guest_links:confirmGuestMessageSent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "messageId": {
+                        "description": "Id<\"threadGuestMessages\">",
+                        "type": "string",
+                        "x-lunora-table": "threadGuestMessages"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "messageId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_guest_links:confirmGuestMessageSent",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_guest_links:confirmGuestMessageSent",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#chat_guest_links:createGuestLink": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_guest_links:createGuestLink` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_guest_links:createGuestLink",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_guest_links:createGuestLink",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "expiresAt": {
+                      "type": "number"
+                    },
+                    "linkToken": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "expiresAt",
+                    "linkToken"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_guest_links:createGuestLink",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#chat_guest_links:dismissHeldGuestMessage": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_guest_links:dismissHeldGuestMessage` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_guest_links:dismissHeldGuestMessage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "messageId": {
+                        "description": "Id<\"threadGuestMessages\">",
+                        "type": "string",
+                        "x-lunora-table": "threadGuestMessages"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "messageId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_guest_links:dismissHeldGuestMessage",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_guest_links:dismissHeldGuestMessage",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#chat_guest_links:getGuestLink": {
+      "post": {
+        "description": "Invoke the `query` `chat_guest_links:getGuestLink` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_guest_links:getGuestLink",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_guest_links:getGuestLink",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "link": {
+                      "anyOf": [
+                        {
+                          "properties": {
+                            "bound": {
+                              "type": "boolean"
+                            },
+                            "expiresAt": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "bound",
+                            "expiresAt"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "messages": {
+                      "items": {
+                        "properties": {
+                          "createdAt": {
+                            "type": "number"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "const": "held",
+                                "type": "string"
+                              },
+                              {
+                                "const": "sent",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "createdAt",
+                          "id",
+                          "status",
+                          "text"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "link",
+                    "messages"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: chat_guest_links:getGuestLink",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#chat_guest_links:getGuestView": {
+      "post": {
+        "description": "Invoke the `action` `chat_guest_links:getGuestView` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_guest_links:getGuestView",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "guestToken": {
+                        "type": "string"
+                      },
+                      "linkToken": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "guestToken",
+                      "linkToken"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_guest_links:getGuestView",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "expiresAt": {
+                          "type": "number"
+                        },
+                        "messages": {
+                          "items": {
+                            "properties": {
+                              "createdAt": {
+                                "type": "number"
+                              },
+                              "status": {
+                                "anyOf": [
+                                  {
+                                    "const": "held",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "sent",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "createdAt",
+                              "status",
+                              "text"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "expiresAt",
+                        "messages"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: chat_guest_links:getGuestView",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#chat_guest_links:postGuestMessage": {
+      "post": {
+        "description": "Invoke the `action` `chat_guest_links:postGuestMessage` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_guest_links:postGuestMessage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "guestToken": {
+                        "type": "string"
+                      },
+                      "linkToken": {
+                        "type": "string"
+                      },
+                      "requestId": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "linkToken",
+                      "text"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_guest_links:postGuestMessage",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "guestToken": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: chat_guest_links:postGuestMessage",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#chat_guest_links:revokeGuestLink": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_guest_links:revokeGuestLink` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_guest_links:revokeGuestLink",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_guest_links:revokeGuestLink",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_guest_links:revokeGuestLink",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#chat_guest_links:sendHeldGuestMessage": {
+      "post": {
+        "description": "Invoke the `mutation` `chat_guest_links:sendHeldGuestMessage` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_guest_links:sendHeldGuestMessage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "messageId": {
+                        "description": "Id<\"threadGuestMessages\">",
+                        "type": "string",
+                        "x-lunora-table": "threadGuestMessages"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "messageId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_guest_links:sendHeldGuestMessage",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "threadId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "text",
+                    "threadId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: chat_guest_links:sendHeldGuestMessage",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#chat_link_preview:getLinkPreview": {
       "post": {
         "description": "Invoke the `action` `chat_link_preview:getLinkPreview` over the Lunora RPC envelope (POST /_lunora/rpc).",

@@ -10,6 +10,8 @@ export default defineModule({
         "presentations",
         "requestedSecrets",
         "threadGoals",
+        "threadGuestLinks",
+        "threadGuestMessages",
         "threadPins",
         "threadTags",
         "toolApprovalRuns",

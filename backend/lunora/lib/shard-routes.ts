@@ -18,9 +18,10 @@ import { internalQuery } from "../_generated/server";
  * signed-in stranger can still find its share page. `device` routes a paired
  * device's id to its owner, for the host ingest (`acp/http.ts`). `watch` routes a
  * watched repository's id to its owner, for the repository webhook
- * (`source-control/webhook.ts`).
+ * (`source-control/webhook.ts`). `guest-link` routes the SHA-256 of a guest link token to the
+ * thread owner, for the guest's message and view (`chat/guest-links.ts`).
  */
-export type ShardRouteKind = "device" | "messenger" | "page-public" | "thread-public" | "thread-share" | "trigger" | "watch";
+export type ShardRouteKind = "device" | "guest-link" | "messenger" | "page-public" | "thread-public" | "thread-share" | "trigger" | "watch";
 
 /** The `shardRoutes.key` for `value` of `kind`. */
 export const shardRouteKey = (kind: ShardRouteKind, value: string): string => `${kind}:${value}`;
@@ -104,6 +105,7 @@ export const getRouteOwner = internalQuery
     .input({
         kind: v.union(
             v.literal("device"),
+            v.literal("guest-link"),
             v.literal("messenger"),
             v.literal("page-public"),
             v.literal("thread-public"),

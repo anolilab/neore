@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { registeredApi } from "../../test/registered-api";
 
+import { listGuestNotesForExport } from "../chat/guest-links";
 import { listMessagesByThreadIdAdmitted } from "../agent/messages";
 import { listThreadSummariesForExport } from "../agent/thread-summaries";
 import { getThreadInternal, listThreadsByUserIdInternal } from "../agent/threads";
@@ -39,6 +40,7 @@ describe("collectConversations", () => {
         registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
+        registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -110,6 +112,7 @@ describe("collectConversations", () => {
         registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
+        registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -160,6 +163,7 @@ describe("collectConversations", () => {
         registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
+        registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -267,6 +271,7 @@ describe("collectConversations: a locked chat", () => {
         registry.set("agent_threads:getThreadInternal", getThreadInternal);
         registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
+        registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
     };
 
     it("exports the owner's locked chat with its title and every message", async () => {

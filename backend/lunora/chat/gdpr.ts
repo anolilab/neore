@@ -5,6 +5,7 @@
  * the owner's. Batching follows `gdpr/batch.ts`.
  */
 import type { MutationCtx } from "../_generated/server";
+import { deleteShardRoute } from "../lib/shard-routes";
 import { BATCH, type BatchResult, deleteParentsWithChildren } from "../gdpr/batch";
 
 /**
@@ -34,7 +35,7 @@ export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: st
  * of each per call.
  */
 export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
-    const [streams, approvalRuns, secrets, goals] = await Promise.all([
+    const [streams, approvalRuns, secrets, goals, guestMessages, guestLinks] = await Promise.all([
         ctx.db
             .query("persistentStreams")
             .withIndex("by_userId_status", (q) => q.eq("userId", userId))
@@ -51,13 +52,32 @@ export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: st
             .query("threadGoals")
             .withIndex("by_user", (q) => q.eq("userId", userId))
             .take(BATCH),
+        // Text strangers left for the user, then the links that took it (the route to a link goes with `shardRoutes`' owner).
+        ctx.db
+            .query("threadGuestMessages")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .take(BATCH),
+        ctx.db
+            .query("threadGuestLinks")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .take(BATCH),
     ]);
 
     await Promise.all([
         ...approvalRuns.map(async (row) => await ctx.db.delete("toolApprovalRuns", row._id)),
         ...secrets.map(async (row) => await ctx.db.delete("requestedSecrets", row._id)),
         ...goals.map(async (row) => await ctx.db.delete("threadGoals", row._id)),
+        ...guestMessages.map(async (row) => await ctx.db.delete("threadGuestMessages", row._id)),
     ]);
+
+    // A link is removed only once no guest message can still reference it: a short batch of messages drained them all.
+    // Otherwise the links wait for the next call, which `hasMore` below asks for.
+    const messagesDrained = guestMessages.length < BATCH;
+
+    if (messagesDrained) {
+        await Promise.all(guestLinks.map(async (row) => await ctx.db.delete("threadGuestLinks", row._id)));
+        await Promise.all(guestLinks.map(async (link) => await deleteShardRoute(ctx, "guest-link", link.linkHash)));
+    }
 
     const streamsLeft = await deleteParentsWithChildren(
         streams,
@@ -72,7 +92,15 @@ export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: st
         },
     );
 
-    return { hasMore: streamsLeft || approvalRuns.length >= BATCH || secrets.length >= BATCH || goals.length >= BATCH };
+    return {
+        hasMore:
+            streamsLeft ||
+            approvalRuns.length >= BATCH ||
+            secrets.length >= BATCH ||
+            goals.length >= BATCH ||
+            guestMessages.length >= BATCH ||
+            (messagesDrained && guestLinks.length >= BATCH),
+    };
 };
 
 /** The user's presentations, each after its slides. */
