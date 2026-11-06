@@ -148,6 +148,9 @@ export interface ApiTypes {
             getOrganizationPolicy: FunctionReference<"query", {}, { policy: { models?: { allowed: Array<string> }; permissionCap?: "off" | "ask" | "auto"; schemaVersion: 1; settings?: Record<string, { locked: boolean; value: boolean }> }; revision: number; updatedAt: number } | null>;
             setOrganizationPolicy: FunctionReference<"mutation", { document: string }, { revision: number }>;
         };
+        setup_steps: {
+            setSetupStepSkipped: FunctionReference<"mutation", { skipped: boolean; stepId: "pair" | "ssh" | "agent" }, null>;
+        };
         team: {
             addTeamMember: FunctionReference<"mutation", { teamId: string; userId: string }, void>;
             createTeam: FunctionReference<"mutation", { name: string }, string>;
@@ -1010,6 +1013,9 @@ export const api: ApiTypes = {
         organization_policy: {
             getOrganizationPolicy: { __lunoraRef: "auth_organization_policy:getOrganizationPolicy" },
             setOrganizationPolicy: { __lunoraRef: "auth_organization_policy:setOrganizationPolicy" },
+        },
+        setup_steps: {
+            setSetupStepSkipped: { __lunoraRef: "auth_setup_steps:setSetupStepSkipped" },
         },
         team: {
             addTeamMember: { __lunoraRef: "auth_team:addTeamMember" },

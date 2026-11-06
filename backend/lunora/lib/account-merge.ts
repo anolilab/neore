@@ -28,6 +28,7 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
+import { mergeSkippedSteps } from "../auth/lib/setup-step-limits";
 import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
 import schema from "../schema";
@@ -93,6 +94,7 @@ type RawDb = {
     delete: (table: string, id: string) => Promise<void>;
     get: (table: string, id: string) => Promise<unknown>;
     insert: (table: string, document: Record<string, unknown>, options: { allowExplicitId: boolean }) => Promise<string>;
+    patch: (table: string, id: string, fields: Record<string, unknown>) => Promise<void>;
     query: (table: string) => {
         paginate: (options: {
             cursor: string | null;
@@ -114,26 +116,74 @@ export const listShardRowsPage = internalQuery
         return { continueCursor, isDone, page };
     });
 
-/** On the GUEST's shard: the ids of the first page of `table` — for the delete pass. */
+/**
+ * On the GUEST's shard: the ids of the first page of `table` — for the delete pass. With `ownedBy`, only that user's
+ * rows: the tables the new account keeps its own row of are cleared of the guest's row alone, so a shard that also
+ * holds the new account's row (one shard serving both, as local routing can) keeps it.
+ */
 export const listShardRowIds = internalQuery
-    .input({ table: v.string() })
+    .input({ ownedBy: v.optional(v.string()), table: v.string() })
     .output(v.array(v.string()))
     .query(async ({ args, ctx }) => {
+        if (args.ownedBy !== undefined) {
+            const facades = ctx.db as unknown as Record<
+                string,
+                { findMany: (options: { limit: number; where: { userId: string } }) => Promise<{ page: Record<string, unknown>[] }> }
+            >;
+            const { page } = await facades[args.table]!.findMany({ limit: MERGE_PAGE_SIZE, where: { userId: args.ownedBy } });
+
+            return page.map((row) => row._id as string);
+        }
+
         const rows = await rawDb(ctx).query(args.table).take(MERGE_PAGE_SIZE);
 
         return rows.map((row) => row._id as string);
     });
+
+/**
+ * The new account keeps its own `userSettings` row, but the guest's skipped first-run steps are a choice the guest made
+ * and would otherwise vanish on sign-up: they are added to the new row's list and nothing else of it changes.
+ */
+const carrySetupSteps = async (ctx: { db: unknown }, guestRows: Record<string, unknown>[], from: string, to: string): Promise<void> => {
+    // Only the converting guest's own row: a page may hold other rows, and their choices are not this account's.
+    const skipped = guestRows.flatMap((row) => (row.userId === from && Array.isArray(row.setupStepsSkipped) ? (row.setupStepsSkipped as string[]) : []));
+
+    if (skipped.length === 0) {
+        return;
+    }
+
+    // By userId, through the table's index: the new account's row is found wherever it sits, never by scanning a page of rows.
+    const settings = (ctx.db as { userSettings: { findFirst: (options: { where: { userId: string } }) => Promise<Record<string, unknown> | null> } })
+        .userSettings;
+    const existing = await settings.findFirst({ where: { userId: to } });
+    const db = rawDb(ctx);
+
+    if (existing) {
+        await db.patch("userSettings", existing._id as string, {
+            setupStepsSkipped: mergeSkippedSteps(existing.setupStepsSkipped as string[] | undefined, skipped),
+        });
+    } else {
+        await db.insert("userSettings", { setupStepsSkipped: mergeSkippedSteps(undefined, skipped), userId: to }, { allowExplicitId: false });
+    }
+};
 
 /** On the NEW user's shard: insert `rows` of `table` under their own ids, re-owned. */
 export const importShardRows = internalMutation
     .input({ from: v.string(), rows: v.array(v.any()), table: v.string(), to: v.string() })
     .output(v.object({ imported: v.number() }))
     .mutation(async ({ args, ctx }) => {
+        const db = rawDb(ctx);
+
+        if (args.table === "userSettings") {
+            await carrySetupSteps(ctx, args.rows as Record<string, unknown>[], args.from, args.to);
+
+            return { imported: 0 };
+        }
+
         if (KEEP_NEW_USERS.has(args.table)) {
             return { imported: 0 };
         }
 
-        const db = rawDb(ctx);
         let imported = 0;
 
         for (const row of args.rows as Record<string, unknown>[]) {
@@ -237,7 +287,7 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
         let emptied = false;
 
         for (let round = 0; round < MAX_ROUNDS_PER_TABLE; round += 1) {
-            const ids: string[] = await call(references.listIds, { table }, from);
+            const ids: string[] = await call(references.listIds, KEEP_NEW_USERS.has(table) ? { ownedBy: from, table } : { table }, from);
 
             if (ids.length === 0) {
                 emptied = true;

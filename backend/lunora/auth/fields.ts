@@ -4,6 +4,7 @@ import { v } from "lunorash/server";
 import { MAX_SEARCH_DOMAIN_BLOCKLIST } from "../chat/tools/search-domains";
 import { MAX_LENGTH } from "../lib/validators";
 import { MAX_MODEL_NICKNAME_LENGTH, MAX_MODEL_NICKNAMES } from "./lib/model-nicknames";
+import { MAX_SKIPPED_SETUP_STEPS } from "./lib/setup-step-limits";
 
 /**
  * Every user-writable setting. `userId` is NOT here: `updateUserSettings` takes
@@ -129,6 +130,11 @@ export const userSettingsFieldsWithoutUserId = {
 
 export const userSettingsFields = {
     ...userSettingsFieldsWithoutUserId,
+    // Not writable through `updateUserSettings` (it takes the fields above): `setSetupStepSkipped` is the one writer, one
+    // step at a time, so a whole-list write from a stale client cannot erase a saved skip. The row still carries it.
+    setupStepsSkipped: v.optional(
+        v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= MAX_SKIPPED_SETUP_STEPS, { message: "Too many skipped setup steps" }),
+    ), // First-run setup steps the user skipped. Absent means none.
     userId: v.string(),
 };
 

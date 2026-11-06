@@ -28303,6 +28303,18 @@
           "optional": true,
           "unique": false
         },
+        "setupStepsSkipped": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
+        },
         "taskEmailEnabled": {
           "kind": "boolean",
           "nullable": false,

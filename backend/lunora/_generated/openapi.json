@@ -13002,6 +13002,84 @@
         "x-lunora-function-kind": "query"
       }
     },
+    "/_lunora/rpc#auth_setup_steps:setSetupStepSkipped": {
+      "post": {
+        "description": "Invoke the `mutation` `auth_setup_steps:setSetupStepSkipped` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "auth_setup_steps:setSetupStepSkipped",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "skipped": {
+                        "type": "boolean"
+                      },
+                      "stepId": {
+                        "anyOf": [
+                          {
+                            "const": "pair",
+                            "type": "string"
+                          },
+                          {
+                            "const": "ssh",
+                            "type": "string"
+                          },
+                          {
+                            "const": "agent",
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "skipped",
+                      "stepId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "auth_setup_steps:setSetupStepSkipped",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: auth_setup_steps:setSetupStepSkipped",
+        "tags": [
+          "auth"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#auth_team:addTeamMember": {
       "post": {
         "description": "Invoke the `mutation` `auth_team:addTeamMember` over the Lunora RPC envelope (POST /_lunora/rpc).",

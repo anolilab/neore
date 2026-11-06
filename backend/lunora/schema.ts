@@ -3417,6 +3417,8 @@ export const schema = defineSchema({
         // Hostnames the web search tool never returns (`chat/tools/search-domains.ts`). Absent = none.
         searchDomainBlocklist: v.optional(v.array(v.string())),
         sendBehavior: v.optional(v.string()),
+        // First-run setup steps the user skipped (`onboarding/setup-steps.ts` in the web app): "pair" | "ssh" | "agent". Absent = none.
+        setupStepsSkipped: v.optional(v.array(v.string())),
         // Opt-in email when a task or trigger run finishes with a result (`notifications/task-email.ts`). Absent = off.
         taskEmailEnabled: v.optional(v.boolean()),
         temporaryChatRetentionHours: v.optional(v.number()),
