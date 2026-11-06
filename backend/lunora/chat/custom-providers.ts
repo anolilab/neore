@@ -468,7 +468,7 @@ export const probeCustomProvider = authAction
         }
 
         if (!response.ok) {
-            // A Worker must consume or cancel every body it opens (CLAUDE.md: an
+            // A Worker must consume or cancel every body it opens (`docs/agents/local-dev.md`: an
             // unconsumed body on a failed fetch can take the local runtime down).
             await response.body?.cancel();
 

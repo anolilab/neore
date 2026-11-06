@@ -11,12 +11,17 @@ import socialProviders from "../lib/social-providers";
  * than from a build-time list that could offer a provider the backend lacks.
  */
 export interface SignInMethods {
+    /** Registration needs an invitation, and guests are refused (`SIGNUP_INVITE_ONLY`). */
+    inviteOnly: boolean;
     oidc: { label: string; providerId: string } | null;
     passkey: boolean;
     social: string[];
 }
 
-const NO_METHODS: SignInMethods = { oidc: null, passkey: false, social: [] };
+/** How long an answer is used before it is read again. */
+export const SIGN_IN_METHODS_STALE_MS = 5 * 60 * 1000;
+
+const NO_METHODS: SignInMethods = { inviteOnly: true, oidc: null, passkey: false, social: [] };
 
 const isSignInMethods = (value: unknown): value is SignInMethods => {
     const candidate = value as Partial<SignInMethods> | null;
@@ -36,7 +41,12 @@ const fetchSignInMethods = async (): Promise<SignInMethods> => {
 
     const body: unknown = await response.json();
 
-    return isSignInMethods(body) ? body : NO_METHODS;
+    if (!isSignInMethods(body)) {
+        return NO_METHODS;
+    }
+
+    // A backend that does not say is treated as invite-only: the failure direction of "open" is guests and sign-up links.
+    return { ...body, inviteOnly: body.inviteOnly !== false };
 };
 
 /**
@@ -44,22 +54,33 @@ const fetchSignInMethods = async (): Promise<SignInMethods> => {
  * signs in through the same `signIn.social`), whether passkeys are on, and a
  * resolver from provider id to its button config.
  *
- * Only queried where sign-in UI renders, and once per page load at most. Until
+ * Only queried where sign-in UI renders, and at most once per five minutes. Until
  * it answers (and during SSR) nothing but email is offered, which is also the
  * safe reading when the backend is unreachable.
+ *
+ * `inviteOnly` is `undefined` until the answer arrives (and during SSR), so a
+ * caller can wait rather than guess; after a failed fetch it reads `true`.
  */
 const useSignInMethods = (): {
     findProvider: (id: string) => Provider | undefined;
+    inviteOnly: boolean | undefined;
     isLoading: boolean;
     passkey: boolean;
     socialProviders: string[];
 } => {
-    const { data = NO_METHODS, isLoading } = useQuery({
+    const {
+        data = NO_METHODS,
+        isError,
+        isLoading,
+        isSuccess,
+    } = useQuery({
         enabled: globalThis.window !== undefined,
         queryFn: fetchSignInMethods,
         queryKey: ["auth", "sign-in-methods"],
         retry: 1,
-        staleTime: Infinity,
+        // As long as the endpoint's own `cache-control` (5 min), so a policy change (`SIGNUP_INVITE_ONLY`) reaches an
+        // open tab at its next mount or focus instead of only after a reload.
+        staleTime: SIGN_IN_METHODS_STALE_MS,
     });
 
     const { oidc } = data;
@@ -72,6 +93,7 @@ const useSignInMethods = (): {
 
             return socialProviders.find((candidate) => candidate.provider === id);
         },
+        inviteOnly: isSuccess || isError ? data.inviteOnly : undefined,
         isLoading,
         passkey: data.passkey,
         socialProviders: oidc ? [...data.social, oidc.providerId] : data.social,

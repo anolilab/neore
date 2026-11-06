@@ -101,7 +101,7 @@ beforeEach(() => {
 });
 
 describe(ingestAttachments, () => {
-    it("stores an image and a PDF as parts the model reads, and keeps the caption", async () => {
+    it("stores an image, and a PDF whose text cannot be read, as parts a model reads, and keeps the caption", async () => {
         platform.downloads.set("img", BYTES("image/jpeg"));
         platform.downloads.set("pdf", BYTES("application/octet-stream"));
 
@@ -122,6 +122,32 @@ describe(ingestAttachments, () => {
             ],
             text: "what do these say?",
         });
+    });
+
+    it("sends a PDF's extracted text, as chat does, so the media model needs no file input", async () => {
+        platform.downloads.set("pdf", BYTES("application/octet-stream"));
+
+        const parser = { fetch: async () => Response.json({ content: "Q3 revenue rose 12%.", tables: [] }) };
+        const result = await ingest([{ kind: "file", name: "q3.pdf", ref: "pdf" }], undefined, {
+            ...(context() as object),
+            services: { documentParser: parser },
+        } as never);
+
+        expect(result.parts).toStrictEqual([]);
+        expect(result.text).toBe("[Document: q3.pdf]\nQ3 revenue rose 12%.");
+    });
+
+    it("keeps a PDF too long to inline as a file part, so none of it is cut", async () => {
+        platform.downloads.set("pdf", BYTES("application/octet-stream"));
+
+        const parser = { fetch: async () => Response.json({ content: "x".repeat(20_001), tables: [] }) };
+        const result = await ingest([{ kind: "file", name: "q3.pdf", ref: "pdf" }], undefined, {
+            ...(context() as object),
+            services: { documentParser: parser },
+        } as never);
+
+        expect(result.parts).toStrictEqual([{ data: "storage:agent-files/application-pdf", filename: "q3.pdf", mediaType: "application/pdf", type: "file" }]);
+        expect(result.text).toBe("");
     });
 
     it("transcribes a voice note from its stored copy and keeps the recording attached, not as a part", async () => {

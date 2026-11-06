@@ -69,7 +69,7 @@ export const backfillChatFileLinks = internalMutation
         }
 
         // Stamped even if the thread is gone: the row is removed with it, and the sweep must not re-walk an orphan forever.
-        await patchRow(ctx.db, "threadPasscodes", row, { filesIndexedAt: Date.now() });
+        await patchRow(ctx.db, "threadPasscodes", row, { filesIndexedAt: ctx.now });
 
         return null;
     });

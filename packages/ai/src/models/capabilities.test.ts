@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_FILE_PART_MIME_TYPES, INGEST_SUPPORTED_MIME, isFilePartSupported, isIngestSupported } from "./capabilities";
+import { DEFAULT_FILE_PART_MIME_TYPES, INGEST_SUPPORTED_MIME, isFilePartSupported, isIngestSupported, staticUnsupportedModels } from "./capabilities";
+import { MODEL_LOOKUP } from "./registry";
 
 describe("isFilePartSupported", () => {
     it("should return true for supported MIME types", () => {
@@ -63,5 +64,14 @@ describe("INGEST_SUPPORTED_MIME", () => {
     it("should contain CSV MIME types", () => {
         expect(INGEST_SUPPORTED_MIME.has("text/csv")).toBe(true);
         expect(INGEST_SUPPORTED_MIME.has("application/csv")).toBe(true);
+    });
+});
+
+describe("staticUnsupportedModels", () => {
+    it("names a model without tools by registry id as well as API id, since chat passes the registry id", () => {
+        const gemma = MODEL_LOOKUP.get("cf-gemma-3-12b")!;
+
+        expect(staticUnsupportedModels.has(gemma.id)).toBe(true);
+        expect(staticUnsupportedModels.has(gemma.modelApiId)).toBe(true);
     });
 });

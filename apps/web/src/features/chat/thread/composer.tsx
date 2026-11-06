@@ -138,7 +138,7 @@ const MODE_ICON_COLOR: Record<ComposerMode, string> = {
  * Vertical mode switcher — lives on the left side of the input area.
  * ↑/↓ arrows (or scroll wheel) cycle through modes; clicking the icon opens a full picker.
  */
-const ComposerModeSwitcher: FC<{
+export const ComposerModeSwitcher: FC<{
     disabled?: boolean;
     mode: ComposerMode;
     onModeChange: (mode: ComposerMode) => void;

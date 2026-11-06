@@ -37,6 +37,12 @@ export interface ModelFilterRules {
 }
 
 /**
+ * The region of a model served wherever its provider has capacity (Workers AI), with no endpoint that keeps a call
+ * in one region. Any region rule refuses it: an allow-list cannot be honoured, and neither can a block-list.
+ */
+export const GLOBAL_REGION = "GLOBAL";
+
+/**
  * Check whether a single model candidate passes the filter rules.
  *
  * Returns `null` if allowed, or a human-readable rejection reason if blocked.
@@ -60,6 +66,19 @@ export const getModelRejectionReason = (candidate: FilterableModel, rules: Model
     // Provider block-list
     if (rules.blockedProviders && rules.blockedProviders.length > 0 && rules.blockedProviders.includes(candidate.provider)) {
         return `Provider "${candidate.provider}" is blocked`;
+    }
+
+    // Zero data retention and no data collection are enforced only through OpenRouter's provider routing. Workers AI
+    // offers no such control, so it cannot honour either flag.
+    if (candidate.provider === "cloudflare" && (rules.requireZDR === true || rules.denyDataCollection === true)) {
+        return `Model "${candidate.modelId}" cannot guarantee zero data retention or no data collection`;
+    }
+
+    if (
+        candidate.regions?.includes(GLOBAL_REGION) &&
+        ((rules.allowedRegions && rules.allowedRegions.length > 0) || (rules.blockedRegions && rules.blockedRegions.length > 0))
+    ) {
+        return `Model "${candidate.modelId}" may be served from any region, so it cannot honour region rules`;
     }
 
     // Region allow-list: model must have at least one region that matches
@@ -107,6 +126,23 @@ export const filterModels = <T extends FilterableModel>(candidates: T[], rules: 
 /**
  * Check if the rules object has any active filters.
  */
+
+/**
+ * The rules that govern where a user's data may go: regions, providers they block, zero data retention and no data
+ * collection. An embedding model is checked against these only: it is hidden and never picked, so a chat-model
+ * allow-list (`allowedModels`, `allowedProviders`, `blockedModels`) is not about it and must not switch off vector
+ * memory and knowledge.
+ */
+export const dataHandlingRules = (rules: ModelFilterRules): ModelFilterRules => {
+    return {
+        ...(rules.allowedRegions && { allowedRegions: rules.allowedRegions }),
+        ...(rules.blockedProviders && { blockedProviders: rules.blockedProviders }),
+        ...(rules.blockedRegions && { blockedRegions: rules.blockedRegions }),
+        ...(rules.denyDataCollection !== undefined && { denyDataCollection: rules.denyDataCollection }),
+        ...(rules.requireZDR !== undefined && { requireZDR: rules.requireZDR }),
+    };
+};
+
 export const hasActiveFilters = (rules: ModelFilterRules | undefined): rules is ModelFilterRules => {
     if (!rules) return false;
 
@@ -146,6 +182,8 @@ export const deriveModelRegions = (model: { modelApiId: string; provider: string
     if (provider === "fireworks") return ["US"];
 
     if (provider === "bfl") return ["EU", "US"]; // Black Forest Labs (Germany)
+
+    if (provider === "cloudflare") return [GLOBAL_REGION]; // Workers AI runs a model wherever Cloudflare has capacity
 
     // OpenRouter/Requesty: derive from underlying model provider
     const apiPrefix = modelApiId.split("/", 1)[0]?.toLowerCase() ?? "";

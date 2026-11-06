@@ -20,7 +20,8 @@ const openMockedChat = async (page: Page, scenario: string): Promise<void> => {
 };
 
 test.describe("Streaming faults from a mocked gateway", () => {
-    test("a rate-limited send shows the limit and no reply", async ({ page }: { page: Page }) => {
+    // Signed in: under invite-only a signed-out send asks for a sign-in before it reaches the gateway.
+    test("a rate-limited send shows the limit and no reply", async ({ userPage: page }: { userPage: Page }) => {
         await openMockedChat(page, "rate-limited");
 
         // A refused send keeps the text in the composer for a retry, so this does not

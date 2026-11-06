@@ -110,6 +110,13 @@ export interface ComposerTiptapEditorProps {
      * setting is off, or this composer is not a chat composer).
      */
     requestCompletion?: GhostRequest;
+
+    /**
+     * Slash commands, @ mentions and {{variable}} suggestions. They read the
+     * signed-in user's prompts, skills, files and chats, so a composer shown to
+     * a signed-out visitor turns them off. Default on.
+     */
+    suggestions?: boolean;
     /** Text value (synced from store) */
     value: string;
 }
@@ -168,6 +175,7 @@ const ComposerTiptapEditor = ({
     placeholder: placeholderProp,
     ref,
     requestCompletion,
+    suggestions = true,
     value,
 }: ComposerTiptapEditorProps & { ref?: React.RefObject<ComposerTiptapEditorRef | null> }) => {
     const { t } = useLingui();
@@ -178,9 +186,13 @@ const ComposerTiptapEditor = ({
     const editorContainerRef = useRef<HTMLDivElement>(null);
 
     // Popup state
-    const [slashMatch, setSlashMatch] = useState<SlashCommandMatch | null>(null);
-    const [fileMentionMatch, setFileMentionMatch] = useState<FileMentionMatch | null>(null);
-    const [variableMatch, setVariableMatch] = useState<VariableAutocompleteMatch | null>(null);
+    const [slashMatchState, setSlashMatch] = useState<SlashCommandMatch | null>(null);
+    const [fileMentionMatchState, setFileMentionMatch] = useState<FileMentionMatch | null>(null);
+    const [variableMatchState, setVariableMatch] = useState<VariableAutocompleteMatch | null>(null);
+    // With suggestions off nothing opens, so Enter still sends "/like this".
+    const slashMatch = suggestions ? slashMatchState : null;
+    const fileMentionMatch = suggestions ? fileMentionMatchState : null;
+    const variableMatch = suggestions ? variableMatchState : null;
     const [editorRect, setEditorRect] = useState<DOMRect | null>(null);
 
     // Model data for slash commands (filtered by PostHog feature flags)

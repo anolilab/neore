@@ -167,7 +167,7 @@ export const readWithRetry = async (read: () => Promise<Response>, { policy, sig
 
             serverAskMs = retryAfterMs(response.headers);
             lastFailure = new SessionReadFailedError(response.status);
-            // Nobody will read this body; an unconsumed one is a `wrangler dev` crash trigger (CLAUDE.md).
+            // Nobody will read this body; an unconsumed one is a `wrangler dev` crash trigger (`docs/agents/local-dev.md`).
 
             await response.body?.cancel().catch(() => undefined);
         } catch (error) {

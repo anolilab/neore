@@ -11,6 +11,7 @@ import type { ServiceFetch } from "../../lib/services.js";
 import { backupCapabilities, eligibleBackupModel, supportsBackupFallback } from "./backup-model.js";
 import { FallbackLanguageModel } from "./fallback-language-model.js";
 import { type GatewayCustomProviderConfig, GatewayLanguageModel } from "./gateway-language-model.js";
+import { defaultModelUnderRules, readsImagesAndCallsTools } from "../../lib/utility-model.js";
 
 // Lazy singleton — providers are loaded via dynamic import() the first time this
 // is called, keeping provider SDKs out of the module-analysis bundle.
@@ -205,7 +206,8 @@ const getAgent = async (model: AgentModel | string, options: GetAgentOptions): P
     // Fallback to default model if the requested model is not available
     // This can happen with archived threads that have old or unavailable models
     if (!agent) {
-        const fallbackModel = DEFAULT_CHAT_MODEL;
+        // The Workers AI default cannot keep to a region rule: under one, the fallback is a default the rules allow.
+        const fallbackModel = defaultModelUnderRules(DEFAULT_CHAT_MODEL, options?.modelFilterRules, readsImagesAndCallsTools);
         const fallbackAgent = agents[fallbackModel];
 
         if (!fallbackAgent) {

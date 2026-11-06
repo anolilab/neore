@@ -2,16 +2,19 @@ import { Authenticated, AuthLoading, Unauthenticated } from "@lunora/react";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { LUNORA_ID_SOURCE } from "@neore/client-runtime";
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useLocation } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 
 import GlobalCommandPalette from "@/components/command-palette";
 import { ModelPickerPopup } from "@/components/model-picker";
 import ProgrammableSidebarProvider from "@/components/programmable-sidebar-provider";
-import AutoGuestSignIn from "@/features/auth/components/auto-guest-signin";
+import SignInRedirect from "@/features/auth/components/sign-in-redirect";
+import UnauthenticatedGate from "@/features/auth/components/unauthenticated-gate";
 import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import ChatLoadingSkeleton from "@/features/chat/loading/chat-loading-skeleton";
 import { chatDefaultOpen, chatSidebarNames, chatSidebarStyle } from "@/features/chat/shell-layout";
+import SignedOutChat from "@/features/chat/signed-out/signed-out-chat";
+import { signedOutViewFor } from "@/features/chat/signed-out/signed-out-view";
 import { KeyboardShortcutsManager } from "@/features/keyboard/components/keyboard-shortcuts-manager";
 import useKeyboardShortcutHandler from "@/features/keyboard/hooks/use-keyboard-shortcut-handler";
 import { PresentationViewerRoot } from "@/features/slides";
@@ -22,6 +25,29 @@ const CHAT_THREAD_PATH_RE = new RegExp(`^/chat/(${LUNORA_ID_SOURCE})$`);
 
 const OnboardingDialog = lazy(() => import("@/features/onboarding/components/onboarding-dialog"));
 
+/** Signed out under invite-only: the signed-out chat, a page that works signed out, or sign in first (`signedOutViewFor`). */
+const SignedOutRoute = () => {
+    const view = useLocation({ select: (location) => signedOutViewFor(location.pathname) });
+
+    if (view === "chat") {
+        return <SignedOutChat />;
+    }
+
+    if (view === "page") {
+        return (
+            <ProgrammableSidebarProvider defaultOpen={chatDefaultOpen} sidebarNames={chatSidebarNames} style={chatSidebarStyle}>
+                <Outlet />
+            </ProgrammableSidebarProvider>
+        );
+    }
+
+    return (
+        <SignInRedirect>
+            <ChatLoadingSkeleton />
+        </SignInRedirect>
+    );
+};
+
 const RouteComponent = () => {
     const handleShortcut = useKeyboardShortcutHandler();
 
@@ -31,7 +57,8 @@ const RouteComponent = () => {
                 <ChatLoadingSkeleton />
             </AuthLoading>
             <Unauthenticated>
-                <AutoGuestSignIn />
+                {/* A guest session when registration is open; the signed-out chat when it is invite-only. */}
+                <UnauthenticatedGate loading={<ChatLoadingSkeleton />} signedOut={<SignedOutRoute />} />
             </Unauthenticated>
             <Authenticated>
                 <GlobalCommandPalette />

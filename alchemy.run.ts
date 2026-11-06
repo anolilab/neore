@@ -8,7 +8,7 @@ import * as Redacted from "effect/Redacted";
 
 import backendBindings from "./backend/lunora-bindings.json" with { type: "json" };
 import { resolveDataJurisdiction } from "./backend/lunora/lib/data-jurisdiction";
-import { OPTIONAL_ENV_KEYS, REQUIRED_ENV_KEYS } from "./backend/lunora/lib/env-validation";
+import { encryptionKeyProblem, OPTIONAL_ENV_KEYS, REQUIRED_ENV_KEYS } from "./backend/lunora/lib/env-validation";
 import { JOBS_QUEUE_CONSUMER } from "./backend/lunora/lib/job-queue-config";
 import { jobs, jobsDeadLetters } from "./backend/lunora/queues";
 import { GATEWAY_CRONS } from "./services/llm-gateway/src/crons";
@@ -85,6 +85,14 @@ if (missingDeployEnv.length > 0 && !destroying) {
         `Cannot deploy (stage: ${stage}) — these are unset: ${missingDeployEnv.join(", ")}. ` +
             `Set them as repository secrets; there are deliberately no defaults, because a wrong or empty value here deploys a working-looking app with forgeable sessions.`,
     );
+}
+
+// `lib/encryption.ts` refuses a short key only when it first loads, on a request
+// that needs it, so a bad key would otherwise deploy green.
+const encryptionKeyError = destroying ? undefined : encryptionKeyProblem(process.env.ENCRYPTION_KEY?.trim() ?? "");
+
+if (encryptionKeyError) {
+    throw new Error(`Cannot deploy (stage: ${stage}) — ${encryptionKeyError}`);
 }
 
 // The document parser is a Rust Worker deployed from its prebuilt output
@@ -240,21 +248,15 @@ const requiredEnvPassthrough = Object.fromEntries(REQUIRED_ENV_KEYS.map((name) =
 const optionalEnvPassthrough = boundWhereSet(OPTIONAL_ENV_KEYS);
 
 /**
- * Cloudflare Email Service, bound only when it is the transport to use.
+ * Cloudflare Email Service, the only mail transport, bound only when a stage opts
+ * in with `MAIL_EMAIL_SERVICE=1` and sets `MAIL_FROM`. The binding is what turns
+ * on email verification (`email/mailer.ts#deliversMail`), and Email Service
+ * rejects an unverified sender domain (`E_SENDER_NOT_VERIFIED`). Following
+ * `MAIL_FROM` alone would lock out every password sign-up on a stage that kept an
+ * old `MAIL_FROM` (from Resend) but has no Email Service zone in THIS account.
+ * Without the opt-in the stage sends no mail and sign-up needs no verification.
  *
- * `email/mailer.ts` (`@lunora/mail`) prefers this binding whenever it exists, so
- * the deploy decides the transport. Email Service rejects an unverified sender
- * domain (`E_SENDER_NOT_VERIFIED`), so the binding is useless until a sending
- * subdomain exists on a zone in THIS account — and the product is in beta, so an
- * account without the entitlement could fail the deploy on a binding it cannot
- * create. Resend's key is therefore the switch, which makes the cutover a secret
- * change rather than a code change:
- *
- *   MAIL_FROM set, RESEND_API_KEY unset -> EMAIL bound -> Cloudflare Email Service
- *   MAIL_FROM set, RESEND_API_KEY set   -> no binding  -> Resend
- *
- * `MAIL_FROM` itself rides `requiredEnvPassthrough` (the mailer reads it for
- * every transport). `allowedSenderAddresses` pins the From to its address.
+ * `MAIL_FROM` itself rides `requiredEnvPassthrough` (the mailer reads it). `allowedSenderAddresses` pins the From to its address.
  * Destination is deliberately left unrestricted: `destinationAddress` /
  * `allowedDestinationAddresses` would cap delivery to verified addresses, and
  * this account sends signup and invitation mail to arbitrary users.
@@ -262,7 +264,16 @@ const optionalEnvPassthrough = boundWhereSet(OPTIONAL_ENV_KEYS);
 const mailFrom = process.env.MAIL_FROM?.trim() ?? "";
 /** `allowedSenderAddresses` takes the bare address of a `Name <addr@host>` sender. */
 const mailFromAddress = /<([^<>]+)>\s*$/u.exec(mailFrom)?.[1]?.trim() ?? mailFrom;
-const useEmailService = mailFrom !== "" && !process.env.RESEND_API_KEY?.trim();
+const emailServiceOptIn = process.env.MAIL_EMAIL_SERVICE?.trim() === "1";
+const useEmailService = mailFrom !== "" && emailServiceOptIn;
+
+if (mailFrom !== "" && !emailServiceOptIn && stage !== "production") {
+    // Not fatal: the stage still deploys, just without mail or required verification.
+    console.warn(
+        `[alchemy] stage ${stage}: MAIL_FROM is set but MAIL_EMAIL_SERVICE is not "1", so no EMAIL binding is created and ` +
+            "this stage sends no mail. Set MAIL_EMAIL_SERVICE=1 once MAIL_FROM's domain is an Email Service sending domain here.",
+    );
+}
 
 /**
  * Turnstile is two independent variables with nothing tying them together, and
@@ -317,13 +328,13 @@ if (accessEnabled && accessEmails.length === 0 && !destroying) {
 /**
  * Production must be able to send mail. `@lunora/mail` throws without a sender,
  * so with `MAIL_FROM` unset every sign-up, password reset and invitation that
- * sends mail fails. With it set there is always a transport: the EMAIL binding,
- * or Resend when its key is set (see above).
+ * sends mail fails. With it set, the EMAIL binding is the transport (see above).
  */
-if (stage === "production" && !mailFrom && !destroying) {
+if (stage === "production" && !useEmailService && !destroying) {
     throw new Error(
-        "Cannot deploy (stage: production) — no outbound mail. Set MAIL_FROM to a verified sender: a Cloudflare Email Service " +
-            "sending domain, or a Resend domain together with RESEND_API_KEY. Without it, password resets and invitations are never sent.",
+        "Cannot deploy (stage: production) — no outbound mail. Set MAIL_FROM to a verified sender (a Cloudflare Email Service " +
+            "sending domain in this account) and MAIL_EMAIL_SERVICE=1 (a GitHub environment variable under vars, not a secret). " +
+            "Without both, password resets and invitations are never sent.",
     );
 }
 
@@ -598,6 +609,22 @@ export const BrowserRenderer = Cloudflare.Worker("browser-renderer", {
     name: named("browser-renderer"),
     observability: WORKER_OBSERVABILITY,
     placement: { mode: "smart" },
+    workersDev: false,
+});
+
+// Advisor companion – generated by Lunora (`studio.companion` in backend/lunora.config.ts)
+//
+// Serves the advisor procedure list a hosted Studio scores the Advisors health map
+// against, so the list stays out of the backend bundle. PRIVATE, like the document
+// parser: the backend forwards `/__lunora/advisor-procedures` to it over
+// `ADVISOR_COMPANION` after its own admin check, and the Worker checks nothing itself.
+// The name matches the one codegen derives from `neore-backend` for `lunora dev`.
+export const AdvisorCompanion = Cloudflare.Worker("advisor-companion", {
+    build: WORKER_BUILD,
+    compatibility: { date: COMPATIBILITY_DATE },
+    main: "./backend/lunora/_generated/companion/src/worker.ts",
+    name: named("neore-backend-advisor"),
+    observability: WORKER_OBSERVABILITY,
     workersDev: false,
 });
 
@@ -907,8 +934,12 @@ export default Alchemy.Stack(
                 SERVICE_DOCUMENT_PARSER: DocumentParser,
                 SERVICE_LLM_GATEWAY: Cloudflare.WorkerEntrypoint(gateway, "InternalApi"),
                 SERVICE_NSFW_CHECKER: NsfwChecker,
-                // `MAIL_FROM` and Resend's key ride `requiredEnvPassthrough` above; only
-                // the Email Service binding is decided here. See `email/mailer.ts`.
+                // Lunora's own binding, not a `services` key: the backend forwards the
+                // hosted Studio's advisor route to it. Unbound, that route answers 404 and
+                // the Studio says the companion is not deployed.
+                ADVISOR_COMPANION: AdvisorCompanion,
+                // `MAIL_FROM` rides `requiredEnvPassthrough` above; only the Email
+                // Service binding is decided here. See `email/mailer.ts`.
                 ...(useEmailService ? { EMAIL: Cloudflare.Email.SendEmail("EMAIL", { allowedSenderAddresses: [mailFromAddress] }) } : {}),
                 R2_ENDPOINT: requireEnv("R2_ENDPOINT"),
                 SITE_URL: requireEnv("SITE_URL"),

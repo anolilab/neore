@@ -215,7 +215,7 @@ export const createThread = internalMutation
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
         const insertedId = await ctx.db.insert("threads", {
-            createdAt: Date.now(),
+            createdAt: ctx.now,
             ...args,
             status: "active",
         });

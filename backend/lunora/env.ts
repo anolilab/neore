@@ -13,12 +13,10 @@ export const BETTER_AUTH_SECRET = read("BETTER_AUTH_SECRET");
  * INCLUDING UNSET, keeps sign-up invite-only — the safe direction for a flag whose
  * failure mode is "anyone can register".
  *
- * Anonymous sign-in is unaffected either way; see `auth/lib/invite-only.ts`.
+ * While it is on, anonymous (guest) sign-in is refused too (`auth/sign-in-methods.ts`).
  */
 export const SIGNUP_INVITE_ONLY = read("SIGNUP_INVITE_ONLY") !== "false" && read("SIGNUP_INVITE_ONLY") !== "0";
 export const ENVIRONMENT = read("ENVIRONMENT");
-
-export const RESEND_WEBHOOK_SECRET = read("RESEND_WEBHOOK_SECRET");
 
 export const SITE_URL = read("SITE_URL");
 

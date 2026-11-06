@@ -30,8 +30,8 @@ export const erasePromptsForUser = async (ctx: MutationCtx, userId: string): Pro
 
     // Audited tables, so one delete at a time (`gdpr/batch.ts`). History goes first: it
     // is the child of a prompt.
-    await deleteOneByOne(ctx, "promptHistory", allHistory);
-    await deleteOneByOne(ctx, "prompts", prompts);
-    await deleteOneByOne(ctx, "threadVariables", threadVariables);
-    await deleteOneByOne(ctx, "userVariableDefaults", userDefaults);
+    await deleteOneByOne(allHistory, (row) => ctx.db.delete("promptHistory", row._id));
+    await deleteOneByOne(prompts, (row) => ctx.db.delete("prompts", row._id));
+    await deleteOneByOne(threadVariables, (row) => ctx.db.delete("threadVariables", row._id));
+    await deleteOneByOne(userDefaults, (row) => ctx.db.delete("userVariableDefaults", row._id));
 };

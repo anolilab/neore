@@ -4,8 +4,8 @@
  * accept each other's values.
  *
  * Every capability is spelled out in full, not through a shared const: codegen
- * types a bare const reference as `unknown` (see the validators section of the
- * root CLAUDE.md), and this validator is meant to be an `.output()` and a table
+ * types a bare const reference as `unknown` (see the validators section of
+ * `backend/AGENTS.md`), and this validator is meant to be an `.output()` and a table
  * column. Every member is optional, like the type: one a report lacks reads as
  * `unknown`.
  */

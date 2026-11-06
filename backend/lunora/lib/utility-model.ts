@@ -8,7 +8,7 @@ import { DEFAULT_MEMORY_EXTRACTION_MODEL } from "@neore/ai/constants";
 import { deriveModelRegions, hasActiveFilters, MODEL_LOOKUP, type ModelDefinition, type ModelFilterRules, requiresPaidPlan } from "@neore/ai/models";
 import type { AgentConfig } from "@neore/ai/providers";
 
-import { backupFilterRejection } from "../chat/lib/backup-model.js";
+import { backupCapabilities, backupFilterRejection } from "../chat/lib/backup-model.js";
 import { GatewayLanguageModel } from "../chat/lib/gateway-language-model.js";
 import type { ServiceFetch } from "./services.js";
 
@@ -19,6 +19,10 @@ let _agentsPromise: Promise<Record<string, AgentConfig>> | undefined;
  * region or provider rule that excludes the default usually leaves one of them standing.
  */
 export const UTILITY_FALLBACK_MODELS: ReadonlyArray<string> = [
+    "cf-gpt-oss-120b",
+    "cf-llama-3.3-70b",
+    "cf-mistral-small-3.1",
+    "cf-qwen3-30b-a3b",
     "openai/gpt-4.1-mini",
     "anthropic/claude-haiku-4.5",
     "mistralai/ministral-8b-2501",
@@ -111,6 +115,7 @@ export const pickUtilityModelId = (
     rules: ModelFilterRules | undefined,
     preferred: string = DEFAULT_MEMORY_EXTRACTION_MODEL,
     strict = false,
+    accepts: (definition: ModelDefinition) => boolean = () => true,
 ): string | undefined => {
     const candidates = strict ? [preferred] : [preferred, ...UTILITY_FALLBACK_MODELS.filter((id) => id !== preferred)];
 
@@ -121,6 +126,7 @@ export const pickUtilityModelId = (
 
         return (
             definition !== undefined &&
+            accepts(definition) &&
             definition.enabled !== false &&
             (paidPlan || !requiresPaidPlan(definition)) &&
             avoidsBlockedRegions(definition, rules) &&
@@ -129,6 +135,27 @@ export const pickUtilityModelId = (
         );
     });
 };
+
+/** A stand-in for a reply that only needs tools. */
+export const callsTools = (definition: ModelDefinition): boolean => backupCapabilities(definition).tools;
+
+/** A stand-in for a chat or media default keeps what the default can do: read images and call tools. */
+export const readsImagesAndCallsTools = (definition: ModelDefinition): boolean => {
+    const capabilities = backupCapabilities(definition);
+
+    return capabilities.images && capabilities.tools;
+};
+
+/**
+ * The model a run on the platform default `model` uses under the user's rules: `model` when they allow it, else the
+ * first fallback they allow that `accepts` (`pickUtilityModelId`). The Workers AI defaults are served from any region,
+ * so every region rule refuses them; this keeps a user with one on a model their rules allow. With nothing allowed,
+ * `model` stays and the gateway's refusal stands. Callers apply it to the platform default only. A run cannot tell an
+ * explicit pick of the same id from the default, but the rules would refuse that pick at the gateway anyway, so the
+ * swap never overrides a model the rules allow. `rules` should carry the paid-plan grant (`loadModelFilterRules`).
+ */
+export const defaultModelUnderRules = (model: string, rules: ModelFilterRules | undefined, accepts?: (definition: ModelDefinition) => boolean): string =>
+    hasActiveFilters(rules) ? (pickUtilityModelId(rules, model, false, accepts) ?? model) : model;
 
 /** `pickUtilityModelId`, or the typed refusal. */
 export const requireUtilityModelId = (rules: ModelFilterRules | undefined, preferred?: string, strict = false): string => {

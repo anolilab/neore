@@ -6,15 +6,18 @@ import { LockIcon, MailIcon } from "lucide-react";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
 import type { AuthView } from "../../lib/auth-view-paths";
+import { authViewSearch } from "../../lib/auth-view-paths";
 import type { AuthCardClassNames } from "./auth-card";
 
 interface MagicLinkButtonProperties {
     classNames?: AuthCardClassNames;
     isSubmitting?: boolean;
+    /** Where the flow returns to; carried onto the view this links to. */
+    redirectTo?: string;
     view: AuthView;
 }
 
-const MagicLinkButton = ({ classNames, isSubmitting, view }: MagicLinkButtonProperties) => {
+const MagicLinkButton = ({ classNames, isSubmitting, redirectTo, view }: MagicLinkButtonProperties) => {
     const { basePath, credentials, navigate, viewPaths } = useAuth();
     const { t } = useLingui();
 
@@ -23,7 +26,7 @@ const MagicLinkButton = ({ classNames, isSubmitting, view }: MagicLinkButtonProp
             className={cn("w-full", classNames?.form?.button, classNames?.form?.secondaryButton)}
             disabled={isSubmitting}
             onClick={() => {
-                navigate(`${basePath}/${view === "MAGIC_LINK" || !credentials ? viewPaths.SIGN_IN : viewPaths.MAGIC_LINK}${globalThis.location.search}`);
+                navigate(`${basePath}/${view === "MAGIC_LINK" || !credentials ? viewPaths.SIGN_IN : viewPaths.MAGIC_LINK}${authViewSearch(redirectTo)}`);
             }}
             type="button"
             variant="secondary"
