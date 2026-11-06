@@ -55,7 +55,7 @@ const decodeRun = (run: string): string => {
  * The text with one level of percent-encoding removed. A nested link is decoded one level only: an `&` or `#` that the link itself
  * encoded stays encoded, so it is not taken for a separator in the link's own query.
  */
-const decodeOnce = (text: string): string => text.replaceAll(ENCODED_RUN, decodeRun);
+const decodeOnce = (text: string): string => text.replaceAll(ENCODED_RUN, (run) => decodeRun(run));
 
 /** The text with all its percent-encoding removed, repeated while a pass still changes it. Used to find a prompt, never to split. */
 const decodeFully = (text: string): string => {
