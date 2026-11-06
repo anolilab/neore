@@ -283,14 +283,9 @@ mod tests {
         fs::create_dir_all(&sibling).unwrap();
         let sibling = fs::canonicalize(sibling).unwrap();
         let line = format!("echo leaked > '{}/leak.txt'", sibling.display());
-        let terminal = match state.acp_terminal_start(&request(&project, &line)) {
-            Ok(terminal) => terminal,
-            Err(error) if error.contains("there is none here") => {
-                eprintln!("skipping: {error}");
-                return;
-            }
-            Err(error) => panic!("the terminal did not start: {error}"),
-        };
+        let terminal = state
+            .acp_terminal_start(&request(&project, &line))
+            .unwrap_or_else(|error| panic!("the terminal did not start: {error}"));
         let exit = terminal.wait(Duration::from_secs(20)).expect("ended");
 
         assert_ne!(exit.exit_code, Some(0), "{}", terminal.output().output);
@@ -321,16 +316,10 @@ mod tests {
         }
 
         let (state, project, _, _, _scratch) = setup("runs");
-        let terminal =
-            match state.acp_terminal_start(&request(&project, "pwd; echo made > made.txt")) {
-                Ok(terminal) => terminal,
-                // A machine whose sandbox cannot run this tier says so, and only that skips the test. Any other refusal is a regression.
-                Err(error) if error.contains("there is none here") => {
-                    eprintln!("skipping: {error}");
-                    return;
-                }
-                Err(error) => panic!("the terminal did not start: {error}"),
-            };
+        // Only an unavailable sandbox skips the test (above). Once it is available, any refusal to start is a regression.
+        let terminal = state
+            .acp_terminal_start(&request(&project, "pwd; echo made > made.txt"))
+            .unwrap_or_else(|error| panic!("the terminal did not start: {error}"));
         let exit = terminal.wait(Duration::from_secs(20)).expect("ended");
 
         assert_eq!(exit.exit_code, Some(0), "{}", terminal.output().output);
