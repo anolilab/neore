@@ -127,7 +127,7 @@ describe("a session's terminals", () => {
                     { kind: "allow_once", optionId: "allow" },
                     { kind: "reject_once", optionId: "decline" },
                 ],
-                toolCall: { kind: "execute", rawInput: { command: String.raw`CI=1 npm test --watch 'it'\''s'`, cwd: "/work/app" } },
+                toolCall: { kind: "execute", rawInput: { command: String.raw`env CI=1 sh -c 'npm test --watch '\''it'\''\'\'''\''s'\'''`, cwd: "/work/app" } },
             },
         });
         expect(host.start).toHaveBeenCalledWith({
