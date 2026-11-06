@@ -196,12 +196,12 @@ mod tests {
         let state = DeviceState::new(&dir.join("data"), Box::new(|_| {}));
 
         state
-            .acp_update(
-                serde_json::from_str(
-                    r#"{"op":"saveAgent","key":"agent","label":"Agent","command":"/bin/agent","args":[]}"#,
-                )
-                .unwrap(),
-            )
+            .acp_update(AcpUpdate::SaveAgent {
+                args: Vec::new(),
+                command: "/bin/agent".into(),
+                key: "agent".into(),
+                label: "Agent".into(),
+            })
             .unwrap();
 
         for folder in [&project, &other] {
