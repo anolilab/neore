@@ -72,12 +72,12 @@ vi.mock("@/lib/toast", () => {
     };
 });
 
-const message = { id: "message-1", parts: [{ text: "Summarise this", type: "text" }], role: "user", text: "Summarise this" } as never;
+const messageOf = (text: string) => ({ id: "message-1", parts: [{ text, type: "text" }], role: "user", text }) as never;
 
 const textModels = MODEL_REGISTRY.filter((model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external");
 const [textModel, otherTextModel] = textModels;
 
-const renderAction = (cachedBots?: { _id: string; model: string }[]): void => {
+const renderAction = (cachedBots?: { _id: string; model: string }[], text = "Summarise this"): void => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const Wrapper: FC<{ children: ReactNode }> = ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 
@@ -86,7 +86,7 @@ const renderAction = (cachedBots?: { _id: string; model: string }[]): void => {
         client.setQueryData(["listBots"], cachedBots);
     }
 
-    render(<CopyPromptLinkAction message={message} />, { wrapper: Wrapper });
+    render(<CopyPromptLinkAction message={messageOf(text)} />, { wrapper: Wrapper });
 };
 
 /** Clicks the rendered "Copy prompt link" control, as a person does. */
@@ -262,6 +262,39 @@ describe("CopyPromptLinkAction", () => {
         await waitFor(() => expect(harness.showWarning).toHaveBeenCalledTimes(1));
         expect(writeText).not.toHaveBeenCalled();
         expect(harness.showSuccess).not.toHaveBeenCalled();
+    });
+
+    it("refuses a long non-Latin message whose encoded link would not open, with the warning, and copies nothing", async () => {
+        renderAction(undefined, "漢".repeat(2000));
+
+        clickCopy();
+
+        await waitFor(() => expect(harness.showWarning).toHaveBeenCalledWith("This message is too long to copy as a prompt link."));
+        expect(writeText).not.toHaveBeenCalled();
+        expect(harness.showSuccess).not.toHaveBeenCalled();
+    });
+
+    it("copies a long non-Latin message under the limit, and the copied link opens it whole", async () => {
+        const text = "漢".repeat(800);
+
+        renderAction(undefined, text);
+
+        clickCopy();
+
+        await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+        expect(copiedLink().searchParams.get("prompt")).toBe(text);
+    });
+
+    it("refuses that same long message in a bot chat with the same sentence, as an error, and copies nothing", async () => {
+        harness.thread = { botId: "bot-1" };
+        harness.bots = [{ _id: "bot-1", model: textModel?.id ?? "" }];
+
+        renderAction(harness.bots, "漢".repeat(2000));
+
+        clickCopy();
+
+        await waitFor(() => expect(harness.showError).toHaveBeenCalledWith("This message is too long to copy as a prompt link."));
+        expect(writeText).not.toHaveBeenCalled();
     });
 
     it("reports a refused clipboard write", async () => {
