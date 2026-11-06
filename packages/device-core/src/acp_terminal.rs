@@ -6,6 +6,10 @@
 //! writable place and the network tier `shell_run` has, and nothing runs where there is no sandbox (the "Require
 //! sandbox" setting is not consulted: a terminal is never unsandboxed). The terminal is the caller's to read, kill and
 //! release (`shell::Terminal`).
+//!
+//! A terminal runs for at most `SHELL_MAX_TIMEOUT` (ten minutes, the limit `shell_run` has), then its process group is
+//! killed. The exit reports `SIGKILL` as a kill does, so a timeout is not told apart from one. A longer or configurable
+//! limit is a product decision that has not been made.
 
 use std::path::PathBuf;
 
