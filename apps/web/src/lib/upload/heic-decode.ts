@@ -39,7 +39,8 @@ export const heicToJpegBlob = async (file: File, quality: number): Promise<Blob>
             canvas.toBlob(resolve, "image/jpeg", quality);
         });
 
-        if (!blob) {
+        // A canvas that cannot encode JPEG hands back another type: that is not a JPEG, so it is not sent as one.
+        if (!blob || blob.type !== "image/jpeg") {
             throw new Error("The photo could not be encoded as JPEG.");
         }
 

@@ -43,6 +43,7 @@ describe("jpegNameFor", () => {
     it("keeps the name and swaps the extension", () => {
         expect(jpegNameFor("IMG_0001.HEIC")).toBe("IMG_0001.jpg");
         expect(jpegNameFor("holiday.heif")).toBe("holiday.jpg");
+        expect(jpegNameFor("photo.png")).toBe("photo.jpg");
     });
 });
 
