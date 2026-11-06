@@ -275,7 +275,6 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
         changed !== undefined &&
         answered.outcome === "refused" &&
         // A call the backend expired reads "The host did not answer."; the agent may still have applied the change after that.
-        // A call the backend expired reads "The host did not answer."; the agent may still have applied the change after that.
         (answered.reason === "the agent did not answer" || answered.reason === "The host did not answer.") &&
         changed.current === answered.valueId
     ) {

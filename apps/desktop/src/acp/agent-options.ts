@@ -47,6 +47,18 @@ export const fitPrefix = <T>(items: ReadonlyArray<T>, budget: number): T[] => {
 };
 
 /**
+ * The entries a bounded read keeps: the first `MAX_CHOICES`, with `later` (the first current entry after them, if any) in the last place
+ * when the current one is not among them. The same list `fitKeeping` cuts from the whole input.
+ */
+const withCurrentLast = <T>(kept: T[], later: T | undefined, isCurrent: (item: T) => boolean): T[] => {
+    if (later === undefined || kept.some((item) => isCurrent(item))) {
+        return kept;
+    }
+
+    return [...kept.slice(0, MAX_CHOICES - 1), later];
+};
+
+/**
  * The longest prefix of `items` within `limit` entries and `budget` bytes, with the entry `isCurrent` names kept in it. When the cut
  * would drop it, it takes the place of the last entry kept, so the list still names the agent's current choice.
  */
@@ -109,9 +121,24 @@ const nameOf = (value: unknown, fallback: string, scrub: Scrub): string => {
 const choicesOf = (options: unknown, scrub: Scrub, current: string): AgentOption["choices"] => {
     const choices: AgentOption["choices"] = [];
     const values = new Set<string>();
+    // The first current choice that comes after the first `MAX_CHOICES`: the only entry past the bound that is still read.
+    let later: AgentOption["choices"][number] | undefined;
 
     const add = (entry: unknown): void => {
         if (!isRecord(entry)) {
+            return;
+        }
+
+        if (choices.length >= MAX_CHOICES) {
+            // A raw match is checked before anything else is read from the entry, so the rest of a long list costs one comparison each.
+            if (later === undefined && entry.value === current) {
+                const value = idOf(entry.value, scrub);
+
+                if (value === current) {
+                    later = { name: nameOf(entry.name, value, scrub), value };
+                }
+            }
+
             return;
         }
 
@@ -135,7 +162,7 @@ const choicesOf = (options: unknown, scrub: Scrub, current: string): AgentOption
         }
     }
 
-    return fitKeeping(choices, (choice) => choice.value === current, MAX_CHOICES, Infinity);
+    return withCurrentLast(choices, later, (choice) => choice.value === current);
 };
 
 /** One option, if it is a list the person can choose from. A boolean option, or one with no usable id or current value, is left out; an empty current value is kept. */
@@ -196,6 +223,50 @@ export const configOptionsOf = (value: unknown, scrub: Scrub): AgentOption[] | u
     return options;
 };
 
+/**
+ * A model that comes past the bound, if it is the current one. A raw match is checked before anything else is read from the entry (see `choicesOf`).
+ */
+const currentModelOf = (entry: Record<string, unknown>, idKey: string, current: string, scrub: Scrub): AgentChoiceList["available"][number] | undefined => {
+    if (entry[idKey] !== current) {
+        return undefined;
+    }
+
+    const id = idOf(entry[idKey], scrub);
+
+    return id === current ? { id, name: nameOf(entry.name, id, scrub) } : undefined;
+};
+
+/**
+ * The models a legacy list keeps: the first `MAX_CHOICES` distinct ones, and the first current one after them (see `choicesOf`), within
+ * the byte budget. A long list costs no more than its kept size.
+ */
+const legacyEntriesOf = (entries: unknown[], idKey: string, current: string, scrub: Scrub): AgentChoiceList["available"] => {
+    const available: AgentChoiceList["available"] = [];
+    const ids = new Set<string>();
+    let later: AgentChoiceList["available"][number] | undefined;
+
+    for (const entry of entries) {
+        if (!isRecord(entry)) {
+            continue;
+        }
+
+        if (available.length < MAX_CHOICES) {
+            const id = idOf(entry[idKey], scrub);
+
+            if (id !== undefined && !ids.has(id)) {
+                ids.add(id);
+                available.push({ id, name: nameOf(entry.name, id, scrub) });
+            }
+        } else if (later === undefined) {
+            later = currentModelOf(entry, idKey, current, scrub);
+        }
+    }
+
+    const isCurrent = (entry: AgentChoiceList["available"][number]): boolean => entry.id === current;
+
+    return fitKeeping(withCurrentLast(available, later, isCurrent), isCurrent, MAX_CHOICES, LEGACY_LIST_BYTE_BUDGET);
+};
+
 const listOf = (state: unknown, currentKey: string, listKey: string, idKey: string, scrub: Scrub): AgentChoiceList | undefined => {
     if (!isRecord(state)) {
         return undefined;
@@ -208,19 +279,7 @@ const listOf = (state: unknown, currentKey: string, listKey: string, idKey: stri
         return undefined;
     }
 
-    const available: AgentChoiceList["available"] = [];
-    const ids = new Set<string>();
-
-    for (const entry of entries as unknown[]) {
-        const id = isRecord(entry) ? idOf(entry[idKey], scrub) : undefined;
-
-        if (id !== undefined && isRecord(entry) && !ids.has(id)) {
-            ids.add(id);
-            available.push({ id, name: nameOf(entry.name, id, scrub) });
-        }
-    }
-
-    return { available: fitKeeping(available, (entry) => entry.id === current, MAX_CHOICES, LEGACY_LIST_BYTE_BUDGET), current };
+    return { available: legacyEntriesOf(entries as unknown[], idKey, current, scrub), current };
 };
 
 /** What a `session/new` or `session/load` answer says about options, in the agent's own shape. */
