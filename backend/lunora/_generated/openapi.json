@@ -31950,6 +31950,10 @@
                               {
                                 "const": "running",
                                 "type": "string"
+                              },
+                              {
+                                "const": "awaiting",
+                                "type": "string"
                               }
                             ]
                           },
@@ -52127,6 +52131,9 @@
                         "description": "Id<\"threads\">",
                         "type": "string",
                         "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
                       }
                     },
                     "required": [
