@@ -299,6 +299,7 @@ export interface InternalApiTypes {
         };
         session_organization: {
             getActiveOrganizationIdForSession: FunctionReference<"query", { sessionId: string; userId: string }, string | null>;
+            getSessionOrganizationForCap: FunctionReference<"query", { sessionId: string; userId: string }, { organizationId: string | null } | null>;
         };
     };
     billing: {
@@ -1547,6 +1548,7 @@ export const internal: InternalApiTypes = {
         },
         session_organization: {
             getActiveOrganizationIdForSession: { __lunoraRef: "auth_session_organization:getActiveOrganizationIdForSession" },
+            getSessionOrganizationForCap: { __lunoraRef: "auth_session_organization:getSessionOrganizationForCap" },
         },
     },
     billing: {

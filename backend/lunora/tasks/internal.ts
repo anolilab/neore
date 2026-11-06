@@ -283,6 +283,17 @@ export const claimRound = internalMutation
         if (task.organizationId) {
             if (!(await getMemberByOrganizationAndUser(ctx, task.organizationId, task.userId))) {
                 await refuseRound(ctx, task, LEFT_ORGANIZATION_MESSAGE, true);
+                // The schedule ends here for good, so the owner is told, as a trigger's pause notice tells them. One per cycle.
+                await notifyQuietly(ctx, {
+                    body: LEFT_ORGANIZATION_MESSAGE,
+                    dedupeKey: `task-left-organization:${task._id}:${cycle}`,
+                    emailOutcome: true,
+                    link: "/tasks",
+                    outcome: "failure",
+                    title: task.title,
+                    type: "task",
+                    userId: task.userId,
+                });
 
                 return null;
             }

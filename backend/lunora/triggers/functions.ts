@@ -1409,14 +1409,17 @@ export const updateExecution = internalMutation
             return null;
         }
 
-        // The streak moves on the first settlement only; `pausedTrigger` remembers it so a redelivery can say the same thing.
+        // The streak moves on the first settlement only; `pausedTrigger` and `pausedPermanently` remember it, so a redelivery
+        // (which may not repeat `permanent`) says the same thing.
         let paused = execution.pausedTrigger === true;
+        let pausedPermanently = execution.pausedPermanently === true;
 
         if (settling) {
             paused = await settleFailureStreak(ctx, trigger, execution.startedAt, runOutcome(settled.status, userFixable, permanent));
+            pausedPermanently = paused && permanent === true;
 
             if (paused) {
-                await ctx.db.patch("triggerExecutions", executionId, { pausedTrigger: true });
+                await ctx.db.patch("triggerExecutions", executionId, { pausedTrigger: true, ...(pausedPermanently && { pausedPermanently: true }) });
             }
         }
 
@@ -1436,7 +1439,7 @@ export const updateExecution = internalMutation
             title: trigger.name,
             type: "trigger",
             userId: trigger.userId,
-            ...(paused ? { body: pausedNoticeBody(settled.error, permanent === true) } : settled.error && { body: settled.error }),
+            ...(paused ? { body: pausedNoticeBody(settled.error, pausedPermanently) } : settled.error && { body: settled.error }),
         });
 
         return null;

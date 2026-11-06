@@ -1703,6 +1703,7 @@ export const triggerExecutions = sqliteTable("triggerExecutions", {
     completedAt: real("completedAt"),
     error: text("error"),
     firing: real("firing"),
+    pausedPermanently: integer("pausedPermanently", { mode: "boolean" }),
     pausedTrigger: integer("pausedTrigger", { mode: "boolean" }),
     payload: text("payload"),
     startedAt: real("startedAt").notNull(),

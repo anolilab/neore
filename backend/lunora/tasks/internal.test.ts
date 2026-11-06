@@ -858,6 +858,8 @@ describe("claim refusals", () => {
 
         expect(task).toMatchObject({ cronExpression: "0 9 * * *", lastError: LEFT_ORGANIZATION_MESSAGE, status: "failed" });
         expect("nextRunAt" in task).toBe(false);
+        // Its schedule ended for good, so the owner is told once.
+        expect(await inbox()).toStrictEqual([{ outcome: "failure", title: "Summary", type: "task" }]);
     });
 
     it("refuses a coding-agent task under a cap below auto without charging, and keeps it scheduled", async () => {

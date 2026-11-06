@@ -8,12 +8,17 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { sessionFrom } = vi.hoisted(() => {
+const { activeSpace, sessionFrom } = vi.hoisted(() => {
+    // The caller's verified active organization; `null` is the personal space.
+    const space = { organizationId: null as string | null };
+
     return {
+        activeSpace: space,
         sessionFrom: async (context: { auth: { userId?: string | null } }) => {
             const { userId } = context.auth;
+            const activeOrganization = space.organizationId ? { id: space.organizationId, name: space.organizationId } : null;
 
-            return userId ? { activeOrganization: null, email: `${userId}@example.com`, id: userId, isAdmin: false, name: userId, userId } : null;
+            return userId ? { activeOrganization, email: `${userId}@example.com`, id: userId, isAdmin: false, name: userId, userId } : null;
         },
     };
 });
@@ -329,6 +334,33 @@ describe("creating a worker on a computer", () => {
         });
         expect(await table("subAgentRuns")).toHaveLength(0);
         expect(await table("acpSessions")).toHaveLength(0);
+    });
+
+    it("refuses a worker on a computer under an unstamped lead when the member's active organization is capped", async () => {
+        const device = await pairedDevice();
+        // A bot, comparison or temporary chat: no stored organization.
+        const lead = await newThread();
+
+        await run(
+            async (context) =>
+                await context.db.insert("organizationPolicies", {
+                    document: JSON.stringify({ permissionCap: "ask", schemaVersion: 1 }),
+                    organizationId: "org-active",
+                    revision: 1,
+                    schemaVersion: 1,
+                    updatedAt: Date.now(),
+                }),
+        );
+        activeSpace.organizationId = "org-active";
+
+        try {
+            await expect(createHostWorker(device, { leadThreadId: lead })).rejects.toMatchObject({
+                message: expect.stringMatching(NOT_ALLOWED_BY_CAP),
+            });
+            expect(await table("subAgentRuns")).toHaveLength(0);
+        } finally {
+            activeSpace.organizationId = null;
+        }
     });
 
     it("refuses a pair the computer did not offer, creating nothing", async () => {

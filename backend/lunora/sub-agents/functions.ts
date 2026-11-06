@@ -1761,6 +1761,9 @@ export const createWorker = authMutation
             ...(lead?.model !== undefined && { parentModel: lead.model }),
             ...(args.model !== undefined && { model: args.model }),
             name: args.name,
+            // The member's verified active organization, the last fallback after the lead's stored one: a lead with none
+            // (a bot, comparison or temporary chat) must not leave the worker uncapped.
+            ...(ctx.user.activeOrganization?.id && { organizationId: ctx.user.activeOrganization.id }),
             parentThreadId: args.leadThreadId,
             ...(args.skill !== undefined && { skillSlug: args.skill }),
             task: args.task,
@@ -1802,6 +1805,8 @@ export const dispatchToWorker = authMutation
             childThreadId: args.workerId,
             clientId: args.clientId,
             dispatchedBy: "user",
+            // As in `createWorker`: the last fallback after the worker's and the lead's stored organizations.
+            ...(ctx.user.activeOrganization?.id && { organizationId: ctx.user.activeOrganization.id }),
             parentThreadId: origin.parentThreadId,
             task: args.message,
             userId: ctx.user.userId,

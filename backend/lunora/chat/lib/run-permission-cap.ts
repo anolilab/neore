@@ -81,9 +81,16 @@ export const readRequestPermissionCap = async (ctx: Pick<HttpActionCtx, "auth" |
             return await readPermissionCap(ctx, null);
         }
 
-        const organizationId = await ctx.runQuery(internal.auth.session_organization.getActiveOrganizationIdForSession, { sessionId, userId });
+        const session = await ctx.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, { sessionId, userId });
 
-        return await readPermissionCap(ctx, organizationId);
+        // A token whose session is gone or expired cannot be placed in a space either.
+        if (!session) {
+            toolsLogger.warn("[TOOLS] Request session cannot be validated; capping at ask.");
+
+            return "ask";
+        }
+
+        return await readPermissionCap(ctx, session.organizationId);
     } catch (error: unknown) {
         toolsLogger.warn("[TOOLS] Request organization unavailable; capping at ask:", error);
 

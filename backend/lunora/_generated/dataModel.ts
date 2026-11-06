@@ -1924,6 +1924,7 @@ export interface Doc_triggerExecutions {
     completedAt?: number;
     error?: string;
     firing?: number;
+    pausedPermanently?: boolean;
     pausedTrigger?: boolean;
     payload?: string;
     startedAt: number;
@@ -4929,6 +4930,7 @@ export interface Insert_triggerExecutions {
     completedAt?: number;
     error?: string;
     firing?: number;
+    pausedPermanently?: boolean;
     pausedTrigger?: boolean;
     payload?: string;
     startedAt: number;

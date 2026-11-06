@@ -76,11 +76,25 @@ describe("readRequestPermissionCap", () => {
         ({ auth: { getIdentity: async () => (sessionId === undefined ? null : { sessionId }) }, runQuery }) as never;
 
     it("reads the active organization from the caller's session and caps by it", async () => {
-        const runQuery = vi.fn().mockResolvedValueOnce("org_a").mockResolvedValueOnce("ask");
+        const runQuery = vi.fn().mockResolvedValueOnce({ organizationId: "org_a" }).mockResolvedValueOnce("ask");
 
         expect(await readRequestPermissionCap(requestCtx("session_1", runQuery), "user_1")).toBe("ask");
         expect(runQuery).toHaveBeenNthCalledWith(1, expect.anything(), { sessionId: "session_1", userId: "user_1" });
         expect(runQuery).toHaveBeenNthCalledWith(2, expect.anything(), { organizationId: "org_a" });
+    });
+
+    it("caps at ask when the named session is gone, expired or another user's", async () => {
+        const runQuery = vi.fn().mockResolvedValueOnce(null);
+
+        expect(await readRequestPermissionCap(requestCtx("session_stale", runQuery), "user_1")).toBe("ask");
+        expect(runQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it("gives auto for a valid session in the personal space", async () => {
+        const runQuery = vi.fn().mockResolvedValueOnce({ organizationId: null });
+
+        expect(await readRequestPermissionCap(requestCtx("session_1", runQuery), "user_1")).toBe("auto");
+        expect(runQuery).toHaveBeenCalledTimes(1);
     });
 
     it("caps at ask for a signed-in identity that names no session, since its space cannot be told", async () => {

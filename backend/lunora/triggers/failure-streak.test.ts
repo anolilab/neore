@@ -153,6 +153,28 @@ describe("pausing a trigger after repeated user-fixable failures", () => {
         expect(await noticesKeyed("trigger-paused:")).toMatchObject([{ body: "Paused. You left." }]);
     });
 
+    it("restores a lost permanent pause notice with the same cause on a redelivery that does not repeat it", async () => {
+        const triggerId = await insertTrigger();
+        const executionId = await startRun(triggerId);
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(updateExecution, { error: "You left.", executionId, permanent: true, status: "failed", userFixable: true }),
+        );
+        // The notice was lost.
+        await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("notifications").collect();
+
+            for (const row of rows) {
+                await ctx.db.delete("notifications", row._id);
+            }
+        });
+        // A redelivered settlement, without `permanent`.
+        await harness.run(async (ctx: any) => await ctx.runMutation(updateExecution, { error: "You left.", executionId, status: "failed", userFixable: true }));
+
+        expect(await noticesKeyed("trigger-paused:")).toMatchObject([{ body: "Paused. You left." }]);
+    });
+
     it("pauses on the Nth failure in a row, not before", async () => {
         const triggerId = await insertTrigger();
 
