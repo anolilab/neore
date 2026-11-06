@@ -1079,12 +1079,16 @@ export const resumeApprovedRun = async (
 ): Promise<{ awaitingInput?: AwaitingInput; lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
     const { answer, answerFileIds, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { customProvider } = await resolveRunModel(ctx, config.model, userId);
+    // A sub-agent child is not interactive: no person is in its chat, so it resumes with the refusals its paused run had
+    // (its workers and device calls) and keeps its `ask` tools, which the approval being answered needs.
+    const subAgentChild = config.subAgentRunId !== undefined;
     const [toolResult, userProviderKeys, preferences] = await Promise.all([
         buildAgentTools(ctx, {
             ...(options.admittedRun && { admittedRun: true }),
             autoMediaEnrichment: config.autoMediaEnrichment,
             // A person just answered in the chat, so this run is interactive.
             deviceThreadId: threadId,
+            ...(subAgentChild && { headless: true, headlessCanAsk: true }),
             mcpProgress: toolProgressSink(ctx, streamId),
             model: config.model,
             origin: config.dispatchOrigin,
@@ -1117,6 +1121,14 @@ export const resumeApprovedRun = async (
 
         if (approved && pending.toolName !== null && !Object.hasOwn(toolResult.tools, pending.toolName)) {
             throw new AgentRunError("stale-approval", `Tool ${pending.toolName} is no longer available`);
+        }
+
+        // A runtime name can belong to another server's tool after the tool set is rebuilt: the approved call then runs a tool
+        // the owner did not approve. The permission key the run paused with must still be the one the name maps to.
+        const pausedKey = pending.toolName === null ? undefined : config.toolPermissionKeys?.[pending.toolName];
+
+        if (approved && pending.toolName !== null && pausedKey !== undefined && toolResult.permissionKeys[pending.toolName] !== pausedKey) {
+            throw new AgentRunError("stale-approval", `Tool ${pending.toolName} no longer matches the one the approval was for`);
         }
 
         // An answered question: the approved call executes a copy of the tool
@@ -1181,6 +1193,11 @@ export const resumeApprovedRun = async (
         setResearchDepth(ctx, config.researchDepth);
         // The snapshot keeps what started the run: a person answering an approval does not make it the lead's.
         setDispatchOrigin(ctx, config.dispatchOrigin ?? "lead");
+
+        if (subAgentChild) {
+            setHeadlessRun(ctx);
+        }
+
         // The continuation runs as the owner; who started the turn it resumes is in the snapshot (none for a snapshot that predates it).
         setRunStartedBy(ctx, config.startedBy);
 

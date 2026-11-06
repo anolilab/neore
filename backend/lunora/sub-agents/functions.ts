@@ -64,7 +64,7 @@ import { isTaskModelAllowed } from "../tasks/logic";
 import { threadGateOutcome, throwUnlessGranted } from "../chat/lib/thread-gate";
 import { findPendingRequestOnLatestTurn } from "../chat/lib/tool-approval-claim";
 import { PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
-import { admitOwnedThread } from "../agent/thread-read-access";
+import { admitOwnedThread, requireOwnedThread } from "../agent/thread-read-access";
 import { MAX_LENGTH } from "../lib/validators";
 import { HOST_SESSION_BUSY_RETRY_MS, HOST_START_MAX_ATTEMPTS, hostRunActivity, hostStartRetryDelayMs, sendHostRunTurn } from "./host-runs";
 
@@ -1286,9 +1286,10 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
     });
 
     if (run.childThreadId !== undefined) {
-        // A request the child still waits on can no longer be answered: it is denied, so no claim can run its tool or
-        // persist its "always" decision afterwards.
-        await closeChildApprovals(ctx, run.childThreadId, now);
+        // A request this run still waits on can no longer be answered: it is denied, so no claim can run its tool or
+        // persist its "always" decision afterwards. Only this run's requests: a worker run reuses its child thread, and a
+        // one-shot child thread can carry an interactive chat with its own approvals.
+        await closeChildApprovals(ctx, run.childThreadId, run._id, now);
 
         // A resumed child streams on its own thread, which the cancel does not reach: the stop ends that stream too.
         if (outcome.kind === "cancelled" && !hostRun) {
@@ -1373,14 +1374,18 @@ export const completeRun = internalMutation
 const APPROVAL_ROWS_SCANNED = 50;
 
 /** Denies a child's unanswered approval requests and clears its waiting state: its run has ended, so nothing will answer them. */
-const closeChildApprovals = async (ctx: MutationCtx, childThreadId: string, now: number): Promise<void> => {
+const closeChildApprovals = async (ctx: MutationCtx, childThreadId: string, runId: Id<"subAgentRuns">, now: number): Promise<void> => {
     const pending = await pendingApprovalRows(ctx, childThreadId);
+    const own = pending.filter((row) => row.config.subAgentRunId === runId);
 
-    for (const row of pending) {
+    for (const row of own) {
         await patchById(ctx.db, "toolApprovalRuns", row._id, { resolvedAt: now, resolvedBy: "run-ended", status: "denied" });
     }
 
-    await clearAwaitingInput(ctx.db, childThreadId as Id<"threads">);
+    // The child is awaiting input only while some request of it is still open.
+    if (own.length === pending.length) {
+        await clearAwaitingInput(ctx.db, childThreadId as Id<"threads">);
+    }
 };
 
 /**
@@ -1519,15 +1524,12 @@ const vSubAgentApproval = v.object({
  * the CHILD's thread id, so the request is checked on the child's latest turn.
  */
 export const listSubAgentApprovals = authQuery
-    .input({ parentThreadId: v.id("threads") })
+    .input({ parentThreadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(v.array(vSubAgentApproval))
     .query(async ({ args, ctx }) => {
         const { userId } = ctx.user;
-        const parent = await ctx.db.get("threads", args.parentThreadId);
-
-        if (!parent || parent.deleted || parent.userId !== userId) {
-            throw new LunoraError("NOT_FOUND", "Thread not found");
-        }
+        // A locked parent shows nothing without its unlock proof, as every read of the chat does.
+        const parent = await requireOwnedThread(ctx, args.parentThreadId, userId, args.unlockProof);
 
         const runs = await ctx.db
             .query("subAgentRuns")
@@ -1563,11 +1565,16 @@ export const listSubAgentApprovals = authQuery
                 }
 
                 const input = typeof request.input === "string" ? request.input : (JSON.stringify(request.input ?? null, null, 2) ?? "");
+                // A cut preview says so: approving runs the whole call, so the owner must see that more is not shown.
+                const preview =
+                    input.length > APPROVAL_INPUT_MAX
+                        ? `${input.slice(0, APPROVAL_INPUT_MAX)}\n… (${input.length - APPROVAL_INPUT_MAX} more characters not shown; approving runs the whole call)`
+                        : input;
 
                 approvals.push({
                     approvalId: row.approvalId,
                     childThreadId: child._id,
-                    input: input.slice(0, APPROVAL_INPUT_MAX),
+                    input: preview,
                     runId: run._id,
                     skillSlug: run.skillSlug ?? null,
                     task: run.task.split("\n", 1)[0]!.slice(0, 200),
