@@ -1095,6 +1095,20 @@ describe("getTriggerExecutions", () => {
 describe("run prompts", () => {
     const as = () => harness.withIdentity({ userId: "user-a" } as never);
 
+    it("keeps the prompt of a run whose first settlement is a failure", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+        const executionId = await harness.run(async (ctx: any) => await ctx.db.insert("triggerExecutions", { startedAt: 7, status: "running", triggerId }));
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(updateExecution, { error: "The model failed", executionId, prompt: "Summarise the issue", status: "failed" }),
+        );
+
+        const rows = (await as().query(getTriggerExecutions as never, { limit: 5, triggerId } as never)) as { prompt: string | null; status: string }[];
+
+        expect(rows.find((row) => row.status === "failed")?.prompt).toBe("Summarise the issue");
+    });
+
     it("clears a saved prompt once its expiry has passed, and keeps the run itself", async () => {
         const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
         const [expired, active] = await harness.run(async (ctx: any) => [
