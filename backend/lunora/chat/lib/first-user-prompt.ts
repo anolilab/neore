@@ -37,7 +37,8 @@ export const firstUserPromptText = (rows: ReadonlyArray<ContextRow>): string | u
         const text = textOf(row.message.content).trim();
 
         if (text) {
-            return text.slice(0, MAX_PROMPT_CHARS);
+            // Cut by characters, not UTF-16 units: a cut inside a surrogate pair would leave half an emoji.
+            return [...text].slice(0, MAX_PROMPT_CHARS).join("");
         }
     }
 

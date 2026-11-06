@@ -12,7 +12,7 @@
  */
 
 const CACHE_PREFIX = "neore-thread-list:";
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 
 /** Keyed by the signed-in user, so one account's list is never read for another. */
 const cacheKey = (userId: string): string => `${CACHE_PREFIX}v${CACHE_VERSION}:${userId}`;

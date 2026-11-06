@@ -1896,10 +1896,10 @@ export const regenerateTitleChat = internalAction
  * its title (its content), and a host-run thread's messages never reach a cloud model.
  */
 export const regenerateThreadTitle = authAction
-    .use(rateLimit("chat/regenerateTitle"))
     .input({
         threadId: v.id("threads"),
     })
+    .use(rateLimit("chat/regenerateTitle"))
     .output(v.object({ success: v.boolean() }))
     .action(async ({ args: { threadId }, ctx: context }) => {
         const { userId } = context.user;
