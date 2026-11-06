@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { COMPARISON_COLUMN_MODE_CODE } from "@neore/backend/chat/permission-mode";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -241,6 +242,24 @@ describe("permission mode control", () => {
 
         await waitFor(() => expect(showError).toHaveBeenCalled());
         expect(usePromptQueueStore.getState().queues.t1?.paused).toBe(true);
+    });
+
+    it("does not hold the queued prompts for a mode refused on a comparison column, which saved nothing", async () => {
+        vi.mocked(showError).mockClear();
+        state.save.mockImplementationOnce(async () => {
+            throw Object.assign(new Error("A comparison column takes its comparison's mode: change the mode on the comparison"), {
+                data: { code: COMPARISON_COLUMN_MODE_CODE },
+            });
+        });
+        usePromptQueueStore.getState().hydrate("t1");
+        usePromptQueueStore.getState().enqueue("t1", { attachments: [], text: "queued" });
+
+        renderControl();
+        fireEvent.click(await screen.findByRole("button", { name: "Permission mode: Full access" }));
+        fireEvent.click(screen.getByRole("menuitemradio", { name: SUPERVISED_PATTERN }));
+
+        await waitFor(() => expect(showError).toHaveBeenCalled());
+        expect(usePromptQueueStore.getState().queues.t1?.paused).toBe(false);
     });
 
     it("keeps a selection still saving when the viewer goes to another chat and comes back", async () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
+import { COMPARISON_COLUMN_MODE_CODE } from "@neore/backend/chat/permission-mode";
 import { Button } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@neore/ui/components/dropdown-menu";
 import { skipToken, useIsMutating, useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,6 +14,9 @@ import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
 export type ThreadPermissionMode = "auto" | "auto-edit" | "full" | "supervised";
+
+/** The server refused the save because the thread is a comparison column: its mode is the comparison's, so nothing was saved. */
+const isComparisonRefusal = (error: unknown): boolean => (error as { data?: { code?: unknown } } | null)?.data?.code === COMPARISON_COLUMN_MODE_CODE;
 
 const MODE_ORDER: ReadonlyArray<ThreadPermissionMode> = ["supervised", "auto-edit", "auto", "full"];
 
@@ -114,9 +118,10 @@ const ComposerThreadPermissionMode: FC = () => {
             });
         },
         // Runs before the save stops reading as in flight, so the queue sees the failure before it may release a held prompt: a prompt
-        // held for a save that did not land would otherwise go out under the stored mode.
-        onError: () => {
-            if (threadId) {
+        // held for a save that did not land would otherwise go out under the stored mode. A refused save on a comparison column changed
+        // nothing, so it holds nothing: only a save that failed after it was sent does.
+        onError: (error) => {
+            if (threadId && !isComparisonRefusal(error)) {
                 usePromptQueueStore.getState().setPaused(threadId, true);
             }
         },
