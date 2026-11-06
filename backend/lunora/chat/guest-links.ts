@@ -85,6 +85,11 @@ const hasWaitingNotes = async (context: MutationCtx, threadId: Id<"threads">): P
         .take(GUEST_LINK_SCAN);
 
     for (const link of links) {
+        // A lapsed link's notes are hidden from the owner and cannot be sent, so they do not hold up a new link.
+        if (link.expiresAt <= context.now) {
+            continue;
+        }
+
         const notes = await context.db
             .query("threadGuestMessages")
             .withIndex("by_link", (q) => q.eq("linkId", link._id))

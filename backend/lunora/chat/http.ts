@@ -480,6 +480,11 @@ export const runChatStart = async (
         return Response.json({ error: "Invalid guestMessageId" }, { status: 400 });
     }
 
+    // A held note is a send of its own: it never regenerates a reply, which would answer some other prompt.
+    if (body.guestMessageId !== undefined && body.regenerate) {
+        return Response.json({ error: "A guest note cannot be sent as a regeneration." }, { status: 400 });
+    }
+
     // Auth: extract user from the forwarded JWT
     let user: BetterAuthUser | undefined;
 
@@ -589,6 +594,11 @@ const runChatStartOnShard = async (
 
     if (body.guestMessageId !== undefined && (!guestNote || guestNote.status !== "held" || guestNote.threadId !== validThreadId)) {
         return Response.json({ error: "That guest note is not waiting in this chat." }, { status: 400 });
+    }
+
+    // A guest's note is never a command: text that starts with "/" could select one of the owner's skills or commands.
+    if (guestNote && stripHiddenText(guestNote.text).text.trimStart().startsWith("/")) {
+        return Response.json({ error: "A guest note that starts with / cannot be sent." }, { status: 400 });
     }
 
     // Build message content

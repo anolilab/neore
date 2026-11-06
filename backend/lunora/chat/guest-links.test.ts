@@ -617,3 +617,21 @@ describe("a note's text", () => {
         expect(await rows("threadGuestMessages")).toMatchObject([{ text: "hi" }]);
     });
 });
+
+describe("a new link over a lapsed link", () => {
+    it("is not held up by notes on the lapsed link, which the owner cannot see or send", async () => {
+        const { linkToken } = await createLink();
+
+        await hold(linkToken, "unseen");
+        await harness.run(async (ctx: any) => {
+            const link = await ctx.db
+                .query("threadGuestLinks")
+                .withIndex("by_thread", (q: any) => q.eq("threadId", threadId))
+                .first();
+
+            await ctx.db.patch("threadGuestLinks", link._id, { expiresAt: 1 });
+        });
+
+        await expect(asOwner().mutation(guestLinks.createGuestLink as never, { threadId } as never)).resolves.toBeDefined();
+    });
+});
