@@ -1,19 +1,30 @@
 import { deleteItemAsync, getItemAsync, setItemAsync } from "expo-secure-store";
 
+import { createSerialQueue } from "@/lib/serial-queue";
+
 import type { LastThread } from "./last-thread";
-import { isReopenOn, parseLastThread, reopenValue, threadToReopen } from "./last-thread";
+import { isReopenOn, isSavedThread, parseLastThread, reopenValue, threadToReopen } from "./last-thread";
 
 const LAST_THREAD_KEY = "neore.mobile.last-thread";
 const REOPEN_KEY = "neore.mobile.reopen-last-chat";
 
-/** Records the chat on screen. The OS keeps it out of the app's data folder, like the sign-in grant. */
+// Saves and forgets run one after another, so a forget asked after a save always lands after it.
+const inOrder = createSerialQueue();
+
+/** Saves the chat this account has read. The OS keeps it out of the app's data folder, like the sign-in grant. */
 export const rememberLastThread = async (last: LastThread): Promise<void> => {
-    await setItemAsync(LAST_THREAD_KEY, JSON.stringify(last));
+    await inOrder(async () => {
+        await setItemAsync(LAST_THREAD_KEY, JSON.stringify(last));
+    });
 };
 
-/** Forgets the saved chat, such as one the server no longer lets this account open. */
-export const forgetLastThread = async (): Promise<void> => {
-    await deleteItemAsync(LAST_THREAD_KEY);
+/** Forgets the saved chat, but only while it is `threadId`: a chat saved since then is not the refused one. */
+export const forgetLastThread = async (threadId: string): Promise<void> => {
+    await inOrder(async () => {
+        if (isSavedThread(parseLastThread(await getItemAsync(LAST_THREAD_KEY)), threadId)) {
+            await deleteItemAsync(LAST_THREAD_KEY);
+        }
+    });
 };
 
 export const readReopenLastChat = async (): Promise<boolean> => isReopenOn(await getItemAsync(REOPEN_KEY));

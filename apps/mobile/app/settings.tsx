@@ -10,6 +10,7 @@ import { installMarker } from "@/lib/install-marker";
 const SAVE_FAILED_MESSAGE = "Your choice could not be applied. Try again.";
 const UNSAVED_OPT_OUT_MESSAGE = "Reporting is off for now, but the choice could not be saved. It may turn back on after a restart. Try again.";
 const REOPEN_SAVE_FAILED_MESSAGE = "Your choice could not be saved. Try again.";
+const REOPEN_READ_FAILED_MESSAGE = "This setting could not be read. Switch it to save your choice.";
 
 const SettingsScreen = () => {
     const [isEnabled, setIsEnabled] = useState(false);
@@ -35,7 +36,11 @@ const SettingsScreen = () => {
                     setIsReopenLoaded(true);
                 }
             } catch {
-                // An unreadable setting keeps its default: on.
+                // The stored choice is unknown, so the switch shows the default and can still be changed, which saves a choice.
+                if (isActive) {
+                    setIsReopenLoaded(true);
+                    setReopenFailure(REOPEN_READ_FAILED_MESSAGE);
+                }
             }
         };
 

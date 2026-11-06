@@ -51,6 +51,9 @@ export const parseLastThread = (raw: string | null): LastThread | undefined => {
     return undefined;
 };
 
+/** Whether the saved chat is `threadId`. */
+export const isSavedThread = (saved: LastThread | undefined, threadId: string): boolean => saved?.threadId === threadId;
+
 /** The chat to open on launch: the saved one when the setting is on and this account viewed it. Otherwise none. */
 export const threadToReopen = ({ isOn, last, userId }: { isOn: boolean; last: LastThread | undefined; userId: string }): string | undefined => {
     if (!isOn || last === undefined || last.userId !== userId) {

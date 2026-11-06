@@ -13,6 +13,7 @@ import { fetchAccessToken } from "@/auth/grant";
 import { secureGrantStore } from "@/auth/secure-store";
 import { ChatError, startChat } from "@/chat/chat-api";
 import { forgetLastThread, rememberLastThread } from "@/chat/last-thread-store";
+import { canClaimLaunchReopen } from "@/chat/launch-reopen";
 import { displayTextOf, shareTextOf } from "@/chat/message-parts";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
@@ -125,6 +126,7 @@ const Chat = () => {
     const { threadId: routeThreadId } = useLocalSearchParams<{ threadId: string }>();
     const router = useRouter();
     const { hasToken, status, user } = useAuth();
+    const accountId = user?.id;
     const { cache, refreshTick, reportRead } = useOffline();
     const composer = useWriteControl("composer");
     const sendControl = useWriteControl("send");
@@ -179,16 +181,19 @@ const Chat = () => {
     useEffect(() => () => sendAbort.current?.abort(), []);
 
     // Locked, gone or no longer shared: the saved copy is dropped, and nothing of it stays on screen.
-    const showRefused = useCallback(() => {
-        isRefused.current = true;
-        hasLiveRows.current = false;
-        hasLoadedOlder.current = false;
-        writeRows([]);
-        setOlderCursor(null);
-        setError(REFUSED_MESSAGE);
-        // A chat the server refuses is not reopened on launch.
-        settleQuietly(forgetLastThread());
-    }, [writeRows]);
+    const showRefused = useCallback(
+        (refusedThreadId: string) => {
+            isRefused.current = true;
+            hasLiveRows.current = false;
+            hasLoadedOlder.current = false;
+            writeRows([]);
+            setOlderCursor(null);
+            setError(REFUSED_MESSAGE);
+            // A chat the server refuses is not reopened on launch.
+            settleQuietly(forgetLastThread(refusedThreadId));
+        },
+        [writeRows],
+    );
 
     // The newest pages load when a chat opens; "Load older messages" fetches the rest one page at a time.
     const loadMessages = useCallback(
@@ -223,7 +228,7 @@ const Chat = () => {
                     break;
                 }
                 case "refused": {
-                    showRefused();
+                    showRefused(id);
                     reportRead("succeeded");
                     break;
                 }
@@ -241,6 +246,12 @@ const Chat = () => {
                     }
 
                     setError(withoutRefusal);
+
+                    // Only a chat the server has just let this account read is saved as the one to reopen.
+                    if (accountId) {
+                        settleQuietly(rememberLastThread({ threadId: id, userId: accountId }));
+                    }
+
                     reportRead("succeeded");
                     break;
                 }
@@ -255,7 +266,7 @@ const Chat = () => {
                 }
             }
         },
-        [cache, reportRead, showRefused, writeRows],
+        [accountId, cache, reportRead, showRefused, writeRows],
     );
 
     const loadOlder = async () => {
@@ -297,7 +308,7 @@ const Chat = () => {
                     break;
                 }
                 case "refused": {
-                    showRefused();
+                    showRefused(threadId);
                     break;
                 }
                 case "unreachable": {
@@ -348,14 +359,10 @@ const Chat = () => {
         return () => gate.invalidate();
     }, [threadId]);
 
-    // The chat on screen is the one a relaunch reopens, for the account that viewed it.
-    const accountId = user?.id;
-
+    // A chat opened on its own, such as from a link, takes this launch's reopen: the saved chat must not open later from the list.
     useEffect(() => {
-        if (status === "signed-in" && accountId && threadId) {
-            settleQuietly(rememberLastThread({ threadId, userId: accountId }));
-        }
-    }, [status, threadId, accountId]);
+        canClaimLaunchReopen();
+    }, []);
 
     // The reply checks run in a hook; the screen decides what a refusal or a settled check means for the chat.
     const onConfirmationRefused = useCallback(
@@ -364,7 +371,7 @@ const Chat = () => {
             // into it is stopped, so no row is written into the chat after the refusal.
             sendAbort.current?.abort();
             readGate.current.invalidate();
-            showRefused();
+            showRefused(refusedThreadId);
             settleQuietly(cache?.forgetThreads([refusedThreadId]));
         },
         [cache, showRefused],

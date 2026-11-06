@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isReopenOn, parseLastThread, reopenValue, threadToReopen } from "./last-thread";
+import { isReopenOn, isSavedThread, parseLastThread, reopenValue, threadToReopen } from "./last-thread";
 
 describe("reopen setting", () => {
     it("is on when nothing has been stored", () => {
@@ -54,5 +54,15 @@ describe("threadToReopen", () => {
         const stored = JSON.stringify({ threadId: "t-9", userId: "u-1" });
 
         expect(threadToReopen({ isOn: isReopenOn(null), last: parseLastThread(stored), userId: "u-1" })).toBe("t-9");
+    });
+});
+
+describe("isSavedThread", () => {
+    it("is true only for the chat that is saved", () => {
+        const saved = { threadId: "t-1", userId: "u-1" };
+
+        expect(isSavedThread(saved, "t-1")).toBe(true);
+        expect(isSavedThread(saved, "t-2")).toBe(false);
+        expect(isSavedThread(undefined, "t-1")).toBe(false);
     });
 });
