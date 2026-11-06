@@ -64,9 +64,10 @@ const ChatPage = () => {
         linkModel === undefined &&
         resumeScopeReady;
 
-    // The handoff owns the draft only when its message is really waiting. Read once, on mount, before the handoff effect below
-    // consumes it; a handoff URL with nothing in storage leaves a prompt link free to apply.
-    const [handoffWaiting] = useState(landingMessageWaiting);
+    // The handoff owns the draft only while its message is waiting. Read on mount, before the handoff effect below consumes it, and
+    // cleared once that effect has taken the message: a later link in this visit then applies, even if the address still says
+    // `initialMessage`. A handoff URL with nothing in storage never owned the draft.
+    const [handoffWaiting, setHandoffWaiting] = useState(landingMessageWaiting);
 
     usePromptLinkDraft({
         // The composer sends the free model to an anonymous visitor's text chat, so the link's model waits for the session.
@@ -104,6 +105,7 @@ const ChatPage = () => {
         sessionStorage.removeItem(LANDING_MESSAGE_KEY);
         initialMessageReadRef.current = true;
         setInitialMessage(message);
+        setHandoffWaiting(false);
     }, [hasInitialMessage]);
 
     useEffect(() => {

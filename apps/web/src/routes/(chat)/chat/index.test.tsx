@@ -151,12 +151,21 @@ const linkWith = (extra: Record<string, string>): string => {
     return link.href;
 };
 
-const renderPage = (): void => {
+/** Renders the page; the returned function re-renders it on the search last set, as the router does after a navigation. */
+const mountPage = (): (() => void) => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const Wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
     const ChatPage = Route.options.component as ComponentType;
+    const { rerender } = render(<ChatPage />, { wrapper: Wrapper });
 
-    render(<ChatPage />, { wrapper: Wrapper });
+    return () => {
+        rerender(<ChatPage />);
+    };
+};
+
+/** Sets the address the page sees, read through the route's own search parser, as a navigation would. */
+const setSearch = (raw: Record<string, string>): void => {
+    harness.search = (Route.options.validateSearch as unknown as ValidateSearch)(raw);
 };
 
 const selectedModel = (): string => useModelStore.getState().selectedModel;
@@ -184,7 +193,7 @@ describe("chat index route", () => {
             sessionStorage.setItem(LANDING_MESSAGE_KEY, "handoff text");
             openUrl(linkWith({ initialMessage: "true" }));
 
-            renderPage();
+            mountPage();
 
             await waitFor(() => expect(harness.assistantProps?.initialMessage).toBe("handoff text"));
             expect(useChatUIStore.getState().composerText).toBe("");
@@ -198,7 +207,7 @@ describe("chat index route", () => {
         it("applies the link's prompt and model, because the handoff owns no draft", async () => {
             openUrl(linkWith({ initialMessage: "true" }));
 
-            renderPage();
+            mountPage();
 
             await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("from the link"));
             expect(harness.assistantProps?.initialMessage).toBeUndefined();
@@ -208,11 +217,47 @@ describe("chat index route", () => {
         });
     });
 
+    describe("a later link after a saved prompt", () => {
+        it("applies the link once the saved prompt's address is gone", async () => {
+            openUrl("https://app.example.com/chat?promptId=saved-1");
+
+            const update = mountPage();
+
+            setSearch({ prompt: "later link" });
+            update();
+
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("later link"));
+            expect(harness.showWarning).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("a later link after a handoff has taken its message", () => {
+        it("applies the link, even while the address still names the handoff flag", async () => {
+            sessionStorage.setItem(LANDING_MESSAGE_KEY, "handoff text");
+            openUrl(linkWith({ initialMessage: "true" }));
+
+            const update = mountPage();
+
+            await waitFor(() => expect(harness.assistantProps?.initialMessage).toBe("handoff text"));
+            // The handoff owned the draft, so the link was refused; the navigation that strips it leaves only the flag.
+            expect(useChatUIStore.getState().composerText).toBe("");
+            setSearch({ initialMessage: "true" });
+            update();
+
+            // A later link in this visit, with the flag still in the address: the handoff has taken its message, so it owns nothing.
+            setSearch({ initialMessage: "true", prompt: "second link" });
+            update();
+
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("second link"));
+            expect(harness.showWarning).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe("a saved prompt named in the same URL", () => {
         it("keeps the saved prompt's draft and refuses the link", async () => {
             openUrl(linkWith({ promptId: "saved-1" }));
 
-            renderPage();
+            mountPage();
 
             await waitFor(() => expect(harness.navigate).toHaveBeenCalledTimes(1));
             expect(useChatUIStore.getState().composerText).toBe("");
@@ -298,7 +343,7 @@ describe("chat index route", () => {
             });
 
             openUrl(link);
-            renderPage();
+            mountPage();
 
             await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("Summarise this\nin two lines"));
             expect(selectedModel()).toBe(textModel?.id);
@@ -308,7 +353,7 @@ describe("chat index route", () => {
         it("a blank prompt does not change the chat's model, even with a model in the link", () => {
             openUrl(`https://app.example.com/chat?model=${encodeURIComponent(textModel?.id ?? "")}&prompt=%20%20%20`);
 
-            renderPage();
+            mountPage();
 
             expect(useChatUIStore.getState().composerText).toBe("");
             expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
@@ -318,7 +363,7 @@ describe("chat index route", () => {
         it("treats a blank prompt parameter as no link: nothing is drafted and no navigation strips it", () => {
             openUrl("https://app.example.com/chat?prompt=%20%20%20");
 
-            renderPage();
+            mountPage();
 
             expect(useChatUIStore.getState().composerText).toBe("");
             expect(harness.navigate).not.toHaveBeenCalled();
