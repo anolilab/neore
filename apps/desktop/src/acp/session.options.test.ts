@@ -192,6 +192,15 @@ describe("what the agent sends while the session opens, and what it takes away",
         expect(states[0]?.configOptions?.map((option) => [option.id, option.currentValue])).toEqual([["model", "fast"]]);
     });
 
+    it("confirms a change the agent answers when its own mode update arrived while the change was in flight", async () => {
+        const { player, session, states, steps } = await start("options-mode-during-change");
+        const change = session.setOption("model", "deep");
+
+        await player.play(steps);
+        await expect(change).resolves.toBeUndefined();
+        expect(states.at(-1)?.configOptions?.find((option) => option.id === "model")?.currentValue).toBe("deep");
+    });
+
     it("refuses a change whose answer still lists the old value, and reports what the agent says is true", async () => {
         const { player, session, states, steps } = await start("options-mismatch");
         const change = session.setOption("model", "deep");

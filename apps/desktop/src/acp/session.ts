@@ -165,8 +165,16 @@ export class AgentSession {
     /** What the agent offers (its model, reasoning effort, mode ...), as it last said; unset until the session is open. */
     private offered: RawOptions = {};
 
-    /** Bumped whenever the agent sends its own options, so an answer older than that list does not replace it. */
-    private offeredVersion = 0;
+    /**
+     * Bumped whenever the agent sends its own list of options (`configOptions`) or of modes, so an answer older than that list does
+     * not replace it. The two are counted apart: a mode update says nothing about a model answer, and must not refuse it.
+     */
+    private configVersion = 0;
+
+    private modeVersion = 0;
+
+    /** Counts the option changes asked for, so a late answer to an earlier one does not replace a later one. */
+    private optionRequests = 0;
 
     /** Whether the startup updates are the saved session's (while it loads) or a fresh session's (once it is opened). */
     private startupPhase: "loading" | "opening" = "opening";
@@ -266,13 +274,17 @@ export class AgentSession {
         }
 
         let answer: unknown;
-        const versionAtRequest = this.offeredVersion;
+        const versionAtRequest = this.versionOf(optionId);
+
+        this.optionRequests += 1;
+        const request = this.optionRequests;
 
         // The timeout does not cancel the agent's request: an answer that arrives after it is applied here and reported, so what the
         // person sees follows what the agent did.
         const onLate = (late: unknown): void => {
-            // An answer older than a list the agent has sent since is not applied: that list is what is true now.
-            if (this.status === "ended" || this.offeredVersion !== versionAtRequest) {
+            // An answer older than a list the agent has sent since, or than a later change asked for, is not applied: that is what is
+            // true now.
+            if (this.status === "ended" || this.versionOf(optionId) !== versionAtRequest || request !== this.optionRequests) {
                 return;
             }
 
@@ -292,7 +304,7 @@ export class AgentSession {
 
         // The agent sent its own list while this was outstanding, and that list is newer than the answer: it stands. It must show the
         // value asked for, or the change was not made.
-        if (this.offeredVersion !== versionAtRequest) {
+        if (this.versionOf(optionId) !== versionAtRequest) {
             this.reportOptions();
 
             if (!this.showsValue(optionId, valueId)) {
@@ -449,6 +461,11 @@ export class AgentSession {
             status: this.status,
             turns: this.turns.map((turn) => turn.toState()),
         };
+    }
+
+    /** The version of the list a change to `optionId` is answered against: the modes for the legacy mode state, else the options. */
+    private versionOf(optionId: string | undefined): number {
+        return optionId === undefined ? this.modeVersion : this.configVersion;
     }
 
     /** Applies the agent's answer to a change to what the session offers. False when the answer still shows another value. */
@@ -935,7 +952,7 @@ export class AgentSession {
 
                 if (configOptions !== undefined) {
                     this.offered = { ...this.offered, configOptions };
-                    this.offeredVersion += 1;
+                    this.configVersion += 1;
                     this.reportOptions();
                 }
 
@@ -943,7 +960,7 @@ export class AgentSession {
             }
             case "current_mode_update": {
                 this.offered = withCurrentMode(this.offered, update.currentModeId, this.options.process.scrub);
-                this.offeredVersion += 1;
+                this.modeVersion += 1;
                 this.reportOptions();
 
                 return;
