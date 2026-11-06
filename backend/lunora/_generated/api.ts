@@ -197,7 +197,7 @@ export interface ApiTypes {
             askAside: FunctionReference<"action", { entryId: string; question: string; threadId: Id<"threads">; unlockProof?: string }, { answer: string; token: string; withThread: boolean }>;
         };
         ask_user: {
-            answerAskUser: FunctionReference<"mutation", { answer: string | null; approvalId: string; fileIds?: Array<string>; threadId: Id<"threads">; unlockProof?: string }, { alreadyResolved: boolean; streamId: string | null }>;
+            answerAskUser: FunctionReference<"mutation", { answer?: string | null; answers?: Array<{ note?: string; selected: Array<string> }>; approvalId: string; fileIds?: Array<string>; threadId: Id<"threads">; unlockProof?: string }, { alreadyResolved: boolean; streamId: string | null }>;
         };
         autocomplete: {
             suggestCompletion: FunctionReference<"action", { text: string }, { completion: string }>;
