@@ -12,6 +12,27 @@ import { promptFromLink } from "../utils/prompt-link";
 import type { LinkableModel } from "../utils/prompt-link-model";
 import { linkModelAppliesOnOpen } from "../utils/prompt-link-model";
 
+/**
+ * The text model a chat opens on when it has none usable: the default, if the picker offers it as a text model, else the first text model
+ * the picker offers. `undefined` when the picker offers none.
+ */
+const textModelFallback = (linkable: ReadonlyMap<string, LinkableModel>): string | undefined => {
+    const isText = (entry: LinkableModel): boolean => (entry.mode ?? "text") === "text" && entry.provider !== "external";
+    const defaultEntry = linkable.get(DEFAULT_CHAT_MODEL);
+
+    if (defaultEntry !== undefined && isText(defaultEntry)) {
+        return DEFAULT_CHAT_MODEL;
+    }
+
+    for (const entry of linkable.values()) {
+        if (isText(entry)) {
+            return entry.id;
+        }
+    }
+
+    return undefined;
+};
+
 /** The chat search without the prompt link's own parameters: a saved prompt or a message in the same URL stays. */
 const withoutLinkParameters = (search: Record<string, unknown>): Record<string, unknown> =>
     Object.fromEntries(Object.entries(search).filter(([key]) => key !== "model" && key !== "prompt"));
@@ -129,7 +150,14 @@ export const usePromptLinkDraft = ({
                 const selectedIsCustom = state.selectedModel.startsWith("custom:");
 
                 if (!isAnonymous && !selectedIsText && !selectedIsCustom) {
-                    state.setSelectedModel(DEFAULT_CHAT_MODEL as ModelId, undefined);
+                    // The default is taken only if the picker offers it: a default the owner has switched off is not a model the chat may open on.
+                    const fallback = textModelFallback(linkableModels);
+
+                    if (fallback === undefined) {
+                        showWarning(t`This chat has no text model available, so the link's draft has no model. Choose one in the model picker.`);
+                    } else {
+                        state.setSelectedModel(fallback as ModelId, undefined);
+                    }
                 }
             }
         }

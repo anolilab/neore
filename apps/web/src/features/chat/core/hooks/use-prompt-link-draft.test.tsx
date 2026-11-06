@@ -297,6 +297,34 @@ describe("usePromptLinkDraft", () => {
         expect(harness.showWarning).not.toHaveBeenCalled();
     });
 
+    it("a link whose default is disabled opens on another text model the picker offers, not the disabled default", () => {
+        const enabledText = OFFERED_TEXT_MODELS.values().find((entry) => entry.id !== DEFAULT_CHAT_MODEL);
+
+        expect(enabledText).toBeDefined();
+        // The owner has switched the default off: the picker does not offer it, only other text models.
+        const withoutDefault = new Map([...OFFERED_TEXT_MODELS].filter(([id]) => id !== DEFAULT_CHAT_MODEL));
+
+        useModelStore.setState({ newThreadMode: "image", selectedModel: (imageModel?.id ?? "") as ModelId });
+
+        renderLink({ linkableModels: withoutDefault, prompt: "hi" });
+
+        expect(selectedModel()).toBe(enabledText?.id);
+        expect(selectedModel()).not.toBe(DEFAULT_CHAT_MODEL);
+        expect(useChatUIStore.getState().composerText).toBe("hi");
+    });
+
+    it("a link with no usable text model in the picker says so, and leaves the model alone rather than selecting a disabled one", () => {
+        useModelStore.setState({ newThreadMode: "image", selectedModel: (imageModel?.id ?? "") as ModelId });
+
+        renderLink({ linkableModels: new Map(), prompt: "hi" });
+
+        expect(selectedModel()).toBe(imageModel?.id);
+        expect(harness.showWarning).toHaveBeenCalledWith(
+            "This chat has no text model available, so the link's draft has no model. Choose one in the model picker.",
+        );
+        expect(useChatUIStore.getState().composerText).toBe("hi");
+    });
+
     it("a link with no model opens a text chat after an image chat, on a text model, never on the image model left selected", () => {
         useModelStore.setState({ newThreadMode: "image", selectedModel: (imageModel?.id ?? "") as ModelId });
 
