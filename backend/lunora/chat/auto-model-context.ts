@@ -87,8 +87,9 @@ export const autoRouteContextOf = async (
     const thread = ownedBy(await ctx.db.get("threads", args.threadId));
     const summaries = thread ? await summariesOf(ctx, thread._id) : [];
     const hasCompaction = summaries.some((row) => row.kind === "compact");
-    // The estimate walks the path, so it runs only when a compaction row stands: most threads have none.
-    const compacted = thread && hasCompaction ? await estimateContext(ctx, thread, prompt) : undefined;
+    // The estimate walks the path, so it runs only when a compaction row stands: most threads have none. A stateless reply
+    // sends the prompt alone, so the retained history and its summary do not size it.
+    const compacted = thread && hasCompaction && !args.stateless ? await estimateContext(ctx, thread, prompt) : undefined;
     const covered = compacted?.compactedAt === undefined ? undefined : compacted.covered;
     const sent =
         covered === undefined ? docs : docs.filter((row) => row.order > covered.order || (row.order === covered.order && row.stepOrder > covered.stepOrder));
