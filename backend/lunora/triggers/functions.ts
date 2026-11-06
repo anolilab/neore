@@ -1379,12 +1379,16 @@ const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, s
 /** How long a run keeps its saved prompt after it settles. The run row, its status and its thread stay; only the prompt text goes. */
 export const RUN_PROMPT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** The most prompts one housekeeping pass clears; a larger backlog is worked off over later passes. */
-const PRUNE_RUN_PROMPTS_BATCH = 200;
+/**
+ * The most runs one housekeeping pass rewrites. A run row can hold a webhook body of up to 1 MiB, and a pass reads and
+ * rewrites each row inside one transaction, so the batch is sized for the largest rows; a larger backlog is worked off
+ * over later passes.
+ */
+const PRUNE_RUN_PROMPTS_BATCH = 16;
 
 /**
- * Housekeeping sweep (`shardSweeps()`): clears the saved prompt of each run past its expiry. The index holds only the
- * rows that still carry a prompt, so a pass never rescans rows it already cleared.
+ * Housekeeping sweep (`shardSweeps()`): clears the saved prompt of each run past its expiry. Rows without an expiry are in
+ * the index too, so the range starts above zero, as `reapLapsedClaims` does; otherwise they would fill every batch.
  */
 export const pruneExpiredRunPrompts = internalMutation
     .input({})
@@ -1392,7 +1396,7 @@ export const pruneExpiredRunPrompts = internalMutation
     .mutation(async ({ ctx }) => {
         const expired = await ctx.db
             .query("triggerExecutions")
-            .withIndex("by_promptExpiresAt", (q) => q.lt("promptExpiresAt", ctx.now))
+            .withIndex("by_promptExpiresAt", (q) => q.gt("promptExpiresAt", 0).lt("promptExpiresAt", ctx.now))
             .take(PRUNE_RUN_PROMPTS_BATCH);
 
         for (const row of expired) {

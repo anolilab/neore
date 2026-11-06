@@ -1128,6 +1128,23 @@ describe("run prompts", () => {
         expect(kept?.prompt).toBe("new");
     });
 
+    it("clears an expired prompt even when a full batch of runs has no expiry", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+        const expired = await harness.run(async (ctx: any) => {
+            for (let n = 0; n < 17; n += 1) {
+                await ctx.db.insert("triggerExecutions", { startedAt: n, status: "completed", triggerId });
+            }
+
+            return await ctx.db.insert("triggerExecutions", { prompt: "old", promptExpiresAt: Date.now() - 1, startedAt: 99, status: "completed", triggerId });
+        });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(pruneExpiredRunPrompts, {}));
+
+        const cleared = (await harness.run(async (ctx: any) => await ctx.db.get("triggerExecutions", expired))) as { prompt?: string } | null;
+
+        expect(cleared?.prompt).toBeUndefined();
+    });
+
     it("exports a trigger with the prompt its settled run was given, and never its webhook secret", async () => {
         const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
 
