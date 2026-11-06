@@ -394,6 +394,15 @@ export const releaseKey = internalMutation
         return null;
     });
 
+/**
+ * {@link holdClaim} for a caller outside a transaction. `true` while the claim `claimedAt` still holds the key (it was stretched
+ * to `ttlMs`); `false` when another claim has taken the key, which the caller must then leave alone.
+ */
+export const holdKey = internalMutation
+    .input({ claimedAt: v.number(), key: v.string(), scope: v.string(), ttlMs: v.number(), userId: v.optional(v.string()) })
+    .output(v.boolean())
+    .mutation(async ({ args: { claimedAt, key, scope, ttlMs, userId }, ctx }) => await holdClaim(ctx, scope, key, claimedAt, ttlMs, userId));
+
 /** Lapsed leases handled per tick; the rest wait a minute. */
 export const LAPSE_REAP_BATCH = 50;
 

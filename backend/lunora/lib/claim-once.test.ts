@@ -7,7 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { claimKey, claimKeyFenced, claimOnce, completeKey, holdClaim, purgeExpiredClaims, reapLapsedClaims, releaseKey } from "./claim-once";
+import { claimKey, claimKeyFenced, claimOnce, completeKey, holdClaim, holdKey, purgeExpiredClaims, reapLapsedClaims, releaseKey } from "./claim-once";
 
 const NOW = 1_800_000_000_000;
 const TTL = 60_000;
@@ -223,5 +223,18 @@ describe("purgeExpiredClaims", () => {
         const remaining = await rows();
 
         expect(remaining.map((row) => row.key)).toStrictEqual(["fresh"]);
+    });
+});
+
+describe("holdKey", () => {
+    // What a run calls when it is admitted: its own fenced claim is stretched, and a key another request took is left to it.
+    it("stretches the claim its claimedAt names, and refuses a fence that is not the key's claim", async () => {
+        const claimedAt = (await mutate(claimKeyFenced, { key: "t", scope: "rt", ttlMs: TTL })) as number;
+
+        await expect(mutate(holdKey, { claimedAt, key: "t", scope: "rt", ttlMs: TTL * 10 })).resolves.toBe(true);
+        vi.setSystemTime(NOW + TTL * 5);
+        await expect(claim("t", { scope: "rt" })).resolves.toBe(false);
+
+        await expect(mutate(holdKey, { claimedAt: claimedAt + 1, key: "t", scope: "rt", ttlMs: TTL })).resolves.toBe(false);
     });
 });

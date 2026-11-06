@@ -167,16 +167,40 @@ describe("regenerating the title of a cloud thread", () => {
         expect(await regenerateClaimKeys()).not.toContain(empty);
     });
 
-    it("coalesces a request made while one is in flight: it succeeds, and holds no second claim", async () => {
+    it("refuses a request made while one is in flight, and holds one claim", async () => {
         const cloud = await cloudThread();
         const owner = harness.withIdentity({ userId: OWNER });
 
         await expect(owner.action(regenerateThreadTitle as never, { threadId: cloud } as never)).resolves.toEqual({ success: true });
-        await expect(owner.action(regenerateThreadTitle as never, { threadId: cloud } as never)).resolves.toEqual({ success: true });
+        await expect(owner.action(regenerateThreadTitle as never, { threadId: cloud } as never)).rejects.toMatchObject({ code: "CONFLICT" });
 
-        const claims = await regenerateClaimKeys();
+        const keys = await regenerateClaimKeys();
 
-        expect(claims.filter((key) => key === cloud)).toHaveLength(1);
+        expect(keys.filter((key) => key === cloud)).toHaveLength(1);
+    });
+
+    it("refuses a stored leaf that no longer exists, rather than titling from another branch", async () => {
+        const cloud = await cloudThread();
+
+        await harness.run(async (context: any) => {
+            const gone = await context.db.insert("messages", {
+                message: { content: "A prompt on an abandoned branch", role: "user" },
+                order: 1,
+                status: "success",
+                stepOrder: 0,
+                threadId: cloud,
+                tool: false,
+                userId: OWNER,
+            });
+
+            await context.db.delete("messages", gone);
+            await context.db.patch("threads", cloud, { activeLeafMessageId: gone });
+        });
+
+        await expect(harness.withIdentity({ userId: OWNER }).action(regenerateThreadTitle as never, { threadId: cloud } as never)).rejects.toMatchObject({
+            code: "CONFLICT",
+        });
+        expect(await regenerateClaimKeys()).not.toContain(cloud);
     });
 
     it("does not coalesce requests for different threads", async () => {

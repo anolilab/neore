@@ -1791,6 +1791,12 @@ const REGENERATE_TITLE_SCOPE = "regenerate-title";
 const REGENERATE_TITLE_CLAIM_TTL_MS = 5 * 60 * 1000;
 
 /**
+ * The claim once its job has started: held for the whole run, so a request made while a slow model call is still pending cannot
+ * take the key and pay for a second generation. A run that dies keeps the key only until this lapses.
+ */
+const REGENERATE_TITLE_RUN_TTL_MS = 15 * 60 * 1000;
+
+/**
  * The earliest user prompt on the thread's active branch. A branched thread's path is read by id, so its sibling replies
  * cannot push the prompt out of the read; an unbranched thread's rows are its path. The read stops at the first prompt,
  * and only a message that succeeded can supply a title. `"too-long"` when the path is past the read's limit.
@@ -1914,6 +1920,24 @@ export const regenerateTitleChat = internalAction
         userId: v.string(),
     })
     .action(async ({ args: arguments_, ctx: context }) => {
+        // Admitted: the claim taken at the request is stretched for the run. When another request has taken the key meanwhile (this
+        // job sat unstarted past its short claim), the key is not ours and the job does nothing.
+        if (arguments_.claimedAt !== undefined) {
+            const held = await context.runMutation(internal.lib.claim_once.holdKey, {
+                claimedAt: arguments_.claimedAt,
+                key: arguments_.threadId,
+                scope: REGENERATE_TITLE_SCOPE,
+                ttlMs: REGENERATE_TITLE_RUN_TTL_MS,
+                userId: arguments_.userId,
+            });
+
+            if (!held) {
+                context.log.event("chat.thread_title", { skipped: "claim-taken" });
+
+                return;
+            }
+        }
+
         try {
             await runRegenerateTitle(context, arguments_);
         } finally {
@@ -1974,8 +1998,8 @@ export const regenerateThreadTitle = authAction
             throw new LunoraError("CONFLICT", "This chat has no user prompt to title it from.");
         }
 
-        // One regenerate in flight per thread: a request that finds one running reads the same first prompt, so it is not a second model
-        // call. The claim is fenced by its time, so the job releases only its own claim.
+        // One regenerate in flight per thread, so two requests never pay for two model calls. The claim is fenced by its time, so the
+        // job releases only its own claim.
         const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, {
             key: threadId,
             scope: REGENERATE_TITLE_SCOPE,
@@ -1983,10 +2007,12 @@ export const regenerateThreadTitle = authAction
             userId,
         });
 
+        // A request made while one runs is refused, not reported as scheduled: the running job may skip its write (the branch or
+        // title it was asked about may have moved), so the owner asks again once it has finished.
         if (claimedAt === null) {
-            context.log.event("chat.regenerate_title", { coalesced: true });
+            context.log.event("chat.regenerate_title", { refused: "in-flight" });
 
-            return { success: true };
+            throw new LunoraError("CONFLICT", "A title is already being generated for this chat. Try again when it finishes.");
         }
 
         // The title the owner saw when asking: a rename made while the model works is kept (`writeGeneratedTitle`).
