@@ -55,6 +55,16 @@ describe("message content tool call rows", () => {
 });
 
 describe("message content text parts", () => {
+    it("records a code block in a reply: no part of a reply sits in the element session replay masks", () => {
+        const code = "```ts\nconst answer = 42;\n```";
+        const { container } = render(<MessageContentUI message={message(code)} />);
+
+        // The replay mask belongs to the composer's draft. A code block in a reply is recorded, so nothing in the reply is masked.
+        // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the assertion is about DOM structure
+        expect(container.querySelector("[data-ph-mask]")).toBeNull();
+        expect(container.textContent).toContain("const answer = 42;");
+    });
+
     it("marks each text part for in-thread find, and nothing else", () => {
         const { container } = render(<MessageContentUI message={message("the answer")} />);
 
