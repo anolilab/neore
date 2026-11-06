@@ -1,4 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
+import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 
@@ -93,19 +94,19 @@ export const usePromptLinkDraft = ({
             }
         }
 
-        // A link's model travels only with its prompt (`readPromptLinkSearch` drops it otherwise), so a link without one leaves the model alone.
-        if (applyLink && prompt !== undefined && model !== undefined) {
+        // A link opens a text chat with its draft. The draft is the link's, so a comparison left on would fan it out, and the new chat is set
+        // to text whatever mode the composer was last in (an image chat's). Then the model: the link's, when the composer offers it as a
+        // text model; otherwise the chat keeps a text model it already has, or takes the default text model.
+        if (applyLink && prompt !== undefined) {
             const state = useModelStore.getState();
-            // The model the composer sends with is the link's only where the shared rule (`linkModelAppliesOnOpen`) holds; a copy
-            // names a model only under the same rule.
-            const sendsLinkModel = linkModelAppliesOnOpen({ isAnonymous, linkable: linkableModels, model });
+
+            state.setComparisonMode(false);
+            state.setComposerMode("text", undefined, false);
+
+            // A link's model travels only with its prompt (`readPromptLinkSearch` drops it otherwise).
+            const sendsLinkModel = model !== undefined && linkModelAppliesOnOpen({ isAnonymous, linkable: linkableModels, model });
 
             if (model !== undefined && sendsLinkModel) {
-                // A comparison left on from before would fan the draft out to its models, not to the one the link names.
-                // Ending it clears its selection too, as the picker does when a single model is chosen.
-                state.setComparisonMode(false);
-                // The link opens a text chat, so the new chat is set to text whatever mode the composer was last in.
-                state.setComposerMode("text", undefined, false);
                 state.setSelectedModel(model as ModelId, undefined);
 
                 // Naming a model is choosing it, so Auto ends with the pick, as it does in the model picker for a new chat.
@@ -115,7 +116,18 @@ export const usePromptLinkDraft = ({
                     });
                 }
             } else {
-                showWarning(t`This link's model is not available in this chat. The chat keeps its model.`);
+                if (model !== undefined) {
+                    showWarning(t`This link's model is not available in this chat. The chat keeps its model.`);
+                }
+
+                // An image chat leaves an image model selected; a text chat must not send with one. The free model is the anonymous
+                // visitor's, whatever is stored.
+                const selected = linkableModels.get(state.selectedModel);
+                const selectedIsText = selected !== undefined && (selected.mode ?? "text") === "text" && selected.provider !== "external";
+
+                if (!isAnonymous && !selectedIsText) {
+                    state.setSelectedModel(DEFAULT_CHAT_MODEL as ModelId, undefined);
+                }
             }
         }
 

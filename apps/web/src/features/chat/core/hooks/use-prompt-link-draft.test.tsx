@@ -285,6 +285,28 @@ describe("usePromptLinkDraft", () => {
         expect(harness.showWarning).not.toHaveBeenCalled();
     });
 
+    it("a link with no model opens a text chat after an image chat, on a text model, never on the image model left selected", () => {
+        useModelStore.setState({ newThreadMode: "image", selectedModel: (imageModel?.id ?? "") as ModelId });
+
+        renderLink({ prompt: "hi" });
+
+        expect(useModelStore.getState().newThreadMode).toBe("text");
+        expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+        expect(useChatUIStore.getState().composerText).toBe("hi");
+        expect(harness.showWarning).not.toHaveBeenCalled();
+    });
+
+    it("a link naming a non-text model opens a text chat, says the model is unavailable, and keeps a text model", () => {
+        useModelStore.setState({ newThreadMode: "image" });
+
+        renderLink({ model: imageModel?.id, prompt: "hi" });
+
+        expect(useModelStore.getState().newThreadMode).toBe("text");
+        expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+        expect(useChatUIStore.getState().composerText).toBe("hi");
+        expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
+    });
+
     it("opens a text chat on the link's model even when the composer was last in image mode, and sets the new chat to text", () => {
         useModelStore.setState({ newThreadMode: "image" });
 
