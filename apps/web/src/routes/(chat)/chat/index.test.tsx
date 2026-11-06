@@ -22,6 +22,7 @@ const harness = vi.hoisted(() => {
     return {
         assistantProps: undefined as { initialMessage?: string } | undefined,
         composerModels: [] as { id: string }[],
+        sessionPending: false,
         latestThread: undefined as string | undefined,
         locationSearch: "",
         navigate: vi.fn(),
@@ -114,7 +115,7 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
                         return { data: undefined, isPending: false };
                     },
                     useSession: () => {
-                        return { data: undefined, isPending: false };
+                        return { data: undefined, isPending: harness.sessionPending };
                     },
                 },
             };
@@ -193,6 +194,7 @@ describe("chat index route", () => {
     beforeEach(() => {
         harness.assistantProps = undefined;
         harness.latestThread = undefined;
+        harness.sessionPending = false;
         harness.composerModels = MODEL_REGISTRY.filter(
             (model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external",
         ).map((model) => {
@@ -252,6 +254,26 @@ describe("chat index route", () => {
 
             await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("later link"));
             expect(harness.showWarning).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("a handoff that takes its message before the session answers", () => {
+        it("still owns the draft when the link is decided, so the link is refused with its notice", async () => {
+            sessionStorage.setItem(LANDING_MESSAGE_KEY, "handoff text");
+            openUrl(linkWith({ initialMessage: "true" }));
+            harness.sessionPending = true;
+
+            const update = mountPage();
+
+            // The handoff takes its message on mount, while the session is still pending.
+            await waitFor(() => expect(harness.assistantProps?.initialMessage).toBe("handoff text"));
+
+            harness.sessionPending = false;
+            update();
+
+            await waitFor(() => expect(harness.showWarning).toHaveBeenCalledWith("This chat already has a prompt. The prompt from the link was not added."));
+            expect(useChatUIStore.getState().composerText).toBe("");
+            expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
         });
     });
 

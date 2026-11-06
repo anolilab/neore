@@ -25,6 +25,7 @@ export const usePromptLinkDraft = ({
     allowedModelIds,
     isAnonymous = false,
     model,
+    onDecided,
     otherDraftSource = false,
     prompt,
     ready = true,
@@ -37,6 +38,8 @@ export const usePromptLinkDraft = ({
     /** The signed-in person is an anonymous guest: the composer sends the free model for them in a text chat. */
     isAnonymous?: boolean;
     model?: string;
+    /** Called once the link can be decided (the caller's own ownership of the draft ends here, after this pass has read it). */
+    onDecided?: () => void;
     /** A saved prompt or a message in the same URL already supplies this chat's draft: the link does not replace it. */
     otherDraftSource?: boolean;
     prompt?: string;
@@ -51,6 +54,9 @@ export const usePromptLinkDraft = ({
         if (!ready) {
             return;
         }
+
+        // The first time the link can be decided, whatever else owns the draft has been read: the caller may now stop treating it as owned.
+        onDecided?.();
 
         // The link's parameters are gone once it is applied, so the next link on this mounted page applies too.
         if (prompt === undefined && model === undefined) {
@@ -110,6 +116,7 @@ export const usePromptLinkDraft = ({
             }
         }
 
-        void navigate({ replace: true, search: (previous: Record<string, unknown>) => withoutLinkParameters(previous), to: "/chat" });
-    }, [allowedModelIds, isAnonymous, model, navigate, otherDraftSource, prompt, ready, t]);
+        // `hash: true` keeps the address's fragment: removing the link's parameters must not remove a `#section` the address also has.
+        void navigate({ hash: true, replace: true, search: (previous: Record<string, unknown>) => withoutLinkParameters(previous), to: "/chat" });
+    }, [allowedModelIds, isAnonymous, model, navigate, onDecided, otherDraftSource, prompt, ready, t]);
 };

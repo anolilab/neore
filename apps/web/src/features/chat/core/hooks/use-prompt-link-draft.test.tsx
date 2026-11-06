@@ -170,6 +170,12 @@ describe("usePromptLinkDraft", () => {
         expect(useChatUIStore.getState().composerText).toHaveLength(PROMPT_LINK_MAX_CHARS);
     });
 
+    it("keeps the address's fragment when it removes the link's parameters", () => {
+        renderLink({ model: textModel?.id, prompt: "hi" });
+
+        expect(harness.navigate).toHaveBeenCalledWith(expect.objectContaining({ hash: true, replace: true, to: "/chat" }));
+    });
+
     it("removes only the link's own parameters from the address", () => {
         renderLink({ model: textModel?.id, prompt: "hi" });
 

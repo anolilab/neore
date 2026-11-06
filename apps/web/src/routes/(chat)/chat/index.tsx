@@ -2,7 +2,7 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useLocation, useNavigate, useRouteContext } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
@@ -65,10 +65,13 @@ const ChatPage = () => {
         linkModel === undefined &&
         resumeScopeReady;
 
-    // The handoff owns the draft only while its message is waiting. Read on mount, before the handoff effect below consumes it, and
-    // cleared once that effect has taken the message: a later link in this visit then applies, even if the address still says
-    // `initialMessage`. A handoff URL with nothing in storage never owned the draft.
+    // The handoff owns the draft from mount, when its message is waiting, until the link hook has decided once: the consume effect below
+    // takes the message before the session and catalog answer, so ownership cannot end when the message is taken. After that, a later
+    // link applies even while the address still says `initialMessage`. A handoff URL with nothing in storage never owned the draft.
     const [handoffWaiting, setHandoffWaiting] = useState(landingMessageWaiting);
+    const endHandoffOwnership = useCallback(() => {
+        setHandoffWaiting(false);
+    }, []);
 
     // A link may select only a model the composer's picker offers this user. The link waits until the catalog and the user's rules
     // have answered, so the list is final; if the rules fail to load the list is empty, the link's model is refused and its prompt applies.
@@ -83,6 +86,7 @@ const ChatPage = () => {
         model: linkModel,
         otherDraftSource: Boolean(promptId) || (Boolean(hasInitialMessage) && handoffWaiting),
         prompt: linkPrompt,
+        onDecided: endHandoffOwnership,
         ready: !isSessionPending && composerSettled,
     });
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
@@ -113,7 +117,6 @@ const ChatPage = () => {
         sessionStorage.removeItem(LANDING_MESSAGE_KEY);
         initialMessageReadRef.current = true;
         setInitialMessage(message);
-        setHandoffWaiting(false);
     }, [hasInitialMessage]);
 
     useEffect(() => {
