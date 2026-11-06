@@ -54,7 +54,8 @@
     --muted-foreground: var(--brand-graphite);
     --accent: var(--brand-frost);
     --accent-foreground: var(--brand-obsidian);
-    --destructive: oklch(0.55 0.22 25); /* Red - better contrast */
+    /* Red. At L 0.5 the text is 4.8:1 even on its own 10% tint (AA is 4.5:1); the earlier 0.55 was 4.1:1 there. */
+    --destructive: oklch(0.5 0.22 25);
     --border: var(--brand-silver);
     --input: var(--brand-silver);
     --ring: var(--brand-graphite);
@@ -102,7 +103,8 @@
     --muted-foreground: var(--brand-steel);
     --accent: var(--brand-iron);
     --accent-foreground: var(--brand-frost);
-    --destructive: oklch(0.65 0.2 25); /* Red - optimized for dark mode */
+    /* Red for dark mode. At L 0.78 it is about 5:1 on its 10% tint (the earlier 0.65 was 3.5:1). */
+    --destructive: oklch(0.78 0.17 25);
     --border: oklch(1 0 0 / 6%);
     --input: oklch(1 0 0 / 12%);
     --ring: #8c8c8c; /* 4.8:1 on --brand-charcoal; graphite was 2.7:1, under WCAG 1.4.11's 3:1. Mirrored in apps/web accent-presets.ts */
@@ -342,7 +344,7 @@
     }
 
     & a:not(.not-prose a) {
-        @apply text-primary font-medium underline underline-offset-4;
+        @apply text-primary-text font-medium underline underline-offset-4;
     }
 
     & blockquote:not(.not-prose blockquote) {

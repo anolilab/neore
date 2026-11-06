@@ -197,7 +197,7 @@ const GuideTab = ({
                     {current.source === "host" && current.threadId !== undefined && (
                         <>
                             {" "}
-                            <Link className="text-primary underline" params={{ threadId: current.threadId }} to="/chat/$threadId">
+                            <Link className="text-primary-text underline" params={{ threadId: current.threadId }} to="/chat/$threadId">
                                 {t`Open the agent's conversation`}
                             </Link>
                         </>

@@ -193,7 +193,7 @@
     background-color: #caff00 !important; /* brand-lime */
 }
 
-/* Docs prose links: app global .prose a uses text-primary (lime) which fails
+/* Docs prose links: app global .prose a uses text-primary-text (lime) which fails
    contrast on light/dark backgrounds. Use fd-foreground for text; lime only
    as underline decoration for the brand touch. */
 #nd-page .prose a:not(.not-prose a) {

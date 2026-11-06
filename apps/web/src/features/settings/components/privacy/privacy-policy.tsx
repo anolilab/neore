@@ -18,7 +18,7 @@ const PrivacyPolicy: FC = () => {
                 <p className="text-muted-foreground text-sm">
                     {t`Our privacy policy explains how we collect, use, and protect your personal data in accordance with GDPR and other applicable data protection laws.`}
                 </p>
-                <a className="text-primary text-sm font-medium hover:underline" href={PRIVACY_POLICY_URL} rel="noopener noreferrer" target="_blank">
+                <a className="text-primary-text text-sm font-medium hover:underline" href={PRIVACY_POLICY_URL} rel="noopener noreferrer" target="_blank">
                     {t`View Privacy Policy`} →
                 </a>
             </CardContent>

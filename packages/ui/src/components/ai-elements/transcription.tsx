@@ -82,7 +82,7 @@ export const TranscriptionSegment = ({ className, index, onClick, segment, ...pr
         <button
             className={cn(
                 "inline text-left",
-                isActive && "text-primary",
+                isActive && "text-primary-text",
                 isPast && "text-muted-foreground",
                 !(isActive || isPast) && "text-muted-foreground/60",
                 onSeek && "hover:text-foreground cursor-pointer",

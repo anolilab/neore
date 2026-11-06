@@ -307,7 +307,7 @@ const GroupNode = ({ data, id, selected }: NodeProps) => {
                             className={cn(
                                 "flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium backdrop-blur-sm transition-colors select-none",
                                 isLocked
-                                    ? "bg-background/90 border-primary/30 text-primary/70"
+                                    ? "bg-background/90 border-primary/30 text-primary-text/70"
                                     : "bg-background/70 border-border/40 text-muted-foreground hover:bg-background/90",
                             )}
                             onDoubleClick={handleLabelDoubleClick}

@@ -10,7 +10,7 @@ import { memo, useState } from "react";
 
 export type SourcesProps = ComponentProps<"div">;
 
-export const Sources = ({ className, ...props }: SourcesProps) => <Collapsible className={cn("not-prose text-primary mb-4 text-xs", className)} {...props} />;
+export const Sources = ({ className, ...props }: SourcesProps) => <Collapsible className={cn("not-prose text-primary-text mb-4 text-xs", className)} {...props} />;
 
 export type SourcesTriggerProps = ComponentProps<typeof CollapsibleTrigger> & {
     count: number;

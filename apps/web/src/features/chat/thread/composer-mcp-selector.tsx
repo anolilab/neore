@@ -146,7 +146,7 @@ const ComposerMCPSelector: FC<{ disabled?: boolean }> = ({ disabled }) => {
                         <span className="font-medium">{t`All Servers`}</span>
                         <span className="text-muted-foreground text-xs">{t`Use all enabled MCP servers`}</span>
                     </div>
-                    {isAllSelected && <Check className="text-primary size-4 shrink-0" />}
+                    {isAllSelected && <Check className="text-primary-text size-4 shrink-0" />}
                 </DropdownMenuItem>
                 <div className="bg-border mx-2 my-1 h-px" />
                 {enabledServers.map((server) => {
@@ -167,7 +167,7 @@ const ComposerMCPSelector: FC<{ disabled?: boolean }> = ({ disabled }) => {
                                 <span className="font-medium">{server.name}</span>
                                 <span className="text-muted-foreground max-w-[160px] truncate text-xs">{server.url}</span>
                             </div>
-                            {selected && <Check className="text-primary size-4 shrink-0" />}
+                            {selected && <Check className="text-primary-text size-4 shrink-0" />}
                         </DropdownMenuItem>
                     );
                 })}

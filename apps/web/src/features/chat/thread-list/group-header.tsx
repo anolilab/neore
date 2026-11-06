@@ -111,7 +111,7 @@ const GroupHeader: FC<GroupHeaderProperties> = ({
                         </Tooltip>
                     </TooltipProvider>
                 )}
-                <span className="text-brand-black/50 dark:text-brand-white/50">({group.threads.length})</span>
+                <span className="text-brand-black/60 dark:text-brand-white/50">({group.threads.length})</span>
             </button>
             {isProjectGroup && group.projectId && (
                 <div className="ml-auto">

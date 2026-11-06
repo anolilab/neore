@@ -82,7 +82,7 @@ const ThreadTagsMenu: FC<ThreadTagsMenuProperties> = ({ onManageTags, tagIds, th
                             render={
                                 <Button
                                     aria-label={t`Tags for ${threadTitle}`}
-                                    className="hover:text-primary h-6 w-6 p-0"
+                                    className="hover:text-primary-text h-6 w-6 p-0"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                     }}

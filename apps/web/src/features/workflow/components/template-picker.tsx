@@ -50,7 +50,7 @@ const TemplateCard = ({ onSelect, template }: TemplateCardProps) => {
             type="button"
         >
             <div className="flex items-center gap-3">
-                <div className="bg-primary/10 text-primary flex size-10 items-center justify-center rounded-lg">{icon}</div>
+                <div className="bg-primary/10 text-primary-text flex size-10 items-center justify-center rounded-lg">{icon}</div>
                 <div className="min-w-0 flex-1">
                     <h3 className="truncate font-medium">{i18n._(template.name)}</h3>
                     <p className="text-muted-foreground truncate text-sm">{i18n._(template.description)}</p>

@@ -447,12 +447,12 @@ const ModelsPage = () => {
                     <section className="relative container mx-auto border-x px-4 pt-32 pb-16 sm:pt-40 sm:pb-24 lg:px-10">
                         <SectionSeperator />
                         <motion.div animate="visible" className="max-w-3xl" initial="hidden" variants={fadeIn}>
-                            <span className="text-primary mb-4 inline-block font-mono text-xs font-medium tracking-widest uppercase">
+                            <span className="text-primary-text mb-4 inline-block font-mono text-xs font-medium tracking-widest uppercase">
                                 {t`Text · Image · Video · AI`}
                             </span>
                             <h1 className="mb-4 text-4xl leading-tight font-bold tracking-tight sm:text-5xl md:text-6xl">
                                 <Trans>
-                                    Every model. <span className="text-primary">One subscription.</span>
+                                    Every model. <span className="text-primary-text">One subscription.</span>
                                 </Trans>
                             </h1>
                             <p className="mb-8 max-w-2xl text-base leading-relaxed text-white/50 sm:text-lg">
@@ -508,7 +508,7 @@ const ModelsPage = () => {
                         <motion.div initial="hidden" variants={fadeIn} viewport={{ once: true }} whileInView="visible">
                             <h2 className="mb-3 text-3xl font-bold sm:text-4xl">
                                 <Trans>
-                                    All models. <span className="text-primary">One workspace.</span>
+                                    All models. <span className="text-primary-text">One workspace.</span>
                                 </Trans>
                             </h2>
                             <p className="mx-auto mb-8 max-w-md text-base text-white/50">{t`Start free with 20 messages a day — no credit card required.`}</p>

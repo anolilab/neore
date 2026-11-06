@@ -114,7 +114,7 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
 
             {run?.childThreadId && (
                 <Link
-                    className="text-primary mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
+                    className="text-primary-text mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
                     params={{ threadId: run.childThreadId }}
                     to="/chat/$threadId"
                 >

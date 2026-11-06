@@ -368,7 +368,7 @@ const NodeTopToolbar = ({ data, nodeId, nodeType, selected = false }: NodeTopToo
                                     <DropdownMenuContent align="start" side="bottom" sideOffset={6}>
                                         {modelOptions.map((opt) => (
                                             <DropdownMenuItem
-                                                className={cn("cursor-pointer text-xs", currentModel === opt.value && "text-primary font-medium")}
+                                                className={cn("cursor-pointer text-xs", currentModel === opt.value && "text-primary-text font-medium")}
                                                 key={opt.value}
                                                 onClick={() => handleModelChange(opt.value)}
                                             >
@@ -397,7 +397,7 @@ const NodeTopToolbar = ({ data, nodeId, nodeType, selected = false }: NodeTopToo
                                     <DropdownMenuContent align="start" side="bottom" sideOffset={6}>
                                         {ASPECT_RATIOS.map((ar) => (
                                             <DropdownMenuItem
-                                                className={cn("cursor-pointer text-xs", currentAspectRatio === ar.value && "text-primary font-medium")}
+                                                className={cn("cursor-pointer text-xs", currentAspectRatio === ar.value && "text-primary-text font-medium")}
                                                 key={ar.value}
                                                 onClick={() => handleAspectRatioChange(ar.value)}
                                             >

@@ -75,7 +75,7 @@ const ComposerSearchMode: FC<ComposerSearchModeProps> = ({ disabled, mode, onMod
                                     className={clsx(
                                         "bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 hover:border-border dark:hover:border-sidebar-border/50 text-foreground h-7 gap-1 px-2 dark:text-white",
                                         mode !== "chat" &&
-                                            "bg-primary/10 text-primary border-primary/30 dark:text-primary hover:bg-primary/20 hover:border-primary/40",
+                                            "bg-primary/10 text-primary-text border-primary/30 dark:text-primary-text hover:bg-primary/20 hover:border-primary/40",
                                     )}
                                     variant="outline"
                                 >
@@ -99,7 +99,7 @@ const ComposerSearchMode: FC<ComposerSearchModeProps> = ({ disabled, mode, onMod
                             <span className="font-medium">{label}</span>
                             <span className="text-muted-foreground text-xs">{description}</span>
                         </div>
-                        {mode === id && <Check className="text-primary size-4 shrink-0" />}
+                        {mode === id && <Check className="text-primary-text size-4 shrink-0" />}
                     </DropdownMenuItem>
                 ))}
             </DropdownMenuContent>

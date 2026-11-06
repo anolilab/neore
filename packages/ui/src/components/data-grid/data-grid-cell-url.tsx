@@ -232,7 +232,7 @@ export const UrlCell = <TData extends RowData>({
             {!isEditing && displayValue ? (
                 <div className="size-full overflow-hidden" data-slot="grid-cell-content">
                     <a
-                        className="text-primary decoration-primary/30 hover:decoration-primary/60 data-focused:text-foreground data-invalid:text-destructive data-focused:decoration-foreground/50 data-invalid:decoration-destructive/50 data-focused:hover:decoration-foreground/70 data-invalid:hover:decoration-destructive/70 truncate underline underline-offset-2 data-invalid:cursor-not-allowed"
+                        className="text-primary-text decoration-primary/30 hover:decoration-primary/60 data-focused:text-foreground data-invalid:text-destructive data-focused:decoration-foreground/50 data-invalid:decoration-destructive/50 data-focused:hover:decoration-foreground/70 data-invalid:hover:decoration-destructive/70 truncate underline underline-offset-2 data-invalid:cursor-not-allowed"
                         data-focused={isFocused && !isDangerousUrl ? "" : undefined}
                         data-invalid={isDangerousUrl ? "" : undefined}
                         href={urlHref}

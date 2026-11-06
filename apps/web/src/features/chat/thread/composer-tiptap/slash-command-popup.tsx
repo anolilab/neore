@@ -538,7 +538,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                                                     )}
                                                     <span className="flex-1 truncate text-left font-medium">{model.name ?? model.id}</span>
                                                 </div>
-                                                {isSelected && <CheckIcon className="text-primary ml-auto size-4" />}
+                                                {isSelected && <CheckIcon className="text-primary-text ml-auto size-4" />}
                                             </CommandItem>
                                         );
                                     })}
@@ -593,7 +593,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                                             value={skill._id}
                                         >
                                             <div className="flex min-w-0 flex-1 items-center gap-2">
-                                                <Zap className="text-primary size-4 shrink-0" />
+                                                <Zap className="text-primary-text size-4 shrink-0" />
                                                 <div className="min-w-0 flex-1">
                                                     <span className="block truncate font-medium">{skill.name}</span>
                                                     <span className="text-muted-foreground block truncate text-xs">

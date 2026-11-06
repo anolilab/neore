@@ -59,11 +59,12 @@ const ComposerGoal: FC<ComposerGoalProps> = ({ disabled }) => {
                 <TooltipTrigger
                     render={
                         <Button
-                            aria-label={enabled ? t`Turn off run until done` : t`Turn on run until done`}
+                            // The name starts with the visible label ("Goal"), so a voice user hears what a sighted user sees.
+                            aria-label={t`Goal: run until done`}
                             aria-pressed={enabled}
                             className={clsx(
                                 "bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 text-foreground h-7 gap-1 px-2 dark:text-white",
-                                enabled && "bg-primary/10 text-primary border-primary/30 dark:text-primary hover:bg-primary/20 hover:border-primary/40",
+                                enabled && "bg-primary/10 text-primary-text border-primary/30 dark:text-primary-text hover:bg-primary/20 hover:border-primary/40",
                             )}
                             disabled={disabled}
                             onClick={() => setEnabled(!enabled)}
@@ -85,7 +86,7 @@ const ComposerGoal: FC<ComposerGoalProps> = ({ disabled }) => {
                         render={
                             <Button
                                 aria-label={t`Review rounds: ${maxRounds}. Change`}
-                                className="bg-primary/10 text-primary border-primary/30 h-7 px-2"
+                                className="bg-primary/10 text-primary-text border-primary/30 h-7 px-2"
                                 disabled={disabled}
                                 onClick={cycleRounds}
                                 variant="outline"

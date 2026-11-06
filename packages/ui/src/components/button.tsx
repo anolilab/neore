@@ -29,7 +29,7 @@ const buttonVariants = cva(
                 destructive:
                     "bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/20 text-destructive focus-visible:border-destructive/40 dark:hover:bg-destructive/30",
                 ghost: "hover:bg-muted hover:text-foreground dark:hover:bg-muted/50 aria-expanded:bg-muted aria-expanded:text-foreground",
-                link: "text-primary underline-offset-4 hover:underline",
+                link: "text-primary-text underline-offset-4 hover:underline",
                 marketing:
                     "z-0 text-white rounded-none relative before:absolute before:bg-white before:[background-size:150%_150%] before:[transition:all_.2s_ease-in-out] before:animate-[16s_ease-in-out_infinite_move-background] before:bg-center before:inset-0 before:-z-2 before:[background-image:url('/images/primary-button-background.jpg')] after:bg-black after:-z-1 after:inset-[4px] after:absolute hover:before:transform-[scaleX(1.0125)scaleY(1.025)] hover:before:filter-[brightness(130%)]",
                 "marketing-ghost":

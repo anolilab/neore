@@ -17,7 +17,7 @@ import WeChat from "@neore/ui/icons/wechat";
 import WhatsApp from "@neore/ui/icons/whatsapp";
 import cn from "@neore/ui/utils/cn";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation, useRouter } from "@tanstack/react-router";
+import { Link, useLocation, useRouter } from "@tanstack/react-router";
 import {
     AlarmClock,
     ArchiveIcon,
@@ -189,6 +189,7 @@ const ThreadNodeChildren: FC<{
 
 interface ThreadNodeProperties {
     currentThreadId: string | undefined;
+    dragAttributes?: any;
     dragListeners?: any;
     expandedThreads: Set<string>;
     handleCreateBranch: (threadId: string) => void;
@@ -212,6 +213,7 @@ interface ThreadNodeProperties {
 
 const ThreadNode: FC<ThreadNodeProperties> = ({
     currentThreadId,
+    dragAttributes,
     dragListeners,
     expandedThreads,
     handleCreateBranch,
@@ -439,6 +441,11 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
 
                 e.stopPropagation();
 
+                // The title is a link and navigates by itself.
+                if ((e.target as HTMLElement).closest("a")) {
+                    return;
+                }
+
                 // Prevent navigation when dialogs are open
                 if (showDeleteDialog || showMoveToProjectDialog) {
                     return;
@@ -467,24 +474,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     isTransitioningRef.current = false;
                 }, 100);
             }}
-            onKeyDown={(e) => {
-                if (e.target !== e.currentTarget) {
-                    return;
-                }
-
-                if (!(e.key === "Enter" || e.key === " ") || isSelectionMode) {
-                    return;
-                }
-
-                e.preventDefault();
-                e.stopPropagation();
-
-                if (!showDeleteDialog && !showMoveToProjectDialog && !isActive && urlThreadId !== node.threadId && currentThreadId !== node.threadId) {
-                    router.navigate({ params: { threadId: node.threadId }, search: {}, to: "/chat/$threadId" });
-                }
-            }}
-            role="button"
-            tabIndex={-1}
+            // A pointer shortcut: keyboard users reach the title link (and the row's buttons), so the row takes no role.
+            role="presentation"
         >
             {isSelectionMode && (
                 <Checkbox
@@ -504,7 +495,12 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
             )}
 
             {!isDeleting && !loadingStates.reordering && !isSelectionMode && (
-                <div className="opacity-0 transition-opacity group-hover/action-item:opacity-100" {...dragListeners}>
+                <div
+                    aria-label={named(t`Reorder`)}
+                    className="rounded-sm opacity-0 transition-opacity group-hover/action-item:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none"
+                    {...dragAttributes}
+                    {...dragListeners}
+                >
                     <GripVertical className="text-brand-black/60 dark:text-brand-white/60 h-3 w-3 cursor-grab active:cursor-grabbing" />
                 </div>
             )}
@@ -543,7 +539,19 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             {isFailed && <ThreadStatusIcon status="error" threadId={node.threadId} />}
                             {isComparisonParent && <GitCompareArrows aria-label={t`Model comparison`} className="text-muted-foreground h-3 w-3 shrink-0" />}
                             {isLocked && <Lock aria-hidden="true" className="text-muted-foreground h-3 w-3 shrink-0" />}
-                            <span className={cn("truncate", isUnread && "font-medium")}>{displayTitle}</span>
+                            {isSelectionMode ? (
+                <span className={cn("truncate", isUnread && "font-medium")}>{displayTitle}</span>
+            ) : (
+                // The title is the row's keyboard target: the row itself holds no role, so the link is what Tab reaches.
+                <Link
+                    className={cn("truncate rounded-sm focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none", isUnread && "font-medium")}
+                    params={{ threadId: node.threadId }}
+                    search={{}}
+                    to="/chat/$threadId"
+                >
+                    {displayTitle}
+                </Link>
+            )}
                             {needsYou !== undefined && (
                                 <span className={cn("shrink-0 text-xs", NEEDS_YOU_TEXT_CLASS)}>{needsYou === "approval" ? t`Approval` : t`Question`}</span>
                             )}
@@ -655,7 +663,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             render={
                                 <Button
                                     aria-label={named(i18n._(getPinTooltip(isPinning, node.isPinned)))}
-                                    className="hover:text-primary h-6 w-6 p-0"
+                                    className="hover:text-primary-text h-6 w-6 p-0"
                                     disabled={isPinning}
                                     onClick={(e) => {
                                         e.preventDefault();
@@ -690,7 +698,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         render={
                             <Button
                                 aria-label={named(isBranching ? t`Creating branch...` : t`Create branch`)}
-                                className="hover:text-primary h-6 w-6 p-0"
+                                className="hover:text-primary-text h-6 w-6 p-0"
                                 disabled={isBranching}
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -720,7 +728,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         render={
                             <Button
                                 aria-label={named(t`Move to project`)}
-                                className="hover:text-primary h-6 w-6 p-0"
+                                className="hover:text-primary-text h-6 w-6 p-0"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setShowMoveToProjectDialog(true);
@@ -741,7 +749,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             render={
                                 <Button
                                     aria-label={named(t`Open in new window`)}
-                                    className="hover:text-primary h-6 w-6 p-0"
+                                    className="hover:text-primary-text h-6 w-6 p-0"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         void openThreadWindow(node.threadId);
@@ -798,7 +806,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                     render={
                                         <Button
                                             aria-label={named(isLocked ? t`Chat lock: locked` : t`Chat lock`)}
-                                            className="hover:text-primary h-6 w-6 p-0"
+                                            className="hover:text-primary-text h-6 w-6 p-0"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                             }}
@@ -854,7 +862,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                         render={
                                             <Button
                                                 aria-label={named(t`Snooze thread`)}
-                                                className="hover:text-primary h-6 w-6 p-0"
+                                                className="hover:text-primary-text h-6 w-6 p-0"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                 }}
@@ -905,7 +913,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                     render={
                                         <Button
                                             aria-label={named(isDownloading ? t`Downloading...` : t`Download thread`)}
-                                            className="hover:text-primary h-6 w-6 p-0"
+                                            className="hover:text-primary-text h-6 w-6 p-0"
                                             disabled={isDownloading}
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -941,7 +949,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         render={
                             <Button
                                 aria-label={named(i18n._(getArchiveTooltip(isArchiving, node.status)))}
-                                className="hover:text-primary h-6 w-6 p-0"
+                                className="hover:text-primary-text h-6 w-6 p-0"
                                 disabled={isArchiving}
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -978,7 +986,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             render={
                                 <Button
                                     aria-label={named(isConverting ? t`Converting...` : t`Convert to permanent`)}
-                                    className="hover:text-primary h-6 w-6 p-0"
+                                    className="hover:text-primary-text h-6 w-6 p-0"
                                     disabled={isConverting}
                                     onClick={async (e) => {
                                         e.stopPropagation();
@@ -1086,7 +1094,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 </>
             )}
             {searchQuery.trim() && node.relevantMessages && node.relevantMessages.length > 0 && (
-                <div className="bg-primary/10 text-primary shrink-0 rounded-full px-1.5 py-0.5 text-xs">
+                <div className="bg-primary/10 text-primary-text shrink-0 rounded-full px-1.5 py-0.5 text-xs">
                     <Plural one="# match" other="# matches" value={node.relevantMessages.length} />
                 </div>
             )}
@@ -1107,16 +1115,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             handleThreadToggle(node.threadId, index, e.shiftKey);
                         }
                     }}
-                    onKeyDown={(e) => {
-                        if (!(e.key === "Enter" || e.key === " ") || index === undefined) {
-                            return;
-                        }
-
-                        e.preventDefault();
-                        handleThreadToggle(node.threadId, index, false);
-                    }}
-                    role="button"
-                    tabIndex={0}
+                    role="presentation"
                 >
                     {content}
                 </div>
@@ -1168,24 +1167,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             }, 100);
                         }
                     }}
-                    onKeyDown={(e) => {
-                        if (e.target !== e.currentTarget) {
-                            return;
-                        }
-
-                        if (!(e.key === "Enter" || e.key === " ")) {
-                            return;
-                        }
-
-                        e.preventDefault();
-
-                        if (!showDeleteDialog && !showMoveToProjectDialog && !isActive && urlThreadId !== node.threadId && currentThreadId !== node.threadId) {
-                            router.navigate({ params: { threadId: node.threadId }, search: {}, to: "/chat/$threadId" });
-                        }
-                    }}
                     onMouseEnter={handleMouseEnter}
-                    role="button"
-                    tabIndex={0}
+                    role="presentation"
                 >
                     {content}
                 </div>

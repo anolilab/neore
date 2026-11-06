@@ -89,7 +89,7 @@ const SkillItem = ({ canDelete, isBusy = false, onDelete, onEdit, onExport, onFo
             <CardHeader className="space-y-3 pb-3">
                 <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
-                        <div aria-hidden="true" className="bg-primary/10 text-primary flex size-8 items-center justify-center rounded-md">
+                        <div aria-hidden="true" className="bg-primary/10 text-primary-text flex size-8 items-center justify-center rounded-md">
                             {skill.icon || <Zap className="size-4" />}
                         </div>
                         <div>

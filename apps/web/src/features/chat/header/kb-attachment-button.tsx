@@ -165,7 +165,7 @@ const KBAttachmentButton: FC<KBAttachmentButtonProps> = ({ threadId }) => {
                                 <Button
                                     aria-label={t`Knowledge base`}
                                     aria-pressed={attachedCount > 0}
-                                    className={cn("relative", attachedCount > 0 && "text-primary")}
+                                    className={cn("relative", attachedCount > 0 && "text-primary-text")}
                                     size="icon"
                                     variant="ghost"
                                 >
