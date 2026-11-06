@@ -112,6 +112,7 @@ describe("paths with hidden characters", () => {
         const prompt = buildHostGuidePrompt(input({ baseBranch: "main\u{200D}" }));
 
         expect(prompt).toContain(String.raw`"baseBranch": "main\\u200D"`);
+        expect(prompt).toContain(String.raw`the JSON text "main\\u200D" names main`);
         expect(stripHiddenText(prompt).text).toBe(prompt);
     });
 
