@@ -78,6 +78,9 @@ export default defineConfig(async ({ mode }) => {
             modulePreload: { polyfill: false },
             reportCompressedSize: false,
             rolldownOptions: {
+                // `ROLLDOWN_REPORT=1 vite build` writes the perf report to
+                // `node_modules/.rolldown/report/dist/` (entry.md, timing.md, chunks.md).
+                devtools: process.env.ROLLDOWN_REPORT ? { mode: "report" } : undefined,
                 output: {
                     codeSplitting: {
                         groups: [
