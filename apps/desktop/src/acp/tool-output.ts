@@ -61,5 +61,16 @@ export const terminalIdOf = (content: unknown): string | undefined => {
 export const cutTerminal = (ended: { output: string; truncated: boolean }, secretLength: number): string =>
     ended.truncated ? ended.output.slice(Math.max(0, secretLength - 1)) : ended.output;
 
-/** The tail a row shows: masked whole first, then cut, so the cut never leaves part of a masked value. */
-export const outputTail = (raw: string, scrub: (value: string) => string): string => scrub(raw).slice(-MAX_TOOL_OUTPUT_CHARS);
+/** A lone low surrogate at the start: the second half of a character the cut split. */
+const LOW_SURROGATE = /^[\uDC00-\uDFFF]/u;
+
+/**
+ * The tail a row shows: masked whole first, then cut, so the cut never leaves part of a masked value. The cut counts UTF-16
+ * units, so it can fall between the halves of a character outside the basic plane; such a tail starts without its second
+ * half, which is one unit shorter than the limit and never a lone surrogate.
+ */
+export const outputTail = (raw: string, scrub: (value: string) => string): string => {
+    const tail = scrub(raw).slice(-MAX_TOOL_OUTPUT_CHARS);
+
+    return LOW_SURROGATE.test(tail) ? tail.slice(1) : tail;
+};

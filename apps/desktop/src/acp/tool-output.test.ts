@@ -29,6 +29,15 @@ describe(terminalIdOf, () => {
 });
 
 describe(outputTail, () => {
+    it("does not start a tail on half of a character outside the basic plane", () => {
+        // The cut falls between the two halves of an emoji, so the unshortened tail would start on its second half.
+        const raw = `${"x".repeat(10)}😀${"y".repeat(MAX_TOOL_OUTPUT_CHARS - 1)}`;
+        const tail = outputTail(raw, (value) => value);
+
+        expect(tail).toBe("y".repeat(MAX_TOOL_OUTPUT_CHARS - 1));
+        expect(tail.length).toBeLessThanOrEqual(MAX_TOOL_OUTPUT_CHARS);
+    });
+
     it("keeps the tail of a long output", () => {
         const raw = `${"a".repeat(5000)}END`;
 
