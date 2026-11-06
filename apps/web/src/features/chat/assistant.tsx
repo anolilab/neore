@@ -74,8 +74,12 @@ const AssistantContent: FC<{
             // unmount its editor, edits and all. The reader is told why, and can open it once the edits are saved or discarded.
             event.preventDefault();
 
-            if (useChatUIStore.getState().canvasDirty) {
-                showWarning(t`Save or discard your edits to open this PDF in the panel.`);
+            // A document canvas is open when no PDF preview is (openCanvas clears it). Its editor holds edits that are not
+            // saved yet, and nothing reports them, so the panel does not replace it.
+            const state = useChatUIStore.getState();
+
+            if (state.isCanvasOpen && state.previewFile === null) {
+                showWarning(t`Close the open document to view this PDF in the panel.`);
 
                 return;
             }
