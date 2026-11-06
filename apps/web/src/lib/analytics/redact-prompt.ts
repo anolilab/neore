@@ -165,60 +165,73 @@ export const redactPromptFromUrl = (value: string): string => {
     return `${head}${tail}`;
 };
 
-const containsPrompt = (value: unknown): boolean => {
-    if (typeof value === "string") {
-        return mayNamePrompt(value) && PROMPT_ASSIGNMENT.test(decodeFully(value));
+/**
+ * Whether any string in an event names a prompt, as a value or as a property name, at any depth. Walks with an explicit stack, so depth is
+ * not a limit and a deep event cannot overflow the call stack. A value seen once is not walked again.
+ */
+const containsPrompt = (root: unknown): boolean => {
+    const stack: unknown[] = [root];
+    const seen = new Set<object>();
+
+    while (stack.length > 0) {
+        const value = stack.pop();
+
+        if (typeof value === "string") {
+            if (mayNamePrompt(value) && PROMPT_ASSIGNMENT.test(decodeFully(value))) {
+                return true;
+            }
+
+            continue;
+        }
+
+        if (value === null || typeof value !== "object" || seen.has(value)) {
+            continue;
+        }
+
+        seen.add(value);
+
+        if (Array.isArray(value)) {
+            for (const item of value) {
+                stack.push(item);
+            }
+
+            continue;
+        }
+
+        if (isPlainObject(value)) {
+            for (const [key, item] of Object.entries(value)) {
+                if (mayNamePrompt(key) && PROMPT_ASSIGNMENT.test(decodeFully(key))) {
+                    return true;
+                }
+
+                stack.push(item);
+            }
+        }
     }
 
-    if (Array.isArray(value)) {
-        return value.some((item) => containsPrompt(item));
-    }
-
-    return isPlainObject(value) && Object.values(value).some((item) => containsPrompt(item));
+    return false;
 };
 
 /**
- * Every string in `value`, at any depth, cleaned by `redactPromptFromUrl`. Only a plain array or object is walked; anything else
- * (a `Date`, a class instance) is kept as it is. A container with nothing to change is returned as the same object.
+ * The event with its prompt text removed, and every other field kept. A subtree that names no prompt is returned as it is, so an event
+ * without a prompt comes back unchanged, and nothing below a depth is dropped. Only the path to a prompt is rebuilt.
  */
-/** How deep the walk goes into an event. An event is shallow; past this depth a value is dropped rather than sent unchecked. */
-const MAX_EVENT_DEPTH = 64;
-
-const redactDeep = (value: unknown, depth = 0): unknown => {
-    if (depth > MAX_EVENT_DEPTH) {
-        return undefined;
-    }
-
+const redactDeep = (value: unknown): unknown => {
     if (typeof value === "string") {
         return redactPromptFromUrl(value);
     }
 
+    if (value === null || typeof value !== "object" || !containsPrompt(value)) {
+        return value;
+    }
+
     if (Array.isArray(value)) {
-        let changed = false;
-        const items = value.map((item) => {
-            const next = redactDeep(item, depth + 1);
-
-            changed ||= next !== item;
-
-            return next;
-        });
-
-        return changed ? items : value;
+        return value.map((item) => redactDeep(item));
     }
 
     if (isPlainObject(value)) {
-        // A key is text too: a property named from a link carries its prompt, so the key is cleaned as a string value is.
-        let changed = false;
-        const entries = Object.entries(value).map(([key, item]) => {
-            const cleanKey = redactPromptFromUrl(key);
-            const next = redactDeep(item, depth + 1);
-
-            changed ||= next !== item || cleanKey !== key;
-
-            return [cleanKey, next] as const;
-        });
-
-        return changed ? Object.fromEntries(entries) : value;
+        // A property name is text too: one built from a link carries its prompt, so the name is cleaned as a value is.
+        return Object.fromEntries(Object.entries(value).map(([key, item]) => [redactPromptFromUrl(key), redactDeep(item)]));
     }
 
     return value;

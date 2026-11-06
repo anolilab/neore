@@ -346,14 +346,39 @@ describe("a prompt in an event's property name", () => {
         expect(redactPromptFromEvent(event)?.properties).toEqual(expect.objectContaining({ plain: "value" }));
     });
 
-    it("bounds the walk: a value nested past the event depth is dropped, not sent", () => {
-        let nested: Record<string, unknown> = { leaf: "prompt=secret" };
+    it("keeps every field of a deeply nested event, and removes only the prompt text", () => {
+        // Each level has a field of its own, and the prompt sits at the bottom, 100 levels down.
+        let nested: Record<string, unknown> = { leaf: "kept", prompt: "prompt=secret" };
 
-        for (let level = 0; level < 80; level += 1) {
-            nested = { next: nested };
+        for (let level = 0; level < 100; level += 1) {
+            nested = { [`level${level}`]: level, child: nested, name: `level ${level}` };
         }
 
-        expect(JSON.stringify(redactPromptFromEvent({ event: "$pageview", properties: nested }))).not.toContain("secret");
+        const cleaned = redactPromptFromEvent({ event: "$pageview", properties: nested }) as { properties: Record<string, unknown> };
+        const payload = JSON.stringify(cleaned);
+
+        expect(payload).not.toContain("secret");
+        let node = cleaned.properties as Record<string, unknown>;
+
+        for (let level = 99; level >= 0; level -= 1) {
+            expect(node[`level${level}`]).toBe(level);
+            expect(node.name).toBe(`level ${level}`);
+            node = node.child as Record<string, unknown>;
+        }
+
+        expect(node.leaf).toBe("kept");
+    });
+
+    it("returns a deeply nested event with no prompt as the same object, untouched", () => {
+        let nested: Record<string, unknown> = { leaf: "kept" };
+
+        for (let level = 0; level < 100; level += 1) {
+            nested = { child: nested, level };
+        }
+
+        const event = { event: "$pageview", properties: nested };
+
+        expect(redactPromptFromEvent(event)).toBe(event);
     });
 });
 
