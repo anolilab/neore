@@ -241,3 +241,24 @@ describe("an encoded top-level prompt in an analytics URL", () => {
         expect(cleaned).toBe("https://app.example.com/chat?model=gpt-4o");
     });
 });
+
+describe("a sign-in return link whose prompt has an & or a #", () => {
+    /** The link a copied message makes, as a sign-in page's `redirectTo` carries it. */
+    const returnTo = (prompt: string): string => {
+        const link = new URL(buildPromptLink("https://app.example.com", { model: "gpt-4o", prompt }));
+        const page = new URL("https://app.example.com/auth/sign-in");
+
+        page.searchParams.set("redirectTo", `${link.pathname}${link.search}`);
+
+        return page.href;
+    };
+
+    it.each([
+        ["an &", "a & secret"],
+        ["a #", "a # secret"],
+        ["several & and a word after", "Summarise & keep secret & more"],
+        ["a # with a word after", "x #secret"],
+    ])("removes the whole prompt when it contains %s, and keeps the model", (_name, prompt) => {
+        expect(redactPromptFromUrl(returnTo(prompt))).toBe("https://app.example.com/auth/sign-in?redirectTo=%2Fchat%3Fmodel%3Dgpt-4o");
+    });
+});

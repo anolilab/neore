@@ -42,18 +42,27 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> => {
     return prototype === Object.prototype || prototype === null;
 };
 
-/** The text with its percent-encoding removed, repeated while a pass still changes it: a nested link is encoded twice. */
+/** One run of percent-encoded bytes decoded, or left as it is when it is malformed. */
+const decodeRun = (run: string): string => {
+    try {
+        return decodeURIComponent(run);
+    } catch {
+        return run;
+    }
+};
+
+/**
+ * The text with one level of percent-encoding removed. A nested link is decoded one level only: an `&` or `#` that the link itself
+ * encoded stays encoded, so it is not taken for a separator in the link's own query.
+ */
+const decodeOnce = (text: string): string => text.replaceAll(ENCODED_RUN, decodeRun);
+
+/** The text with all its percent-encoding removed, repeated while a pass still changes it. Used to find a prompt, never to split. */
 const decodeFully = (text: string): string => {
     let current = text;
 
     for (let pass = 0; pass < MAX_DECODE_PASSES; pass += 1) {
-        const next = current.replaceAll(ENCODED_RUN, (run) => {
-            try {
-                return decodeURIComponent(run);
-            } catch {
-                return run;
-            }
-        });
+        const next = decodeOnce(current);
 
         if (next === current) {
             return current;
@@ -77,13 +86,13 @@ const redactSegment = (segment: string, redact: (text: string) => string): strin
         return segment;
     }
 
-    const decodedValue = decodeFully(segment.slice(equals + 1));
+    const rawValue = segment.slice(equals + 1);
 
-    if (!NESTED_PROMPT.test(decodedValue)) {
+    if (!NESTED_PROMPT.test(decodeFully(rawValue))) {
         return segment;
     }
 
-    return `${segment.slice(0, equals)}=${encodeURIComponent(redact(decodedValue))}`;
+    return `${segment.slice(0, equals)}=${encodeURIComponent(redact(decodeOnce(rawValue)))}`;
 };
 
 /** A query with its prompt parameters removed. Every other segment is kept as it was written. */
