@@ -8,7 +8,7 @@ import type { ModelCandidate } from "../skills/builder-logic";
 import { isSelectableTextModel } from "../skills/builder-logic";
 import type { SkillModelCandidate } from "../skills/slash-command";
 import { resolveSkillModel } from "../skills/slash-command";
-import { getNextCronTime } from "../triggers/schedule";
+import { findNextCronTime, getNextCronTime } from "../triggers/schedule";
 
 export const TASK_STATUSES = ["todo", "queued", "running", "needs_review", "done", "failed", "blocked"] as const;
 
@@ -476,24 +476,42 @@ export const nextRecurrenceAt = (cronExpression: string, after: number): number 
 const SLOT_WALK_WINDOW_MS = 7 * 24 * 60 * 60_000;
 
 /**
- * The latest scheduled slot at or before `now`, counting from the due slot `from` on the same grid the
- * scheduler uses (`nextRecurrenceAt`, so slots closer than the floor are not counted): after an outage that
- * is the most recent missed slot, which a skip records. A `from` more than a week old is moved up to the
- * first slot in the last week, so a long outage stays a short walk inside the sweep.
+ * The slot the scheduler would run next after `after` (the same floor as {@link nextRecurrenceAt}), or
+ * `undefined` when the expression matches no date. Unlike `nextRecurrenceAt` it never falls back to "an hour
+ * later": that fallback keeps a schedule ticking but is not a slot that was ever due.
  */
-export const latestSlotAtOrBefore = (cronExpression: string, from: number, now: number): number => {
-    let latest = from;
+const nextRealSlot = (cronExpression: string, after: number): number | undefined => {
+    let next = findNextCronTime(cronExpression, after);
 
-    if (from < now - SLOT_WALK_WINDOW_MS) {
-        const recent = getNextCronTime(cronExpression, now - SLOT_WALK_WINDOW_MS);
-
-        latest = recent <= now ? recent : from;
+    for (let guard = 0; next !== undefined && next - after < MIN_RECURRENCE_INTERVAL_MS && guard < 60; guard += 1) {
+        next = findNextCronTime(cronExpression, next);
     }
 
-    for (let guard = 0; guard < 1000; guard += 1) {
-        const next = nextRecurrenceAt(cronExpression, latest);
+    return next;
+};
 
-        if (next > now || next <= latest) {
+/**
+ * The latest slot a skip records: the most recent slot the scheduler would have run at or before `now`,
+ * walked on its own grid from the due slot `from`. Only real slots count: none before the task existed
+ * (`createdAt`), none of a schedule that matches no date (`undefined` then: nothing was skipped). A `from`
+ * older than a week starts the walk at the first slot in that week, so a long outage stays a short walk;
+ * an expression with no match costs one search, not one per fallback hour.
+ */
+export const latestSlotAtOrBefore = (cronExpression: string, from: number, now: number, createdAt: number): number | undefined => {
+    const earliest = Math.max(createdAt, now - SLOT_WALK_WINDOW_MS);
+    // The due slot itself, when it is a real slot inside the window; else the first real slot in the window.
+    const start = from >= earliest && findNextCronTime(cronExpression, from - 1) === from ? from : findNextCronTime(cronExpression, earliest - 1);
+
+    if (start === undefined || start > now) {
+        return undefined;
+    }
+
+    let latest = start;
+
+    for (let guard = 0; guard < 1000; guard += 1) {
+        const next = nextRealSlot(cronExpression, latest);
+
+        if (next === undefined || next > now) {
             break;
         }
 

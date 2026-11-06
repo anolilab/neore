@@ -35,7 +35,7 @@ import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries"
 import { canReadSkill } from "../skills/access";
 import { vSkillConfig } from "../skills/validators";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } from "./account";
-import type { TaskStatus } from "./logic";
+import type { TaskSkipReason, TaskStatus } from "./logic";
 import {
     canTransition,
     decideAfterVerdict,
@@ -638,14 +638,18 @@ export const checkDueTasks = internalMutation
             // really starts changes, and the stale-round check above reads `updatedAt` as the
             // run's last sign of life.
             const advance = { nextRunAt: nextRecurrenceAt(dueTask.cronExpression, now) };
+            // The skip a slot this sweep cannot run leaves on the task: the latest real slot, or nothing when the
+            // schedule had no real slot to skip. Bounded work, so a skipped task never holds up the rest of the batch.
+            const { cronExpression, nextRunAt: dueSlot } = dueTask;
+            const skipRecord = (reason: TaskSkipReason) => {
+                const at = latestSlotAtOrBefore(cronExpression, dueSlot, now, dueTask.createdAt);
+
+                return at === undefined ? {} : { lastSkippedAt: at, lastSkipReason: reason };
+            };
             const skipped = recurrenceSkipReason(task.status);
 
             if (skipped) {
-                await ctx.db.patch("tasks", task._id, {
-                    ...advance,
-                    lastSkippedAt: latestSlotAtOrBefore(dueTask.cronExpression, dueTask.nextRunAt, now),
-                    lastSkipReason: skipped,
-                });
+                await ctx.db.patch("tasks", task._id, { ...advance, ...skipRecord(skipped) });
 
                 continue;
             }
@@ -665,6 +669,13 @@ export const checkDueTasks = internalMutation
 
             if (landed) {
                 statusById.set(task._id as string, landed);
+            }
+
+            // Its dependencies are not done: this slot does not run now, so it is recorded like any other skip.
+            const blockedSkip = landed === "blocked" ? skipRecord("blocked") : {};
+
+            if ("lastSkippedAt" in blockedSkip) {
+                await ctx.db.patch("tasks", task._id, blockedSkip);
             }
         }
 

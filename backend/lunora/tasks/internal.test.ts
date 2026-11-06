@@ -355,6 +355,62 @@ describe("checkDueTasks missed and overlapping slots", () => {
         expect(await inbox()).toStrictEqual([{ outcome: "failure", title: "Summary", type: "task" }]);
     });
 
+    it("never lets a skipped task hold up the next due task in the batch", async () => {
+        // A schedule that matches no date (30 February), skipped while it runs.
+        const impossible = await insertTask({
+            activeCycle: "c1",
+            createdAt: Date.now() - 400 * 24 * HOUR,
+            cronExpression: "0 0 30 2 *",
+            nextRunAt: Date.now() - 300 * 24 * HOUR,
+            recurring: true,
+            status: "running",
+            title: "Impossible",
+            updatedAt: Date.now() - 60_000,
+        });
+        const next = await insertTask({ cronExpression: HOURLY, nextRunAt: Date.now() - HOUR, recurring: true, status: "done", title: "Next" });
+        const started = performance.now();
+
+        await runInternal(checkDueTasks, {});
+
+        expect(performance.now() - started).toBeLessThan(5000);
+        expect(roundJobs().map((job) => job.args.taskId)).toStrictEqual([next]);
+
+        const skipped = await getTask(impossible);
+
+        expect(skipped.status).toBe("running");
+        expect(skipped.nextRunAt).toBeGreaterThan(Date.now());
+        expect(skipped.lastSkippedAt).toBeUndefined();
+    });
+
+    it("records the first slot of a task found blocked like any later skipped slot", async () => {
+        const slot = Math.floor(Date.now() / HOUR) * HOUR;
+        const dependency = await insertTask({ title: "Dependency" });
+        const taskId = await insertTask({ cronExpression: HOURLY, dependsOn: [dependency], nextRunAt: slot, recurring: true, status: "todo" });
+
+        await runInternal(checkDueTasks, {});
+
+        expect(await getTask(taskId)).toMatchObject({ lastSkippedAt: slot, lastSkipReason: "blocked", status: "blocked" });
+        expect(roundJobs()).toHaveLength(0);
+    });
+
+    it("records no slot from before the task was created", async () => {
+        const latest = Math.floor(Date.now() / HOUR) * HOUR;
+        const taskId = await insertTask({
+            createdAt: latest - 90 * 60_000,
+            cronExpression: HOURLY,
+            nextRunAt: latest - 5 * HOUR,
+            recurring: true,
+            status: "needs_review",
+        });
+
+        await runInternal(checkDueTasks, {});
+
+        const task = await getTask(taskId);
+
+        expect(task.lastSkippedAt).toBe(latest);
+        expect(task.lastSkippedAt).toBeGreaterThanOrEqual(task.createdAt);
+    });
+
     it("records a slot that falls while the previous run is still going, without touching updatedAt", async () => {
         const slot = Math.floor(Date.now() / HOUR) * HOUR;
         const lastSignOfLife = Date.now() - 5 * 60_000;
