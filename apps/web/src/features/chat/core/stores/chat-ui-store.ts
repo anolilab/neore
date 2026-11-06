@@ -536,6 +536,12 @@ export const useScrollState = () => {
     return { isAtBottom, setIsAtBottom };
 };
 
+/**
+ * Whether a document (not a PDF preview) is open in the side panel. Its editor may hold edits that nothing reports yet,
+ * so opening a PDF must not replace it.
+ */
+export const isDocumentOpen = (state: Pick<ChatUIStore, "isCanvasOpen" | "previewFile">): boolean => state.isCanvasOpen && state.previewFile === null;
+
 export const useCanvasState = () => {
     const activeDocumentId = useChatUIStore((state) => state.activeDocumentId);
     const isCanvasOpen = useChatUIStore((state) => state.isCanvasOpen);

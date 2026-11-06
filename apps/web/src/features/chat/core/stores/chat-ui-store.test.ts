@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
 
 import type { PendingAttachment } from "./chat-ui-store";
-import { useChatUIStore } from "./chat-ui-store";
+import { isDocumentOpen, useChatUIStore } from "./chat-ui-store";
 
 const attachment = { fileId: "file-1", id: "a1", status: "complete" } as PendingAttachment;
 const reference = { id: "r1", url: "https://example.com/r1.png" } as ReferenceSelection;
@@ -129,5 +129,21 @@ describe("the side-panel PDF preview", () => {
         useChatUIStore.getState().closeCanvas();
 
         expect(useChatUIStore.getState()).toMatchObject({ isCanvasOpen: false, previewFile: null });
+    });
+
+    it("counts an open document as blocking a PDF, and a PDF preview or a closed panel as not", () => {
+        expect(isDocumentOpen(useChatUIStore.getState())).toBe(false);
+
+        useChatUIStore.getState().openPreviewFile(pdf);
+
+        expect(isDocumentOpen(useChatUIStore.getState())).toBe(false);
+
+        useChatUIStore.getState().openCanvas("doc-1");
+
+        expect(isDocumentOpen(useChatUIStore.getState())).toBe(true);
+
+        useChatUIStore.getState().closeCanvas();
+
+        expect(isDocumentOpen(useChatUIStore.getState())).toBe(false);
     });
 });

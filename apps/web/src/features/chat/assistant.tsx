@@ -13,7 +13,7 @@ import { useEffect } from "react";
 import CanvasPanel from "@/features/canvas/canvas-panel";
 import PdfPreviewPanel from "@/features/canvas/pdf-preview-panel";
 import { ChatProvider } from "@/features/chat/core/context/chat-context";
-import { useCanvasState, useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { isDocumentOpen, useCanvasState, useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { ModelId } from "@/features/chat/core/stores/model-store";
 import AppSidebar from "@/features/layout/components/app-sidebar";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
@@ -74,11 +74,8 @@ const AssistantContent: FC<{
             // unmount its editor, edits and all. The reader is told why, and can open it once the edits are saved or discarded.
             event.preventDefault();
 
-            // A document canvas is open when no PDF preview is (openCanvas clears it). Its editor holds edits that are not
-            // saved yet, and nothing reports them, so the panel does not replace it.
-            const state = useChatUIStore.getState();
-
-            if (state.isCanvasOpen && state.previewFile === null) {
+            // Its editor holds edits that are not saved yet, and nothing reports them, so the panel does not replace it.
+            if (isDocumentOpen(useChatUIStore.getState())) {
                 showWarning(t`Close the open document to view this PDF in the panel.`);
 
                 return;
