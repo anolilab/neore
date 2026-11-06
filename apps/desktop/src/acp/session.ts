@@ -1034,9 +1034,14 @@ export class AgentSession {
                 return;
             }
             case "current_mode_update": {
-                this.offered = withCurrentMode(this.offered, update.currentModeId, this.options.process.scrub);
-                this.modeVersion += 1;
-                this.reportOptions();
+                const offered = withCurrentMode(this.offered, update.currentModeId, this.options.process.scrub);
+
+                // A mode id the agent did not name validly changes nothing, so it does not supersede a change in flight.
+                if (offered !== this.offered) {
+                    this.offered = offered;
+                    this.modeVersion += 1;
+                    this.reportOptions();
+                }
 
                 return;
             }

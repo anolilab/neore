@@ -151,6 +151,15 @@ describe("setOption", () => {
         expect(states.at(-1)?.modes?.current).toBe("code");
     });
 
+    it("confirms a mode change the agent answers when an invalid mode update arrived while it was in flight", async () => {
+        const { player, session, states, steps } = await start("legacy-modes-invalid-update");
+        const change = session.setOption(undefined, "code");
+
+        await player.play(steps);
+        await expect(change).resolves.toBeUndefined();
+        expect(states.at(-1)?.modes?.current).toBe("code");
+    });
+
     it("sends nothing for a value the agent did not offer", async () => {
         const { agent, session } = await start("options-and-change");
         const before = agent.written.length;
