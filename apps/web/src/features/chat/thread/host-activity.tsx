@@ -9,7 +9,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { CheckCircle2, Circle, Loader2 } from "lucide-react";
 import type { FC } from "react";
-import { memo } from "react";
+import { memo, useLayoutEffect, useRef } from "react";
 
 export type HostPlanStatus = "completed" | "in_progress" | "pending";
 
@@ -115,6 +115,17 @@ HostPlan.displayName = "HostPlan";
 const HostToolCall: FC<{ tool: HostToolRow }> = memo(({ tool }) => {
     const { t } = useLingui();
     const { exit, output, status, title } = tool;
+    const outputRef = useRef<HTMLPreElement>(null);
+    // The output is a tail, so it opens at its newest lines; a box the reader scrolled up from keeps its place.
+    const followingRef = useRef(true);
+
+    useLayoutEffect(() => {
+        const box = outputRef.current;
+
+        if (box !== null && followingRef.current) {
+            box.scrollTop = box.scrollHeight;
+        }
+    }, [output]);
 
     const statusText = (): string => {
         switch (status) {
@@ -156,7 +167,7 @@ const HostToolCall: FC<{ tool: HostToolRow }> = memo(({ tool }) => {
     return (
         <li className="rounded-md border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-950/40" data-status={status}>
             <div className="flex items-center gap-2 text-sm">
-                <span className="min-w-0 flex-1 truncate font-mono text-gray-800 dark:text-gray-200">{title}</span>
+                <span className="min-w-0 flex-1 font-mono break-all text-gray-800 dark:text-gray-200">{title}</span>
                 <span className="text-muted-foreground shrink-0 text-xs">{statusText()}</span>
             </div>
             {exitText !== undefined && <p className="text-muted-foreground mt-1 text-xs">{exitText}</p>}
@@ -172,6 +183,12 @@ const HostToolCall: FC<{ tool: HostToolRow }> = memo(({ tool }) => {
                 <pre
                     aria-label={t`Output of ${title}`}
                     className="mt-2 max-h-48 overflow-auto rounded bg-gray-100 p-2 font-mono text-xs whitespace-pre-wrap text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+                    onScroll={(event) => {
+                        const box = event.currentTarget;
+
+                        followingRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < 8;
+                    }}
+                    ref={outputRef}
                     role="region"
                     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
                     tabIndex={0}
