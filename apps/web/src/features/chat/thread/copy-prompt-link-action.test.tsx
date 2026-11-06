@@ -23,8 +23,12 @@ const harness = vi.hoisted(() => {
         showError: vi.fn(),
         showSuccess: vi.fn(),
         showWarning: vi.fn(),
-        composerModelIds: undefined as ReadonlySet<string> | undefined,
-        thread: { botId: null as string | null } as { botId: string | null } | null,
+        composerModelEntries: undefined as ReadonlyMap<string, { id: string; mode?: string; provider?: string }> | undefined,
+        thread: { activeAgent: undefined, autoModel: false, botId: null as string | null } as {
+            activeAgent?: unknown;
+            autoModel?: boolean;
+            botId: string | null;
+        } | null,
         threadModel: "" as string,
     };
 });
@@ -43,7 +47,7 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
     return {
         useChatThread: () => {
             return {
-                composerModelIds: harness.composerModelIds,
+                composerModelEntries: harness.composerModelEntries,
                 isAnonymous: harness.isAnonymous,
                 model: harness.threadModel,
                 thread: harness.thread,
@@ -160,7 +164,7 @@ describe("CopyPromptLinkAction", () => {
             threadModes: new Map(),
         });
         // The composer offers every text model by default, so a copy of any of them is one the open would select.
-        harness.composerModelIds = new Set(textModels.map((model) => model.id));
+        harness.composerModelEntries = new Map(textModels.map((model) => [model.id, { id: model.id, mode: model.mode, provider: model.provider }]));
     });
 
     afterEach(() => {
@@ -407,7 +411,7 @@ describe("CopyPromptLinkAction", () => {
 
         // The thread's model is one the user has since blocked: the picker does not offer it, and the open would not select it.
         harness.threadModel = textModel?.id ?? "";
-        harness.composerModelIds = new Set([DEFAULT_CHAT_MODEL]);
+        harness.composerModelEntries = new Map([[DEFAULT_CHAT_MODEL, { id: DEFAULT_CHAT_MODEL }]]);
 
         renderAction();
 
@@ -417,8 +421,8 @@ describe("CopyPromptLinkAction", () => {
         expect(writeText).not.toHaveBeenCalled();
     });
 
-    it("refuses a copy from a text thread while a new chat would open in image mode, where the open selects no model", async () => {
-        // The new chat opens in the mode the composer was last in: image. The open would not select the text model, so the copy refuses.
+    it("copies from a text thread after an image chat, since the link opens a text chat whatever mode the composer was last in", async () => {
+        // The composer was last in image mode for a new chat. The copy names the thread's own text model, and the open sets a text chat.
         useModelStore.setState({ newThreadMode: "image" });
         harness.threadModel = DEFAULT_CHAT_MODEL;
 
@@ -426,12 +430,38 @@ describe("CopyPromptLinkAction", () => {
 
         clickCopy();
 
-        await waitFor(() => expect(harness.showWarning).toHaveBeenCalledWith("A prompt link cannot name this chat's model, so no link was copied."));
+        await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+        expect(copiedLink().searchParams.get("model")).toBe(DEFAULT_CHAT_MODEL);
+        expect(harness.showWarning).not.toHaveBeenCalled();
+    });
+
+    it("refuses a copy in a chat that Auto routes, since Auto picks the model for each send, and copies nothing", async () => {
+        harness.thread = { activeAgent: undefined, autoModel: true, botId: null };
+
+        renderAction();
+
+        clickCopy();
+
+        await waitFor(() =>
+            expect(harness.showWarning).toHaveBeenCalledWith("Auto chooses the model for each send, so a prompt link cannot name one, and no link was copied."),
+        );
         expect(writeText).not.toHaveBeenCalled();
     });
 
+    it("copies from a chat whose Auto is off, as it does for a thread that has an active model", async () => {
+        harness.thread = { activeAgent: { kind: "model", model: DEFAULT_CHAT_MODEL }, autoModel: true, botId: null };
+        harness.threadModel = DEFAULT_CHAT_MODEL;
+
+        renderAction();
+
+        clickCopy();
+
+        await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+        expect(harness.showWarning).not.toHaveBeenCalled();
+    });
+
     it("refuses a copy while the composer's model list is still loading, rather than copy a model it may not offer", async () => {
-        harness.composerModelIds = undefined;
+        harness.composerModelEntries = undefined;
 
         renderAction();
 
@@ -448,7 +478,7 @@ describe("CopyPromptLinkAction", () => {
 
         harness.thread = { botId: "bot-1" };
         harness.bots = [{ _id: "bot-1", model: textModel?.id ?? "" }];
-        harness.composerModelIds = new Set([DEFAULT_CHAT_MODEL]);
+        harness.composerModelEntries = new Map([[DEFAULT_CHAT_MODEL, { id: DEFAULT_CHAT_MODEL }]]);
 
         renderAction(harness.bots);
 

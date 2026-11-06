@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { ThreadRow } from "@/features/chat/core/context/chat-context-types";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
+import { isAutoRouted } from "@/features/chat/core/utils/composer-model";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC, useLunoraActionOptions } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
@@ -79,7 +80,7 @@ const useModelCombobox = ({ threadId }: UseModelComboboxProps) => {
     // A thread that runs on its own model chooses Auto; a switched thread's path decides its agent, so Auto is off there.
     // An existing thread that has not loaded yet has no Auto state to show, and the new-thread draft is not its own.
     const pendingAuto = useModelStore((state) => state.pendingSettings?.autoModel === true);
-    const autoModel = threadId ? thread?.autoModel === true && !thread.activeAgent : pendingAuto;
+    const autoModel = isAutoRouted({ pendingAuto, thread, threadId });
 
     // Update thread settings
     const updateThread = async (data: ThreadUpdateData) => {

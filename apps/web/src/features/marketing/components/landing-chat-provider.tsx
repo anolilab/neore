@@ -70,7 +70,7 @@ const LandingChatProvider = ({ children }: LandingChatProviderProps) => {
 
     const threadValue = useMemo((): ChatThreadContextValue => {
         return {
-            composerModelIds: undefined,
+            composerModelEntries: undefined,
             isAnonymous,
             isNewThread: true,
             model,

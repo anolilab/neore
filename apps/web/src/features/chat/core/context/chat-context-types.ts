@@ -8,6 +8,7 @@ import type { useLunora } from "@/lib/lunora/crpc";
 import type { RateLimitPause } from "../../thread/rate-limit-pause-notice";
 import type { ThreadOwnerState } from "../../thread-list/lib/thread-state-rules";
 import type { PendingAttachment } from "../stores/chat-ui-store";
+import type { LinkableModel } from "../utils/prompt-link-model";
 
 /**
  * Thread capabilities - what actions are available
@@ -60,8 +61,8 @@ export interface ThreadData extends ThreadOwnerState {
 // --- Split Context Types ---
 
 export interface ChatThreadContextValue {
-    /** The models the composer's picker offers this user, once that list is final (`undefined` while it loads). A copied link checks it. */
-    composerModelIds: ReadonlySet<string> | undefined;
+    /** The composer's picker list, once it is final (`undefined` while it loads). A copied link checks its model against it. */
+    composerModelEntries: ReadonlyMap<string, LinkableModel> | undefined;
     /** The signed-in person is an anonymous guest (the composer shows the free model for a text chat). */
     isAnonymous: boolean;
     isNewThread: boolean;

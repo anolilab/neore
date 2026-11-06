@@ -2,7 +2,7 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useLocation, useNavigate, useRouteContext } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
@@ -12,9 +12,10 @@ import Assistant from "@/features/chat/assistant";
 import { usePromptLinkDraft } from "@/features/chat/core/hooks/use-prompt-link-draft";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
+import type { LinkableModel } from "@/features/chat/core/utils/prompt-link-model";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
-import { useComposerModels, useComposerModelsSettled } from "@/hooks/use-composer-models";
+import { useComposerModelEntries } from "@/hooks/use-composer-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 // Module scope, so it outlives this component's mounts: a page load resumes once.
@@ -22,6 +23,9 @@ import { useCRPC } from "@/lib/lunora/crpc";
 // `firstKey` is the navigation that first showed the chat index on this page load. Only
 // that visit may resume: a later New chat (a new navigation) must open a blank chat.
 const resumeState: { consumed: boolean; firstKey: string | undefined } = { consumed: false, firstKey: undefined };
+
+/** The picker's list before it is final: no model is linkable, so a link selects none. */
+const NO_LINKABLE_MODELS: ReadonlyMap<string, LinkableModel> = new Map();
 
 /** Whether a landing message is waiting in the session. Read without consuming it; false where session storage is unavailable. */
 const landingMessageWaiting = (): boolean => {
@@ -75,19 +79,17 @@ const ChatPage = () => {
 
     // A link may select only a model the composer's picker offers this user. The link waits until the catalog and the user's rules
     // have answered, so the list is final; if the rules fail to load the list is empty, the link's model is refused and its prompt applies.
-    const composerModels = useComposerModels();
-    const composerSettled = useComposerModelsSettled();
-    const allowedModelIds = useMemo(() => new Set(composerModels.map((entry) => entry.id)), [composerModels]);
+    const linkableModels = useComposerModelEntries();
 
     usePromptLinkDraft({
-        allowedModelIds,
+        linkableModels: linkableModels ?? NO_LINKABLE_MODELS,
         // The composer sends the free model to an anonymous visitor's text chat, so the link's model waits for the session.
         isAnonymous: sessionData?.user?.isAnonymous === true,
         model: linkModel,
         otherDraftSource: Boolean(promptId) || (Boolean(hasInitialMessage) && handoffWaiting),
         prompt: linkPrompt,
         onDecided: endHandoffOwnership,
-        ready: !isSessionPending && composerSettled,
+        ready: !isSessionPending && linkableModels !== undefined,
     });
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.

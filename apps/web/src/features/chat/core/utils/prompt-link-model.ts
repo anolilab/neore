@@ -1,44 +1,35 @@
-import type { ModelDefinition } from "@neore/ai/models";
-import { enabledModelOf } from "@neore/ai/models";
-
-import type { ComposerMode } from "../stores/model-store";
 import { composerModelOf } from "./composer-model";
 
-/**
- * The registry row a link can name: an enabled text model the composer picks, and not an external one. Both ends use it, so a
- * link is copied only with a model the link opens on. A custom endpoint's model is not in the registry, so it has no row here.
- *
- * Kept out of `prompt-link.ts`: the chat route's search parser imports that module and runs in the entry chunk, and the model
- * registry this module needs would otherwise be loaded there too.
- */
-export const carriableLinkModel = (model: string | undefined): ModelDefinition | undefined => {
-    const definition = enabledModelOf(model, { mode: "text" });
-
-    return definition?.provider === "external" ? undefined : definition;
-};
+/** A model the composer's picker offers, as far as a prompt link needs to know it: its id, and what kind of model and who serves it. */
+export interface LinkableModel {
+    id: string;
+    /** The picker's mode for the model. A text model may leave it unset. */
+    mode?: string;
+    provider?: string;
+}
 
 /**
  * Whether opening a link on `model` selects it for the new chat. This is the one rule the link's open applies (the draft hook) and
- * its copy checks: the new chat is a text chat, the picker offers the model to this user (`allowedModelIds`), and the composer
- * would send with it (an anonymous visitor's text chat sends the free model). A copy names a model only when this holds.
+ * its copy checks, and it reads the picker's own entries: the model is in the list the picker offers this user, it is a text model
+ * and not an external one, and the composer would send with it (an anonymous visitor's text chat sends the free model). A link always
+ * opens a text chat, so the mode the composer was last in (an image chat's, say) does not decide it: opening the link sets the new chat
+ * to text. A copy names a model only when this holds, so a link opens on exactly the model the copy showed.
  */
 export const linkModelAppliesOnOpen = ({
-    allowedModelIds,
     isAnonymous,
+    linkable,
     model,
-    newThreadMode,
 }: {
-    allowedModelIds: ReadonlySet<string>;
     isAnonymous: boolean;
+    linkable: ReadonlyMap<string, LinkableModel>;
     model: string | undefined;
-    newThreadMode: ComposerMode;
 }): boolean => {
-    const definition = carriableLinkModel(model);
+    const entry = model === undefined ? undefined : linkable.get(model);
 
     return (
-        definition !== undefined &&
-        newThreadMode === "text" &&
-        allowedModelIds.has(definition.id) &&
-        composerModelOf({ isAnonymous, mode: "text", threadModel: definition.id }) === definition.id
+        entry !== undefined &&
+        (entry.mode ?? "text") === "text" &&
+        entry.provider !== "external" &&
+        composerModelOf({ isAnonymous, mode: "text", threadModel: entry.id }) === entry.id
     );
 };

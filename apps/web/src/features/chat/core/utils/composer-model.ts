@@ -45,3 +45,17 @@ export const sendsToComparison = ({
     comparisonMode: boolean;
     selectedModelsForComparison: ReadonlyArray<string>;
 }): boolean => comparisonMode && selectedModelsForComparison.length >= MIN_COMPARISON_MODELS;
+
+/**
+ * Whether the composer routes this chat's sends through Auto, which picks the model for each send. A thread uses its own setting, unless
+ * it has an active model; a new chat uses the setting it is being created with. The composer's picker and a prompt link's copy read this.
+ */
+export const isAutoRouted = ({
+    pendingAuto,
+    thread,
+    threadId,
+}: {
+    pendingAuto: boolean;
+    thread: { activeAgent?: unknown; autoModel?: boolean } | null | undefined;
+    threadId: string | undefined;
+}): boolean => (threadId ? thread?.autoModel === true && !thread.activeAgent : pendingAuto);

@@ -11,6 +11,7 @@ import { useChatUIStore } from "../stores/chat-ui-store";
 import type { ModelId } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
 import { PROMPT_LINK_MAX_CHARS } from "../utils/prompt-link";
+import type { LinkableModel } from "../utils/prompt-link-model";
 import { usePromptLinkDraft } from "./use-prompt-link-draft";
 
 const harness = vi.hoisted(() => {
@@ -50,8 +51,11 @@ const externalModel = "ext/mimo-v2-flash";
 const MODEL_NOTICE = "This link's model is not available in this chat. The chat keeps its model.";
 
 /** Every text model the composer's picker offers, by default: the link may select any of them, as a user with no gate would. */
-const OFFERED_TEXT_MODEL_IDS: ReadonlySet<string> = new Set(
-    MODEL_REGISTRY.filter((model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external").map((model) => model.id),
+const OFFERED_TEXT_MODELS: ReadonlyMap<string, LinkableModel> = new Map(
+    MODEL_REGISTRY.filter((model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external").map((model) => [
+        model.id,
+        { id: model.id, mode: model.mode, provider: model.provider },
+    ]),
 );
 
 /** A text model other than the default: a model a link can name, which the picker does not offer in the test that gates it. */
@@ -60,8 +64,8 @@ const gatedTextModel = MODEL_REGISTRY.find(
 );
 
 interface LinkProps {
-    allowedModelIds?: ReadonlySet<string>;
     isAnonymous?: boolean;
+    linkableModels?: ReadonlyMap<string, LinkableModel>;
     model?: string;
     otherDraftSource?: boolean;
     prompt?: string;
@@ -69,7 +73,7 @@ interface LinkProps {
 }
 
 const renderLink = (initial: LinkProps) =>
-    renderHook((props: LinkProps) => usePromptLinkDraft({ allowedModelIds: OFFERED_TEXT_MODEL_IDS, ...props }), { initialProps: initial });
+    renderHook((props: LinkProps) => usePromptLinkDraft({ linkableModels: OFFERED_TEXT_MODELS, ...props }), { initialProps: initial });
 
 const selectedModel = (): string => useModelStore.getState().selectedModel;
 
@@ -240,7 +244,7 @@ describe("usePromptLinkDraft", () => {
     it("does not select a model the composer's picker does not offer, keeps the chat's model, and still drafts the prompt", () => {
         expect(gatedTextModel).toBeDefined();
 
-        renderLink({ allowedModelIds: new Set([DEFAULT_CHAT_MODEL]), model: gatedTextModel?.id, prompt: "hi" });
+        renderLink({ linkableModels: new Map([[DEFAULT_CHAT_MODEL, { id: DEFAULT_CHAT_MODEL }]]), model: gatedTextModel?.id, prompt: "hi" });
 
         expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
         expect(useChatUIStore.getState().composerText).toBe("hi");
@@ -281,14 +285,14 @@ describe("usePromptLinkDraft", () => {
         expect(harness.showWarning).not.toHaveBeenCalled();
     });
 
-    it("does not apply a link's model to an image, video or audio new chat, which would send in that mode", () => {
+    it("opens a text chat on the link's model even when the composer was last in image mode, and sets the new chat to text", () => {
         useModelStore.setState({ newThreadMode: "image" });
 
         renderLink({ model: textModel?.id, prompt: "hi" });
 
-        expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+        expect(selectedModel()).toBe(textModel?.id);
+        expect(useModelStore.getState().newThreadMode).toBe("text");
         expect(useChatUIStore.getState().composerText).toBe("hi");
-        expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
     });
 
     it("does not apply a text model to an anonymous visitor, whose text chat sends the free model, and says so", () => {

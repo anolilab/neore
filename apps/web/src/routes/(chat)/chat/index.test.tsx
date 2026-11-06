@@ -80,8 +80,7 @@ vi.mock("@/components/error-boundaries/route-error-boundary", () => {
 // The picker's list for this user: by default every text model, so the link may select any of them; a test narrows it.
 vi.mock("@/hooks/use-composer-models", () => {
     return {
-        useComposerModels: () => harness.composerModels,
-        useComposerModelsSettled: () => true,
+        useComposerModelEntries: () => new Map(harness.composerModels.map((model) => [model.id, { id: model.id }])),
     };
 });
 

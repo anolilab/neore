@@ -8,7 +8,8 @@ import { useChatUIStore } from "../stores/chat-ui-store";
 import type { ModelId } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
 import { promptFromLink } from "../utils/prompt-link";
-import { carriableLinkModel, linkModelAppliesOnOpen } from "../utils/prompt-link-model";
+import type { LinkableModel } from "../utils/prompt-link-model";
+import { linkModelAppliesOnOpen } from "../utils/prompt-link-model";
 
 /** The chat search without the prompt link's own parameters: a saved prompt or a message in the same URL stays. */
 const withoutLinkParameters = (search: Record<string, unknown>): Record<string, unknown> =>
@@ -22,7 +23,7 @@ const withoutLinkParameters = (search: Record<string, unknown>): Record<string, 
  * address. It never sends. Nothing is decided until `ready`: the anonymity it reads comes from the session.
  */
 export const usePromptLinkDraft = ({
-    allowedModelIds,
+    linkableModels,
     isAnonymous = false,
     model,
     onDecided,
@@ -30,13 +31,14 @@ export const usePromptLinkDraft = ({
     prompt,
     ready = true,
 }: {
-    /**
-     * The models the composer's picker offers this user (`useComposerModels`). A link selects a model only from this set, so a
-     * model the person is not entitled to, or has blocked, is not selected by a link.
-     */
-    allowedModelIds: ReadonlySet<string>;
     /** The signed-in person is an anonymous guest: the composer sends the free model for them in a text chat. */
     isAnonymous?: boolean;
+
+    /**
+     * The entries of the composer's picker list (`useComposerModelEntries`). A link selects a model only if it is in this list, so a
+     * model the person is not entitled to, or has blocked, is not selected by a link.
+     */
+    linkableModels: ReadonlyMap<string, LinkableModel>;
     model?: string;
     /** Called once the link can be decided (the caller's own ownership of the draft ends here, after this pass has read it). */
     onDecided?: () => void;
@@ -94,16 +96,17 @@ export const usePromptLinkDraft = ({
         // A link's model travels only with its prompt (`readPromptLinkSearch` drops it otherwise), so a link without one leaves the model alone.
         if (applyLink && prompt !== undefined && model !== undefined) {
             const state = useModelStore.getState();
-            const definition = carriableLinkModel(model);
             // The model the composer sends with is the link's only where the shared rule (`linkModelAppliesOnOpen`) holds; a copy
             // names a model only under the same rule.
-            const sendsLinkModel = linkModelAppliesOnOpen({ allowedModelIds, isAnonymous, model, newThreadMode: state.newThreadMode });
+            const sendsLinkModel = linkModelAppliesOnOpen({ isAnonymous, linkable: linkableModels, model });
 
-            if (definition && sendsLinkModel) {
+            if (model !== undefined && sendsLinkModel) {
                 // A comparison left on from before would fan the draft out to its models, not to the one the link names.
                 // Ending it clears its selection too, as the picker does when a single model is chosen.
                 state.setComparisonMode(false);
-                state.setSelectedModel(definition.id as ModelId, undefined);
+                // The link opens a text chat, so the new chat is set to text whatever mode the composer was last in.
+                state.setComposerMode("text", undefined, false);
+                state.setSelectedModel(model as ModelId, undefined);
 
                 // Naming a model is choosing it, so Auto ends with the pick, as it does in the model picker for a new chat.
                 if (state.pendingSettings?.autoModel === true) {
@@ -118,5 +121,5 @@ export const usePromptLinkDraft = ({
 
         // `hash: true` keeps the address's fragment: removing the link's parameters must not remove a `#section` the address also has.
         void navigate({ hash: true, replace: true, search: (previous: Record<string, unknown>) => withoutLinkParameters(previous), to: "/chat" });
-    }, [allowedModelIds, isAnonymous, model, navigate, onDecided, otherDraftSource, prompt, ready, t]);
+    }, [isAnonymous, linkableModels, model, navigate, onDecided, otherDraftSource, prompt, ready, t]);
 };
