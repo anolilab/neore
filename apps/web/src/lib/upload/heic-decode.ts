@@ -10,8 +10,12 @@ const LARGE_BOX_HEADER_BYTES = 16;
 const FULL_BOX_BYTES = 4;
 /** A photo's `meta` box is a few kilobytes; a larger one is not read, so a hostile header is never copied whole into memory. */
 const META_MAX_BYTES = 4 * 1024 * 1024;
-const MAX_TOP_LEVEL_BOXES = 64;
-const MAX_BOXES_PER_LEVEL = 256;
+
+/**
+ * Header bytes the top-level scan may read. A box is passed by its length, so only headers are read and a photo may carry
+ * any number of boxes before `meta`; this budget only stops a file made of endless tiny boxes.
+ */
+const MAX_HEADER_SCAN_BYTES = 1024 * 1024;
 
 const ascii = (bytes: Uint8Array, offset: number): string => String.fromCodePoint(...bytes.subarray(offset, offset + 4));
 
@@ -20,10 +24,14 @@ const viewOf = (bytes: Uint8Array): DataView => new DataView(bytes.buffer, bytes
 /** The `meta` box's body, found by reading only box headers: every other box is skipped by its length, never read. */
 const metaBody = async (file: Blob): Promise<Uint8Array | undefined> => {
     let offset = 0;
+    let scanned = 0;
 
-    for (let count = 0; count < MAX_TOP_LEVEL_BOXES && offset + BOX_HEADER_BYTES <= file.size; count += 1) {
+    // Each box is at least a header long, so `offset` always advances and the walk ends at the end of the file or the budget.
+    while (offset + BOX_HEADER_BYTES <= file.size && scanned < MAX_HEADER_SCAN_BYTES) {
         const head = new Uint8Array(await file.slice(offset, offset + LARGE_BOX_HEADER_BYTES).arrayBuffer());
         const view = viewOf(head);
+
+        scanned += head.length;
         let size = view.getUint32(0);
         let header = BOX_HEADER_BYTES;
 
@@ -63,7 +71,8 @@ const boxesIn = (bytes: Uint8Array): Box[] => {
     const view = viewOf(bytes);
     let offset = 0;
 
-    while (offset + BOX_HEADER_BYTES <= bytes.length && boxes.length < MAX_BOXES_PER_LEVEL) {
+    // Each box is at least a header long, so `offset` always advances; the list is bounded by the bytes it was given.
+    while (offset + BOX_HEADER_BYTES <= bytes.length) {
         let size = view.getUint32(offset);
         let header = BOX_HEADER_BYTES;
 
