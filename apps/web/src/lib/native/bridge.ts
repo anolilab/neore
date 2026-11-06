@@ -45,7 +45,7 @@ interface NativeDeviceRelay {
     hostDisconnect: (deviceId: string) => Promise<void>;
     hostPair: (pairing: { deviceId: string; secret: string; spec: NativeHostSpec }) => Promise<boolean>;
     hostProbe: (spec: NativeHostSpec) => Promise<NativeHostProbe>;
-    manifest: (deviceId?: string) => Promise<NativeSigned>;
+    manifest: (deviceId?: string) => Promise<NativeSigned & { appVersion?: string }>;
     onChanged: (handler: () => void) => UnlistenFunction;
     onProgress: (handler: (report: NativeDeviceProgress) => void) => UnlistenFunction;
     openSettings: () => Promise<void>;
@@ -370,7 +370,8 @@ export const pairNativeDevice = async (pairing: { accountLabel: string; deviceId
 };
 
 /** `undefined` until the shell advertises `device`. With a device id: that server's manifest, signed with its own secret. */
-export const getNativeDeviceManifest = async (deviceId?: string): Promise<NativeSigned | undefined> => getDeviceBridge()?.manifest(deviceId);
+export const getNativeDeviceManifest = async (deviceId?: string): Promise<(NativeSigned & { appVersion?: string }) | undefined> =>
+    getDeviceBridge()?.manifest(deviceId);
 
 /**
  * Connects a server that is not paired yet. The shell asks the user to trust its key on first use and for a key

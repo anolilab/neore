@@ -27,11 +27,13 @@ import { decryptKey, encryptKey } from "../lib/encryption";
 import {
     ACP_CLAIM_LEASE_MS,
     DEVICE_SIGNATURE_WINDOW_MS,
+    MAX_APP_VERSION_INPUT_LENGTH,
     MAX_DEVICE_OUTPUT_BYTES,
     MAX_DEVICE_SCOPE_PROJECTS,
     MAX_DEVICES_PER_USER,
     MAX_MANIFEST_BYTES,
 } from "./lib/constants";
+import { isAppVersion } from "./lib/app-version";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
 import { filterOwnProjectIds } from "./lib/scope";
 import { claimWindowMs, expireOpenCalls, isAcpTool, isDeviceOutdated, isForwardPhase } from "./lib/state";
@@ -174,6 +176,7 @@ export const listDevices = authQuery
                 toolNames: (device.manifest ?? []).map((tool) => tool.name),
                 updateRequired: isDeviceOutdated(device),
                 ...(device.acpOffers !== undefined && device.acpOffers.length > 0 && { acpOffers: device.acpOffers }),
+                ...(device.appVersion !== undefined && { appVersion: device.appVersion }),
                 ...(device.lastSeenAt !== undefined && { lastSeenAt: device.lastSeenAt }),
                 ...(device.projectIds !== undefined && { projectIds: device.projectIds.filter((id) => liveProjects.has(id)) }),
                 ...(device.transport !== undefined && { transport: device.transport }),
@@ -348,7 +351,14 @@ const parseProtocol = (value: unknown): number | undefined => {
  */
 export const updateDeviceManifest = authMutation
     .use(rateLimit("devices/manifest"))
-    .input({ deviceId: v.id("devices"), payload: vManifestPayload, signature: vSignature, viaDeviceId: vViaDeviceId })
+    .input({
+        // Wider than what is kept (`MAX_APP_VERSION_LENGTH`): an over-long value is ignored by `isAppVersion`, not a failed manifest update.
+        appVersion: v.optional(v.string().max(MAX_APP_VERSION_INPUT_LENGTH)),
+        deviceId: v.id("devices"),
+        payload: vManifestPayload,
+        signature: vSignature,
+        viaDeviceId: vViaDeviceId,
+    })
     .output(v.object({ toolCount: v.number() }))
     .mutation(async ({ args, ctx }) => {
         const device = await requireOwnDevice(ctx, args.deviceId, ctx.user.userId, args.viaDeviceId);
@@ -388,9 +398,19 @@ export const updateDeviceManifest = authMutation
 
         // Signed with the rest: a computer that predates the field reports none, which is not "outdated".
         const protocol = parseProtocol(manifest.protocol);
+        // Not covered by the signature: display-only, so a value that is not shaped like a version is ignored, never an error.
+        const appVersion = args.appVersion !== undefined && isAppVersion(args.appVersion) ? args.appVersion : undefined;
 
-        // `undefined` removes the field: a later build that stops reporting it is judged as unreported, not by the old number.
-        await patchRow(ctx.db, "devices", device, { acpOffers: offers, hostProtocol: protocol, lastSeenAt: now, manifest: tools, manifestIssuedAt: issuedAt });
+        // `undefined` removes the field: a later build that stops reporting the protocol is judged as unreported, not by the old number.
+        // The app version is left out of the patch when none was reported, so the stored one stays.
+        await patchRow(ctx.db, "devices", device, {
+            acpOffers: offers,
+            hostProtocol: protocol,
+            lastSeenAt: now,
+            manifest: tools,
+            manifestIssuedAt: issuedAt,
+            ...(appVersion !== undefined && { appVersion }),
+        });
 
         ctx.log.event("devices.update_device_manifest", { toolCount: tools.length });
 
