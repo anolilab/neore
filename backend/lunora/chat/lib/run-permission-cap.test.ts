@@ -83,7 +83,22 @@ describe("readRequestPermissionCap", () => {
         expect(runQuery).toHaveBeenNthCalledWith(2, expect.anything(), { organizationId: "org_a" });
     });
 
-    it("gives auto without a session, which is the personal space", async () => {
+    it("caps at ask for a signed-in identity that names no session, since its space cannot be told", async () => {
+        const runQuery = vi.fn();
+        const context = {
+            auth: {
+                getIdentity: async () => {
+                    return { userId: "user_1" };
+                },
+            },
+            runQuery,
+        } as never;
+
+        expect(await readRequestPermissionCap(context, "user_1")).toBe("ask");
+        expect(runQuery).not.toHaveBeenCalled();
+    });
+
+    it("gives auto without a signed-in identity, which is the personal space", async () => {
         const runQuery = vi.fn();
 
         expect(await readRequestPermissionCap(requestCtx(undefined, runQuery), "user_1")).toBe("auto");

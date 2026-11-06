@@ -59,7 +59,8 @@ import { notifyQuietly } from "../notifications/notify";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
 import { threadGateOutcome, throwUnlessGranted } from "../chat/lib/thread-gate";
-import { permissionCapOf, readPolicyState } from "../auth/lib/organization-policy";
+import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
+import { LEFT_ORGANIZATION_MESSAGE, permissionCapOf, readPolicyState } from "../auth/lib/organization-policy";
 import { MAX_LENGTH } from "../lib/validators";
 import { RUN_STALE_MS, RUN_WATCH_RETRY } from "../chat/lib/interrupted-run";
 import { HOST_SESSION_BUSY_RETRY_MS, HOST_START_MAX_ATTEMPTS, hostRunActivity, hostStartRetryDelayMs, sendHostRunTurn } from "./host-runs";
@@ -434,6 +435,13 @@ const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promis
     // ...and the computer's projects may have changed, or the lead moved to another project.
     if (!(await isHostInLeadScope(ctx, claimed))) {
         await finishRun(ctx, runId, { error: HOST_OUT_OF_SCOPE, kind: "failed" });
+
+        return;
+    }
+
+    // The owner may have left the organization while the turn waited, as `runHeadlessAgent` checks for a cloud run.
+    if (claimed.organizationId && !(await getMemberByOrganizationAndUser(ctx, claimed.organizationId, claimed.userId))) {
+        await finishRun(ctx, runId, { error: LEFT_ORGANIZATION_MESSAGE, kind: "failed" });
 
         return;
     }
@@ -949,6 +957,7 @@ export const messageWorker = internalMutation
         dispatchedBy: vDispatchSource,
         headless: v.optional(v.boolean()),
         message: v.string().max(SUB_AGENT_TASK_MAX),
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         parentThreadId: v.string(),
         toolCallId: v.string(),
         userId: v.string(),
@@ -960,6 +969,7 @@ export const messageWorker = internalMutation
             childThreadId: args.workerId,
             dispatchedBy: args.dispatchedBy,
             ...(args.headless !== undefined && { headless: args.headless }),
+            ...(args.organizationId && { organizationId: args.organizationId }),
             parentThreadId: args.parentThreadId,
             task: args.message,
             toolCallId: args.toolCallId,

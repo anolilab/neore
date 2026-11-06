@@ -32,6 +32,7 @@ import { patchById, withoutUndefined } from "../lib/patch";
 import type { SkillContext } from "../skills/executor";
 import { prepareSkillInvocation } from "../skills/executor";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
+import { LEFT_ORGANIZATION_MESSAGE, permissionCapOf, readPolicyState } from "../auth/lib/organization-policy";
 import { canReadSkill } from "../skills/access";
 import { vSkillConfig } from "../skills/validators";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } from "./account";
@@ -175,10 +176,16 @@ const failedTaskPatch = (lastError: string, now: number) => {
     };
 };
 
-/** Ends a cycle before its round runs, with `lastError` saying why. No `taskRuns` row: nothing ran. */
-const refuseRound = async (ctx: MutationCtx, task: Doc<"tasks">, lastError: string): Promise<void> => {
-    await patchById(ctx.db, "tasks", task._id, failedTaskPatch(lastError, Date.now()));
+/**
+ * Ends a cycle before its round runs, with `lastError` saying why. No `taskRuns` row: nothing ran. `stopsRecurrence`
+ * removes `nextRunAt` too, for a refusal no later round can get past; the schedule itself is kept.
+ */
+const refuseRound = async (ctx: MutationCtx, task: Doc<"tasks">, lastError: string, stopsRecurrence = false): Promise<void> => {
+    await patchById(ctx.db, "tasks", task._id, { ...failedTaskPatch(lastError, Date.now()), ...(stopsRecurrence && { nextRunAt: undefined }) });
 };
+
+/** Why a coding-agent task cannot start under its organization's cap, which an agent on its own would get past. */
+export const CODING_AGENT_CAPPED_MESSAGE = "Your organization's tool policy does not allow a coding agent to run on its own, so this task cannot start one.";
 
 const vClaim = v.union(
     v.null(),
@@ -217,7 +224,9 @@ const vClaim = v.union(
  *   deletion workflow is about to remove the task, and a run now would write a
  *   thread behind the step that erased the user's threads;
  * - the account is anonymous, the task's model is no longer allowed, or a daily
- *   limit is spent: the task fails with the reason.
+ *   limit is spent: the task fails with the reason;
+ * - the task belongs to an organization its owner has left: it fails and stops
+ *   recurring; or it is a coding-agent task under a cap below `auto`: it fails.
  *
  * The daily limits are charged here, in the claim's transaction, so a retried
  * or duplicate action cannot charge twice and a refused round charges nothing.
@@ -266,6 +275,27 @@ export const claimRound = internalMutation
             await refuseRound(ctx, task, `The model '${task.model}' is no longer available for tasks. Pick another model and run the task again.`);
 
             return null;
+        }
+
+        // The organization's checks come before the charge, so a refused round costs nothing. An owner who left the
+        // organization stops the task (it fails the same way every time); a cap below `auto` keeps it scheduled, since the
+        // organization may raise it. A coding agent approves its own tools, so only `auto` lets one start.
+        if (task.organizationId) {
+            if (!(await getMemberByOrganizationAndUser(ctx, task.organizationId, task.userId))) {
+                await refuseRound(ctx, task, LEFT_ORGANIZATION_MESSAGE, true);
+
+                return null;
+            }
+
+            if (task.codingAgent) {
+                const policy = await ctx.db.organizationPolicies.findFirst({ where: { organizationId: task.organizationId } });
+
+                if (permissionCapOf(readPolicyState(policy?.document)) !== "auto") {
+                    await refuseRound(ctx, task, CODING_AGENT_CAPPED_MESSAGE);
+
+                    return null;
+                }
+            }
         }
 
         if (!(await chargeRound(ctx, task.userId, account))) {

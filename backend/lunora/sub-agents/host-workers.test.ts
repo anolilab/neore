@@ -36,10 +36,17 @@ vi.mock("../auth", async (importOriginal) => {
     };
 });
 
-// `user` is a `.global()` (D1) table the in-memory harness cannot write.
+// The organizations the owner has left; every other one counts them as a member.
+const { leftOrganizations } = vi.hoisted(() => {
+    return { leftOrganizations: new Set<string>() };
+});
+
+// `user` and `member` are `.global()` (D1) tables the in-memory harness cannot write.
 vi.mock("../auth/lib/better-auth-queries", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../auth/lib/better-auth-queries")>()),
+        getMemberByOrganizationAndUser: async (_ctx: unknown, organizationId: string, userId: string) =>
+            leftOrganizations.has(organizationId) ? null : { organizationId, userId },
         getUser: async (_ctx: unknown, userId: string) => {
             return { _id: userId };
         },
@@ -74,6 +81,7 @@ const OUT_OF_DATE = /out of date/iu;
 const NOT_ANSWERED = /host did not answer/iu;
 const NEEDS_A_PERSON = /needs a person/iu;
 const NOT_ALLOWED_BY_CAP = /does not allow agents on your computer/iu;
+const LEFT_ORGANIZATION = /no longer a member of the organization/iu;
 const SESSION_ENDED = /session has ended/iu;
 const REFUSED_THREAD = /alone|own|computer/iu;
 const KEEPS_RUNNER = /keeps the runner/iu;
@@ -568,6 +576,29 @@ describe("the end of a host turn", () => {
         expect(await runRow(queued.runId)).toMatchObject({ status: "running" });
         expect(await sendCalls()).toHaveLength(2);
         expect((await sessionOf(receipt.workerId)).status).toBe("busy");
+    });
+
+    it("fails a queued message, sending nothing, when its owner leaves the organization while it waits", async () => {
+        const device = await pairedDevice();
+        const lead = await newThread({ organizationId: "org-left" });
+        const receipt = await createHostWorker(device, { leadThreadId: lead });
+
+        await sessionOpen(device, receipt.workerId);
+
+        const queued = await dispatchFromUser(receipt.workerId, "second");
+
+        expect(queued.state).toBe("queued");
+
+        leftOrganizations.add("org-left");
+
+        try {
+            await finishTurn(device, receipt.workerId);
+
+            expect(await runRow(queued.runId)).toMatchObject({ error: expect.stringMatching(LEFT_ORGANIZATION), status: "failed" });
+            expect(await sendCalls()).toHaveLength(1);
+        } finally {
+            leftOrganizations.delete("org-left");
+        }
     });
 
     it("fails a queued message, sending nothing, when the organization's cap drops below auto while it waits", async () => {

@@ -268,12 +268,12 @@ describe("buildAgentTools quick-check trust", () => {
     const needsApproval = async (trusted: string[], url = URL): Promise<unknown> => {
         const runQuery = vi.fn();
 
-        // The run's thread is read first, for its permission cap, before any server or connector work.
+        // The server, override and grant reads start first; the run's thread is read next, for its permission cap.
         runQuery
-            .mockResolvedValueOnce({ organizationId: null })
             .mockResolvedValueOnce([{ enabled: true, name: "docs", protocol: "http", url }])
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
+            .mockResolvedValueOnce({ organizationId: null })
             .mockResolvedValueOnce(true)
             .mockResolvedValueOnce(trusted);
 
@@ -312,15 +312,15 @@ describe("buildAgentTools quick-check trust", () => {
 
         const runQuery = vi.fn();
 
-        // The run's thread is read first, for its permission cap, before any server or connector work.
+        // The server, override and grant reads start first; the run's thread is read next, for its permission cap.
         runQuery
-            .mockResolvedValueOnce({ organizationId: null })
             .mockResolvedValueOnce([
                 { enabled: true, name: "files", protocol: "http", url: first },
                 { enabled: true, name: "files", protocol: "http", url: second },
             ])
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
+            .mockResolvedValueOnce({ organizationId: null })
             .mockResolvedValueOnce(true)
             .mockResolvedValueOnce([mcpTrustId("files", second)]);
 

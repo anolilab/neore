@@ -155,17 +155,24 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
     // The cap is read beside the reads that do not depend on it. Under `off` every tool is removed, so no quick-check, MCP or
     // connector work (token refresh included) starts. A failed read caps at `ask` (`org-policy.md` §6a).
-    const [permissionCap, allMcpServers, overrides, timedGrants] = await Promise.all([
-        readRunPermissionCap(ctx, { organizationId, threadId }),
+    const preferences = Promise.all([
         ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),
         ctx.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId }),
         // A run nobody is at inherits no time-boxed allow, so it does not even read them.
         headless ? {} : ctx.runQuery(internal.chat.tool_permissions.getToolPermissionGrantsQuery, { userId }),
     ]);
 
+    // Handled here so a failed preference read is not reported as unhandled when an `off` run never awaits it.
+    preferences.catch(() => undefined);
+
+    const permissionCap = await readRunPermissionCap(ctx, { organizationId, threadId });
+
+    // Decided before the preferences are awaited: a failed preference read cannot take down a run that offers no tools.
     if (permissionCap === "off") {
         return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
     }
+
+    const [allMcpServers, overrides, timedGrants] = await preferences;
 
     const [quickCheckOn, connectorServers] = await Promise.all([
         // Nobody answers in a headless run, and an outside agent's calls stay `ask` because only the app approves them.

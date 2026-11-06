@@ -62,17 +62,26 @@ export const readRunPermissionCap = async (
 
 /**
  * The cap for a request with no thread (the MCP app proxy). An HTTP action does not load the session, so the active
- * organization is read the way `/chat/start` reads it: from the caller's session. No session is the personal space;
- * a failed read caps at `ask`.
+ * organization is read the way `/chat/start` reads it: from the caller's session. A failed read caps at `ask`, and
+ * so does a signed-in caller whose identity names no session (a bearer minted before it carried `sid`): its space
+ * cannot be told, so it must not read as the personal space.
  */
 export const readRequestPermissionCap = async (ctx: Pick<HttpActionCtx, "auth" | "runQuery">, userId: string): Promise<ToolPermissionMode> => {
     try {
         const identity = await ctx.auth.getIdentity();
         const sessionId = identity?.sessionId;
-        const organizationId =
-            typeof sessionId === "string"
-                ? await ctx.runQuery(internal.auth.session_organization.getActiveOrganizationIdForSession, { sessionId, userId })
-                : null;
+
+        if (typeof sessionId !== "string") {
+            if (identity) {
+                toolsLogger.warn("[TOOLS] Request identity names no session; capping at ask.");
+
+                return "ask";
+            }
+
+            return await readPermissionCap(ctx, null);
+        }
+
+        const organizationId = await ctx.runQuery(internal.auth.session_organization.getActiveOrganizationIdForSession, { sessionId, userId });
 
         return await readPermissionCap(ctx, organizationId);
     } catch (error: unknown) {

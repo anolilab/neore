@@ -357,3 +357,7 @@ export const permissionCapOf = (state: PolicyState): PermissionCap => {
 
     return state.kind === "policy" ? (state.policy.permissionCap ?? "auto") : "auto";
 };
+
+/** The owner-facing reason a run of an organization's trigger, task or worker is refused after its owner left that organization. */
+export const LEFT_ORGANIZATION_MESSAGE =
+    "You are no longer a member of the organization this was created in, so it has been stopped. Create it again in your personal space to keep it running.";

@@ -87,9 +87,7 @@ export const INTERNAL_PREFIX_RE = /^internal-/;
  */
 export type AgentRunErrorKind = "custom-endpoint" | "left-organization" | "local-endpoint" | "plan-required" | "skill" | "stale-approval";
 
-/** The owner-facing reason a run of an organization's trigger or task is refused after its owner left that organization. */
-export const LEFT_ORGANIZATION_MESSAGE =
-    "You are no longer a member of the organization this was created in, so it has been stopped. Create it again in your personal space to keep it running.";
+export { LEFT_ORGANIZATION_MESSAGE } from "../../auth/lib/organization-policy";
 
 /** A failure a run raised itself, so the catch branches on `kind` rather than on message text. */
 export class AgentRunError extends Error {
