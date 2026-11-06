@@ -146,9 +146,9 @@ const OPTION_UPDATES: ReadonlySet<string> = new Set(["config_option_update", "cu
 
 /**
  * Updates that replace what came before them. While the session opens, only the latest of each kind is kept, so a replayed
- * history of chunks cannot push out the agent's command list or its options.
+ * history of chunks cannot push out the agent's command list. The option updates are not here: `takeStartupOptions` takes them at once.
  */
-const REPLACING_UPDATES: ReadonlySet<string> = new Set(["available_commands_update", "config_option_update", "current_mode_update", "usage_update"]);
+const REPLACING_UPDATES: ReadonlySet<string> = new Set(["available_commands_update", "usage_update"]);
 
 /**
  * What an early update keeps: a command list in the agent's own shape with its entries bounded, so the buffer charges what the
