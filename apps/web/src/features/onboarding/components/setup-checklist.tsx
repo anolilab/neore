@@ -4,7 +4,7 @@ import { CardContent } from "@neore/ui/components/card";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 import type { FC } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
@@ -51,6 +51,8 @@ const SetupChecklist: FC = () => {
     // once, straight from the server, and written into the shared cache; the push that follows carries the same list.
     const storedSettings = crpc.auth.functions.getUserSettings.queryOptions({}, { live: false });
     const unsettledSaves = useRef(0);
+    // The step whose last save was refused: the message stays beside it after the toast has gone.
+    const [failedStep, setFailedStep] = useState<SetupStepId | undefined>(undefined);
     const reloadSettings = async () => {
         if (unsettledSaves.current > 0) {
             // A later save is queued behind this one: its own settle reads the list that includes both.
@@ -83,6 +85,7 @@ const SetupChecklist: FC = () => {
         },
         onMutate: async (args: SkipVariables) => {
             unsettledSaves.current += 1;
+            setFailedStep(undefined);
 
             if (args.owner !== signedInRef.current) {
                 return { stale: true };
@@ -109,6 +112,7 @@ const SetupChecklist: FC = () => {
             queryClient.setQueryData<{ setupStepsSkipped?: string[] } | null>(settingsKey, (row) =>
                 row ? { ...row, setupStepsSkipped: toggleSkipped(row.setupStepsSkipped, args.stepId, !args.skipped) } : row,
             );
+            setFailedStep(args.stepId);
             toast.error(t`Could not save that choice. Try again.`);
         },
         // Settled either way, the stored list is what the card shows: a read that started before the write cannot outlive it.
@@ -162,6 +166,11 @@ const SetupChecklist: FC = () => {
                                     {copy[id].title} <span className="text-muted-foreground font-normal">({status ? statusLabel[status] : pendingLabel})</span>
                                 </p>
                                 <p className="text-muted-foreground text-xs">{copy[id].description}</p>
+                                {failedStep === id && (
+                                    <p className="text-destructive mt-1 text-xs" role="alert">
+                                        {t`Could not save that choice. Try again.`}
+                                    </p>
+                                )}
                             </div>
                             {/* The links stay while the device check is pending or failed; only Skip and Resume need a known status. */}
                             {status !== "done" && (

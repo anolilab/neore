@@ -3,7 +3,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import SetupChecklist from "./setup-checklist";
@@ -452,6 +452,19 @@ describe("<SetupChecklist>", () => {
 
         await waitFor(() => expect(sonnerMock.toast).toHaveBeenCalledTimes(1));
         await waitFor(() => expect(screen.getAllByText("(To do)")).toHaveLength(3));
+        // The toast is a mock that never renders, so this message is the inline one, beside the step that failed.
+        const failedSteps = screen.getAllByRole("listitem").filter((item) => within(item).queryByRole("alert") !== null);
+
+        expect(failedSteps).toHaveLength(1);
+        expect(within(failedSteps[0] as HTMLElement).getByRole("alert").textContent).toBe("Could not save that choice. Try again.");
+        expect(within(failedSteps[0] as HTMLElement).getByRole("link", { name: GO_TO_SERVERS })).toBeTruthy();
+
+        server.fail = false;
+        fireEvent.click(screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }));
+
+        await screen.findByText("(Skipped)");
+
+        expect(screen.queryByRole("alert", { name: undefined })).toBeNull();
     });
 
     it("does not call a step to do before the device list has loaded", async () => {
