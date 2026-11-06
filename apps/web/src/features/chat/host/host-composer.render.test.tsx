@@ -515,7 +515,7 @@ describe("the options the agent offers", () => {
         expect(model.disabled).toBe(false);
     });
 
-    it("shows the legacy model state without a way to change it, and lets the legacy modes be chosen", async () => {
+    it("shows the legacy model and mode states without a way to change them: a mode is changed on the computer", async () => {
         mountWith({
             agentState: {
                 modes: {
@@ -531,12 +531,9 @@ describe("the options the agent offers", () => {
 
         expect(await screen.findByText("M1")).toBeTruthy();
         expect(screen.queryByLabelText("Model")).toBeNull();
-
-        fireEvent.change(screen.getByLabelText("Mode"), { target: { value: "code" } });
-
-        await waitFor(() => expect(mutations()).toHaveLength(1));
-        // No option id: the value is a mode of the legacy state.
-        expect(mutations()[0]?.[1]).toEqual({ threadId: "thread-1", valueId: "code" });
+        expect(screen.queryByLabelText("Mode")).toBeNull();
+        expect(screen.getByText("Ask")).toBeTruthy();
+        expect(mutations()).toHaveLength(0);
     });
 
     it("keeps the controls off once the session has ended", async () => {
