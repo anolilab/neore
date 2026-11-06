@@ -818,7 +818,7 @@ export interface ApiTypes {
             startUsageBackfill: FunctionReference<"mutation", {}, "idle" | "running" | "done">;
         };
         organization: {
-            getOrganizationProjectUsage: FunctionReference<"action", { fromDate: string }, { members: number; projects: Array<{ costMicrodollars: number; replies: number; tokens: number; projectKey: string; title: string }>; truncated: boolean }>;
+            getOrganizationProjectUsage: FunctionReference<"action", { afterUserId?: string; fromDate: string }, { members: number; nextCursor?: string; projects: Array<{ costMicrodollars: number; replies: number; tokens: number; projectKey: string; title: string }>; truncated: boolean }>;
         };
     };
     vault: {

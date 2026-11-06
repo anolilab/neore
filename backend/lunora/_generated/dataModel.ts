@@ -1992,6 +1992,7 @@ export interface Doc_usageBackfill {
     finishedAt?: number;
     lastOrder?: number;
     leaseUntil: number;
+    projects?: { finishedAt?: number; lastOrder?: number; leaseUntil: number; replies: number; runId: string; startedAt: number; status: "running" | "done"; threadCursor?: string; threadId?: string };
     replies: number;
     runId: string;
     startedAt: number;
@@ -2000,7 +2001,6 @@ export interface Doc_usageBackfill {
     threadId?: string;
     updatedAt: number;
     userId: string;
-    projects?: { finishedAt?: number; lastOrder?: number; leaseUntil: number; replies: number; runId: string; startedAt: number; status: "running" | "done"; threadCursor?: string; threadId?: string };
 }
 
 export interface Doc_usageDaily {
@@ -2008,8 +2008,8 @@ export interface Doc_usageDaily {
     _creationTime: number;
     costMicrodollars: number;
     date: string;
-    replies: number;
     projectKey?: string;
+    replies: number;
     skillKey: string;
     skillName?: string;
     tokens: number;
@@ -5002,6 +5002,7 @@ export interface Insert_usageBackfill {
     finishedAt?: number;
     lastOrder?: number;
     leaseUntil: number;
+    projects?: { finishedAt?: number; lastOrder?: number; leaseUntil: number; replies: number; runId: string; startedAt: number; status: "running" | "done"; threadCursor?: string; threadId?: string };
     replies: number;
     runId: string;
     startedAt: number;
@@ -5010,7 +5011,6 @@ export interface Insert_usageBackfill {
     threadId?: string;
     updatedAt: number;
     userId: string;
-    projects?: { finishedAt?: number; lastOrder?: number; leaseUntil: number; replies: number; runId: string; startedAt: number; status: "running" | "done"; threadCursor?: string; threadId?: string };
 }
 
 export interface Insert_usageDaily {
@@ -5018,8 +5018,8 @@ export interface Insert_usageDaily {
     _creationTime?: number;
     costMicrodollars: number;
     date: string;
-    replies: number;
     projectKey?: string;
+    replies: number;
     skillKey: string;
     skillName?: string;
     tokens: number;

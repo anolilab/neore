@@ -1229,7 +1229,7 @@ export interface InternalApiTypes {
         };
         organization: {
             memberProjectUsage: FunctionReference<"query", { fromDate: string; projectIds: Array<string>; userId: string }, { projects: Array<{ costMicrodollars: number; replies: number; tokens: number; projectKey: string }>; truncated: boolean }>;
-            organizationUsageScope: FunctionReference<"query", { organizationId: string; userId: string }, null | { memberIds: Array<string>; projects: Array<{ projectId: string; title: string }>; truncated: boolean }>;
+            organizationUsageScope: FunctionReference<"query", { afterUserId?: string; organizationId: string; userId: string }, null | { memberIds: Array<string>; nextCursor?: string; projects: Array<{ projectId: string; title: string }>; truncated: boolean }>;
         };
     };
     vault: {

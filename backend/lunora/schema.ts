@@ -3295,18 +3295,6 @@ export const schema = defineSchema({
         lastOrder: v.optional(v.number()),
         // Past it the next step picks the job up again (a chain that died).
         leaseUntil: v.number(),
-        // Replies the walk added to the rollup.
-        replies: v.number(),
-        // Steps check it, so a restarted walk ends the chain it replaced.
-        runId: v.string(),
-        // Replies created from here on are the live path's (`recordReplyUsage`).
-        startedAt: v.number(),
-        status: v.union(v.literal("running"), v.literal("done")),
-        // Pagination cursor for the thread AFTER `threadId`.
-        threadCursor: v.optional(v.string()),
-        threadId: v.optional(v.string()),
-        updatedAt: v.number(),
-        userId: v.string(),
         // The second walk, which files replies the rollup already counted under their thread's project
         // (`usage/backfill.ts#runUsageProjectBackfillStep`). Same fields as the walk above; unset = not started.
         projects: v.optional(
@@ -3323,6 +3311,18 @@ export const schema = defineSchema({
                 threadId: v.optional(v.string()),
             }),
         ),
+        // Replies the walk added to the rollup.
+        replies: v.number(),
+        // Steps check it, so a restarted walk ends the chain it replaced.
+        runId: v.string(),
+        // Replies created from here on are the live path's (`recordReplyUsage`).
+        startedAt: v.number(),
+        status: v.union(v.literal("running"), v.literal("done")),
+        // Pagination cursor for the thread AFTER `threadId`.
+        threadCursor: v.optional(v.string()),
+        threadId: v.optional(v.string()),
+        updatedAt: v.number(),
+        userId: v.string(),
     })
         .shardBy("userId")
         .index("by_userId", ["userId"]),
@@ -3331,9 +3331,9 @@ export const schema = defineSchema({
         costMicrodollars: v.number(),
         // The user's calendar day (their time zone when the reply landed), YYYY-MM-DD.
         date: v.string(),
-        replies: v.number(),
         // The project the reply's thread was in when it was recorded; set only on `__project__` rows.
         projectKey: v.optional(v.string()),
+        replies: v.number(),
         // `__total__`, `__project__`, `__assistant__`, a skill id, or `draft:<slug>`. See `usage/activity-logic.ts`.
         skillKey: v.string(),
         skillName: v.optional(v.string()),

@@ -641,4 +641,43 @@ describe("project backfill", () => {
 
         expect(rows.find((row) => row.projectKey === beta)).toMatchObject({ costMicrodollars: 40, replies: 1 });
     });
+
+    it("files a reply's project when its live record lands after the first walk counted it", async () => {
+        const { alpha, inAlpha } = await insertProjectFixture();
+        const key = inAlpha.rowIds[0]![1]!;
+
+        vi.setSystemTime(STARTED);
+
+        // The first walk counted the reply (its key, with no project) and the project walk had passed it while it ran.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("usageReplies", { recordedAt: STARTED, replyKey: key, userId: USER });
+        });
+        await live(key, inAlpha.threadId, 100, 10);
+        await live(key, inAlpha.threadId, 100, 10);
+
+        const rows = await projectRows();
+        const all = await rollup();
+
+        expect(rows).toStrictEqual([EXPECTED_PROJECTS(alpha, "")[0]]);
+        // The total is the first walk's to write, which this fixture skips: the live record adds no second one.
+        expect(all.filter((row) => row.skillKey === TOTAL_SKILL_KEY)).toStrictEqual([]);
+    });
+
+    it("files no project for a reply after the first walk's cutoff whose total never landed", async () => {
+        vi.setSystemTime(DAY_1);
+        await start();
+
+        // The first walk ran to its end; then a reply in a project whose live record was lost.
+        for (let current = await state(); current.status !== "done"; current = await state()) {
+            await step(current.runId);
+        }
+
+        const alpha = await insertProject("Alpha");
+
+        await insertThread(DAY_1 + 1000, [[prompt(), reply(10, 100)]], "active", alpha);
+        vi.setSystemTime(STARTED);
+        await drain();
+
+        expect(await projectRows()).toStrictEqual([]);
+    });
 });

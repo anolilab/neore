@@ -56161,6 +56161,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "afterUserId": {
+                        "type": "string"
+                      },
                       "fromDate": {
                         "type": "string"
                       }
@@ -56196,6 +56199,9 @@
                   "properties": {
                     "members": {
                       "type": "number"
+                    },
+                    "nextCursor": {
+                      "type": "string"
                     },
                     "projects": {
                       "items": {

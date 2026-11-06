@@ -152,13 +152,22 @@ export const recordReplyUsage = internalMutation
             return null;
         }
 
-        // A redelivered job, or a reply the backfill reached first.
-        if (await isReplyRecorded(ctx, args.userId, args.replyKey)) {
-            return null;
-        }
-
         const costMicrodollars = Math.max(0, Math.round(args.costMicrodollars));
         const tokens = Math.max(0, Math.round(args.tokens));
+        const recorded = await ctx.db.usageReplies.findFirst({ where: { replyKey: args.replyKey, userId: args.userId } });
+
+        // A redelivered job, or a reply the backfill reached first. The first walk files no project: when the
+        // project walk passed this reply while it was still running, its project is filed here, once.
+        if (recorded) {
+            const projectKey = recorded.projectFiled ? undefined : await projectOfThread(ctx, args.threadId);
+
+            if (projectKey !== undefined && !(await isReplyRecorded(ctx, args.userId, projectFiledKey(args.replyKey)))) {
+                await markReplyRecorded(ctx, args.userId, projectFiledKey(args.replyKey), args.at);
+                await addToProjectRollup(ctx, args.userId, [{ costMicrodollars, date: args.date, projectKey, replies: 1, tokens }], args.at);
+            }
+
+            return null;
+        }
 
         await markReplyRecorded(ctx, args.userId, args.replyKey, args.at, true);
         await addToRollup(
@@ -244,7 +253,8 @@ export const getSkillBreakdown = authQuery
         const rows = await ctx.db.usageDaily.findMany({
             limit: BREAKDOWN_ROW_LIMIT,
             orderBy: [{ date: "desc" }],
-            where: { date: { gte: args.fromDate }, userId },
+            // Project rows are another breakdown's; they must not use up this read's bound.
+            where: { date: { gte: args.fromDate }, skillKey: { ne: PROJECT_SKILL_KEY }, userId },
         });
 
         return {

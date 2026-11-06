@@ -1769,6 +1769,7 @@ export const usageBackfill = sqliteTable("usageBackfill", {
     finishedAt: real("finishedAt"),
     lastOrder: real("lastOrder"),
     leaseUntil: real("leaseUntil").notNull(),
+    projects: text("projects", { mode: "json" }).$type<{ finishedAt?: number; lastOrder?: number; leaseUntil: number; replies: number; runId: string; startedAt: number; status: "running" | "done"; threadCursor?: string; threadId?: string }>(),
     replies: real("replies").notNull(),
     runId: text("runId").notNull(),
     startedAt: real("startedAt").notNull(),
@@ -1777,7 +1778,6 @@ export const usageBackfill = sqliteTable("usageBackfill", {
     threadId: text("threadId"),
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
-    projects: text("projects", { mode: "json" }).$type<{ finishedAt?: number; lastOrder?: number; leaseUntil: number; replies: number; runId: string; startedAt: number; status: "running" | "done"; threadCursor?: string; threadId?: string }>(),
 }, (t) => ({
     by_userId: index("by_userId").on(t.userId),
 }));
@@ -1787,8 +1787,8 @@ export const usageDaily = sqliteTable("usageDaily", {
     _creationTime: integer("_creationTime").notNull(),
     costMicrodollars: real("costMicrodollars").notNull(),
     date: text("date").notNull(),
-    replies: real("replies").notNull(),
     projectKey: text("projectKey"),
+    replies: real("replies").notNull(),
     skillKey: text("skillKey").notNull(),
     skillName: text("skillName"),
     tokens: real("tokens").notNull(),

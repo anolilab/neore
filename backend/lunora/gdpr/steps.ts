@@ -371,7 +371,8 @@ export const collectActivityForExport = internalQuery
             context.db
                 .query("usageDaily")
                 .withIndex("by_user_date", (q) => q.eq("userId", userId))
-                .take(EXPORT_ACTIVITY_CAP),
+                // Day, skill and project rows: the project rows must not push the others out.
+                .take(EXPORT_ACTIVITY_CAP * 2),
             context.db
                 .query("subAgentRuns")
                 .withIndex("by_user_and_createdAt", (q) => q.eq("userId", userId))
@@ -411,6 +412,7 @@ export const collectActivityForExport = internalQuery
                     replies: row.replies,
                     skill: row.skillName ?? row.skillKey,
                     tokens: row.tokens,
+                    ...(row.projectKey !== undefined && row.projectKey !== null && { project: row.projectKey }),
                 };
             }),
         };

@@ -9,12 +9,13 @@ import { FolderKanban } from "lucide-react";
 import type { FC } from "react";
 import { useState } from "react";
 
-import { useHasPermission } from "@/features/auth/hooks/organization-management";
+import { useActiveOrganization, useHasPermission } from "@/features/auth/hooks/organization-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill } from "../../hooks/use-usage-backfill";
 import { formatUsd, localDayKey, periodStart } from "../../lib/usage-activity";
+import { sumOrganizationUsage } from "../../lib/usage-organization";
 
 /** The row key of what no project accounts for; never a project id. */
 const NO_PROJECT_KEY = "__no_project__";
@@ -54,7 +55,9 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
 
     // Organization admins and owners can update it; members cannot.
     const { data: permission } = useHasPermission(authClient, { permissions: { organization: ["update"] } });
-    const isOrganizationAdmin = permission?.success === true;
+    const { data: activeOrganization } = useActiveOrganization(authClient);
+    const organizationId: string | undefined = activeOrganization?.id;
+    const isOrganizationAdmin = permission?.success === true && organizationId !== undefined;
     const showing: Scope = isOrganizationAdmin ? scope : "mine";
 
     const mine = useQuery({
@@ -67,9 +70,10 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
 
     const fetchOrganization = useAction(api.usage.organization.getOrganizationProjectUsage);
     const organization = useQuery({
-        enabled: showing === "organization",
-        queryFn: () => fetchOrganization({ fromDate }),
-        queryKey: ["usage", "organization-projects", fromDate],
+        enabled: showing === "organization" && organizationId !== undefined,
+        queryFn: async () => await sumOrganizationUsage(async (afterUserId) => await fetchOrganization({ afterUserId, fromDate })),
+        // Keyed by the organization too: switching organizations must not show the last one's totals.
+        queryKey: ["usage", "organization-projects", organizationId, fromDate],
         retry: 1,
         staleTime: 2 * 60_000,
     });
