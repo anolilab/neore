@@ -202,13 +202,13 @@ const modeFor = (thread: Doc<"threads"> | null, userId: string): ThreadPermissio
     return mode === "full" && thread.userId !== userId ? null : mode;
 };
 
+/** Relationship rows read for one thread when its mode is resolved. */
+const MAX_LINKS_CHECKED = 50;
+
 /**
  * A comparison column is a thread of its own, but the mode is chosen once, on the comparison it belongs to: a column always takes its
  * comparison parent's mode, whatever mode it holds. The parent's choice therefore reaches the first send and every follow-up alike.
  */
-/** Relationship rows read for one thread when its mode is resolved. */
-const MAX_LINKS_CHECKED = 50;
-
 export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null, userId: string): Promise<ThreadPermissionMode | null> => {
     // A host thread has no mode, and a comparison link must not give it one.
     if (!thread || thread.runner === "host") {
@@ -222,6 +222,11 @@ export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null,
         .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
         .take(MAX_LINKS_CHECKED);
     const comparison = links.find((link) => link.branchType === "comparison");
+
+    // A read that hit the bound may have cut off a comparison link: the thread cannot be shown to have none, so it runs supervised.
+    if (!comparison && links.length >= MAX_LINKS_CHECKED) {
+        return "supervised";
+    }
 
     // A comparison column always runs under its parent's mode, even one it holds of its own: the shared composer changes the parent's,
     // so a mode saved on the column would otherwise hold while the parent's changes never reach it.
