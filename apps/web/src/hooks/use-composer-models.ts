@@ -6,6 +6,7 @@ import { usePostHog } from "posthog-js/react";
 import { useEffect, useMemo, useState } from "react";
 
 import { filterModelsByBlockedCreators } from "@/components/model-picker/utilities";
+import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import type { LinkableModel } from "@/features/chat/core/utils/prompt-link-model";
 import env from "@/lib/env";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -31,15 +32,41 @@ const ROW = "\u{2}";
  * The models the composer's picker offers this user: the feature-flagged catalog, with the user's overrides and filter rules applied,
  * minus the creators the user has blocked. The picker builds its list from the same two steps (`ModelPicker`).
  */
-export const useComposerModels = (): GatewayModel[] => {
+
+/**
+ * The signed-in account the composer last saw, and when it changed. Shared by every mount of the composer, so a page that mounts after
+ * a switch sees it too.
+ */
+const signedIn: { id: string | null | undefined; since: number } = { id: undefined, since: 0 };
+
+/**
+ * The signed-in account's rules. The rules are one cached read, shared by every account, so a read from the account signed in before may
+ * be there: it is `fresh` only when it was read after this account became the signed-in one. The account change resets and refetches it.
+ */
+const useCurrentAccountPreferences = (): { fresh: boolean; isError: boolean; isSuccess: boolean } => {
     const crpc = useCRPC();
+    const { hooks } = useAuth();
+    const userId = hooks.useSession().data?.user.id ?? null;
+
+    if (signedIn.id !== userId) {
+        signedIn.id = userId;
+        signedIn.since = Date.now();
+    }
+
+    const prefs = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
+
+    return { fresh: prefs.dataUpdatedAt >= signedIn.since, isError: prefs.isError, isSuccess: prefs.isSuccess };
+};
+
+export const useComposerModels = (): GatewayModel[] => {
     // The user's overrides, filter rules and creator blocks come from this one read; without it the list is not filtered.
-    const { isError } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
+    const { fresh, isError, isSuccess } = useCurrentAccountPreferences();
     const models = useFeatureFlaggedModels({ applyUserOverrides: true });
     const { blockedCreators } = useBlockedCreators();
     const filtered = useMemo(() => filterModelsByBlockedCreators(models, blockedCreators), [models, blockedCreators]);
 
-    return isError ? NO_MODELS : filtered;
+    // A read that failed, or one from the previous account, names no models: a link then selects none, and cannot select a model the new account blocked.
+    return isError || (isSuccess && !fresh) ? NO_MODELS : filtered;
 };
 
 /**
@@ -92,11 +119,10 @@ const useFeatureFlagsKnown = (): boolean => {
  * that selects a model waits for this.
  */
 export const useComposerModelsSettled = (): boolean => {
-    const crpc = useCRPC();
-    const { isError, isSuccess } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
+    const { fresh, isError, isSuccess } = useCurrentAccountPreferences();
     const flagsKnown = useFeatureFlagsKnown();
 
-    return useGatewayModelsSettled() && (isSuccess || isError) && flagsKnown;
+    return useGatewayModelsSettled() && (isError || (isSuccess && fresh)) && flagsKnown;
 };
 
 /** The map a signature describes. Built only from the signature, so it is recreated only when the list changes. */

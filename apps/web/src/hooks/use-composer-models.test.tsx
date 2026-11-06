@@ -21,6 +21,9 @@ import { FLAG_WAIT_MS, useComposerModelEntries } from "./use-composer-models";
 const harness = vi.hoisted(() => {
     return {
         catalog: [] as unknown[],
+        client: undefined as undefined | QueryClient,
+        gate: undefined as undefined | Promise<void>,
+        userId: "account-a" as string | null,
         flagCallback: undefined as undefined | ((flags?: unknown, variants?: unknown, context?: { errorsLoading?: boolean }) => void),
         flagEnabled: false,
         navigate: vi.fn(),
@@ -34,6 +37,20 @@ const harness = vi.hoisted(() => {
 vi.mock("@/lib/env", () => {
     return {
         default: { VITE_POSTHOG_API_KEY: "phc_test" },
+    };
+});
+
+vi.mock("@/features/auth/lib/auth-ui-provider", () => {
+    return {
+        useAuth: () => {
+            return {
+                hooks: {
+                    useSession: () => {
+                        return { data: harness.userId ? { user: { id: harness.userId } } : undefined };
+                    },
+                },
+            };
+        },
     };
 });
 
@@ -59,7 +76,18 @@ vi.mock("@/lib/lunora/crpc", () => {
                         getAIUserPreferences: {
                             queryOptions: () => {
                                 return {
-                                    queryFn: () => (harness.prefsFail ? Promise.reject(new Error("unavailable")) : Promise.resolve(harness.prefs)),
+                                    queryFn: async () => {
+                                        // A gate holds the read, as a slow network does: the cache keeps the previous account's read meanwhile.
+                                        if (harness.gate) {
+                                            await harness.gate;
+                                        }
+
+                                        if (harness.prefsFail) {
+                                            throw new Error("unavailable");
+                                        }
+
+                                        return harness.prefs;
+                                    },
                                     queryKey: ["ai-user-preferences"],
                                 };
                             },
@@ -108,9 +136,8 @@ const blockedModel = textModels.find((model) => model.id !== DEFAULT_CHAT_MODEL)
 
 const MODEL_NOTICE = "This link's model is not available in this chat. The chat keeps its model.";
 
-const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{children}</QueryClientProvider>
-);
+// One client per test: the rules are one cached read, and the account switch is the thing under test.
+const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={harness.client ?? new QueryClient()}>{children}</QueryClientProvider>;
 
 /** The composer's entries and the link hook, as the route wires them: the link waits until the list is final. */
 const useLinkWithComposerList = (model: string | undefined) => {
@@ -125,11 +152,14 @@ const selectedModel = (): string => useModelStore.getState().selectedModel;
 
 describe("a prompt link and the user's blocked models", () => {
     beforeEach(() => {
+        harness.client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        harness.userId = "account-a";
         harness.navigate.mockReset();
         harness.showWarning.mockReset();
         harness.catalog = textModels;
         harness.prefs = { modelFilterRules: { blockedModels: blockedModel ? [blockedModel.id] : [] } };
         harness.prefsFail = false;
+        harness.gate = undefined;
         harness.flagEnabled = false;
         harness.flagCallback = undefined;
         harness.posthog = undefined;
@@ -288,6 +318,52 @@ describe("a prompt link and the user's blocked models", () => {
             expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
             expect(useChatUIStore.getState().composerText).toBe("hi");
         });
+    });
+
+    it("an account switch that blocks a model the previous account could use does not select it until the new account's rules load", async () => {
+        expect(blockedModel).toBeDefined();
+
+        // The previous account can use the model: its link selects it.
+        harness.prefs = { modelFilterRules: { blockedModels: [] } };
+        const { result: firstResult, unmount: unmountFirst } = renderHook(() => useLinkWithComposerList(blockedModel?.id), { wrapper });
+
+        await waitFor(() => expect(firstResult.current.settled).toBe(true));
+        await waitFor(() => expect(selectedModel()).toBe(blockedModel?.id));
+        unmountFirst();
+
+        // The account switches, and the new account has blocked that model. The new account's read is held: until it lands, the cache holds
+        // the previous account's read, and a visit to a link for the model must not use it.
+        useModelStore.setState({ selectedModel: DEFAULT_CHAT_MODEL as ModelId });
+        harness.userId = "account-b";
+        harness.prefs = { modelFilterRules: { blockedModels: [blockedModel?.id] } };
+        let resolveGate: () => void = () => undefined;
+
+        harness.gate = new Promise<void>((resolve) => {
+            resolveGate = () => {
+                resolve();
+            };
+        });
+
+        // The first visit's draft is cleared, as a person who sends or discards it would have: the second visit starts with no draft.
+        useChatUIStore.getState().setComposerText("");
+
+        const { result: secondResult } = renderHook(() => useLinkWithComposerList(blockedModel?.id), { wrapper });
+
+        await act(async () => {
+            await new Promise((resolve) => {
+                setTimeout(resolve, 20);
+            });
+        });
+        expect(secondResult.current.settled).toBe(false);
+        expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+
+        // The new account's read lands: the model is refused, with its notice.
+        harness.gate = undefined;
+        resolveGate();
+        await waitFor(() => expect(secondResult.current.settled).toBe(true));
+        await waitFor(() => expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE));
+        expect(useChatUIStore.getState().composerText).toBe("hi");
+        expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
     });
 
     it("the list keeps its identity across re-renders while its entries do not change", async () => {
