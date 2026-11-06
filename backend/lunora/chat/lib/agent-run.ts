@@ -1088,7 +1088,11 @@ export const resumeApprovedRun = async (
             autoMediaEnrichment: config.autoMediaEnrichment,
             // A person just answered in the chat, so this run is interactive.
             deviceThreadId: threadId,
-            ...(subAgentChild && { headless: true, headlessCanAsk: true }),
+            ...(subAgentChild && {
+                headless: true,
+                headlessCanAsk: true,
+                ...(config.headlessApproved && { headlessApproved: config.headlessApproved }),
+            }),
             mcpProgress: toolProgressSink(ctx, streamId),
             model: config.model,
             origin: config.dispatchOrigin,

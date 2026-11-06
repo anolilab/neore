@@ -25,6 +25,12 @@ export const vToolRunConfig = v.object({
      * participant, then the rest of the turn (`chat/group/run.ts`).
      */
     group: v.optional(vGroupRunSnapshot),
+    /**
+     * The built-ins whose `ask` a sub-agent child inherited an approval for (`sub-agents/execute.ts`): the parent's approved
+     * delegation carries into its nested dispatch. The continuation of a paused child keeps them, so an answer does not ask
+     * again for a nested dispatch. Absent on a snapshot that predates it, which reads as no inherited approval.
+     */
+    headlessApproved: v.optional(v.array(v.string())),
     instructions: v.optional(v.string()),
     mcpServerNames: v.array(v.string()),
     /**

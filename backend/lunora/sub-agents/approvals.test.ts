@@ -17,6 +17,7 @@ import {
     awaitApproval,
     cancelSubAgentRunsForStop,
     completeResumedRun,
+    endApprovalWaitForMessage,
     listSubAgentApprovals,
     markRunAwaiting,
     reapSubAgentRun,
@@ -210,6 +211,57 @@ describe("a child that stopped on a request", () => {
     });
 });
 
+describe("a new message into a child that waits on a request", () => {
+    it("denies the request and ends the waiting run", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+
+        expect(await internalCall(endApprovalWaitForMessage, { threadId: childId })).toBe(1);
+        expect(await runStatus()).toBe("cancelled");
+
+        const rows = await run(async (context) => await context.db.query("toolApprovalRuns").collect());
+
+        expect(rows[0]?.status).toBe("denied");
+    });
+
+    it("ends a worker's waiting run and starts the message queued behind it", async () => {
+        const queuedId = await run(
+            async (context) =>
+                await context.db.insert("subAgentRuns", {
+                    childThreadId: childId,
+                    createdAt: Date.now() + 1,
+                    depth: 1,
+                    mode: "worker",
+                    parentThreadId: parentId,
+                    status: "queued",
+                    task: "Tidy up again",
+                    updatedAt: Date.now(),
+                    userId: OWNER,
+                }),
+        );
+
+        await run(async (context) => await context.db.patch("subAgentRuns", runId, { mode: "worker" }));
+
+        expect(await internalCall(endApprovalWaitForMessage, { threadId: childId })).toBe(1);
+        expect(await runStatus()).toBe("cancelled");
+
+        // The queued message's run is handed to a job: its status moves on when the job claims it.
+        const started = jobsQueueMessages.filter((message) => JSON.stringify(message.body).includes(queuedId));
+
+        expect(started).toHaveLength(1);
+    });
+
+    it("leaves a child alone when no request of it is open", async () => {
+        await run(async (context) => {
+            const [row] = await context.db.query("toolApprovalRuns").collect();
+
+            await context.db.patch("toolApprovalRuns", row._id, { resolvedAt: Date.now(), status: "approved" });
+        });
+
+        expect(await internalCall(endApprovalWaitForMessage, { threadId: childId })).toBe(0);
+        expect(await runStatus()).toBe("running");
+    });
+});
+
 describe("listSubAgentApprovals", () => {
     beforeEach(async () => {
         await run(async (context) => await markRunAwaiting(context, runId));
@@ -224,6 +276,7 @@ describe("listSubAgentApprovals", () => {
                 childThreadId: childId,
                 input: expect.stringContaining("/tmp/old.txt"),
                 runId,
+                server: "Files",
                 skillSlug: null,
                 task: "Tidy up the files",
                 toolName: TOOL,

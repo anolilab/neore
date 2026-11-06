@@ -332,6 +332,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 researchDepth: "balanced",
                 searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
                 shouldAutoContinue,
+                ...(options.approvedTools && { headlessApproved: [...options.approvedTools] }),
                 startedBy: userId,
                 subAgentRunId: options.pauseForApproval.subAgentRunId,
                 toolNames: Object.keys(runTools),

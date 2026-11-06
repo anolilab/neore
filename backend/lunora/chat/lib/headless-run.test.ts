@@ -621,6 +621,18 @@ describe("runHeadlessAgent pauseForApproval", () => {
         expect(patches.at(-1)).not.toHaveProperty("lastReplyAt");
     });
 
+    it("keeps the nested-dispatch consent a child inherited in its snapshot, so the owner's answer does not ask again", async () => {
+        seen.saved = [approvalRequest];
+
+        const ctx = fakeCtx();
+
+        await run(ctx, { approvedTools: ["delegateToSubAgent", "messageWorker"], pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+        expect(recorded!.config.headlessApproved).toEqual(["delegateToSubAgent", "messageWorker"]);
+    });
+
     it("records nothing for a run that did not stop on a request", async () => {
         const ctx = fakeCtx();
         const result = await run(ctx, { pauseForApproval: { subAgentRunId: RUN_ID } });

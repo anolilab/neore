@@ -52180,6 +52180,16 @@
                         "type": "string",
                         "x-lunora-table": "subAgentRuns"
                       },
+                      "server": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "skillSlug": {
                         "anyOf": [
                           {
@@ -52209,6 +52219,7 @@
                       "childThreadId",
                       "input",
                       "runId",
+                      "server",
                       "skillSlug",
                       "task",
                       "toolName"

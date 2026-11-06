@@ -50,6 +50,7 @@ const SubAgentApprovals: FC<{ parentThreadId: string; runId: string }> = ({ pare
 
         return (
             <div className="mt-2" key={request.approvalId}>
+                {request.server === null ? null : <span className="text-muted-foreground text-xs">{request.server}</span>}
                 <ToolApprovalCard
                     approvalId={request.approvalId}
                     canAllowForAPeriod={false}
