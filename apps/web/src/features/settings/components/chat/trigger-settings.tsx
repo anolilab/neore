@@ -561,7 +561,8 @@ const TriggerSettings: FC = () => {
                 eventSource: editFormData.type === "event" ? eventSourceFromForm(editFormData.event) : undefined,
                 // The whole set replaces the stored one; an empty set clears it.
                 filters: editFormData.type === "webhook" ? webhookUpdateFilters(editFormData.webhook) : undefined,
-                inputTemplate: editFormData.inputTemplate || undefined,
+                // The form always carries the stored template, so an empty one is a deliberate clear.
+                inputTemplate: editFormData.inputTemplate,
                 model: editFormData.model || undefined,
                 name: editFormData.name,
                 quietWhenEmpty,

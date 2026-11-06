@@ -697,6 +697,8 @@ export const updateTrigger = authMutation
             ...withoutUndefined(patch),
             // `null` removes the description.
             ...(args.description === null && { description: undefined }),
+            // An empty template removes the stored one; `undefined` leaves it as it is.
+            ...(args.inputTemplate !== undefined && args.inputTemplate.trim() === "" && { inputTemplate: undefined }),
             // `undefined` removes a stale time; enabling recomputes it (`firstRunOf`).
             // Also clears a time a non-schedule trigger stored before this check existed.
             // An event trigger's next check is its own and is never touched here.

@@ -66,9 +66,14 @@ const PLACEHOLDER = /\{\{([^{}]*)\}\}/gu;
 /** A frame tag for one delivery: six random bytes in hex, so the body cannot anticipate it. */
 export const randomFrameId = (): string => [...crypto.getRandomValues(new Uint8Array(6))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
+/**
+ * The body's JSON. An integer beyond the safe range keeps its source digits, as a string, so a large ID is not rounded.
+ */
 const parseJson = (body: string): unknown => {
     try {
-        return JSON.parse(body) as unknown;
+        return JSON.parse(body, (_key, value: unknown, context?: { source?: string }) =>
+            typeof value === "number" && Math.abs(value) > Number.MAX_SAFE_INTEGER && context?.source !== undefined ? context.source : value,
+        ) as unknown;
     } catch {
         return undefined;
     }

@@ -274,6 +274,25 @@ describe("trigger schedules", () => {
         expect(trigger.cronExpression).toBe("0 9 * * 1");
     });
 
+    it("clears a stored input template when an update sets it to empty, and keeps it when an update leaves it out", async () => {
+        const { triggerId } = (await as().mutation(
+            createTrigger as never,
+            { inputTemplate: "Old {{body.x}}", model: "m", name: "Hook", type: "webhook" } as never,
+        )) as {
+            triggerId: string;
+        };
+
+        await as().mutation(updateTrigger as never, { name: "Hook", triggerId } as never);
+        const kept = await readTrigger(triggerId);
+
+        expect(kept.inputTemplate).toBe("Old {{body.x}}");
+
+        await as().mutation(updateTrigger as never, { inputTemplate: "", triggerId } as never);
+        const cleared = await readTrigger(triggerId);
+
+        expect(cleared.inputTemplate).toBeUndefined();
+    });
+
     it("refuses an unknown time zone on create and on update, storing nothing", async () => {
         await expect(as().mutation(createTrigger as never, { ...schedule("0 9 * * 1"), timezone: "Europe/Berln" } as never)).rejects.toThrow(
             "Unknown time zone",

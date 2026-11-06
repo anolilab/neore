@@ -198,6 +198,13 @@ describe("renderWebhookPrompt", () => {
         expect((rendered ?? "").length).toBeLessThanOrEqual(MAX_RENDERED_VALUE_LENGTH + 2);
     });
 
+    it("keeps an integer beyond the safe range as its exact digits, not a rounded number", () => {
+        const body = '{"id":12345678901234567890}';
+        const rendered = renderWebhookPrompt("{{body.id}}", { body, headers: {}, query: {} }, FRAME) ?? "";
+
+        expect(rendered.split("\n", 1)[0]).toBe('"12345678901234567890"');
+    });
+
     it("does not cut a supplementary character at the body limit into a lone surrogate", () => {
         // The emoji is two units, at 9,999 and 10,000: a cut at 10,000 would keep only its high surrogate.
         const body = `${"a".repeat(MAX_PAYLOAD_LENGTH - 1)}\u{1F600}`;
