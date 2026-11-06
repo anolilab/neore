@@ -44,6 +44,36 @@ pub struct TerminalRequest {
 }
 
 impl DeviceState {
+    /// Whether a terminal could start in `folder` here: the folder is shared with this computer's tools, and the sandbox
+    /// can run a command there with the settings' network tier. It is what `acp_terminal_start` checks before it spawns,
+    /// without the agent's approval (a session opens only for an approved agent, and a start checks that again). The
+    /// desktop offers an agent the `terminal` capability only when this is true.
+    pub fn acp_terminal_available(&self, folder: &str) -> bool {
+        let settings = self.settings();
+        let Ok(folders) = validate_roots(&[folder.to_owned()]) else {
+            return false;
+        };
+        let Some(folder) = folders.into_iter().next().map(PathBuf::from) else {
+            return false;
+        };
+
+        if !shareable_roots(&settings.roots)
+            .iter()
+            .any(|root| folder.starts_with(root))
+        {
+            return false;
+        }
+
+        sandbox::policy_for_call(
+            &sandbox::support(),
+            false,
+            settings.shell_network_tier(),
+            std::slice::from_ref(&folder),
+            sandbox::home().as_deref(),
+        )
+        .is_ok_and(|policy| policy.is_some())
+    }
+
     /// Plans and starts one terminal. Refused, with nothing started, for an agent not approved for the folder, a working
     /// folder outside it, a variable the agent may not set, or a computer with no sandbox.
     pub fn acp_terminal_start(&self, request: &TerminalRequest) -> Result<Terminal, String> {
@@ -255,15 +285,32 @@ mod tests {
         let line = format!("echo leaked > '{}/leak.txt'", sibling.display());
         let terminal = match state.acp_terminal_start(&request(&project, &line)) {
             Ok(terminal) => terminal,
-            Err(error) => {
+            Err(error) if error.contains("there is none here") => {
                 eprintln!("skipping: {error}");
                 return;
             }
+            Err(error) => panic!("the terminal did not start: {error}"),
         };
         let exit = terminal.wait(Duration::from_secs(20)).expect("ended");
 
         assert_ne!(exit.exit_code, Some(0), "{}", terminal.output().output);
         assert!(!sibling.join("leak.txt").exists());
+    }
+
+    #[test]
+    fn offers_a_terminal_exactly_where_a_start_could_succeed() {
+        let (state, project, _, _, _scratch) = setup("offers");
+        let available = state.acp_terminal_available(project.to_str().unwrap());
+        let started = state.acp_terminal_start(&request(&project, "true"));
+
+        assert_eq!(available, started.is_ok(), "{:?}", started.err());
+    }
+
+    #[test]
+    fn offers_no_terminal_for_a_folder_no_one_shares() {
+        let (state, _, other, _, _scratch) = setup("unshared");
+
+        assert!(!state.acp_terminal_available(other.to_str().unwrap()));
     }
 
     #[test]

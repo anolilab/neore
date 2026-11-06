@@ -798,6 +798,13 @@ impl DeviceCore {
         })
     }
 
+    /// Whether a coding agent's terminal could start in `folder` on this computer (a sandbox that can run it, and the folder
+    /// shared with its tools). The desktop offers `terminal` to an agent only when this is true.
+    #[napi]
+    pub fn acp_terminal_available(&self, folder: String) -> bool {
+        self.state.acp_terminal_available(&folder)
+    }
+
     /// What a terminal printed so far (its tail) and, once it ended, how (`{ output, truncated, exitStatus }`, JSON).
     #[napi]
     pub fn acp_terminal_output(&self, handle: f64) -> Result<String> {

@@ -181,6 +181,11 @@ export declare class DeviceCore {
    * approved for the folder, a working folder outside it, too many terminals, or a computer with no sandbox.
    */
   acpTerminalStart(request: string): Promise<number>
+  /**
+   * Whether a coding agent's terminal could start in `folder` on this computer (a sandbox that can run it, and the folder
+   * shared with its tools). The desktop offers `terminal` to an agent only when this is true.
+   */
+  acpTerminalAvailable(folder: string): boolean
   /** What a terminal printed so far (its tail) and, once it ended, how (`{ output, truncated, exitStatus }`, JSON). */
   acpTerminalOutput(handle: number): string
   /** Resolves how a terminal's command ended (`{ exitCode, signal }`, JSON), once it has. */
