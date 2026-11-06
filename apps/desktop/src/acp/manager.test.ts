@@ -341,9 +341,9 @@ describe("the environment", () => {
         target.send(id, "env");
         await idle(id, target);
 
-        // macOS adds this one to every process it starts; it is not the app's.
+        // macOS adds one and the launching shell adds SHLVL to every process they start; neither is the app's.
         const names = Object.keys(JSON.parse(snapshot(id, target).turns[0].text) as Record<string, string>)
-            .filter((name) => name !== "__CF_USER_TEXT_ENCODING")
+            .filter((name) => name !== "__CF_USER_TEXT_ENCODING" && name !== "SHLVL")
             ;
 
         expect(new Set(names)).toEqual(new Set(["FAKE_AGENT_LOG", "ONLY_FOR_THIS_AGENT", "PATH"]));
