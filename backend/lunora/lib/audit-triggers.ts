@@ -42,8 +42,6 @@ const REDACTED_FIELDS = new Set([
     "verificationToken",
 ]);
 
-type Row = Record<string, unknown> | null | undefined;
-
 /**
  * `aiUserPreferences.mcpServers[].headers[].value`: what the Settings page stores for a header a person typed,
  * usually a bearer token. The snapshot keeps the header's name and the server, not its value.
@@ -68,7 +66,7 @@ const withoutHeaderValues = (servers: unknown): unknown => {
 };
 
 /** A shallow copy with the secret-shaped fields removed. */
-export const redact = (document: Row): Record<string, unknown> | undefined => {
+export const redact = (document: object | null | undefined): Record<string, unknown> | undefined => {
     if (!document) {
         return undefined;
     }
