@@ -4,6 +4,7 @@ import type { FC, PropsWithChildren } from "react";
 import { useEffect } from "react";
 
 import { reportFirstNativeLaunch } from "@/lib/analytics/first-native-launch";
+import { redactPromptFromEvent } from "@/lib/analytics/redact-prompt";
 
 /**
  * Apply a consent decision to PostHog.
@@ -65,6 +66,9 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
                           isIdentifiedID: false,
                       }
                     : undefined,
+            // Every event, page views and error reports included, goes through the redaction: a prompt link's text never leaves
+            // the browser in a URL (`lib/analytics/redact-prompt.ts`).
+            before_send: redactPromptFromEvent,
             capture_pageview: true,
             // PostHog will not set any cookies until the user has given consent
             cookieless_mode: "on_reject",
