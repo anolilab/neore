@@ -62,8 +62,6 @@ const SYSTEM_DB_IMPORTERS = [
     // Whether the lead is shared at all, before a worker is allowed to reach the owner's computer: a refusal, never rows.
     "sub-agents/functions.ts",
     "skills/marketplace.ts",
-    // An organization's projects for its admins' usage view, after the caller's admin role is checked on their `member` row.
-    "usage/organization.ts",
 ].toSorted(byName);
 
 /** `relative()` with POSIX separators, so the keys below hold on Windows too. */
