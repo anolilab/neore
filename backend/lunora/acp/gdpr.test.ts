@@ -136,6 +136,50 @@ describe("the export of coding-agent sessions and events", () => {
         }
     });
 
+    it("keeps every session exactly once when one a page already exported is deleted before the next page", async () => {
+        const device = await insertDevice(A);
+        const choices = Array.from({ length: 100 }, (_unused, index) => {
+            return { name: `choice ${String(index)} ${"漢".repeat(40)}`, value: `v${String(index)}` };
+        });
+        const agentState = { configOptions: [{ category: "model", choices, currentValue: "v0", id: "model", name: "Model" }] };
+        const threads: string[] = [];
+
+        for (let index = 0; index < 100; index += 1) {
+            const threadId = await insertSession(A, device, index);
+
+            threads.push(threadId);
+            await harness.run(async (ctx: any) => {
+                const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+                await ctx.db.patch("acpSessions", row._id, { agentState });
+            });
+        }
+
+        const first = await collectPage(A);
+        const sessions = [...first.sessions];
+
+        expect(first.next).toBeDefined();
+
+        // A session the first page already exported goes away while the export is still paging.
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId: threads[0] } });
+
+            await ctx.db.delete("acpSessions", row._id);
+        });
+
+        for (let cursor = first.next; cursor !== undefined; ) {
+            const page: Page = await collectPage(A, cursor);
+
+            sessions.push(...page.sessions);
+            cursor = page.next;
+        }
+
+        const exported = sessions.map((session) => session.threadId);
+
+        expect(new Set(exported).size).toBe(exported.length);
+        expect(exported).toEqual(expect.arrayContaining(threads.slice(1)));
+    });
+
     it("includes the last option change the person made on a session", async () => {
         const device = await insertDevice(A);
         const threadId = await insertSession(A, device, 0);

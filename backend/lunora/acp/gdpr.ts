@@ -77,10 +77,13 @@ const vExportSession = v.object({
 
 /** Where the next page starts: in the sessions (`page` is the table cursor), or in the host streams' events (`page` is the stream cursor, `seq` the last chunk already read). */
 const vExportCursor = v.object({
+    // The last session of this page already exported, by id: the next page starts after it, wherever it now sits.
+    after: v.optional(v.string()),
     page: v.optional(v.string()),
     phase: v.union(v.literal("sessions"), v.literal("events")),
     seq: v.optional(v.number()),
-    // Rows of this page already exported (a page can be cut short by bytes; see `SESSION_PAGE_BYTES`).
+    // Rows of this page already exported (a page can be cut short by bytes; see `SESSION_PAGE_BYTES`). Used only when the
+    // `after` row is gone, since a count alone moves when rows before it are deleted or inserted while the export runs.
     skip: v.optional(v.number()),
 });
 
@@ -104,12 +107,13 @@ export const collectAcpSessionsForExport = internalQuery
     )
     .query(async ({ args: { cursor, userId }, ctx }) => {
         if (cursor === undefined || cursor.phase === "sessions") {
-            const skip = cursor?.skip ?? 0;
             const { continueCursor, isDone, page } = await ctx.db.acpSessions.findMany({ cursor: cursor?.page, limit: SESSION_PAGE, where: { userId } });
+            const anchor = cursor?.after === undefined ? -1 : page.findIndex((row) => row._id === cursor.after);
+            const start = anchor === -1 ? (cursor?.skip ?? 0) : anchor + 1;
 
             // Labels and times only: no device id, no path ever reaches the backend.
             const rows = page
-                .slice(skip)
+                .slice(start)
                 .map(
                     ({
                         agentKey,
@@ -145,15 +149,17 @@ export const collectAcpSessionsForExport = internalQuery
                 );
 
             // A row can hold up to 128 KiB of agent state, so a page is also cut by bytes. The rest of this query's rows come
-            // next, from the same cursor, past the ones taken.
+            // next, from the same cursor, after the last one taken.
             const sessions = rowsWithinBudget(rows, SESSION_PAGE_BYTES);
-            const more = skip + sessions.length < page.length;
+            const end = start + sessions.length;
+            const more = end < page.length;
+            const lastTaken = page[end - 1];
 
             const afterPage = isDone ? { phase: "events" as const } : { page: continueCursor ?? undefined, phase: "sessions" as const };
 
             return {
                 events: [],
-                next: more ? { page: cursor?.page, phase: "sessions" as const, skip: skip + sessions.length } : afterPage,
+                next: more && lastTaken !== undefined ? { after: lastTaken._id, page: cursor?.page, phase: "sessions" as const, skip: end } : afterPage,
                 sessions,
             };
         }
