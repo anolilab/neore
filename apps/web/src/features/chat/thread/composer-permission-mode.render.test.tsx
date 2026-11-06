@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { COMPARISON_COLUMN_MODE_CODE } from "@neore/backend/chat/permission-mode";
+import { COMPARISON_COLUMN_MODE_CODE, THREAD_PERMISSION_MODES } from "@neore/backend/chat/permission-mode";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -213,7 +213,8 @@ describe("permission mode control", () => {
         fireEvent.click(await screen.findByRole("button", { name: "Permission mode: Full access" }));
 
         expect(await screen.findByText("Anything that is not a plain lookup asks first")).toBeTruthy();
-        expect(screen.getAllByRole("menuitemradio")).toHaveLength(4);
+        // The menu offers the backend's modes: the count follows the shared list, not a copy of it.
+        expect(screen.getAllByRole("menuitemradio")).toHaveLength(THREAD_PERMISSION_MODES.length);
 
         fireEvent.click(screen.getByRole("menuitemradio", { name: SUPERVISED_PATTERN }));
 

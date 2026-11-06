@@ -1,7 +1,8 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
-import { COMPARISON_COLUMN_MODE_CODE } from "@neore/backend/chat/permission-mode";
+import type { ThreadPermissionMode } from "@neore/backend/chat/permission-mode";
+import { COMPARISON_COLUMN_MODE_CODE, isThreadPermissionMode, THREAD_PERMISSION_MODES } from "@neore/backend/chat/permission-mode";
 import { Button } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@neore/ui/components/dropdown-menu";
 import { skipToken, useIsMutating, useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,14 +14,13 @@ import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-st
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
-export type ThreadPermissionMode = "auto" | "auto-edit" | "full" | "supervised";
-
 /** The server refused the save because the thread is a comparison column: its mode is the comparison's, so nothing was saved. */
 const isComparisonRefusal = (error: unknown): boolean => (error as { data?: { code?: unknown } } | null)?.data?.code === COMPARISON_COLUMN_MODE_CODE;
 
-const MODE_ORDER: ReadonlyArray<ThreadPermissionMode> = ["supervised", "auto-edit", "auto", "full"];
+/** The menu lists the backend's modes in this order (`THREAD_PERMISSION_MODES`); a mode added there is a compile error here until labelled. */
+const MODE_ORDER = THREAD_PERMISSION_MODES;
 
-const isMode = (value: unknown): value is ThreadPermissionMode => MODE_ORDER.includes(value as ThreadPermissionMode);
+const isMode = isThreadPermissionMode;
 
 interface ComposerPermissionModeProps {
     disabled?: boolean;
