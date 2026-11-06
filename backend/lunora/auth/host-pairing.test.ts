@@ -177,7 +177,13 @@ describe("pairing a headless machine by code", () => {
 
         expect(redeemed.response.status).toBe(200);
         expect(redeemed.response.headers.get("cache-control")).toBe("no-store");
-        expect(redeemed.body).toEqual({ account: "o***@example.test", device_id: "device-1", name: "build-box.lan", secret: SECRET, token_type: "device_secret" });
+        expect(redeemed.body).toEqual({
+            account: "o***@example.test",
+            device_id: "device-1",
+            name: "build-box.lan",
+            secret: SECRET,
+            token_type: "device_secret",
+        });
         expect(harness.registrations).toEqual([{ codeId: expect.any(String), name: "build-box.lan", platform: "linux", userId: owner.userId }]);
     });
 

@@ -360,7 +360,13 @@ export const registerHeadlessDevice = internalMutation
 
         await assertMayPairHeadless(ctx, args.userId);
 
-        const registered = await insertDevice(ctx, { name: args.name, pairedByCode: args.codeId, platform: args.platform, transport: "headless", userId: args.userId });
+        const registered = await insertDevice(ctx, {
+            name: args.name,
+            pairedByCode: args.codeId,
+            platform: args.platform,
+            transport: "headless",
+            userId: args.userId,
+        });
 
         ctx.log.event("devices.register_headless_device", { platform: args.platform });
 
