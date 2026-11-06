@@ -1,3 +1,4 @@
+import { stripHiddenText } from "@neore/ai/utils";
 import { describe, expect, it } from "vitest";
 
 import type { GuideFile } from "./guide-logic";
@@ -95,6 +96,17 @@ describe("paths with hidden characters", () => {
 
         expect(prompt).toContain(String.raw`"path": "src/a\\u200Cb.ts"`);
         expect(prompt).not.toContain("‌");
+    });
+
+    it.each([
+        ["a combining grapheme joiner", "͏"],
+        ["a supplementary variation selector", "\u{E0100}"],
+    ])("leaves the prompt unchanged by the cleaner when a path has %s after a letter", (_name, char) => {
+        const prompt = buildHostGuidePrompt(input({ files: [file(`src/a${char}b.ts`)] }));
+
+        expect(prompt).not.toContain(char);
+        // The cleaner removes nothing from the prompt, so the path the agent reads is the path the guide matches.
+        expect(stripHiddenText(prompt).text).toBe(prompt);
     });
 });
 

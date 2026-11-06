@@ -102,6 +102,27 @@ describe("assembleGuide", () => {
         expect(guide.stops.some((stop) => stop.kind === "uncovered")).toBe(false);
     });
 
+    it("matches an answer that names a file with a combining or supplementary selector by its escape", () => {
+        // The escape as the prompt shows it: a backslash, then `u` and the code point's hex digits.
+        const escape = (hex: string): string => String.raw`\u${hex}`;
+        const guide = assembleGuide(
+            [file("src/a\u{34F}b.ts"), file("src/a\u{E0100}b.ts")],
+            {
+                proposals: [],
+                stops: [
+                    { explanation: "", files: [{ path: `src/a${escape("034F")}b.ts` }], role: "core", title: "Combining" },
+                    { explanation: "", files: [{ path: `src/a${escape("{E0100}")}b.ts` }], role: "dependent", title: "Selector" },
+                ],
+                summary: "",
+            },
+            0,
+        );
+        const placed = guide.stops.flatMap((stop) => stop.files.map((entry) => entry.path));
+
+        expect(placed.toSorted((a, b) => a.localeCompare(b))).toEqual(["src/a\u{34F}b.ts", "src/a\u{E0100}b.ts"].toSorted((a, b) => a.localeCompare(b)));
+        expect(guide.stops.some((stop) => stop.kind === "uncovered")).toBe(false);
+    });
+
     it("orders core, then dependents, then mechanical changes, then what is not covered", () => {
         const guide = assembleGuide(files, { ...output, stops: [...output.stops].toReversed() }, 0);
 

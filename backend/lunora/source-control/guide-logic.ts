@@ -10,6 +10,8 @@
  *
  * Pure: no host, no database, no model.
  */
+import { hasHiddenText, stripHiddenText } from "@neore/ai/utils";
+
 import type { PullRequestFile } from "./types";
 
 export type GuideFile = Pick<PullRequestFile, "additions" | "deletions" | "patch" | "path" | "previousPath" | "status">;
@@ -182,21 +184,31 @@ const record = (value: unknown): Record<string, unknown> | null =>
 
 const text = (value: unknown, max: number): string => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
-/** The characters a path cannot show: controls, format and private-use characters, surrogates, and variation selectors. */
-const HIDDEN_IN_PATH = /[\p{Cc}\p{Cf}\p{Co}\p{Cs}\u{FE00}-\u{FE0F}]/gu;
+/** Characters a path cannot show, by class: controls, format, private-use, surrogates, line separators and variation selectors. */
+const UNSHOWN_IN_PATH = /[\p{Cc}\p{Cf}\p{Co}\p{Cs}\p{Zl}\p{Zp}\u{FE00}-\u{FE0F}]/u;
 
 /**
- * A changed file's path as the guide reads it. Each hidden character is written as a `\uXXXX` escape, so the prompt shows
- * the exact path and the agent's answer names it the same way, and two files whose names differ only by a hidden character
- * stay two files. The prompt and the answer both go through this, so either spelling of the same path matches.
- * A literal backslash-u sequence in a real path would read the same as its escape: an accepted edge.
+ * Whether the prompt's cleaner would remove this character, or the strict check flags it. Asked of each character on its
+ * own, so the escape set is at least the cleaner's: a character the cleaner could remove is always escaped first.
+ */
+const removedByCleaner = (char: string): boolean => hasHiddenText(char, { strict: true }) || stripHiddenText(char).removed > 0;
+
+/** A character escaped as `\uXXXX`, or `\u{XXXXX}` past the BMP. */
+const escapeChar = (char: string): string => {
+    const hex = (char.codePointAt(0) ?? 0).toString(16).toUpperCase();
+
+    return hex.length > 4 ? String.raw`\u{${hex}}` : String.raw`\u${hex.padStart(4, "0")}`;
+};
+
+/**
+ * A changed file's path as the guide reads it. Each character that cannot be shown, or that the prompt's cleaner would
+ * remove, is written as an escape, so the prompt shows the exact path and the agent's answer names it the same way, and two
+ * files whose names differ only by such a character stay two files. The prompt and the answer both go through this, so
+ * either spelling of the same path matches. A literal backslash-u sequence in a real path would read the same as its escape:
+ * an accepted edge.
  */
 export const pathKey = (path: string): string =>
-    path.replaceAll(HIDDEN_IN_PATH, (char) => {
-        const hex = (char.codePointAt(0) ?? 0).toString(16).toUpperCase();
-
-        return hex.length > 4 ? String.raw`\u{${hex}}` : String.raw`\u${hex.padStart(4, "0")}`;
-    });
+    [...path].map((char) => (UNSHOWN_IN_PATH.test(char) || removedByCleaner(char) ? escapeChar(char) : char)).join("");
 
 const wholeLine = (value: unknown): number | null => (typeof value === "number" && Number.isSafeInteger(value) && value >= 1 ? value : null);
 
