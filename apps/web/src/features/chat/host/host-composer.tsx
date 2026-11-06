@@ -23,6 +23,7 @@ import { useCRPC } from "@/lib/lunora/crpc";
 
 import DiffCommentsDraft from "./diff-comments-draft";
 import { caretAfterRemoval } from "./host-caret";
+import { exceedsRawInputLimit } from "./host-input";
 import { MAX_HOST_PROMPT_CHARS, sendHostMessage } from "./host-send";
 import useHostSendErrorMessages from "./host-send-errors";
 
@@ -120,7 +121,8 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const trimmed = text.trim();
     const status = session?.status;
     const blocked = status === "ended";
-    const canSend = trimmed !== "" && trimmed.length <= MAX_HOST_PROMPT_CHARS && !sending && !running && !blocked;
+    const overLimit = trimmed.length > MAX_HOST_PROMPT_CHARS;
+    const canSend = trimmed !== "" && !overLimit && !sending && !running && !blocked;
     const lastEnd = session?.lastEndReason;
     const offerContinue = !running && !blocked && lastEnd !== undefined && CONTINUABLE.has(lastEnd);
 
@@ -191,6 +193,8 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
             )}
             <div className="flex items-end gap-2">
                 <textarea
+                    aria-describedby={overLimit ? "host-composer-limit" : undefined}
+                    aria-invalid={overLimit || undefined}
                     aria-label={t`Message to the coding agent`}
                     className="bg-background min-h-11 flex-1 resize-none rounded-lg border px-3 py-2 text-sm disabled:opacity-60"
                     disabled={blocked}
@@ -199,6 +203,14 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                         // before its hidden characters are removed. A joiner at the end waits for the next letter.
                         const element = event.currentTarget;
                         const { selectionStart, selectionEnd, value } = element;
+
+                        // Refused before any scan: the controlled value stays as it was.
+                        if (exceedsRawInputLimit(value, MAX_HOST_PROMPT_CHARS)) {
+                            toast.error(messages.too_large);
+
+                            return;
+                        }
+
                         const { removed, text: clean } = stripHiddenText(value, { keepTrailingJoiner: true });
 
                         if (removed > 0) {
@@ -236,8 +248,8 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     </Button>
                 )}
             </div>
-            {trimmed.length > MAX_HOST_PROMPT_CHARS && (
-                <p className="text-destructive text-xs" role="status">
+            {overLimit && (
+                <p className="text-destructive text-xs" id="host-composer-limit" role="status">
                     {messages.too_large}
                 </p>
             )}
