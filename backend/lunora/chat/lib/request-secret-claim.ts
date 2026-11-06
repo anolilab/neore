@@ -35,7 +35,7 @@ import { claimToolApproval, findPendingRequestOnLatestTurn } from "./tool-approv
 export type SecretReply = { kind: "decline" } | { kind: "save"; more?: ReadonlyArray<{ expectedUrl: string; value: string }>; value: string };
 
 /** `ref` for a request with one destination; `refs` (by field name) for one with `fields`. */
-export type SecretClaim = ClaimResult & { ref?: string; refs?: Record<string, string>; savesProviderKey?: boolean; use?: SecretUse };
+export type SecretClaim = ClaimResult & { ref?: string; refs?: Record<string, string>; providerKeySaves?: number; use?: SecretUse };
 
 interface StoredRequest {
     fields?: unknown;
@@ -265,13 +265,13 @@ export const claimSecretAnswer = async (
     }
 
     if (input.fields === undefined) {
-        return { ...claim, ref: refs[0]!, savesProviderKey: prepared[0]!.use.kind === "provider_key", use: prepared[0]!.use };
+        return { ...claim, providerKeySaves: prepared[0]!.use.kind === "provider_key" ? 1 : 0, ref: refs[0]!, use: prepared[0]!.use };
     }
 
     return {
         ...claim,
         refs: Object.fromEntries(asked.map((field, index) => [field.name!, refs[index]!])),
-        savesProviderKey: prepared.some(({ use }) => use.kind === "provider_key"),
+        providerKeySaves: prepared.filter(({ use }) => use.kind === "provider_key").length,
     };
 };
 

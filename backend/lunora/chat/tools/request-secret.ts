@@ -35,6 +35,7 @@ import {
     SECRET_HEADER_NAME_RE,
     SECRET_HEADER_VALUE_MAX,
     SECRET_LABEL_MAX,
+    SECRET_PROVIDER_KEY_MAX,
     SECRET_PROVIDERS,
     SECRET_PURPOSE_MAX,
     SECRET_SERVER_NAME_MAX,
@@ -99,7 +100,15 @@ const inputSchema = z
     .refine((input) => input.fields === undefined || input.format === undefined, { error: "With `fields`, put `format` on each field" })
     .refine((input) => input.fields === undefined || new Set(input.fields.map((field) => field.name)).size === input.fields.length, {
         error: "Field names must be unique",
-    });
+    })
+    // A provider key is stored up to SECRET_PROVIDER_KEY_MAX characters, so a card that requires more could never be answered.
+    .refine(
+        (input) =>
+            (input.fields ?? (input.use === undefined ? [] : [{ format: input.format, use: input.use }])).every(
+                ({ format, use }) => use.kind !== "provider_key" || (format?.minLength ?? 0) <= SECRET_PROVIDER_KEY_MAX,
+            ),
+        { error: `A provider key cannot require more than ${SECRET_PROVIDER_KEY_MAX} characters` },
+    );
 
 const DESCRIPTION = `Ask the user for a secret (an API key or token) you need, on a card that keeps the value out of the chat.
 Use it instead of asking the user to paste a key into the conversation. You never see the value: the tool returns a reference, which you spend with exactly one consumer tool, in the reply that receives it (a reference does not outlive the reply).

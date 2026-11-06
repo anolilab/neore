@@ -102,9 +102,9 @@ export const answerSecretRequest = authMutation
         // The value now waits for its 24 hours on this shard, so housekeeping must visit it even if its last HTTP request was long ago.
         await noteShardActivity(ctx, claim.ownerId);
 
-        // A provider key counts against the same budget as saving one in Settings. A throw rolls the claim back.
-        if (claim.savesProviderKey) {
-            await rateLimitGuard({ ...ctx, rateLimitKey: "byok/save", user: ctx.user });
+        // A provider key counts against the same budget as saving one in Settings, once per key in the card. A throw rolls the claim back.
+        if (claim.providerKeySaves) {
+            await rateLimitGuard({ ...ctx, count: claim.providerKeySaves, rateLimitKey: "byok/save", user: ctx.user });
         }
 
         const streamId = await resumeClaimedRun(ctx, {
@@ -117,7 +117,7 @@ export const answerSecretRequest = authMutation
         });
 
         // Whether it was saved, never what it was.
-        ctx.log.event("chat.answer_secret_request", { alreadyResolved: false, declined: claim.ref === undefined, resumed: true });
+        ctx.log.event("chat.answer_secret_request", { alreadyResolved: false, declined: claim.ref === undefined && claim.refs === undefined, resumed: true });
 
         return { alreadyResolved: false, streamId };
     });
