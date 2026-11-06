@@ -274,6 +274,17 @@ describe("MCP Apps proxy with an OAuth grant", () => {
         expect(JSON.stringify(await response.json())).toContain("needs your approval");
     });
 
+    it("runs a read-only tool that names no thread, as the default does, and still refuses one that would ask", async () => {
+        // The older clients: a call with no thread must not lose the read-only tools they always ran.
+        oauthConfig("fresh");
+
+        const readOnly = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+        const asks = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        expect(readOnly.status).toBe(200);
+        expect(asks.status).toBe(403);
+    });
+
     it("refuses a thread the caller cannot reach", async () => {
         oauthConfig("fresh");
         state.thread = { allowed: false, mode: null };

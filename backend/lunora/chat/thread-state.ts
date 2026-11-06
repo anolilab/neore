@@ -108,7 +108,7 @@ export const setThreadPermissionMode = authMutation
 
         if (thread.permissionMode !== mode) {
             await patchThread(context.db, thread._id, { permissionMode: mode });
-            // Access changes are audited: the mode decides whether the thread's tools ask, so the owner'"'"'s history records it.
+            // Access changes are audited: the mode decides whether the thread's tools ask, so the owner's history records it.
             // The same redaction as the audit triggers: the sharing token and other secrets never reach a snapshot.
             await appendDocumentHistory(context.db, context.now, {
                 attribution: { action: "update", source: "manual" },

@@ -341,9 +341,9 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
     }
 
     // The app's call runs under the thread's mode, as the model's calls do: the proxy is no way around a supervised thread. A call
-    // that names no thread (a client built before the thread was sent) runs under the most restrictive mode: a read-only tool still
+    // that names no thread (a client built before the thread was sent) has no thread mode, so it gets the default: a read-only tool
     // runs, and one that would ask is refused, since no person is there to answer it. Rejecting it would break every such client.
-    const threadMode = threadId ? await threadModeFor(context, user._id, threadId) : "supervised";
+    const threadMode = threadId ? await threadModeFor(context, user._id, threadId) : undefined;
 
     if (threadMode === "denied") {
         return Response.json({ error: "This chat is not available to you" }, { status: 403 });
