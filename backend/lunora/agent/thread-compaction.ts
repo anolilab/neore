@@ -293,9 +293,9 @@ export const prepareThreadCompaction = internalMutation
             return { reason: "nothing" as const };
         }
 
-        const foldClaimedAt = await claimCut(ctx, thread._id, covered._id, thread.userId);
+        const claims = await claimCut(ctx, thread._id, covered._id, thread.userId);
 
-        if (foldClaimedAt === null) {
+        if (claims === null) {
             return { reason: "busy" as const };
         }
 
@@ -305,7 +305,7 @@ export const prepareThreadCompaction = internalMutation
                 coveredCount: (base?.summary.coveredCount ?? skipped) + consumed,
                 coveredUpToMessageId: covered._id,
                 epoch: thread.summaryEpoch ?? 0,
-                foldClaimedAt,
+                ...claims,
                 ...(base && { previousSummary: base.summary.summary, previousSummaryId: base.summary._id }),
                 // Whatever untrusted content the folded rows held, and the previous summary already carried.
                 taintedBy: mergeTaint(
@@ -339,6 +339,7 @@ const foldJob = async (
     const stored = {
         coveredCount: job.coveredCount,
         coveredUpToMessageId: job.coveredUpToMessageId,
+        cutClaimedAt: job.cutClaimedAt,
         epoch: job.epoch,
         foldClaimedAt: job.foldClaimedAt,
         kind: "compact" as const,

@@ -63,7 +63,7 @@ import { type ActionCtx, internalAction, internalMutation, internalQuery, type M
 import { computeTaint, type DeviceTaintSource, mergeTaint } from "../devices/lib/taint";
 import { messagesCarryAttachedText } from "../chat/lib/attached-text";
 import { vDeviceTaintSource } from "../devices/validators";
-import { claimFence, claimOnce, releaseClaim } from "../lib/claim-once";
+import { claimedAtOf, claimFence, releaseClaim } from "../lib/claim-once";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
@@ -110,27 +110,32 @@ export const claimKey = (threadId: string, coveredUpToMessageId: string): string
  * Claims a cut before its paid summarising call: the cut itself (`<thread>:<covered row>`, kept with the stored row so a
  * redelivery does nothing twice) and the thread's one fold in flight. An idle summary and a compaction, or two
  * compactions anchored on different rows, plan DIFFERENT cuts of the same rows; only one of them may pay, and the one
- * refused here skips before its call. Returns the fold claim's fence for `finishThreadSummary`, or `null` when either is held.
+ * refused here skips before its call. Returns both claims' fences for `finishThreadSummary`, or `null` when either is held.
  */
 export const claimCut = async (
     ctx: Pick<MutationCtx, "db">,
     threadId: Id<"threads">,
     coveredUpToMessageId: Id<"messages">,
     userId: string,
-): Promise<number | null> => {
+): Promise<{ cutClaimedAt: number; foldClaimedAt: number } | null> => {
     const foldClaimedAt = await claimFence(ctx, THREAD_FOLD_CLAIM_SCOPE, threadId, { ttlMs: THREAD_FOLD_CLAIM_TTL_MS, userId });
 
     if (foldClaimedAt === null) {
         return null;
     }
 
-    if (!(await claimOnce(ctx, THREAD_CUT_CLAIM_SCOPE, claimKey(threadId, coveredUpToMessageId), THREAD_SUMMARY_CLAIM_TTL_MS, userId))) {
+    const cutClaimedAt = await claimFence(ctx, THREAD_CUT_CLAIM_SCOPE, claimKey(threadId, coveredUpToMessageId), {
+        ttlMs: THREAD_SUMMARY_CLAIM_TTL_MS,
+        userId,
+    });
+
+    if (cutClaimedAt === null) {
         await releaseClaim(ctx, THREAD_FOLD_CLAIM_SCOPE, threadId, foldClaimedAt);
 
         return null;
     }
 
-    return foldClaimedAt;
+    return { cutClaimedAt, foldClaimedAt };
 };
 
 /**
@@ -256,9 +261,10 @@ export const leafOf = async (ctx: Reader, thread: Thread, latest: Row | null): P
 export const preparedValidator = v.object({
     coveredCount: v.number(),
     coveredUpToMessageId: v.id("messages"),
+    /** The fences of the claims this run holds (`claimCut`): its cut, and the thread's one fold in flight. */
+    cutClaimedAt: v.number(),
     /** `threads.summaryEpoch` as the run was prepared; storing the summary needs it unchanged. */
     epoch: v.number(),
-    /** The fence of the thread's fold claim this run holds (`claimCut`); `finishThreadSummary` releases it. */
     foldClaimedAt: v.number(),
     previousSummary: v.optional(v.string()),
     previousSummaryId: v.optional(v.id("threadContextSummaries")),
@@ -375,9 +381,9 @@ export const prepareThreadSummary = internalMutation
             return null;
         }
 
-        const foldClaimedAt = await claimCut(ctx, thread._id, covered._id, thread.userId);
+        const claims = await claimCut(ctx, thread._id, covered._id, thread.userId);
 
-        if (foldClaimedAt === null) {
+        if (claims === null) {
             return null;
         }
 
@@ -385,7 +391,7 @@ export const prepareThreadSummary = internalMutation
             coveredCount: (base?.summary.coveredCount ?? 0) + consumed,
             coveredUpToMessageId: covered._id,
             epoch: thread.summaryEpoch ?? 0,
-            foldClaimedAt,
+            ...claims,
             ...(base && previousSummary !== undefined && { previousSummary, previousSummaryId: base.summary._id }),
             // Whatever untrusted content the folded rows held, and the previous notes already carried.
             taintedBy: mergeTaint(
@@ -443,8 +449,10 @@ export const finishThreadSummary = internalMutation
     .input({
         coveredCount: v.number(),
         coveredUpToMessageId: v.id("messages"),
+        /** The run's cut claim (`claimCut`): released by fence, so a newer claim on the same cut is left alone. */
+        cutClaimedAt: v.optional(v.number()),
         epoch: v.number(),
-        /** The run's fold claim (`claimCut`): the paid call is over, whatever happens to its result. */
+        /** The run's fold claim (`claimCut`): a run that no longer holds it stores nothing; released either way. */
         foldClaimedAt: v.optional(v.number()),
         /** `"compact"` stores a compaction (`agent/thread-compaction.ts`): its claim scope and gate differ, see below. */
         kind: v.optional(v.literal("compact")),
@@ -455,14 +463,17 @@ export const finishThreadSummary = internalMutation
     })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
-        const claimScope = THREAD_CUT_CLAIM_SCOPE;
+        const releaseCut = async () => await releaseClaim(ctx, THREAD_CUT_CLAIM_SCOPE, claimKey(args.threadId, args.coveredUpToMessageId), args.cutClaimedAt);
+        // A run that outlived its fold claim may share the thread with a newer run by now, which holds the claim: it
+        // stores nothing, and its fenced releases leave that run's claims alone.
+        const lapsed = args.foldClaimedAt !== undefined && (await claimedAtOf(ctx, THREAD_FOLD_CLAIM_SCOPE, args.threadId)) !== args.foldClaimedAt;
 
         if (args.foldClaimedAt !== undefined) {
             await releaseClaim(ctx, THREAD_FOLD_CLAIM_SCOPE, args.threadId, args.foldClaimedAt);
         }
 
-        if (args.summary === undefined) {
-            await releaseClaim(ctx, claimScope, claimKey(args.threadId, args.coveredUpToMessageId));
+        if (args.summary === undefined || lapsed) {
+            await releaseCut();
 
             return false;
         }
@@ -472,7 +483,7 @@ export const finishThreadSummary = internalMutation
 
         // Refused after the model call: the claim goes too, so a job after a re-enable or an unlock retries at once.
         const refuse = async (): Promise<false> => {
-            await releaseClaim(ctx, claimScope, claimKey(args.threadId, args.coveredUpToMessageId));
+            await releaseCut();
 
             return false;
         };
@@ -599,6 +610,7 @@ export const runThreadSummary = internalAction
         const done = {
             coveredCount: job.coveredCount,
             coveredUpToMessageId: job.coveredUpToMessageId,
+            cutClaimedAt: job.cutClaimedAt,
             epoch: job.epoch,
             foldClaimedAt: job.foldClaimedAt,
             taintedBy: job.taintedBy,

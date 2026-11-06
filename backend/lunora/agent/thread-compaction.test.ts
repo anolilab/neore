@@ -918,6 +918,46 @@ describe("the idle-summary opt-out", () => {
         expect(rows.find((row) => row.kind === "compact")?.coveredUpToMessageId).not.toBe(job?.coveredUpToMessageId);
     });
 
+    it("stores nothing from a run that outlived its claim on the thread, and leaves the newer run's claims alone", async () => {
+        expect.assertions(3);
+
+        await seedThread(LONG_TURNS);
+        const job = (await prepareIdle()) as Record<string, any> | null;
+
+        expect(job).not.toBeNull();
+
+        // The run's claims lapsed and a newer run took the thread's and the same cut's.
+        await harness.run(async (ctx: any) => {
+            const held = await ctx.db.query("idempotencyClaims").collect();
+
+            for (const claim of held) {
+                await ctx.db.patch("idempotencyClaims", claim._id, { claimedAt: claim.claimedAt + 1 });
+            }
+        });
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(finishThreadSummary, {
+                    coveredCount: job?.coveredCount,
+                    coveredUpToMessageId: job?.coveredUpToMessageId,
+                    cutClaimedAt: job?.cutClaimedAt,
+                    epoch: job?.epoch,
+                    foldClaimedAt: job?.foldClaimedAt,
+                    summary: "a late summary",
+                    taintedBy: job?.taintedBy,
+                    threadId,
+                }),
+        );
+
+        const claims = await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect());
+
+        expect(await stored()).toHaveLength(0);
+        expect(claims.map((claim: { scope: string }) => claim.scope).toSorted((a: string, b: string) => a.localeCompare(b))).toStrictEqual([
+            "thread-cut",
+            "thread-fold",
+        ]);
+    });
+
     it("refuses to store an idle summary prepared before a compaction landed on its path", async () => {
         expect.assertions(3);
 
