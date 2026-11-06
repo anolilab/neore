@@ -342,6 +342,9 @@ describe("the secret request card", () => {
         const field = screen.getByPlaceholderText("Paste it here — it is not shown in the chat");
 
         fireEvent.change(field, { target: { value: "nope-123" } });
+        // The problem is named once the person leaves the field, not on every keystroke.
+        expect(screen.queryByText("This does not look right: it must start with sk-.")).toBeNull();
+        fireEvent.blur(field);
         expect(screen.getByText("This does not look right: it must start with sk-.").getAttribute("role")).toBe("alert");
         expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(true);
         fireEvent.submit(field);

@@ -108,6 +108,8 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const [drafts, setDrafts] = useState<string[]>([]);
     // Which fields are shown as plain text; hidden again once the answer is sent.
     const [revealed, setRevealed] = useState<ReadonlySet<number>>(() => new Set());
+    // Fields the person has left: a format problem is shown only then, so typing a value is not announced one keystroke at a time.
+    const [touched, setTouched] = useState<ReadonlySet<number>>(() => new Set());
     // Shown in the card, tied to the field: the typed value is cleared on send, so the person must know to type it again.
     const [saveError, setSaveError] = useState<string | null>(null);
     const [submitted, setSubmitted] = useState<Submitted | null>(null);
@@ -341,13 +343,28 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                 </div>
             </div>
 
+            {several && fields.some((field, index) => destinationOf(field, servers[index])) && (
+                // Outside the form, so the destinations stay on the card after the answer is sent or when it cannot be answered.
+                <ul className="text-muted-foreground mt-3 flex flex-col gap-0.5 text-xs">
+                    {fields.map((field, index) => {
+                        const destination = destinationOf(field, servers[index]);
+
+                        return destination ? (
+                            <li id={`${fieldId}-${index}-destination`} key={field.name ?? index}>
+                                {field.label || label || t`Secret`} · {destination}
+                            </li>
+                        ) : null;
+                    })}
+                </ul>
+            )}
+
             {canAnswer && (
                 // `ph-no-capture` keeps the fields out of PostHog's autocapture and recordings.
                 <form className="ph-no-capture mt-3 flex flex-col gap-3" onSubmit={onSubmit}>
                     {fields.map((field, index) => {
                         const inputId = `${fieldId}-${index}`;
                         const destination = destinationOf(field, servers[index]);
-                        const formatMessage = formatMessageOf(field, formatProblems[index]);
+                        const formatMessage = touched.has(index) ? formatMessageOf(field, formatProblems[index]) : undefined;
                         const valueMax = valueMaxOf(field);
                         const fieldLabel = field.label || label || t`Secret`;
                         const shown = revealed.has(index);
@@ -366,11 +383,6 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                                 <label className={several ? "text-sm font-medium" : "sr-only"} htmlFor={inputId}>
                                     {fieldLabel}
                                 </label>
-                                {several && destination && (
-                                    <p className="text-muted-foreground text-xs" id={`${inputId}-destination`}>
-                                        {destination}
-                                    </p>
-                                )}
                                 <div className="flex items-center gap-1">
                                     <Input
                                         aria-describedby={describedBy || undefined}
@@ -381,6 +393,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                                         id={inputId}
                                         maxLength={HEADER_VALUE_MAX}
                                         name={`requested-secret-${field.name ?? "value"}`}
+                                        onBlur={() => setTouched((previous) => (previous.has(index) ? previous : new Set(previous).add(index)))}
                                         onChange={(event) => setDraft(index, event.target.value)}
                                         placeholder={t`Paste it here — it is not shown in the chat`}
                                         size="sm"
