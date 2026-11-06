@@ -174,4 +174,12 @@ describe("modeOfThread", () => {
 
         await expect(modeOfThread({ db } as never, host as never, "u1")).resolves.toBeNull();
     });
+
+    it("runs a comparison column supervised once its parent is gone, not under the column's own mode", async () => {
+        // The parent was deleted and its link rows stayed behind: the column must not fall back to the defaults.
+        const orphan = { _id: "orphan", permissionMode: "auto", userId: "u1" };
+        const db = databaseWith([{ branchType: "comparison", parentThreadId: "deleted-parent", threadId: "orphan" }]);
+
+        await expect(modeOfThread({ db } as never, orphan as never, "u1")).resolves.toBe("supervised");
+    });
 });

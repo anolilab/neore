@@ -226,7 +226,10 @@ export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null,
     // A comparison column always runs under its parent's mode, even one it holds of its own: the shared composer changes the parent's,
     // so a mode saved on the column would otherwise hold while the parent's changes never reach it.
     if (comparison) {
-        return modeFor(await ctx.db.get("threads", comparison.parentThreadId), userId);
+        const parent = await ctx.db.get("threads", comparison.parentThreadId);
+
+        // A parent that is gone leaves its link rows behind: the column has no mode to inherit, so it runs supervised, not on its own.
+        return parent ? modeFor(parent, userId) : "supervised";
     }
 
     return modeFor(thread, userId);
