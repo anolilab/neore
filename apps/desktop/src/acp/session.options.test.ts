@@ -187,6 +187,25 @@ describe("setOption", () => {
         }
     });
 
+    it("confirms a mode change the agent answers when a mode update that changes nothing arrived while it was in flight, without reporting it", async () => {
+        const { player, session, states, steps } = await start("legacy-modes-unchanged-update");
+        const change = session.setOption(undefined, "code");
+
+        await player.play(steps.slice(0, 1));
+        const reported = states.length;
+
+        // The current mode again, and a mode the agent does not list: neither is a change, so neither is reported.
+        await player.play(steps.slice(1, 3));
+        await new Promise<void>((resolve) => {
+            setTimeout(resolve, 20);
+        });
+        expect(states).toHaveLength(reported);
+
+        await player.play(steps.slice(3));
+        await expect(change).resolves.toBeUndefined();
+        expect(states.at(-1)?.modes?.current).toBe("code");
+    });
+
     it("sends nothing for a value the agent did not offer", async () => {
         const { agent, session } = await start("options-and-change");
         const before = agent.written.length;
