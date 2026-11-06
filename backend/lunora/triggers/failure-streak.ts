@@ -4,7 +4,8 @@
  * A run that fails for a reason only its owner can fix (the model is no longer
  * offered, the custom endpoint is gone, the plan no longer covers the model)
  * fails the same way on every later run. After {@link TRIGGER_PAUSE_AFTER_FAILURES}
- * such runs in a row the trigger pauses and tells the owner. Everything else —
+ * such runs in a row the trigger pauses and tells the owner; one no later run can cure
+ * (the owner left the trigger's organization) pauses it at once. Everything else —
  * a provider outage, a timeout, a rate limit, the daily run limit — says nothing
  * about the trigger itself, so it neither counts nor resets the streak.
  */
@@ -14,7 +15,15 @@ import type { AgentRunErrorKind } from "../chat/lib/agent-run";
 export const TRIGGER_PAUSE_AFTER_FAILURES = 3;
 
 /** The run errors a run raises itself (`AgentRunError`) that only the owner's settings can cure. */
-export const USER_FIXABLE_RUN_ERRORS: ReadonlySet<AgentRunErrorKind> = new Set<AgentRunErrorKind>(["custom-endpoint", "local-endpoint", "plan-required"]);
+export const USER_FIXABLE_RUN_ERRORS: ReadonlySet<AgentRunErrorKind> = new Set<AgentRunErrorKind>([
+    "custom-endpoint",
+    "left-organization",
+    "local-endpoint",
+    "plan-required",
+]);
+
+/** Of those, the ones no later run can cure (the owner left the trigger's organization): the first one pauses the trigger. */
+export const PERMANENT_RUN_ERRORS: ReadonlySet<AgentRunErrorKind> = new Set<AgentRunErrorKind>(["left-organization"]);
 
 const MODEL_UNAVAILABLE_SUFFIX = "' is no longer available for triggers. Pick another model and enable the trigger again.";
 
@@ -23,12 +32,19 @@ export const modelUnavailableMessage = (model: string): string => `The model '${
 
 export const isModelUnavailableRefusal = (refusal: string): boolean => refusal.startsWith("The model '") && refusal.endsWith(MODEL_UNAVAILABLE_SUFFIX);
 
-export type RunOutcome = "success" | "transient" | "user-fixable";
+export type RunOutcome = "permanent" | "success" | "transient" | "user-fixable";
 
-/** How one settled run counts: a success, a failure only the owner can cure (`userFixable`), or any other failure. */
-export const runOutcome = (status: string, userFixable: boolean | undefined): RunOutcome => {
+/**
+ * How one settled run counts: a success, a failure no later run can cure (`permanent`), a failure only the owner can
+ * cure (`userFixable`), or any other failure.
+ */
+export const runOutcome = (status: string, userFixable: boolean | undefined, permanent?: boolean): RunOutcome => {
     if (status === "completed") {
         return "success";
+    }
+
+    if (permanent === true) {
+        return "permanent";
     }
 
     return userFixable === true ? "user-fixable" : "transient";
@@ -46,9 +62,14 @@ export const advanceStreak = (streak: number, outcome: RunOutcome): { pause: boo
 
     const next = streak + 1;
 
-    return { pause: next >= TRIGGER_PAUSE_AFTER_FAILURES, streak: next };
+    return { pause: outcome === "permanent" || next >= TRIGGER_PAUSE_AFTER_FAILURES, streak: next };
 };
 
-/** The notification body for a paused trigger: what happened, then why the last run failed. */
-export const pausedNoticeBody = (error: string | undefined): string =>
-    `Paused after ${String(TRIGGER_PAUSE_AFTER_FAILURES)} failed runs in a row. Fix the cause and turn the trigger back on.${error ? ` Last error: ${error}` : ""}`;
+/** The notification body for a paused trigger: what happened, then why the last run failed. A permanent failure says only why. */
+export const pausedNoticeBody = (error: string | undefined, permanent = false): string => {
+    if (permanent) {
+        return `Paused. ${error ?? "It cannot run again as it is."}`;
+    }
+
+    return `Paused after ${String(TRIGGER_PAUSE_AFTER_FAILURES)} failed runs in a row. Fix the cause and turn the trigger back on.${error ? ` Last error: ${error}` : ""}`;
+};

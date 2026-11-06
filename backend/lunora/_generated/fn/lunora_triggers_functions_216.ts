@@ -108,22 +108,29 @@ __val1 = source["error"];
 __has1 = true;
 }
 if (typeof source["executionId"] !== "string") return DEFER;
-if (typeof source["status"] !== "string") return DEFER;
 let __has2 = false;
 let __val2;
-if (source["threadId"] !== undefined) {
-if (typeof source["threadId"] !== "string") return DEFER;
-__val2 = source["threadId"];
+if (source["permanent"] !== undefined) {
+if (typeof source["permanent"] !== "boolean") return DEFER;
+__val2 = source["permanent"];
 __has2 = true;
 }
+if (typeof source["status"] !== "string") return DEFER;
 let __has3 = false;
 let __val3;
-if (source["userFixable"] !== undefined) {
-if (typeof source["userFixable"] !== "boolean") return DEFER;
-__val3 = source["userFixable"];
+if (source["threadId"] !== undefined) {
+if (typeof source["threadId"] !== "string") return DEFER;
+__val3 = source["threadId"];
 __has3 = true;
 }
-return { ...(__has1 ? { "error": __val1 } : {}), "executionId": source["executionId"], "status": source["status"], ...(__has2 ? { "threadId": __val2 } : {}), ...(__has3 ? { "userFixable": __val3 } : {}) };
+let __has4 = false;
+let __val4;
+if (source["userFixable"] !== undefined) {
+if (typeof source["userFixable"] !== "boolean") return DEFER;
+__val4 = source["userFixable"];
+__has4 = true;
+}
+return { ...(__has1 ? { "error": __val1 } : {}), "executionId": source["executionId"], ...(__has2 ? { "permanent": __val2 } : {}), "status": source["status"], ...(__has3 ? { "threadId": __val3 } : {}), ...(__has4 ? { "userFixable": __val4 } : {}) };
 });
 installCompiledValidatorMap(lunora_triggers_functions_216.updateTriggerStats.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;

@@ -1366,18 +1366,20 @@ const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, s
  * Closes an execution and tells the owner. A run is counted toward the trigger's failure
  * streak once, on the `running` to settled transition of its own execution row: a
  * redelivered call finds it already settled. `userFixable` marks a failure only the owner
- * can cure; any other failure leaves the streak where it was.
+ * can cure, and `permanent` one no later run can cure, which pauses the trigger at once;
+ * any other failure leaves the streak where it was.
  */
 export const updateExecution = internalMutation
     .input({
         error: v.optional(v.string()),
         executionId: v.id("triggerExecutions"),
+        permanent: v.optional(v.boolean()),
         status: v.string(),
         threadId: v.optional(v.string()),
         userFixable: v.optional(v.boolean()),
     })
     .output(v.null())
-    .mutation(async ({ args: { error, executionId, status, threadId, userFixable }, ctx }) => {
+    .mutation(async ({ args: { error, executionId, permanent, status, threadId, userFixable }, ctx }) => {
         const execution = await ctx.db.get("triggerExecutions", executionId);
 
         if (!execution) {
@@ -1411,7 +1413,7 @@ export const updateExecution = internalMutation
         let paused = execution.pausedTrigger === true;
 
         if (settling) {
-            paused = await settleFailureStreak(ctx, trigger, execution.startedAt, runOutcome(settled.status, userFixable));
+            paused = await settleFailureStreak(ctx, trigger, execution.startedAt, runOutcome(settled.status, userFixable, permanent));
 
             if (paused) {
                 await ctx.db.patch("triggerExecutions", executionId, { pausedTrigger: true });
@@ -1434,7 +1436,7 @@ export const updateExecution = internalMutation
             title: trigger.name,
             type: "trigger",
             userId: trigger.userId,
-            ...(paused ? { body: pausedNoticeBody(settled.error) } : settled.error && { body: settled.error }),
+            ...(paused ? { body: pausedNoticeBody(settled.error, permanent === true) } : settled.error && { body: settled.error }),
         });
 
         return null;

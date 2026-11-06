@@ -209,6 +209,18 @@ describe("repair loop", () => {
         expect(task.lastError).toBe("The agent run failed.");
         expect(await inbox()).toStrictEqual([{ outcome: "failure", title: "Summary", type: "task" }]);
     });
+
+    it("stops a recurring task's schedule on an error no later round can cure, keeping the schedule itself", async () => {
+        const taskId = await insertTask({ activeCycle: "c1", cronExpression: "0 9 * * *", nextRunAt: 1000, recurring: true, status: "queued" });
+        const claimed = await claim(taskId, 0);
+
+        expect(await complete({ outcome: { error: "You left.", kind: "error", stopsRecurrence: true }, runId: claimed.runId })).toBe("failed");
+
+        const task = await getTask(taskId);
+
+        expect(task).toMatchObject({ cronExpression: "0 9 * * *", lastError: "You left.", status: "failed" });
+        expect("nextRunAt" in task).toBe(false);
+    });
 });
 
 describe("completion", () => {

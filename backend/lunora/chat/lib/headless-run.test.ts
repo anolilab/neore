@@ -430,7 +430,8 @@ describe("runHeadlessAgent thread tags", () => {
 
         seen.notMember = true;
 
-        await expect(run(ctx, { organizationId: "org-left" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+        // The run's own kind, so a trigger or task stops instead of failing on every later run.
+        await expect(run(ctx, { organizationId: "org-left" })).rejects.toMatchObject({ kind: "left-organization", name: "AgentRunError" });
         expect(seen.created).toEqual([]);
     });
 

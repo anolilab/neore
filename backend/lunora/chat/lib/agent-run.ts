@@ -81,8 +81,15 @@ export const INTERNAL_PREFIX_RE = /^internal-/;
  *   longer answerable — the conversation moved on, or the tool is gone.
  * - `plan-required`: a model outside the free tier, asked for without a paid
  *   plan or the user's own key for its provider. Its message is ours and safe to show.
+ * - `left-organization`: a headless run (trigger, task, eval, sub-agent) whose owner
+ *   is no longer a member of the organization it was created in. It fails the same
+ *   way every time, so its trigger or task stops. Its message is ours and safe to show.
  */
-export type AgentRunErrorKind = "custom-endpoint" | "local-endpoint" | "plan-required" | "skill" | "stale-approval";
+export type AgentRunErrorKind = "custom-endpoint" | "left-organization" | "local-endpoint" | "plan-required" | "skill" | "stale-approval";
+
+/** The owner-facing reason a run of an organization's trigger or task is refused after its owner left that organization. */
+export const LEFT_ORGANIZATION_MESSAGE =
+    "You are no longer a member of the organization this was created in, so it has been stopped. Create it again in your personal space to keep it running.";
 
 /** A failure a run raised itself, so the catch branches on `kind` rather than on message text. */
 export class AgentRunError extends Error {

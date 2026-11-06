@@ -26,7 +26,7 @@ import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { wrapUntrusted } from "../coding-agents/agent-output";
 import type { VerifierVerdict } from "./logic";
 import { buildTaskPrompt, buildVerifierPrompt, isPassingFallback, parseVerifierOutput, resolveTaskModel, VERIFIER_SYSTEM_PROMPT } from "./logic";
-import { TaskRunError, taskErrorMessage } from "./run-error";
+import { stopsRecurrence, TaskRunError, taskErrorMessage } from "./run-error";
 import { vTaskRunOrigin } from "./validators";
 
 const VERIFIER_TIMEOUT_MS = 60_000;
@@ -365,7 +365,7 @@ export const runTaskRound = internalAction
             console.error(`[Tasks] Round ${String(args.round)} of task ${args.taskId} failed:`, error);
             await ctx.runMutation(internal.tasks.internal.completeRound, {
                 ...(place.keepLastThread && { keepLastThread: true }),
-                outcome: { error: taskErrorMessage(error, model), kind: "error" },
+                outcome: { error: taskErrorMessage(error, model), kind: "error", ...(stopsRecurrence(error) && { stopsRecurrence: true as const }) },
                 runId: claim.runId,
                 threadId,
             });

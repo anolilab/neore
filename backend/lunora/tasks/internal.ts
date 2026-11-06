@@ -477,7 +477,8 @@ export const getTaskForVerification = internalQuery
  *   rounds being spent on a verifier that is down.
  */
 const vRoundOutcome = v.union(
-    v.object({ error: v.string(), kind: v.literal("error") }),
+    // `stopsRecurrence`: no later round can succeed (the owner left the task's organization), so the schedule ends here.
+    v.object({ error: v.string(), kind: v.literal("error"), stopsRecurrence: v.optional(v.literal(true)) }),
     v.object({ finalAnswer: v.string(), kind: v.literal("verified"), verdict: vVerdict }),
     v.object({ finalAnswer: v.string(), kind: v.literal("unverified") }),
 );
@@ -549,7 +550,12 @@ export const completeRound = internalMutation
             const error = outcome.error.slice(0, 2000);
 
             await ctx.db.patch("taskRuns", run._id, { ...runResult, error, status: "error" });
-            await patchById(ctx.db, "tasks", task._id, { ...failedTaskPatch(error, now), lastRunThreadId });
+            await patchById(ctx.db, "tasks", task._id, {
+                ...failedTaskPatch(error, now),
+                lastRunThreadId,
+                // Removing `nextRunAt` takes the task out of the due-recurrence index; its schedule is kept, so it shows what ran.
+                ...(outcome.stopsRecurrence === true && { nextRunAt: undefined }),
+            });
             await notifyTaskRound(ctx, task, run, "failure", error, args.threadId ?? run.threadId);
 
             return "failed";

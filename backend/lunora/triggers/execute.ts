@@ -16,7 +16,7 @@ import { AgentRunError } from "../chat/lib/agent-run";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { MAX_LENGTH } from "../lib/validators";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
-import { isModelUnavailableRefusal, USER_FIXABLE_RUN_ERRORS } from "./failure-streak";
+import { isModelUnavailableRefusal, PERMANENT_RUN_ERRORS, USER_FIXABLE_RUN_ERRORS } from "./failure-streak";
 import { releaseRetryDelayMs } from "../lib/claim-once";
 import { filterTextOf } from "./filters";
 import { eventInputMessage } from "./event-sources";
@@ -411,6 +411,7 @@ export const executeTrigger = internalAction
             await ctx.runMutation(internal.triggers.functions.updateExecution, {
                 error: [errorMessage, note].filter(Boolean).join(" ").slice(0, 2000),
                 executionId,
+                ...(userFixable && PERMANENT_RUN_ERRORS.has(error.kind) && { permanent: true }),
                 status: "failed",
                 userFixable,
             });
