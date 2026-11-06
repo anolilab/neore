@@ -101,9 +101,14 @@ const annotatedToolMode = async (
  * approval is a pause in the model's run (`needsApproval`), and an iframe's call
  * has no run to pause and no one to ask — running it would be auto-approval.
  */
-const refusalFor = (mode: ToolPermissionMode, toolName: string, cappedBy: boolean): string | null => {
-    // The organization's cap lowered the mode, so changing the member's own setting would change nothing.
-    if (cappedBy) {
+const refusalFor = (
+    mode: ToolPermissionMode,
+    toolName: string,
+    { member, permissionCap }: { member: ToolPermissionMode; permissionCap: ToolPermissionMode },
+): string | null => {
+    // The organization's policy is the reason when changing the member's own setting would change nothing: the cap
+    // lowered the mode, the cap is `off`, or the tool is at `ask` under a cap that would hold "Allow" at `ask` anyway.
+    if (member !== mode || (permissionCap !== "auto" && (permissionCap === "off" || mode === "ask"))) {
         return `Tool "${toolName}" is limited by your organization's tool policy, so an MCP App cannot run it`;
     }
 
@@ -311,7 +316,7 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
     const permissionCap = await readRequestPermissionCap(context, user._id);
 
     if (permissionCap === "off") {
-        return Response.json({ error: refusalFor("off", toolName, true) }, { status: 403 });
+        return Response.json({ error: refusalFor("off", toolName, { member: "off", permissionCap }) }, { status: 403 });
     }
 
     const serverConfig = await findServerConfig(context, user._id, serverName);
@@ -324,7 +329,7 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
     const descriptor = descriptorFor(serverConfig, toolName);
     const chosen = isToolPermissionMode(overrides[descriptor.key]) ? resolveToolPermission(descriptor, overrides, { permissionCap }) : undefined;
     const memberChosen = chosen === undefined ? undefined : resolveToolPermission(descriptor, overrides, {});
-    const refusedUpFront = chosen && refusalFor(chosen, toolName, memberChosen !== chosen);
+    const refusedUpFront = chosen && memberChosen && refusalFor(chosen, toolName, { member: memberChosen, permissionCap });
 
     if (refusedUpFront) {
         return Response.json({ error: refusedUpFront }, { status: 403 });
@@ -333,7 +338,7 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
     try {
         const outcome = await withServerClient(serverConfig, async (client) => {
             const annotated = chosen ? undefined : await annotatedToolMode(client, descriptor, toolName, permissionCap);
-            const refused = annotated ? refusalFor(annotated.mode, toolName, annotated.member !== annotated.mode) : null;
+            const refused = annotated ? refusalFor(annotated.mode, toolName, { member: annotated.member, permissionCap }) : null;
 
             if (refused) {
                 return { refused };

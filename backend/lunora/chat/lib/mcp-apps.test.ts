@@ -196,6 +196,34 @@ describe("MCP Apps proxy with an OAuth grant", () => {
         await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("organization's tool policy") });
     });
 
+    it("names the organization's policy, not the member's setting, for a tool already at ask under an ask cap", async () => {
+        oauthConfig("fresh");
+        state.cap = "ask";
+
+        // Unannotated, so the member's own mode is the default `ask`; setting it to "Allow" would be held at `ask` by the cap.
+        const unannotated = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        state.overrides = { "connector:notion:create_page": "ask" };
+
+        const overridden = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        for (const response of [unannotated, overridden]) {
+            expect(response.status).toBe(403);
+            await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("organization's tool policy") });
+        }
+    });
+
+    it("still names the member's own setting for a tool they switched off under an ask cap", async () => {
+        oauthConfig("fresh");
+        state.cap = "ask";
+        state.overrides = { "connector:notion:create_page": "off" };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("turned off in your tool permissions") });
+    });
+
     it("refuses every call under an off cap without contacting the server or refreshing its token", async () => {
         const oauth = oauthConfig("fresh");
 
