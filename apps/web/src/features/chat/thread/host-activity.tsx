@@ -98,7 +98,9 @@ export const HostPlan: FC<{ entries: HostPlanEntry[] }> = memo(({ entries }) => 
                     // Entries carry no id and the plan is replaced whole: position and text together name an entry.
                     <li className="flex items-start gap-2 text-sm" data-status={entry.status} key={`${String(index)}:${entry.content}`}>
                         <StatusIcon status={entry.status} />
-                        <span className={entry.status === "completed" ? "text-muted-foreground line-through" : "text-gray-800 dark:text-gray-200"}>
+                        <span
+                            className={`min-w-0 break-words ${entry.status === "completed" ? "text-muted-foreground line-through" : "text-gray-800 dark:text-gray-200"}`}
+                        >
                             {entry.content}
                         </span>
                         <span className="text-muted-foreground ms-auto shrink-0 text-xs">{statusText(entry.status)}</span>

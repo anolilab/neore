@@ -48,6 +48,25 @@ describe("a coding agent's plan", () => {
         expect(status.className).toContain("ms-auto");
         expect(status.className).not.toContain("ml-auto");
     });
+
+    it("lets a long unbroken task name wrap, so it cannot push its status out of view", () => {
+        render(
+            <HostPlan
+                entries={[
+                    {
+                        content: "cargo test -p neore-device-core --features keychain -- acp_terminal::tests::runs_an_allowed",
+                        priority: "high",
+                        status: "pending",
+                    },
+                ]}
+            />,
+        );
+
+        const task = screen.getByText(CARGO_TITLE);
+
+        expect(task.className).toContain("min-w-0");
+        expect(task.className).toContain("break-words");
+    });
 });
 
 describe("a coding agent's tool calls", () => {
