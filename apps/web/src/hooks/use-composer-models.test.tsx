@@ -21,7 +21,7 @@ import { useComposerModelEntries } from "./use-composer-models";
 const harness = vi.hoisted(() => {
     return {
         catalog: [] as unknown[],
-        flagCallback: undefined as undefined | (() => void),
+        flagCallback: undefined as undefined | ((flags?: unknown, variants?: unknown, context?: { errorsLoading?: boolean }) => void),
         flagEnabled: false,
         navigate: vi.fn(),
         posthog: undefined as undefined | Record<string, unknown>,
@@ -246,6 +246,25 @@ describe("a prompt link and the user's blocked models", () => {
             await waitFor(() => expect(selectedModel()).toBe(flagged.id));
             expect(harness.showWarning).not.toHaveBeenCalled();
         }, 15_000);
+
+        it("a flag request that fails decides the link at once, without the wait", async () => {
+            const { result } = renderHook(() => useLinkWithComposerList(flagged.id), { wrapper });
+
+            await act(async () => {
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 50);
+                });
+            });
+            expect(result.current.settled).toBe(false);
+
+            act(() => {
+                harness.flagCallback?.(undefined, undefined, { errorsLoading: true });
+            });
+
+            await waitFor(() => expect(result.current.settled).toBe(true));
+            expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
+            expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+        }, 5000);
 
         it("when the flags never arrive, the link decides after the wait without the flagged model, and its prompt still applies", async () => {
             const { result } = renderHook(() => useLinkWithComposerList(flagged.id), { wrapper });

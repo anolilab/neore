@@ -18,7 +18,7 @@ import { useBlockedCreators } from "./use-model-filter-rules";
  * How long a link waits for PostHog's feature flags before it decides without them. A model behind a flag is hidden until the flags
  * arrive, as the picker hides it, so after this wait the link refuses such a model rather than wait for flags that may never come.
  */
-const FLAG_WAIT_MS = 5000;
+const FLAG_WAIT_MS = 1500;
 
 /** The list while the user's rules are not known: a failed read. A link then selects no model, so it cannot select one the user blocked. */
 const NO_MODELS: GatewayModel[] = [];
@@ -51,13 +51,19 @@ const useFeatureFlagsKnown = (): boolean => {
     const gated = useGatewayModels().some((model) => model.featureFlag);
     const [, setFlagsVersion] = useState(0);
     const [waitOver, setWaitOver] = useState(false);
+    const [flagsFailed, setFlagsFailed] = useState(false);
 
     useEffect(() => {
         if (!posthog || typeof posthog.onFeatureFlags !== "function") {
             return undefined;
         }
 
-        return posthog.onFeatureFlags(() => {
+        return posthog.onFeatureFlags((_flags, _variants, context) => {
+            // A flag request that failed will not be retried by this page: the flags are as known as they will be.
+            if (context?.errorsLoading === true) {
+                setFlagsFailed(true);
+            }
+
             setFlagsVersion((version) => version + 1);
         });
     }, [posthog]);
@@ -77,7 +83,7 @@ const useFeatureFlagsKnown = (): boolean => {
     }, [gated]);
 
     // Without a PostHog project there are no flags to wait for.
-    return !gated || !env.VITE_POSTHOG_API_KEY || posthog?.flagsEndpointWasHit === true || waitOver;
+    return !gated || !env.VITE_POSTHOG_API_KEY || posthog?.flagsEndpointWasHit === true || flagsFailed || waitOver;
 };
 
 /**
