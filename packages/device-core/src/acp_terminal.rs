@@ -268,8 +268,16 @@ mod tests {
             ..request(&project, "echo hi")
         };
 
-        assert!(state.acp_terminal_start(&reserved).is_err());
-        assert!(state.acp_terminal_start(&request(&project, "   ")).is_err());
+        // The reason must be the refusal itself, not a sandbox or start error: a start that accepted the variable could
+        // still fail later on a machine without a sandbox, and only the message tells that apart.
+        assert_eq!(
+            refusal(&state, &reserved),
+            "NEORE_DEVICE_SECRET is reserved by Neore"
+        );
+        assert_eq!(
+            refusal(&state, &request(&project, "   ")),
+            "the command is empty or too long"
+        );
     }
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
