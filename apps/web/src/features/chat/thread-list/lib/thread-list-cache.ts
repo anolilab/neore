@@ -17,6 +17,9 @@ const CACHE_VERSION = 2;
 /** Keyed by the signed-in user, so one account's list is never read for another. */
 const cacheKey = (userId: string): string => `${CACHE_PREFIX}v${CACHE_VERSION}:${userId}`;
 
+/** The keys a previous build wrote one user's list under (versions start at 1). They hold the same titles and must not outlive the account. */
+const olderCacheKeys = (userId: string): string[] => Array.from({ length: CACHE_VERSION - 1 }, (_, index) => `${CACHE_PREFIX}v${index + 1}:${userId}`);
+
 const clears = { count: 0 };
 
 /**
@@ -271,6 +274,10 @@ export const readThreadListCache = (userId: string | undefined, storage: Storage
     }
 
     try {
+        for (const key of olderCacheKeys(userId)) {
+            storage.removeItem(key);
+        }
+
         const raw = storage.getItem(cacheKey(userId));
 
         if (raw === null) {
@@ -351,7 +358,9 @@ export const clearThreadListCacheFor = (userId: string, storage: Storage | undef
     writeHold.blockedUsers.add(userId);
 
     try {
-        storage?.removeItem(cacheKey(userId));
+        for (const key of [cacheKey(userId), ...olderCacheKeys(userId)]) {
+            storage?.removeItem(key);
+        }
     } catch {
         // Nothing to clear when the store is unavailable.
     }
