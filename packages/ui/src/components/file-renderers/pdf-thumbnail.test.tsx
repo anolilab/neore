@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
+// eslint-disable-next-line import/no-extraneous-dependencies -- vitest is this package's devDependency; the app's config does not read it
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PDF_LOAD_TIMEOUT_MS } from "./pdf-limits";
@@ -14,9 +15,9 @@ import PdfThumbnail from "./pdf-thumbnail";
 const ORIGIN = "https://files.example";
 const PDF_URL = `${ORIGIN}/report.pdf?sig=1`;
 
-// Whether the stand-in first page renders; a test sets it before rendering.
+// Whether the stand-in first page renders, and whether the document is still loading; a test sets them before rendering.
 const firstPage = vi.hoisted(() => {
-    return { renders: false };
+    return { documentPending: false, renders: false };
 });
 
 // eslint-disable-next-line no-restricted-syntax -- the unit-test transform does not load pdf.js; the worker module is a no-op here
@@ -29,12 +30,22 @@ vi.mock("react-pdf", async () => {
     const { useEffect } = await import("react");
 
     return {
-        Document: ({ children, onLoadSuccess }: { children: ReactNode; onLoadSuccess: (document: { numPages: number }) => void }) => {
+        Document: ({
+            children,
+            loading,
+            onLoadSuccess,
+        }: {
+            children: ReactNode;
+            loading: ReactNode;
+            onLoadSuccess: (document: { numPages: number }) => void;
+        }) => {
             useEffect(() => {
-                onLoadSuccess({ numPages: 2 });
+                if (!firstPage.documentPending) {
+                    onLoadSuccess({ numPages: 2 });
+                }
             }, [onLoadSuccess]);
 
-            return children;
+            return firstPage.documentPending ? loading : children;
         },
         Page: ({ onRenderSuccess }: { onRenderSuccess: () => void }) => {
             useEffect(() => {
@@ -69,7 +80,8 @@ describe("the thumbnail's load deadline", () => {
     let container: HTMLDivElement;
     let root: Root;
 
-    const renderThumbnail = async () => {
+    const mountThumbnail = async () => {
+        // eslint-disable-next-line testing-library/no-unnecessary-act -- a plain react-dom root, not a Testing Library render: act is what flushes it
         await act(async () => {
             root.render(
                 <FetchableOriginsProvider origins={originsOf(ORIGIN)}>
@@ -89,6 +101,7 @@ describe("the thumbnail's load deadline", () => {
 
     beforeEach(() => {
         vi.useFakeTimers();
+        firstPage.documentPending = false;
         firstPage.renders = false;
         container = document.createElement("div");
         document.body.append(container);
@@ -104,7 +117,7 @@ describe("the thumbnail's load deadline", () => {
     });
 
     it("fails a first page that never renders, once the deadline passes", async () => {
-        const button = await renderThumbnail();
+        const button = await mountThumbnail();
 
         expect(button?.getAttribute("aria-busy")).toBe("true");
 
@@ -117,12 +130,24 @@ describe("the thumbnail's load deadline", () => {
     it("stops waiting once the first page has rendered, so no deadline fails it", async () => {
         firstPage.renders = true;
 
-        const button = await renderThumbnail();
+        const button = await mountThumbnail();
 
         expect(button?.getAttribute("aria-busy")).toBe("false");
 
         await advance(PDF_LOAD_TIMEOUT_MS + 1);
 
         expect(container.querySelector('[role="status"]')).toBeNull();
+    });
+
+    // The loading placeholder pulses through a class, and the reduced-motion preference is a CSS media query, so jsdom cannot
+    // evaluate it. This pins the class that switches the pulse off under `prefers-reduced-motion: reduce`.
+    it("switches the loading placeholder's pulse off under reduced motion", async () => {
+        firstPage.documentPending = true;
+
+        await mountThumbnail();
+
+        const placeholder = container.querySelector("span.animate-pulse");
+
+        expect(placeholder?.classList.contains("motion-reduce:animate-none")).toBe(true);
     });
 });

@@ -70,7 +70,7 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
                 <Document
                     error={<span className="text-muted-foreground w-[200px] p-6 text-sm">{t`This preview could not be loaded.`}</span>}
                     file={url}
-                    loading={<span aria-hidden="true" className="bg-muted block h-[260px] w-[200px] animate-pulse rounded" />}
+                    loading={<span aria-hidden="true" className="bg-muted block h-[260px] w-[200px] animate-pulse rounded motion-reduce:animate-none" />}
                     onLoadError={() => setFailed(true)}
                     onLoadProgress={() => setProgress((count) => count + 1)}
                     onLoadSuccess={({ numPages }: { numPages: number }) => setPages(numPages)}

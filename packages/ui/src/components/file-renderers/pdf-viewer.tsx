@@ -166,7 +166,7 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, fill, url }) 
                         file={url}
                         loading={
                             <div className="flex items-center justify-center py-12" role="status">
-                                <ZoomIn aria-hidden="true" className="text-muted-foreground size-6 animate-pulse" />
+                                <ZoomIn aria-hidden="true" className="text-muted-foreground size-6 animate-pulse motion-reduce:animate-none" />
                                 <span className="sr-only">{t`Loading preview…`}</span>
                             </div>
                         }
