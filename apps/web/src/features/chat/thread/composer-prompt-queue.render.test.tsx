@@ -7,10 +7,32 @@ import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-st
 
 import ComposerPromptQueue from "./composer-prompt-queue";
 
+// The pointer sensor needs layout to pick a drop target, which jsdom has none of. The drop itself is the component's
+// `onDragEnd`, so the mock keeps the real `DndContext` and records the handler it is given, to call with a drop.
+const drag = vi.hoisted(() => {
+    return { onDragEnd: undefined as undefined | ((event: { active: { id: string }; over: { id: string } | null }) => void) };
+});
+
+vi.mock("@dnd-kit/core", async (importOriginal) => {
+    const original = await importOriginal<typeof import("@dnd-kit/core")>();
+
+    return {
+        ...original,
+        DndContext: (props: Parameters<typeof original.DndContext>[0]) => {
+            const { onDragEnd } = props;
+
+            drag.onDragEnd = onDragEnd as typeof drag.onDragEnd;
+
+            return <original.DndContext {...props} />;
+        },
+    };
+});
+
 const chat = vi.hoisted(() => {
     return { error: undefined as Error | undefined, isStreaming: false, sendMessage: vi.fn(), threadId: "thread-1" };
 });
 const withdrawSteer = vi.hoisted(() => vi.fn());
+const MOVED_TO = /Moved to position/u;
 
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -225,5 +247,44 @@ describe("composer prompt queue", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Send next" }));
         await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("three", []));
+    });
+
+    it("moves a dropped message to where it lands in the queue", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two", "three"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+        const [one, , three] = usePromptQueueStore.getState().queues[chat.threadId]?.items ?? [];
+
+        act(() => {
+            drag.onDragEnd?.({ active: { id: three!.id }, over: { id: one!.id } });
+        });
+
+        await nextFrame();
+
+        expect((usePromptQueueStore.getState().queues[chat.threadId]?.items ?? []).map((item) => item.text)).toStrictEqual(["three", "one", "two"]);
+        expect(screen.getByText("Moved to position 1")).toBeTruthy();
+    });
+
+    it("refuses a drop across a pending steer, and announces no move for it", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        enqueue(chat.threadId, { attachments: [], steer: { id: "steer-1", streamId: "stream-1" }, text: "steered" });
+        enqueue(chat.threadId, { attachments: [], text: "two" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+        const [one, , two] = usePromptQueueStore.getState().queues[chat.threadId]?.items ?? [];
+
+        act(() => {
+            drag.onDragEnd?.({ active: { id: two!.id }, over: { id: one!.id } });
+        });
+
+        expect((usePromptQueueStore.getState().queues[chat.threadId]?.items ?? []).map((item) => item.text)).toStrictEqual(["one", "steered", "two"]);
+        expect(screen.queryByText(MOVED_TO)).toBeNull();
     });
 });
