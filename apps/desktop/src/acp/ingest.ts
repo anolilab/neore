@@ -154,6 +154,9 @@ export class HostPoster implements SessionObserver {
     /** The agent's own reports not yet posted, by session: the newest value of each field (`sessionState`). */
     private readonly pendingState = new Map<string, PendingState>();
 
+    /** The last observation time handed out. A later report never gets an earlier one, even if the desktop clock went back. */
+    private lastObservedAt = 0;
+
     private stateTimer: ReturnType<typeof setTimeout> | undefined;
 
     /** When the pending timer fires: a sooner report moves it earlier, a later one leaves it. */
@@ -250,7 +253,11 @@ export class HostPoster implements SessionObserver {
         // A usage report inside the same window that leaves the cost out keeps the cost before it: the agent's cost is cumulative.
         const usage = patch.usage === undefined ? pending?.usage : { ...pending?.usage, ...patch.usage };
 
-        this.pendingState.set(sessionId, { ...pending, ...patch, ...usage !== undefined && { usage }, at: this.now() });
+        // Never earlier than the last one: the backend drops a report older than the stored one, and keeps an equal one.
+        const at = Math.max(this.now(), this.lastObservedAt);
+
+        this.lastObservedAt = at;
+        this.pendingState.set(sessionId, { ...pending, ...patch, ...usage !== undefined && { usage }, at });
         // A fresh report is the newest value, so it does not wait out its own session's backoff: the next flush sends it.
         this.stateRetryAt.delete(sessionId);
         this.stateAttempts.delete(sessionId);

@@ -1580,6 +1580,27 @@ describe("what the agent reports about itself", () => {
         expect(statePosts()).toHaveLength(MAX_STATE_ATTEMPTS);
     });
 
+    it("keeps the order of reports when the desktop clock moves back between them", async () => {
+        const host = poster();
+
+        await open(host);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        clock -= 60_000;
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(2000);
+
+        const [first, second] = statePosts();
+
+        expect(statePosts()).toHaveLength(2);
+        expect(second?.post.events[0]).toMatchObject({ usage: usage(11) });
+        // The later report carries a later observation time, so the backend keeps it.
+        const atOf = (post: Post | undefined) => (post?.events[0] as unknown as { at: number } | undefined)?.at ?? 0;
+
+        expect(atOf(second?.post)).toBeGreaterThanOrEqual(atOf(first?.post));
+    });
+
     it("retries a failed report with what was observed, under a fresh issuedAt, when nothing newer is reported", async () => {
         const host = poster();
 
