@@ -2265,37 +2265,7 @@ export const unpinThread = authMutation
 
 export const getPinnedThreads = authQuery
     .input({})
-    .output(
-        v.array(
-            v.object({
-                _creationTime: v.number(),
-                _id: v.string(),
-                botId: v.optional(v.string()),
-                createdAt: v.optional(v.number()),
-                createdBy: v.optional(v.string()),
-                customSystemPrompt: v.optional(v.string()),
-                deleted: v.optional(v.boolean()),
-                deletedAt: v.optional(v.number()),
-                enabledFeatures: v.optional(v.array(v.string())),
-                isPublic: v.optional(v.boolean()),
-                lastUserMessageAt: v.optional(v.number()),
-                lockedAt: v.optional(v.number()),
-                model: v.optional(v.string()),
-                order: v.optional(v.number()),
-                pinnedAt: v.optional(v.number()),
-                projectId: v.optional(v.string()),
-                publicAccessToken: v.optional(v.string()),
-                reasoningEffort: v.optional(v.number()),
-                statelessMode: v.optional(v.boolean()),
-                status: v.string(),
-                summary: v.optional(v.string()),
-                tags: v.optional(v.array(v.string())),
-                title: v.optional(v.string()),
-                updatedAt: v.optional(v.number()),
-                userId: v.optional(v.string()),
-            }),
-        ),
-    )
+    .output(v.array(v.object({ ...vThreadDocumentFields })))
     .query(async ({ ctx: context }) => {
         const { userId } = context.user;
 
