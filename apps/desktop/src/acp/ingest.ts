@@ -712,13 +712,6 @@ export class HostPoster implements SessionObserver {
             if (this.pendingState.has(sessionId) && !this.stateRetryAt.has(sessionId)) {
                 this.scheduleState(STATE_DEBOUNCE_MS);
             }
-        } finally {
-            this.stateInFlight.delete(sessionId);
-
-            // A report that arrived while this one was on its way waits for the next flush of this session.
-            if (this.pendingState.has(sessionId)) {
-                this.scheduleState(STATE_DEBOUNCE_MS);
-            }
         }
     }
 

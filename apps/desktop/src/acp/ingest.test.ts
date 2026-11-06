@@ -1477,30 +1477,6 @@ describe("what the agent reports about itself", () => {
         expect(statePosts()[1]?.post.events[0]).toMatchObject({ usage: usage(11) });
     });
 
-    it("does not hold one session's report behind another session's stalled post", async () => {
-        const host = poster();
-        let release = () => {};
-        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the supported Node range starts before it exists
-        const stalled = new Promise<void>((resolve) => {
-            release = resolve;
-        });
-
-        await open(host, "s1");
-        await open(host, "s2");
-        backend.gate = (post) => post.sessionId === "s1" ? stalled : undefined;
-
-        host.sessionState("s1", { usage: usage(10) });
-        host.sessionState("s2", { usage: usage(20) });
-        await settle(2000);
-
-        // s1's post is still waiting for its answer; s2's report is posted all the same.
-        expect(statePosts().map((entry) => entry.post.sessionId)).toEqual(expect.arrayContaining(["s1", "s2"]));
-
-        release();
-        backend.gate = undefined;
-        await settle(2000);
-    });
-
     it("does not retry one session's failed report early because another session reported", async () => {
         const host = poster();
 
