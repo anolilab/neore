@@ -186,12 +186,28 @@ export class TurnChannel {
         return true;
     }
 
+    /**
+     * Replaces the output of a call still waiting, so only its latest output is posted. A status change for the call queued after that
+     * output keeps the order the agent sent: the newer output then goes after the status, never ahead of it, so the backend does not
+     * show a final output next to the status before it.
+     */
     private replacePendingOutput(event: HostEvent & { kind: "tool_output" }): boolean {
         const index = this.pending.findIndex((queued) => queued.kind === "tool_output" && queued.id === event.id);
         const queued = this.pending[index];
 
         if (queued === undefined) {
             return false;
+        }
+
+        const statusAfter = this.pending.slice(index + 1).some((later) => later.kind === "tool" && later.id === event.id);
+
+        if (statusAfter) {
+            this.pending.splice(index, 1);
+            this.pendingJson -= jsonLength(queued);
+            this.pending.push(event);
+            this.pendingJson += jsonLength(event);
+
+            return true;
         }
 
         this.pendingJson += jsonLength(event) - jsonLength(queued);

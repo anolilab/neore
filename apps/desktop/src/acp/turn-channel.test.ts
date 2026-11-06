@@ -50,3 +50,46 @@ describe("a turn's plan updates waiting to be posted", () => {
         expect(posted.map((event) => event.kind)).toEqual(["text", "plan"]);
     });
 });
+
+describe("a call's output and its status waiting to be posted", () => {
+    it("never posts a call's final output before the status that finished it, when a batch ends between them", async () => {
+        vi.useFakeTimers();
+        const { host: recorded, posts } = recordingHost();
+        let release = (): void => {};
+        let holdFirst = true;
+        const host: ChannelHost = {
+            ...recorded,
+            // The first batch is held in flight, so everything below queues behind it: the batch that carries the rest ends there.
+            send: async (channel, firstSeq, events) => {
+                if (holdFirst) {
+                    holdFirst = false;
+                    // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` is not in this package's TypeScript lib
+                    await new Promise<void>((resolve) => {
+                        release = resolve;
+                    });
+                }
+
+                return await recorded.send(channel, firstSeq, events);
+            },
+        };
+        const channel = new TurnChannel(host, "sess-1", "turn-1", "thread-1", false);
+
+        channel.enqueue({ id: "c1", kind: "tool", status: "in_progress", title: "build", toolKind: "execute" });
+        await vi.advanceTimersByTimeAsync(10);
+
+        channel.enqueue({ id: "c1", kind: "tool_output", output: "building" });
+        channel.enqueue({ id: "c1", kind: "tool", status: "completed", title: "build", toolKind: "execute" });
+        channel.enqueue({ exit: { code: 0 }, id: "c1", kind: "tool_output", output: "done" });
+
+        release();
+        await vi.advanceTimersByTimeAsync(10_000);
+        channel.stop();
+
+        const posted = posts.flat();
+        const finished = posted.findIndex((event) => event.kind === "tool" && event.status === "completed");
+        const finalOutput = posted.findIndex((event) => event.kind === "tool_output" && event.output === "done");
+
+        expect(finished).toBeGreaterThan(-1);
+        expect(finalOutput).toBeGreaterThan(finished);
+    });
+});
