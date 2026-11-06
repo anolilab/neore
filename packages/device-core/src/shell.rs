@@ -692,6 +692,12 @@ pub struct TerminalOutput {
 struct TerminalState {
     exit: Option<TerminalExit>,
     kill: bool,
+    /// The shell's pid, which is also its process group id.
+    #[cfg_attr(not(unix), allow(dead_code))]
+    pid: u32,
+    /// Set just before the watcher reaps the shell. Until then the leader is unreaped, so its group id is still this command's.
+    #[cfg_attr(not(unix), allow(dead_code))]
+    reaped: bool,
 }
 
 struct TerminalShared {
@@ -779,6 +785,8 @@ impl Terminal {
             state: Mutex::new(TerminalState {
                 exit: None,
                 kill: false,
+                pid: spawned.child.id(),
+                reaped: false,
             }),
         });
         let watched = Arc::clone(&shared);
@@ -798,6 +806,8 @@ impl Terminal {
             }
 
             kill_tree(&mut spawned.child);
+            // Reaping returns the group id to the system: from here no signal from `signal_now` may reach it.
+            watched.state.lock().unwrap().reaped = true;
             let status = spawned.child.wait().ok();
             #[cfg(unix)]
             drop(spawned.tracked.take());
@@ -849,6 +859,20 @@ impl Terminal {
         self.shared.state.lock().unwrap().kill = true;
     }
 
+    /// Ends the command and everything it started, signalled from the calling thread rather than by the watcher, which
+    /// runs again only every 25 ms. The group is signalled only while the shell is unreaped, so its id is still this
+    /// command's. Does not wait for the command to end (see [`end_now`]).
+    pub fn signal_now(&self) {
+        let mut state = self.shared.state.lock().unwrap();
+
+        state.kill = true;
+
+        #[cfg(unix)]
+        if !state.reaped {
+            kill_group(state.pid);
+        }
+    }
+
     pub fn exited(&self) -> bool {
         self.shared.state.lock().unwrap().exit.is_some()
     }
@@ -857,6 +881,21 @@ impl Terminal {
 impl Drop for Terminal {
     fn drop(&mut self) {
         self.kill();
+    }
+}
+
+/// Ends each of `terminals` now and waits, up to `limit` in all, for them to end. For a host that is stopping: every
+/// group is signalled before any wait, so none depends on a watcher thread that may not run again before the process exits.
+pub fn end_now<'a>(terminals: impl IntoIterator<Item = &'a Terminal>, limit: Duration) {
+    let deadline = Instant::now() + limit;
+    let terminals: Vec<&Terminal> = terminals.into_iter().collect();
+
+    for terminal in &terminals {
+        terminal.signal_now();
+    }
+
+    for terminal in &terminals {
+        terminal.wait(deadline.saturating_duration_since(Instant::now()));
     }
 }
 
@@ -1545,6 +1584,71 @@ mod tests {
             slow.wait(Duration::from_secs(10))
                 .and_then(|exit| exit.signal),
             Some("SIGKILL".to_owned())
+        );
+    }
+
+    /// The pid a background child wrote down, once it has.
+    fn written_pid(file: &Path) -> i32 {
+        let deadline = Instant::now() + Duration::from_secs(10);
+
+        loop {
+            if let Some(pid) = std::fs::read_to_string(file)
+                .ok()
+                .and_then(|text| text.trim().parse().ok())
+            {
+                return pid;
+            }
+
+            assert!(
+                Instant::now() < deadline,
+                "the background child never wrote its pid"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    /// Whether `pid` is gone. A child that has exited but is not yet reaped by its parent still exists, so this waits for that too.
+    #[cfg(unix)]
+    fn process_gone(pid: i32) -> bool {
+        let deadline = Instant::now() + Duration::from_secs(10);
+
+        loop {
+            // SAFETY: signal 0 sends nothing; it only asks whether the process exists.
+            if unsafe { libc::kill(pid, 0) } != 0 {
+                return true;
+            }
+
+            if Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn ending_terminals_now_takes_down_a_background_child_when_the_call_returns() {
+        let Some((policy, shared, _)) = terminal_policy("end-now") else {
+            return;
+        };
+        // The shell leaves a background child in its group, then waits on a second command, which keeps the terminal running.
+        let terminal = Terminal::start(
+            "sleep 600 & echo $! > child.pid; sleep 600",
+            &shared,
+            &policy,
+            &[],
+            1024,
+            Duration::from_secs(600),
+        )
+        .unwrap();
+        let child = written_pid(&shared.join("child.pid"));
+
+        end_now([&terminal], Duration::from_secs(10));
+
+        assert!(terminal.exited(), "the terminal did not end");
+        assert!(
+            process_gone(child),
+            "the background child outlived the terminal"
         );
     }
 
