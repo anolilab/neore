@@ -103,7 +103,7 @@ const annotatedToolMode = async (
  */
 const refusalFor = (mode: ToolPermissionMode, toolName: string, cappedBy: boolean): string | null => {
     // The organization's cap lowered the mode, so changing the member's own setting would change nothing.
-    if (cappedBy && mode !== "auto") {
+    if (cappedBy) {
         return `Tool "${toolName}" is limited by your organization's tool policy, so an MCP App cannot run it`;
     }
 
