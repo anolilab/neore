@@ -141,7 +141,9 @@ export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Pr
 
     // The first prompt after a switch carries what the agent is taking over (harness-switch.md, S3); the saved
     // message is the user's own words alone. A prompt too long for the call with it is refused, never cut.
-    const handoff = await pendingHandoffOf(ctx, thread);
+    // The handoff is earlier conversation, sent ahead of the prompt: it is cleaned the same way.
+    const pendingHandoff = await pendingHandoffOf(ctx, thread);
+    const handoff = pendingHandoff === undefined ? undefined : stripHiddenText(pendingHandoff).text;
     const queued = await queueHostTurn(ctx, { handoff, session, taintedBy: args.taintedBy, text, threadId, userId }, now);
 
     if ("error" in queued) {

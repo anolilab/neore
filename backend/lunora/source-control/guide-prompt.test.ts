@@ -98,6 +98,13 @@ describe("paths with hidden characters", () => {
         expect(prompt).not.toContain("‌");
     });
 
+    it("writes a branch name with a hidden character as an escape, so the agent compares against the same ref", () => {
+        const prompt = buildHostGuidePrompt(input({ baseBranch: "main\u{200D}" }));
+
+        expect(prompt).toContain(String.raw`"baseBranch": "main\\u200D"`);
+        expect(stripHiddenText(prompt).text).toBe(prompt);
+    });
+
     it("sends text fields with the hidden characters already removed, so the size checks measure what is sent", () => {
         const prompt = buildHostGuidePrompt(
             input({
