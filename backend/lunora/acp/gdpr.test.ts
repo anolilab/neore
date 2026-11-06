@@ -196,6 +196,22 @@ describe("the export of coding-agent sessions and events", () => {
         expect(first).toMatchObject({ optionResult: { outcome: "confirmed", valueId: "deep" } });
     });
 
+    it("includes the agent's usage report with the time it was observed, which dates its values", async () => {
+        const device = await insertDevice(A);
+        const threadId = await insertSession(A, device, 0);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+            await ctx.db.patch("acpSessions", row._id, { agentState: { usage: { size: 200_000, used: 12_345 } }, agentStateAt: 1_700_000_000_000 });
+        });
+
+        const pages = await collectAll(A);
+        const [first] = pages.flatMap((page) => page.sessions);
+
+        expect(first).toMatchObject({ agentState: { usage: { size: 200_000, used: 12_345 } }, agentStateAt: 1_700_000_000_000 });
+    });
+
     it("is complete past one page of sessions, and carries no other user's", async () => {
         const device = await insertDevice(A);
         const other = await insertDevice(B);
