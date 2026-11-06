@@ -221,7 +221,8 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                         const { removed, text: clean } = stripHiddenText(value, { keepTrailingJoiner: true });
 
                         if (removed > 0) {
-                            toast.info(t`Hidden characters were removed from your message.`);
+                            // A stable id: repeated removals update one notification instead of stacking.
+                            toast.info(t`Hidden characters were removed from your message.`, { id: "host-composer-hidden-text" });
 
                             // The controlled value is set back to the clean text after this handler, which moves the caret to the end.
                             // Put it where the person left it, once that has happened.
