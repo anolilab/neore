@@ -43,6 +43,7 @@ vi.mock("@/lib/toast", () => {
 });
 
 const textModel = MODEL_REGISTRY.find((model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external");
+const otherTextModel = MODEL_REGISTRY.filter((model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external")[1];
 const imageModel = MODEL_REGISTRY.find((model) => model.mode === "image" && model.enabled !== false);
 const disabledModel = "fal-ai/flux-schnell";
 const externalModel = "ext/mimo-v2-flash";
@@ -66,7 +67,13 @@ describe("usePromptLinkDraft", () => {
         harness.showWarning.mockReset();
         useChatUIStore.getState().setComposerText("");
         useChatUIStore.setState({ attachedReferences: [], composerAttachments: [] });
-        useModelStore.setState({ newThreadMode: "text", pendingSettings: undefined, selectedModel: DEFAULT_CHAT_MODEL as ModelId });
+        useModelStore.setState({
+            comparisonMode: false,
+            newThreadMode: "text",
+            pendingSettings: undefined,
+            selectedModel: DEFAULT_CHAT_MODEL as ModelId,
+            selectedModelsForComparison: [],
+        });
     });
 
     afterEach(() => {
@@ -197,6 +204,19 @@ describe("usePromptLinkDraft", () => {
 
         expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
         expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
+    });
+
+    it("ends a comparison left on from before, so the draft sends on the named model and not on the comparison's models", () => {
+        expect(textModel).toBeDefined();
+        expect(otherTextModel).toBeDefined();
+        useModelStore.setState({ comparisonMode: true, selectedModelsForComparison: [otherTextModel?.id ?? "", textModel?.id ?? ""] as ModelId[] });
+
+        renderLink({ model: textModel?.id, prompt: "hi" });
+
+        expect(useModelStore.getState().comparisonMode).toBe(false);
+        expect(useModelStore.getState().selectedModelsForComparison).toEqual([]);
+        expect(selectedModel()).toBe(textModel?.id);
+        expect(useChatUIStore.getState().composerText).toBe("hi");
     });
 
     it("ends Auto as a pick does, so the link's model is the one a send runs on", () => {

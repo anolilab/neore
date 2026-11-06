@@ -17,8 +17,8 @@ const withoutLinkParameters = (search: Record<string, unknown>): Record<string, 
 
 /**
  * Applies a prompt link once: its prompt becomes the draft, and its model is chosen only when the composer would send with
- * that model (a text new chat, and not an anonymous visitor's, who sends the free model). Naming it ends Auto, as a pick in
- * the model picker does. A draft or a saved prompt already in place is kept with a notice, and so is the model the person
+ * that model (a text new chat, and not an anonymous visitor's, who sends the free model). Naming it ends Auto and any
+ * comparison, as a pick in the model picker does. A draft or a saved prompt already in place is kept with a notice, and so is the model the person
  * chose. A model the composer would not send is left alone, with a notice. The link's parameters are then removed from the
  * address. It never sends. Nothing is decided until `ready`: the anonymity it reads comes from the session.
  */
@@ -91,6 +91,9 @@ export const usePromptLinkDraft = ({
                 composerModelOf({ isAnonymous, mode: "text", threadModel: definition.id }) === definition.id;
 
             if (definition && sendsLinkModel) {
+                // A comparison left on from before would fan the draft out to its models, not to the one the link names.
+                // Ending it clears its selection too, as the picker does when a single model is chosen.
+                state.setComparisonMode(false);
                 state.setSelectedModel(definition.id as ModelId, undefined);
 
                 // Naming a model is choosing it, so Auto ends with the pick, as it does in the model picker for a new chat.
