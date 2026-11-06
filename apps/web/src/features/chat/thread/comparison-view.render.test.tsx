@@ -34,7 +34,11 @@ vi.mock("@tanstack/react-router", () => {
     };
 });
 vi.mock("@/features/auth/hooks/use-user-settings", () => {
-    return { useUserSettings: () => ({ data: undefined }) };
+    return {
+        useUserSettings: () => {
+            return { data: undefined };
+        },
+    };
 });
 vi.mock("@/hooks/use-feature-flagged-models", () => {
     return { default: () => [] };
@@ -54,7 +58,17 @@ vi.mock("@/lib/agent", () => {
 vi.mock("@/lib/lunora/crpc", () => {
     return {
         useCRPC: () => {
-            return { chat: { streaming: { getActiveStreamForThread: { queryOptions: () => ({}) } } } };
+            return {
+                chat: {
+                    streaming: {
+                        getActiveStreamForThread: {
+                            queryOptions: () => {
+                                return {};
+                            },
+                        },
+                    },
+                },
+            };
         },
     };
 });
@@ -66,13 +80,13 @@ vi.mock("./message-content", async () => {
     const { use } = await import("react");
     const { ChatThreadContext: Context } = await import("@/features/chat/core/context/chat-context-hooks");
 
-    return {
-        default: () => {
-            const context = use(Context);
+    const ColumnMessageContent = () => {
+        const context = use(Context);
 
-            return <div data-testid="column-lock">{context.thread?.lockedAt ? "locked" : "open"}</div>;
-        },
+        return <div data-testid="column-lock">{context.thread?.lockedAt ? "locked" : "open"}</div>;
     };
+
+    return { default: ColumnMessageContent };
 });
 
 describe("comparison columns", () => {
@@ -82,9 +96,7 @@ describe("comparison columns", () => {
 
         render(
             <ChatThreadContext value={{ isNewThread: false, model: "gpt-4o", thread: parent, threadId: "parent" }}>
-                <ComparisonView
-                    branches={[{ activeStreamId: null, isLoading: false, messages: [], model: "gpt-4o", thread: child, threadId: "child" }]}
-                />
+                <ComparisonView branches={[{ activeStreamId: null, isLoading: false, messages: [], model: "gpt-4o", thread: child, threadId: "child" }]} />
             </ChatThreadContext>,
         );
 

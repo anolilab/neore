@@ -68,7 +68,10 @@ describe("getPinnedThreads", () => {
                 }),
         );
 
-        const pinned = (await harness.withIdentity({ userId: OWNER }).query(getPinnedThreads as never, {} as never)) as { _id: string; permissionMode?: string }[];
+        const pinned = (await harness.withIdentity({ userId: OWNER }).query(getPinnedThreads as never, {} as never)) as {
+            _id: string;
+            permissionMode?: string;
+        }[];
 
         expect(pinned.map((thread) => thread._id)).toEqual([threadId]);
         expect(pinned[0]?.permissionMode).toBe("supervised");
