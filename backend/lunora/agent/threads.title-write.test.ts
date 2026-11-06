@@ -39,7 +39,14 @@ const rowIn =
                 await context.db.insert("messages", { order, status: "success", stepOrder: 0, threadId, tool: false, userId: OWNER, ...fields }),
         )) as string;
 
-const writeTitle = async (threadId: string, expectedTitle: string, requestedBy?: string, expectedPromptId?: string, expectedLeaf?: string) => {
+const writeTitle = async (
+    threadId: string,
+    expectedTitle: string,
+    requestedBy?: string,
+    expectedPromptId?: string,
+    expectedLeaf?: string,
+    title = "Generated",
+) => {
     const expectedTitleDigest = await sha256Hex(expectedTitle);
 
     return await harness.run(
@@ -50,7 +57,7 @@ const writeTitle = async (threadId: string, expectedTitle: string, requestedBy?:
                 expectedTitleDigest,
                 requestedBy,
                 threadId: threadId as Id<"threads">,
-                title: "Generated",
+                title,
             }),
     );
 };
@@ -129,7 +136,7 @@ describe("writing a generated title for a requester", () => {
         await harness.run(async (context: any) => await context.db.delete("threadAccess", grantId));
 
         // The grant is revoked after the job's own check: the write itself refuses, so the title it generated is not kept.
-        await expect(writeTitle(threadId, "Generated", GRANTEE)).resolves.toBe(false);
+        await expect(writeTitle(threadId, "Generated", GRANTEE, undefined, undefined, "Renewed")).resolves.toBe(false);
         await expect(titleOf(threadId)).resolves.toBe("Generated");
     });
 
@@ -251,5 +258,21 @@ describe("writing a title from a prompt that was deleted", () => {
             ),
         ).resolves.toBe(false);
         await expect(titleOf(threadId)).resolves.toBe("Old");
+    });
+});
+
+describe("a title that already landed", () => {
+    it("reports a title that landed in an earlier try as saved, even though the digest has moved on", async () => {
+        const threadId = await threadWith({ title: "Generated" });
+
+        // The retry compares the digest of the title it read before the earlier try: the title has moved, but it is already this one.
+        await expect(writeTitle(threadId, "Old")).resolves.toBe(true);
+        await expect(titleOf(threadId)).resolves.toBe("Generated");
+    });
+
+    it("still reports it saved once the chat has been locked since it landed", async () => {
+        const threadId = await threadWith({ lockedAt: 1000, title: "Generated" });
+
+        await expect(writeTitle(threadId, "Old")).resolves.toBe(true);
     });
 });

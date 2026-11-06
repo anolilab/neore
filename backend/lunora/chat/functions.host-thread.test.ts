@@ -329,6 +329,17 @@ describe("a charged title run whose write does not land", () => {
         expect(gaveBack).toBe(1);
     });
 
+    it("reports a landed write as saved even when giving back its charge would fail", async () => {
+        await expect(
+            settleTitleWrite(
+                async () => true,
+                async () => {
+                    throw new Error("release failed");
+                },
+            ),
+        ).resolves.toBe(true);
+    });
+
     it("keeps its charge when the title is written, so a retry after the write is refused", async () => {
         const key = "thread-w:run-written";
 

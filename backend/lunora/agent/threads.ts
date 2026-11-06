@@ -310,7 +310,17 @@ export const writeTitleIfUnchanged = async (
 ): Promise<boolean> => {
     const thread = await ctx.db.get("threads", arguments_.threadId);
 
-    if (!thread || isThreadLocked(thread) || thread.runner === "host" || thread.deletedAt !== undefined) {
+    if (!thread) {
+        return false;
+    }
+
+    // A title that already reads as this one landed in an earlier try whose response was lost: it is saved, whatever has happened to the
+    // thread since. Without this the retry would see the digest moved, refuse, and give the charge back for a title that is already there.
+    if (thread.title === arguments_.title) {
+        return true;
+    }
+
+    if (isThreadLocked(thread) || thread.runner === "host" || thread.deletedAt !== undefined) {
         return false;
     }
 
