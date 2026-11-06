@@ -66,6 +66,8 @@ const vExportSession = v.object({
     agentLabel: v.string(),
     // What the agent reported about its own context use and cost (`session_state`), as the thread's context meter showed it.
     agentState: v.optional(vAcpAgentState),
+    // When the agent's report was observed: the time the stored values are dated by.
+    agentStateAt: v.optional(v.number()),
     capabilities: v.optional(vCapabilityReport),
     createdAt: v.number(),
     folderLabel: v.string(),
@@ -123,6 +125,7 @@ export const collectAcpSessionsForExport = internalQuery
                         agentKey,
                         agentLabel,
                         agentState,
+                        agentStateAt,
                         capabilities,
                         createdAt,
                         folderLabel,
@@ -142,6 +145,7 @@ export const collectAcpSessionsForExport = internalQuery
                             status,
                             threadId: threadId as string,
                             ...(agentState !== undefined && { agentState }),
+                            ...(agentStateAt !== undefined && { agentStateAt }),
                             ...(capabilities !== undefined && { capabilities }),
                             ...(importedTurns !== undefined && { importedTurns }),
                             ...(importState !== undefined && { importState }),

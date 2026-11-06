@@ -89,6 +89,15 @@ const mergeUsage = (older: AgentUsage | undefined, newer: AgentUsage | undefined
 
     return { size: newer.size, used: newer.used, ...cost !== undefined && { cost } };
 };
+/** The option fields of a report: the agent's options and its legacy states, which the desktop reports only when they change. */
+const optionFieldsOf = (state: SessionStatePatch): SessionStatePatch => {
+    return {
+        ...state.configOptions !== undefined && { configOptions: state.configOptions },
+        ...state.models !== undefined && { models: state.models },
+        ...state.modes !== undefined && { modes: state.modes },
+    };
+};
+
 /** A run of 401s this long and this many is a device the backend no longer knows, not a clock blip. */
 const REVOKED_AFTER_MS = 60_000;
 const REVOKED_AFTER_ATTEMPTS = 5;
@@ -177,6 +186,9 @@ export class HostPoster implements SessionObserver {
     /** What each running turn's calls last posted as their output (`tool_output`), by turn and call id. */
     private readonly postedOutput = new Map<string, string>();
 
+    /** The option fields of a report that was dropped: the session's next report carries them, since they are sent only on change. */
+    private readonly heldOptions = new Map<string, SessionStatePatch>();
+
     /** The text of each running turn, kept for the references its reply makes (capped). */
     private readonly texts = new Map<string, string>();
 
@@ -255,12 +267,15 @@ export class HostPoster implements SessionObserver {
         const pending = this.pendingState.get(sessionId);
         // A usage report inside the same window that leaves the cost out keeps the cost before it: the agent's cost is cumulative.
         const usage = patch.usage === undefined ? pending?.usage : { ...pending?.usage, ...patch.usage };
+        // Options held by a dropped report go out with this one; a newer options report in the patch replaces them.
+        const held = this.heldOptions.get(sessionId);
 
         // Never earlier than the last one: the backend drops a report older than the stored one, and keeps an equal one.
         const at = Math.max(this.now(), this.lastObservedAt);
 
         this.lastObservedAt = at;
-        this.pendingState.set(sessionId, { ...pending, ...patch, ...usage !== undefined && { usage }, at });
+        this.heldOptions.delete(sessionId);
+        this.pendingState.set(sessionId, { ...held, ...pending, ...patch, ...usage !== undefined && { usage }, at });
         // A fresh report is the newest value, so it does not wait out its own session's backoff: the next flush sends it.
         this.stateRetryAt.delete(sessionId);
         this.stateAttempts.delete(sessionId);
@@ -591,6 +606,22 @@ export class HostPoster implements SessionObserver {
         }
 
         this.sessions.get(sessionId)?.announceClose();
+        this.forgetStateOf(sessionId);
+    }
+
+    /**
+     * Forgets a session's post bookkeeping once the session has ended and nothing of it is pending or in flight. Without this,
+     * the per-session maps keep every session that ever posted a report for the life of the process.
+     */
+    private forgetStateOf(sessionId: string): void {
+        if (this.pendingState.has(sessionId) || this.stateInFlight.has(sessionId) || this.sessions.get(sessionId)?.isClosed !== true) {
+            return;
+        }
+
+        this.stateSentAt.delete(sessionId);
+        this.stateAttempts.delete(sessionId);
+        this.stateRetryAt.delete(sessionId);
+        this.heldOptions.delete(sessionId);
     }
 
     private bindThread(sessionId: string, threadId: string): void {
@@ -721,10 +752,17 @@ export class HostPoster implements SessionObserver {
                 const attempts = (this.stateAttempts.get(sessionId) ?? 0) + 1;
 
                 if (waiting === undefined && attempts >= MAX_STATE_ATTEMPTS) {
-                    // Nothing newer replaces it, and it has failed this many times: dropped, not written back.
+                    // Nothing newer replaces it, and it has failed this many times: its usage is dropped, not written back (the agent's
+                    // next report carries the usage again). The options are sent only on change, so they are held for the next report.
                     this.pendingState.delete(sessionId);
                     this.stateAttempts.delete(sessionId);
                     this.stateRetryAt.delete(sessionId);
+
+                    const options = optionFieldsOf(pending);
+
+                    if (Object.keys(options).length > 0) {
+                        this.heldOptions.set(sessionId, options);
+                    }
                 } else {
                     this.pendingState.set(sessionId, newerPending(pending, waiting));
                     this.stateAttempts.set(sessionId, attempts);
@@ -747,6 +785,8 @@ export class HostPoster implements SessionObserver {
             if (this.pendingState.has(sessionId) && !this.stateRetryAt.has(sessionId)) {
                 this.scheduleState(STATE_DEBOUNCE_MS);
             }
+
+            this.forgetStateOf(sessionId);
         }
     }
 

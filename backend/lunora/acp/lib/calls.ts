@@ -113,6 +113,13 @@ const recordOptionResult = async (ctx: MutationCtx, call: Call, input: Record<st
         return;
     }
 
+    // A change asked for after this one, already answered, stands: an older change ending now (its window closed late) does not replace it.
+    const answered = session.optionResult === undefined ? null : await ctx.db.get("deviceCalls", session.optionResult.callId as Id<"deviceCalls">);
+
+    if (answered && answered.createdAt > call.createdAt) {
+        return;
+    }
+
     const signed = (end.error ?? "").replace(REFUSAL_PREFIX, "").trim();
     let reason = OPTION_REASONS.has(signed) ? signed : OTHER_REASON;
 

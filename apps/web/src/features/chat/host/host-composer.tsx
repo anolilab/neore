@@ -200,7 +200,14 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     />
                 </div>
             )}
-            <HostOptions ended={blocked} key={threadId} optionResult={session?.optionResult} state={session?.agentState} threadId={threadId} />
+            {/* Keyed by the session too: a new session in the thread starts with no change of its own waiting. */}
+            <HostOptions
+                ended={blocked}
+                key={`${threadId}:${session?._id ?? ""}`}
+                optionResult={session?.optionResult}
+                state={session?.agentState}
+                threadId={threadId}
+            />
             <div className="flex items-end gap-2">
                 <textarea
                     aria-label={t`Message to the coding agent`}

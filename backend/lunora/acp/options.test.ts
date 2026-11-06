@@ -217,6 +217,13 @@ describe("setHostOption", () => {
         expect(await rows("deviceCalls", { toolName: "acp_set_config" })).toHaveLength(1);
     });
 
+    it("refuses a mode option whatever the case of its category, as the computer does", async () => {
+        const { threadId } = await readySession({ configOptions: [{ ...MODE_OPTION, category: "Mode" }, MODEL] });
+
+        await expect(setOption(threadId, { optionId: "mode", valueId: "auto" })).rejects.toThrow(MODE_REFUSAL);
+        expect(await rows("deviceCalls", { toolName: "acp_set_config" })).toHaveLength(0);
+    });
+
     it("refuses a legacy mode while the agent sends options, and a session that reported nothing", async () => {
         const both = await readySession({ configOptions: [MODEL], modes: MODES });
 
@@ -317,5 +324,21 @@ describe("setHostOption", () => {
         const view = (await as(ownerId).query(getHostSession as never, { threadId } as never)) as Row;
 
         expect(view.optionResult).toMatchObject({ callId, outcome: "refused", reason: "The host did not answer." });
+    });
+
+    it("does not let an older change that expires late replace the confirmed answer to a newer one", async () => {
+        const { device, threadId } = await readySession({ configOptions: [MODEL] });
+        const { callId: older } = (await setOption(threadId, { optionId: "model", valueId: "deep" })) as Row;
+
+        // The older change is past its claim window, so a newer change can be asked for and answered before the older one expires.
+        await run(async (ctx) => await ctx.db.patch("deviceCalls", older, { createdAt: Date.now() - ACP_CLAIM_WINDOW_MS - 5000 }));
+        const { callId: newer } = (await setOption(threadId, { optionId: "model", valueId: "fast" })) as Row;
+
+        await complete(device, newer);
+        await run(async (ctx) => await ctx.runMutation(calls.checkAcpCall, { callId: older }));
+
+        const view = (await as(ownerId).query(getHostSession as never, { threadId } as never)) as Row;
+
+        expect(view.optionResult).toMatchObject({ callId: newer, outcome: "confirmed", valueId: "fast" });
     });
 });

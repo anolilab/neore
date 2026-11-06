@@ -1624,6 +1624,31 @@ describe("what the agent reports about itself", () => {
         expect(statePosts()).toHaveLength(MAX_STATE_ATTEMPTS);
     });
 
+    it("sends the options of a dropped report with the session's next report, since the agent sends options only on change", async () => {
+        const host = poster();
+        const option = { category: "model", choices: [{ name: "Fast", value: "fast" }], currentValue: "fast", id: "model", name: "Model" };
+        let failing = true;
+
+        await open(host);
+        backend.respond = (post) => {
+            if (failing && (post.events[0] as { kind?: string } | undefined)?.kind === "session_state") {
+                return Response.json({ error: "x" }, { status: 503 });
+            }
+
+            return undefined;
+        };
+        host.sessionState("s1", { configOptions: [option], usage: usage(10) });
+        await settleInSteps(10 * 60_000);
+
+        expect(statePosts()).toHaveLength(MAX_STATE_ATTEMPTS);
+
+        failing = false;
+        host.sessionState("s1", { usage: usage(12) });
+        await settle(2000);
+
+        expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ configOptions: [option], usage: usage(12) });
+    });
+
     it("keeps the order of reports when the desktop clock moves back between them", async () => {
         const host = poster();
 
@@ -1643,6 +1668,24 @@ describe("what the agent reports about itself", () => {
         const atOf = (post: Post | undefined) => (post?.events[0] as unknown as { at: number } | undefined)?.at ?? 0;
 
         expect(atOf(second?.post)).toBeGreaterThanOrEqual(atOf(first?.post));
+    });
+
+    it("forgets the bookkeeping of a session that ended once its last report is posted", async () => {
+        const host = poster();
+
+        await open(host);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        host.sessionEnded("s1");
+        await settle(2000);
+
+        // The per-session maps are private: read them to see that nothing is left for the ended session.
+        const bookkeeping = host as unknown as Record<"heldOptions" | "stateAttempts" | "stateRetryAt" | "stateSentAt", Map<string, unknown>>;
+
+        expect(bookkeeping.stateSentAt.has("s1")).toBe(false);
+        expect(bookkeeping.stateAttempts.has("s1")).toBe(false);
+        expect(bookkeeping.stateRetryAt.has("s1")).toBe(false);
+        expect(bookkeeping.heldOptions.has("s1")).toBe(false);
     });
 
     it("retries a failed report with what was observed, under a fresh issuedAt, when nothing newer is reported", async () => {

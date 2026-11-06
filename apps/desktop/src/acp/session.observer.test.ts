@@ -391,6 +391,190 @@ describe("a usage report the agent sends before its session answers", () => {
 
         expect(reported).toContainEqual({ usage: expect.objectContaining({ used: 12_345 }) });
     });
+
+    it("keeps the valid report when a malformed one follows it before the answer", async () => {
+        const reported: { usage?: unknown }[] = [];
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: {
+                ...recorder().observer,
+                sessionState: (_id, patch) => {
+                    reported.push(patch);
+                },
+            },
+            onChange: () => {},
+            process: agent.process,
+        });
+        const started = session.start();
+
+        await expect.poll(() => agent.written.some((frame) => frame.method === "initialize")).toBe(true);
+        agent.say({ id: agent.written.find((frame) => frame.method === "initialize")?.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/new")).toBe(true);
+
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "usage_update", size: 200_000, used: 12_345 } } });
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "usage_update", size: 200_000, used: "lots" } } });
+
+        agent.say({ id: agent.written.find((frame) => frame.method === "session/new")?.id, result: { sessionId: "sess_1" } });
+        await started;
+
+        expect(reported).toEqual([{ usage: { size: 200_000, used: 12_345 } }]);
+    });
+
+    it("does not give a fresh session the options an update for another session carries", async () => {
+        const reported: { configOptions?: unknown }[] = [];
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: {
+                ...recorder().observer,
+                sessionState: (_id, patch) => {
+                    reported.push(patch);
+                },
+            },
+            onChange: () => {},
+            process: agent.process,
+        });
+        const started = session.start();
+
+        await expect.poll(() => agent.written.some((frame) => frame.method === "initialize")).toBe(true);
+        agent.say({ id: agent.written.find((frame) => frame.method === "initialize")?.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/new")).toBe(true);
+
+        // The session's id is not known until session/new answers: an update naming another session is not this one's options.
+        agent.say({
+            method: "session/update",
+            params: {
+                sessionId: "sess_other",
+                update: {
+                    configOptions: [{ category: "model", currentValue: "deep", id: "model", name: "Model", options: [{ name: "Deep", value: "deep" }], type: "select" }],
+                    sessionUpdate: "config_option_update",
+                },
+            },
+        });
+
+        agent.say({ id: agent.written.find((frame) => frame.method === "session/new")?.id, result: { sessionId: "sess_1" } });
+        await started;
+
+        expect(reported.filter((patch) => patch.configOptions !== undefined)).toEqual([]);
+    });
+
+    it("bounds what a chatty agent makes a fresh session keep before its answer, and still applies the latest option and usage", async () => {
+        const reported: { configOptions?: unknown; usage?: unknown }[] = [];
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: {
+                ...recorder().observer,
+                sessionState: (_id, patch) => {
+                    reported.push(patch);
+                },
+            },
+            onChange: () => {},
+            process: agent.process,
+        });
+        const started = session.start();
+
+        await expect.poll(() => agent.written.some((frame) => frame.method === "initialize")).toBe(true);
+        agent.say({ id: agent.written.find((frame) => frame.method === "initialize")?.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/new")).toBe(true);
+
+        const option = (value: number) => {
+            return {
+                category: "model",
+                currentValue: `v${String(value)}`,
+                id: "model",
+                name: "Model",
+                options: [{ name: "V", value: `v${String(value)}` }],
+                type: "select",
+            };
+        };
+        const update = (sessionId: string, fields: Record<string, unknown>) => {
+            return { method: "session/update", params: { sessionId, update: fields } };
+        };
+        const COUNT = 1000;
+
+        for (let index = 0; index < COUNT; index += 1) {
+            // Other sessions' options and chatter that startup has no use for arrive between the answering session's reports.
+            agent.say(update(`other-${String(index % 500)}`, { configOptions: [option(index)], sessionUpdate: "config_option_update" }));
+            agent.say(update("sess_1", { content: { text: "hi", type: "text" }, sessionUpdate: "agent_message_chunk" }));
+            agent.say(update("sess_1", { sessionUpdate: "usage_update", size: 200_000, used: index }));
+            agent.say(update("sess_1", { configOptions: [option(index)], sessionUpdate: "config_option_update" }));
+        }
+
+        // Only the latest option list and the latest usage report of the answering session are kept, and few sessions in all.
+        const retained = (session as unknown as { startupReads: Map<string, unknown[]> }).startupReads;
+
+        await expect.poll(() => retained.get("sess_1")?.length).toBe(2);
+        expect(retained.size).toBeLessThanOrEqual(4);
+        let entries = 0;
+
+        for (const reads of retained.values()) {
+            entries += reads.length;
+        }
+
+        expect(entries).toBeLessThanOrEqual(4 * 3);
+
+        agent.say({ id: agent.written.find((frame) => frame.method === "session/new")?.id, result: { sessionId: "sess_1" } });
+        await started;
+
+        expect(reported.find((patch) => patch.configOptions !== undefined)?.configOptions).toEqual([expect.objectContaining({ currentValue: `v${String(COUNT - 1)}` })]);
+        let usage: unknown;
+
+        for (const patch of reported) {
+            if (patch.usage !== undefined) {
+                usage = patch.usage;
+            }
+        }
+
+        expect(usage).toEqual({ size: 200_000, used: COUNT - 1 });
+    });
+
+    it("keeps nothing of the updates a session sent before its answer when the session fails to open", async () => {
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: recorder().observer,
+            onChange: () => {},
+            process: agent.process,
+        });
+        const started = session.start();
+
+        await expect.poll(() => agent.written.some((frame) => frame.method === "initialize")).toBe(true);
+        agent.say({ id: agent.written.find((frame) => frame.method === "initialize")?.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/new")).toBe(true);
+
+        agent.say({
+            method: "session/update",
+            params: { sessionId: "sess_1", update: { configOptions: [{ category: "model", currentValue: "a", id: "model", name: "Model", options: [{ name: "A", value: "a" }], type: "select" }], sessionUpdate: "config_option_update" } },
+        });
+        await expect.poll(() => (session as unknown as { startupReads: Map<string, unknown[]> }).startupReads.size).toBe(1);
+
+        agent.say({ error: { code: -32_000, message: "no session" }, id: agent.written.find((frame) => frame.method === "session/new")?.id });
+        await expect(started).rejects.toThrow();
+
+        expect((session as unknown as { startupReads: Map<string, unknown[]> }).startupReads.size).toBe(0);
+    });
 });
 
 describe("a change asked for from the web or the phone", () => {

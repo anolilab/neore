@@ -46,7 +46,29 @@ const fitPrefix = <T>(items: ReadonlyArray<T>, budget: number): T[] => {
     return kept;
 };
 
-/** The option with as many of its choices as fit in `budget` bytes; `undefined` when the option without them does not fit. */
+/**
+ * The longest prefix of `items` within `limit` entries and `budget` bytes, with the entry `isCurrent` names kept in it. When the cut
+ * would drop it, it takes the place of the last entry kept, so the list still names the agent's current choice.
+ */
+const fitKeeping = <T>(items: ReadonlyArray<T>, isCurrent: (item: T) => boolean, limit: number, budget: number): T[] => {
+    const kept = fitPrefix(items.slice(0, limit), budget);
+    const current = items.find((item) => isCurrent(item));
+
+    if (current === undefined || kept.includes(current)) {
+        return kept;
+    }
+
+    const reserve = bytesOf(current) + 1;
+
+    // The current entry alone does not fit: the list is cut without it.
+    if (2 + reserve > budget) {
+        return kept;
+    }
+
+    return [...fitPrefix(items.filter((item) => item !== current).slice(0, limit - 1), budget - reserve), current];
+};
+
+/** The option with as many of its choices as fit in `budget` bytes, its current one among them; `undefined` when the option without them does not fit. */
 const fitOption = (option: AgentOption, budget: number): AgentOption | undefined => {
     const bare = bytesOf({ ...option, choices: [] });
 
@@ -54,7 +76,7 @@ const fitOption = (option: AgentOption, budget: number): AgentOption | undefined
         return undefined;
     }
 
-    return { ...option, choices: fitPrefix(option.choices, budget - bare) };
+    return { ...option, choices: fitKeeping(option.choices, (choice) => choice.value === option.currentValue, MAX_CHOICES, budget - bare) };
 };
 
 type Scrub = (text: string) => string;
@@ -69,7 +91,7 @@ export interface RawOptions {
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** An id the agent chose, kept only whole: empty, too long or changed by the scrub reads as no id. */
-const idOf = (value: unknown, scrub: Scrub): string | undefined => {
+export const idOf = (value: unknown, scrub: Scrub): string | undefined => {
     if (typeof value !== "string" || value === "" || new TextEncoder().encode(value).length > MAX_ID_BYTES) {
         return undefined;
     }
@@ -83,18 +105,20 @@ const nameOf = (value: unknown, fallback: string, scrub: Scrub): string => {
     return name === "" ? fallback : name;
 };
 
-/** The choices of a list option, groups flattened into one list, cut to the bound. */
-const choicesOf = (options: unknown, scrub: Scrub): AgentOption["choices"] => {
+/** The choices of a list option, groups flattened into one list, cut to the bound with the `current` one kept among them. */
+const choicesOf = (options: unknown, scrub: Scrub, current: string): AgentOption["choices"] => {
     const choices: AgentOption["choices"] = [];
+    const values = new Set<string>();
 
     const add = (entry: unknown): void => {
-        if (!isRecord(entry) || choices.length >= MAX_CHOICES) {
+        if (!isRecord(entry)) {
             return;
         }
 
         const value = idOf(entry.value, scrub);
 
-        if (value !== undefined && choices.every((choice) => choice.value !== value)) {
+        if (value !== undefined && !values.has(value)) {
+            values.add(value);
             choices.push({ name: nameOf(entry.name, value, scrub), value });
         }
     };
@@ -111,7 +135,7 @@ const choicesOf = (options: unknown, scrub: Scrub): AgentOption["choices"] => {
         }
     }
 
-    return choices;
+    return fitKeeping(choices, (choice) => choice.value === current, MAX_CHOICES, Infinity);
 };
 
 /** One option, if it is a list the person can choose from. A boolean option, or one with no usable id or value, is left out. */
@@ -130,7 +154,7 @@ const optionOf = (entry: unknown, scrub: Scrub): AgentOption | undefined => {
     const category = typeof entry.category === "string" ? scrub(entry.category).slice(0, MAX_CATEGORY_CHARS) : "";
 
     return {
-        choices: choicesOf(entry.options, scrub),
+        choices: choicesOf(entry.options, scrub, currentValue),
         currentValue,
         id,
         name: nameOf(entry.name, id, scrub),
@@ -184,16 +208,18 @@ const listOf = (state: unknown, currentKey: string, listKey: string, idKey: stri
     }
 
     const available: AgentChoiceList["available"] = [];
+    const ids = new Set<string>();
 
     for (const entry of entries as unknown[]) {
         const id = isRecord(entry) ? idOf(entry[idKey], scrub) : undefined;
 
-        if (id !== undefined && isRecord(entry) && available.length < MAX_CHOICES && available.every((other) => other.id !== id)) {
+        if (id !== undefined && isRecord(entry) && !ids.has(id)) {
+            ids.add(id);
             available.push({ id, name: nameOf(entry.name, id, scrub) });
         }
     }
 
-    return { available: fitPrefix(available, LEGACY_LIST_BYTE_BUDGET), current };
+    return { available: fitKeeping(available, (entry) => entry.id === current, MAX_CHOICES, LEGACY_LIST_BYTE_BUDGET), current };
 };
 
 /** What a `session/new` or `session/load` answer says about options, in the agent's own shape. */
@@ -236,7 +262,7 @@ export const withCurrentMode = (raw: RawOptions, modeId: unknown, scrub: Scrub):
         ...raw.modes !== undefined && { modes: { ...raw.modes, current: id } },
         ...raw.configOptions !== undefined && {
             configOptions: raw.configOptions.map((option) =>
-                option.category === "mode" && option.choices.some((choice) => choice.value === id) ? { ...option, currentValue: id } : option,
+                option.category?.toLowerCase() === "mode" && option.choices.some((choice) => choice.value === id) ? { ...option, currentValue: id } : option,
             ),
         },
     };
