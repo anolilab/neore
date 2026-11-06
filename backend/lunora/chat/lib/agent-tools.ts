@@ -65,6 +65,16 @@ export interface BuildAgentToolsOptions {
     model: LanguageModel | string;
     /** Who started the run, when not the person at the app: an API key's run gets no device tools and no `auto` tool. */
     origin?: RunOrigin;
+    /**
+     * The thread whose permission mode applies to these tools, when it is not `threadId`: a group turn's speakers build their tools
+     * without a thread of their own, but the mode is the group thread's. Omitted, the mode is read for `threadId`.
+     */
+    permissionModeThreadId?: string;
+    /**
+     * Who started the turn, when the tools are built as someone else: an approval resumes a run as the thread's owner, so the
+     * mode is read for the person the snapshot names — `full` is the owner's to give, not a collaborator's. Omitted, `userId`.
+     */
+    permissionModeUserId?: string;
     searchMode: SearchMode;
     /**
      * An invoked skill's tool config. It only changes the CANDIDATES: extra
@@ -123,6 +133,8 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         mcpServerNames,
         model,
         origin,
+        permissionModeThreadId,
+        permissionModeUserId,
         searchMode,
         skillTools,
         snapshot,
@@ -130,6 +142,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         untrustedContext = true,
         userId,
     } = options;
+    const modeThreadId = permissionModeThreadId ?? threadId;
 
     // Built-ins beyond the search mode's set: a skill's extra tools on a fresh
     // run, or — on a snapshot rebuild — every built-in the paused run had (a
@@ -143,7 +156,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         admittedRun,
     );
 
-    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers] = await Promise.all([
+    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers, threadMode] = await Promise.all([
         ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),
         ctx.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId }),
         // A run nobody is at inherits no time-boxed allow, so it does not even read them.
@@ -165,6 +178,20 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
             return [];
         }),
+        // A headless run ignores the thread's mode, so it does not read it. A failed read falls back to the restrictive mode: a
+        // read that fails must not restore the automatic defaults for tools the thread's mode would ask about.
+        headless || modeThreadId === undefined
+            ? null
+            : ctx
+                  .runQuery(internal.chat.tool_permissions.getThreadPermissionMode, {
+                      threadId: modeThreadId as Id<"threads">,
+                      userId: permissionModeUserId ?? userId,
+                  })
+                  .catch((error: unknown) => {
+                      toolsLogger.warn("[TOOLS] Thread permission mode unavailable, using supervised:", error);
+
+                      return "supervised" as const;
+                  }),
     ]);
 
     // Bearer tokens for servers the user signed in to. The FULL list, so a grant
@@ -268,6 +295,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         ...(headlessApproved && { headlessApproved: new Set(headlessApproved) }),
         ...(quickCheck && { lowRiskCheck: quickCheck.check }),
         ...(trusted && { lowRiskTrusted: trusted }),
+        ...(threadMode && { threadMode }),
         timedGrants,
     });
 

@@ -253,6 +253,7 @@ describe("buildAgentTools quick-check trust", () => {
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
             .mockResolvedValueOnce(true)
+            .mockResolvedValueOnce(null)
             .mockResolvedValueOnce(trusted);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
@@ -297,6 +298,7 @@ describe("buildAgentTools quick-check trust", () => {
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
             .mockResolvedValueOnce(true)
+            .mockResolvedValueOnce(null)
             .mockResolvedValueOnce([mcpTrustId("files", second)]);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {

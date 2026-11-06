@@ -44,6 +44,8 @@ beforeAll(async () => {
     registerModule(registry, "agent_branches", await import("../agent/branches"));
     registerModule(registry, "agent_thread_lock", await import("../agent/thread-lock"));
     registerModule(registry, "lib_document_history", await import("../lib/document-history"));
+    registerModule(registry, "chat_tool_permissions", await import("./tool-permissions"));
+    registerModule(registry, "chat_thread_state", await import("./thread-state"));
 }, 30_000);
 
 // Same identity seam as `thread-read-paths.test.ts`: the session reads come off the harness identity.
@@ -68,6 +70,26 @@ vi.mock("../lib/audit-triggers", async (importOriginal) => {
         ...(await importOriginal<typeof import("../lib/audit-triggers")>()),
         auditTriggersFor: () => {
             return {};
+        },
+    };
+});
+
+// Fails only the mode copy of a branch (`copyThreadPermissionMode` writes `permissionMode`), after the new thread exists.
+const failModeCopy = vi.hoisted(() => {
+    return { on: false };
+});
+
+vi.mock("../agent/table-writes", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../agent/table-writes")>();
+
+    return {
+        ...original,
+        patchThread: (...args: Parameters<typeof original.patchThread>) => {
+            if (failModeCopy.on && "permissionMode" in args[2]) {
+                throw new Error("mode copy failed");
+            }
+
+            return original.patchThread(...args);
         },
     };
 });
@@ -532,5 +554,32 @@ describe("an unlocked chat returns its content through the composite read", () =
 
     it("and refuses the same read without a proof, with the locked code", async () => {
         await expect(as(OWNER).query(getThreadWithData as never, { threadId } as never)).rejects.toMatchObject({ data: { code: THREAD_LOCKED_CODE } });
+    });
+});
+
+describe("branching a chat under a permission mode", () => {
+    it("removes the new thread when its mode cannot be copied, rather than leaving an empty chat behind", async () => {
+        const source = await harness.run(
+            async (context: any) =>
+                await context.db.insert("threads", { model: "gpt-4o", permissionMode: "supervised", status: "active", title: "Source", userId: OWNER }),
+        );
+        const ownedThreads = async () =>
+            await harness.run(async (context: any) => {
+                const rows = await context.db.query("threads").collect();
+
+                return rows.filter((row: any) => row.userId === OWNER).length;
+            });
+
+        const before = await ownedThreads();
+
+        failModeCopy.on = true;
+
+        try {
+            await expect(as(OWNER).action(branchThread as never, { threadId: source } as never)).rejects.toThrow("mode copy failed");
+        } finally {
+            failModeCopy.on = false;
+        }
+
+        expect(await ownedThreads()).toBe(before);
     });
 });

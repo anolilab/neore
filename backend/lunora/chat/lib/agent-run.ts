@@ -1088,6 +1088,8 @@ export const resumeApprovedRun = async (
             mcpProgress: toolProgressSink(ctx, streamId),
             model: config.model,
             origin: config.dispatchOrigin,
+            // The run resumes as the owner; the mode is the one the person who started the turn gets (none named: nobody's `full`).
+            permissionModeUserId: config.startedBy ?? "",
             searchMode: config.searchMode as SearchMode,
             snapshot: { mcpServerNames: config.mcpServerNames, toolNames: config.toolNames },
             threadId,

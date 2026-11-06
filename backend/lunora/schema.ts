@@ -3004,6 +3004,9 @@ export const schema = defineSchema({
         order: v.optional(v.number()),
         organizationId: v.optional(v.string()),
         parentThreadIds: v.optional(v.array(v.string())),
+        // How much of a cloud run the owner leaves unasked (`chat/lib/thread-permission-mode.ts`). Unset = "auto", today's
+        // behaviour. Never set on a host thread, whose approvals keep their own rules.
+        permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto-edit"), v.literal("auto"), v.literal("full"))),
         pinnedAt: v.optional(v.number()),
         projectId: v.optional(v.id("projects")),
         publicAccessToken: v.optional(v.string()),

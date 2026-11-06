@@ -8,7 +8,9 @@ import { patchThread } from "../agent/table-writes";
 import { getThread, updateThread } from "../agent/threads";
 import schema from "../schema";
 import { isSnoozeInRange, SNOOZE_MAX_MS } from "./lib/thread-state-logic";
-import { markThreadViewed, snoozeThread, unsnoozeThread } from "./thread-state";
+import { COMPARISON_COLUMN_MODE_CODE } from "./lib/thread-permission-mode";
+import { markThreadViewed, setThreadPermissionMode, snoozeThread, unsnoozeThread } from "./thread-state";
+import { modeOfThread, threadModeForApp } from "./tool-permissions";
 
 const OWNER = "user-owner";
 const GRANTEE = "user-grantee";
@@ -185,6 +187,109 @@ describe("snooze and unsnooze", () => {
     });
 });
 
+describe("setThreadPermissionMode", () => {
+    it("stores the mode for the owner, shows it to the owner only, and leaves updatedAt alone", async () => {
+        await as(OWNER).mutation(setThreadPermissionMode as never, { mode: "supervised", threadId } as never);
+        expect(await read()).toMatchObject({ permissionMode: "supervised", updatedAt: 111 });
+
+        await as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never);
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "read", threadId, userId: GRANTEE });
+        });
+
+        const asOwner: any = await as(OWNER).query(getThread as never, { threadId } as never);
+        const asGrantee: any = await as(GRANTEE).query(getThread as never, { threadId } as never);
+
+        expect(asOwner.permissionMode).toBe("full");
+        expect(asGrantee.permissionMode).toBeUndefined();
+    });
+
+    it("records a change in the thread's history, attributed to the owner, and nothing for a repeat of the same mode", async () => {
+        await as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never);
+        await as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never);
+
+        const history: any[] = await harness.run(async (context: any) => await context.db.query("documentHistory").collect());
+        const rows = history.filter((row) => row.documentId === threadId);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ attribution: { action: "update", source: "manual" }, isDeleted: false, tableName: "threads", userId: OWNER });
+        expect(rows[0].doc.permissionMode).toBe("full");
+        expect(rows[0].oldDoc.permissionMode).toBeUndefined();
+    });
+
+    it("keeps a shared thread's sharing token out of the history snapshots the mode change writes", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.patch("threads", threadId, { publicAccessToken: "tok-secret-value" });
+        });
+
+        await as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never);
+
+        const history: any[] = await harness.run(async (context: any) => await context.db.query("documentHistory").collect());
+        const row = history.find((entry) => entry.documentId === threadId);
+
+        expect(row).toBeDefined();
+        expect(JSON.stringify(row)).not.toContain("tok-secret-value");
+        expect(row.doc).not.toHaveProperty("publicAccessToken");
+        expect(row.oldDoc).not.toHaveProperty("publicAccessToken");
+    });
+
+    it("refuses a stranger, an unknown mode and a host thread", async () => {
+        await expect(as(STRANGER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never)).rejects.toThrow(NOT_FOUND_PATTERN);
+        await expect(as(OWNER).mutation(setThreadPermissionMode as never, { mode: "yolo", threadId } as never)).rejects.toThrow();
+        await harness.run(async (context: any) => {
+            await context.db.patch("threads", threadId, { runner: "host" });
+        });
+        await expect(as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never)).rejects.toThrow();
+        const row = await read();
+
+        expect(row.permissionMode).toBeUndefined();
+    });
+
+    it("refuses a comparison column, whose runs take the comparison's mode, and stores nothing on it", async () => {
+        const column: string = await harness.run(
+            async (context: any) => await context.db.insert("threads", { status: "active", title: "Column", updatedAt: 1, userId: OWNER }),
+        );
+
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadRelationships", {
+                branchType: "comparison",
+                createdAt: 1,
+                parentThreadId: threadId,
+                threadId: column,
+                userId: OWNER,
+            });
+        });
+
+        await expect(as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId: column } as never)).rejects.toMatchObject({
+            data: { code: COMPARISON_COLUMN_MODE_CODE },
+        });
+
+        const row = await harness.run(async (context: any) => await context.db.get("threads", column));
+
+        expect(row.permissionMode).toBeUndefined();
+    });
+
+    it("accepts a mode on an orphaned column, whose comparison parent has been deleted", async () => {
+        const gone: string = await harness.run(
+            async (context: any) => await context.db.insert("threads", { status: "active", title: "Gone", updatedAt: 1, userId: OWNER }),
+        );
+        const column: string = await harness.run(
+            async (context: any) => await context.db.insert("threads", { status: "active", title: "Orphan", updatedAt: 1, userId: OWNER }),
+        );
+
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadRelationships", { branchType: "comparison", createdAt: 1, parentThreadId: gone, threadId: column, userId: OWNER });
+            await context.db.delete("threads", gone);
+        });
+
+        await as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId: column } as never);
+
+        const row = await harness.run(async (context: any) => await context.db.get("threads", column));
+
+        expect(row.permissionMode).toBe("full");
+    });
+});
+
 describe("who can read the state", () => {
     it("shows it to the owner and strips it for a grantee", async () => {
         await harness.run(async (context: any) => {
@@ -202,5 +307,74 @@ describe("who can read the state", () => {
         for (const key of ["awaitingInput", "lastReplyAt", "lastViewedAt", "snoozedUntil"]) {
             expect(key in asGrantee).toBe(false);
         }
+    });
+});
+
+describe("getThreadPermissionModeForApp", () => {
+    const readFor = async (userId: string) => await harness.run(async (context: any) => await threadModeForApp(context, threadId, userId));
+
+    beforeEach(async () => {
+        await harness.run(async (context: any) => {
+            await context.db.patch("threads", threadId, { permissionMode: "supervised" });
+        });
+    });
+
+    it("answers the owner of a passcode-locked chat, who has no unlock proof here", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.patch("threads", threadId, { lockedAt: 2 });
+        });
+
+        expect(await readFor(OWNER)).toStrictEqual({ allowed: true, mode: "supervised" });
+    });
+
+    it("refuses a grantee of a locked chat and a stranger, and admits a grantee of an open one", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "read", threadId, userId: GRANTEE });
+        });
+
+        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, mode: "supervised" });
+        expect(await readFor(STRANGER)).toStrictEqual({ allowed: false, mode: null });
+
+        await harness.run(async (context: any) => {
+            await context.db.patch("threads", threadId, { lockedAt: 2 });
+        });
+
+        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: false, mode: null });
+    });
+
+    it("does not give a grantee the owner's `full`", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.patch("threads", threadId, { permissionMode: "full" });
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: GRANTEE });
+        });
+
+        expect(await readFor(OWNER)).toStrictEqual({ allowed: true, mode: "full" });
+        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, mode: null });
+    });
+
+    it("keeps a comparison column on its parent's mode even once the column has one of its own", async () => {
+        const child: string = await harness.run(
+            async (context: any) => await context.db.insert("threads", { status: "active", title: "Column", updatedAt: 1, userId: OWNER }),
+        );
+
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadRelationships", {
+                branchType: "comparison",
+                createdAt: 1,
+                parentThreadId: threadId,
+                threadId: child,
+                userId: OWNER,
+            });
+        });
+
+        const modeOf = async () => await harness.run(async (context: any) => await modeOfThread(context, await context.db.get("threads", child), OWNER));
+
+        expect(await modeOf()).toBe("supervised");
+
+        await harness.run(async (context: any) => {
+            await context.db.patch("threads", child, { permissionMode: "auto" });
+        });
+
+        expect(await modeOf()).toBe("supervised");
     });
 });

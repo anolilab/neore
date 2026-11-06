@@ -5,6 +5,12 @@ import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash
 import * as lunora_chat_thread_state_92 from "../../chat/thread-state.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
+installCompiledValidatorMap(lunora_chat_thread_state_92.getEffectivePermissionMode.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["threadId"] !== "string") return DEFER;
+return { "threadId": source["threadId"] };
+});
 installCompiledValidatorMap(lunora_chat_thread_state_92.markThreadViewed.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;

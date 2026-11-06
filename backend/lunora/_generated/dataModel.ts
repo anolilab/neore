@@ -1852,6 +1852,7 @@ export interface Doc_threads {
     order?: number;
     organizationId?: string;
     parentThreadIds?: Array<string>;
+    permissionMode?: "supervised" | "auto-edit" | "auto" | "full";
     pinnedAt?: number;
     projectId?: Id<"projects">;
     publicAccessToken?: string;
@@ -4845,6 +4846,7 @@ export interface Insert_threads {
     order?: number;
     organizationId?: string;
     parentThreadIds?: Array<string>;
+    permissionMode?: "supervised" | "auto-edit" | "auto" | "full";
     pinnedAt?: number;
     projectId?: Id<"projects">;
     publicAccessToken?: string;

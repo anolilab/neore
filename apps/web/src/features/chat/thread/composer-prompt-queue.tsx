@@ -26,7 +26,7 @@
 import { Plural, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
-import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CornerDownRightIcon, ListOrderedIcon, PaperclipIcon, SendIcon, XIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { useCallback, useEffect, useRef } from "react";
@@ -39,6 +39,8 @@ import type { QueuedSteer, SteerWithdrawal } from "@/features/chat/core/utils/pr
 import { decideAutoSend, deliveredSteerItems, takeNextToSend } from "@/features/chat/core/utils/prompt-queue";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
+
+import { permissionModeSaveKey, usePermissionModeSaving } from "./composer-permission-mode";
 
 /**
  * `sendMessage` clears the composer synchronously (before its first await) —
@@ -79,6 +81,7 @@ const useQueueActions = () => {
     const { threadId: currentThreadId } = useChatThread();
     const { isStreaming } = useChatIsStreaming();
     const { error } = useChatError();
+    const queryClient = useQueryClient();
     const { mutateAsync: withdrawSteer } = useMutation(crpc.chat.steering.withdrawSteer.mutationOptions());
     const busyRef = useRef(false);
     // What an `await` in here must re-read afterwards, not close over.
@@ -142,7 +145,15 @@ const useQueueActions = () => {
                     canSend: () => {
                         const latest = latestRef.current;
 
-                        return latest.threadId === threadId && !latest.isStreaming && (explicit || !latest.hasError) && !useChatUIStore.getState().isSubmitting;
+                        return (
+                            latest.threadId === threadId &&
+                            !latest.isStreaming &&
+                            // Read from the cache, not the rendered flag: a save that began after the last render is not in that flag yet,
+                            // and this check runs after the withdrawal's await, so it could send under the old mode.
+                            queryClient.isMutating({ exact: true, mutationKey: permissionModeSaveKey(threadId) }) === 0 &&
+                            (explicit || !latest.hasError) &&
+                            !useChatUIStore.getState().isSubmitting
+                        );
                     },
                     peek: () => usePromptQueueStore.getState().queues[threadId]?.items[0],
                     plain: ({ steer }) => {
@@ -166,7 +177,7 @@ const useQueueActions = () => {
                 removeRequestedMeanwhile();
             }
         },
-        [removeRequestedMeanwhile, sendQueuedPrompt, withdraw],
+        [queryClient, removeRequestedMeanwhile, sendQueuedPrompt, withdraw],
     );
 
     useEffect(() => {
@@ -297,6 +308,8 @@ const ComposerPromptQueue: FC = () => {
     const { error } = useChatError();
     const queue = usePromptQueueStore(selectThreadQueue(threadId));
     const { removePrompt, sendNextPrompt } = useQueueActions();
+    const modeSaving = usePermissionModeSaving(threadId);
+    const wasModeSaving = useRef(modeSaving);
     const crpc = useCRPC();
     // The same query (and key) the chat context reads, so no second subscription.
     const { data: activeStream } = useQuery(
@@ -390,6 +403,17 @@ const ComposerPromptQueue: FC = () => {
         }
     }, [error, isStreaming, queue.items, queue.paused, sendNextPrompt, threadId]);
 
+    // A save that ends releases the prompts that waited for it, unless the thread is busy, failed, or paused.
+    useEffect(() => {
+        const ended = wasModeSaving.current && !modeSaving;
+
+        wasModeSaving.current = modeSaving;
+
+        if (ended && threadId && !isStreaming && !error && !queue.paused && queue.items.length > 0) {
+            void sendNextPrompt(threadId);
+        }
+    }, [error, isStreaming, modeSaving, queue.items.length, queue.paused, sendNextPrompt, threadId]);
+
     const handleRemove = useCallback(
         (id: string) => {
             if (threadId) {
@@ -421,6 +445,11 @@ const ComposerPromptQueue: FC = () => {
         statusText = <Plural one="# steering — the reply reads it at its next step" other="# steering — the reply reads them at its next step" value={count} />;
     }
 
+    // "Send next" is disabled while the permission mode saves: say why, and that the queue moves on once it has.
+    if (modeSaving && !isStreaming) {
+        statusText = t`${count} queued — waiting for the permission mode to save`;
+    }
+
     return (
         <div className="mx-2 mt-2 flex flex-wrap items-center gap-1.5">
             <span aria-live="polite" className="text-muted-foreground flex items-center gap-1 text-xs" role="status">
@@ -433,7 +462,7 @@ const ComposerPromptQueue: FC = () => {
                 ))}
             </ol>
             {!isStreaming && (
-                <Button className="h-6 gap-1 px-2 text-xs" onClick={handleSendNext} size="sm" type="button" variant="outline">
+                <Button className="h-6 gap-1 px-2 text-xs" disabled={modeSaving} onClick={handleSendNext} size="sm" type="button" variant="outline">
                     <SendIcon aria-hidden="true" className="size-3" />
                     {t`Send next`}
                 </Button>

@@ -9,7 +9,7 @@ import PresentationArtifact from "@neore/chat-ui/chat/presentation-artifact";
 import { FetchableOriginsProvider } from "@neore/ui/components/file-renderers/fetchable-origins-provider";
 import { originsOf } from "@neore/ui/hooks/use-fetchable-origins";
 import { AlertCircleIcon, FilePlus2Icon, Loader2Icon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { LUNORA_URL } from "@/lib/env";
 import { useSettings } from "@/lib/settings";
@@ -32,15 +32,24 @@ interface ChatPageProps {
 // File previews fetch the backend's signed storage URLs, so its origin is the one the provider admits.
 const FETCHABLE_ORIGINS = originsOf(LUNORA_URL);
 
-const components = {
-    DocumentArtifact,
-    // MCP App proxy calls go to the backend's HTTP routes on the Lunora Worker.
-    McpApp: LUNORA_URL ? (props: Omit<Parameters<typeof McpAppView>[0], "lunoraSiteUrl">) => <McpAppView {...props} lunoraSiteUrl={LUNORA_URL} /> : undefined,
-    PresentationArtifact,
+// MCP App proxy calls go to the backend's HTTP routes on the Lunora Worker. They name the thread the app is shown in: the proxy
+// applies that thread's permission mode. A call that names none has no thread mode: it gets the tool defaults, so a read-only
+// tool runs and one that would ask is refused.
+const componentsFor = (threadId: string | null) => {
+    return {
+        DocumentArtifact,
+        McpApp: LUNORA_URL
+            ? (props: Omit<Parameters<typeof McpAppView>[0], "lunoraSiteUrl" | "threadId">) => (
+                  <McpAppView {...props} lunoraSiteUrl={LUNORA_URL} {...(threadId !== null && { threadId })} />
+              )
+            : undefined,
+        PresentationArtifact,
+    };
 };
 
 export function ChatPage({ onBack, onThreadCreated, seed, threadId }: ChatPageProps) {
     const settings = useSettings();
+    const components = useMemo(() => componentsFor(threadId), [threadId]);
     const models = useModels();
     const thread = useQuery(api.chat.functions.getThread, threadId ? { threadId: threadId as Id<"threads"> } : "skip");
 

@@ -17,8 +17,11 @@ const state = vi.hoisted(() => {
         acceptedToken: "fresh",
         config: null as MCPServerConfig | null,
         connects: 0,
+        crossed: [] as string[],
         overrides: {} as Record<string, string>,
         seenTokens: [] as string[],
+        shard: "alice",
+        thread: { allowed: true, mode: null } as { allowed: boolean; mode: string | null },
     };
 });
 
@@ -26,6 +29,20 @@ vi.mock("../../auth/lib/helper", () => {
     return {
         getCurrentUserInternal: async () => {
             return { _id: "alice" };
+        },
+    };
+});
+
+vi.mock("../../lib/thread-shard", () => {
+    return { threadShardFor: async () => state.shard };
+});
+
+vi.mock("../../lib/cross-shard", () => {
+    return {
+        callOnShard: async (_ref: unknown, _args: unknown, options: { shardKey: string }) => {
+            state.crossed.push(options.shardKey);
+
+            return state.thread;
         },
     };
 });
@@ -101,9 +118,13 @@ vi.mock("@modelcontextprotocol/sdk/client/index.js", () => {
     };
 });
 
-const context = { runQuery: async () => state.overrides } as never;
+const context = {
+    runQuery: async (ref: { __lunoraRef?: string }) =>
+        ref.__lunoraRef === "chat_tool_permissions:getThreadPermissionModeForApp" ? state.thread : state.overrides,
+} as never;
 
-const post = (body: unknown) => new Request("https://backend.example.com/mcp/x", { body: JSON.stringify(body), method: "POST" });
+const post = (body: unknown) =>
+    new Request("https://backend.example.com/mcp/x", { body: JSON.stringify({ threadId: "thread-1", ...(body as object) }), method: "POST" });
 
 const oauthConfig = (refreshTo: string | null) => {
     const oauth = { markExpired: vi.fn(async () => {}), reconnectHint: "Reconnect Notion in Settings → Connectors", refresh: vi.fn(async () => refreshTo) };
@@ -125,7 +146,10 @@ beforeEach(() => {
     state.acceptedToken = "fresh";
     state.config = null;
     state.connects = 0;
+    state.crossed = [];
     state.overrides = {};
+    state.shard = "alice";
+    state.thread = { allowed: true, mode: null };
     state.seenTokens = [];
 });
 
@@ -204,11 +228,111 @@ describe("MCP Apps proxy with an OAuth grant", () => {
         expect(response.status).toBe(200);
     });
 
+    it("reads a shared thread's mode on its owner's shard and keeps the caller's server", async () => {
+        oauthConfig("fresh");
+        state.shard = "owner";
+        state.overrides = { "connector:notion:search": "auto" };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(200);
+        expect(state.crossed).toStrictEqual(["owner"]);
+    });
+
+    it("refuses a collaborator the owner's shard does not admit", async () => {
+        oauthConfig("fresh");
+        state.shard = "owner";
+        state.thread = { allowed: false, mode: null };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(403);
+    });
+
     it("finds only the caller's own servers", async () => {
         oauthConfig("fresh");
 
         const response = await readMCPResourceHttpAction(context, post({ serverName: "Someone else's", uri: "ui://x" }));
 
         expect(response.status).toBe(404);
+    });
+
+    it("runs a call that names no thread under the most restrictive mode, so one that would ask is refused, not rejected", async () => {
+        // A client built before the thread was sent must keep working: the call is not turned away, and a tool that needs an answer
+        // from a person (supervised asks for it) is refused without reaching the server.
+        oauthConfig("fresh");
+
+        const response = await callMCPToolFromAppHttpAction(
+            context,
+            new Request("https://backend.example.com/mcp/tool", {
+                body: JSON.stringify({ arguments: {}, serverName: "Notion", toolName: "create_page" }),
+                method: "POST",
+            }),
+        );
+
+        expect(response.status).not.toBe(400);
+        expect(JSON.stringify(await response.json())).toContain("needs your approval");
+    });
+
+    it("runs a read-only tool that names no thread, as the default does, and still refuses one that would ask", async () => {
+        // The older clients: a call with no thread must not lose the read-only tools they always ran.
+        oauthConfig("fresh");
+
+        // `post` adds a thread, so these are sent bare: no `threadId` at all.
+        const bare = (toolName: string) =>
+            new Request("https://backend.example.com/mcp/tool", {
+                body: JSON.stringify({ arguments: {}, serverName: "Notion", toolName }),
+                method: "POST",
+            });
+
+        const readOnly = await callMCPToolFromAppHttpAction(context, bare("search"));
+        const asks = await callMCPToolFromAppHttpAction(context, bare("create_page"));
+
+        expect(readOnly.status).toBe(200);
+        expect(asks.status).toBe(403);
+    });
+
+    it("lets an owner's app call through, reading the thread on the caller's own shard without crossing to another", async () => {
+        // The route runs on the caller's shard (`onCallerShard`), which is the owner's shard for the owner's own thread: no cross-shard call.
+        oauthConfig("fresh");
+        state.shard = "alice";
+        state.thread = { allowed: true, mode: "auto" };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(200);
+        expect(state.crossed).toEqual([]);
+    });
+
+    it("refuses a thread the caller cannot reach", async () => {
+        oauthConfig("fresh");
+        state.thread = { allowed: false, mode: null };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(403);
+    });
+
+    it("applies a supervised thread's mode: a server's read-only hint no longer runs unasked, a tool the user allowed still does", async () => {
+        oauthConfig("fresh");
+        state.thread = { allowed: true, mode: "supervised" };
+        state.overrides = { "connector:notion:create_page": "auto" };
+
+        const lookup = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+        const allowed = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        expect(lookup.status).toBe(403);
+        expect(allowed.status).toBe(200);
+    });
+
+    it("keeps a tool that needs approval refused under full access: an iframe is not the model's turn", async () => {
+        oauthConfig("fresh");
+        state.thread = { allowed: true, mode: "full" };
+
+        // Unannotated: the default is `ask`, which `full` would lift to `auto` for the model's own calls.
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("needs your approval") });
     });
 });

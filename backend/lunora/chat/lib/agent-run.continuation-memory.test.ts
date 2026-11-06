@@ -116,6 +116,18 @@ describe("a run that pauses on a tool approval", () => {
 });
 
 describe("a tool-approval continuation", () => {
+    it("builds its tools for the person who started the turn, not the owner it resumes as, so a collaborator's turn never gets `full`", async () => {
+        await resume({ ...BASE_CONFIG, startedBy: "collaborator-1" }, [reply]);
+
+        expect(vi.mocked(buildAgentTools).mock.calls[0]?.[1]).toMatchObject({ permissionModeUserId: "collaborator-1", userId: "owner-1" });
+    });
+
+    it("names nobody for a snapshot that does not say who started the turn", async () => {
+        await resume(BASE_CONFIG, [reply]);
+
+        expect(vi.mocked(buildAgentTools).mock.calls[0]?.[1]).toMatchObject({ permissionModeUserId: "" });
+    });
+
     it("extracts only the steers it took after the pause, leaving the prompt and earlier steers to the pause", async () => {
         const { jobs } = await resume({ ...BASE_CONFIG, memory: CARRIED }, [reply]);
         const extractions = jobs(internal.memory.extract.extractMemories);

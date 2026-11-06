@@ -1,0 +1,41 @@
+/**
+ * The per-thread permission mode of a cloud thread: how much of the run the owner leaves unasked.
+ *
+ * - `supervised` — every tool that is not read-only asks.
+ * - `auto-edit`  — as supervised, plus whatever is in `BUILTIN_TOOLS_FILE_EDIT` (empty for now).
+ * - `auto`       — today's behaviour: each tool keeps its own default. This is also what an absent value means.
+ * - `full`       — every tool that would ask runs, except the ones that wait for a person.
+ *
+ * Pure data; the resolution is in `tool-permissions.ts`.
+ */
+export type ThreadPermissionMode = "auto" | "auto-edit" | "full" | "supervised";
+
+export const THREAD_PERMISSION_MODES: ReadonlyArray<ThreadPermissionMode> = ["supervised", "auto-edit", "auto", "full"];
+
+/**
+ * The error code of a refused mode save on a comparison column (`setThreadPermissionMode`). The column's mode is the comparison's, so the
+ * save changed nothing: the client tells it apart from a save that failed by this code, not by its message.
+ */
+export const COMPARISON_COLUMN_MODE_CODE = "COMPARISON_COLUMN_MODE";
+
+/** What an absent value means. */
+export const DEFAULT_THREAD_PERMISSION_MODE: ThreadPermissionMode = "auto";
+
+export const isThreadPermissionMode = (value: unknown): value is ThreadPermissionMode =>
+    typeof value === "string" && (THREAD_PERMISSION_MODES as ReadonlyArray<string>).includes(value);
+
+/**
+ * Built-ins that answer from data the app already holds, with no outbound call: they spend nothing, start nothing and send nothing
+ * the model chose to a third party. `supervised` and `auto-edit` leave these at their own mode. An allowlist: a built-in not named
+ * here asks. A search, a lookup, or a memory query that reaches a provider (even one of the app's own, billed per request) asks.
+ */
+export const BUILTIN_TOOLS_READ_ONLY: ReadonlySet<string> = new Set(["dateTime", "listLanguages"]);
+
+/**
+ * Built-ins that write files or artifacts with no outward reach, which `auto-edit` may let run. Empty for now: the document
+ * tools are not here because their HTML can load remote images when the owner views them. Design canvases and slides are not
+ * here either: their JSON or HTML can name remote images that load when opened. `fileOperations` is not here: a bot with its own
+ * computer shares that filesystem across threads, so its writes ask. `retrieve` is not a lookup: it fetches model-chosen URLs,
+ * which can carry thread data and spend quota. Shell, code execution, browser, network, generation and delegation tools keep asking.
+ */
+export const BUILTIN_TOOLS_FILE_EDIT: ReadonlySet<string> = new Set<string>();

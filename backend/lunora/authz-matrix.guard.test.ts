@@ -51,7 +51,7 @@ const matrixRows = (): string[] => {
     const markdown = readFileSync(MATRIX, "utf8");
     const section = markdown.slice(markdown.indexOf("## Procedures"), markdown.indexOf("\n## ", markdown.indexOf("## Procedures") + 1));
 
-    return [...section.matchAll(/^\| `([a-z0-9_]+\.\w+)` \|/gmu)].map((match) => match[1] as string).toSorted(byName);
+    return [...section.matchAll(/^\| `([a-z0-9_]+\.\w+)`\s+\|/gmu)].map((match) => match[1] as string).toSorted(byName);
 };
 
 /**

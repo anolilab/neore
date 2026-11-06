@@ -32,12 +32,14 @@ export interface McpAppViewProps {
     part: ToolPart;
     resourceUri: string;
     serverName: string;
+    /** The thread the app is shown in: its permission mode applies to the app's tool calls. */
+    threadId?: string;
     toolName: string;
 }
 
 const SANDBOX_URL = new URL("https://proxy.mcpui.dev");
 
-const McpAppView = memo<McpAppViewProps>(({ lunoraSiteUrl, part, resourceUri, serverName, toolName }) => {
+const McpAppView = memo<McpAppViewProps>(({ lunoraSiteUrl, part, resourceUri, serverName, threadId, toolName }) => {
     const { t } = useLingui();
     const isError = part.state === "output-error";
 
@@ -69,6 +71,7 @@ const McpAppView = memo<McpAppViewProps>(({ lunoraSiteUrl, part, resourceUri, se
                 body: JSON.stringify({
                     arguments: params.arguments ?? {},
                     serverName,
+                    ...(threadId !== undefined && { threadId }),
                     toolName: params.name,
                 }),
                 credentials: "include",
@@ -86,7 +89,7 @@ const McpAppView = memo<McpAppViewProps>(({ lunoraSiteUrl, part, resourceUri, se
 
             return response.json() as ReturnType<OnCallTool>;
         },
-        [lunoraSiteUrl, serverName],
+        [lunoraSiteUrl, serverName, threadId],
     );
 
     const onOpenLink = useCallback<OnOpenLink>(({ url }) => {

@@ -1228,42 +1228,7 @@ export const getThreadsWithTemporaryFilter = internalQuery
         v.object({
             continueCursor: v.union(v.string(), v.null()),
             isDone: v.boolean(),
-            page: v.array(
-                v.object({
-                    _creationTime: v.number(),
-                    _id: v.string(),
-                    botId: v.optional(v.string()),
-                    createdAt: v.optional(v.number()),
-                    createdBy: v.optional(v.string()),
-                    customSystemPrompt: v.optional(v.string()),
-                    deleted: v.optional(v.boolean()),
-                    deletedAt: v.optional(v.number()),
-                    dictationLanguage: v.optional(v.string()),
-                    enabledFeatures: v.optional(v.array(v.string())),
-                    isPublic: v.optional(v.boolean()),
-                    isTemporary: v.optional(v.boolean()),
-                    language: v.optional(v.string()),
-                    lastUserMessageAt: v.optional(v.number()),
-                    lockedAt: v.optional(v.number()),
-                    mode: v.optional(v.string()),
-                    model: v.optional(v.string()),
-                    multiChat: v.optional(v.boolean()),
-                    order: v.optional(v.number()),
-                    organizationId: v.optional(v.string()),
-                    pinnedAt: v.optional(v.number()),
-                    projectId: v.optional(v.string()),
-                    publicAccessToken: v.optional(v.string()),
-                    reasoningEffort: v.optional(v.number()),
-                    statelessMode: v.optional(v.boolean()),
-                    status: v.string(),
-                    summary: v.optional(v.string()),
-                    tags: v.optional(v.array(v.string())),
-                    teamId: v.optional(v.string()),
-                    title: v.optional(v.string()),
-                    updatedAt: v.optional(v.number()),
-                    userId: v.optional(v.string()),
-                }),
-            ),
+            page: v.array(v.object({ ...vThreadDocumentFields })),
         }),
     )
     .query(async ({ args, ctx: context }) => {
@@ -2265,37 +2230,7 @@ export const unpinThread = authMutation
 
 export const getPinnedThreads = authQuery
     .input({})
-    .output(
-        v.array(
-            v.object({
-                _creationTime: v.number(),
-                _id: v.string(),
-                botId: v.optional(v.string()),
-                createdAt: v.optional(v.number()),
-                createdBy: v.optional(v.string()),
-                customSystemPrompt: v.optional(v.string()),
-                deleted: v.optional(v.boolean()),
-                deletedAt: v.optional(v.number()),
-                enabledFeatures: v.optional(v.array(v.string())),
-                isPublic: v.optional(v.boolean()),
-                lastUserMessageAt: v.optional(v.number()),
-                lockedAt: v.optional(v.number()),
-                model: v.optional(v.string()),
-                order: v.optional(v.number()),
-                pinnedAt: v.optional(v.number()),
-                projectId: v.optional(v.string()),
-                publicAccessToken: v.optional(v.string()),
-                reasoningEffort: v.optional(v.number()),
-                statelessMode: v.optional(v.boolean()),
-                status: v.string(),
-                summary: v.optional(v.string()),
-                tags: v.optional(v.array(v.string())),
-                title: v.optional(v.string()),
-                updatedAt: v.optional(v.number()),
-                userId: v.optional(v.string()),
-            }),
-        ),
-    )
+    .output(v.array(v.object({ ...vThreadDocumentFields })))
     .query(async ({ ctx: context }) => {
         const { userId } = context.user;
 
@@ -2344,35 +2279,7 @@ export const updateThreadOrder = authMutation
 
 export const getThreadOrders = authQuery
     .input({})
-    .output(
-        v.array(
-            v.object({
-                _creationTime: v.number(),
-                _id: v.string(),
-                botId: v.optional(v.string()),
-                createdAt: v.optional(v.number()),
-                createdBy: v.optional(v.string()),
-                customSystemPrompt: v.optional(v.string()),
-                deleted: v.optional(v.boolean()),
-                deletedAt: v.optional(v.number()),
-                enabledFeatures: v.optional(v.array(v.string())),
-                isPublic: v.optional(v.boolean()),
-                model: v.optional(v.string()),
-                order: v.optional(v.number()),
-                pinnedAt: v.optional(v.number()),
-                projectId: v.optional(v.string()),
-                publicAccessToken: v.optional(v.string()),
-                reasoningEffort: v.optional(v.number()),
-                statelessMode: v.optional(v.boolean()),
-                status: v.string(),
-                summary: v.optional(v.string()),
-                tags: v.optional(v.array(v.string())),
-                title: v.optional(v.string()),
-                updatedAt: v.optional(v.number()),
-                userId: v.optional(v.string()),
-            }),
-        ),
-    )
+    .output(v.array(v.object({ ...vThreadDocumentFields })))
     .query(async ({ ctx: context }) => {
         const { userId } = context.user;
 
@@ -2983,6 +2890,26 @@ export const branchThread = authAction
             userId,
         });
         const newThreadId: string = newThread._id;
+
+        // A branch keeps the mode its source runs under (`modeOfThread`): a stricter mode must not drop to the defaults.
+        try {
+            const sourceMode = await context.runQuery(internal.chat.tool_permissions.getThreadPermissionMode, {
+                threadId: parentThread._id as Id<"threads">,
+                userId,
+            });
+
+            if (sourceMode) {
+                await context.runMutation(internal.chat.thread_state.copyThreadPermissionMode, {
+                    mode: sourceMode,
+                    threadId: newThreadId,
+                });
+            }
+        } catch (error) {
+            // Nothing has been copied into the branch yet: without this it would stay as an empty chat the user never asked for.
+            await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: newThreadId as Id<"threads"> });
+
+            throw error;
+        }
 
         // A fork of a bot chat stays that bot's chat: its runs need the bot's persona and scoped memory.
         if (branchName || parentThread.botId) {

@@ -41,12 +41,14 @@ export interface ThreadData extends ThreadOwnerState {
     customSystemPrompt?: string;
     enabledFeatures?: string[];
     language?: string;
-    /** Set while the chat has a passcode (`thread-lock.ts`); a locked chat takes no file attachments. */
+    /** Set while the chat has a passcode. A locked read without its proof is a stub that carries no mode. */
     lockedAt?: number | null;
     mode?: "text" | "image" | "video";
     model: string;
     multiChat?: boolean;
     parentThreadId?: string;
+    /** How much of a cloud run the owner leaves unasked; unset is "auto". Owner-only, never on a host thread. */
+    permissionMode?: "auto" | "auto-edit" | "full" | "supervised";
     reasoningEffort?: number;
     /** `host`: a coding agent on a paired computer runs the turns (`backend/lunora/acp/`). Unset: the cloud. */
     runner?: "host";
