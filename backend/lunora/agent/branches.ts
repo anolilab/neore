@@ -176,10 +176,10 @@ export const activePathIdsOf = async (
     threadId: Id<"threads">,
     leafMessageId: Id<"messages">,
 ): Promise<string[] | null | "too-long"> => {
-    // The stored leaf, or, when its row is gone, the thread's own active path. Taking the path from the leaf alone would read as
-    // "no rows" and refuse a thread that still has its prompts on screen.
-    const stored = await context.db.get("messages", leafMessageId);
-    const leaf = stored && stored.threadId === threadId ? stored : await resolveLeafRow(context, threadId, leafMessageId);
+    // The path the thread view shows: `resolveLeafRow` descends from the stored leaf to its latest child, and falls back to the thread's
+    // own active path when the stored row is gone. Walking up from the stored leaf alone would read a shortened path when a writer
+    // left the stored leaf behind new rows, so the title would come from a path that is not on screen.
+    const leaf = await resolveLeafRow(context, threadId, leafMessageId);
 
     if (!leaf) {
         return null;

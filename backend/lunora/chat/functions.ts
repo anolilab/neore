@@ -1658,6 +1658,35 @@ export const releaseTitleCharge = async (context: Pick<ActionContext, "runMutati
 };
 
 /**
+ * Runs `cleanup`, then throws `error`. A failing cleanup is not the one reported: the error that made the cleanup necessary is what
+ * the caller and the scheduler see, so a release that fails cannot hide a model failure.
+ */
+export const throwAfterCleanup = async (cleanup: () => Promise<unknown>, error: unknown): Promise<never> => {
+    try {
+        await cleanup();
+    } catch {
+        // The cleanup's own failure is logged by nothing here on purpose: the original error is the one that matters.
+    }
+
+    throw error;
+};
+
+/** Tries `attempt` up to `times` times, stopping at the first success. `false` when every try failed. */
+export const tryTimes = async (times: number, attempt: () => Promise<unknown>): Promise<boolean> => {
+    for (let index = 0; index < times; index += 1) {
+        try {
+            await attempt();
+
+            return true;
+        } catch {
+            // Try again: a release is a single small write, and a transient failure of one is usually gone on the next.
+        }
+    }
+
+    return false;
+};
+
+/**
  * Generates a title from `prompt` and writes it onto the thread. An automatic title never replaces one
  * the owner set (`force` is false); only an explicit regenerate sets `force`, and it may replace any title.
  * `expectedTitleDigest` is the digest of the title the run read (a regenerate's click-time title): when the thread has another title by
@@ -1782,8 +1811,12 @@ const writeGeneratedTitle = async (
         )
         .catch(async (error: unknown) => {
             // The call threw before it answered: no title was generated, so the charge is given back and a retried run may ask again.
+            // A failed give-back does not replace the model error: that error is the one thrown.
             if (arguments_.chargeKey !== undefined && charge !== null) {
-                await releaseTitleCharge(context, arguments_.chargeKey, charge);
+                const key = arguments_.chargeKey;
+                const claimedAt = charge;
+
+                await throwAfterCleanup(() => releaseTitleCharge(context, key, claimedAt), error);
             }
 
             throw error;
@@ -2125,8 +2158,15 @@ export const regenerateThreadTitle = authAction
                 userId,
             });
         } catch (error) {
-            // The job did not start, so nothing will release the claim: give it back for the next request.
-            await context.runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: threadId, scope: REGENERATE_TITLE_SCOPE });
+            // The job did not start, so nothing will release the claim: give it back for the next request. A release that keeps failing
+            // is retried a few times; if it still fails the claim lapses after its short TTL, and the scheduling error is what is reported.
+            const released = await tryTimes(3, () =>
+                context.runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: threadId, scope: REGENERATE_TITLE_SCOPE }),
+            );
+
+            if (!released) {
+                context.log.event("chat.regenerate_title", { skipped: "release-failed" });
+            }
 
             throw error;
         }

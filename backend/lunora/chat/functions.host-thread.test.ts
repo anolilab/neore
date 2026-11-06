@@ -22,7 +22,9 @@ import {
     releaseTitleCharge,
     regenerateThreadTitle,
     titleIneligibility,
+    throwAfterCleanup,
     titleUsageEvent,
+    tryTimes,
 } from "./functions";
 
 const OWNER = "user-owner";
@@ -224,6 +226,45 @@ describe("the prompt a title is written from, and the charge for it", () => {
     }, 60_000);
 });
 
+describe("the error a title run reports, and the retries of its give-back", () => {
+    it("reports the model's error when the give-back after it fails too", async () => {
+        const modelError = new Error("gateway answered 503");
+
+        await expect(
+            throwAfterCleanup(async () => {
+                throw new Error("release failed");
+            }, modelError),
+        ).rejects.toBe(modelError);
+        await expect(throwAfterCleanup(async () => undefined, modelError)).rejects.toBe(modelError);
+    });
+
+    it("retries a release up to the limit, and says whether it landed", async () => {
+        let transient = 0;
+
+        await expect(
+            tryTimes(3, async () => {
+                transient += 1;
+
+                if (transient < 3) {
+                    throw new Error("transient");
+                }
+            }),
+        ).resolves.toBe(true);
+        expect(transient).toBe(3);
+
+        let down = 0;
+
+        await expect(
+            tryTimes(3, async () => {
+                down += 1;
+
+                throw new Error("down");
+            }),
+        ).resolves.toBe(false);
+        expect(down).toBe(3);
+    });
+});
+
 describe("continueThread", () => {
     it("refuses a prompt that is empty once the hidden characters are gone, before it touches the thread", async () => {
         await expect(
@@ -408,6 +449,21 @@ describe("regenerating the title of a cloud thread", () => {
             model: "model-a",
             outputTokens: 2,
             skipped: "changed-before-write",
+        });
+    });
+
+    it("titles from the path the thread shows when a writer left the stored leaf behind new rows", async () => {
+        const cloud = await insertThread({});
+        const reply = await appendMessage(cloud, undefined, { message: { content: "Hello", role: "assistant" } });
+        const prompt = await appendMessage(cloud, reply, { message: { content: "Plan a trip", role: "user" } });
+
+        await appendMessage(cloud, prompt, { message: { content: "Sure", role: "assistant" } });
+
+        // The stored leaf is the first reply; the thread shows the path that goes on from it, through the prompt.
+        await harness.run(async (context: any) => await context.db.patch("threads", cloud, { activeLeafMessageId: reply }));
+
+        await expect(harness.withIdentity({ userId: OWNER }).action(regenerateThreadTitle as never, { threadId: cloud } as never)).resolves.toEqual({
+            success: true,
         });
     });
 
