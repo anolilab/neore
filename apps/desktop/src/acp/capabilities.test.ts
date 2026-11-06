@@ -64,6 +64,21 @@ describe("withOptionCapabilities", () => {
         expect(capabilityOf(withOptionCapabilities(base, { configOptions: [effort] }), "identity.reasoningEffort")).toEqual({ degradation: "none", supported: true });
     });
 
+    it("reads the category of an option without regard to its case, so a model and a thought level named with capitals still count", () => {
+        const cased = [
+            { ...model, category: "Model" },
+            { ...effort, category: "Thought_Level" },
+        ];
+
+        expect(groups({ configOptions: cased }).identity?.models).toEqual([
+            { id: "fast", name: "Fast" },
+            { id: "deep", name: "Deep" },
+        ]);
+        const casedReport = withOptionCapabilities(base, { configOptions: cased });
+
+        expect(capabilityOf(casedReport, "identity.reasoningEffort")).toEqual({ degradation: "none", supported: true });
+    });
+
     it("does not report a mode option as a permission mode: the session's modes are not the runner's", () => {
         expect(groups({ configOptions: [mode] }).permissions?.modes ?? []).toEqual([]);
     });
