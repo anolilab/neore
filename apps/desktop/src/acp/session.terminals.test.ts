@@ -59,7 +59,7 @@ const answerTo = async (agent: MemoryAgent, id: number): Promise<Record<string, 
     return agent.written.find((frame) => frame.id === id && !("method" in frame)) ?? {};
 };
 
-const open = async (options: { folderIsRemote?: boolean; gate: PermissionGate; host: TerminalHost; observer?: SessionObserver }) => {
+const open = async (options: { cancelGraceMs?: number; folderIsRemote?: boolean; gate: PermissionGate; host: TerminalHost; observer?: SessionObserver }) => {
     const agent = memoryAgent();
     const session = new AgentSession({
         agentKey: "example",
@@ -70,6 +70,7 @@ const open = async (options: { folderIsRemote?: boolean; gate: PermissionGate; h
         onChange: () => {},
         process: agent.process,
         terminals: options.host,
+        ...options.cancelGraceMs !== undefined && { cancelGraceMs: options.cancelGraceMs },
         ...options.folderIsRemote === true && { folderIsRemote: true },
         ...options.observer !== undefined && { hostInfo: HOST_INFO, observer: options.observer },
     });
@@ -276,6 +277,44 @@ describe("a session's terminals", () => {
 
         await session.close();
         expect(host.release).toHaveBeenCalledWith(41);
+    });
+
+    it("does not end an agent that answered the cancel in time, while a killed command's result is still due", async () => {
+        const events: { kind: string; reason?: string }[] = [];
+        const observer: SessionObserver = {
+            permissionRequested: () => {},
+            permissionResolved: () => {},
+            sessionEnded: () => {
+                events.push({ kind: "sessionEnded" });
+            },
+            sessionOpened: () => {},
+            text: () => {},
+            thought: () => {},
+            tool: () => {},
+            turnEnded: (_session, _turn, reason) => {
+                events.push({ kind: "turnEnded", reason });
+            },
+            turnStarted: () => {},
+        };
+        const { finish, host } = fakeHost();
+        const { agent, session } = await open({ cancelGraceMs: 400, gate: allow([]), host, observer });
+        const first = await busy(agent, session);
+
+        create(agent, 5);
+        await answerTo(agent, 5);
+
+        session.cancel();
+        // The agent stops right away. The grace period runs on, while the killed command's exit is still to come.
+        agent.say({ id: first.id, result: { stopReason: "cancelled" } });
+        await new Promise((resolve) => {
+            setTimeout(() => {
+                resolve(undefined);
+            }, 1000);
+        });
+        finish({ exitCode: null, signal: "SIGKILL" });
+
+        await expect.poll(() => events.some((event) => event.kind === "turnEnded")).toBe(true);
+        expect(events).toEqual([{ kind: "turnEnded", reason: "cancelled" }]);
     });
 
     it("reports a cancelled command's exit before the cancelled turn ends", async () => {

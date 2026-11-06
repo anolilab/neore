@@ -748,6 +748,13 @@ export class AgentSession {
             const response = await this.connection.request(METHOD.prompt, promptParams(this.agentSessionId, turn.user));
             const reason = isRecord(response) ? response.stopReason : undefined;
 
+            // The agent answered, so a cancel's grace period is over: its timer must not end a stopped agent while the killed
+            // commands' results are awaited below.
+            if (this.current === turn) {
+                clearTimeout(this.cancelTimer);
+                this.cancelTimer = undefined;
+            }
+
             // A command the cancel killed may report how it ended only after the agent's answer. The turn is sealed once that
             // is recorded, or after a bounded wait, so the command's last output still reaches the turn.
             if (this.cancelRequested) {
