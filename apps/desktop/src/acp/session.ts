@@ -1095,11 +1095,12 @@ export class AgentSession {
 
         this.observe((observer) =>
             observer.permissionRequested(this.id, turn.id, {
-                // A command run on this computer is allowed only in its window: the web offers a decline alone.
-                complete: described.detailsComplete && request.localOnly !== true,
+                // Whole when the agent's details are. A command run on this computer is allowed only in its window, so the web is
+                // offered its decline alone: that is what the options say, not whether the request is whole.
+                complete: described.detailsComplete,
                 kind: "permission_request",
                 options: described.options
-                    .filter((option) => !option.kind.includes("always"))
+                    .filter((option) => !option.kind.includes("always") && !(request.localOnly === true && option.kind.startsWith("allow")))
                     .map((option) => {
                         return { ...option, kind: this.options.process.scrub(option.kind), optionId: this.options.process.scrub(option.optionId) };
                     }),

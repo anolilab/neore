@@ -279,6 +279,68 @@ describe("a session's terminals", () => {
         expect(host.release).toHaveBeenCalledWith(41);
     });
 
+    it("tells the web a command run here is whole, and offers it a decline alone", async () => {
+        const requested: unknown[] = [];
+        const observer: SessionObserver = {
+            permissionRequested: (_session, _turn, request) => {
+                requested.push(request);
+            },
+            permissionResolved: () => {},
+            sessionEnded: () => {},
+            sessionOpened: () => {},
+            text: () => {},
+            thought: () => {},
+            tool: () => {},
+            turnEnded: () => {},
+            turnStarted: () => {},
+        };
+        const { host } = fakeHost();
+        const { agent, session } = await open({ gate: allow([]), host, observer });
+
+        await busy(agent, session);
+        create(agent, 5);
+        await answerTo(agent, 5);
+
+        expect(requested).toEqual([expect.objectContaining({ complete: true, options: [expect.objectContaining({ kind: "reject_once" })] })]);
+    });
+
+    it("tells the web a request whose details were cut is incomplete", async () => {
+        const requested: unknown[] = [];
+        const observer: SessionObserver = {
+            permissionRequested: (_session, _turn, request) => {
+                requested.push(request);
+            },
+            permissionResolved: () => {},
+            sessionEnded: () => {},
+            sessionOpened: () => {},
+            text: () => {},
+            thought: () => {},
+            tool: () => {},
+            turnEnded: () => {},
+            turnStarted: () => {},
+        };
+        const { host } = fakeHost();
+        const { agent, session } = await open({ gate: allow([]), host, observer });
+
+        await busy(agent, session);
+
+        // Details past the most the core keeps: the request is cut, so it is not whole.
+        agent.say({
+            id: 9,
+            method: "session/request_permission",
+            params: {
+                options: [
+                    { kind: "allow_once", name: "Allow", optionId: "allow" },
+                    { kind: "reject_once", name: "Deny", optionId: "deny" },
+                ],
+                sessionId: "sess_1",
+                toolCall: { kind: "execute", rawInput: { command: "x".repeat(70_000) }, title: "Run", toolCallId: "call_9" },
+            },
+        });
+        await expect.poll(() => requested.length).toBe(1);
+        expect(requested[0]).toMatchObject({ complete: false });
+    });
+
     it("does not end an agent that answered the cancel in time, while a killed command's result is still due", async () => {
         const events: { kind: string; reason?: string }[] = [];
         const observer: SessionObserver = {
