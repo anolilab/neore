@@ -58,6 +58,8 @@ beforeAll(async () => {
     registerModule(registry, "chat_functions", await import("./functions"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
     registerModule(registry, "lib_claim_once", await import("../lib/claim-once"));
+    registerModule(registry, "agent_branches", await import("../agent/branches"));
+    registerModule(registry, "agent_messages", await import("../agent/messages"));
 }, 30_000);
 
 beforeEach(async () => {
@@ -108,10 +110,29 @@ describe("continueThread", () => {
 describe("regenerating the title of a cloud thread", () => {
     const GRANTEE = "user-grantee";
 
-    const cloudThread = async (fields: Record<string, unknown> = {}) =>
+    const insertThread = async (fields: Record<string, unknown> = {}) =>
         (await harness.run(
             async (context: any) => await context.db.insert("threads", { model: "gpt-4o", status: "active", title: "Shared", userId: OWNER, ...fields }),
         )) as string;
+
+    /** A cloud thread whose first message is a user prompt, so there is a prompt to title it from. */
+    const cloudThread = async (fields: Record<string, unknown> = {}) => {
+        const created = await insertThread(fields);
+
+        await harness.run(async (context: any) => {
+            await context.db.insert("messages", {
+                message: { content: "Plan a trip to Lisbon", role: "user" },
+                order: 0,
+                status: "success",
+                stepOrder: 0,
+                threadId: created,
+                tool: false,
+                userId: OWNER,
+            });
+        });
+
+        return created;
+    };
 
     /** The thread ids that hold a regenerate claim. */
     const regenerateClaimKeys = async (): Promise<string[]> => {
@@ -135,6 +156,15 @@ describe("regenerating the title of a cloud thread", () => {
         await expect(harness.withIdentity({ userId: OWNER }).action(regenerateThreadTitle as never, { threadId: cloud } as never)).resolves.toEqual({
             success: true,
         });
+    });
+
+    it("refuses a chat with no user prompt to title it from, and schedules nothing", async () => {
+        const empty = await insertThread();
+
+        await expect(harness.withIdentity({ userId: OWNER }).action(regenerateThreadTitle as never, { threadId: empty } as never)).rejects.toMatchObject({
+            code: "CONFLICT",
+        });
+        expect(await regenerateClaimKeys()).not.toContain(empty);
     });
 
     it("coalesces a request made while one is in flight: it succeeds, and holds no second claim", async () => {

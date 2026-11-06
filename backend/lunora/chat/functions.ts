@@ -1962,16 +1962,16 @@ export const regenerateThreadTitle = authAction
             throw new LunoraError("CONFLICT", "A locked chat keeps its title, so it cannot be regenerated.");
         }
 
-        // A path past the read's limit is not titled, so the request is refused here, where the owner can see why.
-        const pathIds = thread.activeLeafMessageId
-            ? await context.runQuery(internal.agent.branches.getActivePathIds, {
-                  leafMessageId: thread.activeLeafMessageId as Id<"messages">,
-                  threadId: threadId as Id<"threads">,
-              })
-            : null;
+        // Refused here, where the owner can see why: a path past the read's limit, or no user prompt to title the chat from. The job
+        // finds the same prompt again, so nothing is scheduled for a regenerate that would change nothing.
+        const branch = await activeBranchPrompt(context, threadId, thread.activeLeafMessageId);
 
-        if (pathIds === "too-long") {
+        if (branch.kind === "too-long") {
             throw new LunoraError("CONFLICT", "This chat is too long to retitle from its first prompt.");
+        }
+
+        if (!branch.text) {
+            throw new LunoraError("CONFLICT", "This chat has no user prompt to title it from.");
         }
 
         // One regenerate in flight per thread: a request that finds one running reads the same first prompt, so it is not a second model
