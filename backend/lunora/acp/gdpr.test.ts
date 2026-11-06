@@ -167,7 +167,7 @@ describe("the export of coding-agent sessions and events", () => {
             await ctx.db.delete("acpSessions", row._id);
         });
 
-        for (let cursor = first.next; cursor !== undefined; ) {
+        for (let cursor = first.next; cursor !== undefined;) {
             const page: Page = await collectPage(A, cursor);
 
             sessions.push(...page.sessions);
