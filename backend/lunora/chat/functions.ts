@@ -1675,21 +1675,35 @@ export const throwAfterCleanup = async (cleanup: () => Promise<unknown>, error: 
  * Runs a title's write after its model answer. A write that is refused, or that throws, gives the run's charge back (`giveBack`), so a
  * billed run never keeps its charge with no title. A thrown write's error is the one reported. Answers whether the title was written.
  */
-export const settleTitleWrite = async (write: () => Promise<boolean>, giveBack: () => Promise<void>): Promise<boolean> => {
-    let written: boolean;
+export const settleTitleWrite = async (
+    write: () => Promise<boolean>,
+    giveBack: () => Promise<void>,
+    attempts: number = TITLE_WRITE_ATTEMPTS,
+): Promise<boolean> => {
+    let lastError: unknown;
 
-    try {
-        written = await write();
-    } catch (error) {
-        return await throwAfterCleanup(giveBack, error);
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+        try {
+            const written = await write();
+
+            // A refusal is a decision, not a transient failure: it is not retried, and its charge is given back.
+            if (!written) {
+                await giveBack();
+            }
+
+            return written;
+        } catch (error) {
+            // A transient failure (the eligibility read or the write) is tried again while the charge is still held, so the answer is
+            // not billed a second time: the charge is given back only once every try has failed.
+            lastError = error;
+        }
     }
 
-    if (!written) {
-        await giveBack();
-    }
-
-    return written;
+    return await throwAfterCleanup(giveBack, lastError);
 };
+
+/** How many times a title's post-answer eligibility read and write are tried before its charge is given back. */
+const TITLE_WRITE_ATTEMPTS = 3;
 
 /** Tries `attempt` up to `times` times, stopping at the first success. `false` when every try failed. */
 export const tryTimes = async (times: number, attempt: () => Promise<unknown>): Promise<boolean> => {
@@ -1854,7 +1868,8 @@ const writeGeneratedTitle = async (
     // switched branch, or lost the requester's write access since. Each of those keeps the thread as it is.
     // The path is not re-read here: the write below checks the prompt on the active path in its own transaction, the authoritative check,
     // and a second whole-path read after the answer would be the large read the write avoids.
-    const afterModel = await titleIneligibility(context, { ...arguments_, expectedPromptId: undefined });
+    // The eligibility read is part of the attempt below, so a transient failure in it is retried with the write, not left holding the charge.
+    let afterModel: string | undefined;
 
     // The title the run read (a regenerate's click-time title, else the one read above). The write checks it, and the requester's
     // admin access, in the same transaction, so a rename or a revoked grant committed since is kept.
@@ -1873,21 +1888,23 @@ const writeGeneratedTitle = async (
         }
     };
 
-    const written = await settleTitleWrite(
-        async () =>
-            afterModel === undefined
-                ? await context.runMutation(internal.agent.threads.setGeneratedTitle, {
-                      expectedLeaf: arguments_.expectedLeaf,
-                      expectedPromptId: arguments_.expectedPromptId,
-                      expectedTitleDigest: arguments_.expectedTitleDigest ?? (await sha256Hex(metadata.title ?? "")),
-                      promptId: arguments_.promptId,
-                      requestedBy: arguments_.requestedBy,
-                      threadId: arguments_.threadId as Id<"threads">,
-                      title: textResult.text,
-                  })
-                : false,
-        giveBackCharge,
-    );
+    const written = await settleTitleWrite(async () => {
+        afterModel = await titleIneligibility(context, { ...arguments_, expectedPromptId: undefined });
+
+        if (afterModel !== undefined) {
+            return false;
+        }
+
+        return await context.runMutation(internal.agent.threads.setGeneratedTitle, {
+            expectedLeaf: arguments_.expectedLeaf,
+            expectedPromptId: arguments_.expectedPromptId,
+            expectedTitleDigest: arguments_.expectedTitleDigest ?? (await sha256Hex(metadata.title ?? "")),
+            promptId: arguments_.promptId,
+            requestedBy: arguments_.requestedBy,
+            threadId: arguments_.threadId as Id<"threads">,
+            title: textResult.text,
+        });
+    }, giveBackCharge);
 
     // The model was billed whether or not the title was written: one event carries its usage, with the reason when it was not written.
     const skipped = written ? undefined : skippedReason(afterModel);

@@ -284,6 +284,51 @@ describe("a charged title run whose write does not land", () => {
         await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toEqual(expect.any(Number));
     });
 
+    it("retries a transient failure of the post-answer check and write while holding the charge, and lands the title", async () => {
+        let tries = 0;
+        let gaveBack = false;
+
+        await expect(
+            settleTitleWrite(
+                async () => {
+                    tries += 1;
+
+                    if (tries < 3) {
+                        throw new Error("transient");
+                    }
+
+                    return true;
+                },
+                async () => {
+                    gaveBack = true;
+                },
+            ),
+        ).resolves.toBe(true);
+        expect(tries).toBe(3);
+        expect(gaveBack).toBe(false);
+    });
+
+    it("gives the charge back only after every try has failed, and reports the last error", async () => {
+        let tries = 0;
+        let gaveBack = 0;
+        const lastError = new Error("storage down");
+
+        await expect(
+            settleTitleWrite(
+                async () => {
+                    tries += 1;
+
+                    throw tries === 3 ? lastError : new Error("transient");
+                },
+                async () => {
+                    gaveBack += 1;
+                },
+            ),
+        ).rejects.toBe(lastError);
+        expect(tries).toBe(3);
+        expect(gaveBack).toBe(1);
+    });
+
     it("keeps its charge when the title is written, so a retry after the write is refused", async () => {
         const key = "thread-w:run-written";
 
