@@ -19,6 +19,7 @@ import {
     admitTitleCharge,
     promptById,
     refusedBeforeDispatch,
+    releaseTitleCharge,
     regenerateThreadTitle,
     titleIneligibility,
     titleUsageEvent,
@@ -173,8 +174,32 @@ describe("the prompt a title is written from, and the charge for it", () => {
     it("admits a title's model call once per key, so a retried run that reaches the call again is refused", async () => {
         const key = "thread-x:run-1";
 
-        await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toBe(true);
-        await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toBe(false);
+        await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toEqual(expect.any(Number));
+        await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toBeNull();
+    });
+
+    it("gives a charge back when its call threw before answering, so a retry may ask, and a stale give-back takes nothing", async () => {
+        // Fake time, so the admissions below cannot share a timestamp and the fence means what it says.
+        vi.useFakeTimers({ now: 1_800_000_000_000, toFake: ["Date"] });
+
+        try {
+            const key = "thread-y:run-2";
+            const first = (await harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))) as number;
+
+            vi.setSystemTime(1_800_000_001_000);
+            await harness.run(async (context: any) => await releaseTitleCharge(context, key, first));
+
+            vi.setSystemTime(1_800_000_002_000);
+            const retried = (await harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))) as number;
+
+            expect(retried).toBeGreaterThan(first);
+
+            // The first call's fence is stale: giving it back again does not drop the retried run's claim.
+            await harness.run(async (context: any) => await releaseTitleCharge(context, key, first));
+            await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toBeNull();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("refuses a chat whose path is past the limit with a visible conflict, before it claims the regenerate", async () => {

@@ -402,6 +402,12 @@ export const releaseKey = internalMutation
     });
 
 /**
+ * The `ttlMs` that makes {@link holdClaim} keep a claim for `runMs` counted from `now`. `holdClaim` counts from the claim's `claimedAt`,
+ * which is earlier for a job that started late, so the time since the claim is added: the hold then runs from the start of the job.
+ */
+export const holdTtlFrom = (claimedAt: number, runMs: number, now: number = Date.now()): number => runMs + Math.max(0, now - claimedAt);
+
+/**
  * {@link holdClaim} for a caller outside a transaction. `true` while the claim `claimedAt` still holds the key (it was stretched
  * to `ttlMs`); `false` when another claim has taken the key, which the caller must then leave alone.
  */

@@ -87,6 +87,7 @@ import { TEXT_TO_VIDEO_PROVIDERS } from "./lib/video-providers";
 import { gatewayFetch, NO_SERVICE_FETCH } from "../lib/services";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
 import getAgent from "./lib/get-agent";
+import { holdTtlFrom } from "../lib/claim-once";
 import { sha256Hex } from "../lib/crypto";
 import { firstUserPrompt } from "./lib/first-user-prompt";
 import { getMessageFileIds, loadNsfwStatuses, redactUIMessagesForPublicViewer } from "./lib/public-thread";
@@ -1644,11 +1645,17 @@ const TITLE_CHARGE_SCOPE = "title-charge";
 const TITLE_CHARGE_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Admits one title model call for `chargeKey`: `true` the first time, `false` for every later admission of the same key within the
- * TTL. The claim is not released: a retried run that reaches this again is refused, so its model call is not billed twice.
+ * Admits one title model call for `chargeKey`: the claim's `claimedAt` the first time, `null` for every later admission of the same
+ * key within the TTL. The claim is kept once the model has answered: a retried run that reaches this again is refused, so its model
+ * call is not billed twice. It is given back only when the call threw before answering (`releaseTitleCharge`).
  */
-export const admitTitleCharge = async (context: Pick<ActionContext, "runMutation">, chargeKey: string, userId: string | undefined): Promise<boolean> =>
-    await context.runMutation(internal.lib.claim_once.claimKey, { key: chargeKey, scope: TITLE_CHARGE_SCOPE, ttlMs: TITLE_CHARGE_TTL_MS, userId });
+export const admitTitleCharge = async (context: Pick<ActionContext, "runMutation">, chargeKey: string, userId: string | undefined): Promise<number | null> =>
+    await context.runMutation(internal.lib.claim_once.claimKeyFenced, { key: chargeKey, scope: TITLE_CHARGE_SCOPE, ttlMs: TITLE_CHARGE_TTL_MS, userId });
+
+/** Gives a charge back when its call threw before answering, so a later run for the same key may ask again. Fenced by `claimedAt`. */
+export const releaseTitleCharge = async (context: Pick<ActionContext, "runMutation">, chargeKey: string, claimedAt: number): Promise<void> => {
+    await context.runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: chargeKey, scope: TITLE_CHARGE_SCOPE });
+};
 
 /**
  * Generates a title from `prompt` and writes it onto the thread. An automatic title never replaces one
@@ -1744,11 +1751,13 @@ const writeGeneratedTitle = async (
     }
 
     // A model call is billed per call, and the scheduler retries a failed run. A run admitted once is not admitted again, so a retry
-    // after the call does not bill it twice. Taken just before the call, so a failure before it leaves the run retryable.
-    if (arguments_.chargeKey !== undefined) {
-        const admitted = await admitTitleCharge(context, arguments_.chargeKey, userId);
+    // after the answer does not bill it twice. A call that throws before answering gives its charge back (below), so a retry can ask.
+    let charge: number | null = null;
 
-        if (!admitted) {
+    if (arguments_.chargeKey !== undefined) {
+        charge = await admitTitleCharge(context, arguments_.chargeKey, userId);
+
+        if (charge === null) {
             context.log.event("chat.thread_title", { skipped: "already-charged" });
 
             return;
@@ -1757,18 +1766,27 @@ const writeGeneratedTitle = async (
 
     // Pass timezone/location/language to getThreadTitlePrompt for context (date/time formatting, language)
     const threadTitlePrompt = getThreadTitlePrompt(timezone, location, language, titleInstructions);
-    const textResult = await thread.generateText(
-        {
-            prompt: `${threadTitlePrompt}\nHere is the user's prompt:\n"${arguments_.prompt}"\nGenerate a title that accurately represents what this conversation is about based on the prompt provided.`,
-        },
-        {
-            // A regenerate sends the prompt alone: the thread's other messages are not the title's content.
-            ...(arguments_.stateless && { contextOptions: { recentMessages: 0 } }),
-            storageOptions: {
-                saveMessages: "none",
+    const textResult = await thread
+        .generateText(
+            {
+                prompt: `${threadTitlePrompt}\nHere is the user's prompt:\n"${arguments_.prompt}"\nGenerate a title that accurately represents what this conversation is about based on the prompt provided.`,
             },
-        },
-    );
+            {
+                // A regenerate sends the prompt alone: the thread's other messages are not the title's content.
+                ...(arguments_.stateless && { contextOptions: { recentMessages: 0 } }),
+                storageOptions: {
+                    saveMessages: "none",
+                },
+            },
+        )
+        .catch(async (error: unknown) => {
+            // The call threw before it answered: no title was generated, so the charge is given back and a retried run may ask again.
+            if (arguments_.chargeKey !== undefined && charge !== null) {
+                await releaseTitleCharge(context, arguments_.chargeKey, charge);
+            }
+
+            throw error;
+        });
 
     // The model answered after the checks above: the thread may have been locked, deleted, become host-run, been renamed,
     // switched branch, or lost the requester's write access since. Each of those keeps the thread as it is.
@@ -1994,7 +2012,8 @@ export const regenerateTitleChat = internalAction
                 claimedAt: arguments_.claimedAt,
                 key: arguments_.threadId,
                 scope: REGENERATE_TITLE_SCOPE,
-                ttlMs: REGENERATE_TITLE_RUN_TTL_MS,
+                // Counted from this start, not from the request: a job that starts after the claim lapsed still holds for a full run.
+                ttlMs: holdTtlFrom(arguments_.claimedAt, REGENERATE_TITLE_RUN_TTL_MS),
                 userId: arguments_.userId,
             });
 
