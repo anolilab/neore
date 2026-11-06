@@ -323,7 +323,9 @@ describe("the agent's slash commands", () => {
         { description: "Resume a session", name: "resume" },
     ];
     const withCommands = () => session({ agentLabel: "Example agent", agentState: { availableCommands: COMMANDS } });
+    // The draft is typed in the focused box: the menu opens only while the box has focus.
     const typeInto = (box: HTMLTextAreaElement, value: string) => {
+        fireEvent.focus(box);
         fireEvent.change(box, { target: { selectionStart: value.length, value } });
     };
 
@@ -496,6 +498,22 @@ describe("the agent's slash commands", () => {
 
         await waitFor(() => expect(box.selectionStart).toBe(8));
         expect(box.value).toBe("/review and");
+    });
+
+    it("closes the menu when the draft loses focus, and opens it again when the box is focused", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+        expect(await screen.findByRole("listbox")).toBeTruthy();
+
+        // Clicking the thread or another control takes the focus: the list must not stay drawn over the composer.
+        fireEvent.blur(box);
+        expect(screen.queryByRole("listbox")).toBeNull();
+
+        fireEvent.focus(box);
+        expect(await screen.findByRole("listbox")).toBeTruthy();
     });
 
     it("closes on Escape and reopens when the text changes", async () => {

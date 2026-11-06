@@ -95,6 +95,8 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const [activeIndex, setActiveIndex] = useState(0);
     // The text an Escape closed the menu for: any edit reopens it.
     const [closedFor, setClosedFor] = useState<{ start: number; text: string } | undefined>(undefined);
+    // The menu belongs to the draft being typed in: leaving the box closes it, as Escape does.
+    const [focused, setFocused] = useState(false);
     const box = useRef<HTMLTextAreaElement>(null);
     const pendingCursor = useRef<number | undefined>(undefined);
     const list = useRef<HTMLUListElement>(null);
@@ -149,7 +151,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
             ? []
             : matchingCommands(commands, slash.query);
     // A session that has ended disables the input, so its menu must not stay open over a control nobody can use.
-    const menuOpen = !blocked && slash !== null && choices.length > 0;
+    const menuOpen = !blocked && focused && slash !== null && choices.length > 0;
     const active = Math.min(activeIndex, Math.max(choices.length - 1, 0));
     const agentLabel = session?.agentLabel ?? t`Agent`;
 
@@ -344,6 +346,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                         className="bg-background min-h-11 w-full resize-none rounded-lg border px-3 py-2 text-sm disabled:opacity-60"
                         disabled={blocked}
                         maxLength={MAX_HOST_PROMPT_CHARS}
+                        onBlur={() => setFocused(false)}
                         onChange={(event) => {
                             setText(event.target.value);
                             // Any edit reopens the menu: a dismissal holds for the text it was made on, and only until the next edit.
@@ -352,6 +355,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                             setActiveIndex(0);
                         }}
                         onClick={(event) => setCursor(caretOf(event.currentTarget))}
+                        onFocus={() => setFocused(true)}
                         onKeyDown={onKeyDown}
                         onKeyUp={(event) => setCursor(caretOf(event.currentTarget))}
                         placeholder={t`Message the agent on your computer`}
