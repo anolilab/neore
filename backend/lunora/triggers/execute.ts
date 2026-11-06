@@ -8,6 +8,7 @@
 import { v } from "lunorash/server";
 
 import { parseCustomModelId } from "@neore/ai/models";
+import { stripHiddenText } from "@neore/ai/utils";
 
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
@@ -28,6 +29,16 @@ const ADMISSION_RETRY_DELAYS_MS = [100, 400];
 
 /** The most of a run's prompt the run log keeps; the run itself gets the whole prompt. */
 const MAX_LOGGED_PROMPT_LENGTH = 2000;
+
+/** The first `max` UTF-16 units, without a surrogate pair cut in two: a lone high surrogate at the end is dropped. */
+/** A high surrogate at the end of a string: the first half of a pair that a cut would split. */
+const TRAILING_HIGH_SURROGATE = /[\uD800-\uDBFF]$/u;
+
+export const cutOnCodePoint = (text: string, max: number): string => {
+    const cut = text.slice(0, max);
+
+    return TRAILING_HIGH_SURROGATE.test(cut) ? cut.slice(0, -1) : cut;
+};
 
 const RELEASE_DEFERRED_NOTE = "Giving this delivery back failed; a retry is scheduled, and a redelivery is refused as a duplicate until it succeeds.";
 
@@ -326,7 +337,12 @@ export const executeTrigger = internalAction
                 inputMessage = sanitizedPayload || "Trigger activated.";
             }
 
-            loggedPrompt = inputMessage.slice(0, MAX_LOGGED_PROMPT_LENGTH);
+            // The log keeps what the agent is given: the same hidden-character strip the headless run applies, with the same
+            // refusal (hidden characters removed and nothing left). A refused prompt never reaches the agent, so it logs nothing.
+            const agentInput = stripHiddenText(inputMessage);
+            const refused = agentInput.removed > 0 && agentInput.text.trim() === "";
+
+            loggedPrompt = refused ? undefined : cutOnCodePoint(agentInput.text, MAX_LOGGED_PROMPT_LENGTH);
 
             // 4. Run the agent in a new thread (auto-continue: up to 25 steps)
             // A scheduled bot routine may use the bot's shell and file tools, and only those.

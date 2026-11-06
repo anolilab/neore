@@ -2,14 +2,13 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-import * as lunora_usage_backfill_215 from "../../usage/backfill.js";
+import * as lunora_triggers_gdpr_212 from "../../triggers/gdpr.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_usage_backfill_215.runUsageBackfillStep.args, (source) => {
+installCompiledValidatorMap(lunora_triggers_gdpr_212.collectTriggersForExport.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["runId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
-return { "runId": source["runId"], "userId": source["userId"] };
+return { "userId": source["userId"] };
 });
-export * from "../../usage/backfill.js";
+export * from "../../triggers/gdpr.js";

@@ -102,6 +102,10 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             "collect-evals",
             async () => await context.run(internal.evals.gdpr.collectEvalsForExport, { userId }, { dedupId: stepDedupId(scope, "collect-evals") }),
         );
+        const triggers = await context.step.do(
+            "collect-triggers",
+            async () => await context.run(internal.triggers.gdpr.collectTriggersForExport, { userId }, { dedupId: stepDedupId(scope, "collect-triggers") }),
+        );
         // A page per step, so no checkpoint outgrows the log's size limit however many drafts there are. The first
         // step keeps the old name: an in-flight run's recorded result has no cursor and reads as the only page.
         const reviewDrafts = await collectAllReviewDrafts(async (cursor, page) => {
@@ -240,6 +244,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                             settings,
                             tasks,
                             threadTags,
+                            triggers,
                             userEmail,
                             userId,
                             watchedRepositories,

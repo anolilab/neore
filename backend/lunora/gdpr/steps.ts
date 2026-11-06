@@ -515,6 +515,9 @@ export const generateExportFile = internalAction
         // Optional so an export workflow already in flight when this shipped
         // still replays against the new signature.
         threadTags: v.optional(v.any()),
+        // Triggers with their settings and their newest runs, with the prompts those runs were given (`triggers/gdpr.ts`).
+        // Optional for the same in-flight-replay reason as `threadTags`.
+        triggers: v.optional(v.any()),
         userEmail: v.string(),
         userId: v.string(),
         // The user's watched repositories (`source-control/gdpr.ts`). Optional for the same in-flight-replay reason.
@@ -555,6 +558,7 @@ export const generateExportFile = internalAction
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadTags: args.threadTags ?? [],
+            triggers: args.triggers ?? { triggers: [] },
             usageDaily: activity?.usageDaily ?? [],
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };

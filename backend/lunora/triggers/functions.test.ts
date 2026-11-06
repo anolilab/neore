@@ -18,6 +18,7 @@ import {
     deleteTrigger,
     getTriggerExecutions,
     getTriggers,
+    pruneExpiredRunPrompts,
     releaseQuietWindow,
     reserveQuietWindow,
     setTriggerEnabled,
@@ -26,6 +27,7 @@ import {
     updateTrigger,
     updateTriggerStats,
 } from "./functions";
+import { collectTriggersForExport } from "./gdpr";
 import { MAX_ACTIVE_EVENT_WATCHERS } from "./event-sources/types";
 import { compileWebhookPreset } from "./presets";
 import { findNextCronTime } from "./schedule";
@@ -1086,6 +1088,46 @@ describe("getTriggerExecutions", () => {
         for (const limit of [0, 101, -1, 1.5, NaN, Infinity]) {
             await expect(as().query(getTriggerExecutions as never, { limit, triggerId } as never)).rejects.toThrow();
         }
+    });
+});
+
+describe("run prompts", () => {
+    const as = () => harness.withIdentity({ userId: "user-a" } as never);
+
+    it("clears a saved prompt once its expiry has passed, and keeps the run itself", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+        const [expired, active] = await harness.run(async (ctx: any) => [
+            await ctx.db.insert("triggerExecutions", { prompt: "old", promptExpiresAt: Date.now() - 1, startedAt: 1, status: "completed", triggerId }),
+            await ctx.db.insert("triggerExecutions", { prompt: "new", promptExpiresAt: Date.now() + 60_000, startedAt: 2, status: "completed", triggerId }),
+        ]);
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(pruneExpiredRunPrompts, {}));
+
+        const [cleared, kept] = await harness.run(async (ctx: any) => [
+            await ctx.db.get("triggerExecutions", expired),
+            await ctx.db.get("triggerExecutions", active),
+        ]);
+
+        expect(cleared).toMatchObject({ status: "completed" });
+        expect(cleared?.prompt).toBeUndefined();
+        expect(kept?.prompt).toBe("new");
+    });
+
+    it("exports a trigger with the prompt its settled run was given, and never its webhook secret", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+
+        await harness.run(
+            async (ctx: any) => await ctx.db.insert("triggerExecutions", { prompt: "Summarise the issue", startedAt: 5, status: "completed", triggerId }),
+        );
+
+        const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(collectTriggersForExport, { userId: "user-a" }))) as {
+            triggers: { name: string; runs: { prompt: string | null }[] }[];
+        };
+        const [trigger] = exported.triggers;
+
+        expect(trigger?.name).toBe("Hook");
+        expect(trigger?.runs[0]?.prompt).toBe("Summarise the issue");
+        expect(trigger).not.toHaveProperty("webhookSecret");
     });
 });
 

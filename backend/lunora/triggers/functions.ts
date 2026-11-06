@@ -1382,6 +1382,32 @@ const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, s
  * redelivered call finds it already settled. `userFixable` marks a failure only the owner
  * can cure; any other failure leaves the streak where it was.
  */
+/** How long a run keeps its saved prompt after it settles. The run row, its status and its thread stay; only the prompt text goes. */
+export const RUN_PROMPT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** The most prompts one housekeeping pass clears; a larger backlog is worked off over later passes. */
+const PRUNE_RUN_PROMPTS_BATCH = 200;
+
+/**
+ * Housekeeping sweep (`shardSweeps()`): clears the saved prompt of each run past its expiry. The index holds only the
+ * rows that still carry a prompt, so a pass never rescans rows it already cleared.
+ */
+export const pruneExpiredRunPrompts = internalMutation
+    .input({})
+    .output(v.null())
+    .mutation(async ({ ctx }) => {
+        const expired = await ctx.db
+            .query("triggerExecutions")
+            .withIndex("by_promptExpiresAt", (q) => q.lt("promptExpiresAt", ctx.now))
+            .take(PRUNE_RUN_PROMPTS_BATCH);
+
+        for (const row of expired) {
+            await patchRow(ctx.db, "triggerExecutions", row, { prompt: undefined, promptExpiresAt: undefined });
+        }
+
+        return null;
+    });
+
 export const updateExecution = internalMutation
     .input({
         error: v.optional(v.string()),
@@ -1409,7 +1435,7 @@ export const updateExecution = internalMutation
                 status,
                 ...(threadId && { threadId }),
                 ...(error && { error }),
-                ...(prompt !== undefined && { prompt }),
+                ...(prompt !== undefined && { prompt, promptExpiresAt: ctx.now + RUN_PROMPT_RETENTION_MS }),
                 completedAt: ctx.now,
             });
         }

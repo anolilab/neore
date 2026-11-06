@@ -26729,6 +26729,12 @@
           "optional": true,
           "unique": false
         },
+        "promptExpiresAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "startedAt": {
           "kind": "number",
           "nullable": false,
@@ -26786,6 +26792,12 @@
         }
       },
       "indexes": {
+        "by_promptExpiresAt": {
+          "fields": [
+            "promptExpiresAt"
+          ],
+          "unique": false
+        },
         "by_triggerId_startedAt": {
           "fields": [
             "triggerId",
