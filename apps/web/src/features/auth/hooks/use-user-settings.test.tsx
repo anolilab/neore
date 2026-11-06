@@ -368,21 +368,54 @@ describe("useUpdateUserSettings.updateLatest with failFast", () => {
         await flush();
     });
 
-    it("sends the write at once while offline, instead of pausing it until the connection returns", async () => {
-        const { result } = setup();
+    it("fails at once while offline, sending nothing and keeping the value it had", async () => {
+        const { queryClient, result } = setup();
 
         onlineManager.setOnline(false);
+
+        let outcome: Promise<void> | undefined;
+
         act(() => {
-            void result.current.updateLatest(
+            outcome = result.current.updateLatest(
                 () => {
                     return { threadTitleInstructions: "Short titles" };
                 },
                 { failFast: true },
             );
         });
+
+        await expect(outcome).rejects.toThrow("no connection");
+        expect(harness.sent).toHaveLength(0);
+        expect(queryClient.getQueryData(QUERY_KEY)).toEqual({ threadTitleInstructions: "" });
+    });
+
+    it("fails when the connection drops while it waits behind an earlier save, instead of waiting for the connection", async () => {
+        const { queryClient, result } = setup();
+
+        let outcome: Promise<void> | undefined;
+
+        act(() => {
+            void result.current.updateLatest(() => {
+                return { threadTitleInstructions: "First" };
+            });
+            outcome = result.current.updateLatest(
+                () => {
+                    return { threadTitleInstructions: "Second" };
+                },
+                { failFast: true },
+            );
+        });
         await flush();
 
-        expect(harness.sent.map((request) => request.value)).toEqual(["Short titles"]);
+        // The earlier save is out and pauses; the connection drops.
+        act(() => {
+            onlineManager.setOnline(false);
+        });
+
+        await expect(outcome).rejects.toThrow("no connection");
+        // Only the earlier save was sent, and the cache shows its value again, not the unsaved one.
+        expect(harness.sent).toHaveLength(1);
+        expect(queryClient.getQueryData(QUERY_KEY)).toEqual({ threadTitleInstructions: "First" });
     });
 
     it("waits its turn behind a save already in flight, so two writes never run at once", async () => {
