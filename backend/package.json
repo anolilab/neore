@@ -132,11 +132,13 @@
         ],
         "services": {
             "services": [
+                "ADVISOR_COMPANION",
                 "SERVICE_BROWSER_RENDERER",
                 "SERVICE_DOCUMENT_PARSER",
                 "SERVICE_NSFW_CHECKER"
             ],
             "env.preview.services": [
+                "ADVISOR_COMPANION",
                 "SERVICE_BROWSER_RENDERER",
                 "SERVICE_DOCUMENT_PARSER",
                 "SERVICE_LLM_GATEWAY",

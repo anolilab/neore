@@ -474,7 +474,7 @@ export const reserveGatewayCredits = internalMutation
             .first();
 
         if (!reservation) {
-            throw new Error("Reservation row missing after deduction");
+            throw new LunoraError("INTERNAL", "Reservation row missing after deduction");
         }
 
         // The lease is taken in the same mutation as the deduction, so a run evicted in between leaves neither half. Its lapse names

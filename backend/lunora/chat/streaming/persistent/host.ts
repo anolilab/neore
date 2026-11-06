@@ -86,6 +86,11 @@ export const updateHostStream = async (
 /** The latest a host stream may expire: no window moves it past `HOST_TURN_MAX_MS` from its creation. */
 const hardDeadlineOf = (stream: Pick<Stream, "_creationTime">): number => stream._creationTime + HOST_TURN_MAX_MS;
 
+/** Records that an ended host turn was cut off rather than gone quiet, so Continue is offered (acp-agent-host.md §4.5). */
+export const markHostStreamInterrupted = async (ctx: Pick<MutationCtx, "db">, streamId: Id<"persistentStreams">): Promise<void> => {
+    await ctx.db.patch("persistentStreams", streamId, { hostEndReason: "interrupted" });
+};
+
 export const extendHostStream = async (ctx: Pick<MutationCtx, "db">, stream: Stream, now: number): Promise<void> => {
     await ctx.db.patch("persistentStreams", stream._id, { expiresAt: Math.min(now + HOST_STREAM_IDLE_MS, hardDeadlineOf(stream)) });
 };

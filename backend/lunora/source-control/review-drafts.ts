@@ -200,7 +200,13 @@ export const saveDraftComment = authMutation
         startLine: v.union(v.number(), v.null()),
     })
     .output(v.from(vEdit))
-    .mutation(async ({ args, ctx }) => await saveDraftCommentFor(ctx, ctx.user.userId, args));
+    .mutation(async ({ args, ctx }) => {
+        const result = await saveDraftCommentFor(ctx, ctx.user.userId, args);
+
+        ctx.log.event("source_control.save_draft_comment", { edited: args.commentId !== undefined, multiLine: args.startLine !== null, status: result.status });
+
+        return result;
+    });
 
 export const deleteDraftComment = authMutation
     .use(rateLimit("sourceControl/draft"))
@@ -221,14 +227,15 @@ export const deleteDraftComment = authMutation
         }
 
         const comments = draft.comments.filter((comment) => comment.id !== args.commentId);
+        const draftCleared = isEmpty({ ...draft, comments });
 
-        if (isEmpty({ ...draft, comments })) {
+        if (draftCleared) {
             await ctx.db.delete("reviewDrafts", draft._id);
-
-            return { commentId: null, revision: draft.revision + 1, status: "ok" as const };
+        } else {
+            await ctx.db.patch("reviewDrafts", draft._id, { comments, revision: draft.revision + 1, updatedAt: now });
         }
 
-        await ctx.db.patch("reviewDrafts", draft._id, { comments, revision: draft.revision + 1, updatedAt: now });
+        ctx.log.event("source_control.delete_draft_comment", { draftCleared, remainingComments: comments.length });
 
         return { commentId: null, revision: draft.revision + 1, status: "ok" as const };
     });
@@ -264,6 +271,8 @@ export const setDraftReview = authMutation
 
         if (draft === null) {
             if (isEmpty({ body: args.body, comments: [], verdict: args.verdict })) {
+                ctx.log.event("source_control.set_draft_review", { outcome: "unchanged", verdict: args.verdict });
+
                 return { commentId: null, revision: 0, status: "ok" as const };
             }
 
@@ -282,11 +291,15 @@ export const setDraftReview = authMutation
                 verdict: args.verdict,
             });
 
+            ctx.log.event("source_control.set_draft_review", { outcome: "created", verdict: args.verdict });
+
             return { commentId: null, revision: 1, status: "ok" as const };
         }
 
         if (isEmpty({ body: args.body, comments: draft.comments, verdict: args.verdict })) {
             await ctx.db.delete("reviewDrafts", draft._id);
+
+            ctx.log.event("source_control.set_draft_review", { outcome: "cleared", verdict: args.verdict });
 
             return { commentId: null, revision: draft.revision + 1, status: "ok" as const };
         }
@@ -301,6 +314,8 @@ export const setDraftReview = authMutation
             updatedAt: now,
             verdict: args.verdict,
         });
+
+        ctx.log.event("source_control.set_draft_review", { headMoved: commitId === "head_moved", outcome: "updated", verdict: args.verdict });
 
         return { commentId: null, revision: draft.revision + 1, status: "ok" as const };
     });
@@ -322,6 +337,8 @@ export const discardReviewDraft = authMutation
         if (draft !== null) {
             await ctx.db.delete("reviewDrafts", draft._id);
         }
+
+        ctx.log.event("source_control.discard_review_draft", { discarded: draft !== null });
 
         return { status: "ok" as const };
     });

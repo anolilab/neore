@@ -1,81 +1,9 @@
 import { consumeQueuedSend } from "@lunora/mail";
-import { LunoraError, v } from "lunorash/server";
+import { v } from "lunorash/server";
 import { createElement } from "react";
 
-import { internalAction, internalMutation } from "../_generated/server";
-import { ENVIRONMENT } from "../env";
-import { emailLogger } from "../lib/logger";
+import { internalAction } from "../_generated/server";
 import { mailer, queueEmail } from "./mailer";
-
-export const insertExpectation = internalMutation
-    .input({
-        email: v.string(),
-        expectation: v.union(v.literal("delivered"), v.literal("bounced"), v.literal("complained")),
-    })
-    .output(v.null())
-    .mutation(async ({ args: arguments_, ctx: context }) => {
-        await context.db.insert("emails", {
-            email: arguments_.email,
-            expectation: arguments_.expectation,
-        });
-
-        return null;
-    });
-
-export const handleEmailEvent = internalMutation
-    // Was `vOnEmailEventArgsFields`, exported by the Resend component. The component
-    // is gone, so the shape is declared here; `webhook.ts` is the only caller.
-    .input({
-        event: v.object({ type: v.string() }),
-        id: v.string(),
-    })
-    .output(v.null())
-    .mutation(async ({ args: arguments_, ctx: context }) => {
-        const emailId = arguments_.id as string;
-        const email = await context.db.emails.findUnique({ where: { email: emailId } });
-
-        if (!email) {
-            if (ENVIRONMENT === "development") {
-                emailLogger.debug("No test email found for id", emailId);
-            }
-
-            return null;
-        }
-
-        const eventType = arguments_.event.type;
-
-        if (eventType === "email.delivered") {
-            if (email.expectation === "bounced") {
-                throw new LunoraError("INTERNAL", "Email was delivered but expected to be bounced");
-            }
-
-            if (email.expectation === "complained") {
-                if (ENVIRONMENT === "development") {
-                    emailLogger.debug("Complained email was delivered, expecting complaint coming...");
-                }
-
-                return null;
-            }
-
-            await context.db.delete("emails", email._id);
-        }
-
-        if (eventType === "email.bounced") {
-            if (email.expectation !== "bounced") {
-                throw new LunoraError("INTERNAL", `Email was bounced but expected to be ${email.expectation}`);
-            }
-
-            await context.db.delete("emails", email._id);
-        } else if (eventType === "email.complained") {
-            if (email.expectation !== "complained") {
-                throw new LunoraError("INTERNAL", `Email was complained but expected to be ${email.expectation}`);
-            }
-
-            await context.db.delete("emails", email._id);
-        }
-
-        return null;
-    });
 
 /**
  * The queue half of `mailer().queue()` (`./mailer.ts`): sends one rendered

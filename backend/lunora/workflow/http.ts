@@ -38,6 +38,7 @@ import { imageRequestArgs, runVideoNode, systemPromptFor, type VideoRunContext }
 import { imageCountOf, type MediaCharge, withMediaCharge } from "./media-billing";
 import { executeTextNode } from "./mention-targets";
 import { buildExecutionContext, resolveRunAccount, workflowRunErrors } from "./run-setup";
+import { aiNodeModel, directModelRefusal, nodeMaxTokens, runsOnGatewayOnly, workflowModelRefusals } from "./executor";
 
 let _agentsPromise: Promise<Record<string, AgentConfig>> | undefined;
 
@@ -114,7 +115,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
 
     // Checked before any node runs, so a run that cannot finish never bills an earlier clip.
     const account = await resolveRunAccount(context, userId);
-    const inputErrors = workflowRunErrors(account, workflowContent);
+    const inputErrors = [...workflowRunErrors(account, workflowContent), ...(await workflowModelRefusals(context, userId, workflowContent.nodes))];
 
     if (inputErrors.length > 0) {
         return Response.json({ error: inputErrors.join("; ") }, { status: 400 });
@@ -224,7 +225,14 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
                         }
 
                         case "ai": {
-                            const result = await executeAINodeStreaming(node, executionContext, userProviderKeys ?? undefined, sendEvent, nodeId);
+                            const result = await executeAINodeStreaming(
+                                node,
+                                executionContext,
+                                { actionContext: context, orgId: account.orgId, userId },
+                                userProviderKeys ?? undefined,
+                                sendEvent,
+                                nodeId,
+                            );
 
                             output = result.output;
                             usage = result.usage;
@@ -535,6 +543,7 @@ const streamWorkflowHttpAction = async (context: HttpActionCtx, request: Request
 const executeAINodeStreaming = async (
     node: WorkflowNode,
     context: ExecutionContext,
+    run: { actionContext: HttpActionCtx; orgId?: string; userId: string },
     userProviderKeys: Record<string, string> | undefined,
     sendEvent: (event: StreamEvent) => Promise<void>,
     nodeId: string,
@@ -547,10 +556,42 @@ const executeAINodeStreaming = async (
     };
 
     const prompt = getLastOutputAsString(context);
-    const modelId = (data.model ?? "claude-sonnet-4-20250514") as string;
+
+    if (!prompt) {
+        throw new Error("No input provided to AI node");
+    }
+
+    const modelId = await aiNodeModel(run.actionContext, run.userId, data.model);
+    const maxTokens = nodeMaxTokens(data.maxTokens);
+
+    // A gateway-only model is reached through an action (this route has no gateway binding), so its text arrives whole.
+    if (runsOnGatewayOnly(modelId)) {
+        const result = await run.actionContext.runAction(internal.workflow.executor.generateWorkflowText, {
+            maxTokens,
+            modelId,
+            orgId: run.orgId,
+            prompt,
+            system: systemPromptFor(node, context),
+            temperature: data.temperature,
+            userId: run.userId,
+        });
+
+        await sendEvent({ nodeId, text: result.text, type: "text_chunk" });
+
+        return {
+            output: result.text,
+            usage: { completionTokens: result.outputTokens, promptTokens: result.inputTokens, totalTokens: result.inputTokens + result.outputTokens },
+        };
+    }
+
+    const refusal = await directModelRefusal(run.actionContext, run.userId, modelId);
+
+    if (refusal) {
+        throw new Error(refusal);
+    }
 
     const agents = await getAgents();
-    const agent = agents[modelId] ?? agents["claude-sonnet-4-20250514" as string];
+    const agent = agents[modelId];
     let languageModel = agent?.chat;
 
     if (userProviderKeys && Object.keys(userProviderKeys).length > 0) {
@@ -568,7 +609,7 @@ const executeAINodeStreaming = async (
 
     let fullText = "";
     const streamResult = streamTextAi({
-        maxOutputTokens: data.maxTokens,
+        maxOutputTokens: maxTokens,
         model: languageModel,
         prompt,
         system: systemPromptFor(node, context),

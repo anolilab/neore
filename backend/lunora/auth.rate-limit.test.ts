@@ -1,11 +1,13 @@
 /**
- * `AUTH_RATE_LIMIT_CUSTOM_RULES` exempts `/get-session` from better-auth's
- * per-IP limiter and nothing else. These drive better-auth's REAL limiter
+ * `AUTH_RATE_LIMIT_CUSTOM_RULES` exempts `/get-session` and `/sign-in-methods`
+ * from better-auth's per-IP limiter and nothing else. These drive better-auth's REAL limiter
  * (`onRequestRateLimit`, reached through `auth.handler`) with the options
  * `@lunora/auth` resolves from ours, so both halves are pinned against the code
  * that enforces them, not against a copy of its rules:
  *
  * - `get-session` never answers 429, however many reads one IP sends;
+ * - nor does `sign-in-methods`, which the `/sign-in` prefix rule would
+ *   otherwise hold to 3 per 10 s;
  * - `/sign-in/*` (anonymous sign-in included) still does after 3 in 10 s;
  * - `@lunora/auth`'s catch-all still limits every other path.
  *
@@ -93,6 +95,26 @@ describe("better-auth rate limit rules", () => {
         const result = await statuses(auth, 150, () => request("/get-session", ip));
 
         expect(result.indexOf(429)).toBe(100);
+    });
+
+    // Every chat page reads it to decide between guest chat and the signed-out chat. Under the `/sign-in` prefix rule
+    // the 4th read in 10 s from one IP answered 429, which the app reads as invite-only: guests turned away.
+    it("never answers sign-in-methods with 429", async () => {
+        const auth = buildLimitedAuth();
+        const ip = nextIp();
+
+        const result = await statuses(auth, 20, () => request("/sign-in-methods", ip));
+
+        expect(result.filter((status) => status === 429)).toHaveLength(0);
+    });
+
+    it("answers sign-in-methods with 429 after 3 reads when the override is absent", async () => {
+        const auth = buildLimitedAuth({});
+        const ip = nextIp();
+
+        const result = await statuses(auth, 5, () => request("/sign-in-methods", ip));
+
+        expect(result.indexOf(429)).toBe(3);
     });
 
     it("still limits anonymous sign-in to 3 per 10 s", async () => {

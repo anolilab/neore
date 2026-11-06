@@ -2,7 +2,7 @@
  * Multi-select state for "Forward messages".
  *
  * A store of its own, not a prop or a chat-context field: chat rows are
- * memoized on message identity (CLAUDE.md, "Chat rows are memoized on message
+ * memoized on message identity (`apps/web/AGENTS.md`, "Chat rows are memoized on message
  * IDENTITY"), so selection must never change a context every row reads. Each
  * row subscribes to ONE boolean — `selectIsSelected(id)` — and re-renders only
  * when that boolean flips; the bar subscribes to the count.

@@ -573,14 +573,6 @@ const DatenschutzPage: FC = () => (
                                 </p>
                             </div>
                             <div className="border-brand-silver rounded-md border p-4">
-                                <h3 className="text-brand-obsidian mb-1 font-medium">Resend (Plus Five Five, Inc.)</h3>
-                                <p className="text-sm">2261 Market Street, San Francisco, CA 94114, USA</p>
-                                <p className="mt-1 text-sm">
-                                    <strong>Zweck:</strong> Versand transaktionaler E-Mails (Registrierungsbestätigung, Einladungen, Passwortzurücksetzung),
-                                    soweit der Versand nicht über Cloudflare erfolgt.
-                                </p>
-                            </div>
-                            <div className="border-brand-silver rounded-md border p-4">
                                 <h3 className="text-brand-obsidian mb-1 font-medium">Werkzeug- und Datenanbieter</h3>
                                 <p className="text-sm">
                                     Exa, Tavily, Firecrawl, Parallel, Valyu (Websuche und Recherche), E2B (Ausführung von Programmcode), GitHub, Google Maps,
@@ -627,9 +619,6 @@ const DatenschutzPage: FC = () => (
                             <li>
                                 <strong>KI-Modellanbieter</strong> (OpenRouter, Groq, xAI, Google, OpenAI, Requesty, FAL.ai, Black Forest Labs, Replicate) –
                                 Standardvertragsklauseln (SCCs), soweit nicht unter dem EU-U.S. DPF zertifiziert
-                            </li>
-                            <li>
-                                <strong>Resend (Plus Five Five, Inc.)</strong> – Standardvertragsklauseln (SCCs)
                             </li>
                             <li>
                                 <strong>ElevenLabs</strong> – Standardvertragsklauseln (SCCs), soweit nicht unter dem EU-U.S. DPF zertifiziert

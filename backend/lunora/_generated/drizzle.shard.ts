@@ -309,6 +309,7 @@ export const documents = sqliteTable("documents", {
     by_messageId: index("by_messageId").on(t.messageId),
     by_userId: index("by_userId").on(t.userId),
     by_threadId_and_kind: index("by_threadId_and_kind").on(t.threadId, t.kind),
+    by_userId_and_kind: index("by_userId_and_kind").on(t.userId, t.kind),
 }));
 
 export const documentVersions = sqliteTable("documentVersions", {

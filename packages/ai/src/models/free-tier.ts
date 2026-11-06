@@ -6,6 +6,17 @@
  * Guests are pinned to `ANONYMOUS_FREE_MODEL` before this is consulted.
  */
 export const FREE_TIER_TEXT_MODELS: ReadonlySet<string> = new Set([
+    "cf-gemma-3-12b",
+    "cf-glm-4.7-flash",
+    "cf-gpt-oss-20b",
+    "cf-gpt-oss-120b",
+    "cf-granite-4.0-micro",
+    "cf-kimi-k2.5",
+    "cf-llama-3.3-70b",
+    "cf-llama-4-scout",
+    "cf-mistral-small-3.1",
+    "cf-nemotron-3-120b",
+    "cf-qwen3-30b-a3b",
     "deepseek/deepseek-chat-v3.1",
     "gemma3-8b:free",
     "google/gemini-2.0-flash-001",

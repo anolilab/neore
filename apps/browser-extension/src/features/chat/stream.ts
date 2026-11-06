@@ -3,7 +3,7 @@ import { parseStreamLine } from "@neore/chat-ui/utils/stream-line";
 
 /**
  * Client for the gateway's `/v1/stream` NDJSON relay (edge streaming, see
- * CLAUDE.md). Lines are parsed by `@neore/chat-ui/utils/stream-line`, the same
+ * `backend/lunora/chat/AGENTS.md`). Lines are parsed by `@neore/chat-ui/utils/stream-line`, the same
  * parser the web app uses.
  */
 

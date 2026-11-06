@@ -58,7 +58,7 @@ export default defineConfig({
     /**
      * One spec at a time. Every backend call lands on the single `__root__`
      * Durable Object and the local D1's first access costs ~1s per request
-     * (CLAUDE.md → Sharding and concurrency), so Playwright's default of half
+     * (`backend/AGENTS.md` → Sharding and concurrency), so Playwright's default of half
      * the cores — 6 browsers here — queued first paints behind each other for
      * 5-10s, pushed agent runs 30s behind their queue delivery, and the
      * resulting abandoned requests surfaced as bursts of "Network connection
