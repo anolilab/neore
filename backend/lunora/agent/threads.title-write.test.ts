@@ -234,3 +234,22 @@ describe("writing a title for a chat whose leaf moved during generation", () => 
         await expect(writeTitle(threadId, "Old", undefined, prompt, reply)).resolves.toBe(true);
     });
 });
+
+describe("writing a title from a prompt that was deleted", () => {
+    it("refuses the write once its prompt is gone, and keeps the title", async () => {
+        const threadId = await threadWith({ title: "Old" });
+        const promptId = await rowIn(threadId)(1, { message: { content: "Plan a trip", role: "user" } });
+
+        await harness.run(async (context: any) => await context.db.delete("messages", promptId));
+
+        const expectedTitleDigest = await sha256Hex("Old");
+
+        await expect(
+            harness.run(
+                async (context: any) =>
+                    await writeTitleIfUnchanged(context, { expectedTitleDigest, promptId, threadId: threadId as Id<"threads">, title: "Generated" }),
+            ),
+        ).resolves.toBe(false);
+        await expect(titleOf(threadId)).resolves.toBe("Old");
+    });
+});

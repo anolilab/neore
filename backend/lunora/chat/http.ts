@@ -813,8 +813,15 @@ const runChatStartOnShard = async (
                 // A fresh id per scheduled title job: its retries carry the same id (and so the same billing key), a later message's job does not.
                 const jobId = crypto.randomUUID();
 
+                // The prompt's id: the job refuses to title from a prompt deleted before it runs.
                 titleJobs.push(
-                    async () => await httpScheduler(context).runAfter(0, internal.chat.functions.createTitleChat, { jobId, prompt, threadId: titleThreadId }),
+                    async () =>
+                        await httpScheduler(context).runAfter(0, internal.chat.functions.createTitleChat, {
+                            jobId,
+                            prompt,
+                            promptId: messageId,
+                            threadId: titleThreadId,
+                        }),
                 );
             } else {
                 titleJobs.push(

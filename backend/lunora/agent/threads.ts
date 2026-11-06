@@ -298,7 +298,15 @@ export const updateThread = internalMutation
  */
 export const writeTitleIfUnchanged = async (
     ctx: Pick<MutationContext, "db">,
-    arguments_: { expectedLeaf?: string; expectedPromptId?: string; expectedTitleDigest: string; requestedBy?: string; threadId: Id<"threads">; title: string },
+    arguments_: {
+        expectedLeaf?: string;
+        expectedPromptId?: string;
+        expectedTitleDigest: string;
+        promptId?: string;
+        requestedBy?: string;
+        threadId: Id<"threads">;
+        title: string;
+    },
 ): Promise<boolean> => {
     const thread = await ctx.db.get("threads", arguments_.threadId);
 
@@ -308,6 +316,15 @@ export const writeTitleIfUnchanged = async (
 
     if ((await sha256Hex(thread.title ?? "")) !== arguments_.expectedTitleDigest) {
         return false;
+    }
+
+    // The prompt the title came from must still be a message of this thread: a deleted prompt is no title's source.
+    if (arguments_.promptId !== undefined) {
+        const prompt = await ctx.db.get("messages", arguments_.promptId as Id<"messages">);
+
+        if (!prompt || prompt.threadId !== arguments_.threadId) {
+            return false;
+        }
     }
 
     // An unbranched thread has no leaf: its rows are its path. A branched one must still run through the prompt at the time of the write.
@@ -344,6 +361,7 @@ export const setGeneratedTitle = internalMutation
         expectedLeaf: v.optional(v.string().max(MAX_LENGTH.id)),
         expectedPromptId: v.optional(v.string().max(MAX_LENGTH.id)),
         expectedTitleDigest: v.string().max(MAX_LENGTH.short),
+        promptId: v.optional(v.string().max(MAX_LENGTH.id)),
         requestedBy: v.optional(v.string()),
         threadId: v.id("threads"),
         title: v.string().max(MAX_LENGTH.long),

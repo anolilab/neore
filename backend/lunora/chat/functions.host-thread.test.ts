@@ -19,6 +19,7 @@ import {
     admitTitleCharge,
     autoTitleChargeKey,
     promptById,
+    promptGone,
     refusedBeforeDispatch,
     releaseTitleCharge,
     settleTitleWrite,
@@ -173,6 +174,18 @@ describe("the prompt a title is written from, and the charge for it", () => {
 
         await expect(harness.run(async (context: any) => await promptById(context, cloud, prompt))).resolves.toEqual({ id: prompt, text: "Plan a trip" });
         await expect(harness.run(async (context: any) => await promptById(context, cloud, reply))).resolves.toBeUndefined();
+    });
+
+    it("treats a prompt that was deleted as gone, and a prompt still in the thread as present", async () => {
+        const cloud = await insertCloud();
+        const prompt = await appendMessage(cloud, undefined, { message: { content: "Plan a trip", role: "user" } });
+
+        await expect(harness.run(async (context: any) => await promptGone(context, cloud, prompt))).resolves.toBe(false);
+
+        await harness.run(async (context: any) => await context.db.delete("messages", prompt));
+
+        await expect(harness.run(async (context: any) => await promptGone(context, cloud, prompt))).resolves.toBe(true);
+        await expect(harness.run(async (context: any) => await promptById(context, cloud, prompt))).resolves.toBeUndefined();
     });
 
     it("admits a title's model call once per key, so a retried run that reaches the call again is refused", async () => {

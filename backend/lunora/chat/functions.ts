@@ -1722,6 +1722,7 @@ const writeGeneratedTitle = async (
         expectedTitleDigest?: string;
         force: boolean;
         prompt: string;
+        promptId?: string;
         requestedBy?: string;
         stateless?: boolean;
         threadId: string;
@@ -1800,6 +1801,13 @@ const writeGeneratedTitle = async (
         return;
     }
 
+    // A prompt deleted since the job was scheduled is no title's source: refused before anything is charged.
+    if (arguments_.promptId !== undefined && (await promptGone(context, arguments_.threadId, arguments_.promptId))) {
+        context.log.event("chat.thread_title", { skipped: "prompt-deleted" });
+
+        return;
+    }
+
     // A model call is billed per call, and the scheduler retries a failed run. A run admitted once is not admitted again, so a retry
     // after the answer does not bill it twice. A call that throws before answering gives its charge back (below), so a retry can ask.
     let charge: number | null = null;
@@ -1872,6 +1880,7 @@ const writeGeneratedTitle = async (
                       expectedLeaf: arguments_.expectedLeaf,
                       expectedPromptId: arguments_.expectedPromptId,
                       expectedTitleDigest: arguments_.expectedTitleDigest ?? (await sha256Hex(metadata.title ?? "")),
+                      promptId: arguments_.promptId,
                       requestedBy: arguments_.requestedBy,
                       threadId: arguments_.threadId as Id<"threads">,
                       title: textResult.text,
@@ -1907,12 +1916,18 @@ export const autoTitleChargeKey = (threadId: string, jobId: string | undefined):
     jobId === undefined ? `${threadId}:auto-title` : `${threadId}:auto-title:${jobId}`;
 
 export const createTitleChat = internalAction
-    .input({ jobId: v.optional(v.string().max(MAX_LENGTH.id)), prompt: v.string(), threadId: v.string() })
+    .input({
+        jobId: v.optional(v.string().max(MAX_LENGTH.id)),
+        prompt: v.string(),
+        promptId: v.optional(v.string().max(MAX_LENGTH.id)),
+        threadId: v.string(),
+    })
     .action(async ({ args: arguments_, ctx: context }) => {
         await writeGeneratedTitle(context, {
             chargeKey: autoTitleChargeKey(arguments_.threadId, arguments_.jobId),
             force: false,
             prompt: arguments_.prompt,
+            promptId: arguments_.promptId,
             threadId: arguments_.threadId,
         });
     });
@@ -2004,6 +2019,16 @@ const activeBranchPrompt = async (
     return { kind: "too-long" };
 };
 
+/** Whether the prompt a title was scheduled from is gone: deleted, or no longer a message of this thread. */
+export const promptGone = async (context: ActionContext, threadId: string, promptId: string): Promise<boolean> => {
+    const [row] = await context.runQuery(internal.agent.messages.getMessagesByIds, {
+        messageIds: [promptId as Id<"messages">],
+        threadId: threadId as Id<"threads">,
+    });
+
+    return !row;
+};
+
 /**
  * The title's prompt, re-read by the id the request found: one row, not a second scan of the path. A row that is no longer a
  * successful user message gives none.
@@ -2074,6 +2099,7 @@ const runRegenerateTitle = async (
         expectedTitleDigest: arguments_.expectedTitleDigest,
         force: true,
         prompt: branch.prompt.text,
+        promptId: branch.prompt.id,
         requestedBy: arguments_.userId,
         stateless: true,
         threadId: arguments_.threadId,
