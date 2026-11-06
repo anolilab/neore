@@ -49,7 +49,7 @@ const StatusIcon: FC<{ status: HostPlanStatus }> = ({ status }) => {
 
 /** The agent's plan as a task list; each entry says its status in words, the icon only repeats it. */
 export const HostPlan: FC<{ entries: HostPlanEntry[] }> = memo(({ entries }) => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
 
     if (entries.length === 0) {
         return null;
@@ -59,12 +59,17 @@ export const HostPlan: FC<{ entries: HostPlanEntry[] }> = memo(({ entries }) => 
      * What is spoken about the plan: the count, singular or plural, and the task in progress when there is one. Each sentence is one
      * translatable message, so a translator orders the whole announcement, not its pieces.
      */
-    const announcement = (done: number, total: number, inProgress: string | undefined): string => {
+    const announcement = (doneCount: number, totalCount: number, inProgress: string | undefined): string => {
+        // The counts in the reader's own number format (a comma, a space or other separator in some locales).
+        const numbers = new Intl.NumberFormat(i18n.locale);
+        const done = numbers.format(doneCount);
+        const total = numbers.format(totalCount);
+
         if (inProgress === undefined) {
-            return total === 1 ? t`${done} of ${total} task done` : t`${done} of ${total} tasks done`;
+            return totalCount === 1 ? t`${done} of ${total} task done` : t`${done} of ${total} tasks done`;
         }
 
-        return total === 1 ? t`${done} of ${total} task done. In progress: ${inProgress}` : t`${done} of ${total} tasks done. In progress: ${inProgress}`;
+        return totalCount === 1 ? t`${done} of ${total} task done. In progress: ${inProgress}` : t`${done} of ${total} tasks done. In progress: ${inProgress}`;
     };
 
     const statusText = (status: HostPlanStatus): string => {
@@ -134,6 +139,8 @@ const HostToolCall: FC<{ tool: HostToolRow }> = memo(({ tool }) => {
         }
     };
 
+    const finished = ["cancelled", "completed", "declined", "failed"].includes(status);
+
     let exitText: string | undefined;
 
     if (exit?.code !== undefined) {
@@ -153,6 +160,12 @@ const HostToolCall: FC<{ tool: HostToolRow }> = memo(({ tool }) => {
                 <span className="text-muted-foreground shrink-0 text-xs">{statusText()}</span>
             </div>
             {exitText !== undefined && <p className="text-muted-foreground mt-1 text-xs">{exitText}</p>}
+            {/* Said once, when the call reaches its outcome; the output streams past it, so it is not part of this announcement. */}
+            {finished && (
+                <span className="sr-only" role="status">
+                    {exitText === undefined ? t`${title}: ${statusText()}` : t`${title}: ${statusText()}. ${exitText}`}
+                </span>
+            )}
             {output !== undefined && output !== "" && (
                 // Scrolls on its own, so it takes keyboard focus (a keyboard user could not reach the rest otherwise); the name says
                 // whose output it is.
