@@ -181,6 +181,17 @@ describe(createLunoraAttachmentAdapter, () => {
         expect(uploadFile).toHaveBeenCalledWith(expect.objectContaining({ name: "IMG_9.jpg", type: "image/jpeg" }), expect.anything());
     });
 
+    it("downscales a converted photo that is over the cap, rather than refusing its JPEG before the downscaler runs", async () => {
+        isSafariUserAgent.mockReturnValue(true);
+        heicToJpegBlob.mockResolvedValueOnce(new Blob([new Uint8Array(21 * MB)], { type: "image/jpeg" }));
+        downscaleOversizedImage.mockResolvedValueOnce(new File(["small"], "IMG_11.jpg", { type: "image/jpeg" }));
+        const adapter = createLunoraAttachmentAdapter(client().lunora);
+        const file = new File(["heic"], "IMG_11.HEIC", { type: "image/heic" });
+
+        await expect(adapter.upload({ file })).resolves.toBeDefined();
+        expect(downscaleOversizedImage).toHaveBeenCalledWith(expect.objectContaining({ name: "IMG_11.jpg" }));
+    });
+
     it("sends a HEIC photo unchanged in a browser that cannot decode it, and does not decode it", async () => {
         isSafariUserAgent.mockReturnValue(false);
         heicToJpegBlob.mockClear();

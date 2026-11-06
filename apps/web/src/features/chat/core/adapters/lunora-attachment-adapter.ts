@@ -281,7 +281,8 @@ const getFileLabel = (isVideo: boolean | undefined, isAudio: boolean | undefined
 };
 
 /** Accept common file types - images, text, documents, PDFs, video, audio, DOCX. The composer's file picker uses the same list. */
-// The types the chat upload accepts (the server's allowlist), so the picker offers nothing it would refuse.
+// The types the chat upload accepts (the server's allowlist). HEIC and HEIF are offered for the browsers that convert them
+// to JPEG (Safari); any other browser sends the file unchanged, and the server refuses it.
 export const ATTACHMENT_ACCEPT = `image/*,.heic,.heif,text/plain,text/markdown,text/html,text/css,text/javascript,text/xml,text/yaml,application/pdf,application/json,application/javascript,application/typescript,application/xml,${DOCX_TYPE},.md,${TEXT_PREVIEW_SUFFIXES.join(",")},.txt,.docx`;
 
 /**
@@ -323,13 +324,20 @@ export const createLunoraAttachmentAdapter = (lunora: LunoraClient): AttachmentA
 
         const limit = attachmentSizeLimit(source);
 
-        // Before any decode: a file over the cap is refused without being opened as an image.
-        if (source.size > limit.maxBytes) {
+        // Before any decode: a file over the cap is refused without being opened as an image. A converted photo is the exception:
+        // its JPEG can be over the cap while the downscaler brings it under, so it is judged after the downscale below.
+        const converted = source !== state.file;
+
+        if (!converted && source.size > limit.maxBytes) {
             throw new AttachmentTooLargeError(source.name, limit);
         }
 
         // A 12 MB photo is shrunk to fit the provider, not refused for its weight; the result is never larger than the original.
         const file = await downscaleOversizedImage(source);
+
+        if (file.size > limit.maxBytes) {
+            throw new AttachmentTooLargeError(source.name, limit);
+        }
 
         return {
             contentType: attachmentContentType(file),
