@@ -29,7 +29,7 @@ import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
-import { documentTextPart } from "./lib/attached-text";
+import { documentTextPart, guestTextPart } from "./lib/attached-text";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
 import { createStreamToken } from "./streaming/persistent/stream-token";
 
@@ -357,6 +357,8 @@ export interface ChatStartBody {
     fileIds?: string[];
     /** Run until a reviewer confirms this goal is met (`chat/goals/`). Text turns in the caller's own chat only. */
     goal?: { maxRounds?: number; text: string };
+    /** The owner sends a guest's held message on (`chat/guest-links.ts`): the prompt is marked as guest text, so the quick check never reads it as the owner's. */
+    guestMessageId?: string;
     imageSize?: string;
     language?: string;
     mcpServerNames?: string[];
@@ -469,6 +471,14 @@ export const runChatStart = async (
         return Response.json({ error: "Invalid pageContext" }, { status: 400 });
     }
 
+    // Only the shape is checked: a made-up id marks the owner's own text as guest text, which only ever asks for approval.
+    if (
+        body.guestMessageId !== undefined &&
+        (typeof body.guestMessageId !== "string" || body.guestMessageId.length === 0 || body.guestMessageId.length > 200)
+    ) {
+        return Response.json({ error: "Invalid guestMessageId" }, { status: 400 });
+    }
+
     // Auth: extract user from the forwarded JWT
     let user: BetterAuthUser | undefined;
 
@@ -569,7 +579,7 @@ const runChatStartOnShard = async (
     const messageContent: any[] = [];
 
     if (body.prompt) {
-        messageContent.push({ text: body.prompt.trim(), type: "text" });
+        messageContent.push(body.guestMessageId === undefined ? { text: body.prompt.trim(), type: "text" } : guestTextPart(body.prompt.trim()));
     } else if (contentType === "image") {
         messageContent.push({ text: "Generate an image", type: "text" });
     } else {

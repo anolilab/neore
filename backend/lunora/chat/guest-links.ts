@@ -161,7 +161,9 @@ export const getGuestLink = authQuery
 
 /**
  * The owner's Send: hands back the guest's text so the owner's client sends it through the ordinary send path
- * (this procedure runs no model and starts no run itself). The message stays HELD until the client confirms
+ * (this procedure runs no model and starts no run itself). The client must send the text with this message's id as
+ * `guestMessageId` on `/chat/start`: that marks it as guest text, so the quick approval check never reads it as the owner's.
+ * The message stays HELD until the client confirms
  * the send ({@link confirmGuestMessageSent}), so a send that failed can be retried and the guest never sees a
  * failed one as sent. A message already confirmed is not handed out again.
  */

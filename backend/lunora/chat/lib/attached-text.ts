@@ -32,13 +32,23 @@ interface MessageLike {
     role?: unknown;
 }
 
-const hasPageMarker = (part: { providerOptions?: unknown }): boolean => {
-    const options = part.providerOptions as { neore?: { pageContext?: unknown } } | undefined;
-
-    return Boolean(options?.neore?.pageContext);
+/**
+ * The text part a guest's message becomes when the owner sends it on (`/chat/start` with `guestMessageId`). The
+ * owner's client sends the text as an ordinary prompt, so only this server-set mark tells the quick check that the
+ * owner did not write it. The mark only ever restricts: a client that sets it on its own text gets a prompt, nothing more.
+ */
+export const guestTextPart = (text: string): { providerOptions: { neore: { guestText: true } }; text: string; type: "text" } => {
+    return { providerOptions: { neore: { guestText: true } }, text, type: "text" };
 };
 
-/** Whether any user message carries attached document or page text. */
+/** A structural mark the server put on the part: a captured page, or guest text the owner sent on. */
+const hasStructuralMarker = (part: { providerOptions?: unknown }): boolean => {
+    const options = part.providerOptions as { neore?: { guestText?: unknown; pageContext?: unknown } } | undefined;
+
+    return Boolean(options?.neore?.pageContext) || options?.neore?.guestText === true;
+};
+
+/** Whether any user message carries attached document, captured page or guest text, which the person did not type. */
 export const messagesCarryAttachedText = (messages: ReadonlyArray<MessageLike>): boolean =>
     messages.some((message) => {
         if (message.role !== "user") {
@@ -54,6 +64,6 @@ export const messagesCarryAttachedText = (messages: ReadonlyArray<MessageLike>):
         }
 
         return (message.content as ReadonlyArray<{ providerOptions?: unknown; text?: unknown; type?: unknown }>).some(
-            (part) => hasPageMarker(part) || (part.type === "text" && typeof part.text === "string" && isAttachedContentText(part.text)),
+            (part) => hasStructuralMarker(part) || (part.type === "text" && typeof part.text === "string" && isAttachedContentText(part.text)),
         );
     });
