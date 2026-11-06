@@ -153,19 +153,21 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         admittedRun,
     );
 
-    // The cap first: under `off` every tool is removed, so no MCP or connector work (token refresh included) starts.
-    // A failed read caps at `ask` (`org-policy.md` §6a).
-    const permissionCap = await readRunPermissionCap(ctx, { organizationId, threadId });
+    // The cap is read beside the reads that do not depend on it. Under `off` every tool is removed, so no quick-check, MCP or
+    // connector work (token refresh included) starts. A failed read caps at `ask` (`org-policy.md` §6a).
+    const [permissionCap, allMcpServers, overrides, timedGrants] = await Promise.all([
+        readRunPermissionCap(ctx, { organizationId, threadId }),
+        ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),
+        ctx.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId }),
+        // A run nobody is at inherits no time-boxed allow, so it does not even read them.
+        headless ? {} : ctx.runQuery(internal.chat.tool_permissions.getToolPermissionGrantsQuery, { userId }),
+    ]);
 
     if (permissionCap === "off") {
         return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
     }
 
-    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers] = await Promise.all([
-        ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),
-        ctx.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId }),
-        // A run nobody is at inherits no time-boxed allow, so it does not even read them.
-        headless ? {} : ctx.runQuery(internal.chat.tool_permissions.getToolPermissionGrantsQuery, { userId }),
+    const [quickCheckOn, connectorServers] = await Promise.all([
         // Nobody answers in a headless run, and an outside agent's calls stay `ask` because only the app approves them.
         // Under a cap below `auto` the quick check is off anyway, so its eligibility and trusted servers are not read.
         headless || origin === "outside_agent" || threadId === undefined || permissionCap !== "auto"
