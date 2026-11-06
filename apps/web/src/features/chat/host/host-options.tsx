@@ -78,7 +78,8 @@ const rowsOf = (state: HostAgentState | undefined, labels: { mode: string; model
     if (state.configOptions !== undefined && state.configOptions.length > 0) {
         return state.configOptions.map((option) => {
             return {
-                changeable: option.choices.length > 0,
+                // A mode is changed on the computer, where the person sees what it grants: its value shows, read-only.
+                changeable: option.choices.length > 0 && option.category !== "mode",
                 choices: option.choices,
                 current: option.currentValue,
                 // Tagged, so an option the agent names like a legacy row cannot be mistaken for it; the option id itself goes to the backend.
@@ -105,7 +106,8 @@ const rowsOf = (state: HostAgentState | undefined, labels: { mode: string; model
 
     if (state.modes !== undefined) {
         rows.push({
-            changeable: state.modes.available.length > 0,
+            // Read-only for the same reason as a mode option: the computer changes it.
+            changeable: false,
             choices: state.modes.available.map((entry) => {
                 return { name: entry.name, value: entry.id };
             }),

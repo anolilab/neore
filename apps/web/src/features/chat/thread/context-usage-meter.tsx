@@ -73,7 +73,7 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
             <TooltipTrigger
                 render={
                     <button
-                        aria-label={t`${formatTokenCount(usedTokens)}/${formatTokenCount(contextWindow)} tokens used (${percent}%)`}
+                        aria-label={t`${formatTokenCount(usedTokens, i18n.locale)}/${formatTokenCount(contextWindow, i18n.locale)} tokens used (${percent}%)`}
                         className={cn(
                             "flex items-center gap-1.5 text-xs transition-colors",
                             isCriticalUsage && "text-destructive",
@@ -105,7 +105,7 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
                         </div>
                         {/* Token count text */}
                         <span className="tabular-nums">
-                            {formatTokenCount(usedTokens)}/{formatTokenCount(contextWindow)}
+                            {formatTokenCount(usedTokens, i18n.locale)}/{formatTokenCount(contextWindow, i18n.locale)}
                         </span>
                     </button>
                 }
@@ -114,7 +114,7 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
                 <div className="space-y-1.5">
                     <div className="font-medium">{t`Context Usage`}</div>
                     <div className="text-muted-foreground text-xs">
-                        {t`${formatTokenCount(usedTokens)} of ${formatTokenCount(contextWindow)} tokens used (${formatPercent(percentage, i18n.locale)}%)`}
+                        {t`${formatTokenCount(usedTokens, i18n.locale)} of ${formatTokenCount(contextWindow, i18n.locale)} tokens used (${formatPercent(percentage, i18n.locale)}%)`}
                     </div>
                     {detail !== undefined && <div className="text-muted-foreground text-xs">{detail}</div>}
                     {isAtCapacity && (

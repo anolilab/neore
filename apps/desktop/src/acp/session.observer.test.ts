@@ -353,3 +353,63 @@ describe("a session and turns the backend sent", () => {
         expect(typeof waiting[3]).toBe("string");
     });
 });
+
+describe("a usage report the agent sends before its session answers", () => {
+    it("reaches the meter once the session has opened, rather than being dropped", async () => {
+        const reported: { usage?: unknown }[] = [];
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: {
+                ...recorder().observer,
+                sessionState: (_id, patch) => {
+                    reported.push(patch);
+                },
+            },
+            onChange: () => {},
+            process: agent.process,
+        });
+        const started = session.start();
+
+        await expect.poll(() => agent.written.some((frame) => frame.method === "initialize")).toBe(true);
+        const initialize = agent.written.find((frame) => frame.method === "initialize");
+
+        agent.say({ id: initialize?.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/new")).toBe(true);
+
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "usage_update", size: 200_000, used: 12_345 } } });
+
+        const opened = agent.written.find((frame) => frame.method === "session/new");
+
+        agent.say({ id: opened?.id, result: { sessionId: "sess_1" } });
+        await started;
+
+        expect(reported).toContainEqual({ usage: expect.objectContaining({ used: 12_345 }) });
+    });
+});
+
+describe("a change asked for from the web or the phone", () => {
+    it("refuses a mode, whichever way it is named, and never sends it to the agent", async () => {
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: recorder().observer,
+            onChange: () => {},
+            process: agent.process,
+        });
+
+        // The legacy mode state (no option id) is a mode, refused before the session's own checks.
+        await expect(session.setRemoteOption(undefined, "code")).rejects.toThrow("a mode is changed on the computer");
+        expect(agent.written).toEqual([]);
+    });
+});

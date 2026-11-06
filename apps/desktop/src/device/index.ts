@@ -480,7 +480,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             case "setConfig": {
                 // The agent's answer is the confirmation; a change it could not make refuses the call with the reason.
                 return (async () => {
-                    await (server?.acp ?? requireAcp()).setOption(command.sessionId, command.optionId, command.valueId);
+                    await (server?.acp ?? requireAcp()).setRemoteOption(command.sessionId, command.optionId, command.valueId);
 
                     return "accepted" as const;
                 })();
