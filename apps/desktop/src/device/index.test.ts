@@ -355,7 +355,7 @@ describe("relay channels (the site window)", () => {
     it("change an option of a coding agent's session and sign the agent's answer, or the reason it could not be changed", async () => {
         const { AcpManager } = await import("../acp/manager");
         const command = { kind: "setConfig", optionId: "model", sessionId: "s1", valueId: "deep" };
-        const change = vi.spyOn(AcpManager.prototype, "setOption");
+        const change = vi.spyOn(AcpManager.prototype, "setRemoteOption");
 
         try {
             core.acpPrepare.mockReturnValue(JSON.stringify({ callId: "c10", command, expiresAt: Date.now() + 60_000, refusal: null }));

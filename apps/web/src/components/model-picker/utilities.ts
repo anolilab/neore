@@ -148,7 +148,10 @@ export const formatTokenCount = (value: number | undefined, locale?: string): st
         return "0";
     }
 
-    const decimal = (scaled: number, digits: number): string => (locale === undefined ? scaled.toFixed(digits) : new Intl.NumberFormat(locale, { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(scaled));
+    const decimal = (scaled: number, digits: number): string =>
+        locale === undefined
+            ? scaled.toFixed(digits)
+            : new Intl.NumberFormat(locale, { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(scaled);
 
     if (value >= 1_000_000) {
         return `${decimal(value / 1_000_000, 1)}M`;
