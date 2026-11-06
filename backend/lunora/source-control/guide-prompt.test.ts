@@ -98,6 +98,21 @@ describe("paths with hidden characters", () => {
         expect(prompt).not.toContain("‌");
     });
 
+    it("sends text fields with the hidden characters already removed, so the size checks measure what is sent", () => {
+        const prompt = buildHostGuidePrompt(
+            input({
+                body: "Body\u{200B} text",
+                files: [file("src/a.ts")],
+                instructions: "Look\u{E0041} at errors",
+                threads: [{ comments: [{ authorLogin: "m\u{200D}allory", body: "hi\u{E0042}" }], path: "src/a.ts" }],
+                title: "Fix\u{202E} thing",
+            }),
+        );
+
+        expect(stripHiddenText(prompt).text).toBe(prompt);
+        expect(prompt).toContain("Look at errors");
+    });
+
     it.each([
         ["a combining grapheme joiner", "͏"],
         ["a supplementary variation selector", "\u{E0100}"],

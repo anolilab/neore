@@ -8,6 +8,7 @@
  * free text outside it. What a model answers is not trusted either (`guide-logic.ts`).
  */
 import { render } from "@neore/ai/prompts/optimizer";
+import { stripHiddenText } from "@neore/ai/utils";
 
 import { MAX_DEVICE_INPUT_BYTES } from "../devices/lib/constants";
 import { utf8Length } from "../devices/lib/signing";
@@ -67,6 +68,35 @@ const FORMAT = `Answer with ONE JSON object and nothing else:
   ]
 }`;
 
+/**
+ * The prompt's text with hidden characters removed first, so the size checks measure what is sent. Paths are left as they
+ * are: `encodePath` escapes their hidden characters, and removing them here would change the path the answer must name.
+ */
+const cleanedInput = (input: GuidePromptInput): GuidePromptInput => {
+    const clean = (value: string): string => stripHiddenText(value).text;
+
+    return {
+        ...input,
+        baseBranch: clean(input.baseBranch),
+        body: clean(input.body),
+        commits: input.commits.map((commit) => {
+            return { ...commit, message: clean(commit.message) };
+        }),
+        headBranch: clean(input.headBranch),
+        instructions: clean(input.instructions),
+        repository: clean(input.repository),
+        threads: input.threads.map((thread) => {
+            return {
+                ...thread,
+                comments: thread.comments.map((comment) => {
+                    return { ...comment, authorLogin: clean(comment.authorLogin), body: clean(comment.body) };
+                }),
+            };
+        }),
+        title: clean(input.title),
+    };
+};
+
 const RULES = `You write a reading guide for one pull request.
 - Order the stops the way a careful reviewer reads: the core change first (role "core"), then what depends on it (role "dependent").
 - Each stop points at the lines worth reading with "ranges" (line numbers of the diff, on the side given).
@@ -104,7 +134,8 @@ const pullRequestEntry = (input: GuidePromptInput, bodyMax: number): string =>
 const instructionsOf = (instructions: string): string => (instructions.trim() === "" ? "(none)" : `${quote(instructions.trim())} (the reviewer's own words)`);
 
 /** The prompt the gateway-routed model gets: the diff itself, within a budget. Files past it keep their line in the list. */
-export const buildCloudGuidePrompt = (input: GuidePromptInput): { prompt: string; system: string } => {
+export const buildCloudGuidePrompt = (given: GuidePromptInput): { prompt: string; system: string } => {
+    const input = cleanedInput(given);
     let budget = PATCH_BUDGET_CHARS;
     const files = input.files.slice(0, FILE_LIST_MAX).map((file) => {
         const patch = file.patch === null || isMechanicalFile(file) ? undefined : file.patch.slice(0, Math.min(PATCH_FILE_MAX_CHARS, budget));
@@ -127,7 +158,8 @@ export const buildCloudGuidePrompt = (input: GuidePromptInput): { prompt: string
  * The prompt a coding agent gets in a local checkout. It carries no diff (the signed call that delivers it is
  * small): the agent reads it with git, and the evidence names the files so its answer can be checked against them.
  */
-export const buildHostGuidePrompt = (input: GuidePromptInput): string => {
+export const buildHostGuidePrompt = (given: GuidePromptInput): string => {
+    const input = cleanedInput(given);
     const head = `${RULES}
 
 You are in a checkout of the repository. Check that the remote matches the "repository" of the pull request in the evidence below, then read the change with read-only git commands: the head commit is its "headSha"; compare it with the merge base of its "baseBranch". Do not edit files, do not run the project's code, scripts or tests, and do not push.

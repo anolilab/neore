@@ -82,6 +82,8 @@ export const MAX_PROPOSALS = 20;
 export const MAX_LABEL_PROPOSALS = 5;
 const MAX_TITLE = 200;
 const MAX_EXPLANATION = 2000;
+/** An answer's path, before it is decoded: a source path of up to 4,096 characters, and each character escapes to at most 10. */
+const MAX_ANSWER_PATH = 40_960;
 const MAX_SUMMARY = 2000;
 const MAX_COMMENT = 4000;
 const MAX_LABEL = 50;
@@ -301,7 +303,7 @@ const modelStopsOf = (value: unknown, byPath: Map<string, GuideFile>, lines: Map
 
         for (const entryNamed of named) {
             const fileEntry = record(entryNamed);
-            const path = decodePath(text(fileEntry?.path, 1024));
+            const path = decodePath(text(fileEntry?.path, MAX_ANSWER_PATH));
             const known = byPath.get(path);
 
             // A path the pull request does not change, a mechanical file, or one the stop already names is not a place to read.
@@ -344,7 +346,7 @@ const proposalsOf = (value: unknown, byPath: Map<string, GuideFile>, lines: Map<
         const id = `proposal-${String(proposals.length + 1)}`;
 
         if (candidate?.kind === "comment") {
-            const path = decodePath(text(candidate.path, 1024));
+            const path = decodePath(text(candidate.path, MAX_ANSWER_PATH));
             const known = byPath.get(path);
             const body = text(candidate.body, MAX_COMMENT);
             const line = wholeLine(candidate.line);

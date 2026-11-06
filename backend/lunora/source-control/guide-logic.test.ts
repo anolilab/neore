@@ -152,6 +152,20 @@ describe("assembleGuide", () => {
         }
     });
 
+    it("matches a path that is short as written but longer than 1,024 characters once its hidden characters are escaped", () => {
+        // 300 zero-width joiners: 303 characters as written, 1,806 as the prompt shows them.
+        const hidden = `src/${"\u{200C}".repeat(300)}.ts`;
+        const escaped = `src/${String.raw`\u200C`.repeat(300)}.ts`;
+        const guide = assembleGuide(
+            [file(hidden)],
+            { proposals: [], stops: [{ explanation: "", files: [{ path: escaped }], role: "core", title: "Long" }], summary: "" },
+            0,
+        );
+
+        expect(guide.stops.flatMap((stop) => stop.files.map((entry) => entry.path))).toEqual([hidden]);
+        expect(guide.stops.some((stop) => stop.kind === "uncovered")).toBe(false);
+    });
+
     it("orders core, then dependents, then mechanical changes, then what is not covered", () => {
         const guide = assembleGuide(files, { ...output, stops: [...output.stops].toReversed() }, 0);
 
