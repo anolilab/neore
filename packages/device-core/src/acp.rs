@@ -470,7 +470,7 @@ impl DeviceState {
                     // Pinned or not: an edit that moved the program but left a path into the folder in a later
                     // argument cleared the pin and kept the files, and nothing else would ever delete them.
                     if settings.acp_agents.iter().any(|agent| agent.key == key)
-                        && install_root.join(&key).exists()
+                        && fs::symlink_metadata(install_root.join(&key)).is_ok()
                     {
                         uninstall = Some(key.clone());
                     }

@@ -57,7 +57,7 @@ export const consentText = ({ agent, format, sha256, target }: ResolvedInstall):
  * What the user is asked for an npm agent. The hash is the package index's, read just now; the registry publishes
  * none for these agents, and the text says so rather than letting it look like the publisher's.
  */
-export const npmConsentText = ({ agent, args, env, name, version }: ResolvedNpmInstall, entry: NpmIndexEntry, tools: NodeTools): ConsentText => {
+export const npmConsentText = ({ agent, args, env, name, version }: ResolvedNpmInstall, entry: NpmIndexEntry, tools: NodeTools & { resolvedNode?: string }): ConsentText => {
     return {
         detail: [
             `Publisher (as listed in the registry): ${agent.publisher}`,
@@ -69,6 +69,7 @@ export const npmConsentText = ({ agent, args, env, name, version }: ResolvedNpmI
             `Download: ${entry.tarball}`,
             // Each part quoted, so an argument with a space is one argument on screen as it is to the core.
             `Runs: ${[tools.node, `<the package's program>`, ...args].map((part) => JSON.stringify(part)).join(" ")}`,
+            tools.resolvedNode !== undefined && tools.resolvedNode !== tools.node ? `That node is a link to ${JSON.stringify(tools.resolvedNode)}; Neore checks it still points there when it installs, and refuses if it does not.` : undefined,
             Object.keys(env).length === 0 ? undefined : `Sets: ${Object.keys(env).join(", ")}`,
             "",
             "The registry publishes no hash for this agent. This hash came from the npm package index just now, not from the publisher: you are trusting the index as it is today (trust on first use). Neore downloads the package, checks it against this hash and refuses to install it if it differs.",
@@ -175,8 +176,8 @@ export class AgentInstaller {
             throw new Error("Node.js and npm were not found. Install Node.js (which includes npm), then try again.");
         }
 
-        // The core records the resolved path of node; the dialog shows that one, not a link that may be re-pointed.
-        const tools = { ...found, node: realpathOr(found.node) };
+        // The dialog names the node the core records (as found); the core also checks it resolves to what is shown here.
+        const tools = { ...found, resolvedNode: realpathOr(found.node) };
 
         const fetchImpl = this.options.fetch ?? globalThis.fetch;
         const entry = await lookupNpmIntegrity(fetchImpl, resolved.name, resolved.version);
@@ -205,7 +206,7 @@ export class AgentInstaller {
                         key: resolved.agent.id,
                         label: resolved.agent.name,
                         node: found.node,
-                        nodeResolved: tools.node,
+                        nodeResolved: tools.resolvedNode,
                         npm: tools.npm,
                         package: resolved.name,
                         publisher: resolved.agent.publisher,

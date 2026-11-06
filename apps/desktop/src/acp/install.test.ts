@@ -274,7 +274,7 @@ describe("an npm agent", () => {
         expect(detail).toContain("never updates it on its own");
     });
 
-    it("shows the resolved node but hands the core the path that ends in node, so a node linked to another name installs", async () => {
+    it("names the node the core records, says its link is checked at install, and installs a node linked to another name", async () => {
         const bin = path.join(mkdtempSync(path.join(scratch, "bin-")), "bin");
 
         mkdirSync(bin);
@@ -286,8 +286,15 @@ describe("an npm agent", () => {
 
         await installer.install("thing", "1.0.0");
 
-        expect(confirm.mock.calls[0][0].detail).toContain(JSON.stringify(realpathSync(link)));
-        expect(JSON.parse(core.acpInstallNpm.mock.calls[0][0]).node).toBe(link);
+        const { detail } = confirm.mock.calls[0][0];
+        const sent = JSON.parse(core.acpInstallNpm.mock.calls[0][0]) as { node: string; nodeResolved: string };
+
+        // The Runs line names the path the core records; the resolved one is said to be checked at install.
+        expect(detail).toContain(`Runs: ${JSON.stringify(link)}`);
+        expect(detail).toContain(`link to ${JSON.stringify(realpathSync(link))}`);
+        expect(detail).toContain("checks it still points there when it installs");
+        expect(sent.node).toBe(link);
+        expect(sent.nodeResolved).toBe(realpathSync(link));
     });
 
     it("looks the hash up before the dialog and downloads nothing on a no", async () => {

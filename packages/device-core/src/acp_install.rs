@@ -504,14 +504,10 @@ impl DeviceState {
 
         match moved {
             Ok(()) => {
-                std::thread::spawn(move || {
-                    let _ = fs::remove_dir_all(&target);
-                });
+                std::thread::spawn(move || remove_entry(&target));
             }
             // Could not be moved: delete it where it is, as before.
-            Err(_) => {
-                let _ = fs::remove_dir_all(path);
-            }
+            Err(_) => remove_entry(path),
         }
     }
 
@@ -600,6 +596,17 @@ fn remove_stale(staging: &Path) {
             let _ = fs::remove_dir_all(entry.path());
         }
     }
+}
+
+/// Removes whatever `path` is without following it: a folder with its contents, a file or a link (dangling or not)
+/// by itself.
+fn remove_entry(path: &Path) {
+    let is_folder = fs::symlink_metadata(path).is_ok_and(|meta| meta.is_dir());
+    let _ = if is_folder {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
+    };
 }
 
 /// Names this run in the trash: the pid alone is reused by the operating system, so a crashed run's tree would be

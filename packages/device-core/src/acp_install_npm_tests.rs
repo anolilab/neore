@@ -1233,3 +1233,66 @@ fn a_trash_folder_that_is_a_link_is_not_swept() {
         "nothing behind the link is removed"
     );
 }
+
+#[test]
+fn removing_an_agent_also_removes_a_dangling_link_at_its_install_path() {
+    let (state, guard) = state("dangling");
+    let dir = guard.path().to_path_buf();
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+
+    state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap();
+
+    // The installed folder is replaced by a link to nothing.
+    let at = dir.join("acp-agents/fixture");
+
+    fs::remove_dir_all(&at).unwrap();
+    std::os::unix::fs::symlink(dir.join("not-there"), &at).unwrap();
+    state
+        .acp_update(
+            serde_json::from_value(json!({ "op": "removeAgent", "key": "fixture" })).unwrap(),
+        )
+        .unwrap();
+
+    assert!(fs::symlink_metadata(&at).is_err(), "the link is gone");
+    state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap();
+}
+
+#[test]
+fn pruning_removes_a_stray_file_and_a_link_without_following_it() {
+    let (state, guard) = state("prune-file");
+    let dir = guard.path().to_path_buf();
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let outside = dir.join("outside");
+
+    state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap();
+    fs::create_dir_all(&outside).unwrap();
+    fs::write(outside.join("keep"), "x").unwrap();
+
+    let key_dir = dir.join("acp-agents/fixture");
+
+    fs::write(key_dir.join("stray.txt"), "x").unwrap();
+    std::os::unix::fs::symlink(&outside, key_dir.join("link")).unwrap();
+    state.acp_install_prune("fixture");
+
+    assert!(
+        fs::symlink_metadata(key_dir.join("stray.txt")).is_err(),
+        "the file is removed"
+    );
+    assert!(
+        fs::symlink_metadata(key_dir.join("link")).is_err(),
+        "the link is removed"
+    );
+    assert!(
+        outside.join("keep").exists(),
+        "what the link pointed at is not"
+    );
+    assert!(installed(&dir).exists(), "the pinned version stays");
+}
