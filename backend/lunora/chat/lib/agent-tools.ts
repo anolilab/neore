@@ -167,7 +167,8 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         // A run nobody is at inherits no time-boxed allow, so it does not even read them.
         headless ? {} : ctx.runQuery(internal.chat.tool_permissions.getToolPermissionGrantsQuery, { userId }),
         // Nobody answers in a headless run, and an outside agent's calls stay `ask` because only the app approves them.
-        headless || origin === "outside_agent" || threadId === undefined
+        // Under a cap below `auto` the quick check is off anyway, so its eligibility and trusted servers are not read.
+        headless || origin === "outside_agent" || threadId === undefined || permissionCap !== "auto"
             ? false
             : // A failed read turns the quick check off; it must not take the run down.
               ctx

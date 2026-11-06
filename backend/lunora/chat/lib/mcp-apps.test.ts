@@ -15,6 +15,7 @@ import type { MCPServerConfig } from "./mcp-tools";
 const state = vi.hoisted(() => {
     return {
         acceptedToken: "fresh",
+        cap: "auto" as "auto" | "ask" | "off",
         config: null as MCPServerConfig | null,
         connects: 0,
         overrides: {} as Record<string, string>,
@@ -27,6 +28,13 @@ vi.mock("../../auth/lib/helper", () => {
         getCurrentUserInternal: async () => {
             return { _id: "alice" };
         },
+    };
+});
+
+vi.mock("./run-permission-cap", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("./run-permission-cap")>()),
+        readRequestPermissionCap: async () => state.cap,
     };
 });
 
@@ -124,6 +132,7 @@ const oauthConfig = (refreshTo: string | null) => {
 
 beforeEach(() => {
     state.acceptedToken = "fresh";
+    state.cap = "auto";
     state.config = null;
     state.connects = 0;
     state.overrides = {};
@@ -174,6 +183,17 @@ describe("MCP Apps proxy with an OAuth grant", () => {
 
         expect(response.status).toBe(403);
         await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("needs your approval") });
+    });
+
+    it("says the organization's policy limits a tool its cap lowered, since changing the member's own setting would not help", async () => {
+        oauthConfig("fresh");
+        state.cap = "ask";
+        state.overrides = { "connector:notion:create_page": "auto" };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("organization's tool policy") });
     });
 
     it("refuses a tool the user set to ask before connecting, and runs one they allowed", async () => {
