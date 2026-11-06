@@ -55,9 +55,25 @@ describe("configOptionsOf", () => {
     });
 
     it("leaves out a boolean option and one without a usable id or value", () => {
-        expect(
-            configOptionsOf([select("b", { currentValue: true, type: "boolean" }), select("", {}), select("x", { currentValue: "" }), "junk", null], plain),
-        ).toBeUndefined();
+        // 65 two-byte characters are 130 bytes: more than an id may take.
+        const tooLong = "é".repeat(65);
+
+        const entries = [select("b", { currentValue: true, type: "boolean" }), select("", {}), select("x", { currentValue: tooLong }), "junk", null];
+
+        expect(configOptionsOf(entries, plain)).toBeUndefined();
+    });
+
+    it("keeps an option with no current selection, with its choices, since the backend accepts an empty current value", () => {
+        const [option] = configOptionsOf([select("m", { currentValue: "" })], plain) ?? [];
+
+        expect(option).toMatchObject({
+            choices: [
+                { name: "A", value: "a" },
+                { name: "B", value: "b" },
+            ],
+            currentValue: "",
+            id: "m",
+        });
     });
 
     it("keeps at most 20 options and 100 choices, and one of each id", () => {
