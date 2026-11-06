@@ -338,6 +338,8 @@ describe("the agent's slash commands", () => {
         typeInto(box, "/");
 
         expect(await screen.findByRole("listbox", { name: "Commands from Example agent" })).toBeTruthy();
+        // The suggestions are filtered from what was typed, so assistive technology is told the box autocompletes into a list.
+        expect(box.getAttribute("aria-autocomplete")).toBe("list");
         expect(screen.getAllByRole("option")).toHaveLength(3);
         expect(screen.getAllByText("Example agent")).toHaveLength(3);
 

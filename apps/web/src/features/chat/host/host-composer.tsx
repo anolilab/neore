@@ -340,6 +340,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     )}
                     <textarea
                         aria-activedescendant={menuOpen ? `${listId}-${active}` : undefined}
+                        aria-autocomplete="list"
                         aria-controls={menuOpen ? listId : undefined}
                         aria-expanded={menuOpen}
                         aria-label={t`Message to the coding agent`}
