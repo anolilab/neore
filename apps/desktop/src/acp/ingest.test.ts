@@ -1319,11 +1319,15 @@ describe("what the agent reports about itself", () => {
 
     it("does not hold one session's report behind another session's stalled post", async () => {
         const host = poster();
-        let release = (): void => {};
+        let release = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the supported Node range starts before it exists
+        const stalled = new Promise<void>((resolve) => {
+            release = resolve;
+        });
 
         await open(host, "s1");
         await open(host, "s2");
-        backend.gate = (post) => (post.sessionId === "s1" ? new Promise<void>((resolve) => { release = resolve; }) : undefined);
+        backend.gate = (post) => post.sessionId === "s1" ? stalled : undefined;
 
         host.sessionState("s1", { usage: usage(10) });
         host.sessionState("s2", { usage: usage(20) });
