@@ -53,10 +53,16 @@ export const isPromptLinkTooLong = (raw: string, model?: string): boolean => {
 /** The search values a prompt link carries, trimmed and capped; absent or blank values are dropped. */
 export const readPromptLinkSearch = (search: { model?: unknown; prompt?: unknown }): { model?: string; prompt?: string } => {
     const prompt = typeof search.prompt === "string" ? promptFromLink(search.prompt) : "";
+
+    // A link without a usable prompt is not a prompt link: its model is not carried either, so it changes nothing.
+    if (prompt === "") {
+        return {};
+    }
+
     const model = typeof search.model === "string" ? search.model.trim() : "";
 
     return {
-        ...(prompt !== "" && { prompt }),
+        prompt,
         ...(model !== "" && { model }),
     };
 };

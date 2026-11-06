@@ -225,6 +225,16 @@ describe("chat index route", () => {
             expect(harness.navigate).toHaveBeenCalledTimes(1);
         });
 
+        it("a blank prompt does not change the chat's model, even with a model in the link", () => {
+            openUrl(`https://app.example.com/chat?model=${encodeURIComponent(textModel?.id ?? "")}&prompt=%20%20%20`);
+
+            renderPage();
+
+            expect(useChatUIStore.getState().composerText).toBe("");
+            expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+            expect(harness.showWarning).not.toHaveBeenCalled();
+        });
+
         it("treats a blank prompt parameter as no link: nothing is drafted and no navigation strips it", () => {
             openUrl("https://app.example.com/chat?prompt=%20%20%20");
 

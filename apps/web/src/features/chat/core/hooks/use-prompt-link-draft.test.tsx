@@ -219,6 +219,14 @@ describe("usePromptLinkDraft", () => {
         expect(useChatUIStore.getState().composerText).toBe("hi");
     });
 
+    it("does not change the chat's model for a link with no prompt, even when it names a model", () => {
+        renderLink({ model: textModel?.id });
+
+        expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+        expect(useChatUIStore.getState().composerText).toBe("");
+        expect(harness.showWarning).not.toHaveBeenCalled();
+    });
+
     it("ends Auto as a pick does, so the link's model is the one a send runs on", () => {
         useModelStore.setState({ pendingSettings: { autoModel: true } });
 

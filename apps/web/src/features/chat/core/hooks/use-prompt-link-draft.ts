@@ -80,7 +80,8 @@ export const usePromptLinkDraft = ({
             }
         }
 
-        if (applyLink && model !== undefined) {
+        // A link's model travels only with its prompt (`readPromptLinkSearch` drops it otherwise), so a link without one leaves the model alone.
+        if (applyLink && prompt !== undefined && model !== undefined) {
             const state = useModelStore.getState();
             const definition = carriableLinkModel(model);
             // The model the composer sends with is the link's only in a text chat, and only where the composer shows that model

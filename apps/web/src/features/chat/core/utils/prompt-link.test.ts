@@ -83,6 +83,13 @@ describe(isPromptLinkTooLong, () => {
 });
 
 describe(readPromptLinkSearch, () => {
+    it("carries a model only with a usable prompt: a blank or missing prompt drops the model too", () => {
+        expect(readPromptLinkSearch({ model: "gpt-4o", prompt: " ".repeat(3) })).toEqual({});
+        expect(readPromptLinkSearch({ model: "gpt-4o", prompt: "\u{E0041}" })).toEqual({});
+        expect(readPromptLinkSearch({ model: "gpt-4o" })).toEqual({});
+        expect(readPromptLinkSearch({ model: "gpt-4o", prompt: "hi" })).toEqual({ model: "gpt-4o", prompt: "hi" });
+    });
+
     it("drops blank and non-text values", () => {
         expect(readPromptLinkSearch({ model: "  ", prompt: " ".repeat(3) })).toEqual({});
         expect(readPromptLinkSearch({ model: 3, prompt: { text: "x" } })).toEqual({});
