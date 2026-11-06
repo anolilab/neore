@@ -186,8 +186,9 @@ describe("renderWebhookPrompt", () => {
     });
 
     it("renders a field nested deeply as a valid string literal, cut to the value limit, instead of throwing", () => {
-        // Deep enough that its JSON is over the value limit, shallow enough that no engine's stack limit decides the outcome.
-        const depth = 5000;
+        // Deep enough that its JSON is over the value limit (2 characters a level), shallow enough that no engine's stack, or
+        // the stack a test runner has already used, decides the outcome: at 5,000 levels, a CI worker overflowed while stringifying.
+        const depth = 1100;
         const body = `{"deep":${"[".repeat(depth)}${"]".repeat(depth)}}`;
         const rendered = renderWebhookPrompt("{{body.deep}}", { body, headers: {}, query: {} }, FRAME);
 
