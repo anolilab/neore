@@ -217,13 +217,17 @@ const linksOf = async (ctx: QueryCtx, threadId: Id<"threads">) =>
         .take(MAX_LINKS_CHECKED);
 
 /**
- * Whether a thread is a comparison column. Its runs take the comparison's mode, so a mode set on it would never apply
- * (`setThreadPermissionMode` refuses it).
+ * Whether a thread is a LIVE comparison column: one of its comparison links names a parent row that still exists. Its runs take that
+ * parent's mode, so a mode set on it would never apply (`setThreadPermissionMode` refuses it). A column whose parent is gone has no
+ * parent to take a mode from, so it is not one.
  */
 export const isComparisonColumn = async (ctx: QueryCtx, threadId: Id<"threads">): Promise<boolean> => {
     const links = await linksOf(ctx, threadId);
+    const parents = await Promise.all(
+        links.filter((link) => link.branchType === "comparison").map(async (link) => await ctx.db.get("threads", link.parentThreadId)),
+    );
 
-    return links.some((link) => link.branchType === "comparison");
+    return parents.some((parent) => parent !== null);
 };
 
 export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null, userId: string): Promise<ThreadPermissionMode | null> => {
@@ -254,8 +258,13 @@ export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null,
     if (comparison) {
         const parent = await ctx.db.get("threads", comparison.parentThreadId);
 
-        // A parent that is gone leaves its link rows behind: the column has no mode to inherit, so it runs supervised, not on its own.
-        return parent ? modeFor(parent, userId) : "supervised";
+        if (parent) {
+            return modeFor(parent, userId);
+        }
+
+        // A parent that is gone leaves its link rows behind, so the column has no parent to take a mode from: its own mode applies, and
+        // supervised when it holds none. A collaborator's `full` is the owner's to give, so it counts as none (supervised).
+        return modeFor(thread, userId) ?? "supervised";
     }
 
     return modeFor(thread, userId);

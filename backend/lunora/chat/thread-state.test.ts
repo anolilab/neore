@@ -266,6 +266,26 @@ describe("setThreadPermissionMode", () => {
 
         expect(row.permissionMode).toBeUndefined();
     });
+
+    it("accepts a mode on an orphaned column, whose comparison parent has been deleted", async () => {
+        const gone: string = await harness.run(
+            async (context: any) => await context.db.insert("threads", { status: "active", title: "Gone", updatedAt: 1, userId: OWNER }),
+        );
+        const column: string = await harness.run(
+            async (context: any) => await context.db.insert("threads", { status: "active", title: "Orphan", updatedAt: 1, userId: OWNER }),
+        );
+
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadRelationships", { branchType: "comparison", createdAt: 1, parentThreadId: gone, threadId: column, userId: OWNER });
+            await context.db.delete("threads", gone);
+        });
+
+        await as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId: column } as never);
+
+        const row = await harness.run(async (context: any) => await context.db.get("threads", column));
+
+        expect(row.permissionMode).toBe("full");
+    });
 });
 
 describe("who can read the state", () => {

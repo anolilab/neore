@@ -175,12 +175,26 @@ describe("modeOfThread", () => {
         await expect(modeOfThread({ db } as never, host as never, "u1")).resolves.toBeNull();
     });
 
-    it("runs a comparison column supervised once its parent is gone, not under the column's own mode", async () => {
-        // The parent was deleted and its link rows stayed behind: the column must not fall back to the defaults.
+    it("runs an orphaned comparison column under its own mode once it holds one", async () => {
+        // The parent was deleted and its link rows stayed behind: the column's own saved mode applies, not the defaults.
         const orphan = { _id: "orphan", permissionMode: "auto", userId: "u1" };
         const db = databaseWith([{ branchType: "comparison", parentThreadId: "deleted-parent", threadId: "orphan" }]);
 
+        await expect(modeOfThread({ db } as never, orphan as never, "u1")).resolves.toBe("auto");
+    });
+
+    it("runs an orphaned comparison column supervised when it holds no mode of its own", async () => {
+        const orphan = { _id: "orphan-bare", userId: "u1" };
+        const db = databaseWith([{ branchType: "comparison", parentThreadId: "deleted-parent", threadId: "orphan-bare" }]);
+
         await expect(modeOfThread({ db } as never, orphan as never, "u1")).resolves.toBe("supervised");
+    });
+
+    it("keeps an orphaned column supervised for a collaborator, whose owner's full access is not theirs to run under", async () => {
+        const orphan = { _id: "orphan-full", permissionMode: "full", userId: "u1" };
+        const db = databaseWith([{ branchType: "comparison", parentThreadId: "deleted-parent", threadId: "orphan-full" }]);
+
+        await expect(modeOfThread({ db } as never, orphan as never, "u2")).resolves.toBe("supervised");
     });
 
     it("fails closed when a child has comparison links to two different parents", async () => {
