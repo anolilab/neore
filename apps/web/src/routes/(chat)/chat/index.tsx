@@ -14,8 +14,7 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
-import { useComposerModels } from "@/hooks/use-composer-models";
-import { useGatewayModelsSettled } from "@/hooks/use-gateway-models";
+import { useComposerModels, useComposerModelsSettled } from "@/hooks/use-composer-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 // Module scope, so it outlives this component's mounts: a page load resumes once.
@@ -71,10 +70,10 @@ const ChatPage = () => {
     // `initialMessage`. A handoff URL with nothing in storage never owned the draft.
     const [handoffWaiting, setHandoffWaiting] = useState(landingMessageWaiting);
 
-    // A link may select only a model the composer's picker offers this user. The list is empty until the catalog answers, so the
-    // link waits for it, and a catalog that fails leaves the list empty: the link's model is then refused, its prompt still applies.
+    // A link may select only a model the composer's picker offers this user. The link waits until the catalog and the user's rules
+    // have answered, so the list is final; if the rules fail to load the list is empty, the link's model is refused and its prompt applies.
     const composerModels = useComposerModels();
-    const catalogSettled = useGatewayModelsSettled();
+    const composerSettled = useComposerModelsSettled();
     const allowedModelIds = useMemo(() => new Set(composerModels.map((entry) => entry.id)), [composerModels]);
 
     usePromptLinkDraft({
@@ -84,7 +83,7 @@ const ChatPage = () => {
         model: linkModel,
         otherDraftSource: Boolean(promptId) || (Boolean(hasInitialMessage) && handoffWaiting),
         prompt: linkPrompt,
-        ready: !isSessionPending && catalogSettled,
+        ready: !isSessionPending && composerSettled,
     });
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.

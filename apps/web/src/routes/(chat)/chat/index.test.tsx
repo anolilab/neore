@@ -80,6 +80,7 @@ vi.mock("@/components/error-boundaries/route-error-boundary", () => {
 vi.mock("@/hooks/use-composer-models", () => {
     return {
         useComposerModels: () => harness.composerModels,
+        useComposerModelsSettled: () => true,
     };
 });
 
