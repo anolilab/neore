@@ -75,7 +75,11 @@ const QuoteChip = Node.create<QuoteChipOptions>({
             const excerpt = document.createElement("span");
             const source = document.createElement("button");
             const paint = (): void => {
-                source.textContent = labels().goToReply;
+                const label = labels().goToReply;
+
+                if (source.textContent !== label) {
+                    source.textContent = label;
+                }
             };
 
             dom.dataset.quoteChip = "";
