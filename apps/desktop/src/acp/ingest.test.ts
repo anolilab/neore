@@ -1317,6 +1317,26 @@ describe("what the agent reports about itself", () => {
     // The state posts the backend received, in order. A state report is not a turn event (`HostEvent`), so its kind is read off the raw event.
     const statePosts = () => backend.posts.filter((entry) => (entry.post.events[0] as { kind?: string } | undefined)?.kind === "session_state");
 
+    it("does not hold one session's report behind another session's stalled post", async () => {
+        const host = poster();
+        let release = (): void => {};
+
+        await open(host, "s1");
+        await open(host, "s2");
+        backend.gate = (post) => (post.sessionId === "s1" ? new Promise<void>((resolve) => { release = resolve; }) : undefined);
+
+        host.sessionState("s1", { usage: usage(10) });
+        host.sessionState("s2", { usage: usage(20) });
+        await settle(2000);
+
+        // s1's post is still waiting for its answer; s2's report is posted all the same.
+        expect(statePosts().map((entry) => entry.post.sessionId)).toEqual(expect.arrayContaining(["s1", "s2"]));
+
+        release();
+        backend.gate = undefined;
+        await settle(2000);
+    });
+
     it("posts a report as a turn-less session post, signed, once the session has its thread", async () => {
         const host = poster();
 
