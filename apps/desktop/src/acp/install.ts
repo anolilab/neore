@@ -179,6 +179,7 @@ export class AgentInstaller {
         // The dialog names the node the core records (as found); the core also checks it resolves to what is shown here.
         const tools = { ...found, resolvedNode: realpathOr(found.node) };
 
+        const npmResolved = realpathOr(found.npm);
         const fetchImpl = this.options.fetch ?? globalThis.fetch;
         const entry = await lookupNpmIntegrity(fetchImpl, resolved.name, resolved.version);
 
@@ -208,6 +209,7 @@ export class AgentInstaller {
                         node: found.node,
                         nodeResolved: tools.resolvedNode,
                         npm: tools.npm,
+                        npmResolved,
                         package: resolved.name,
                         publisher: resolved.agent.publisher,
                         source: entry.tarball,

@@ -480,7 +480,7 @@ impl DeviceState {
     /// deletes it on a thread of its own: an npm install is a `node_modules` tree of tens of thousands of files,
     /// and the callers hold the install lock and may be on the app's main thread. A crash during the delete leaves
     /// the trash for the next stage to clear.
-    fn discard(&self, path: &Path) {
+    pub(crate) fn discard(&self, path: &Path) {
         if fs::symlink_metadata(path).is_err() {
             return;
         }

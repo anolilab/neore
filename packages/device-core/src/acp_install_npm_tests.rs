@@ -98,6 +98,10 @@ fn request(
         key: "fixture".into(),
         label: "Fixture".into(),
         node: node.to_string_lossy().into_owned(),
+        npm_resolved: fs::canonicalize(npm)
+            .unwrap()
+            .to_string_lossy()
+            .into_owned(),
         node_resolved: fs::canonicalize(node)
             .unwrap()
             .to_string_lossy()
@@ -1295,4 +1299,106 @@ fn pruning_removes_a_stray_file_and_a_link_without_following_it() {
         "what the link pointed at is not"
     );
     assert!(installed(&dir).exists(), "the pinned version stays");
+}
+
+#[test]
+fn an_npm_re_pointed_after_the_confirmation_is_refused() {
+    let (state, guard) = state("npm-repoint");
+    let dir = guard.path().to_path_buf();
+    let (node, real_npm, _) = fake_tools(&dir);
+    let other = dir.join("other-npm");
+    let link = dir.join("bin-npm/npm");
+
+    fs::copy(&real_npm, &other).unwrap();
+    fs::create_dir_all(link.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(&real_npm, &link).unwrap();
+
+    let confirmed = request_for(&state, &node, &link, "1.0.0");
+
+    fs::remove_file(&link).unwrap();
+    std::os::unix::fs::symlink(&other, &link).unwrap();
+
+    let error = state.acp_install_npm(confirmed).unwrap_err();
+
+    assert!(error.contains("npm is not the file it was"), "{error}");
+    assert!(state.acp_view().agents.is_empty());
+}
+
+#[test]
+fn a_failed_install_leaves_its_staging_folder_to_a_background_delete() {
+    let (state, guard) = state("stage-async");
+    let dir = guard.path().to_path_buf();
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let request = request(
+        &state,
+        &node,
+        &npm,
+        &bytes,
+        "sha512-".to_owned() + &"A".repeat(86) + "==",
+    );
+    let stage = Path::new(&request.archive).parent().unwrap().to_path_buf();
+
+    assert!(state.acp_install_npm(request).is_err());
+    assert!(
+        !stage.exists(),
+        "the staging folder is out of the staging area at once"
+    );
+
+    let trash = dir.join("acp-agents/.trash");
+    let emptied = (0..100).any(|_| {
+        let left = fs::read_dir(&trash).map_or(0, Iterator::count);
+
+        if left > 0 {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+
+        left == 0
+    });
+
+    assert!(emptied, "and its files are deleted in the background");
+}
+
+#[test]
+fn a_shim_that_needs_its_version_manager_home_gets_it_during_the_install() {
+    let (state, guard) = state("shim-home");
+    let dir = guard.path().to_path_buf();
+    let (real_node, npm, _) = fake_tools(&dir);
+    let shim_dir = dir.join("shims");
+    let shim = shim_dir.join("npm");
+    let marker = dir.join("home-seen");
+    let bytes = tarball(&manifest(), &[]);
+
+    // An npm shim that only works when its manager's home reaches it, then does what the fake npm does.
+    fs::create_dir_all(&shim_dir).unwrap();
+    fs::write(
+        &shim,
+        format!(
+            "#!/bin/sh\n[ -n \"$VOLTA_HOME\" ] || {{ echo no-home >&2; exit 4; }}\necho \"$VOLTA_HOME\" > '{}'\nexec '{}' \"$@\"\n",
+            marker.display(),
+            npm.display()
+        ),
+    )
+    .unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        fs::set_permissions(&shim, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    std::env::set_var("VOLTA_HOME", "/opt/volta-home");
+
+    let result = state.acp_install_npm(request(
+        &state,
+        &real_node,
+        &shim,
+        &bytes,
+        integrity(&bytes),
+    ));
+
+    std::env::remove_var("VOLTA_HOME");
+    result.unwrap();
+    assert_eq!(
+        fs::read_to_string(&marker).unwrap().trim(),
+        "/opt/volta-home"
+    );
 }

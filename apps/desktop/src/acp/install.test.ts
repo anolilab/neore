@@ -323,6 +323,7 @@ describe("an npm agent", () => {
             node: TOOLS.node,
             nodeResolved: TOOLS.node,
             npm: TOOLS.npm,
+            npmResolved: TOOLS.npm,
             package: "thing",
             publisher: "unknown publisher",
             source: TARBALL,

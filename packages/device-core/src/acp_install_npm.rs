@@ -45,8 +45,17 @@ const STAGE_CHECK_EVERY: u32 = 10;
 const TARBALL: &str = "package.tgz";
 const HOME_DIR: &str = "home";
 /// Variables the install passes on: a proxy and certificate settings decide whether the network is reachable, and
-/// nothing in them chooses which code runs.
-const PASSED_ENV: [&str; 8] = [
+/// the home folders of the version managers (Volta, mise, asdf, fnm, nvm) let their `node`/`npm` shims find the
+/// tool the person chose. None of them names a program to run; the shim itself is the one the person's PATH gave.
+const PASSED_ENV: [&str; 16] = [
+    "VOLTA_HOME",
+    "MISE_DATA_DIR",
+    "MISE_CONFIG_DIR",
+    "ASDF_DATA_DIR",
+    "ASDF_DIR",
+    "FNM_DIR",
+    "NVM_DIR",
+    "XDG_DATA_HOME",
     "HTTPS_PROXY",
     "HTTP_PROXY",
     "NO_PROXY",
@@ -77,6 +86,8 @@ pub struct NpmInstallRequest {
     /// What `node` resolved to when the person confirmed. The install is refused if it resolves elsewhere now, so
     /// the interpreter that is shown, the one npm runs under and the one recorded are the same file.
     pub node_resolved: String,
+    /// The same for `npm`: what it resolved to when the person confirmed.
+    pub npm_resolved: String,
     /// Absolute path of `npm`.
     pub npm: String,
     /// The package name, `name` or `@scope/name`.
@@ -177,7 +188,13 @@ fn validate(request: &NpmInstallRequest) -> Result<(PathBuf, PathBuf), String> {
         return Err("Node.js is not the file it was when you confirmed (it was re-pointed or replaced). Nothing was installed; try again".into());
     }
 
-    Ok((node, program_path(&request.npm, "npm")?))
+    let npm = program_path(&request.npm, "npm")?;
+
+    if fs::canonicalize(&npm).ok().as_deref() != Some(Path::new(&request.npm_resolved)) {
+        return Err("npm is not the file it was when you confirmed (it was re-pointed or replaced). Nothing was installed; try again".into());
+    }
+
+    Ok((node, npm))
 }
 
 /// The program `npx <package>` would run: the single `bin`, or the one named like the package.
@@ -597,8 +614,8 @@ impl DeviceState {
         let result = self.install_npm_staged(&request, &node, &npm, &staged, &stage_dir);
 
         // npm's cache and anything half-installed go whatever happened; a successful install already moved its
-        // folder out.
-        let _ = fs::remove_dir_all(&stage_dir);
+        // folder out. Moved to the trash and deleted on a thread: a failed install can be a very large tree.
+        self.discard(&stage_dir);
 
         result
     }
