@@ -147,8 +147,8 @@ export class HostPoster implements SessionObserver {
     /** When the pending timer fires: a sooner report moves it earlier, a later one leaves it. */
     private stateDueAt: number | undefined;
 
-    /** Sessions whose state post is on its way: at most one per session, so a session's reports stay in order. */
-    private readonly stateInFlight = new Set<string>();
+    /** The state post on its way, per session: at most one per session, so a session's reports stay in order. */
+    private readonly stateInFlight = new Map<string, Promise<void>>();
 
     /** When a session's failed report may be retried: its own backoff, unaffected by other sessions' reports. */
     private readonly stateRetryAt = new Map<string, number>();
@@ -198,9 +198,10 @@ export class HostPoster implements SessionObserver {
         const link = new SessionLink(sessionId, capSessionInfo(info), {
             bound: (id, thread) => this.bindThread(id, thread),
             deviceId: () => this.options.deviceId(),
+            flushReport: async (id) => await this.flushReport(id),
             now: () => this.now(),
             random: () => this.random(),
-            released: (id) => this.releaseChannels(id),
+            released: (id) => this.releaseSession(id),
             request: async (payload) => await this.request(payload),
         });
 
@@ -507,6 +508,38 @@ export class HostPoster implements SessionObserver {
         }
     }
 
+    /** A session that stays local: its waiting turns end, and a report held for it is dropped by the flush this schedules. */
+    private releaseSession(sessionId: string): void {
+        this.releaseChannels(sessionId);
+
+        if (this.pendingState.has(sessionId)) {
+            this.scheduleState(STATE_DEBOUNCE_MS);
+        }
+    }
+
+    /**
+     * Posts the report held for a session now, and resolves once that post has settled. A post already on its way for the
+     * session goes first. A single failed attempt is not waited on: the report is kept for its retry and the caller goes on.
+     */
+    private async flushReport(sessionId: string): Promise<void> {
+        for (let sending = this.stateInFlight.get(sessionId); sending !== undefined; sending = this.stateInFlight.get(sessionId)) {
+            // eslint-disable-next-line no-await-in-loop -- one session's posts go one after another
+            await sending;
+        }
+
+        const pending = this.pendingState.get(sessionId);
+        const deviceId = this.options.deviceId();
+        const threadId = this.sessions.get(sessionId)?.threadId;
+
+        // Not bound to a thread (still opening, or local): nothing is posted here. A local session's report is dropped by the flush.
+        if (typeof threadId !== "string" || pending === undefined || deviceId === undefined || this.stopped) {
+            return;
+        }
+
+        this.pendingState.delete(sessionId);
+        await this.sendState(sessionId, pending, deviceId);
+    }
+
     /**
      * Tells the backend a local session is over, once its last turn has been delivered: the backend refuses turn
      * posts into an ended session, so closing first would lose the final reply.
@@ -617,22 +650,11 @@ export class HostPoster implements SessionObserver {
                 continue;
             }
 
-            // A session whose report failed waits out its own backoff, even when another session's report wakes this pass.
-            const retryAt = this.stateRetryAt.get(sessionId);
+            // A session whose report failed waits out its own backoff, and its posts are two seconds apart, whichever pass runs.
+            const heldUntil = this.stateHeldUntil(sessionId);
 
-            if (retryAt !== undefined && retryAt > this.now()) {
-                nextDueAt = Math.min(nextDueAt ?? retryAt, retryAt);
-
-                continue;
-            }
-
-            // Two seconds between one session's posts, whichever pass runs: a pass another session's timer brings sooner waits for it.
-            // The window counts forward only, so a clock that moved back does not hold the report until it catches up.
-            const sentAt = this.stateSentAt.get(sessionId);
-            const eligibleAt = (sentAt ?? 0) + STATE_DEBOUNCE_MS;
-
-            if (sentAt !== undefined && sentAt <= this.now() && eligibleAt > this.now()) {
-                nextDueAt = Math.min(nextDueAt ?? eligibleAt, eligibleAt);
+            if (heldUntil !== undefined) {
+                nextDueAt = Math.min(nextDueAt ?? heldUntil, heldUntil);
 
                 continue;
             }
@@ -655,54 +677,83 @@ export class HostPoster implements SessionObserver {
         await Promise.all(sends);
     }
 
-    /** Posts one session's report. A failed post keeps what is newer than this send, and waits out its own backoff. */
+    /**
+     * When a session's next report may go: the end of its failed post's backoff, else two seconds after its last post. Undefined
+     * when it may go now. The window counts forward only, so a clock that moved back does not hold the report until it catches up.
+     */
+    private stateHeldUntil(sessionId: string): number | undefined {
+        const retryAt = this.stateRetryAt.get(sessionId);
+
+        if (retryAt !== undefined && retryAt > this.now()) {
+            return retryAt;
+        }
+
+        const sentAt = this.stateSentAt.get(sessionId);
+        const eligibleAt = (sentAt ?? 0) + STATE_DEBOUNCE_MS;
+
+        return sentAt !== undefined && sentAt <= this.now() && eligibleAt > this.now() ? eligibleAt : undefined;
+    }
+
+    /** Sends one session's report. It is in flight until it has settled: a held report (`flushReport`) waits for it. */
     private async sendState(sessionId: string, pending: PendingState, deviceId: string): Promise<void> {
-        this.stateInFlight.add(sessionId);
-        this.stateSentAt.set(sessionId, this.now());
+        let settled = () => {};
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the supported Node range starts before it exists
+        this.stateInFlight.set(sessionId, new Promise<void>((resolve) => {
+            settled = resolve;
+        }));
 
         try {
-            const now = this.now();
-            const { at, ...fields } = pending;
-            const payload = JSON.stringify({ deviceId, events: [{ ...fields, at, kind: "session_state" }], issuedAt: now, kind: "turn", sessionId, v: 1 });
-            let result: PostResult;
-
-            try {
-                result = await this.request(payload);
-            } catch {
-                result = { kind: "retry" };
-            }
-
-            if (result.kind === "retry") {
-                const waiting = this.pendingState.get(sessionId);
-                const attempts = (this.stateAttempts.get(sessionId) ?? 0) + 1;
-
-                if (waiting === undefined && attempts >= MAX_STATE_ATTEMPTS) {
-                    // Nothing newer replaces it, and it has failed this many times: dropped, not written back.
-                    this.pendingState.delete(sessionId);
-                    this.stateAttempts.delete(sessionId);
-                    this.stateRetryAt.delete(sessionId);
-                } else {
-                    this.pendingState.set(sessionId, newerPending(pending, waiting));
-                    this.stateAttempts.set(sessionId, attempts);
-
-                    // A fresh report that arrived meanwhile is not held behind this failure: the finally block sends it at its
-                    // debounce. Only a failed report with nothing newer waiting backs off.
-                    if (waiting === undefined) {
-                        this.stateRetryAt.set(sessionId, this.now() + STATE_RETRY_MS);
-                        this.scheduleState(STATE_RETRY_MS);
-                    }
-                }
-            } else {
-                this.stateRetryAt.delete(sessionId);
-                this.stateAttempts.delete(sessionId);
-            }
+            await this.postState(sessionId, pending, deviceId);
         } finally {
             this.stateInFlight.delete(sessionId);
+            settled();
 
             // A report that arrived while this post was on its way is sent by the next flush of this session, unless it is backing off.
             if (this.pendingState.has(sessionId) && !this.stateRetryAt.has(sessionId)) {
                 this.scheduleState(STATE_DEBOUNCE_MS);
             }
+        }
+    }
+
+    /** Posts one session's report. A failed post keeps what is newer than this send, and waits out its own backoff. */
+    private async postState(sessionId: string, pending: PendingState, deviceId: string): Promise<void> {
+        this.stateSentAt.set(sessionId, this.now());
+
+        const now = this.now();
+        const { at, ...fields } = pending;
+        const payload = JSON.stringify({ deviceId, events: [{ ...fields, at, kind: "session_state" }], issuedAt: now, kind: "turn", sessionId, v: 1 });
+        let result: PostResult;
+
+        try {
+            result = await this.request(payload);
+        } catch {
+            result = { kind: "retry" };
+        }
+
+        if (result.kind === "retry") {
+            const waiting = this.pendingState.get(sessionId);
+            const attempts = (this.stateAttempts.get(sessionId) ?? 0) + 1;
+
+            if (waiting === undefined && attempts >= MAX_STATE_ATTEMPTS) {
+                // Nothing newer replaces it, and it has failed this many times: dropped, not written back.
+                this.pendingState.delete(sessionId);
+                this.stateAttempts.delete(sessionId);
+                this.stateRetryAt.delete(sessionId);
+            } else {
+                this.pendingState.set(sessionId, newerPending(pending, waiting));
+                this.stateAttempts.set(sessionId, attempts);
+
+                // A fresh report that arrived meanwhile is not held behind this failure: the finally block sends it at its
+                // debounce. Only a failed report with nothing newer waiting backs off.
+                if (waiting === undefined) {
+                    this.stateRetryAt.set(sessionId, this.now() + STATE_RETRY_MS);
+                    this.scheduleState(STATE_RETRY_MS);
+                }
+            }
+        } else {
+            this.stateRetryAt.delete(sessionId);
+            this.stateAttempts.delete(sessionId);
         }
     }
 

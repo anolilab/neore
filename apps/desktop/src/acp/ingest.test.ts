@@ -1158,6 +1158,47 @@ describe("a session that ends locally", () => {
         expect(backend.posts.findIndex(({ post }) => post.close === true)).toBeGreaterThan(0);
     });
 
+    it("posts a usage report held for a session that ended during its session_open to the thread the open answers with, before the close", async () => {
+        const isOpen = (post: Post) => (post.events[0] as { kind?: string } | undefined)?.kind === "session_open";
+        const reports = () => backend.posts.filter(({ post }) => (post.events[0] as { kind?: string } | undefined)?.kind === "session_state");
+        let release = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the supported Node range starts before it exists
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+
+        backend.respond = (post) => isOpen(post) ? Response.json({ ended: false, next: 0, threadId: "thread-held" }) : undefined;
+
+        const host = poster(undefined, async (url, init) => {
+            const { payload } = JSON.parse(String(init?.body)) as { payload: string };
+
+            if (isOpen(JSON.parse(payload) as Post)) {
+                await gate;
+            }
+
+            return await backend.fetch(String(url), init);
+        });
+
+        host.sessionOpened("s1", INFO);
+        await settle();
+        host.sessionState("s1", { usage: { size: 200_000, used: 9 } });
+        host.sessionEnded("s1");
+        await settle(4000);
+
+        // The open is unanswered: the report waits for the thread, and the close waits for the report.
+        expect(reports()).toHaveLength(0);
+        expect(closes()).toHaveLength(0);
+
+        release();
+        await settle(4000);
+
+        expect(reports()).toHaveLength(1);
+        expect(reports()[0]?.post).toMatchObject({ sessionId: "s1" });
+        expect(reports()[0]?.post.events[0]).toMatchObject({ usage: { size: 200_000, used: 9 } });
+        expect(closes()).toHaveLength(1);
+        expect(backend.posts.indexOf(reports()[0] as never)).toBeLessThan(backend.posts.indexOf(closes()[0] as never));
+    });
+
     it("sends no close for a session the backend refused to open", async () => {
         const host = poster();
 

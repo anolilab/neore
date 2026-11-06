@@ -37,6 +37,8 @@ export class SessionLink {
         private readonly poster: {
             bound: (sessionId: string, threadId: string) => void;
             deviceId: () => string | undefined;
+            /** Posts the report held for the session now and resolves once that post has settled (a failed one is kept for its retry). */
+            flushReport: (sessionId: string) => Promise<void>;
             now: () => number;
             random: () => number;
             /** The session will not be posted: turns waiting on its thread are over. */
@@ -51,12 +53,16 @@ export class SessionLink {
         clearTimeout(this.closeTimer);
     }
 
-    /** The local session ended: a `session_open` still being retried must not create a backend session for it. */
+    /**
+     * The local session ended: a `session_open` still being retried must not create a backend session for it. An open
+     * in flight decides the thread: if it is answered with one, the session binds to it (`attempt`), and its held
+     * report and close follow. Only an open that ends without a thread leaves the session local.
+     */
     public close(): void {
         this.closed = true;
         clearTimeout(this.timer);
 
-        if (this.threadId === undefined) {
+        if (this.threadId === undefined && !this.opening) {
             this.local();
         }
     }
@@ -65,10 +71,12 @@ export class SessionLink {
      * The local session is over and its turns are delivered: the backend ends the session now instead of leaving it
      * `idle` until someone reads it as stale. A session the backend never heard of has nothing to close. A close
      * waits for an open still in flight: sent first, it would be answered "unknown" and the open would then create
-     * a session nobody closes.
+     * a session nobody closes. It also waits for the report held for the session: the backend does not take a report
+     * for a session it has closed.
      */
     public async announceClose(): Promise<void> {
         await this.inflight;
+        await this.poster.flushReport(this.sessionId);
 
         const deviceId = this.poster.deviceId();
 
@@ -137,10 +145,8 @@ export class SessionLink {
                 this.posted = false;
             }
 
-            if (this.closed) {
-                return;
-            }
-
+            // Also when closed: a thread the backend answered with binds the session, so the report held for it can post
+            // and the close follows it. `retryLater` does nothing once closed; the finally below ends the session locally.
             if (result.kind === "ok" && result.threadId !== undefined) {
                 // An ended session (its thread was deleted in the app) takes no more turns.
                 if (result.ended) {
@@ -151,13 +157,18 @@ export class SessionLink {
                 }
             } else if (result.kind === "refused") {
                 this.local();
-            } else {
+            } else if (!this.closed) {
                 this.retryLater();
             }
         } catch {
             this.retryLater();
         } finally {
             this.opening = false;
+
+            // Closed while the open was in flight, and no thread came of it: the session stays local.
+            if (this.closed && this.threadId === undefined) {
+                this.local();
+            }
         }
     }
 
