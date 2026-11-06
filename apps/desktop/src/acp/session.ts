@@ -179,6 +179,9 @@ export class AgentSession {
     /** Whether the startup updates are the saved session's (while it loads) or a fresh session's (once it is opened). */
     private startupPhase: "loading" | "opening" = "opening";
 
+    /** The newest usage report sent before the session answered, reported once it has opened. */
+    private startupUsage: Record<string, unknown> | undefined;
+
     /** What happened to the saved session the backend asked to load; unset when it asked for none. */
     private reattach: HostSessionInfo["reattach"];
 
@@ -215,6 +218,16 @@ export class AgentSession {
             this.agent = await initialize(this.connection, this.options.appVersion, this.options.startupTimeoutMs);
             this.report = this.options.capabilityReport?.(this.agent) ?? reportFromHandshake(this.agent.capabilities, Date.now());
             this.agentSessionId = await this.openAgentSession();
+
+            // A usage report the agent sent before its session answered reaches the meter now. Its session id is checked like any
+            // other update's, so a report from a failed load is not carried into this session.
+            const early = this.startupUsage;
+
+            this.startupUsage = undefined;
+
+            if (early !== undefined) {
+                this.onNotification(METHOD.sessionUpdate, early);
+            }
 
             // What the agent offered is known now, so the report says whether it has models, reasoning effort and modes.
             if (this.report !== undefined) {
@@ -257,6 +270,20 @@ export class AgentSession {
         }
 
         this.reportOptions();
+    }
+
+    /**
+     * A change asked for from the web or the phone. A mode can grant standing permissions, so it is changed on the computer only:
+     * the legacy mode state (no option id) and an option the agent reports as a mode are refused here, whatever the backend checked.
+     */
+    public async setRemoteOption(optionId: string | undefined, valueId: string): Promise<void> {
+        const category = optionId === undefined ? "mode" : this.offered.configOptions?.find((option) => option.id === optionId)?.category;
+
+        if (category?.toLowerCase() === "mode") {
+            throw new Error("a mode is changed on the computer, not from here");
+        }
+
+        await this.setOption(optionId, valueId);
     }
 
     /**
@@ -476,8 +503,14 @@ export class AgentSession {
             return true;
         }
 
-        // The answer lists every option with its new value; one that is not a list means only this value moved.
-        const listed = configOptionsOf(isRecord(answer) ? answer.configOptions : undefined, this.options.process.scrub);
+        // The answer lists every option with its new value; one that is not a list means only this value moved. A list that holds
+        // no usable option is not that: it confirms nothing, and what is offered stays as it was.
+        const sent = isRecord(answer) ? answer.configOptions : undefined;
+        const listed = configOptionsOf(sent, this.options.process.scrub);
+
+        if (sent !== undefined && listed === undefined) {
+            return false;
+        }
 
         this.offered = listed === undefined ? withOptionValue(this.offered, optionId, valueId) : { ...this.offered, configOptions: listed };
 
@@ -905,18 +938,30 @@ export class AgentSession {
 
     // ─── From the agent ────────────────────────────────────────────────────
 
-    private onNotification(method: string, params: unknown): void {
-        // While the session opens its id is not known yet, and an agent may send its options before it answers. They are
-        // kept, older than the answer, so the answer's own fields replace them.
-        if (this.agentSessionId === "" && this.status === "starting" && method === METHOD.sessionUpdate && isRecord(params) && isRecord(params.update)) {
-            // While the saved session loads, only its updates count. Once a fresh session is opened, the saved id's late updates are
-            // the failed load's, and the fresh session's own updates are the ones that count.
-            const { resumeSessionId } = this.options;
-            const counts = resumeSessionId === undefined || (this.startupPhase === "loading" ? params.sessionId === resumeSessionId : params.sessionId !== resumeSessionId);
+    /**
+     * An update that arrives while the session opens, before its id is known. While the saved session loads, only its updates
+     * count; once a fresh session is opened, the saved id's late updates are the failed load's. The options are taken at once; the
+     * newest usage report is kept for `start` to report.
+     */
+    private takeStartupUpdate(params: Record<string, unknown>): void {
+        const { resumeSessionId } = this.options;
+        const counts = resumeSessionId === undefined || (this.startupPhase === "loading" ? params.sessionId === resumeSessionId : params.sessionId !== resumeSessionId);
 
-            if (counts) {
-                this.takeStartupOptions(params.update);
-            }
+        if (!counts || !isRecord(params.update)) {
+            return;
+        }
+
+        if (params.update.sessionUpdate === "usage_update") {
+            this.startupUsage = params;
+        } else {
+            this.takeStartupOptions(params.update);
+        }
+    }
+
+    private onNotification(method: string, params: unknown): void {
+        // While the session opens its id is not known yet, and an agent may send its options before it answers.
+        if (this.agentSessionId === "" && this.status === "starting" && method === METHOD.sessionUpdate && isRecord(params) && isRecord(params.update)) {
+            this.takeStartupUpdate(params);
 
             return;
         }
