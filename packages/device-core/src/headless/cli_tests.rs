@@ -99,3 +99,31 @@ fn unpair_is_refused_while_a_run_holds_the_pairing_and_nothing_is_asked() {
     assert!(!dir.join("host.json").exists());
     assert!(keychain.entries.borrow().is_empty());
 }
+
+#[test]
+fn version_is_asked_for_as_a_command_or_after_one() {
+    assert!(asks_for_version("--version", &[]));
+    assert!(asks_for_version("-V", &[]));
+    assert!(asks_for_version("pair", &words(&["--version"])));
+    assert!(asks_for_version("run", &words(&["-V"])));
+    assert!(asks_for_version("unpair", &words(&["--yes", "--version"])));
+    assert!(!asks_for_version(
+        "pair",
+        &words(&["--backend", "https://neore.ai"])
+    ));
+    assert!(!asks_for_version("--stdio", &[]));
+}
+
+#[test]
+fn unpairing_a_machine_that_is_not_paired_succeeds_and_asks_nothing() {
+    use super::super::vault::tests::{temp_dir, FakeKeychain};
+
+    let keychain = FakeKeychain::default();
+    let vault = Vault::new(temp_dir("unpair-none"), &keychain);
+
+    // No `--yes` and no terminal: still a success, because there is nothing to confirm.
+    assert_eq!(
+        format!("{:?}", unpair(&vault, false)),
+        format!("{:?}", ExitCode::SUCCESS)
+    );
+}

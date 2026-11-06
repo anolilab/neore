@@ -683,8 +683,8 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
         ...buildAuthOptions({
             // A machine that pairs itself by code is registered on its owner's shard.
             hostPairing: {
-                precheck: async (userId) => {
-                    await shard.call(internal.devices.internal.checkHeadlessPairing, { userId }, { shardKey: userId });
+                precheck: async (userId, codeId) => {
+                    await shard.call(internal.devices.internal.checkHeadlessPairing, { codeId, userId }, { shardKey: userId });
                 },
                 register: async ({ codeId, name, platform, userId }) =>
                     await shard.call(internal.devices.internal.registerHeadlessDevice, { codeId, name, platform, userId }, { shardKey: userId }),

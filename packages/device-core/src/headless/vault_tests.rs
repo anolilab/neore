@@ -411,3 +411,36 @@ fn an_unpaired_machine_loads_nothing_and_forget_clears_a_pairing() {
     assert_eq!(vault.load().unwrap(), None);
     assert!(keychain.entries.borrow().is_empty());
 }
+
+#[test]
+fn debug_output_never_carries_the_secret() {
+    let keychain = FakeKeychain {
+        broken: true,
+        ..FakeKeychain::default()
+    };
+    let vault = Vault::new(temp_dir("debug"), &keychain);
+
+    // A file pairing keeps the secret in the record itself.
+    #[cfg(unix)]
+    {
+        vault.save(&pairing("device-1"), Storage::File).unwrap();
+
+        let loaded = vault.load().unwrap().unwrap();
+
+        assert_eq!(loaded.secret, SECRET);
+        assert!(!format!("{loaded:?}").contains(SECRET));
+        assert!(!format!("{:?}", loaded.record).contains(SECRET));
+        assert!(!format!("{loaded:#?}").contains(SECRET));
+    }
+
+    let record = Record {
+        account: String::new(),
+        backend: "https://neore.ai".into(),
+        device_id: "d".into(),
+        name: "n".into(),
+        secret: SECRET.into(),
+        storage: Storage::File,
+    };
+
+    assert!(!format!("{record:?}").contains(SECRET));
+}

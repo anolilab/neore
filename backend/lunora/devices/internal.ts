@@ -307,6 +307,13 @@ export const sweepDeviceCalls = internalMutation
         return null;
     });
 
+/** The device already registered for this redeemed code, if any. */
+const findDeviceForCode = async (ctx: Pick<QueryCtx, "db">, userId: string, codeId: string) => {
+    const { page } = await ctx.db.devices.findMany({ limit: MAX_DEVICES_PER_USER + 1, where: { userId } });
+
+    return page.find((device) => device.pairedByCode === codeId && device.encryptedSecret !== undefined);
+};
+
 /** Whether a machine may pair itself to this account: a real account, not being deleted, with room for one more device. */
 const assertMayPairHeadless = async (ctx: QueryCtx, userId: string): Promise<void> => {
     const account = await ctx.db.user.findFirst({ consistency: "primary", where: { _id: ctx.db.asId("user", userId) } });
@@ -327,9 +334,15 @@ const assertMayPairHeadless = async (ctx: QueryCtx, userId: string): Promise<voi
  * take the device, so the code stays unclaimed and the person can free a slot first. Runs on the account's shard.
  */
 export const checkHeadlessPairing = internalQuery
-    .input({ userId: v.string().max(MAX_LENGTH.short) })
+    .input({ codeId: v.optional(v.string().max(MAX_LENGTH.id)), userId: v.string().max(MAX_LENGTH.short) })
     .output(v.null())
     .query(async ({ args, ctx }) => {
+        // A retried poll of a code whose device already exists is finishing that pairing: its own device must not
+        // count against the cap (`registerHeadlessDevice` hands it back).
+        if (args.codeId !== undefined && (await findDeviceForCode(ctx, args.userId, args.codeId))) {
+            return null;
+        }
+
         await assertMayPairHeadless(ctx, args.userId);
 
         return null;
@@ -351,8 +364,7 @@ export const registerHeadlessDevice = internalMutation
     })
     .output(v.object({ deviceId: v.string(), secret: v.string() }))
     .mutation(async ({ args, ctx }) => {
-        const { page } = await ctx.db.devices.findMany({ limit: MAX_DEVICES_PER_USER + 1, where: { userId: args.userId } });
-        const existing = page.find((device) => device.pairedByCode === args.codeId && device.encryptedSecret !== undefined);
+        const existing = await findDeviceForCode(ctx, args.userId, args.codeId);
 
         if (existing?.encryptedSecret) {
             return { deviceId: existing._id as string, secret: await decryptKey(existing.encryptedSecret, "device-secrets") };

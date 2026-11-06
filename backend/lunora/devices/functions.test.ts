@@ -1264,6 +1264,22 @@ describe("a headless machine paired by code", () => {
         expect(other.secret).not.toBe(first.secret);
     });
 
+    it("does not count a code's own device against the cap when its pairing is retried", async () => {
+        for (let index = 0; index < 9; index += 1) {
+            await pairHeadless(ownerId, `filler-${String(index)}`);
+        }
+
+        const own = await pairHeadless(ownerId, "build-box", "code-own");
+        const check = async (codeId?: string) =>
+            await harness.run(async (ctx: any) => await ctx.runQuery(internals.checkHeadlessPairing, { ...(codeId && { codeId }), userId: ownerId }));
+
+        // The account is now at the cap: a new code is refused, but the retry of the code that filled it is not.
+        await expect(check("code-other")).rejects.toThrow("At most");
+        await expect(check()).rejects.toThrow("At most");
+        await expect(check("code-own")).resolves.toBeNull();
+        expect(await pairHeadless(ownerId, "build-box", "code-own")).toEqual(own);
+    });
+
     it("never exceeds the device cap when two pairings register at once", async () => {
         for (let index = 0; index < 9; index += 1) {
             await pairHeadless(ownerId, `filler-${String(index)}`);

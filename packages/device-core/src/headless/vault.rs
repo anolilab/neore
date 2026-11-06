@@ -41,7 +41,7 @@ impl Storage {
 }
 
 /// What the machine knows about its pairing besides the secret.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Record {
     /// The approving account as the backend displayed it (a masked address), so `run` can show whose machine this is.
@@ -54,6 +54,21 @@ pub struct Record {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub secret: String,
     pub storage: Storage,
+}
+
+impl std::fmt::Debug for Record {
+    // Hand-written: a derived `Debug` would print the secret of a file pairing into any log that formats a record.
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Record")
+            .field("account", &self.account)
+            .field("backend", &self.backend)
+            .field("device_id", &self.device_id)
+            .field("name", &self.name)
+            .field("secret", &(!self.secret.is_empty()).then_some("<redacted>"))
+            .field("storage", &self.storage)
+            .finish()
+    }
 }
 
 /// The OS keychain, by account. A trait so the fallback is tested without one.
@@ -144,10 +159,20 @@ pub struct NewPairing<'a> {
     pub secret: &'a str,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub struct Loaded {
     pub record: Record,
     pub secret: String,
+}
+
+impl std::fmt::Debug for Loaded {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Loaded")
+            .field("record", &self.record)
+            .field("secret", &"<redacted>")
+            .finish()
+    }
 }
 
 impl<'a> Vault<'a> {

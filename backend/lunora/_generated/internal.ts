@@ -613,7 +613,7 @@ export interface InternalApiTypes {
             deleteUserDevices: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
         };
         internal: {
-            checkHeadlessPairing: FunctionReference<"query", { userId: string }, null>;
+            checkHeadlessPairing: FunctionReference<"query", { codeId?: string; userId: string }, null>;
             createDeviceCall: FunctionReference<"mutation", { deviceId: Id<"devices">; input: string; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: Id<"threads">; toolCallId?: string; toolName: string; userId: string }, { callId: string } | { error: "busy" | "ineligible" | "input_too_large" | "offline" | "outdated" | "rate_limited" }>;
             expireDeviceCall: FunctionReference<"mutation", { callId: Id<"deviceCalls">; reason: string }, null | { createdAt: number; deadline: number; error?: string; exitCode?: number; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; truncated?: boolean }>;
             getDeviceCallState: FunctionReference<"query", { callId: Id<"deviceCalls"> }, null | { createdAt: number; deadline: number; error?: string; exitCode?: number; output?: string; status: "pending" | "claimed" | "completed" | "failed" | "denied" | "expired"; truncated?: boolean }>;

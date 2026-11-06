@@ -27,7 +27,7 @@ interface Registration {
     userId: string;
 }
 
-const build = (options: { precheck?: (userId: string) => Promise<void>; register?: () => Promise<void>; withHostPairing?: boolean } = {}) => {
+const build = (options: { precheck?: (userId: string, codeId: string) => Promise<void>; register?: () => Promise<void>; withHostPairing?: boolean } = {}) => {
     const registrations: Registration[] = [];
     const attempts: string[] = [];
     const database = memoryAdapter({ account: [], apikey: [], deviceCode: [], rateLimit: [], session: [], user: [], verification: [] });

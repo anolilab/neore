@@ -96,7 +96,7 @@ export interface MintedCliKey {
 /** What a redeemed host code registers: a device of the approving account, paired for the machine that asked. */
 export interface HostPairingOptions {
     /** Throws when the account cannot add a device. Runs before the code is spent, so a refusal leaves it unclaimed. */
-    precheck: (userId: string) => Promise<void>;
+    precheck: (userId: string, codeId: string) => Promise<void>;
     /**
      * Creates the device and its secret, after the atomic claim. `codeId` names the redeemed code: a retry after a
      * failure puts the code back, so the same id comes again and must find the device it already made.
@@ -383,7 +383,7 @@ const redeemHost = (options: HostPairingOptions) =>
                 }
 
                 try {
-                    await options.precheck(record.userId as string);
+                    await options.precheck(record.userId as string, String((record as { id?: unknown }).id ?? ""));
                 } catch (error) {
                     throw refusalOrRetryable(error);
                 }

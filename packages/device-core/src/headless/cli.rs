@@ -65,6 +65,13 @@ fn flag(args: &mut impl Iterator<Item = String>, name: &str, into: &mut Option<S
 pub fn main(command: &str, args: impl Iterator<Item = String>) -> ExitCode {
     let mut args = args.collect::<Vec<_>>().into_iter();
 
+    // The build's version is not an error either: `neore-host --version`, or after a command.
+    if asks_for_version(command, args.as_slice()) {
+        println!("neore-host {}", env!("CARGO_PKG_VERSION"));
+
+        return ExitCode::SUCCESS;
+    }
+
     // Asking for help is not an error, and it must not do the command's work.
     if matches!(command, "pair" | "run" | "unpair") && asks_for_help(args.as_slice()) {
         println!("{}", help_for(command));
@@ -320,6 +327,21 @@ fn unpair(vault: &Vault<'_>, confirmed: bool) -> ExitCode {
         }
     };
 
+    // Nothing paired is already the state `unpair` aims for, so it is a success, not a failure, and asks nothing.
+    match vault.record() {
+        Ok(None) => {
+            println!("This machine holds no pairing. Nothing to remove.");
+
+            return ExitCode::SUCCESS;
+        }
+        Ok(Some(_)) => {}
+        Err(error) => {
+            eprintln!("neore-host: {error}");
+
+            return ExitCode::FAILURE;
+        }
+    }
+
     if !confirmed && !confirmed_at_terminal(vault) {
         eprintln!("neore-host: nothing was removed. Run `neore-host unpair --yes` to confirm, or `--dry-run` to see what it would remove.");
 
@@ -396,6 +418,14 @@ Example:
   neore-host unpair --dry-run"
             .to_owned(),
     }
+}
+
+/// `--version` or `-V` as the command, or anywhere among a headless command's arguments.
+fn asks_for_version(command: &str, args: &[String]) -> bool {
+    let is_flag = |word: &str| matches!(word, "--version" | "-V");
+
+    is_flag(command)
+        || (matches!(command, "pair" | "run" | "unpair") && args.iter().any(|word| is_flag(word)))
 }
 
 /// `--help` or `-h` anywhere among a command's arguments. (`--name` values never start with `-`.)
