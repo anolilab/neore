@@ -1016,8 +1016,10 @@ const runChatStartOnShard = async (
             ...(activeOrganizationId && { organizationId: activeOrganizationId }),
             ...(origin && { origin }),
             // The typed text, for skill-command detection. Not on regenerate: that
-            // replies to an existing prompt, which the run reads from the message.
-            ...(!body.regenerate && body.prompt && { userPrompt: body.prompt }),
+            // replies to an existing prompt, which the run reads from the message. A guest note's routing reads the note's
+            // own saved text, never the prompt the client sent.
+            ...(!body.regenerate && guestNote && { userPrompt: stripHiddenText(guestNote.text).text }),
+            ...(!body.regenerate && !guestNote && body.prompt && { userPrompt: body.prompt }),
             streamId: streamId!,
             streamingConfig: {
                 ...streamingConfig,
