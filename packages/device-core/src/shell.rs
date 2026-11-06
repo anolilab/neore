@@ -709,7 +709,9 @@ struct TerminalShared {
 /// A command started for a coding agent's `terminal/create` (`acp_terminal.rs`): it returns at once and is read
 /// while it runs. It always runs in the sandbox (the type takes a policy, never an absent one), keeps the tail of its
 /// output, and is killed with its whole process group when killed, dropped, past `timeout`, or once its shell ended
-/// (background children die with it, as for `shell_run`). One watcher thread owns the process.
+/// (background children die with it, as for `shell_run`). A descendant that started its own session or group (`setsid`,
+/// or a double fork) is not in that group and is not reached, so it can keep running in the sandbox after the end.
+/// One watcher thread owns the process.
 pub struct Terminal {
     shared: Arc<TerminalShared>,
     cap: usize,
