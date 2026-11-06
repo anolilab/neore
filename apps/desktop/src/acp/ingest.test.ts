@@ -1472,6 +1472,34 @@ describe("what the agent reports about itself", () => {
         expect(statePosts().filter((entry) => entry.post.sessionId === "s1")).toHaveLength(2);
     });
 
+    it("does not post one session's fresh report less than two seconds after its last post, when another session's retry wakes the pass", async () => {
+        const host = poster();
+
+        await open(host, "s1");
+        await open(host, "s2");
+        const t0 = clock;
+
+        // s2's report fails, so its retry is due 30 s after the failed post (at t0 + 32 s).
+        backend.failNext.push("network");
+        host.sessionState("s2", { usage: usage(5) });
+        await settle(2000);
+
+        // s1 posts at t0 + 30.5 s; its next report arrives at t0 + 32 s, just as s2's retry comes due.
+        await settle(26_500);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(1500);
+
+        // s1's second post waits until two seconds after its first, not at the retry's wake-up.
+        const s1Posts = statePosts().filter((entry) => entry.post.sessionId === "s1");
+
+        expect(s1Posts.map((entry) => entry.at - t0)).toEqual([30_500]);
+
+        await settle(500);
+        expect(statePosts().filter((entry) => entry.post.sessionId === "s1").map((entry) => entry.at - t0)).toEqual([30_500, 32_500]);
+    });
+
     it("sends a fresh report at its debounce when it arrived while the post it follows was failing", async () => {
         const host = poster();
         let release = () => {};

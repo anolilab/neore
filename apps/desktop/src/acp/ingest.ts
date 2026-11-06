@@ -156,6 +156,9 @@ export class HostPoster implements SessionObserver {
     /** Failed posts of a session's current report, reset by a fresh report or a success (`MAX_STATE_ATTEMPTS`). */
     private readonly stateAttempts = new Map<string, number>();
 
+    /** When a session last posted its report: its next one waits out `STATE_DEBOUNCE_MS` from it, whichever pass runs. */
+    private readonly stateSentAt = new Map<string, number>();
+
     /** The text of each running turn, kept for the references its reply makes (capped). */
     private readonly texts = new Map<string, string>();
 
@@ -586,7 +589,7 @@ export class HostPoster implements SessionObserver {
         // A snapshot: a send below writes its entry back, and this pass must not reach that entry again.
         const snapshot = new Map(this.pendingState);
         const sends: Promise<void>[] = [];
-        let nextRetryAt: number | undefined;
+        let nextDueAt: number | undefined;
 
         for (const sessionId of snapshot.keys()) {
             const pending = this.pendingState.get(sessionId);
@@ -618,7 +621,16 @@ export class HostPoster implements SessionObserver {
             const retryAt = this.stateRetryAt.get(sessionId);
 
             if (retryAt !== undefined && retryAt > this.now()) {
-                nextRetryAt = Math.min(nextRetryAt ?? retryAt, retryAt);
+                nextDueAt = Math.min(nextDueAt ?? retryAt, retryAt);
+
+                continue;
+            }
+
+            // Two seconds between one session's posts, whichever pass runs: a pass another session's timer brings sooner waits for it.
+            const eligibleAt = (this.stateSentAt.get(sessionId) ?? -Infinity) + STATE_DEBOUNCE_MS;
+
+            if (eligibleAt > this.now()) {
+                nextDueAt = Math.min(nextDueAt ?? eligibleAt, eligibleAt);
 
                 continue;
             }
@@ -634,8 +646,8 @@ export class HostPoster implements SessionObserver {
             sends.push(this.sendState(sessionId, pending, deviceId));
         }
 
-        if (nextRetryAt !== undefined) {
-            this.scheduleState(nextRetryAt - this.now());
+        if (nextDueAt !== undefined) {
+            this.scheduleState(nextDueAt - this.now());
         }
 
         await Promise.all(sends);
@@ -644,6 +656,7 @@ export class HostPoster implements SessionObserver {
     /** Posts one session's report. A failed post keeps what is newer than this send, and waits out its own backoff. */
     private async sendState(sessionId: string, pending: PendingState, deviceId: string): Promise<void> {
         this.stateInFlight.add(sessionId);
+        this.stateSentAt.set(sessionId, this.now());
 
         try {
             const now = this.now();
