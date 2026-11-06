@@ -55,23 +55,23 @@
   constants, `acp/lib/constants.ts` and `device-core/src/media.rs`, pinned
   equal by `media-limits.test.ts`.
   Host turns write no usage row and charge no credit.
-  - **Agent-reported state** (`session_state`, a turn-less post like `session_open`):
-    - Usage (`usage_update`) is stored on `acpSessions.agentState` with `agentStateAt`; each field present replaces the stored one.
-    - A report older than `agentStateAt` is dropped; a repeated value still moves `agentStateAt`.
-    - The desktop coalesces it to one post per session every 2 s (`HostPoster.flushState`).
+    - **Agent-reported state** (`session_state`, a turn-less post like `session_open`):
+        - Usage (`usage_update`) is stored on `acpSessions.agentState` with `agentStateAt`; each field present replaces the stored one.
+        - A report older than `agentStateAt` is dropped; a repeated value still moves `agentStateAt`.
+        - The desktop coalesces it to one post per session every 2 s (`HostPoster.flushState`).
 
-  **File-event hooks** (`apps/desktop/src/acp/hooks/`, acp-agent-host.md §4.10)
-  read `.neore/hooks.json` from the approved folder — repository content, so inert until the
-  local device window approves that file's SHA-256 (re-read and re-hashed when a hook fires),
-  and a hook can only send a prompt to the already-open session. The watcher drops events
-  during and shortly after any turn; do not shorten that window or let a hook start a session. `acp_*` device calls have
-  their own claim window (60 s) and open-call budget (3 per device); the backend
-  queues `acp_cancel` itself (`devices/lib/acp-call.ts`) because
-  `createDeviceCall` refuses anything the manifest does not list.
-  **A host thread can have several sessions** (harness switch S3): a switch to another host agent ends the thread's session
-  and opens the next in the SAME thread, so `sessionOfThread` is the newest by creation and an older one stays as an `ended` row.
-  The handoff for the new agent rides the first `acp_send` (`acp/lib/pending-handoff.ts`, derived from the path, no flag), never
-  the saved message; a switch across the runner makes a new thread linked by a `continuation` relationship.
+    **File-event hooks** (`apps/desktop/src/acp/hooks/`, acp-agent-host.md §4.10)
+    read `.neore/hooks.json` from the approved folder — repository content, so inert until the
+    local device window approves that file's SHA-256 (re-read and re-hashed when a hook fires),
+    and a hook can only send a prompt to the already-open session. The watcher drops events
+    during and shortly after any turn; do not shorten that window or let a hook start a session. `acp_*` device calls have
+    their own claim window (60 s) and open-call budget (3 per device); the backend
+    queues `acp_cancel` itself (`devices/lib/acp-call.ts`) because
+    `createDeviceCall` refuses anything the manifest does not list.
+    **A host thread can have several sessions** (harness switch S3): a switch to another host agent ends the thread's session
+    and opens the next in the SAME thread, so `sessionOfThread` is the newest by creation and an older one stays as an `ended` row.
+    The handoff for the new agent rides the first `acp_send` (`acp/lib/pending-handoff.ts`, derived from the path, no flag), never
+    the saved message; a switch across the runner makes a new thread linked by a `continuation` relationship.
 
 - **Coding agents on a paired computer** (`backend/lunora/acp/`, `apps/desktop/src/acp/`, acp-agent-host.md) —
   the web and the phone reach them only through signed `acp_*` device calls (`devices/lib/acp-call.ts`), and the
