@@ -22,7 +22,11 @@ const harness = vi.hoisted(() => {
     return {
         assistantProps: undefined as { initialMessage?: string } | undefined,
         composerModels: [] as { id: string }[],
+        savedPrompt: null as unknown,
         sessionPending: false,
+        validation: (() => {
+            return { errors: {}, isValid: true };
+        }) as (...args: unknown[]) => { errors: Record<string, unknown>; isValid: boolean },
         latestThread: undefined as string | undefined,
         locationSearch: "",
         navigate: vi.fn(),
@@ -122,10 +126,31 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
     };
 });
 
+vi.mock("@/features/prompts/lib/prompt-validation", () => {
+    return {
+        default: (...args: unknown[]) => harness.validation(...args),
+    };
+});
+
+vi.mock("@/hooks/use-feature-flagged-models", () => {
+    return {
+        default: () => [],
+    };
+});
+
 vi.mock("@/lib/lunora/crpc", () => {
     return {
         useCRPC: () => {
             return {
+                prompts: {
+                    functions: {
+                        getPrompt: {
+                            queryOptions: () => {
+                                return { queryFn: () => Promise.resolve(harness.savedPrompt), queryKey: ["saved-prompt"] };
+                            },
+                        },
+                    },
+                },
                 chat: {
                     resume: {
                         latestResumableThread: {
@@ -184,6 +209,8 @@ const mountPage = (): (() => void) => {
 
 /** Sets the address the page sees, read through the route's own search parser, as a navigation would. */
 const setSearch = (raw: Record<string, string>): void => {
+    // The address the page reads its own text from, and the search the router parsed from it.
+    harness.locationSearch = `?${new URLSearchParams(raw).toString()}`;
     harness.search = (Route.options.validateSearch as unknown as ValidateSearch)(raw);
 };
 
@@ -194,6 +221,10 @@ describe("chat index route", () => {
         harness.assistantProps = undefined;
         harness.latestThread = undefined;
         harness.sessionPending = false;
+        harness.savedPrompt = null;
+        harness.validation = () => {
+            return { errors: {}, isValid: true };
+        };
         harness.composerModels = MODEL_REGISTRY.filter(
             (model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external",
         ).map((model) => {
@@ -253,6 +284,16 @@ describe("chat index route", () => {
 
             await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("later link"));
             expect(harness.showWarning).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("a prompt typed into the address as a number", () => {
+        it("opens with that exact text, not the number the router reads it as", async () => {
+            openUrl("https://app.example.com/chat?prompt=1e3");
+
+            mountPage();
+
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("1e3"));
         });
     });
 
@@ -316,8 +357,34 @@ describe("chat index route", () => {
         });
     });
 
+    describe("a saved prompt that will not apply does not discard the link's draft", () => {
+        it("a missing saved prompt applies nothing, so the link's prompt is drafted", async () => {
+            harness.savedPrompt = null;
+            openUrl(linkWith({ promptId: "saved-1" }));
+
+            mountPage();
+
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("from the link"));
+            expect(harness.showWarning).not.toHaveBeenCalled();
+        });
+
+        it("a saved prompt whose settings are invalid applies nothing, so the link's prompt is drafted", async () => {
+            harness.savedPrompt = { content: "saved text", enabledFeatures: undefined, model: "not-a-model", reasoningEffort: undefined };
+            harness.validation = () => {
+                return { errors: { model: "unavailable" }, isValid: false };
+            };
+            openUrl(linkWith({ promptId: "saved-1" }));
+
+            mountPage();
+
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("from the link"));
+            expect(harness.showWarning).not.toHaveBeenCalled();
+        });
+    });
+
     describe("a saved prompt named in the same URL", () => {
         it("keeps the saved prompt's draft and refuses the link", async () => {
+            harness.savedPrompt = { content: "saved text", enabledFeatures: undefined, model: DEFAULT_CHAT_MODEL, reasoningEffort: undefined };
             openUrl(linkWith({ promptId: "saved-1" }));
 
             mountPage();

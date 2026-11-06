@@ -1,5 +1,6 @@
 import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useLocation, useNavigate, useRouteContext } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -15,7 +16,9 @@ import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 import type { LinkableModel } from "@/features/chat/core/utils/prompt-link-model";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
+import validatePromptSettings from "@/features/prompts/lib/prompt-validation";
 import { useComposerModelEntries } from "@/hooks/use-composer-models";
+import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 // Module scope, so it outlives this component's mounts: a page load resumes once.
@@ -36,15 +39,40 @@ const landingMessageWaiting = (): boolean => {
     }
 };
 
+/**
+ * The prompt as the address spells it. A link is built with its text JSON-quoted (`prompt.ts`), so a quoted value is read as that string;
+ * any other value is its own text, as a hand-written `1e3` or `true` is.
+ */
+const rawPromptText = (search: string): string | undefined => {
+    const raw = new URLSearchParams(search).get("prompt");
+
+    if (raw === null) {
+        return undefined;
+    }
+
+    try {
+        const parsed: unknown = JSON.parse(raw);
+
+        return typeof parsed === "string" ? parsed : raw;
+    } catch {
+        return raw;
+    }
+};
+
 const ChatPage = () => {
     const route = "/(chat)/chat/";
     const context = useRouteContext({ from: route });
     const promptId = Route.useSearch({ select: ({ promptId: selected }) => selected });
     const redirectReason = Route.useSearch({ select: ({ redirectReason: selected }) => selected });
     const hasInitialMessage = Route.useSearch({ select: ({ initialMessage }) => initialMessage });
-    const linkPrompt = Route.useSearch({ select: ({ prompt }) => prompt });
-    const linkModel = Route.useSearch({ select: ({ model }) => model });
+    const parsedLinkPrompt = Route.useSearch({ select: ({ prompt }) => prompt });
+    const parsedLinkModel = Route.useSearch({ select: ({ model }) => model });
     const location = useLocation();
+    // The router has already read the address: a prompt that looks like a number is a number there. The address's own text is what a
+    // link carries, so it is read when it is there, and the parsed value only when it is not.
+    const linkRead = readPromptLinkSearch({ model: parsedLinkModel, prompt: rawPromptText(location.search) ?? parsedLinkPrompt });
+    const linkPrompt = linkRead.prompt;
+    const linkModel = linkRead.model;
     // TanStack keys each history entry; a new navigation gets a new key.
     const navigationKey = location.state.__TSR_key;
     const { t } = useLingui();
@@ -81,6 +109,17 @@ const ChatPage = () => {
     // have answered, so the list is final; if the rules fail to load the list is empty, the link's model is refused and its prompt applies.
     const linkableModels = useComposerModelEntries();
 
+    // A saved prompt (`promptId`) owns the draft only if it will apply: it loads, and its settings are valid, as `usePromptLoader` requires.
+    // A missing or invalid one applies nothing, so the link keeps the draft, and the link waits until the prompt has answered.
+    const pickerModels = useFeatureFlaggedModels();
+    const savedPrompt = useQuery(crpc.prompts.functions.getPrompt.queryOptions(promptId ? { promptId: promptId as Id<"prompts"> } : skipToken));
+    const savedPromptPending = Boolean(promptId) && savedPrompt.isPending;
+    const savedPromptApplies =
+        Boolean(promptId) &&
+        savedPrompt.data !== undefined &&
+        savedPrompt.data !== null &&
+        validatePromptSettings(savedPrompt.data.model, savedPrompt.data.reasoningEffort, savedPrompt.data.enabledFeatures, pickerModels).isValid;
+
     usePromptLinkDraft({
         linkableModels: linkableModels ?? NO_LINKABLE_MODELS,
         // The composer sends the free model to an anonymous visitor's text chat, so the link's model waits for the session.
@@ -88,10 +127,10 @@ const ChatPage = () => {
         model: linkModel,
         // A handoff owns the draft while it is pending: its flag is in the address and its message is either waiting in storage now (one
         // written after this page mounted, as a new handoff is) or was waiting at mount and not yet decided. Read now, so the link sees it.
-        otherDraftSource: Boolean(promptId) || (Boolean(hasInitialMessage) && (handoffWaiting || landingMessageWaiting())),
+        otherDraftSource: savedPromptApplies || (Boolean(hasInitialMessage) && (handoffWaiting || landingMessageWaiting())),
         prompt: linkPrompt,
         onDecided: endHandoffOwnership,
-        ready: !isSessionPending && linkableModels !== undefined,
+        ready: !isSessionPending && linkableModels !== undefined && !savedPromptPending,
     });
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.
