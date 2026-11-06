@@ -41,6 +41,9 @@ class FakeBackend {
 
     public respond: ((post: Post) => Response | undefined) | undefined;
 
+    /** Holds a post's answer back until the promise it returns settles, so a test can stall one session's request. */
+    public gate: ((post: Post) => Promise<void> | undefined) | undefined;
+
     public readonly fetch = async (_url: URL | string, init?: RequestInit): Promise<Response> => {
         const { payload, signature } = JSON.parse(String(init?.body)) as { payload: string; signature: string };
         const post = JSON.parse(payload) as Post;
@@ -58,6 +61,8 @@ class FakeBackend {
         if (typeof failure === "number") {
             return Response.json({ error: "x" }, { status: failure });
         }
+
+        await this.gate?.(post);
 
         const custom = this.respond?.(post);
 
@@ -1401,6 +1406,67 @@ describe("what the agent reports about itself", () => {
 
         expect(statePosts()).toHaveLength(2);
         expect(statePosts()[1]?.post.events[0]).toMatchObject({ usage: usage(11) });
+    });
+
+    it("does not hold one session's report behind another session's stalled post", async () => {
+        const host = poster();
+        let release = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the supported Node range starts before it exists
+        const stalled = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+
+        await open(host, "s1");
+        await open(host, "s2");
+        backend.gate = (post) => post.sessionId === "s1" ? stalled : undefined;
+
+        host.sessionState("s1", { usage: usage(10) });
+        host.sessionState("s2", { usage: usage(20) });
+        await settle(2000);
+
+        // s1's post is still waiting for its answer; s2's report is posted all the same.
+        expect(statePosts().map((entry) => entry.post.sessionId)).toEqual(expect.arrayContaining(["s1", "s2"]));
+
+        release();
+        backend.gate = undefined;
+        await settle(2000);
+    });
+
+    it("does not retry one session's failed report early because another session reported", async () => {
+        const host = poster();
+
+        await open(host, "s1");
+        await open(host, "s2");
+        backend.failNext.push("network");
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        expect(statePosts().map((entry) => entry.post.sessionId)).toEqual(["s1"]);
+
+        // s2 reports while s1 is backing off: s2 is posted at its debounce, s1 waits for its own retry.
+        host.sessionState("s2", { usage: usage(20) });
+        await settle(2000);
+        expect(statePosts().map((entry) => entry.post.sessionId)).toEqual(["s1", "s2"]);
+
+        await settle(30_000);
+        expect(statePosts().filter((entry) => entry.post.sessionId === "s1")).toHaveLength(2);
+    });
+
+    it("retries a failed report with what was observed, under a fresh issuedAt, when nothing newer is reported", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext.push("network");
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        const [first] = statePosts();
+
+        await settle(30_000);
+        const retried = statePosts()[1];
+
+        expect(statePosts()).toHaveLength(2);
+        expect(retried?.post.events).toEqual(first?.post.events);
+        // A retry is signed afresh: an old issuedAt fails the backend's freshness check after an outage.
+        expect(retried?.post.issuedAt).toBeGreaterThan(first?.post.issuedAt ?? 0);
     });
 
     it("drops a report the backend refuses, and the session keeps going", async () => {

@@ -141,9 +141,11 @@ export class HostPoster implements SessionObserver {
     /** When the pending timer fires: a sooner report moves it earlier, a later one leaves it. */
     private stateDueAt: number | undefined;
 
-    private stateFlushing = false;
+    /** Sessions whose state post is on its way: at most one per session, so a session's reports stay in order. */
+    private readonly stateInFlight = new Set<string>();
 
-    private stateFlushAgain = false;
+    /** When a session's failed report may be retried: its own backoff, unaffected by other sessions' reports. */
+    private readonly stateRetryAt = new Map<string, number>();
 
     /** The text of each running turn, kept for the references its reply makes (capped). */
     private readonly texts = new Map<string, string>();
@@ -218,6 +220,8 @@ export class HostPoster implements SessionObserver {
         const usage = patch.usage === undefined ? pending?.usage : { ...pending?.usage, ...patch.usage };
 
         this.pendingState.set(sessionId, { ...pending, ...patch, ...usage !== undefined && { usage }, at: this.now() });
+        // A fresh report is the newest value, so it does not wait out its own session's backoff: the next flush sends it.
+        this.stateRetryAt.delete(sessionId);
         this.scheduleState(STATE_DEBOUNCE_MS);
     }
 
@@ -546,27 +550,11 @@ export class HostPoster implements SessionObserver {
     }
 
     /**
-     * One state pass at a time. A pass that comes due while another is posting waits for it and runs after it, so two state
-     * posts for a session are never in flight together: the backend then sees each session's reports in the order they were sent.
+     * Runs one pass when the timer comes due. There is no pass lock: each session's post is guarded by `stateInFlight`, so one
+     * session's stalled request never holds back another session's report.
      */
     private async runStateFlush(): Promise<void> {
-        if (this.stateFlushing) {
-            this.stateFlushAgain = true;
-
-            return;
-        }
-
-        this.stateFlushing = true;
-
-        try {
-            do {
-                this.stateFlushAgain = false;
-                // eslint-disable-next-line no-await-in-loop -- each pass must finish before the next one starts
-                await this.flushState();
-            } while (this.stateFlushAgain && !this.stopped);
-        } finally {
-            this.stateFlushing = false;
-        }
+        await this.flushState();
     }
 
     /**
@@ -580,13 +568,15 @@ export class HostPoster implements SessionObserver {
         }
 
         const deviceId = this.options.deviceId();
-        // A snapshot: a retry below writes its entry back, and this pass must not reach that entry again.
+        // A snapshot: a send below writes its entry back, and this pass must not reach that entry again.
         const snapshot = new Map(this.pendingState);
+        const sends: Promise<void>[] = [];
+        let nextRetryAt: number | undefined;
 
         for (const sessionId of snapshot.keys()) {
             const pending = this.pendingState.get(sessionId);
 
-            if (pending === undefined || this.stopped) {
+            if (pending === undefined || this.stopped || this.stateInFlight.has(sessionId)) {
                 continue;
             }
 
@@ -598,25 +588,56 @@ export class HostPoster implements SessionObserver {
                 continue;
             }
 
-            this.pendingState.delete(sessionId);
+            // A session whose report failed waits out its own backoff, even when another session's report wakes this pass.
+            const retryAt = this.stateRetryAt.get(sessionId);
 
+            if (retryAt !== undefined && retryAt > this.now()) {
+                nextRetryAt = Math.min(nextRetryAt ?? retryAt, retryAt);
+
+                continue;
+            }
+
+            this.pendingState.delete(sessionId);
+            // Sessions are independent: one slow post does not hold up another session's report. Each is signed when it is sent.
+            sends.push(this.sendState(sessionId, pending, deviceId));
+        }
+
+        if (nextRetryAt !== undefined) {
+            this.scheduleState(nextRetryAt - this.now());
+        }
+
+        await Promise.all(sends);
+    }
+
+    /** Posts one session's report. A failed post keeps what is newer than this send, and waits out its own backoff. */
+    private async sendState(sessionId: string, pending: PendingState, deviceId: string): Promise<void> {
+        this.stateInFlight.add(sessionId);
+
+        try {
             const now = this.now();
             const { at, ...fields } = pending;
             const payload = JSON.stringify({ deviceId, events: [{ ...fields, at, kind: "session_state" }], issuedAt: now, kind: "turn", sessionId, v: 1 });
             let result: PostResult;
 
             try {
-                // One post per session, in order: each is signed when it is sent.
-                // eslint-disable-next-line no-await-in-loop
                 result = await this.request(payload);
             } catch {
                 result = { kind: "retry" };
             }
 
             if (result.kind === "retry") {
-                // Keep what is newer than this send, and let the next flush carry it with the rest.
                 this.pendingState.set(sessionId, newerPending(pending, this.pendingState.get(sessionId)));
+                this.stateRetryAt.set(sessionId, this.now() + STATE_RETRY_MS);
                 this.scheduleState(STATE_RETRY_MS);
+            } else {
+                this.stateRetryAt.delete(sessionId);
+            }
+        } finally {
+            this.stateInFlight.delete(sessionId);
+
+            // A report that arrived while this post was on its way is sent by the next flush of this session, unless it is backing off.
+            if (this.pendingState.has(sessionId) && !this.stateRetryAt.has(sessionId)) {
+                this.scheduleState(STATE_DEBOUNCE_MS);
             }
         }
     }
