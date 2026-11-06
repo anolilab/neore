@@ -8,9 +8,20 @@ import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-st
 import ComposerPromptQueue from "./composer-prompt-queue";
 
 const chat = vi.hoisted(() => {
-    return { error: undefined as Error | undefined, isStreaming: false, saving: false, sendMessage: vi.fn(), threadId: "thread-1" };
+    return {
+        error: undefined as Error | undefined,
+        isStreaming: false,
+        // A mode save as the query cache sees it now; `saving` is the flag the last render read.
+        liveSaving: false,
+        saving: false,
+        sendMessage: vi.fn(),
+        threadId: "thread-1",
+    };
 });
 const withdrawSteer = vi.hoisted(() => vi.fn());
+const queryClient = vi.hoisted(() => {
+    return { isMutating: () => (chat.saving || chat.liveSaving ? 1 : 0) };
+});
 
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -30,6 +41,7 @@ vi.mock("@tanstack/react-query", () => {
         useQuery: () => {
             return { data: undefined };
         },
+        useQueryClient: () => queryClient,
     };
 });
 vi.mock("@/lib/lunora/crpc", () => {
@@ -74,6 +86,8 @@ describe("composer prompt queue", () => {
     beforeEach(() => {
         chat.error = new Error("the reply failed");
         chat.isStreaming = false;
+        chat.liveSaving = false;
+        chat.saving = false;
         chat.sendMessage.mockReset();
         withdrawSteer.mockReset();
         usePromptQueueStore.setState({ queues: {} });
@@ -98,6 +112,46 @@ describe("composer prompt queue", () => {
         view.rerender(<ComposerPromptQueue />);
 
         await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
+    });
+
+    it("holds a prompt when a mode save begins after the last render, while a steer withdrawal settles", async () => {
+        chat.error = undefined;
+
+        let finish: (value: { outcome: "withdrawn" }) => void = () => {};
+
+        // The lib target has no `Promise.withResolvers` yet.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const promise = new Promise<{ outcome: "withdrawn" }>((resolve) => {
+            finish = resolve;
+        });
+
+        withdrawSteer.mockReturnValue(promise);
+
+        const view = render(<ComposerPromptQueue />);
+
+        // Enqueued after mount, so the queue sends it: the steer's withdrawal is the await the save races.
+        await act(async () => {
+            usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], steer: { id: "steer-1", streamId: "stream-1" }, text: "steered" });
+        });
+        expect(withdrawSteer).toHaveBeenCalledTimes(1);
+
+        // The save starts, but no render has seen it yet: the rendered flag still reads idle.
+        chat.liveSaving = true;
+
+        await act(async () => {
+            finish({ outcome: "withdrawn" });
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+
+        // The save ends: the held prompt goes out, the steered one first.
+        chat.liveSaving = false;
+        chat.saving = true;
+        view.rerender(<ComposerPromptQueue />);
+        chat.saving = false;
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("steered", []));
     });
 
     it("sends on Send next clicked while a chip removal settles, though the reply ended in an error", async () => {

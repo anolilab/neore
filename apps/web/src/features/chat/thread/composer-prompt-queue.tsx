@@ -26,7 +26,7 @@
 import { Plural, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
-import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CornerDownRightIcon, ListOrderedIcon, PaperclipIcon, SendIcon, XIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { useCallback, useEffect, useRef } from "react";
@@ -40,7 +40,7 @@ import { decideAutoSend, deliveredSteerItems, takeNextToSend } from "@/features/
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
-import { usePermissionModeSaving } from "./composer-permission-mode";
+import { permissionModeSaveKey, usePermissionModeSaving } from "./composer-permission-mode";
 
 /**
  * `sendMessage` clears the composer synchronously (before its first await) —
@@ -81,12 +81,11 @@ const useQueueActions = () => {
     const { threadId: currentThreadId } = useChatThread();
     const { isStreaming } = useChatIsStreaming();
     const { error } = useChatError();
-    // A prompt sent while the thread's permission mode is saving would run under the old mode: it waits for the save.
-    const modeSaving = usePermissionModeSaving(currentThreadId);
+    const queryClient = useQueryClient();
     const { mutateAsync: withdrawSteer } = useMutation(crpc.chat.steering.withdrawSteer.mutationOptions());
     const busyRef = useRef(false);
     // What an `await` in here must re-read afterwards, not close over.
-    const latestRef = useRef({ hasError: Boolean(error), isStreaming, modeSaving, threadId: currentThreadId });
+    const latestRef = useRef({ hasError: Boolean(error), isStreaming, threadId: currentThreadId });
     // A thread whose send was asked for while a removal held `busyRef`; `explicit` is the Send next button, which outranks a reply's error.
     const sendRequestedRef = useRef<{ explicit: boolean; threadId: string } | undefined>(undefined);
     // Chips whose removal was asked for while another call held `busyRef`.
@@ -95,8 +94,8 @@ const useQueueActions = () => {
     const sendNextPromptRef = useRef<(threadId: string, options?: { explicit?: boolean }) => Promise<void>>(async () => {});
 
     useEffect(() => {
-        latestRef.current = { hasError: Boolean(error), isStreaming, modeSaving, threadId: currentThreadId };
-    }, [currentThreadId, error, isStreaming, modeSaving]);
+        latestRef.current = { hasError: Boolean(error), isStreaming, threadId: currentThreadId };
+    }, [currentThreadId, error, isStreaming]);
 
     /** Once `busyRef` is free: runs the removals asked for meanwhile, one after the other (each re-queues the rest while it holds the flag). */
     const removeRequestedMeanwhile = useCallback(() => {
@@ -149,7 +148,9 @@ const useQueueActions = () => {
                         return (
                             latest.threadId === threadId &&
                             !latest.isStreaming &&
-                            !latest.modeSaving &&
+                            // Read from the cache, not the rendered flag: a save that began after the last render is not in that flag yet,
+                            // and this check runs after the withdrawal's await, so it could send under the old mode.
+                            queryClient.isMutating({ exact: true, mutationKey: permissionModeSaveKey(threadId) }) === 0 &&
                             (explicit || !latest.hasError) &&
                             !useChatUIStore.getState().isSubmitting
                         );
@@ -176,7 +177,7 @@ const useQueueActions = () => {
                 removeRequestedMeanwhile();
             }
         },
-        [removeRequestedMeanwhile, sendQueuedPrompt, withdraw],
+        [queryClient, removeRequestedMeanwhile, sendQueuedPrompt, withdraw],
     );
 
     useEffect(() => {
