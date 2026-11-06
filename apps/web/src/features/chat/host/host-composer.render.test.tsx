@@ -5,6 +5,7 @@
 
 import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => {
@@ -12,6 +13,8 @@ const harness = vi.hoisted(() => {
         calls: [] as [string, unknown][],
         /** What the next sends answer, in order; an empty list answers ok. */
         sendResults: [] as ({ error: string; ok: false } | { ok: true })[],
+        /** When set, a send waits for it before it answers. */
+        gate: undefined as Promise<void> | undefined,
         data: {} as Record<string, unknown>,
     };
 });
@@ -32,7 +35,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 vi.mock("sonner", () => {
-    return { toast: { error: vi.fn(), success: vi.fn() } };
+    return { toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() } };
 });
 
 vi.mock("./host-send", () => {
@@ -40,6 +43,10 @@ vi.mock("./host-send", () => {
         MAX_HOST_PROMPT_CHARS: 30_000,
         sendHostMessage: vi.fn(async (input: unknown) => {
             harness.calls.push(["send", input]);
+
+            if (harness.gate) {
+                await harness.gate;
+            }
 
             return harness.sendResults.shift() ?? { ok: true };
         }),
@@ -199,6 +206,112 @@ describe("the coding-agent composer", () => {
         expect(ids[2]).not.toBe(ids[0]);
     });
 
+    it("counts the length the server will send, so a draft ending in a joiner that is removed is not refused", async () => {
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+        // 29,998 characters, an emoji (two units) and a trailing joiner: 30,001 units while typed, 30,000 once the joiner goes.
+        const draft = `${"a".repeat(29_998)}\u{1F600}\u{200D}`;
+
+        fireEvent.change(box, { target: { value: draft } });
+
+        const send = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
+
+        expect(send.disabled).toBe(false);
+        fireEvent.click(send);
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+        expect((harness.calls[0]?.[1] as { text: string }).text).toBe(`${"a".repeat(29_998)}\u{1F600}`);
+        // The sent text clears from the box, joiner and all.
+        await waitFor(() => expect(box.value).toBe(""));
+    });
+
+    it("keeps the refusal of a paste made while a send is in flight, and keeps Send off for the draft", async () => {
+        let open: () => void = () => undefined;
+
+        harness.gate = new Promise<void>((resolve) => {
+            open = () => {
+                resolve();
+            };
+        });
+
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "a valid draft" } });
+        fireEvent.click(screen.getByRole("button", { name: "Send" }));
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+
+        // A paste is refused while the first send is still pending.
+        fireEvent.change(box, { target: { value: "x".repeat(120_001) } });
+        open();
+        harness.gate = undefined;
+
+        await waitFor(() => expect(box.value).toBe(""));
+        // The refusal made during the send is still shown, and the field cannot send.
+        expect(screen.queryAllByRole("status").length).toBeGreaterThan(0);
+        expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("keeps a joiner typed while a send is pending, and does not clear the draft it did not send", async () => {
+        let open: () => void = () => undefined;
+
+        harness.gate = new Promise<void>((resolve) => {
+            open = () => {
+                resolve();
+            };
+        });
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "x\u{1F600}" } });
+        fireEvent.click(screen.getByRole("button", { name: "Send" }));
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+
+        // The person keeps going while the send is pending: a joiner continues the emoji sequence.
+        fireEvent.change(box, { target: { value: "x\u{1F600}\u{200D}" } });
+        open();
+        harness.gate = undefined;
+
+        // Wait for the send to finish (Send is off while it is pending), then check what the box holds.
+        await waitFor(() => expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(false));
+        expect(box.value).toBe("x\u{1F600}\u{200D}");
+    });
+
+    it("does not send the draft a refused paste would have left, and shows the refusal", async () => {
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "a valid draft" } });
+        // A paste over the raw-input limit is refused: the field keeps its draft and says so.
+        fireEvent.change(box, { target: { value: "x".repeat(120_001) } });
+
+        expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
+        fireEvent.keyDown(box, { key: "Enter" });
+        expect(harness.calls).toHaveLength(0);
+        // The field keeps its draft, is marked invalid, and says why as its accessible description.
+        expect(box.value).toBe("a valid draft");
+        expect(box.getAttribute("aria-invalid")).toBe("true");
+        expect(box.getAttribute("aria-describedby")).toBe("host-composer-limit");
+        expect(screen.getAllByRole("status").map((element) => element.id)).toContain("host-composer-limit");
+    });
+
+    it("removes hidden characters typed into the draft, keeps the caret where it was, and says so", async () => {
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        // A bidi override typed between "a" and "b", with the caret at the end: the field keeps "ab", and the caret
+        // stays at the end of the text, one unit left of where the removed character was counted.
+        fireEvent.change(box, { target: { value: "a\u{202E}b" } });
+
+        expect(box.value).toBe("ab");
+        await waitFor(() => expect(box.selectionStart).toBe(2));
+        expect(toast.info).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ id: "host-composer-hidden-text" }));
+    });
+
     it("does not send an empty message", async () => {
         mount(session());
 
@@ -237,6 +350,37 @@ describe("the coding-agent composer", () => {
         await waitFor(() =>
             expect(harness.calls[0]).toEqual(["send", { requestId: expect.any(String), text: "Continue where you left off.", threadId: "thread-1" }]),
         );
+    });
+
+    it("keeps a paste refusal when Continue succeeds, since the draft it refused is still in the box", async () => {
+        mount(session({ lastEndReason: "interrupted" }));
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "a valid draft" } });
+        fireEvent.change(box, { target: { value: "x".repeat(120_001) } });
+        fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+        await waitFor(() => expect(screen.getAllByRole("status").map((element) => element.id)).toContain("host-composer-limit"));
+        expect(box.getAttribute("aria-invalid")).toBe("true");
+        expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("keeps an unsent draft that matches the Continue prompt when Continue succeeds", async () => {
+        mount(session({ lastEndReason: "interrupted" }));
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "Continue where you left off." } });
+        fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+        // One turn of the event loop lets the mocked send finish before the box is read.
+        await new Promise((resolve) => {
+            setTimeout(resolve, 0);
+        });
+        expect(box.value).toBe("Continue where you left off.");
     });
 
     it("offers no Continue after a turn that finished or was stopped", async () => {

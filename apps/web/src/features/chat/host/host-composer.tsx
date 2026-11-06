@@ -9,6 +9,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import { findHiddenText, stripHiddenText } from "@neore/ai/utils";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
@@ -22,6 +23,8 @@ import ContextUsageMeter from "@/features/chat/thread/context-usage-meter";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import DiffCommentsDraft from "./diff-comments-draft";
+import { caretAfterRemoval } from "./host-caret";
+import { exceedsRawInputLimit } from "./host-input";
 import HostOptions from "./host-options";
 import { MAX_HOST_PROMPT_CHARS, sendHostMessage } from "./host-send";
 import useHostSendErrorMessages from "./host-send-errors";
@@ -101,6 +104,12 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const pendingCursor = useRef<number | undefined>(undefined);
     const list = useRef<HTMLUListElement>(null);
     const listId = useId();
+    // Set when a paste was refused, so the field keeps saying why until the next accepted edit (the toast fades).
+    const [refusedPaste, setRefusedPaste] = useState(false);
+    // Counts the refusals, so a send clears only those that came before it, not one made while it was in flight.
+    const refusals = useRef(0);
+    // The box's text as the last change left it, read by a send that finishes after the person has typed.
+    const boxText = useRef("");
     const attempt = useRef<{ id: string; text: string } | undefined>(undefined);
     const { data: session } = useQuery(crpc.acp.functions.getHostSession.queryOptions({ threadId }));
     const { data: live } = useQuery(crpc.chat.streaming.getActiveStreamForThread.queryOptions({ threadId: id }));
@@ -111,7 +120,9 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
 
     const messages = useHostSendErrorMessages();
 
-    const send = async (prompt: string) => {
+    // `draft` is the editable text the prompt came from, as it was when the send began: a success clears the box only if
+    // the person has not typed since.
+    const send = async (prompt: string, draft?: string) => {
         // One request id per message: a retry of a lost answer finds the first try, not a second turn. A different
         // text (an edit after a failure, or Continue) is a different message and gets its own, or the backend would
         // call it a repeat of the first and drop it.
@@ -120,6 +131,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
         }
 
         setSending(true);
+        const refusalsBefore = refusals.current;
 
         const result = await sendHostMessage({ requestId: attempt.current.id, text: prompt, threadId });
 
@@ -127,8 +139,18 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
 
         if (result.ok) {
             attempt.current = undefined;
-            // Continue sends a fixed prompt: a draft being typed beside it stays.
-            setText((current) => (current.trim() === prompt ? "" : current));
+
+            // Continue sends a fixed prompt, and a draft typed while a send was pending is not the one sent: the box and any
+            // refusal stay as they are. Only the draft that was sent clears, and a refusal that came before the send lapses with it.
+            // Only a textarea send has a draft; Continue sends a fixed prompt and leaves the box alone.
+            if (draft !== undefined && boxText.current === draft) {
+                boxText.current = "";
+                setText("");
+
+                if (refusals.current === refusalsBefore) {
+                    setRefusedPaste(false);
+                }
+            }
 
             return;
         }
@@ -136,10 +158,15 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
         toast.error(messages[result.error]);
     };
 
-    const trimmed = text.trim();
+    // The text the server will send: the editable draft keeps a trailing joiner, which the server removes before its checks,
+    // so the length and empty checks here use the same cleaned text.
+    const sendable = stripHiddenText(text).text.trim();
     const status = session?.status;
     const blocked = status === "ended";
-    const canSend = trimmed !== "" && trimmed.length <= MAX_HOST_PROMPT_CHARS && !sending && !running && !blocked;
+    const overLimit = sendable.length > MAX_HOST_PROMPT_CHARS;
+    const limitNote = overLimit || refusedPaste;
+    // A refused paste keeps the draft it replaced, so the field shows the error and Send must not send that draft.
+    const canSend = sendable !== "" && !overLimit && !refusedPaste && !sending && !running && !blocked;
     const usage = session?.agentState?.usage;
     const lastEnd = session?.lastEndReason;
     const offerContinue = !running && !blocked && lastEnd !== undefined && CONTINUABLE.has(lastEnd);
@@ -199,6 +226,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
         }
 
         pendingCursor.current = next.cursor;
+        boxText.current = next.text;
         setText(next.text);
     };
 
@@ -233,7 +261,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
         }
 
         event.preventDefault();
-        void send(trimmed);
+        void send(sendable, text);
     };
 
     const answerRequest = (request: PendingRequest, optionId: string) => {
@@ -349,18 +377,54 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                         aria-activedescendant={menuOpen ? `${listId}-${active}` : undefined}
                         aria-autocomplete="list"
                         aria-controls={menuOpen ? listId : undefined}
+                        aria-describedby={limitNote ? "host-composer-limit" : undefined}
                         aria-expanded={menuOpen}
+                        aria-invalid={limitNote || undefined}
                         aria-label={t`Message to the coding agent`}
                         className="bg-background min-h-11 w-full resize-none rounded-lg border px-3 py-2 text-sm disabled:opacity-60"
                         disabled={blocked}
-                        maxLength={MAX_HOST_PROMPT_CHARS}
                         onBlur={() => setFocused(false)}
                         onChange={(event) => {
-                            setText(event.target.value);
+                            // Typed and pasted text both come through here, whole: a length limit on the element would cut a paste
+                            // before its hidden characters are removed. A joiner at the end waits for the next letter.
+                            const element = event.currentTarget;
+                            const { selectionStart, selectionEnd, value } = element;
+
+                            // Refused before any scan: the controlled value stays as it was.
+                            if (exceedsRawInputLimit(value, MAX_HOST_PROMPT_CHARS)) {
+                                refusals.current += 1;
+                                setRefusedPaste(true);
+                                toast.error(messages.too_large);
+
+                                return;
+                            }
+
+                            setRefusedPaste(false);
+
                             // Any edit reopens the menu: a dismissal holds for the text it was made on, and only until the next edit.
                             setClosedFor(undefined);
-                            setCursor(caretOf(event.target));
                             setActiveIndex(0);
+
+                            const { removed, text: clean } = stripHiddenText(value, { keepTrailingJoiner: true });
+                            const hidden = removed > 0 ? findHiddenText(value, { keepTrailingJoiner: true }) : [];
+
+                            // The controlled value is set back to the clean text after this handler, which moves the caret to the end.
+                            // The menu's caret is where the person left it, once that has happened.
+                            setCursor(caretAfterRemoval(caretOf(element), hidden));
+
+                            if (removed > 0) {
+                                // A stable id: repeated removals update one notification instead of stacking.
+                                toast.info(t`Hidden characters were removed from your message.`, { id: "host-composer-hidden-text" });
+
+                                // Put the selection where the person left it, once the controlled value has been set.
+                                const start = caretAfterRemoval(selectionStart, hidden);
+                                const end = caretAfterRemoval(selectionEnd, hidden);
+
+                                queueMicrotask(() => element.setSelectionRange(start, end));
+                            }
+
+                            boxText.current = clean;
+                            setText(clean);
                         }}
                         onClick={(event) => setCursor(caretOf(event.currentTarget))}
                         onFocus={() => setFocused(true)}
@@ -381,7 +445,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     <Button
                         disabled={!canSend}
                         onClick={() => {
-                            send(trimmed);
+                            send(sendable, text);
                         }}
                         type="button"
                     >
@@ -389,6 +453,11 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     </Button>
                 )}
             </div>
+            {limitNote && (
+                <p className="text-destructive text-xs" id="host-composer-limit" role="status">
+                    {messages.too_large}
+                </p>
+            )}
         </div>
     );
 };
