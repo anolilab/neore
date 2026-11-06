@@ -273,4 +273,54 @@ describe("a session's terminals", () => {
         await session.close();
         expect(host.release).toHaveBeenCalledWith(41);
     });
+
+    it("reports a cancelled command's exit before the cancelled turn ends", async () => {
+        type ToolReport = Parameters<SessionObserver["tool"]>[2];
+        const events: { kind: string; tool?: ToolReport }[] = [];
+        const observer: SessionObserver = {
+            permissionRequested: () => {},
+            permissionResolved: () => {},
+            sessionEnded: () => {},
+            sessionOpened: () => {},
+            text: () => {},
+            thought: () => {},
+            tool: (_session, _turn, tool) => {
+                events.push({ kind: "tool", tool });
+            },
+            turnEnded: () => {
+                events.push({ kind: "turnEnded" });
+            },
+            turnStarted: () => {},
+        };
+        const { finish, host } = fakeHost();
+        const { agent, session } = await open({ gate: allow([]), host, observer });
+
+        const first = await busy(agent, session);
+
+        create(agent, 5);
+
+        const answer = await answerTo(agent, 5);
+        const { terminalId } = answer.result as { terminalId: string };
+
+        agent.say({
+            method: "session/update",
+            params: { sessionId: "sess_1", update: { content: [{ terminalId, type: "terminal" }], kind: "execute", sessionUpdate: "tool_call", status: "in_progress", title: "npm test", toolCallId: "call_1" } },
+        });
+        await expect.poll(() => events.length).toBe(1);
+
+        session.cancel();
+        // The agent answers the cancelled prompt, and the command the cancel killed reports how it ended right after.
+        agent.say({ id: first.id, result: { stopReason: "cancelled" } });
+        finish({ exitCode: null, signal: "SIGKILL" });
+
+        await expect.poll(() => events.some((event) => event.kind === "turnEnded")).toBe(true);
+        await expect.poll(() => events.some((event) => event.kind === "tool" && event.tool?.exit !== undefined)).toBe(true);
+
+        const turnEnd = events.findIndex((event) => event.kind === "turnEnded");
+        const exitReport = events.findIndex((event) => event.kind === "tool" && event.tool?.exit !== undefined);
+
+        expect(exitReport).toBeGreaterThan(-1);
+        expect(exitReport).toBeLessThan(turnEnd);
+        expect(events[exitReport]?.tool).toMatchObject({ id: "call_1", output: "building...\nok" });
+    });
 });

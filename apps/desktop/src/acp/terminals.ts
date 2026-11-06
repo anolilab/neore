@@ -203,6 +203,8 @@ interface OpenTerminal {
     exited: Promise<TerminalExitStatus>;
     handle: number;
     released: boolean;
+    /** Settles once the command's result is recorded and its tool rows are told; set when the terminal is opened. */
+    reported?: Promise<void>;
     /** The turn that started the command: a cancel of that turn stops it, and no other turn's. */
     turnId: string | undefined;
 }
@@ -271,7 +273,7 @@ export class SessionTerminals {
         const terminal: OpenTerminal = { exited: this.host.wait(handle), handle, released: false, turnId };
 
         this.open.set(terminalId, terminal);
-        this.watch(terminalId, terminal);
+        terminal.reported = this.watch(terminalId, terminal);
 
         return terminalId;
     }
@@ -327,6 +329,34 @@ export class SessionTerminals {
             terminal.cancelled = true;
             this.host.kill(terminal.handle);
         }
+    }
+
+    /**
+     * Resolves once the commands the turn's cancel killed have recorded how they ended and told their rows, or after `limitMs`,
+     * whichever comes first. The turn is sealed after this, so a killed command's last output still reaches it.
+     */
+    public async settleKilled(turnId: string, limitMs: number): Promise<void> {
+        const reports: Promise<void>[] = [];
+
+        for (const terminal of this.open.values()) {
+            if (terminal.cancelled === true && terminal.turnId === turnId && terminal.ended === undefined && terminal.reported !== undefined) {
+                reports.push(terminal.reported);
+            }
+        }
+
+        if (reports.length === 0) {
+            return;
+        }
+
+        let timer: ReturnType<typeof setTimeout> | undefined;
+
+        await Promise.race([
+            Promise.all(reports),
+            new Promise((resolve) => {
+                timer = setTimeout(resolve, limitMs);
+            }),
+        ]);
+        clearTimeout(timer);
     }
 
     /**

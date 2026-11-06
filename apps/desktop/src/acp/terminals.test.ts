@@ -280,4 +280,51 @@ describe(SessionTerminals, () => {
 
         expect(reported).toEqual(["partial"]);
     });
+
+    it("holds a turn for a killed command's result, but no longer than the limit", async () => {
+        const finishes: ((exit: { exitCode: number | null; signal: string | null }) => void)[] = [];
+        const host = {
+            kill: vi.fn(),
+            output: vi.fn(() => {
+                return { output: "tail", truncated: false };
+            }),
+            release: vi.fn(),
+            start: vi.fn(async () => 3),
+            wait: vi.fn(
+                async () =>
+                    await new Promise<{ exitCode: number | null; signal: string | null }>((resolve) => {
+                        finishes.push(resolve);
+                    }),
+            ),
+        };
+        const ended = vi.fn();
+        const terminals = new SessionTerminals(host as never, ended);
+
+        await terminals.create(request, "turn-2");
+        terminals.killTurn("turn-2");
+
+        const held = terminals.settleKilled("turn-2", 5000);
+
+        finishes[0]?.({ exitCode: null, signal: "SIGKILL" });
+        await held;
+
+        // The hold returned only after the command's result was recorded and its row told.
+        expect(ended).toHaveBeenCalledTimes(1);
+    });
+
+    it("stops holding a turn when a killed command never reports", async () => {
+        const host = {
+            kill: vi.fn(),
+            output: vi.fn(),
+            release: vi.fn(),
+            start: vi.fn(async () => 4),
+            wait: vi.fn(async () => await new Promise<never>(() => {})),
+        };
+        const terminals = new SessionTerminals(host as never, () => {});
+
+        await terminals.create(request, "turn-2");
+        terminals.killTurn("turn-2");
+
+        await expect(terminals.settleKilled("turn-2", 20)).resolves.toBeUndefined();
+    });
 });

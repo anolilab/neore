@@ -60,6 +60,9 @@ const sleep = (ms: number): Promise<void> =>
 /** After the agent's output closes, how long to wait for its exit status so the error can say why. */
 const EXIT_WAIT_MS = 500;
 
+/** After a cancel answered, how long a turn waits for the commands the cancel killed to report how they ended. */
+const KILLED_TERMINAL_WAIT_MS = 2000;
+
 /** How a terminal ended, as the tool event carries it. */
 const exitReport = (exit: TerminalExitStatus): TerminalExit => {
     return { ...exit.exitCode !== null && { code: exit.exitCode }, ...exit.signal !== null && { signal: exit.signal } };
@@ -666,6 +669,12 @@ export class AgentSession {
         try {
             const response = await this.connection.request(METHOD.prompt, promptParams(this.agentSessionId, turn.user));
             const reason = isRecord(response) ? response.stopReason : undefined;
+
+            // A command the cancel killed may report how it ended only after the agent's answer. The turn is sealed once that
+            // is recorded, or after a bounded wait, so the command's last output still reaches the turn.
+            if (this.cancelRequested) {
+                await this.terminals?.settleKilled(turn.id, KILLED_TERMINAL_WAIT_MS);
+            }
 
             this.finishTurn(turn, STOP_REASONS.has(reason as StopReason) ? (reason as StopReason) : "end_turn");
         } catch (error) {
