@@ -45,6 +45,12 @@ export const AskUserQuestionFields: FC<{
                             id={`${idPrefix}-${String(index)}-${String(choiceIndex)}`}
                             name={`${idPrefix}-${String(index)}`}
                             onChange={() => onChange(index, { selected: toggleAskUserChoice(current.selected, choice, entry.multiSelect) })}
+                            // A checked radio fires no change when clicked again, so a click on the picked choice clears it here.
+                            onClick={() => {
+                                if (!entry.multiSelect && current.selected.includes(choice)) {
+                                    onChange(index, { selected: [] });
+                                }
+                            }}
                             type={entry.multiSelect ? "checkbox" : "radio"}
                         />
                         <span>{choice}</span>
@@ -56,6 +62,7 @@ export const AskUserQuestionFields: FC<{
                     maxLength={ASK_USER_ANSWER_MAX}
                     onChange={(event) => onChange(index, { note: event.target.value })}
                     placeholder={entry.choices.length > 0 ? t`Add a note (optional)…` : t`Type your answer…`}
+                    required={entry.choices.length === 0}
                     rows={2}
                     size="sm"
                     value={current.note}
