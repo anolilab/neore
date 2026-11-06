@@ -573,7 +573,11 @@ export class AgentSession {
         const { response, sessionId } = await openNewSession(this.connection, folder, timeoutMs);
 
         // What the agent sent for this session before its answer is older than the answer, which wins below.
-        for (const startup of this.startupUpdates.splice(0)) {
+        const startups = [...this.startupUpdates];
+
+        this.startupUpdates.length = 0;
+
+        for (const startup of startups) {
             if (startup.sessionId === sessionId) {
                 this.takeOwnStartupUpdate(startup);
             }

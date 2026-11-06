@@ -52,7 +52,7 @@ const fitPrefix = <T>(items: ReadonlyArray<T>, budget: number): T[] => {
  */
 const fitKeeping = <T>(items: ReadonlyArray<T>, isCurrent: (item: T) => boolean, limit: number, budget: number): T[] => {
     const kept = fitPrefix(items.slice(0, limit), budget);
-    const current = items.find(isCurrent);
+    const current = items.find((item) => isCurrent(item));
 
     if (current === undefined || kept.includes(current)) {
         return kept;
@@ -135,7 +135,7 @@ const choicesOf = (options: unknown, scrub: Scrub, current: string): AgentOption
         }
     }
 
-    return fitKeeping(choices, (choice) => choice.value === current, MAX_CHOICES, Number.POSITIVE_INFINITY);
+    return fitKeeping(choices, (choice) => choice.value === current, MAX_CHOICES, Infinity);
 };
 
 /** One option, if it is a list the person can choose from. A boolean option, or one with no usable id or value, is left out. */

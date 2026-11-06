@@ -1562,7 +1562,13 @@ describe("what the agent reports about itself", () => {
         let failing = true;
 
         await open(host);
-        backend.respond = (post) => ((post.events[0] as { kind?: string } | undefined)?.kind === "session_state" && failing ? Response.json({ error: "x" }, { status: 503 }) : undefined);
+        backend.respond = (post) => {
+            if (failing && (post.events[0] as { kind?: string } | undefined)?.kind === "session_state") {
+                return Response.json({ error: "x" }, { status: 503 });
+            }
+
+            return undefined;
+        };
         host.sessionState("s1", { configOptions: [option], usage: usage(10) });
         await settleInSteps(10 * 60_000);
 

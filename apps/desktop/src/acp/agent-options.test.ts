@@ -86,7 +86,9 @@ describe("configOptionsOf", () => {
     });
 
     it("keeps the current choice in a list cut to the bound, when the agent lists it last", () => {
-        const choices = Array.from({ length: 150 }, (_unused, index) => ({ name: "C", value: `c${String(index)}` }));
+        const choices = Array.from({ length: 150 }, (_unused, index) => {
+            return { name: "C", value: `c${String(index)}` };
+        });
         const [option] = configOptionsOf([select("l", { currentValue: "c149", options: choices })], plain) ?? [];
 
         expect(option?.choices).toHaveLength(MAX_CHOICES);
@@ -99,7 +101,9 @@ describe("configOptionsOf", () => {
         const wide = (id: string) =>
             select(id, {
                 currentValue: valueOf(id, 99),
-                options: Array.from({ length: 100 }, (_unused, choice) => ({ name: "é".repeat(200), value: valueOf(id, choice) })),
+                options: Array.from({ length: 100 }, (_unused, choice) => {
+                    return { name: "é".repeat(200), value: valueOf(id, choice) };
+                }),
             });
         const options = configOptionsOf([wide("a"), wide("b")], plain) ?? [];
 
@@ -110,7 +114,9 @@ describe("configOptionsOf", () => {
     });
 
     it("keeps the current model in a legacy list cut to the bound, when the agent lists it last", () => {
-        const models = Array.from({ length: 150 }, (_unused, index) => ({ modelId: `m${String(index)}`, name: "M" }));
+        const models = Array.from({ length: 150 }, (_unused, index) => {
+            return { modelId: `m${String(index)}`, name: "M" };
+        });
         const report = optionsOf({ models: { availableModels: models, currentModelId: "m149" } }, plain);
 
         expect(report.models?.available).toHaveLength(MAX_CHOICES);
@@ -255,7 +261,21 @@ describe("a change the agent reports", () => {
     });
 
     it("moves a mode option whose category the agent capitalises, as the computer and the web read it", () => {
-        const capitalised = optionsOf({ configOptions: [select("mode", { category: "Mode", currentValue: "ask", options: [{ name: "Ask", value: "ask" }, { name: "Code", value: "code" }] })] }, plain);
+        const capitalised = optionsOf(
+            {
+                configOptions: [
+                    select("mode", {
+                        category: "Mode",
+                        currentValue: "ask",
+                        options: [
+                            { name: "Ask", value: "ask" },
+                            { name: "Code", value: "code" },
+                        ],
+                    }),
+                ],
+            },
+            plain,
+        );
 
         expect(withCurrentMode(capitalised, "code", plain).configOptions?.[0]?.currentValue).toBe("code");
     });
