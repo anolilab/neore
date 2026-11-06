@@ -1220,11 +1220,16 @@ export interface InternalApiTypes {
     };
     usage: {
         activity: {
-            recordReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; replyKey: string; skillKey: string; skillName?: string; tokens: number; userId: string }, null>;
+            recordReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; replyKey: string; skillKey: string; skillName?: string; threadId?: string; tokens: number; userId: string }, null>;
         };
         backfill: {
             runUsageBackfillStep: FunctionReference<"mutation", { runId: string; userId: string }, null>;
+            runUsageProjectBackfillStep: FunctionReference<"mutation", { runId: string; userId: string }, null>;
             sweepUsageRollup: FunctionReference<"mutation", {}, { pruned: number; status: "idle" | "running" | "done" }>;
+        };
+        organization: {
+            memberProjectUsage: FunctionReference<"query", { fromDate: string; projectIds: Array<string>; userId: string }, { projects: Array<{ costMicrodollars: number; replies: number; tokens: number; projectKey: string }>; truncated: boolean }>;
+            organizationUsageScope: FunctionReference<"query", { organizationId: string; userId: string }, null | { memberIds: Array<string>; projects: Array<{ projectId: string; title: string }>; truncated: boolean }>;
         };
     };
     vault: {
@@ -2481,7 +2486,12 @@ export const internal: InternalApiTypes = {
         },
         backfill: {
             runUsageBackfillStep: { __lunoraRef: "usage_backfill:runUsageBackfillStep" },
+            runUsageProjectBackfillStep: { __lunoraRef: "usage_backfill:runUsageProjectBackfillStep" },
             sweepUsageRollup: { __lunoraRef: "usage_backfill:sweepUsageRollup" },
+        },
+        organization: {
+            memberProjectUsage: { __lunoraRef: "usage_organization:memberProjectUsage" },
+            organizationUsageScope: { __lunoraRef: "usage_organization:organizationUsageScope" },
         },
     },
     vault: {

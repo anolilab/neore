@@ -1777,6 +1777,7 @@ export const usageBackfill = sqliteTable("usageBackfill", {
     threadId: text("threadId"),
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
+    projects: text("projects", { mode: "json" }).$type<{ finishedAt?: number; lastOrder?: number; leaseUntil: number; replies: number; runId: string; startedAt: number; status: "running" | "done"; threadCursor?: string; threadId?: string }>(),
 }, (t) => ({
     by_userId: index("by_userId").on(t.userId),
 }));
@@ -1787,6 +1788,7 @@ export const usageDaily = sqliteTable("usageDaily", {
     costMicrodollars: real("costMicrodollars").notNull(),
     date: text("date").notNull(),
     replies: real("replies").notNull(),
+    projectKey: text("projectKey"),
     skillKey: text("skillKey").notNull(),
     skillName: text("skillName"),
     tokens: real("tokens").notNull(),
@@ -1795,12 +1797,14 @@ export const usageDaily = sqliteTable("usageDaily", {
 }, (t) => ({
     by_user_skill_date: index("by_user_skill_date").on(t.userId, t.skillKey, t.date),
     by_user_date: index("by_user_date").on(t.userId, t.date),
+    by_user_project_date: index("by_user_project_date").on(t.userId, t.projectKey, t.date),
     by_date: index("by_date").on(t.date),
 }));
 
 export const usageReplies = sqliteTable("usageReplies", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    projectFiled: integer("projectFiled", { mode: "boolean" }),
     recordedAt: real("recordedAt").notNull(),
     replyKey: text("replyKey").notNull(),
     userId: text("userId").notNull(),

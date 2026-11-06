@@ -18,6 +18,15 @@
  * walk whose chain died (its lease ran out) and, once the walk is done, prunes
  * the `usageReplies` keys only redelivery still needs.
  *
+ * A second walk over the same threads ({@link runUsageProjectBackfillStep})
+ * files the replies the rollup counted before it knew about projects under
+ * their thread's project (only threads that are still in one). It adds project
+ * rows and nothing else, so it never moves the totals; it shares the first
+ * walk's window and grouping, keeps its own position on the same row, and
+ * counts a reply once against the live path: the live record marks its key
+ * `projectFiled`, the walk marks `project:<key>`, and each skips what the other
+ * marked. Keys are pruned only once both walks are done.
+ *
  * Threads are paged through `by_userId`, whose key no thread edit changes, so
  * a thread archived, restored or moved mid-walk keeps its place: every thread
  * is walked once. An index that sorts on an editable column (`status`,
@@ -34,9 +43,10 @@ import { usageDailyCutoffDate } from "../gdpr/retention";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
 import { currentUserShard } from "../lib/shard-context";
-import type { RollupIncrement } from "./activity-logic";
-import { addToRollup, isReplyRecorded, markReplyRecorded } from "./activity";
-import type { BackfillRow, BackfillWindow } from "./backfill-logic";
+import type { ProjectIncrement, RollupIncrement } from "./activity-logic";
+import { projectFiledKey } from "./activity-logic";
+import { addToProjectRollup, addToRollup, isReplyRecorded, markReplyRecorded } from "./activity";
+import type { BackfillRow, BackfillWindow, ReplyGroup } from "./backfill-logic";
 import { backfillIncrement, completeOrders, groupReplies } from "./backfill-logic";
 
 /** Message rows one step reads, at most (plus one oversized `order` read whole). */
@@ -70,6 +80,17 @@ type BackfillStatus = "done" | "idle" | "running";
 type DbCtx = Pick<MutationCtx, "db">;
 
 const loadState = async (ctx: Pick<QueryCtx, "db">, userId: string) => await ctx.db.usageBackfill.findFirst({ where: { userId } });
+
+type BackfillState = NonNullable<Awaited<ReturnType<typeof loadState>>>;
+
+/** Both walks together: done once both are, idle while either has not started. */
+const combinedStatus = (state: BackfillState | null): BackfillStatus => {
+    if (!state || !state.projects) {
+        return "idle";
+    }
+
+    return state.status === "done" && state.projects.status === "done" ? "done" : "running";
+};
 
 /**
  * Starts the user's walk, or takes over one whose chain stopped (its position
@@ -108,6 +129,40 @@ export const ensureBackfill = async (ctx: MutationCtx, userId: string, now: numb
     return "running";
 };
 
+/**
+ * Starts the user's project walk, or takes over one whose chain stopped — the
+ * same rules as {@link ensureBackfill}, whose row it needs (call that first).
+ */
+export const ensureProjectBackfill = async (ctx: MutationCtx, userId: string, now: number): Promise<Exclude<BackfillStatus, "idle">> => {
+    const state = await loadState(ctx, userId);
+
+    if (!state) {
+        return "running";
+    }
+
+    const walk = state.projects;
+
+    if (walk?.status === "done") {
+        return "done";
+    }
+
+    if (walk && walk.leaseUntil > now) {
+        return "running";
+    }
+
+    const runId = `${String(now)}:${walk ? String(walk.replies) : "0"}`;
+
+    await ctx.db.patch("usageBackfill", state._id, {
+        projects: walk
+            ? { ...walk, leaseUntil: now + BACKFILL_LEASE_MS, runId }
+            : { leaseUntil: now + BACKFILL_LEASE_MS, replies: 0, runId, startedAt: now, status: "running" as const },
+        updatedAt: now,
+    });
+    await ctx.scheduler.runAfter(0, internal.usage.backfill.runUsageProjectBackfillStep, { runId, userId });
+
+    return "running";
+};
+
 const readThreadRows = async (ctx: DbCtx, threadId: string, afterOrder: number | undefined): Promise<BackfillRow[]> =>
     (await ctx.db
         .query("messages")
@@ -138,16 +193,31 @@ interface Position {
     threadId?: string;
 }
 
-interface StepResult {
+interface StepResult<I> {
     done: boolean;
-    increments: RollupIncrement[];
+    increments: I[];
     /** The first row id of each reply counted. */
     keys: string[];
     position: Position;
 }
 
+interface WalkedThread {
+    projectId?: string;
+    threadCursor: string;
+    threadId: string;
+}
+
+/**
+ * What one walk does with a reply group of a thread: the increment it adds, or
+ * undefined to leave it. `skipThread` lets a walk pass a thread without reading it.
+ */
+interface WalkPass<I> {
+    count: (group: ReplyGroup, thread: { projectId?: string }) => Promise<I | undefined>;
+    skipThread?: (thread: { projectId?: string }) => boolean;
+}
+
 /** The next thread to walk from `threadCursor`, and the cursor past it; undefined past the last one. */
-const nextThread = async (ctx: DbCtx, userId: string, threadCursor: string | undefined): Promise<{ threadCursor: string; threadId: string } | undefined> => {
+const nextThread = async (ctx: DbCtx, userId: string, threadCursor: string | undefined): Promise<WalkedThread | undefined> => {
     if (threadCursor === THREADS_END) {
         return undefined;
     }
@@ -163,7 +233,18 @@ const nextThread = async (ctx: DbCtx, userId: string, threadCursor: string | und
     }
 
     // A null cursor would start the walk over, so the end is spelled out.
-    return { threadCursor: threads.isDone || !threads.continueCursor ? THREADS_END : threads.continueCursor, threadId: next._id as string };
+    return {
+        threadCursor: threads.isDone || !threads.continueCursor ? THREADS_END : threads.continueCursor,
+        threadId: next._id as string,
+        ...(next.projectId && { projectId: next.projectId as string }),
+    };
+};
+
+/** The project of the thread a walk resumes in mid-way. */
+const projectOfThread = async (ctx: DbCtx, threadId: string): Promise<string | undefined> => {
+    const thread = await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } });
+
+    return thread?.projectId ?? undefined;
 };
 
 /** One read of a thread past `afterOrder`: the rows it can group now, the `order` it covers, and the rows it read. */
@@ -185,13 +266,20 @@ const readCompleteRows = async (
     return { pageFull, read: page.length + whole.length, rows: whole, through: complete.splitOrder };
 };
 
-/** One step of the walk from `position`: what it counts, and where the next step starts. */
-const walk = async (ctx: DbCtx, userId: string, position: Position, window: BackfillWindow): Promise<StepResult> => {
+/** One step of a walk from `position`: what it counts, and where the next step starts. */
+const walk = async <I>(ctx: DbCtx, userId: string, position: Position, pass: WalkPass<I>): Promise<StepResult<I>> => {
     let { lastOrder, threadCursor, threadId } = position;
-    const increments: RollupIncrement[] = [];
+    let thread: { projectId?: string } = {};
+    const increments: I[] = [];
     const keys: string[] = [];
     let budget = BACKFILL_ROWS_PER_STEP;
     let threadsStarted = 0;
+
+    if (threadId !== undefined && pass.skipThread) {
+        const projectId = await projectOfThread(ctx, threadId);
+
+        thread = projectId === undefined ? {} : { projectId };
+    }
 
     while (budget > 0) {
         if (threadId === undefined) {
@@ -206,8 +294,14 @@ const walk = async (ctx: DbCtx, userId: string, position: Position, window: Back
             }
 
             ({ threadCursor, threadId } = next);
+            thread = next.projectId === undefined ? {} : { projectId: next.projectId };
             lastOrder = undefined;
             threadsStarted += 1;
+
+            if (pass.skipThread?.(thread)) {
+                threadId = undefined;
+                continue;
+            }
         }
 
         const { pageFull, read, rows, through } = await readCompleteRows(ctx, threadId, lastOrder);
@@ -215,9 +309,9 @@ const walk = async (ctx: DbCtx, userId: string, position: Position, window: Back
         budget -= read;
 
         for (const group of groupReplies(rows)) {
-            const increment = backfillIncrement(group, window);
+            const increment = await pass.count(group, thread);
 
-            if (increment && !(await anyRecorded(ctx, userId, group.rows))) {
+            if (increment !== undefined) {
                 increments.push(increment);
                 keys.push(group.rows[0]!._id);
             }
@@ -229,6 +323,25 @@ const walk = async (ctx: DbCtx, userId: string, position: Position, window: Back
     }
 
     return { done: false, increments, keys, position: { lastOrder, threadCursor, threadId } };
+};
+
+const windowFor = async (ctx: DbCtx, userId: string, cutoff: number, now: number): Promise<BackfillWindow> => {
+    const settings = await ctx.db.userSettings.findFirst({ where: { userId } });
+
+    return { cutoff, oldestDate: usageDailyCutoffDate(now), userId, ...(settings?.timezone && { timeZone: settings.timezone }) };
+};
+
+/** Whether the live path filed any of these rows' reply under its project itself. */
+const anyProjectFiled = async (ctx: DbCtx, userId: string, rows: ReadonlyArray<BackfillRow>): Promise<boolean> => {
+    for (const row of rows) {
+        const recorded = await ctx.db.usageReplies.findFirst({ where: { replyKey: row._id, userId } });
+
+        if (recorded?.projectFiled) {
+            return true;
+        }
+    }
+
+    return false;
 };
 
 /** One step of the user's walk; a step of a replaced chain, or of a finished walk, does nothing. */
@@ -248,12 +361,18 @@ export const runUsageBackfillStep = internalMutation
         }
 
         const { now } = ctx;
-        const settings = await ctx.db.userSettings.findFirst({ where: { userId } });
-        const step = await walk(
+        const window = await windowFor(ctx, userId, state.startedAt, now);
+        const step = await walk<RollupIncrement>(
             ctx,
             userId,
             { lastOrder: state.lastOrder, threadCursor: state.threadCursor, threadId: state.threadId },
-            { cutoff: state.startedAt, oldestDate: usageDailyCutoffDate(now), userId, ...(settings?.timezone && { timeZone: settings.timezone }) },
+            {
+                count: async (group) => {
+                    const increment = backfillIncrement(group, window);
+
+                    return increment && !(await anyRecorded(ctx, userId, group.rows)) ? increment : undefined;
+                },
+            },
         );
 
         for (const key of step.keys) {
@@ -278,15 +397,90 @@ export const runUsageBackfillStep = internalMutation
         return null;
     });
 
-/** Where the caller's backfill stands: `idle` = never started. */
+/**
+ * One step of the user's project walk: files the finished replies of threads
+ * still in a project, from before the walk started, under that project — unless
+ * the live path or an earlier step already did. A step of a replaced chain, or
+ * of a finished walk, does nothing.
+ */
+export const runUsageProjectBackfillStep = internalMutation
+    .input({ runId: v.string(), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args: { runId, userId }, ctx }) => {
+        const state = await loadState(ctx, userId);
+        const position = state?.projects;
+
+        if (!state || position?.status !== "running" || position.runId !== runId) {
+            return null;
+        }
+
+        if (await isAccountDeletionUnderway(ctx, userId)) {
+            return null;
+        }
+
+        const { now } = ctx;
+        const window = await windowFor(ctx, userId, position.startedAt, now);
+        const step = await walk<ProjectIncrement>(
+            ctx,
+            userId,
+            { lastOrder: position.lastOrder, threadCursor: position.threadCursor, threadId: position.threadId },
+            {
+                count: async (group, thread) => {
+                    const increment = backfillIncrement(group, window);
+                    const key = group.rows[0]?._id;
+
+                    if (!increment || thread.projectId === undefined || key === undefined) {
+                        return undefined;
+                    }
+
+                    if ((await isReplyRecorded(ctx, userId, projectFiledKey(key))) || (await anyProjectFiled(ctx, userId, group.rows))) {
+                        return undefined;
+                    }
+
+                    return {
+                        costMicrodollars: increment.costMicrodollars,
+                        date: increment.date,
+                        projectKey: thread.projectId,
+                        replies: increment.replies,
+                        tokens: increment.tokens,
+                    };
+                },
+                skipThread: (thread) => thread.projectId === undefined,
+            },
+        );
+
+        for (const key of step.keys) {
+            await markReplyRecorded(ctx, userId, projectFiledKey(key), now);
+        }
+
+        await addToProjectRollup(ctx, userId, step.increments, now);
+        await ctx.db.patch("usageBackfill", state._id, {
+            projects: {
+                leaseUntil: now + BACKFILL_LEASE_MS,
+                replies: position.replies + step.increments.length,
+                runId: position.runId,
+                startedAt: position.startedAt,
+                status: step.done ? ("done" as const) : ("running" as const),
+                ...(step.position.lastOrder !== undefined && { lastOrder: step.position.lastOrder }),
+                ...(step.position.threadCursor !== undefined && { threadCursor: step.position.threadCursor }),
+                ...(step.position.threadId !== undefined && { threadId: step.position.threadId }),
+                ...(step.done && { finishedAt: now }),
+            },
+            updatedAt: now,
+        });
+
+        if (!step.done) {
+            await ctx.scheduler.runAfter(0, internal.usage.backfill.runUsageProjectBackfillStep, { runId, userId });
+        }
+
+        return null;
+    });
+
+/** Where the caller's backfill stands, both walks together: `idle` = not started. */
 export const getUsageBackfillStatus = authQuery
     .input({})
     .output(vBackfillStatus)
-    .query(async ({ ctx }): Promise<BackfillStatus> => {
-        const state = await loadState(ctx, ctx.user.userId);
-
-        return state?.status ?? "idle";
-    });
+    .query(async ({ ctx }): Promise<BackfillStatus> => combinedStatus(await loadState(ctx, ctx.user.userId)));
 
 /** The usage page opened: start the caller's backfill, or resume one that stopped. */
 export const startUsageBackfill = authMutation
@@ -300,16 +494,18 @@ export const startUsageBackfill = authMutation
             return "idle";
         }
 
-        const status = await ensureBackfill(ctx, userId, ctx.now);
+        const replies = await ensureBackfill(ctx, userId, ctx.now);
+        const projects = await ensureProjectBackfill(ctx, userId, ctx.now);
+        const status = replies === "done" && projects === "done" ? "done" : "running";
 
-        ctx.log.event("usage.start_usage_backfill", { status });
+        ctx.log.event("usage.start_usage_backfill", { projects, status });
 
         return status;
     });
 
 /**
  * The shard housekeeping sweep (`lib/shard-housekeeping.ts`), for the user whose
- * shard this is: starts or resumes their backfill, and once it is done prunes
+ * shard this is: starts or resumes both walks, and once both are done prunes
  * the `usageReplies` keys older than {@link REPLY_KEY_KEEP_MS}.
  */
 export const sweepUsageRollup = internalMutation
@@ -323,8 +519,11 @@ export const sweepUsageRollup = internalMutation
         }
 
         const { now } = ctx;
-        const status = await ensureBackfill(ctx, userId, now);
+        const replies = await ensureBackfill(ctx, userId, now);
+        const projects = await ensureProjectBackfill(ctx, userId, now);
+        const status = replies === "done" && projects === "done" ? "done" : "running";
 
+        // Both walks check these keys: they stay until neither still needs them.
         if (status !== "done") {
             return { pruned: 0, status };
         }

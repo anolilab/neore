@@ -5,9 +5,13 @@ import {
     addDays,
     DEFAULT_SKILL_KEY,
     foldDayTotals,
+    foldProjectIncrements,
+    foldProjectTotals,
     foldSkillTotals,
     HEATMAP_DAYS,
     isDayKey,
+    PROJECT_SKILL_KEY,
+    remainderOf,
     repliesByOrder,
     replyUsageArgs,
     skillKeyOf,
@@ -147,6 +151,12 @@ describe("replyUsageArgs", () => {
         });
     });
 
+    it("carries the thread of the first reply row, whose project the record files it under", () => {
+        const args = replyUsageArgs([{ _id: "m_reply", message: { role: "assistant" }, threadId: "th_1", usage: { totalTokens: 1 } }], { at, userId: "u1" });
+
+        expect(args?.threadId).toBe("th_1");
+    });
+
     it("records nothing for a run that saved no reply row", () => {
         expect(replyUsageArgs([{ _id: "m_prompt", message: { role: "user" } }], { at, userId: "u1" })).toBeUndefined();
         expect(replyUsageArgs([{ message: { role: "assistant" } }], { at, userId: "u1" })).toBeUndefined();
@@ -188,6 +198,41 @@ describe("withDayTotals", () => {
             { costMicrodollars: 20, date: "2026-09-01", replies: 1, skillKey: "sk_1", skillName: "Alice", tokens: 2 },
             { costMicrodollars: 5, date: "2026-09-02", replies: 2, skillKey: "sk_1", tokens: 4 },
             { costMicrodollars: 5, date: "2026-09-02", replies: 2, skillKey: TOTAL_SKILL_KEY, tokens: 4 },
+        ]);
+    });
+});
+
+describe("project rows", () => {
+    const projectRow = (projectKey: string, costMicrodollars: number, replies = 1) => {
+        return { costMicrodollars, date: "2026-09-20", projectKey, replies, skillKey: PROJECT_SKILL_KEY, tokens: replies * 10, updatedAt: 1 };
+    };
+
+    it("folds per project, costliest first, and the skill breakdown leaves them out", () => {
+        const rows = [projectRow("p_a", 100), projectRow("p_b", 300), projectRow("p_a", 50), row({ skillKey: "sk_1" })];
+
+        expect(foldProjectTotals(rows)).toStrictEqual([
+            { costMicrodollars: 300, projectKey: "p_b", replies: 1, tokens: 10 },
+            { costMicrodollars: 150, projectKey: "p_a", replies: 2, tokens: 20 },
+        ]);
+        expect(foldSkillTotals(rows).map((skill) => skill.skillKey)).toStrictEqual(["sk_1"]);
+    });
+
+    it("leaves no project the rest of the total, never below zero", () => {
+        const projects = [
+            { costMicrodollars: 100, replies: 1, tokens: 10 },
+            { costMicrodollars: 40, replies: 1, tokens: 4 },
+        ];
+
+        expect(remainderOf({ costMicrodollars: 147, replies: 3, tokens: 15 }, projects)).toStrictEqual({ costMicrodollars: 7, replies: 1, tokens: 1 });
+        expect(remainderOf({ costMicrodollars: 100, replies: 1, tokens: 10 }, projects)).toStrictEqual({ costMicrodollars: 0, replies: 0, tokens: 0 });
+    });
+
+    it("folds increments into one per day and project", () => {
+        const one = { costMicrodollars: 1, date: "2026-09-20", projectKey: "p_a", replies: 1, tokens: 1 };
+
+        expect(foldProjectIncrements([one, one, { ...one, projectKey: "p_b" }])).toStrictEqual([
+            { ...one, costMicrodollars: 2, replies: 2, tokens: 2 },
+            { ...one, projectKey: "p_b" },
         ]);
     });
 });

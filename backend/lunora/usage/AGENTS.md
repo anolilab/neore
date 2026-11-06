@@ -12,3 +12,14 @@
   grouping (`backfill-logic.ts#groupReplies`) must keep matching what one run
   saves, or its keys stop lining up with the live ones. Keys are pruned only
   after the user's backfill is done.
+- **Project rows** — a reply in a thread with a project also adds a
+  `__project__` row (`projectKey` = project id), read from the thread when
+  `recordReplyUsage` lands (pass `threadId`; rows carry it via `SavedRowLike`).
+  Replies outside a project write none: "No project" is total − projects, so
+  never write a project row for a reply the total does not count. The project
+  walk (`runUsageProjectBackfillStep`) adds only project rows; it skips keys the
+  live path marked `projectFiled` and marks its own `project:<key>`, which the
+  live path checks. Key pruning waits for both walks.
+- **Organization view** (`organization.ts`) fans out to each member's shard
+  with `callOnShard`; it is bounded (`MAX_MEMBERS`, `MAX_PROJECTS`) and checks
+  the admin role on the `member` row, not the session.

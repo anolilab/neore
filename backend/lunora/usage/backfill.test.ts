@@ -10,8 +10,16 @@ import { GATEWAY_COST_METADATA_KEY } from "../agent/message-cost";
 import { runInShard } from "../lib/shard-context";
 import schema from "../schema";
 import { recordReplyUsage } from "./activity";
-import { DEFAULT_SKILL_KEY, TOTAL_SKILL_KEY } from "./activity-logic";
-import { BACKFILL_ROWS_PER_STEP, getUsageBackfillStatus, REPLY_KEY_KEEP_MS, runUsageBackfillStep, startUsageBackfill, sweepUsageRollup } from "./backfill";
+import { DEFAULT_SKILL_KEY, PROJECT_SKILL_KEY, TOTAL_SKILL_KEY } from "./activity-logic";
+import {
+    BACKFILL_ROWS_PER_STEP,
+    getUsageBackfillStatus,
+    REPLY_KEY_KEEP_MS,
+    runUsageBackfillStep,
+    runUsageProjectBackfillStep,
+    startUsageBackfill,
+    sweepUsageRollup,
+} from "./backfill";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -52,11 +60,16 @@ interface RowSpec {
 }
 
 /** Inserts one thread and its rows, each `order` a prompt plus its reply rows, at `at`. */
-const insertThread = async (at: number, orders: RowSpec[][], threadStatus = "active"): Promise<{ rowIds: string[][]; threadId: string }> => {
+const insertThread = async (
+    at: number,
+    orders: RowSpec[][],
+    threadStatus = "active",
+    projectId?: string,
+): Promise<{ rowIds: string[][]; threadId: string }> => {
     vi.setSystemTime(at);
 
     return await harness.run(async (ctx: any) => {
-        const threadId = await ctx.db.insert("threads", { status: threadStatus, title: "T", userId: USER });
+        const threadId = await ctx.db.insert("threads", { status: threadStatus, title: "T", userId: USER, ...(projectId !== undefined && { projectId }) });
         const rowIds: string[][] = [];
 
         for (const [order, rows] of orders.entries()) {
@@ -103,21 +116,29 @@ const state = async () => await harness.run(async (ctx: any) => await ctx.db.usa
 
 const step = async (runId: string) => await harness.run(async (ctx: any) => await ctx.runMutation(runUsageBackfillStep, { runId, userId: USER }));
 
-/** Steps until done; returns how many it took. `repeat` delivers every step twice, as a redelivering queue would. */
+const projectStep = async (runId: string) => await harness.run(async (ctx: any) => await ctx.runMutation(runUsageProjectBackfillStep, { runId, userId: USER }));
+
+/** Steps both walks until done; returns how many steps it took. `repeat` delivers every step twice, as a redelivering queue would. */
 const drain = async (repeat = false): Promise<number> => {
     let steps = 0;
 
     for (;;) {
         const current = await state();
 
-        if (current.status === "done") {
-            return steps;
-        }
-
-        await step(current.runId);
-
-        if (repeat) {
+        if (current.status !== "done") {
             await step(current.runId);
+
+            if (repeat) {
+                await step(current.runId);
+            }
+        } else if (current.projects && current.projects.status !== "done") {
+            await projectStep(current.projects.runId);
+
+            if (repeat) {
+                await projectStep(current.projects.runId);
+            }
+        } else {
+            return steps;
         }
 
         steps += 1;
@@ -128,15 +149,33 @@ const drain = async (repeat = false): Promise<number> => {
     }
 };
 
+interface RollupRow {
+    costMicrodollars: number;
+    date: string;
+    projectKey?: string;
+    replies: number;
+    skillKey: string;
+    skillName?: string;
+    tokens: number;
+}
+
 const rollup = async () =>
     await harness.run(async (ctx: any) => {
         const { page } = await ctx.db.usageDaily.findMany({ where: { userId: USER } });
 
-        return (page as { costMicrodollars: number; date: string; replies: number; skillKey: string; skillName?: string; tokens: number }[])
-            .map(({ costMicrodollars, date, replies, skillKey, skillName, tokens }) => {
-                return { costMicrodollars, date, replies, skillKey, tokens, ...(skillName !== undefined && { skillName }) };
+        return (page as RollupRow[])
+            .map(({ costMicrodollars, date, projectKey, replies, skillKey, skillName, tokens }) => {
+                return {
+                    costMicrodollars,
+                    date,
+                    replies,
+                    skillKey,
+                    tokens,
+                    ...(skillName !== undefined && { skillName }),
+                    ...(projectKey !== undefined && { projectKey }),
+                };
             })
-            .toSorted((a, b) => a.date.localeCompare(b.date) || a.skillKey.localeCompare(b.skillKey));
+            .toSorted((a, b) => a.date.localeCompare(b.date) || a.skillKey.localeCompare(b.skillKey) || (a.projectKey ?? "").localeCompare(b.projectKey ?? ""));
     });
 
 /**
@@ -471,5 +510,135 @@ describe("sweepUsageRollup", () => {
         });
 
         expect(keys.map((key: { replyKey: string }) => key.replyKey)).toStrictEqual(["new"]);
+    });
+});
+
+describe("project backfill", () => {
+    const insertProject = async (title: string): Promise<string> =>
+        await harness.run(async (ctx: any) => await ctx.db.insert("projects", { createdAt: DAY_1, title, userId: USER }));
+
+    /** The project rows, costliest first. */
+    const projectRows = async () => {
+        const rows = await rollup();
+
+        return rows.filter((row) => row.skillKey === PROJECT_SKILL_KEY).toSorted((a, b) => b.costMicrodollars - a.costMicrodollars);
+    };
+
+    const live = async (replyKey: string, threadId: string, cost: number, tokens: number) =>
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(recordReplyUsage, {
+                    at: STARTED,
+                    costMicrodollars: cost,
+                    date: "2026-09-20",
+                    replyKey,
+                    skillKey: DEFAULT_SKILL_KEY,
+                    threadId,
+                    tokens,
+                    userId: USER,
+                }),
+        );
+
+    /** Two projects of one reply each, and a reply in no project: 100 + 40 + 7 µ$. */
+    const insertProjectFixture = async () => {
+        const alpha = await insertProject("Alpha");
+        const beta = await insertProject("Beta");
+        const inAlpha = await insertThread(DAY_1, [[prompt(), reply(10, 100)]], "active", alpha);
+        const inBeta = await insertThread(DAY_1, [[prompt(), reply(4, 40)]], "active", beta);
+
+        await insertThread(DAY_1, [[prompt(), reply(1, 7)]]);
+
+        return { alpha, beta, inAlpha, inBeta };
+    };
+
+    const EXPECTED_PROJECTS = (alpha: string, beta: string) => [
+        { costMicrodollars: 100, date: "2026-09-20", projectKey: alpha, replies: 1, skillKey: PROJECT_SKILL_KEY, tokens: 10 },
+        { costMicrodollars: 40, date: "2026-09-20", projectKey: beta, replies: 1, skillKey: PROJECT_SKILL_KEY, tokens: 4 },
+    ];
+
+    it("files replies the rollup already counted under their thread's project, and moves no total", async () => {
+        const { alpha, beta } = await insertProjectFixture();
+
+        vi.setSystemTime(STARTED);
+        await start();
+        await drain();
+
+        expect(await status()).toBe("done");
+        const rows = await rollup();
+
+        expect(await projectRows()).toStrictEqual(EXPECTED_PROJECTS(alpha, beta));
+        expect(rows.find((row) => row.skillKey === TOTAL_SKILL_KEY)).toMatchObject({ costMicrodollars: 147, replies: 3 });
+    });
+
+    it("is idempotent: every step delivered twice, and a walk started again, file each reply once", async () => {
+        const { alpha, beta } = await insertProjectFixture();
+
+        vi.setSystemTime(STARTED);
+        await start();
+        await drain(true);
+
+        const finished = await state();
+
+        expect(finished.projects.replies).toBe(2);
+        expect(await start()).toBe("done");
+        await projectStep(finished.projects.runId);
+        await drain(true);
+
+        expect(await projectRows()).toStrictEqual(EXPECTED_PROJECTS(alpha, beta));
+    });
+
+    it("starts for a user whose first walk finished before projects were filed", async () => {
+        const { alpha, beta } = await insertProjectFixture();
+
+        vi.setSystemTime(STARTED);
+        await start();
+
+        // The first walk ran to its end on its own, as it did before the project walk existed.
+        for (let current = await state(); current.status !== "done"; current = await state()) {
+            await step(current.runId);
+        }
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.usageBackfill.findFirst({ where: { userId: USER } });
+
+            const before = Object.fromEntries(Object.entries(row).filter(([key]) => !["_creationTime", "_id", "projects"].includes(key)));
+
+            await ctx.db.delete("usageBackfill", row._id);
+            await ctx.db.insert("usageBackfill", before);
+        });
+
+        expect(await status()).toBe("idle");
+        expect(await start()).toBe("running");
+        await drain();
+
+        expect(await projectRows()).toStrictEqual(EXPECTED_PROJECTS(alpha, beta));
+    });
+
+    it("skips a reply the live path filed, and the live path files none the walk already did", async () => {
+        const { alpha, beta, inAlpha, inBeta } = await insertProjectFixture();
+
+        vi.setSystemTime(STARTED);
+
+        // Alpha's reply finished before the walk and was recorded live afterwards, with its project.
+        await live(inAlpha.rowIds[0]![1]!, inAlpha.threadId, 100, 10);
+        await start();
+        await drain();
+
+        expect(await projectRows()).toStrictEqual(EXPECTED_PROJECTS(alpha, beta));
+
+        // Beta's reply, filed by the walk, now recorded live by a late delivery: no second project row.
+        // Its first-walk key is dropped, so the record gets past the reply check and reaches the project one.
+        await harness.run(async (ctx: any) => {
+            const key = inBeta.rowIds[0]![1]!;
+
+            const recorded = await ctx.db.usageReplies.findFirst({ where: { replyKey: key, userId: USER } });
+
+            await ctx.db.delete("usageReplies", recorded._id);
+        });
+        await live(inBeta.rowIds[0]![1]!, inBeta.threadId, 40, 4);
+
+        const rows = await projectRows();
+
+        expect(rows.find((row) => row.projectKey === beta)).toMatchObject({ costMicrodollars: 40, replies: 1 });
     });
 });

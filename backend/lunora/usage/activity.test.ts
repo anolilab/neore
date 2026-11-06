@@ -6,8 +6,9 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { getActivityHeatmap, getSkillBreakdown, recordReplyUsage } from "./activity";
+import { getActivityHeatmap, getProjectBreakdown, getProjectUsage, getSkillBreakdown, recordReplyUsage } from "./activity";
 import { DEFAULT_SKILL_KEY } from "./activity-logic";
+import { memberProjectUsage } from "./organization";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -147,5 +148,101 @@ describe("getSkillBreakdown", () => {
             { costMicrodollars: 300, replies: 1, skillKey: "sk_1", skillName: "/writer", tokens: 10 },
             { costMicrodollars: 40, replies: 1, skillKey: DEFAULT_SKILL_KEY, tokens: 10 },
         ]);
+    });
+});
+
+describe("usage by project", () => {
+    interface Totals {
+        costMicrodollars: number;
+        replies: number;
+        tokens: number;
+    }
+
+    interface ProjectBreakdown {
+        noProject: Totals;
+        projects: (Totals & { projectKey: string; title?: string })[];
+        total: Totals;
+        truncated: boolean;
+    }
+
+    const projectBreakdown = async (userId: string, fromDate: string): Promise<ProjectBreakdown> =>
+        (await as(userId).query(getProjectBreakdown as never, { fromDate } as never)) as ProjectBreakdown;
+
+    const projectUsage = async (userId: string, projectId: string, fromDate: string): Promise<Totals> =>
+        (await as(userId).query(getProjectUsage as never, { fromDate, projectId } as never)) as Totals;
+
+    /** A project of `userId`'s and a thread of theirs in it (or in none). */
+    const insertThread = async (userId: string, title?: string): Promise<{ projectId?: string; threadId: string }> =>
+        await harness.run(async (ctx: any) => {
+            const projectId = title === undefined ? undefined : await ctx.db.insert("projects", { createdAt: 1, title, userId });
+            const threadId = await ctx.db.insert("threads", { status: "active", title: "T", userId, ...(projectId !== undefined && { projectId }) });
+
+            return { projectId, threadId };
+        });
+
+    it("shows two threads in two projects as separate totals that add up to the overall total", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+        const beta = await insertThread(USER, "Beta");
+        const loose = await insertThread(USER);
+
+        await record({ costMicrodollars: 300, threadId: alpha.threadId, tokens: 30 });
+        await record({ costMicrodollars: 200, skillKey: "sk_1", skillName: "/writer", threadId: alpha.threadId, tokens: 20 });
+        await record({ costMicrodollars: 100, date: "2026-09-21", threadId: beta.threadId, tokens: 10 });
+        await record({ costMicrodollars: 7, threadId: loose.threadId, tokens: 1 });
+        await record({ costMicrodollars: 3, tokens: 1 });
+
+        const result = await projectBreakdown(USER, "2026-09-01");
+
+        expect(result.projects).toStrictEqual([
+            { costMicrodollars: 500, projectKey: alpha.projectId, replies: 2, title: "Alpha", tokens: 50 },
+            { costMicrodollars: 100, projectKey: beta.projectId, replies: 1, title: "Beta", tokens: 10 },
+        ]);
+        expect(result.noProject).toStrictEqual({ costMicrodollars: 10, replies: 2, tokens: 2 });
+        expect(result.total).toStrictEqual({ costMicrodollars: 610, replies: 5, tokens: 62 });
+
+        const sum = [...result.projects, result.noProject].reduce((total, row) => total + row.costMicrodollars, 0);
+
+        expect(sum).toBe(result.total.costMicrodollars);
+        expect(await projectUsage(USER, alpha.projectId!, "2026-09-01")).toStrictEqual({ costMicrodollars: 500, replies: 2, tokens: 50 });
+        expect(await projectUsage(USER, beta.projectId!, "2026-09-21")).toStrictEqual({ costMicrodollars: 100, replies: 1, tokens: 10 });
+
+        // The skill breakdown is unchanged by the project rows.
+        const skills = await breakdown(USER, "2026-09-01");
+
+        expect(skills.skills.reduce((total, skill) => total + skill.costMicrodollars, 0)).toBe(610);
+    });
+
+    it("files a redelivered record under its project once", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+
+        await record({ replyKey: "run-1", threadId: alpha.threadId });
+        await record({ replyKey: "run-1", threadId: alpha.threadId });
+
+        expect(await projectUsage(USER, alpha.projectId!, "2026-09-01")).toStrictEqual({ costMicrodollars: 100, replies: 1, tokens: 10 });
+    });
+
+    it("shows a user only their own project usage", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+
+        await record({ threadId: alpha.threadId });
+
+        expect(await projectUsage(OTHER, alpha.projectId!, "2026-09-01")).toStrictEqual({ costMicrodollars: 0, replies: 0, tokens: 0 });
+        const theirs = await projectBreakdown(OTHER, "2026-09-01");
+
+        expect(theirs.projects).toStrictEqual([]);
+    });
+
+    it("gives the organization view one member's totals for the projects asked about", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+        const beta = await insertThread(USER, "Beta");
+
+        await record({ costMicrodollars: 300, threadId: alpha.threadId });
+        await record({ costMicrodollars: 100, threadId: beta.threadId });
+
+        const result = await harness.run(
+            async (ctx: any) => await ctx.runQuery(memberProjectUsage, { fromDate: "2026-09-01", projectIds: [alpha.projectId], userId: USER }),
+        );
+
+        expect(result).toStrictEqual({ projects: [{ costMicrodollars: 300, projectKey: alpha.projectId, replies: 1, tokens: 10 }], truncated: false });
     });
 });

@@ -430,6 +430,7 @@ export const askAside = authAction
                     date: usageDayOf(at, timezone),
                     replyKey: `aside:${entryId}`,
                     skillKey: DEFAULT_SKILL_KEY,
+                    threadId,
                     tokens: result.totalUsage?.totalTokens ?? 0,
                     userId,
                 });

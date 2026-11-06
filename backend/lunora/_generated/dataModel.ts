@@ -2000,6 +2000,7 @@ export interface Doc_usageBackfill {
     threadId?: string;
     updatedAt: number;
     userId: string;
+    projects?: { finishedAt?: number; lastOrder?: number; leaseUntil: number; replies: number; runId: string; startedAt: number; status: "running" | "done"; threadCursor?: string; threadId?: string };
 }
 
 export interface Doc_usageDaily {
@@ -2008,6 +2009,7 @@ export interface Doc_usageDaily {
     costMicrodollars: number;
     date: string;
     replies: number;
+    projectKey?: string;
     skillKey: string;
     skillName?: string;
     tokens: number;
@@ -2018,6 +2020,7 @@ export interface Doc_usageDaily {
 export interface Doc_usageReplies {
     _id: Id<"usageReplies">;
     _creationTime: number;
+    projectFiled?: boolean;
     recordedAt: number;
     replyKey: string;
     userId: string;
@@ -2552,7 +2555,7 @@ export interface IndexNamesByTable {
     triggers: "by_userId_organizationId" | "by_type_enabled" | "by_enabled_nextTriggerAt" | "by_userId_type_enabled" | "by_type_enabled_nextTriggerAt";
     twoFactor: "userId";
     usageBackfill: "by_userId";
-    usageDaily: "by_user_skill_date" | "by_user_date" | "by_date";
+    usageDaily: "by_user_skill_date" | "by_user_date" | "by_user_project_date" | "by_date";
     usageReplies: "by_user_reply" | "by_recordedAt";
     user: "email_name" | "name" | "role" | "userId" | "by_isAnonymous";
     userConnectors: "by_user_and_definition" | "by_organization" | "by_status" | "by_connectorDefinitionId";
@@ -5007,6 +5010,7 @@ export interface Insert_usageBackfill {
     threadId?: string;
     updatedAt: number;
     userId: string;
+    projects?: { finishedAt?: number; lastOrder?: number; leaseUntil: number; replies: number; runId: string; startedAt: number; status: "running" | "done"; threadCursor?: string; threadId?: string };
 }
 
 export interface Insert_usageDaily {
@@ -5015,6 +5019,7 @@ export interface Insert_usageDaily {
     costMicrodollars: number;
     date: string;
     replies: number;
+    projectKey?: string;
     skillKey: string;
     skillName?: string;
     tokens: number;
@@ -5025,6 +5030,7 @@ export interface Insert_usageDaily {
 export interface Insert_usageReplies {
     _id?: Id<"usageReplies">;
     _creationTime?: number;
+    projectFiled?: boolean;
     recordedAt: number;
     replyKey: string;
     userId: string;

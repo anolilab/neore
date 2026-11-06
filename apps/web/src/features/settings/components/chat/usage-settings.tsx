@@ -25,6 +25,7 @@ import { useAction } from "@/lib/lunora/crpc";
 
 import { useUsageBackfill } from "../../hooks/use-usage-backfill";
 import UsageActivityHeatmap from "./usage-activity-heatmap";
+import UsageProjectBreakdown from "./usage-project-breakdown";
 import UsageSkillBreakdown from "./usage-skill-breakdown";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -336,6 +337,9 @@ const UsageSettings: FC = () => {
 
                 {/* Skill / agent breakdown */}
                 <UsageSkillBreakdown backfilling={backfilling} days={days} />
+
+                {/* Project breakdown (the caller's own, or the organization's for its admins) */}
+                <UsageProjectBreakdown backfilling={backfilling} days={days} />
 
                 {/* Daily cost trend */}
                 <Card>
