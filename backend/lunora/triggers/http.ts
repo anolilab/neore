@@ -319,7 +319,12 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
             body || trigger.inputTemplate
                 ? renderWebhookPrompt(
                       trigger.inputTemplate,
-                      { body, headers: Object.fromEntries(request.headers), query: firstQueryValues(request.url) },
+                      {
+                          body,
+                          headers: Object.fromEntries(request.headers),
+                          jsonText: strictBody ?? "",
+                          query: firstQueryValues(request.url),
+                      },
                       randomFrameId(),
                   )
                 : undefined;

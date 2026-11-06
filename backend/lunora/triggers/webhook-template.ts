@@ -52,6 +52,8 @@ const isCredentialName = (name: string): boolean => {
 export interface WebhookInputs {
     readonly body: string;
     readonly headers: Readonly<Record<string, string>>;
+    /** The text body paths are read from, when it is not `body`: a body that is not valid UTF-8 passes `""`, so none resolves. */
+    readonly jsonText?: string;
     readonly query: Readonly<Record<string, string>>;
 }
 
@@ -144,7 +146,7 @@ export const renderWebhookPrompt = (template: string | undefined, input: Webhook
     }
 
     try {
-        const json = parseJson(input.body);
+        const json = parseJson(input.jsonText ?? input.body);
         let framesBody = false;
         let prompt = "";
         let last = 0;

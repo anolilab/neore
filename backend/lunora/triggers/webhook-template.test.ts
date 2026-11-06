@@ -163,6 +163,15 @@ describe("renderWebhookPrompt", () => {
         );
     });
 
+    it("reads no body path from text that is not valid UTF-8, though the frame keeps the decoded text", () => {
+        // The replacement character makes this parse as JSON, so only the strict text may be read.
+        const lossy = '{"note":"a�b"}';
+
+        expect(renderWebhookPrompt("{{body.note}}", { body: lossy, headers: {}, jsonText: "", query: {} }, FRAME)).toBe(
+            `""\n\n${LEAD}\n\n<${TAG}>\n${lossy}\n</${TAG}>`,
+        );
+    });
+
     it("appends the framed body when the template places neither the body nor a body value", () => {
         const body = '{"x":1}';
 
