@@ -278,8 +278,15 @@ describe("MCP Apps proxy with an OAuth grant", () => {
         // The older clients: a call with no thread must not lose the read-only tools they always ran.
         oauthConfig("fresh");
 
-        const readOnly = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
-        const asks = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+        // `post` adds a thread, so these are sent bare: no `threadId` at all.
+        const bare = (toolName: string) =>
+            new Request("https://backend.example.com/mcp/tool", {
+                body: JSON.stringify({ arguments: {}, serverName: "Notion", toolName }),
+                method: "POST",
+            });
+
+        const readOnly = await callMCPToolFromAppHttpAction(context, bare("search"));
+        const asks = await callMCPToolFromAppHttpAction(context, bare("create_page"));
 
         expect(readOnly.status).toBe(200);
         expect(asks.status).toBe(403);
