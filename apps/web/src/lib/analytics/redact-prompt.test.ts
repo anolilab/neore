@@ -91,3 +91,50 @@ describe(redactPromptFromEvent, () => {
         expect(event.properties.$current_url).toBe(linkOpened);
     });
 });
+
+/** The path and query a link opens, as a sign-in return URL records them (`openedFrom`, `redirectTo`). */
+const linkPath = ((): string => {
+    const { pathname, search } = new URL(linkOpened);
+
+    return `${pathname}${search}`;
+})();
+
+/** A sign-in page's URL carrying the link as its `redirectTo`, written the way the sign-in view writes it. */
+const signInPage = (returnPath: string): string => {
+    const page = new URL("https://app.example.com/auth/sign-in");
+
+    page.searchParams.set("redirectTo", returnPath);
+
+    return page.href;
+};
+
+describe("a prompt link on a sign-in route", () => {
+    it("keeps the prompt text out of the sign-in page's URL, where the return link is nested encoded", () => {
+        const cleaned = redactPromptFromUrl(signInPage(linkPath));
+
+        expect(cleaned).not.toContain("Summarise");
+        expect(cleaned).not.toContain("merger");
+        expect(cleaned).toBe("https://app.example.com/auth/sign-in?redirectTo=%2Fchat");
+    });
+
+    it("keeps the prompt text out when the return link is encoded twice", () => {
+        const twice = new URL("https://app.example.com/auth/sign-in");
+
+        twice.searchParams.set("redirectTo", signInPage(linkPath));
+
+        expect(redactPromptFromUrl(twice.href)).not.toContain("merger");
+    });
+
+    it("keeps the prompt text out of a pageview on the sign-in route, from the page URL and the referrer", () => {
+        const event = {
+            event: "$pageview",
+            properties: { $current_url: signInPage(linkPath), $pathname: "/auth/sign-in", $referrer: linkOpened },
+        };
+
+        const payload = JSON.stringify(redactPromptFromEvent(event));
+
+        expect(payload).not.toContain("Summarise");
+        expect(payload).not.toContain("merger");
+        expect(payload).toContain("/auth/sign-in");
+    });
+});

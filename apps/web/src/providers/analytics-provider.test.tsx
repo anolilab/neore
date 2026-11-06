@@ -65,5 +65,14 @@ describe("AnalyticsProvider", () => {
 
         expect(JSON.stringify(sent)).not.toContain("merger");
         expect(sent.properties.$current_url).toBe("https://app.example.com/chat?model=gpt-4o");
+
+        // A sign-in route records the link in its own URL, encoded as its return address.
+        const signIn = new URL("https://app.example.com/auth/sign-in");
+
+        signIn.searchParams.set("redirectTo", "/chat?prompt=Summarise%20the%20merger%20plan&model=gpt-4o");
+
+        const onSignIn = options?.before_send?.({ event: "$pageview", properties: { $current_url: signIn.href } }) as typeof event;
+
+        expect(JSON.stringify(onSignIn)).not.toContain("merger");
     });
 });
