@@ -86,7 +86,9 @@ const ChatPage = () => {
         // The composer sends the free model to an anonymous visitor's text chat, so the link's model waits for the session.
         isAnonymous: sessionData?.user?.isAnonymous === true,
         model: linkModel,
-        otherDraftSource: Boolean(promptId) || (Boolean(hasInitialMessage) && handoffWaiting),
+        // A handoff owns the draft while it is pending: its flag is in the address and its message is either waiting in storage now (one
+        // written after this page mounted, as a new handoff is) or was waiting at mount and not yet decided. Read now, so the link sees it.
+        otherDraftSource: Boolean(promptId) || (Boolean(hasInitialMessage) && (handoffWaiting || landingMessageWaiting())),
         prompt: linkPrompt,
         onDecided: endHandoffOwnership,
         ready: !isSessionPending && linkableModels !== undefined,

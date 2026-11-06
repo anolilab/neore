@@ -256,6 +256,24 @@ describe("chat index route", () => {
         });
     });
 
+    describe("a new handoff, written after the page mounted", () => {
+        it("keeps precedence over the link in the same address, as a handoff at mount does", async () => {
+            openUrl(linkWith({ initialMessage: "true" }));
+            harness.sessionPending = true;
+
+            const update = mountPage();
+
+            // The handoff's message is written after the page mounted, before the session answers.
+            sessionStorage.setItem(LANDING_MESSAGE_KEY, "new handoff text");
+            harness.sessionPending = false;
+            update();
+
+            await waitFor(() => expect(harness.showWarning).toHaveBeenCalledWith("This chat already has a prompt. The prompt from the link was not added."));
+            expect(useChatUIStore.getState().composerText).toBe("");
+            expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+        });
+    });
+
     describe("a handoff that takes its message before the session answers", () => {
         it("still owns the draft when the link is decided, so the link is refused with its notice", async () => {
             sessionStorage.setItem(LANDING_MESSAGE_KEY, "handoff text");
