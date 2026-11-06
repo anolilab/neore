@@ -78,7 +78,8 @@ const rowsOf = (state: HostAgentState | undefined, labels: { mode: string; model
     if (state.configOptions !== undefined && state.configOptions.length > 0) {
         return state.configOptions.map((option) => {
             return {
-                // A mode is changed on the computer, where the person sees what it grants: its value shows, read-only.
+                // A mode is changed on the computer, where the person sees what it grants: its value shows, read-only. The computer
+                // matches the category without regard to case, so this does too.
                 changeable: option.choices.length > 0 && option.category?.toLowerCase() !== "mode",
                 choices: option.choices,
                 current: option.currentValue,

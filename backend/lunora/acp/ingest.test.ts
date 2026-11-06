@@ -2435,6 +2435,17 @@ describe("what the agent reports about itself", () => {
         expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: { cost, size: 200_000, used: 12 } } });
     });
 
+    it("keeps the newer of two reports from a clock a little ahead, even when the older one arrives later", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const newer = Date.now() + 2 * 60_000;
+
+        await report(device, newer, { usage: usage(20) });
+        await report(device, newer - 10_000, { usage: usage(10) });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(20) } });
+    });
+
     it("orders a report stamped ahead of the server clock at the server's time, so a current report is still applied", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);
@@ -2447,6 +2458,109 @@ describe("what the agent reports about itself", () => {
 
         expect(stored?.agentStateAt).toBeLessThanOrEqual(Date.now() + 1000);
         expect(stored).toMatchObject({ agentState: { usage: usage(11) } });
+    });
+
+    it("applies reports after the desktop's clock is corrected back, not only once wall time passes a watermark it stamped ahead", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const base = Date.now();
+
+        try {
+            vi.useFakeTimers({ toFake: ["Date"] });
+            vi.setSystemTime(base);
+            await report(device, base + 4 * 60_000, { usage: usage(10) });
+
+            vi.setSystemTime(base - 60 * 60_000);
+            await report(device, base - 60 * 60_000 + 1000, { usage: usage(11) });
+        } finally {
+            vi.useRealTimers();
+        }
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(11) } });
+    });
+
+    const commands = (...names: string[]) =>
+        names.map((name) => {
+            return { description: `Does ${name}`, name };
+        });
+
+    it("stores the agent's commands, with an input hint, and the owner reads them back", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const list = [{ description: "Review", hint: "a branch", name: "review" }, ...commands("compact")];
+
+        const result = await report(device, 1000, { availableCommands: list });
+
+        expect(result.status).toBe(200);
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { availableCommands: list }, agentStateAt: 1000 });
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ agentState: { availableCommands: list } });
+    });
+
+    it("replaces the commands with a newer list and keeps the usage a later report leaves out", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { availableCommands: commands("a", "b"), usage: usage(5) });
+        await report(device, 2000, { availableCommands: commands("c") });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { availableCommands: commands("c"), usage: usage(5) }, agentStateAt: 2000 });
+    });
+
+    it("keeps the stored list when the same commands arrive again, and a reordered list replaces it", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { availableCommands: commands("a", "b") });
+        await report(device, 2000, { availableCommands: commands("a", "b") });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { availableCommands: commands("a", "b") }, agentStateAt: 2000 });
+
+        await report(device, 3000, { availableCommands: commands("b", "a") });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { availableCommands: commands("b", "a") }, agentStateAt: 3000 });
+    });
+
+    it("stores a commands-only report, leaves the usage alone, and advances the watermark", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { usage: usage(5) });
+        await report(device, 2000, { availableCommands: commands("a") });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { availableCommands: commands("a"), usage: usage(5) }, agentStateAt: 2000 });
+    });
+
+    it("drops an older commands report that arrives after a newer one", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 3000, { availableCommands: commands("new") });
+        const late = await report(device, 2000, { availableCommands: commands("old") });
+
+        expect(late.status).toBe(200);
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { availableCommands: commands("new") }, agentStateAt: 3000 });
+    });
+
+    it("refuses commands past the bounds", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+
+        const entry = { description: "d", name: "n" };
+
+        for (const bad of [
+            Array.from({ length: 101 }, (_, index) => {
+                return { ...entry, name: `n${index}` };
+            }),
+            [{ ...entry, name: "n".repeat(65) }],
+            [{ ...entry, name: "" }],
+            [{ ...entry, description: "d".repeat(301) }],
+            [{ ...entry, hint: "h".repeat(201) }],
+        ]) {
+            const result = await report(device, 1000, { availableCommands: bad });
+
+            expect(result.status).toBe(400);
+        }
     });
 
     it("refuses a report for a session the device does not hold", async () => {

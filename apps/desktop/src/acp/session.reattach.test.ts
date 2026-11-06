@@ -6,6 +6,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import type { SessionStatePatch } from "./host-events";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { AcpManager } from "./manager";
 import { spawnAgent } from "./process";
@@ -14,6 +15,7 @@ import { Scratch } from "./testing/harness";
 let scratch: Scratch;
 let manager: AcpManager;
 let opened: HostSessionInfo[];
+let states: SessionStatePatch[];
 
 const observer: SessionObserver = {
     permissionRequested: () => {},
@@ -21,6 +23,9 @@ const observer: SessionObserver = {
     sessionEnded: () => {},
     sessionOpened: (_id, info) => {
         opened.push(info);
+    },
+    sessionState: (_id, patch) => {
+        states.push(patch);
     },
     text: () => {},
     thought: () => {},
@@ -54,6 +59,7 @@ const methods = () => scratch.methods();
 beforeEach(() => {
     scratch = new Scratch();
     opened = [];
+    states = [];
 });
 
 afterEach(() => {
@@ -95,5 +101,23 @@ describe("a start with a saved session id", () => {
 
         expect(methods()).not.toContain("session/load");
         expect(opened[0]?.reattach).toBeUndefined();
+    });
+});
+
+describe("a resumed session with a long history", () => {
+    it("still shows the agent's commands, though they arrive after more replayed updates than the early buffer holds", async () => {
+        await startWith({ FAKE_AGENT_REPLAY_BURST: "1", FAKE_AGENT_SESSIONS: "load" }, "s-new");
+
+        const commands = states.flatMap((patch) => patch.availableCommands?.map((command) => command.name) ?? []);
+
+        expect(commands).toContain("review");
+    });
+
+    it("still shows the agent's commands when the replayed history alone fills the early buffer's bytes", async () => {
+        await startWith({ FAKE_AGENT_REPLAY_BYTES: "1", FAKE_AGENT_SESSIONS: "load" }, "s-new");
+
+        const commands = states.flatMap((patch) => patch.availableCommands?.map((command) => command.name) ?? []);
+
+        expect(commands).toContain("review");
     });
 });

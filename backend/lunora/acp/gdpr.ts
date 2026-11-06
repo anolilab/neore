@@ -51,6 +51,18 @@ const rowsWithinBudget = <Row>(rows: ReadonlyArray<Row>, budget: number): Row[] 
     return kept;
 };
 
+/**
+ * What the agent advertises as its slash commands is its own configuration, not the person's data, and a list of them can be large
+ * (up to the validator's bound per session): the export keeps the usage and leaves the command list out.
+ */
+const withoutCommands = (state: Infer<typeof vAcpAgentState>): Infer<typeof vAcpAgentState> => {
+    const kept = { ...state };
+
+    delete kept.availableCommands;
+
+    return kept;
+};
+
 /** Chunk rows read per query while scanning a stream for events. */
 const CHUNK_PAGE = 200;
 
@@ -64,7 +76,8 @@ const EVENT_BYTES_BUDGET = 400_000;
 const vExportSession = v.object({
     agentKey: v.string(),
     agentLabel: v.string(),
-    // What the agent reported about its own context use and cost (`session_state`), as the thread's context meter showed it.
+    // What the agent reported about itself (`session_state`): its context use and cost, and its advertised commands, as the thread's
+    // meter and command menu showed them. The export leaves the command list out (see `withoutCommands`).
     agentState: v.optional(vAcpAgentState),
     // When the agent's report was observed: the time the stored values are dated by.
     agentStateAt: v.optional(v.number()),
@@ -144,7 +157,7 @@ export const collectAcpSessionsForExport = internalQuery
                             folderLabel,
                             status,
                             threadId: threadId as string,
-                            ...(agentState !== undefined && { agentState }),
+                            ...(agentState !== undefined && { agentState: withoutCommands(agentState) }),
                             ...(agentStateAt !== undefined && { agentStateAt }),
                             ...(capabilities !== undefined && { capabilities }),
                             ...(importedTurns !== undefined && { importedTurns }),

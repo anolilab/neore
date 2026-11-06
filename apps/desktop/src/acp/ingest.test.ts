@@ -1104,6 +1104,22 @@ describe("a session that ends locally", () => {
         expect(closes()).toHaveLength(1);
     });
 
+    it("forgets an ended session's id once the report held for it is posted, and before the close", async () => {
+        const host = poster();
+        const bookkeeping = host as unknown as Record<"endedSessions", Set<string>>;
+
+        await open(host);
+        host.sessionState("s1", { usage: { size: 200_000, used: 10 } });
+        host.sessionEnded("s1");
+        await settle(POST_INTERVAL_MS);
+
+        const reportIndex = backend.posts.findIndex(({ post }) => (post.events[0] as { kind?: string } | undefined)?.kind === "session_state");
+
+        expect(reportIndex).toBeGreaterThanOrEqual(0);
+        expect(backend.posts.indexOf(closes()[0] as never)).toBeGreaterThan(reportIndex);
+        expect(bookkeeping.endedSessions.size).toBe(0);
+    });
+
     it("sends the close at once when no turn ever ran", async () => {
         const host = poster();
 
@@ -1156,6 +1172,47 @@ describe("a session that ends locally", () => {
 
         expect(closes()).toHaveLength(1);
         expect(backend.posts.findIndex(({ post }) => post.close === true)).toBeGreaterThan(0);
+    });
+
+    it("posts a usage report held for a session that ended during its session_open to the thread the open answers with, before the close", async () => {
+        const isOpen = (post: Post) => (post.events[0] as { kind?: string } | undefined)?.kind === "session_open";
+        const reports = () => backend.posts.filter(({ post }) => (post.events[0] as { kind?: string } | undefined)?.kind === "session_state");
+        let release = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the supported Node range starts before it exists
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+
+        backend.respond = (post) => isOpen(post) ? Response.json({ ended: false, next: 0, threadId: "thread-held" }) : undefined;
+
+        const host = poster(undefined, async (url, init) => {
+            const { payload } = JSON.parse(String(init?.body)) as { payload: string };
+
+            if (isOpen(JSON.parse(payload) as Post)) {
+                await gate;
+            }
+
+            return await backend.fetch(String(url), init);
+        });
+
+        host.sessionOpened("s1", INFO);
+        await settle();
+        host.sessionState("s1", { usage: { size: 200_000, used: 9 } });
+        host.sessionEnded("s1");
+        await settle(4000);
+
+        // The open is unanswered: the report waits for the thread, and the close waits for the report.
+        expect(reports()).toHaveLength(0);
+        expect(closes()).toHaveLength(0);
+
+        release();
+        await settle(4000);
+
+        expect(reports()).toHaveLength(1);
+        expect(reports()[0]?.post).toMatchObject({ sessionId: "s1" });
+        expect(reports()[0]?.post.events[0]).toMatchObject({ usage: { size: 200_000, used: 9 } });
+        expect(closes()).toHaveLength(1);
+        expect(backend.posts.indexOf(reports()[0] as never)).toBeLessThan(backend.posts.indexOf(closes()[0] as never));
     });
 
     it("sends no close for a session the backend refused to open", async () => {
@@ -1309,6 +1366,27 @@ describe("what the agent reports about itself", () => {
 
         expect(statePosts()).toHaveLength(1);
         expect(statePosts()[0]?.post.events[0]).toMatchObject({ usage: usage(4) });
+    });
+
+    it("posts the agent's commands once, with the newest list, alongside a usage report", async () => {
+        const host = poster();
+
+        await open(host);
+        const observedAt = clock;
+
+        host.sessionState("s1", { availableCommands: [{ description: "old", name: "old" }] });
+        host.sessionState("s1", { usage: usage(3) });
+        host.sessionState("s1", { availableCommands: [{ description: "Compact", name: "compact" }] });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(1);
+        expect(statePosts()[0]?.post.events).toEqual([
+            { at: observedAt, availableCommands: [{ description: "Compact", name: "compact" }], kind: "session_state", usage: usage(3) },
+        ]);
+
+        await settle(30_000);
+
+        expect(statePosts()).toHaveLength(1);
     });
 
     it("drops a report for a session that is local only, and never posts it", async () => {
@@ -1579,6 +1657,31 @@ describe("what the agent reports about itself", () => {
         await settle(2000);
 
         expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ configOptions: [option], usage: usage(12) });
+    });
+
+    it("sends the command list of a dropped report with the session's next report, since the agent sends it once at its start", async () => {
+        const host = poster();
+        const commands = [{ description: "Compact the context", name: "compact" }];
+        let failing = true;
+
+        await open(host);
+        backend.respond = (post) => {
+            if (failing && (post.events[0] as { kind?: string } | undefined)?.kind === "session_state") {
+                return Response.json({ error: "x" }, { status: 503 });
+            }
+
+            return undefined;
+        };
+        host.sessionState("s1", { availableCommands: commands, usage: usage(10) });
+        await settleInSteps(10 * 60_000);
+
+        expect(statePosts()).toHaveLength(MAX_STATE_ATTEMPTS);
+
+        failing = false;
+        host.sessionState("s1", { usage: usage(12) });
+        await settle(2000);
+
+        expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ availableCommands: commands, usage: usage(12) });
     });
 
     it("forgets the bookkeeping of a session that ended once its last report is posted", async () => {

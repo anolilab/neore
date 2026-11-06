@@ -71,6 +71,7 @@
         - Usage (`usage_update`) is stored on `acpSessions.agentState` with `agentStateAt`; each field present replaces the stored one, and a usage report without a cost keeps the stored cost.
         - A report older than `agentStateAt` is dropped; a repeated value still moves `agentStateAt`.
         - The desktop coalesces it to one post per session every 2 s (`HostPoster.flushState`).
+        - The advertised commands (`available_commands_update`) are stored as `agentState.availableCommands`, replaced whole when present, and compared field by field, in order, to skip an unchanged list. Their bounds are shared between `vAgentCommands` and the desktop's `agent-state.ts`. The GDPR export leaves the list out.
         - A failed post backs off 30 s, unless a fresh report is waiting; a report failed `MAX_STATE_ATTEMPTS` times with nothing newer is dropped.
 
 - **Coding agents on a paired computer** (`backend/lunora/acp/`, `apps/desktop/src/acp/`, acp-agent-host.md) —

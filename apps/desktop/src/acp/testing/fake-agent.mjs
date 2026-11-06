@@ -295,6 +295,27 @@ const handle = async (message) => {
             update(state.sessionId, { sessionUpdate: kind, content: { type: "text", text } });
         }
         update(state.sessionId, { sessionUpdate: "tool_call", toolCallId: "h1", title: "Read", kind: "read", status: "completed" });
+        // FAKE_AGENT_REPLAY_BURST=1: a long replay of history, then the command list, both before the load answers.
+        if (process.env.FAKE_AGENT_REPLAY_BURST === "1") {
+            for (let index = 0; index < 40; index += 1) {
+                update(state.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "old " } });
+            }
+            update(state.sessionId, { sessionUpdate: "available_commands_update", availableCommands: [{ name: "review", description: "Review the change" }] });
+        }
+
+        // FAKE_AGENT_REPLAY_BYTES=1: the same, with chunks big enough to fill the byte budget of the other early updates first.
+        if (process.env.FAKE_AGENT_REPLAY_BYTES === "1") {
+            const big = "x".repeat(24 * 1024);
+
+            for (let index = 0; index < 40; index += 1) {
+                update(state.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: big } });
+            }
+            // Larger than the room the chunks leave in the budget, so only a budget of its own lets the list in.
+            const long = "d".repeat(3900);
+            const commands = ["review", "review2", "review3", "review4", "review5"].map((name) => ({ name, description: long }));
+
+            update(state.sessionId, { sessionUpdate: "available_commands_update", availableCommands: commands });
+        }
 
         return send({ id: message.id, result: {} });
     }

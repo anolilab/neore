@@ -124,6 +124,27 @@
                         },
                         "agentState": {
                           "properties": {
+                            "availableCommands": {
+                              "items": {
+                                "properties": {
+                                  "description": {
+                                    "type": "string"
+                                  },
+                                  "hint": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "description",
+                                  "name"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
                             "configOptions": {
                               "items": {
                                 "properties": {
