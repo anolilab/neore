@@ -378,6 +378,24 @@ describe("the options the agent offers", () => {
         expect(screen.getByText("Ask")).toBeTruthy();
     });
 
+    it("says what the agent confirmed when the option it changed is no longer among its options", async () => {
+        const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+        await waitFor(() => expect(mutations()).toHaveLength(1));
+
+        // The agent's list no longer has the model, and the session holds its confirmed answer for that change.
+        client.setQueryData(["acp.functions.getHostSession", { threadId: "thread-1" }], {
+            _id: "session-1",
+            agentState: { configOptions: [] },
+            optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+            status: "idle",
+        });
+
+        expect(await screen.findByText("The agent confirmed: Model is now Deep, but no longer lists Model.")).toBeTruthy();
+    });
+
     it("gives a new session in the thread its own options, not the change still waiting on the old session", async () => {
         const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
