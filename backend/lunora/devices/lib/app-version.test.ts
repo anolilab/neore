@@ -16,6 +16,10 @@ describe("isAppVersion", () => {
         }
     });
 
+    it("accepts a long numeric component, as the desktop release tags do", () => {
+        expect(isAppVersion("1234567890.1.2")).toBe(true);
+    });
+
     it("refuses a version longer than the cap", () => {
         expect(isAppVersion(`1.0-${"a".repeat(MAX_APP_VERSION_LENGTH)}`)).toBe(false);
     });
