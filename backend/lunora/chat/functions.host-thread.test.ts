@@ -21,6 +21,7 @@ import {
     promptById,
     refusedBeforeDispatch,
     releaseTitleCharge,
+    settleTitleWrite,
     regenerateThreadTitle,
     titleIneligibility,
     throwAfterCleanup,
@@ -236,6 +237,57 @@ describe("the prompt a title is written from, and the charge for it", () => {
 
         expect(claims.some((claim) => claim.scope === "regenerate-title" && claim.key === cloud)).toBe(false);
     }, 60_000);
+});
+
+describe("a charged title run whose write does not land", () => {
+    it("gives its charge back when the write is refused, so the charge never stays with no title", async () => {
+        const key = "thread-w:run-refused";
+        const claimedAt = (await harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))) as number;
+
+        await expect(
+            settleTitleWrite(
+                async () => false,
+                async () => await harness.run(async (context: any) => await releaseTitleCharge(context, key, claimedAt)),
+            ),
+        ).resolves.toBe(false);
+
+        // The charge is free again: the run's retry (or a later one) may ask, and it is not refused as already charged.
+        await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toEqual(expect.any(Number));
+    });
+
+    it("gives its charge back when the write throws, and reports the write's error", async () => {
+        const key = "thread-w:run-thrown";
+        const claimedAt = (await harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))) as number;
+        const writeError = new Error("transient storage failure");
+
+        await expect(
+            settleTitleWrite(
+                async () => {
+                    throw writeError;
+                },
+                async () => await harness.run(async (context: any) => await releaseTitleCharge(context, key, claimedAt)),
+            ),
+        ).rejects.toBe(writeError);
+        await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toEqual(expect.any(Number));
+    });
+
+    it("keeps its charge when the title is written, so a retry after the write is refused", async () => {
+        const key = "thread-w:run-written";
+
+        await harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER));
+        let gaveBack = false;
+
+        await expect(
+            settleTitleWrite(
+                async () => true,
+                async () => {
+                    gaveBack = true;
+                },
+            ),
+        ).resolves.toBe(true);
+        expect(gaveBack).toBe(false);
+        await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toBeNull();
+    });
 });
 
 describe("the error a title run reports, and the retries of its give-back", () => {

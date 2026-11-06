@@ -1671,6 +1671,26 @@ export const throwAfterCleanup = async (cleanup: () => Promise<unknown>, error: 
     throw error;
 };
 
+/**
+ * Runs a title's write after its model answer. A write that is refused, or that throws, gives the run's charge back (`giveBack`), so a
+ * billed run never keeps its charge with no title. A thrown write's error is the one reported. Answers whether the title was written.
+ */
+export const settleTitleWrite = async (write: () => Promise<boolean>, giveBack: () => Promise<void>): Promise<boolean> => {
+    let written: boolean;
+
+    try {
+        written = await write();
+    } catch (error) {
+        return await throwAfterCleanup(giveBack, error);
+    }
+
+    if (!written) {
+        await giveBack();
+    }
+
+    return written;
+};
+
 /** Tries `attempt` up to `times` times, stopping at the first success. `false` when every try failed. */
 export const tryTimes = async (times: number, attempt: () => Promise<unknown>): Promise<boolean> => {
     for (let index = 0; index < times; index += 1) {
@@ -1830,16 +1850,35 @@ const writeGeneratedTitle = async (
 
     // The title the run read (a regenerate's click-time title, else the one read above). The write checks it, and the requester's
     // admin access, in the same transaction, so a rename or a revoked grant committed since is kept.
-    const written =
-        afterModel === undefined &&
-        (await context.runMutation(internal.agent.threads.setGeneratedTitle, {
-            expectedLeaf: arguments_.expectedLeaf,
-            expectedPromptId: arguments_.expectedPromptId,
-            expectedTitleDigest: arguments_.expectedTitleDigest ?? (await sha256Hex(metadata.title ?? "")),
-            requestedBy: arguments_.requestedBy,
-            threadId: arguments_.threadId as Id<"threads">,
-            title: textResult.text,
-        }));
+    // Once the model has answered, the answer is kept only in this write: a title that does not land gives its charge back, so the
+    // charge never stays with no title. The answer itself is not stored (that would need a schema decision).
+    const giveBackCharge = async (): Promise<void> => {
+        if (arguments_.chargeKey === undefined || charge === null) {
+            return;
+        }
+
+        const key = arguments_.chargeKey;
+        const claimedAt = charge;
+
+        if (!(await tryTimes(3, () => releaseTitleCharge(context, key, claimedAt)))) {
+            context.log.event("chat.thread_title", { skipped: "charge-release-failed" });
+        }
+    };
+
+    const written = await settleTitleWrite(
+        async () =>
+            afterModel === undefined
+                ? await context.runMutation(internal.agent.threads.setGeneratedTitle, {
+                      expectedLeaf: arguments_.expectedLeaf,
+                      expectedPromptId: arguments_.expectedPromptId,
+                      expectedTitleDigest: arguments_.expectedTitleDigest ?? (await sha256Hex(metadata.title ?? "")),
+                      requestedBy: arguments_.requestedBy,
+                      threadId: arguments_.threadId as Id<"threads">,
+                      title: textResult.text,
+                  })
+                : false,
+        giveBackCharge,
+    );
 
     // The model was billed whether or not the title was written: one event carries its usage, with the reason when it was not written.
     const skipped = written ? undefined : skippedReason(afterModel);
