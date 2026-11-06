@@ -128,6 +128,36 @@ describe("a coding agent's turn", () => {
         expect(screen.queryByRole("list")).toBeNull();
     });
 
+    it("shows a compact host turn's plan too, in a comparison column as in the thread", async () => {
+        harness.body = {
+            hostActivity: {
+                plan: [
+                    { content: "Read the code", priority: "high", status: "completed" },
+                    { content: "Write the fix", priority: "medium", status: "in_progress" },
+                ],
+                tools: [],
+            },
+            hostState: "running",
+            reasoning: "",
+            status: "streaming",
+            text: "",
+        };
+
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <StreamingPlaceholder compact streamId="stream-1" />
+            </QueryClientProvider>,
+        );
+
+        const list = await screen.findByRole("list");
+
+        expect(
+            within(list)
+                .getAllByRole("listitem")
+                .map((item) => item.textContent),
+        ).toEqual(["Read the codeDone", "Write the fixIn progress"]);
+    });
+
     it("shows each tool call with its status in words and the tail of what it printed in a labelled region", async () => {
         mount({
             hostActivity: {
