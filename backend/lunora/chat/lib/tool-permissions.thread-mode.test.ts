@@ -183,6 +183,17 @@ describe("modeOfThread", () => {
         await expect(modeOfThread({ db } as never, orphan as never, "u1")).resolves.toBe("supervised");
     });
 
+    it("fails closed when a child has comparison links to two different parents", async () => {
+        // The first listed parent is the looser one: taking it would run the column under `auto`.
+        threads.free = { _id: "free", permissionMode: "auto", userId: "u1" };
+        const db = databaseWith([
+            { branchType: "comparison", parentThreadId: "free", threadId: "child" },
+            { branchType: "comparison", parentThreadId: "parent", threadId: "child" },
+        ]);
+
+        await expect(modeOfThread({ db } as never, threads.child as never, "u1")).resolves.toBe("supervised");
+    });
+
     it("fails closed when the link rows reach the read bound without showing a comparison", async () => {
         // 50 is the read bound (`MAX_LINKS_CHECKED`): a comparison link past it would be unseen, so the thread runs supervised.
         const rows = Array.from({ length: 50 }, () => {

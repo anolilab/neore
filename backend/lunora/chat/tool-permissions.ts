@@ -209,6 +209,23 @@ const MAX_LINKS_CHECKED = 50;
  * A comparison column is a thread of its own, but the mode is chosen once, on the comparison it belongs to: a column always takes its
  * comparison parent's mode, whatever mode it holds. The parent's choice therefore reaches the first send and every follow-up alike.
  */
+/** The relationship rows where `threadId` is the child, read up to the bound (`MAX_LINKS_CHECKED`). */
+const linksOf = async (ctx: QueryCtx, threadId: Id<"threads">) =>
+    await ctx.db
+        .query("threadRelationships")
+        .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+        .take(MAX_LINKS_CHECKED);
+
+/**
+ * Whether a thread is a comparison column. Its runs take the comparison's mode, so a mode set on it would never apply
+ * (`setThreadPermissionMode` refuses it).
+ */
+export const isComparisonColumn = async (ctx: QueryCtx, threadId: Id<"threads">): Promise<boolean> => {
+    const links = await linksOf(ctx, threadId);
+
+    return links.some((link) => link.branchType === "comparison");
+};
+
 export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null, userId: string): Promise<ThreadPermissionMode | null> => {
     // A host thread has no mode, and a comparison link must not give it one.
     if (!thread || thread.runner === "host") {
@@ -217,11 +234,15 @@ export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null,
 
     // Every link is read, not the first: a child with a comparison link and another link must still take its parent's mode, whichever
     // is listed first. The rows per child are few; the bound only keeps a runaway row count from being read whole.
-    const links = await ctx.db
-        .query("threadRelationships")
-        .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
-        .take(MAX_LINKS_CHECKED);
-    const comparison = links.find((link) => link.branchType === "comparison");
+    const links = await linksOf(ctx, thread._id);
+    const comparisons = links.filter((link) => link.branchType === "comparison");
+
+    // Two comparison links name two parents, and neither one's mode is the column's: fail closed rather than take whichever is listed first.
+    if (new Set(comparisons.map((link) => link.parentThreadId)).size > 1) {
+        return "supervised";
+    }
+
+    const [comparison] = comparisons;
 
     // A read that hit the bound may have cut off a comparison link: the thread cannot be shown to have none, so it runs supervised.
     if (!comparison && links.length >= MAX_LINKS_CHECKED) {
