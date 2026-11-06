@@ -616,7 +616,14 @@ const pendingRequestOfStream = async (
         const request = await findPendingRequestOnLatestTurn(ctx, stream.threadId as Id<"threads">, row.approvalId);
 
         if (request?.toolCallId) {
-            const question = request.toolName === ASK_USER_TOOL_NAME ? (request.input as { question?: unknown } | undefined)?.question : undefined;
+            const asked = request.toolName === ASK_USER_TOOL_NAME ? (request.input as { question?: unknown; questions?: unknown } | undefined) : undefined;
+            // A multi-question call has no `question`: its questions are listed one per line.
+            const question = Array.isArray(asked?.questions)
+                ? asked.questions
+                      .map((entry: { question?: unknown }) => entry.question)
+                      .filter((text) => typeof text === "string")
+                      .join("\n")
+                : asked?.question;
 
             return { ...(typeof question === "string" && { question }), toolCallId: request.toolCallId, toolName: request.toolName };
         }

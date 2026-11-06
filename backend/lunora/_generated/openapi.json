@@ -15517,6 +15517,26 @@
                           }
                         ]
                       },
+                      "answers": {
+                        "items": {
+                          "properties": {
+                            "note": {
+                              "type": "string"
+                            },
+                            "selected": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "selected"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
                       "approvalId": {
                         "type": "string"
                       },
@@ -15536,7 +15556,6 @@
                       }
                     },
                     "required": [
-                      "answer",
                       "approvalId",
                       "threadId"
                     ],
@@ -22812,6 +22831,30 @@
                       },
                       "expectedUrl": {
                         "type": "string"
+                      },
+                      "more": {
+                        "items": {
+                          "properties": {
+                            "expectedUrl": {
+                              "type": "string",
+                              "writeOnly": true,
+                              "format": "password"
+                            },
+                            "value": {
+                              "type": "string",
+                              "writeOnly": true,
+                              "format": "password"
+                            }
+                          },
+                          "required": [
+                            "expectedUrl",
+                            "value"
+                          ],
+                          "type": "object",
+                          "writeOnly": true
+                        },
+                        "type": "array",
+                        "writeOnly": true
                       },
                       "threadId": {
                         "description": "Id<\"threads\">",

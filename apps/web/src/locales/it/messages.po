@@ -672,7 +672,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} strumenti: {1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:204
+#: src/features/home/components/home-page.tsx:207
 msgid "{0} unread"
 msgstr "{0} non lette"
 
@@ -1185,7 +1185,7 @@ msgstr "{name} in pausa"
 msgid "{name} resumed"
 msgstr "{name} ripreso"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:56
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
 msgid "{name} wants to run \"{tool}\""
 msgstr "{name} vuole eseguire \"{tool}\""
 
@@ -1228,6 +1228,10 @@ msgstr "{providerName} · la tua chiave API"
 #: src/features/settings/lib/custom-models.ts:63
 msgid "{providerName} · your own Bedrock account ({region})"
 msgstr "{providerName} · il tuo account Bedrock ({region})"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:307
+msgid "{refusedLabel} does not have the format this request asks for, so nothing was saved. Enter it again."
+msgstr "{refusedLabel} non ha il formato richiesto da questa richiesta, quindi non è stato salvato nulla. Inseriscilo di nuovo."
 
 #: src/features/settings/components/chat/usage-settings.tsx:391
 #: src/routes/admin/gateway/index.tsx:67
@@ -1626,7 +1630,7 @@ msgstr "SLA del 99,99%"
 msgid "a change is waiting to be read"
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:158
+#: src/features/home/components/home-page.tsx:165
 msgid "A chat is waiting for your answer"
 msgstr "Una chat attende la tua risposta"
 
@@ -1775,7 +1779,7 @@ msgstr "Un modello aggiunge i suoi partecipanti alle tue skill, dove puoi modifi
 msgid "A thread gets a reply"
 msgstr ""
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:49
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:52
 msgid "a tool"
 msgstr "uno strumento"
 
@@ -1794,6 +1798,10 @@ msgstr "Quando crei questo trigger verranno generati un URL del webhook e un sec
 #: src/features/notifications/lib/notification-labels.ts:75
 msgid "A usage alert was triggered"
 msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:308
+msgid "A value does not have the format this request asks for, so nothing was saved. Check it and enter it again."
+msgstr "Un valore non ha il formato richiesto da questa richiesta, quindi non è stato salvato nulla. Controllalo e inseriscilo di nuovo."
 
 #: src/features/develop/components/watched-repositories.tsx:38
 msgid "A webhook only tells Neore to look again sooner. Polling keeps working without one."
@@ -2043,6 +2051,10 @@ msgstr "Aggiungi un membro della tua organizzazione a <0>{0}</0>"
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "Aggiungi un modello..."
+
+#: src/features/chat/thread/ask-user-questions.tsx:64
+msgid "Add a note (optional)…"
+msgstr "Aggiungi una nota (facoltativo)…"
 
 #: src/features/workflow/components/nodes/comment-node.tsx:106
 msgid "Add a note..."
@@ -2951,7 +2963,7 @@ msgstr "Tutte le categorie"
 msgid "All changes saved"
 msgstr "Tutte le modifiche salvate"
 
-#: src/features/home/components/home-page.tsx:245
+#: src/features/home/components/home-page.tsx:248
 msgid "All chats"
 msgstr "Tutte le chat"
 
@@ -3097,7 +3109,7 @@ msgstr ""
 msgid "Allow for today"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:64
+#: src/features/chat/host/host-composer.tsx:67
 msgid "Allow once"
 msgstr ""
 
@@ -3316,6 +3328,10 @@ msgstr ""
 msgid "Answer"
 msgstr "Risposta"
 
+#: src/features/chat/thread/ask-user-prompt.tsx:306
+msgid "Answer every question with a choice or a note to send."
+msgstr "Rispondi a ogni domanda con una scelta o una nota per inviare."
+
 #: src/features/settings/connectors/messenger/messenger-page.tsx:83
 msgid "Answer messages to a WeChat Official Account (safe mode). Beta: not yet tested against a live account."
 msgstr "Rispondi ai messaggi di un WeChat Official Account (modalità sicura). Beta: non ancora testato su un account reale."
@@ -3324,7 +3340,7 @@ msgstr "Rispondi ai messaggi di un WeChat Official Account (modalità sicura). B
 msgid "Answer ready"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:134
+#: src/features/chat/thread/ask-user-prompt.tsx:181
 msgid "Answer sent — continuing"
 msgstr "Risposta inviata — si continua"
 
@@ -3332,7 +3348,7 @@ msgstr "Risposta inviata — si continua"
 msgid "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 msgstr "Rispondi ai messaggi WhatsApp tramite il tuo numero WhatsApp Business (Meta Cloud API). Le risposte seguono la regola delle 24 ore di WhatsApp."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:130
+#: src/features/chat/thread/ask-user-prompt.tsx:177
 msgid "Answered"
 msgstr "Risposta data"
 
@@ -3847,11 +3863,15 @@ msgstr ""
 msgid "At least {EVENT_MIN_INTERVAL_MINUTES} minutes between checks."
 msgstr ""
 
+#: src/features/chat/thread/request-secret-prompt.tsx:214
+msgid "At least {minLength} characters"
+msgstr "Almeno {minLength} caratteri"
+
 #: src/features/chat/thread/composer-length-notice.tsx:45
 msgid "Attach as file"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:262
+#: src/features/chat/thread/ask-user-prompt.tsx:333
 msgid "Attach file"
 msgstr "Allega file"
 
@@ -3859,7 +3879,7 @@ msgstr "Allega file"
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "Allega file o intere raccolte che l’IA potrà consultare e citare in questa conversazione."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:219
+#: src/features/chat/thread/ask-user-prompt.tsx:283
 msgid "Attached files"
 msgstr "File allegati"
 
@@ -3867,15 +3887,15 @@ msgstr "File allegati"
 msgid "Attached image"
 msgstr "Immagine allegata"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:175
+#: src/features/chat/thread/ask-user-prompt.tsx:232
 msgid "Attached:"
 msgstr "Allegato:"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:250
+#: src/features/chat/thread/ask-user-prompt.tsx:321
 msgid "Attaching files…"
 msgstr "Allegando i file…"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:262
+#: src/features/chat/thread/ask-user-prompt.tsx:333
 msgid "Attaching…"
 msgstr "Allegando…"
 
@@ -6199,7 +6219,7 @@ msgstr "Chiudi traduzione"
 msgid "Closed"
 msgstr "Chiuso"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:240
+#: src/features/chat/thread/request-secret-prompt.tsx:339
 msgid "Closed — the conversation moved on. Ask again in the chat."
 msgstr ""
 
@@ -7324,7 +7344,7 @@ msgid "Context-aware generation"
 msgstr "Generazione consapevole del contesto"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
-#: src/features/chat/host/host-composer.tsx:186
+#: src/features/chat/host/host-composer.tsx:213
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "Continua"
@@ -7333,7 +7353,7 @@ msgstr "Continua"
 msgid "Continue interrupted replies"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:180
+#: src/features/chat/host/host-composer.tsx:207
 msgid "Continue where you left off."
 msgstr ""
 
@@ -7732,7 +7752,7 @@ msgstr ""
 msgid "Could not answer the question. Try again."
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:215
+#: src/features/chat/thread/request-secret-prompt.tsx:314
 msgid "Could not answer. Please try again."
 msgstr ""
 
@@ -8028,11 +8048,11 @@ msgstr ""
 msgid "Could not send the message."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:138
+#: src/features/chat/host/host-composer.tsx:165
 msgid "Could not send your answer."
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:97
+#: src/features/chat/thread/ask-user-prompt.tsx:116
 #: src/features/chat/thread/tool-approval.tsx:75
 msgid "Could not send your answer. Please try again."
 msgstr "Impossibile inviare la tua risposta. Riprova."
@@ -8071,7 +8091,7 @@ msgstr "Impossibile interrompere la conversazione"
 msgid "Could not stop the reply. Please try again."
 msgstr ""
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:91
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:95
 msgid "Could not stop the sub-agent."
 msgstr ""
 
@@ -8084,7 +8104,7 @@ msgstr ""
 msgid "Could not switch the model. Please try again."
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:228
+#: src/features/home/components/home-page.tsx:231
 msgid "Could not turn on the Daily Brief."
 msgstr "Impossibile attivare il Daily Brief."
 
@@ -8729,7 +8749,7 @@ msgstr "Daily Brief"
 msgid "Daily Brief turned off"
 msgstr "Daily Brief disattivato"
 
-#: src/features/home/components/home-page.tsx:229
+#: src/features/home/components/home-page.tsx:232
 #: src/features/notifications/components/notification-settings.tsx:112
 msgid "Daily Brief turned on"
 msgstr "Daily Brief attivato"
@@ -8876,12 +8896,12 @@ msgstr ""
 msgid "Debug an error or review my code..."
 msgstr "Correggi un errore o rivedi il mio codice..."
 
-#: src/features/chat/host/host-composer.tsx:69
-#: src/features/chat/thread/request-secret-prompt.tsx:335
+#: src/features/chat/host/host-composer.tsx:72
+#: src/features/chat/thread/request-secret-prompt.tsx:495
 msgid "Decline"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:234
+#: src/features/chat/thread/request-secret-prompt.tsx:333
 msgid "Declined — continuing without it"
 msgstr ""
 
@@ -9880,7 +9900,7 @@ msgstr "Chiave pubblica Discord"
 
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:54
 #: src/features/changelog/components/changelog-card.tsx:59
-#: src/features/chat/thread/ask-user-prompt.tsx:270
+#: src/features/chat/thread/ask-user-prompt.tsx:346
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:202
@@ -9916,7 +9936,7 @@ msgstr "Ignora segreto del webhook"
 msgid "Dismissed"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:132
+#: src/features/chat/thread/ask-user-prompt.tsx:179
 msgid "Dismissed — continuing without an answer"
 msgstr "Ignorata — si continua senza risposta"
 
@@ -10032,7 +10052,7 @@ msgstr "Non hai un account?"
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
 #: src/features/devices/components/devices-settings.tsx:255
 #: src/features/skills/components/bundle-import-dialog.tsx:248
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:105
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:109
 #: src/features/sub-agents/components/worker-run-log.tsx:34
 #: src/features/tasks/components/task-status.tsx:16
 msgid "Done"
@@ -11230,7 +11250,7 @@ msgstr "Inserisci la chiave API"
 msgid "Enter the endpoint URL first"
 msgstr "Inserisci prima l'URL dell'endpoint"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:236
+#: src/features/chat/thread/ask-user-prompt.tsx:301
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "Invio per inviare, Maiusc+Invio per andare a capo."
 
@@ -12128,7 +12148,7 @@ msgstr "non riuscito"
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:175
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:102
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:106
 #: src/features/sub-agents/components/worker-run-log.tsx:31
 #: src/features/tasks/components/task-status.tsx:17
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:64
@@ -13368,7 +13388,7 @@ msgstr "Il nome del file non può essere vuoto"
 msgid "Files"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:252
+#: src/features/chat/thread/ask-user-prompt.tsx:323
 msgid "Files cannot be attached in a locked chat."
 msgstr "Non è possibile allegare file in una chat bloccata."
 
@@ -14437,7 +14457,7 @@ msgstr "Tedesco (Svizzera)"
 msgid "Germany"
 msgstr "Germania"
 
-#: src/features/home/components/home-page.tsx:221
+#: src/features/home/components/home-page.tsx:224
 msgid "Get a short summary here every morning."
 msgstr "Ricevi qui un breve riepilogo ogni mattina."
 
@@ -15174,9 +15194,17 @@ msgstr "Aiuta l'IA a capirti meglio condividendo alcune informazioni su di te. V
 msgid "Here they are: planning, budget and next steps."
 msgstr ""
 
+#: src/features/chat/host/host-composer.tsx:245
+msgid "Hidden characters were removed from your message."
+msgstr "Sono stati rimossi caratteri nascosti dal tuo messaggio."
+
 #: src/features/settings/components/chat/model-filter-settings.tsx:278
 msgid "Hidden in Model Picker"
 msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:434
+msgid "Hide {fieldLabel}"
+msgstr "Nascondi {fieldLabel}"
 
 #: src/components/model-picker/model-picker.tsx:1163
 msgid "Hide {name} from model picker"
@@ -15430,7 +15458,7 @@ msgid "HLS playback is not supported in this browser."
 msgstr "La riproduzione HLS non è supportata in questo browser."
 
 #: src/components/error-boundaries/route-error-boundary.tsx:118
-#: src/features/home/components/home-page.tsx:120
+#: src/features/home/components/home-page.tsx:127
 #: src/features/layout/components/sidebar-shortcut.tsx:71
 #: src/features/layout/lib/dashboard-page-names.ts:24
 msgid "Home"
@@ -16072,7 +16100,7 @@ msgid "in {0, plural, one {# file} other {# files}}"
 msgstr ""
 
 #. placeholder {0}: request.folder
-#: src/features/chat/host/host-composer.tsx:55
+#: src/features/chat/host/host-composer.tsx:58
 msgid "In {0}"
 msgstr ""
 
@@ -16640,7 +16668,7 @@ msgstr "Potrebbe essere scaduto, revocato o già usato. Chiedi un nuovo link."
 msgid "It opened a different session than its own, so the conversation was handed over"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:215
+#: src/features/chat/thread/request-secret-prompt.tsx:314
 msgid "It was not saved. Paste it again and save."
 msgstr ""
 
@@ -17916,7 +17944,7 @@ msgstr "Caricamento workflow..."
 msgid "Loading your items…"
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:128
+#: src/features/home/components/home-page.tsx:135
 msgid "Loading your overview…"
 msgstr "Caricamento della panoramica…"
 
@@ -17945,7 +17973,7 @@ msgstr "Caricamento..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:320
 #: src/features/chat/thread/memory-usage-action.tsx:46
-#: src/features/chat/thread/request-secret-prompt.tsx:314
+#: src/features/chat/thread/request-secret-prompt.tsx:479
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
@@ -18825,7 +18853,7 @@ msgstr "Campo messaggio"
 msgid "Message selection"
 msgstr "Selezione dei messaggi"
 
-#: src/features/chat/host/host-composer.tsx:198
+#: src/features/chat/host/host-composer.tsx:260
 msgid "Message the agent on your computer"
 msgstr ""
 
@@ -18837,7 +18865,7 @@ msgstr ""
 msgid "Message the worker..."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:192
+#: src/features/chat/host/host-composer.tsx:221
 msgid "Message to the coding agent"
 msgstr ""
 
@@ -19436,7 +19464,7 @@ msgstr "Più passaggi = qualità più alta, generazione più lunga"
 msgid "More than a proxy — an intelligent layer between your app and every LLM provider."
 msgstr "Più di un proxy: uno strato intelligente tra la tua app e ogni provider di LLM."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:149
+#: src/features/chat/thread/request-secret-prompt.tsx:185
 msgid "More than one of your MCP servers is named {serverName}. Rename one in Settings first, or decline."
 msgstr ""
 
@@ -19909,11 +19937,12 @@ msgid "Needs review"
 msgstr "Da rivedere"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:465
-#: src/features/home/components/home-page.tsx:151
+#: src/features/home/components/home-page.tsx:158
 msgid "Needs you"
 msgstr "Richiede la tua attenzione"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:100
+#: src/features/home/components/home-page.tsx:113
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:104
 #: src/features/sub-agents/components/worker-run-log.tsx:29
 msgid "Needs your approval"
 msgstr "Richiede la tua approvazione"
@@ -20441,7 +20470,7 @@ msgstr "Nessuna videocamera selezionata"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "Ancora nessun caso. Aggiungine uno a mano, importa un file CSV o JSONL oppure salva uno scambio della chat con \"Salva come caso di valutazione\"."
 
-#: src/features/home/components/home-page.tsx:252
+#: src/features/home/components/home-page.tsx:255
 msgid "No chats yet. Start one above."
 msgstr "Ancora nessuna chat. Iniziane una qui sopra."
 
@@ -20971,7 +21000,7 @@ msgstr "Nessuno strumento."
 msgid "No triggers yet"
 msgstr "Ancora nessun trigger"
 
-#: src/features/home/components/home-page.tsx:211
+#: src/features/home/components/home-page.tsx:214
 msgid "No unread notifications."
 msgstr "Nessuna notifica non letta."
 
@@ -21179,11 +21208,11 @@ msgid "Not set"
 msgstr "Non impostato"
 
 #. placeholder {0}: unreadFiles.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:179
+#: src/features/chat/thread/ask-user-prompt.tsx:236
 msgid "Not shown to this model: {0}"
 msgstr "Non mostrati a questo modello: {0}"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:126
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:130
 msgid "Not started"
 msgstr "Non avviato"
 
@@ -21202,6 +21231,11 @@ msgstr "Nota (facoltativa)"
 #: src/features/tasks/components/task-detail-dialog.tsx:96
 msgid "Note for the next run (optional)"
 msgstr "Nota per la prossima esecuzione (facoltativa)"
+
+#. placeholder {0}: entry.question
+#: src/features/chat/thread/ask-user-questions.tsx:60
+msgid "Note for: {0}"
+msgstr "Nota per: {0}"
 
 #: src/features/settings/components/chat/agent-settings.tsx:243
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
@@ -21223,7 +21257,7 @@ msgstr ""
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "Nessun servizio è in ascolto a quell'indirizzo. Avvia Ollama o il server di LM Studio, controlla la porta e assicurati che l'URL termini con /v1."
 
-#: src/features/home/components/home-page.tsx:172
+#: src/features/home/components/home-page.tsx:179
 msgid "Nothing is running right now."
 msgstr "Al momento non c'è nulla in corso."
 
@@ -21231,7 +21265,7 @@ msgstr "Al momento non c'è nulla in corso."
 msgid "Nothing is saved, installed or enabled until you choose to save."
 msgstr "Niente viene salvato, installato o attivato finché non scegli di salvare."
 
-#: src/features/home/components/home-page.tsx:153
+#: src/features/home/components/home-page.tsx:160
 msgid "Nothing is waiting on you."
 msgstr "Nulla è in attesa di te."
 
@@ -21247,7 +21281,7 @@ msgstr "Notifica"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "Workflow di notifica, canali e preferenze dei destinatari"
 
-#: src/features/home/components/home-page.tsx:208
+#: src/features/home/components/home-page.tsx:211
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:199
@@ -21680,12 +21714,12 @@ msgstr "Apri"
 #: src/features/chat/thread/widgets/places-widget.tsx:165
 msgctxt "place opening hours"
 msgid "Open"
-msgstr "Aperto"
+msgstr ""
 
 #: src/features/chat/thread/widgets/stock-widget.tsx:160
 msgctxt "stock opening price"
 msgid "Open"
-msgstr "Apertura"
+msgstr ""
 
 #: src/features/chat/thread/comparison-view.tsx:140
 msgid "Open {modelName} in full thread"
@@ -21908,7 +21942,7 @@ msgstr "Apri la conversazione dell'esecuzione"
 msgid "Open the side-question panel without interrupting a running reply ({0})"
 msgstr ""
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:171
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:175
 msgid "Open the sub-agent's thread"
 msgstr "Apri la conversazione del sub-agente"
 
@@ -22364,7 +22398,7 @@ msgstr ""
 msgid "Or from a terminal:"
 msgstr "Oppure da un terminale:"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:208
+#: src/features/chat/thread/ask-user-prompt.tsx:270
 msgid "Or type your own answer…"
 msgstr "Oppure scrivi la tua risposta…"
 
@@ -22922,7 +22956,7 @@ msgstr "Incolla l’URL dell’immagine"
 msgid "Paste image URL..."
 msgstr "Incolla l’URL dell’immagine..."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:292
+#: src/features/chat/thread/request-secret-prompt.tsx:427
 msgid "Paste it here — it is not shown in the chat"
 msgstr ""
 
@@ -23058,7 +23092,7 @@ msgstr "Elimina definitivamente il tuo account e tutti i dati associati"
 msgid "Permission Level"
 msgstr "Livello di permesso"
 
-#: src/features/chat/host/host-composer.tsx:151
+#: src/features/chat/host/host-composer.tsx:178
 msgid "Permission requests from the agent"
 msgstr ""
 
@@ -23605,11 +23639,11 @@ msgstr "Ragionamento e rispetto delle istruzioni di livello premium"
 msgid "Premium-tier reasoning transparency"
 msgstr "Trasparenza del ragionamento di livello premium"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:136
+#: src/features/chat/thread/ask-user-prompt.tsx:183
 msgid "Preparing a question…"
 msgstr "Preparazione di una domanda…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:242
+#: src/features/chat/thread/request-secret-prompt.tsx:341
 msgid "Preparing a request…"
 msgstr ""
 
@@ -24466,10 +24500,9 @@ msgstr "Metti in coda il messaggio"
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Metti in coda il messaggio: verrà inviato al termine della risposta attuale"
 
-#: src/features/home/components/home-page.tsx:176
-#: src/features/home/components/home-page.tsx:184
-#: src/features/home/components/home-page.tsx:192
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:103
+#: src/features/home/components/home-page.tsx:110
+#: src/features/home/components/home-page.tsx:183
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:107
 #: src/features/sub-agents/components/worker-list.tsx:80
 #: src/features/sub-agents/components/worker-run-log.tsx:32
 #: src/features/tasks/components/task-status.tsx:19
@@ -24937,7 +24970,7 @@ msgstr ""
 msgid "Recent"
 msgstr "Recenti"
 
-#: src/features/home/components/home-page.tsx:249
+#: src/features/home/components/home-page.tsx:252
 msgid "Recent chats"
 msgstr "Chat recenti"
 
@@ -25353,7 +25386,7 @@ msgstr "Rimuovere «{0}»?"
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
 #: src/features/chat/group/group-participant-bar.tsx:210
-#: src/features/chat/thread/ask-user-prompt.tsx:224
+#: src/features/chat/thread/ask-user-prompt.tsx:288
 #: src/features/prompts/components/thread-variables-config.tsx:232
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
@@ -26003,7 +26036,7 @@ msgid "retry"
 msgstr ""
 
 #: src/features/chat/thread/chat-error.tsx:56
-#: src/features/chat/thread/request-secret-prompt.tsx:311
+#: src/features/chat/thread/request-secret-prompt.tsx:476
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
@@ -26044,7 +26077,7 @@ msgstr "Riprova con una nota"
 msgid "Retrying now"
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:144
+#: src/features/home/components/home-page.tsx:151
 msgid "Retrying…"
 msgstr "Nuovo tentativo…"
 
@@ -26095,7 +26128,7 @@ msgid "Review submitted"
 msgstr ""
 
 #. placeholder {0}: task.title
-#: src/features/home/components/home-page.tsx:163
+#: src/features/home/components/home-page.tsx:170
 msgid "Review task: {0}"
 msgstr "Rivedi l'attività: {0}"
 
@@ -26386,10 +26419,9 @@ msgstr "Esegui il workflow per vedere qui la cronologia delle esecuzioni."
 
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
-#: src/features/home/components/home-page.tsx:170
-#: src/features/home/components/home-page.tsx:176
-#: src/features/home/components/home-page.tsx:184
-#: src/features/home/components/home-page.tsx:192
+#: src/features/home/components/home-page.tsx:113
+#: src/features/home/components/home-page.tsx:177
+#: src/features/home/components/home-page.tsx:183
 #: src/features/settings/components/chat/trigger-settings.tsx:178
 #: src/features/tasks/components/task-detail-dialog.tsx:136
 #: src/features/tasks/components/task-status.tsx:20
@@ -26539,7 +26571,7 @@ msgstr "Arabia Saudita"
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:165
-#: src/features/chat/thread/request-secret-prompt.tsx:331
+#: src/features/chat/thread/request-secret-prompt.tsx:491
 #: src/features/develop/components/draft-comment-card.tsx:43
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -26646,11 +26678,15 @@ msgstr "Salva workflow"
 msgid "Saved"
 msgstr "Salvato"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:238
+#: src/features/chat/thread/request-secret-prompt.tsx:337
 msgid "Saved — continuing"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:236
+#: src/features/chat/thread/request-secret-prompt.tsx:335
+msgid "Saved — the assistant can use each once, in this reply"
+msgstr "Salvato: l'assistente può usare ciascuno una volta, in questa risposta"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:335
 msgid "Saved — the assistant can use it once, in this reply"
 msgstr ""
 
@@ -27071,7 +27107,8 @@ msgstr "postazione/mese"
 msgid "secret"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:277
+#: src/features/chat/thread/request-secret-prompt.tsx:380
+#: src/features/chat/thread/request-secret-prompt.tsx:396
 #: src/features/develop/components/watched-repositories.tsx:33
 msgid "Secret"
 msgstr ""
@@ -27364,7 +27401,7 @@ msgstr "Modello semi-realistico con buona aderenza al prompt"
 msgid "Semi-realistic visual style"
 msgstr "Stile visivo semi-realistico"
 
-#: src/features/chat/host/host-composer.tsx:214
+#: src/features/chat/host/host-composer.tsx:276
 #: src/features/sub-agents/components/worker-composer.tsx:104
 msgid "Send"
 msgstr ""
@@ -27389,7 +27426,7 @@ msgstr "Invia un messaggio per iniziare"
 msgid "Send a new verification link"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:266
+#: src/features/chat/thread/ask-user-prompt.tsx:342
 msgid "Send answer"
 msgstr "Invia risposta"
 
@@ -27585,12 +27622,11 @@ msgstr "Sessioni revocate"
 msgid "Set a password for your account"
 msgstr "Imposta una password per il tuo account"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:154
-#: src/features/chat/thread/request-secret-prompt.tsx:171
+#: src/features/chat/thread/request-secret-prompt.tsx:196
 msgid "Set as the {header} header on your {serverName} MCP server"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:161
+#: src/features/chat/thread/request-secret-prompt.tsx:190
 msgid "Set as the {header} header on your {serverName} MCP server ({address})"
 msgstr ""
 
@@ -27786,6 +27822,10 @@ msgstr "Testo breve"
 #: src/features/settings/lib/settings-keywords.ts:45
 msgid "shortcut"
 msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:434
+msgid "Show {fieldLabel}"
+msgstr "Mostra {fieldLabel}"
 
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:63
 msgid "Show {hidden} more lines"
@@ -29056,7 +29096,7 @@ msgstr "avviata secondo pianificazione"
 msgid "started when its dependencies finished"
 msgstr "avviata al termine delle sue dipendenze"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:131
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:135
 msgid "Starting"
 msgstr "Avvio"
 
@@ -29073,7 +29113,7 @@ msgstr "Avvio dell'importazione..."
 msgid "Starting test drive…"
 msgstr "Avvio della prova…"
 
-#: src/features/chat/host/host-composer.tsx:166
+#: src/features/chat/host/host-composer.tsx:193
 msgid "Starting the agent on your computer. A message you send now goes out once it is up."
 msgstr ""
 
@@ -29092,6 +29132,14 @@ msgstr "Avvio…"
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:97
 msgid "starts with"
 msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:211
+msgid "Starts with {prefix}"
+msgstr "Inizia con {prefix}"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:207
+msgid "Starts with {prefix}, at least {minLength} characters"
+msgstr "Inizia con {prefix}, almeno {minLength} caratteri"
 
 #: src/features/marketing/data/models-data.ts:1114
 msgid "State-of-the-art code generation quality"
@@ -29185,12 +29233,12 @@ msgstr "Azioni"
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/chat/host/host-composer.tsx:203
+#: src/features/chat/host/host-composer.tsx:265
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:316
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:329
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:160
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:164
 #: src/features/sub-agents/components/worker-stop-bar.tsx:56
 #: src/features/workflow/components/canvas/workflow-controls.tsx:618
 msgid "Stop"
@@ -29249,7 +29297,7 @@ msgid "Stop watching {0}"
 msgstr ""
 
 #: src/features/chat/goal/goal-notes.tsx:65
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:101
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:105
 #: src/features/sub-agents/components/worker-run-log.tsx:30
 msgid "Stopped"
 msgstr ""
@@ -29666,7 +29714,7 @@ msgstr "Risultato stilizzato"
 msgid "stylized animation"
 msgstr "animazione stilizzata"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:142
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:146
 msgid "Sub-agent"
 msgstr "Sub-agente"
 
@@ -29678,7 +29726,7 @@ msgstr "Sub-agente non riuscito"
 msgid "Sub-agent finished"
 msgstr "Sub-agente completato"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:114
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:118
 msgid "Sub-agent was not approved."
 msgstr "Il sub-agente non è stato approvato."
 
@@ -29742,7 +29790,7 @@ msgstr "Suggerisci idee video per un canale YouTube di tecnologia"
 msgid "Suggested"
 msgstr "Suggeriti"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:184
+#: src/features/chat/thread/ask-user-prompt.tsx:244
 #: src/features/skills/components/skill-builder-dialog.tsx:235
 msgid "Suggested answers"
 msgstr "Risposte suggerite"
@@ -30625,7 +30673,7 @@ msgstr ""
 msgid "That passcode is not right."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:141
+#: src/features/chat/host/host-composer.tsx:168
 msgid "That request is no longer waiting."
 msgstr ""
 
@@ -30698,7 +30746,11 @@ msgstr "L’archivio contiene un percorso di file non sicuro."
 msgid "The archive holds too many files."
 msgstr "L’archivio contiene troppi file."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:158
+#: src/features/chat/thread/ask-user-prompt.tsx:213
+msgid "The assistant has a few questions"
+msgstr "L'assistente ha alcune domande"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:213
 msgid "The assistant has a question"
 msgstr "L'assistente ha una domanda"
 
@@ -30706,7 +30758,7 @@ msgstr "L'assistente ha una domanda"
 msgid "The assistant is asking for a secret"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:259
+#: src/features/chat/thread/request-secret-prompt.tsx:358
 msgid "The assistant needs a secret"
 msgstr ""
 
@@ -30958,7 +31010,7 @@ msgstr "L'ultima richiesta di eliminazione non è andata a buon fine. Puoi richi
 msgid "the last time"
 msgstr "l'ultima volta"
 
-#: src/features/chat/host/host-composer.tsx:176
+#: src/features/chat/host/host-composer.tsx:203
 msgid "The last turn stopped before it finished."
 msgstr ""
 
@@ -31136,11 +31188,11 @@ msgstr "Il server non elenca ancora modelli: scaricane o caricane uno prima"
 msgid "The skill could not be imported."
 msgstr "Impossibile importare la skill."
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:48
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:51
 msgid "The sub-agent"
 msgstr "Il sotto-agente"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:118
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:122
 msgid "The sub-agent could not start."
 msgstr "Il sub-agente non è riuscito ad avviarsi."
 
@@ -31505,6 +31557,10 @@ msgstr "Questo file CSV sembra vuoto o non valido."
 msgid "This diff is cut short."
 msgstr ""
 
+#: src/features/chat/thread/request-secret-prompt.tsx:221
+msgid "This does not look right: it must start with {prefix}."
+msgstr "Non sembra corretto: deve iniziare con {prefix}."
+
 #: src/features/local-models/components/ollama-model-manager.tsx:177
 msgid "This endpoint is not Ollama. Model management is available for Ollama only — in LM Studio, download models in the app."
 msgstr "Questo endpoint non è Ollama. La gestione dei modelli è disponibile solo per Ollama: in LM Studio scarica i modelli dall'app."
@@ -31588,9 +31644,18 @@ msgstr ""
 msgid "This is how your organization appears to members"
 msgstr "Così la tua organizzazione appare ai membri"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:325
+#. placeholder {0}: valueMaxOf(field)
+#: src/features/chat/thread/request-secret-prompt.tsx:395
+#~ msgid "This is too long: up to {0} characters."
+#~ msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:447
 msgid "This is too long: up to {valueMax} characters."
 msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:227
+msgid "This is too short: at least {minLength} characters."
+msgstr "È troppo corto: almeno {minLength} caratteri."
 
 #: src/features/auth/components/organization/organization-slug-card.tsx:109
 #: src/features/auth/components/organization/organization-slug-card.tsx:159
@@ -31724,7 +31789,7 @@ msgstr "Questa operazione rimuove i file del modello dal tuo computer. Puoi scar
 msgid "This repository was not found."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:58
+#: src/features/chat/host/host-composer.tsx:61
 msgid "This request was too long to show whole. You can decline it here; to allow it, answer on your computer."
 msgstr ""
 
@@ -31748,7 +31813,7 @@ msgstr "Questa selezione è troppo grande per essere importata in una volta. Imp
 msgid "This server requires sign-in. Save it, then choose Sign in."
 msgstr "Questo server richiede l'accesso. Salvalo, poi scegli Accedi."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:209
+#: src/features/chat/thread/request-secret-prompt.tsx:294
 msgid "This server's address changed. Check the address below and save again."
 msgstr ""
 
@@ -31756,7 +31821,7 @@ msgstr ""
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
 msgstr "La voce di registro di questo server richiede i valori qui sotto. Servono a completare l'URL e gli header."
 
-#: src/features/chat/host/host-composer.tsx:171
+#: src/features/chat/host/host-composer.tsx:198
 #: src/features/chat/host/host-send-errors.ts:19
 msgid "This session has ended. Start a new one from the desktop app."
 msgstr ""
@@ -31785,7 +31850,7 @@ msgstr "Questo slug è disponibile"
 msgid "This spreadsheet appears to be empty or could not be parsed."
 msgstr "Questo foglio di calcolo sembra vuoto o non è stato possibile analizzarlo."
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:120
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:124
 msgid "This sub-agent run is no longer available."
 msgstr "Questa esecuzione del sub-agente non è più disponibile."
 
@@ -32578,7 +32643,7 @@ msgstr "Prova a modificare i termini di ricerca."
 #: src/components/error-component.tsx:40
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
-#: src/features/home/components/home-page.tsx:144
+#: src/features/home/components/home-page.tsx:151
 msgid "Try again"
 msgstr "Riprova"
 
@@ -32663,7 +32728,7 @@ msgstr ""
 msgid "Turn off run until done"
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:236
+#: src/features/home/components/home-page.tsx:239
 msgid "Turn on Daily Brief"
 msgstr "Attiva il Daily Brief"
 
@@ -32754,7 +32819,8 @@ msgstr ""
 msgid "Type to search"
 msgstr "Digita per cercare"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:208
+#: src/features/chat/thread/ask-user-prompt.tsx:270
+#: src/features/chat/thread/ask-user-questions.tsx:64
 msgid "Type your answer…"
 msgstr "Scrivi la tua risposta…"
 
@@ -33111,7 +33177,7 @@ msgstr ""
 msgid "Untitled"
 msgstr "Senza titolo"
 
-#: src/features/home/components/home-page.tsx:257
+#: src/features/home/components/home-page.tsx:260
 msgid "Untitled chat"
 msgstr "Chat senza titolo"
 
@@ -34500,11 +34566,11 @@ msgstr "In attesa dell'output…"
 msgid "Waiting for the agent…"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:244
+#: src/features/chat/thread/request-secret-prompt.tsx:343
 msgid "Waiting for the owner"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:138
+#: src/features/chat/thread/ask-user-prompt.tsx:185
 msgid "Waiting for the owner to answer"
 msgstr "In attesa della risposta del proprietario"
 
@@ -34519,18 +34585,18 @@ msgstr "In attesa dell'approvazione del proprietario"
 msgid "Waiting for uploads to complete…"
 msgstr "In attesa del completamento dei caricamenti…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:244
+#: src/features/chat/thread/request-secret-prompt.tsx:343
 msgid "Waiting for you"
 msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
-#: src/features/chat/thread/ask-user-prompt.tsx:138
+#: src/features/chat/thread/ask-user-prompt.tsx:185
 msgid "Waiting for your answer"
 msgstr "In attesa della tua risposta"
 
 #. placeholder {0}: approval.threadTitle
-#: src/features/home/components/home-page.tsx:158
+#: src/features/home/components/home-page.tsx:165
 msgid "Waiting for your answer in {0}"
 msgstr "In attesa della tua risposta in {0}"
 
@@ -34776,7 +34842,7 @@ msgstr "Che cos’è la funzione Canvas?"
 msgid "What it evaluates"
 msgstr "Cosa valuta"
 
-#: src/features/home/components/home-page.tsx:121
+#: src/features/home/components/home-page.tsx:128
 msgid "What needs you, what's running, and where you left off."
 msgstr "Cosa richiede la tua attenzione, cosa è in corso e dove eri rimasto."
 
@@ -34956,7 +35022,7 @@ msgstr "Ampiamente affidabile per i carichi di lavoro di produzione"
 msgid "Width"
 msgstr "Larghezza"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:143
+#: src/features/chat/thread/request-secret-prompt.tsx:174
 msgid "Will be saved as your {provider} API key"
 msgstr ""
 
@@ -35035,7 +35101,7 @@ msgid "Workflows"
 msgstr "Workflow"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:466
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:104
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:108
 #: src/features/sub-agents/components/worker-list.tsx:80
 #: src/features/sub-agents/components/worker-run-log.tsx:33
 msgid "Working"
@@ -35345,7 +35411,7 @@ msgstr "Non hai ancora file di conoscenza indicizzati."
 msgid "You have no projects yet."
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:166
+#: src/features/chat/thread/request-secret-prompt.tsx:193
 msgid "You have no saved MCP server named {serverName}. Add it in Settings first, or decline."
 msgstr ""
 
@@ -35471,7 +35537,7 @@ msgstr "Il tuo account e tutti i dati associati sono in fase di eliminazione. L'
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "Il tuo spazio di lavoro IA <0>inizia qui.</0>"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:200
+#: src/features/chat/thread/ask-user-prompt.tsx:262
 msgid "Your answer"
 msgstr "La tua risposta"
 
@@ -35479,7 +35545,8 @@ msgstr "La tua risposta"
 msgid "Your answer in Neore has finished."
 msgstr "La risposta in Neore è pronta."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:168
+#: src/features/chat/thread/ask-user-prompt.tsx:223
+#: src/features/chat/thread/ask-user-questions.tsx:85
 msgid "Your answer:"
 msgstr "La tua risposta:"
 
@@ -35623,7 +35690,7 @@ msgstr ""
 msgid "Your next message will start a self-destructing chat."
 msgstr "Il tuo prossimo messaggio avvierà una chat che si autodistrugge."
 
-#: src/features/home/components/home-page.tsx:134
+#: src/features/home/components/home-page.tsx:141
 msgid "Your overview could not be loaded."
 msgstr "Impossibile caricare la tua panoramica."
 
@@ -35677,7 +35744,7 @@ msgstr ""
 msgid "Your review was requested"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:301
+#: src/features/chat/thread/request-secret-prompt.tsx:466
 msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."
 msgstr ""
 

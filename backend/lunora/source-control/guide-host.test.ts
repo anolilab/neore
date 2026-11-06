@@ -138,6 +138,17 @@ describe("beginHostGuide", () => {
         expect(JSON.parse(send?.envelope as string)).toMatchObject({ taintedBy: send?.taintedBy, tool: "acp_send" });
     });
 
+    it("strips hidden characters from the guide's prompt before it reaches the computer", async () => {
+        const deviceId = await pairedDevice(ownerId);
+
+        await begin(deviceId, { text: "Write the guide.\u{E0041}\u{202E}" });
+
+        const calls = await rows("deviceCalls");
+        const send = calls.find((call) => call.toolName === "acp_send");
+
+        expect(JSON.parse(send?.envelope as string)).toMatchObject({ input: { text: "Write the guide." }, tool: "acp_send" });
+    });
+
     it("refuses a folder that is not offered for that agent, or not this repository, and writes nothing", async () => {
         const deviceId = await pairedDevice(ownerId);
 
