@@ -1,7 +1,7 @@
 import { MODEL_REGISTRY } from "@neore/ai/models";
 import { describe, expect, it } from "vitest";
 
-import { backupCanServe, eligibleBackupModel } from "./backup-model";
+import { attachmentsIn, backupCanServe, eligibleBackupModel } from "./backup-model";
 
 const textModels = MODEL_REGISTRY.filter((m) => m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text");
 const [first, second] = textModels;
@@ -58,5 +58,54 @@ describe("backupCanServe", () => {
     it("takes a plain-text, tool-free call whatever it supports", () => {
         expect(backupCanServe({ files: false, images: false, tools: false }, { hasTools: false, messages: [{ content: "hi", role: "user" }] })).toBe(true);
         expect(backupCanServe({ files: false, images: true, tools: true }, { hasTools: false, messages: [image] })).toBe(true);
+    });
+
+    it("refuses a tool-result image or PDF it does not support", () => {
+        const toolImage = {
+            content: [{ output: { type: "content", value: [{ data: "AAAA", mediaType: "image/png", type: "image-data" }] }, type: "tool-result" }],
+            role: "tool",
+        };
+        const toolPdf = {
+            content: [{ output: { type: "content", value: [{ data: "AAAA", mediaType: "application/pdf", type: "file-data" }] }, type: "tool-result" }],
+            role: "tool",
+        };
+
+        expect(backupCanServe({ ...all, images: false }, { hasTools: false, messages: [toolImage] })).toBe(false);
+        expect(backupCanServe({ ...all, files: false }, { hasTools: false, messages: [toolPdf] })).toBe(false);
+    });
+});
+
+describe("attachmentsIn", () => {
+    it("finds an image a tool result carries, so a text-only fallback is not chosen for it", () => {
+        const messages = [
+            {
+                content: [
+                    {
+                        output: {
+                            type: "content",
+                            value: [
+                                { text: "Answered", type: "text" },
+                                { data: "AAAA", mediaType: "image/png", type: "image-data" },
+                            ],
+                        },
+                        type: "tool-result",
+                    },
+                ],
+                role: "tool",
+            },
+        ];
+
+        expect(attachmentsIn(messages)).toEqual({ files: false, images: true });
+    });
+
+    it("finds a PDF a tool result carries as a file", () => {
+        const messages = [
+            {
+                content: [{ output: { type: "content", value: [{ data: "AAAA", mediaType: "application/pdf", type: "file-data" }] }, type: "tool-result" }],
+                role: "tool",
+            },
+        ];
+
+        expect(attachmentsIn(messages)).toEqual({ files: true, images: false });
     });
 });

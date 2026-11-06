@@ -768,6 +768,8 @@ export const continueGroupAfterToolApproval = async (
     ctx: ActionCtx,
     args: {
         answer?: string;
+        /** The files an `askUser` answer carries (`lib/ask-user-files.ts`). */
+        answerFileIds?: string[];
         approvalId: string;
         approved: boolean;
         config: ToolRunConfig & { group: GroupRunSnapshot };
@@ -777,7 +779,7 @@ export const continueGroupAfterToolApproval = async (
         userId: string;
     },
 ): Promise<void> => {
-    const { answer, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
+    const { answer, answerFileIds, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { group } = config;
 
     // Participants are re-checked: one that lost access since the pause does
@@ -795,7 +797,7 @@ export const continueGroupAfterToolApproval = async (
 
     const resumed = await resumeApprovedRun(
         ctx,
-        { answer, approvalId, approved, config, denyReason, streamId, threadId, userId },
+        { answer, answerFileIds, approvalId, approved, config, denyReason, streamId, threadId, userId },
         {
             // Reached only through `continueAfterToolApproval`, after its stream gate.
             admittedRun: true,

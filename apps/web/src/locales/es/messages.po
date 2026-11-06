@@ -2073,7 +2073,7 @@ msgstr "Añade una alerta arriba para recibir un aviso cuando tu uso supere un u
 msgid "Add an extra layer of security to your account by enabling two-factor authentication."
 msgstr "Añade una capa extra de seguridad a tu cuenta activando la autenticación en dos pasos."
 
-#: src/features/onboarding/components/setup-checklist.tsx:81
+#: src/features/onboarding/components/setup-checklist.tsx:164
 msgid "Add an SSH server"
 msgstr ""
 
@@ -3320,7 +3320,7 @@ msgstr "Responde mensajes de una cuenta oficial de WeChat (modo seguro). Beta: a
 msgid "Answer ready"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:120
+#: src/features/chat/thread/ask-user-prompt.tsx:134
 msgid "Answer sent — continuing"
 msgstr "Respuesta enviada — continuando"
 
@@ -3328,7 +3328,7 @@ msgstr "Respuesta enviada — continuando"
 msgid "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 msgstr "Responde mensajes de WhatsApp con tu número de WhatsApp Business (Meta Cloud API). Las respuestas siguen la regla de 24 horas de WhatsApp."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:116
+#: src/features/chat/thread/ask-user-prompt.tsx:130
 msgid "Answered"
 msgstr "Respondida"
 
@@ -3847,13 +3847,33 @@ msgstr ""
 msgid "Attach as file"
 msgstr ""
 
+#: src/features/chat/thread/ask-user-prompt.tsx:262
+msgid "Attach file"
+msgstr "Adjuntar archivo"
+
 #: src/features/chat/header/kb-attachment-button.tsx:187
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "Adjunta archivos o colecciones completas para que la IA los consulte y cite en esta conversación."
 
+#: src/features/chat/thread/ask-user-prompt.tsx:219
+msgid "Attached files"
+msgstr "Archivos adjuntos"
+
 #: ../../packages/chat-ui/src/chat/message-item.tsx:121
 msgid "Attached image"
 msgstr "Imagen adjunta"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:175
+msgid "Attached:"
+msgstr "Adjunto:"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:250
+msgid "Attaching files…"
+msgstr "Adjuntando archivos…"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:262
+msgid "Attaching…"
+msgstr "Adjuntando…"
 
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 msgid "Attachment"
@@ -5673,7 +5693,7 @@ msgstr "Las integraciones marcadas se ofrecen para configurar después de guarda
 msgid "Checked: {0}"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:85
+#: src/features/onboarding/components/setup-checklist.tsx:168
 msgid "Checking"
 msgstr ""
 
@@ -6312,11 +6332,11 @@ msgstr ""
 msgid "Coding agents you can start on {0}"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:88
+#: src/features/onboarding/components/setup-checklist.tsx:171
 msgid "Coding setup"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:90
+#: src/features/onboarding/components/setup-checklist.tsx:173
 msgid "Coding setup steps"
 msgstr ""
 
@@ -7728,6 +7748,16 @@ msgstr ""
 msgid "Could not apply the changes"
 msgstr "No se pudieron aplicar los cambios"
 
+#. placeholder {0}: failed.join(", ")
+#: src/features/chat/thread/use-ask-user-attachments.ts:186
+msgid "Could not attach {0}. The other files were attached; try those again."
+msgstr "No se pudo adjuntar {0}. Los demás archivos se adjuntaron; inténtalo de nuevo con esos."
+
+#. placeholder {0}: failed.join(", ")
+#: src/features/chat/thread/use-ask-user-attachments.ts:187
+msgid "Could not attach {0}. Try those again."
+msgstr "No se pudo adjuntar {0}. Inténtalo de nuevo."
+
 #: src/features/chat/thread/composer-input.tsx:1349
 msgid "Could not attach the chat"
 msgstr "No se pudo adjuntar el chat"
@@ -7746,7 +7776,7 @@ msgstr "No se pudo cancelar la ejecución."
 
 #: src/features/chat/thread/composer-model-selector.tsx:127
 msgid "Could not change Auto. Please try again."
-msgstr ""
+msgstr "No se pudo cambiar Auto. Inténtalo de nuevo."
 
 #: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
@@ -7755,13 +7785,13 @@ msgstr "No se pudieron cambiar las notificaciones push. Inténtalo de nuevo."
 #: src/features/chat/model-settings/use-model-combobox.ts:283
 #: src/features/chat/model-settings/use-model-combobox.ts:307
 msgid "Could not change the model. Please try again."
-msgstr ""
+msgstr "No se pudo cambiar el modelo. Inténtalo de nuevo."
 
 #: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:85
+#: src/features/onboarding/components/setup-checklist.tsx:168
 msgid "Could not check"
 msgstr ""
 
@@ -7893,7 +7923,7 @@ msgstr "No se pudieron cargar las herramientas: {error}"
 msgid "Could not load your activity."
 msgstr "No se pudo cargar tu actividad."
 
-#: src/features/onboarding/components/setup-checklist.tsx:146
+#: src/features/onboarding/components/setup-checklist.tsx:234
 msgid "Could not load your saved choices, so Skip and Resume are off until it is read again. The steps show what was last saved."
 msgstr ""
 
@@ -7952,7 +7982,7 @@ msgstr "No se pudo leer ese chat"
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "No se pudo leer ese chat. Si está bloqueado, desbloquéalo primero."
 
-#: src/features/onboarding/components/setup-checklist.tsx:132
+#: src/features/onboarding/components/setup-checklist.tsx:220
 msgid "Could not read your devices, so the steps cannot be checked yet. The links still work."
 msgstr ""
 
@@ -7988,7 +8018,8 @@ msgstr ""
 msgid "Could not retry. Please try again."
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:57
+#: src/features/onboarding/components/setup-checklist.tsx:134
+#: src/features/onboarding/components/setup-checklist.tsx:189
 msgid "Could not save that choice. Try again."
 msgstr ""
 
@@ -8026,7 +8057,7 @@ msgstr ""
 msgid "Could not send your answer."
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:83
+#: src/features/chat/thread/ask-user-prompt.tsx:97
 #: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "No se pudo enviar tu respuesta. Inténtalo de nuevo."
@@ -9874,7 +9905,7 @@ msgstr "Clave pública de Discord"
 
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:54
 #: src/features/changelog/components/changelog-card.tsx:59
-#: src/features/chat/thread/ask-user-prompt.tsx:191
+#: src/features/chat/thread/ask-user-prompt.tsx:270
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:203
@@ -9910,7 +9941,7 @@ msgstr "Descartar secreto del webhook"
 msgid "Dismissed"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:118
+#: src/features/chat/thread/ask-user-prompt.tsx:132
 msgid "Dismissed — continuing without an answer"
 msgstr "Descartada — continuando sin respuesta"
 
@@ -10025,7 +10056,7 @@ msgstr "¿No tienes una cuenta?"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:104
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
 #: src/features/devices/components/devices-settings.tsx:256
-#: src/features/onboarding/components/setup-checklist.tsx:84
+#: src/features/onboarding/components/setup-checklist.tsx:167
 #: src/features/skills/components/bundle-import-dialog.tsx:248
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
@@ -11225,7 +11256,7 @@ msgstr "Introduce la clave de API"
 msgid "Enter the endpoint URL first"
 msgstr "Introduce primero la URL del endpoint"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:182
+#: src/features/chat/thread/ask-user-prompt.tsx:236
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "Intro para enviar, Mayús+Intro para una nueva línea."
 
@@ -13363,6 +13394,10 @@ msgstr "El nombre del archivo no puede estar vacío"
 msgid "Files"
 msgstr ""
 
+#: src/features/chat/thread/ask-user-prompt.tsx:252
+msgid "Files cannot be attached in a locked chat."
+msgstr "No se pueden adjuntar archivos en un chat bloqueado."
+
 #: src/features/chat/thread/host-changes.tsx:50
 msgid "Files changed by this turn"
 msgstr ""
@@ -14580,7 +14615,7 @@ msgid "Go to next page"
 msgstr "Ir a la página siguiente"
 
 #: src/features/devices/components/devices-settings.tsx:396
-#: src/features/onboarding/components/setup-checklist.tsx:74
+#: src/features/onboarding/components/setup-checklist.tsx:157
 msgid "Go to pairing"
 msgstr ""
 
@@ -14592,7 +14627,7 @@ msgstr "Ir a la página anterior"
 msgid "Go to Prompts"
 msgstr "Ir a Prompts"
 
-#: src/features/onboarding/components/setup-checklist.tsx:79
+#: src/features/onboarding/components/setup-checklist.tsx:162
 msgid "Go to servers"
 msgstr ""
 
@@ -16300,11 +16335,11 @@ msgstr ""
 msgid "Install"
 msgstr "Instalar"
 
-#: src/features/onboarding/components/setup-checklist.tsx:71
+#: src/features/onboarding/components/setup-checklist.tsx:154
 msgid "Install a coding agent"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:70
+#: src/features/onboarding/components/setup-checklist.tsx:153
 msgid "Install a coding agent in the Neore desktop app and approve it for a folder on a paired computer. The install happens in the desktop window, not here."
 msgstr ""
 
@@ -17441,7 +17476,7 @@ msgstr "Permite que el agente use archivos, un terminal y servidores MCP locales
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:80
+#: src/features/onboarding/components/setup-checklist.tsx:163
 msgid "Let the agent work on a server you reach over SSH. Needs a paired computer."
 msgstr ""
 
@@ -21185,6 +21220,11 @@ msgstr ""
 msgid "Not set"
 msgstr "Sin asignar"
 
+#. placeholder {0}: unreadFiles.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:179
+msgid "Not shown to this model: {0}"
+msgstr "Este modelo no las vio: {0}"
+
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:75
 msgid "Not started"
 msgstr "No iniciado"
@@ -21589,6 +21629,10 @@ msgstr "Solo los propietarios de la organización pueden gestionar la facturaci�
 #: src/features/chat/group/group-mode.ts:66
 msgid "Only participants you @mention answer."
 msgstr "Solo responden los participantes que @menciones."
+
+#: src/features/chat/thread/use-ask-user-attachments.ts:96
+msgid "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
+msgstr "Solo imágenes PNG, JPEG, WEBP o GIF, y PDF de hasta 10 MB; 20 MB en total y cuatro como máximo."
 
 #: src/features/settings/components/chat/trigger-settings.tsx:263
 msgid "Only post when there is something to report"
@@ -22362,7 +22406,7 @@ msgstr ""
 msgid "Or from a terminal:"
 msgstr "O desde una terminal:"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:176
+#: src/features/chat/thread/ask-user-prompt.tsx:208
 msgid "Or type your own answer…"
 msgstr "O escribe tu propia respuesta…"
 
@@ -22678,11 +22722,11 @@ msgstr "Páginas compartidas contigo"
 msgid "Paint over the areas you want to edit. White regions will be regenerated, dark regions will be preserved."
 msgstr "Pinta sobre las áreas que quieres editar. Las regiones blancas se regenerarán y las oscuras se conservarán."
 
-#: src/features/onboarding/components/setup-checklist.tsx:76
+#: src/features/onboarding/components/setup-checklist.tsx:159
 msgid "Pair a computer"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:75
+#: src/features/onboarding/components/setup-checklist.tsx:158
 msgid "Pair a computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer, and the step is done once any computer is paired with your account."
 msgstr ""
 
@@ -23615,7 +23659,7 @@ msgstr "Razonamiento y seguimiento de instrucciones de nivel premium"
 msgid "Premium-tier reasoning transparency"
 msgstr "Transparencia de razonamiento de nivel premium"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:122
+#: src/features/chat/thread/ask-user-prompt.tsx:136
 msgid "Preparing a question…"
 msgstr "Preparando una pregunta…"
 
@@ -24724,7 +24768,7 @@ msgstr "Solo lectura"
 msgid "Read the docs"
 msgstr "Lee la documentación"
 
-#: src/features/onboarding/components/setup-checklist.tsx:69
+#: src/features/onboarding/components/setup-checklist.tsx:152
 msgid "Read the guide"
 msgstr ""
 
@@ -25363,10 +25407,11 @@ msgstr "¿Eliminar \"{0}\"?"
 msgid "Remove “{0}”?"
 msgstr "¿Eliminar «{0}»?"
 
+#. placeholder {0}: file.name
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
-#. placeholder {0}: variable.name
 #: src/features/chat/group/group-participant-bar.tsx:210
+#: src/features/chat/thread/ask-user-prompt.tsx:224
 #: src/features/prompts/components/thread-variables-config.tsx:232
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
@@ -25960,7 +26005,7 @@ msgstr "Resultado"
 msgid "Result not delivered"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:121
+#: src/features/onboarding/components/setup-checklist.tsx:209
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Resume"
 msgstr "Reanudar"
@@ -26021,7 +26066,7 @@ msgstr ""
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:141
 #: src/features/local-models/components/ollama-model-manager.tsx:188
-#: src/features/onboarding/components/setup-checklist.tsx:154
+#: src/features/onboarding/components/setup-checklist.tsx:242
 #: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/tasks/components/task-detail-dialog.tsx:106
 #: src/features/workflow/components/nodes/file-node.tsx:221
@@ -26043,7 +26088,7 @@ msgstr "Reintentar en {retryAfterMinutes} min"
 msgid "Retry now"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:140
+#: src/features/onboarding/components/setup-checklist.tsx:228
 msgid "Retry the device check"
 msgstr ""
 
@@ -27408,7 +27453,7 @@ msgstr "Envía un mensaje para empezar"
 msgid "Send a new verification link"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:187
+#: src/features/chat/thread/ask-user-prompt.tsx:266
 msgid "Send answer"
 msgstr "Enviar respuesta"
 
@@ -28292,7 +28337,7 @@ msgid "Skills views"
 msgstr "Vistas de habilidades"
 
 #: src/features/onboarding/components/onboarding-dialog.tsx:405
-#: src/features/onboarding/components/setup-checklist.tsx:121
+#: src/features/onboarding/components/setup-checklist.tsx:209
 msgid "Skip"
 msgstr "Omitir"
 
@@ -28314,7 +28359,7 @@ msgstr "Omitir recorrido"
 
 #: src/features/develop/components/checks-tab.tsx:80
 #: src/features/evals/components/run-detail.tsx:36
-#: src/features/onboarding/components/setup-checklist.tsx:84
+#: src/features/onboarding/components/setup-checklist.tsx:167
 #: src/features/settings/components/chat/trigger-settings.tsx:176
 msgid "Skipped"
 msgstr "Omitido"
@@ -29768,7 +29813,7 @@ msgstr "Sugiere ideas de videos para un canal de tecnología en YouTube"
 msgid "Suggested"
 msgstr "Sugeridos"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:159
+#: src/features/chat/thread/ask-user-prompt.tsx:184
 #: src/features/skills/components/skill-builder-dialog.tsx:235
 msgid "Suggested answers"
 msgstr "Respuestas sugeridas"
@@ -30724,7 +30769,7 @@ msgstr "El archivo contiene una ruta de archivo no segura."
 msgid "The archive holds too many files."
 msgstr "El archivo contiene demasiados archivos."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:141
+#: src/features/chat/thread/ask-user-prompt.tsx:158
 msgid "The assistant has a question"
 msgstr "El asistente tiene una pregunta"
 
@@ -32019,7 +32064,7 @@ msgstr "Las conversaciones conservan todo tu historial. Ramifica ideas, fija los
 msgid "Threads working on this {requestNoun}"
 msgstr ""
 
-#: src/features/onboarding/components/setup-checklist.tsx:88
+#: src/features/onboarding/components/setup-checklist.tsx:171
 msgid "Three steps to use coding agents on your own machines. Skip any of them and come back later."
 msgstr ""
 
@@ -32103,7 +32148,7 @@ msgstr ""
 msgid "to {0}"
 msgstr "en {0}"
 
-#: src/features/onboarding/components/setup-checklist.tsx:84
+#: src/features/onboarding/components/setup-checklist.tsx:167
 #: src/features/tasks/components/task-status.tsx:21
 msgid "To do"
 msgstr "Por hacer"
@@ -32231,6 +32276,11 @@ msgstr ""
 #: src/features/chat/thread/sandbox-files.tsx:278
 msgid "too large"
 msgstr "demasiado grande"
+
+#. placeholder {0}: tooLarge.join(", ")
+#: src/features/chat/thread/use-ask-user-attachments.ts:180
+msgid "Too large to attach: {0}. Reduce the file and attach it again."
+msgstr "Demasiado grande para adjuntar: {0}. Reduce el archivo y adjúntalo de nuevo."
 
 #: src/features/workflow/components/nodes/text-node.tsx:78
 msgid "Too long to check as JSON"
@@ -32780,7 +32830,7 @@ msgstr ""
 msgid "Type to search"
 msgstr "Escribe para buscar"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:176
+#: src/features/chat/thread/ask-user-prompt.tsx:208
 msgid "Type your answer…"
 msgstr "Escribe tu respuesta…"
 
@@ -34530,7 +34580,7 @@ msgstr ""
 msgid "Waiting for the owner"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:124
+#: src/features/chat/thread/ask-user-prompt.tsx:138
 msgid "Waiting for the owner to answer"
 msgstr "Esperando la respuesta del propietario"
 
@@ -34551,7 +34601,7 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
-#: src/features/chat/thread/ask-user-prompt.tsx:124
+#: src/features/chat/thread/ask-user-prompt.tsx:138
 msgid "Waiting for your answer"
 msgstr "Esperando tu respuesta"
 
@@ -35497,7 +35547,7 @@ msgstr "Tu cuenta y todos los datos asociados se están eliminando. No se puede 
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "Tu espacio de trabajo de IA <0>empieza aquí.</0>"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:168
+#: src/features/chat/thread/ask-user-prompt.tsx:200
 msgid "Your answer"
 msgstr "Tu respuesta"
 
@@ -35505,7 +35555,7 @@ msgstr "Tu respuesta"
 msgid "Your answer in Neore has finished."
 msgstr "Tu respuesta en Neore ha terminado."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:151
+#: src/features/chat/thread/ask-user-prompt.tsx:168
 msgid "Your answer:"
 msgstr "Tu respuesta:"
 

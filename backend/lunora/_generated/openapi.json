@@ -15598,6 +15598,12 @@
                       "approvalId": {
                         "type": "string"
                       },
+                      "fileIds": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
                       "threadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",

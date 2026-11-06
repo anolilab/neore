@@ -6,22 +6,26 @@
  *
  * While the call waits (`approval-requested`) the owner answers here: a
  * suggested choice sends at once, or they type their own answer — Enter sends,
- * Shift+Enter adds a line. Dismissing is permanent, so it is only ever the
- * explicit button: Escape just leaves the field. Either resumes the run
- * server-side (`answerAskUser`), which opens a fresh stream the thread's
- * streaming placeholder picks up. Afterwards it shows the answer read-only.
+ * Shift+Enter adds a line. An answer can carry up to four files, attached with
+ * the composer's upload route; the server reads them for the one model call
+ * that answers. Dismissing is permanent, so it is only ever the explicit
+ * button: Escape just leaves the field. Either resumes the run server-side
+ * (`answerAskUser`), which opens a fresh stream the thread's streaming placeholder
+ * picks up. Afterwards it shows the answer read-only, with the names of the
+ * files it carried.
  *
  * Only the thread owner can answer: the run resumes with the owner's tools and
  * keys. Anyone else sees the question read-only.
  */
 
 import { useLingui } from "@lingui/react/macro";
+import { ASK_USER_ANSWER_MAX, ASK_USER_FILE_TYPES, ASK_USER_MAX_FILES } from "@neore/backend/ask-user-limits";
 import type { Id } from "@neore/backend/dataModel";
 import type { ToolPart } from "@neore/chat-ui/types";
 import { Button } from "@neore/ui/components/button";
 import { Textarea } from "@neore/ui/components/textarea";
 import { useMutation } from "@tanstack/react-query";
-import { MessageCircleQuestion, Send, X } from "lucide-react";
+import { MessageCircleQuestion, Paperclip, Send, X } from "lucide-react";
 import type { FC, FormEvent, KeyboardEvent } from "react";
 import { useId, useRef, useState } from "react";
 
@@ -31,16 +35,16 @@ import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
 import { normalizeAskUserChoices } from "./ask-user-choices";
-
-/** Mirrors `ASK_USER_ANSWER_MAX` on the server. */
-const ANSWER_MAX = 4000;
+import { useAskUserAttachments } from "./use-ask-user-attachments";
 
 interface AskUserInput {
     choices?: string[];
     question?: string;
 }
 
-type AskUserOutput = { answer: string; answered: true } | { answered: false; message: string };
+type AskUserOutput =
+    | { answer: string; answered: true; attachedFiles?: { filename: string; mediaType: string }[]; unreadFiles?: string[] }
+    | { answered: false; message: string };
 
 type Submitted = { answer: string; kind: "answer" } | { kind: "dismiss" };
 
@@ -57,6 +61,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const [submitted, setSubmitted] = useState<Submitted | null>(null);
     // Focus lands here after a send: the form (and the focused control) goes away.
     const groupRef = useRef<HTMLDivElement>(null);
+    const { attachButtonRef, attachFiles, attachNotice, cancelSelection, fileInputRef, files, removeFile, uploading } = useAskUserAttachments();
     const { isPending, mutate } = useMutation(crpc.chat.ask_user.answerAskUser.mutationOptions());
 
     const input = (typeof part.input === "object" && part.input !== null ? part.input : {}) as AskUserInput;
@@ -67,16 +72,25 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
     const isWaiting = part.state === "approval-requested" && submitted === null;
     const canAnswer = isOwner && isWaiting && !!approvalId && !!threadId && !isPending;
+    // The server refuses files in a locked chat, so the attach control is not offered there.
+    const isLocked = thread?.lockedAt !== undefined && thread?.lockedAt !== null;
 
     const send = (reply: Submitted) => {
         if (!approvalId || !threadId) {
             return;
         }
 
+        cancelSelection();
         setSubmitted(reply);
         groupRef.current?.focus();
         mutate(
-            { answer: reply.kind === "answer" ? reply.answer : null, approvalId, threadId: threadId as Id<"threads"> },
+            {
+                answer: reply.kind === "answer" ? reply.answer : null,
+                approvalId,
+                // Dismissing carries no files: the question closes without an answer.
+                ...(reply.kind === "answer" && files.length > 0 && { fileIds: files.map((file) => file.fileId) }),
+                threadId: threadId as Id<"threads">,
+            },
             {
                 onError: (error) => {
                     setSubmitted(null);
@@ -89,7 +103,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const sendDraft = () => {
         const answer = draft.trim();
 
-        if (answer.length > 0 && canAnswer) {
+        if (answer.length > 0 && canAnswer && !uploading) {
             send({ answer, kind: "answer" });
         }
     };
@@ -132,6 +146,9 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         answerText = submitted.answer;
     }
 
+    const answeredFiles = output?.answered ? (output.attachedFiles ?? []) : [];
+    const unreadFiles = output?.answered ? (output.unreadFiles ?? []) : [];
+
     return (
         <div aria-labelledby={headingId} className="bg-muted/40 mb-4 rounded-lg border p-3 outline-none" ref={groupRef} role="group" tabIndex={-1}>
             <div className="flex items-start gap-2">
@@ -153,12 +170,27 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                 </p>
             )}
 
+            {answeredFiles.length > 0 && (
+                <p className="text-muted-foreground mt-2 text-xs">
+                    {t`Attached:`} {answeredFiles.map((file) => file.filename).join(", ")}
+                </p>
+            )}
+
+            {unreadFiles.length > 0 && <p className="text-muted-foreground mt-1 text-xs">{t`Not shown to this model: ${unreadFiles.join(", ")}`}</p>}
+
             {canAnswer && (
                 <form className="mt-3 flex flex-col gap-2" onSubmit={onSubmit}>
                     {choices.length > 0 && (
                         <div aria-label={t`Suggested answers`} className="flex flex-wrap gap-2" role="group">
                             {choices.map((choice) => (
-                                <Button key={choice} onClick={() => send({ answer: choice, kind: "answer" })} size="sm" type="button" variant="outline">
+                                <Button
+                                    disabled={uploading}
+                                    key={choice}
+                                    onClick={() => send({ answer: choice, kind: "answer" })}
+                                    size="sm"
+                                    type="button"
+                                    variant="outline"
+                                >
                                     {choice}
                                 </Button>
                             ))}
@@ -170,7 +202,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                     <Textarea
                         aria-describedby={hintId}
                         id={answerId}
-                        maxLength={ANSWER_MAX}
+                        maxLength={ASK_USER_ANSWER_MAX}
                         onChange={(event) => setDraft(event.target.value)}
                         onKeyDown={onKeyDown}
                         placeholder={choices.length > 0 ? t`Or type your own answer…` : t`Type your answer…`}
@@ -178,11 +210,58 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         size="sm"
                         value={draft}
                     />
+                    {attachNotice && (
+                        <p className="text-destructive text-xs" role="alert">
+                            {attachNotice}
+                        </p>
+                    )}
+                    {files.length > 0 && (
+                        <ul aria-label={t`Attached files`} className="flex flex-wrap gap-2">
+                            {files.map((file) => (
+                                <li className="bg-background flex items-center gap-1 rounded-md border px-2 py-1 text-xs" key={file.fileId}>
+                                    <span className="max-w-40 truncate">{file.name}</span>
+                                    <button
+                                        aria-label={t`Remove ${file.name}`}
+                                        className="text-muted-foreground hover:text-foreground"
+                                        onClick={() => removeFile(file)}
+                                        type="button"
+                                    >
+                                        <X aria-hidden="true" className="size-3" />
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                     <p className="text-muted-foreground text-xs" id={hintId}>
                         {t`Enter to send, Shift+Enter for a new line.`}
                     </p>
+                    <input
+                        accept={ASK_USER_FILE_TYPES.join(",")}
+                        aria-hidden="true"
+                        className="hidden"
+                        multiple
+                        onChange={attachFiles}
+                        ref={fileInputRef}
+                        tabIndex={-1}
+                        type="file"
+                    />
                     <div className="flex flex-wrap gap-2">
-                        <Button disabled={draft.trim().length === 0} size="sm" type="submit">
+                        <span className="sr-only" role="status">
+                            {uploading ? t`Attaching files…` : ""}
+                        </span>
+                        {isLocked && <p className="text-muted-foreground text-xs">{t`Files cannot be attached in a locked chat.`}</p>}
+                        <Button
+                            disabled={uploading || files.length >= ASK_USER_MAX_FILES || isLocked}
+                            onClick={() => fileInputRef.current?.click()}
+                            ref={attachButtonRef}
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                        >
+                            <Paperclip aria-hidden="true" />
+                            {uploading ? t`Attaching…` : t`Attach file`}
+                        </Button>
+                        <Button disabled={uploading || draft.trim().length === 0} size="sm" type="submit">
                             <Send aria-hidden="true" />
                             {t`Send answer`}
                         </Button>

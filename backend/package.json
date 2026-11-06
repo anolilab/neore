@@ -35,6 +35,7 @@
         "./dataModel": "./lunora/_generated/dataModel.ts",
         "./document-limits": "./lunora/lib/document-limits.ts",
         "./setup-step-limits": "./lunora/auth/lib/setup-step-limits.ts",
+        "./ask-user-limits": "./lunora/chat/tools/ask-user-constants.ts",
         "./knowledge/citations": "./lunora/knowledge/citations.ts",
         "./messenger/reply-tools": "./lunora/messenger/lib/reply-tools.ts",
         "./package.json": "./package.json",
