@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { documentTextPart } from "./attached-text";
 import { firstUserPromptText } from "./first-user-prompt";
 
 describe("firstUserPromptText", () => {
@@ -77,5 +78,59 @@ describe("reading a long structured prompt for a title", () => {
         const text = firstUserPromptText([{ message: { content: `${" ".repeat(50)}Plan a trip`, role: "user" } }]);
 
         expect(text).toBe("Plan a trip");
+    });
+});
+
+describe("a message with attached text and a question", () => {
+    const pageMarked = (text: string) => {
+        return { providerOptions: { neore: { pageContext: { kind: "page" } } }, text, type: "text" };
+    };
+
+    it("takes the typed question, not the attached document's text, when both are in the message", () => {
+        const content = [documentTextPart("notes.pdf", "Quarterly figures ".repeat(200)), { text: "What is the total?", type: "text" }];
+
+        expect(firstUserPromptText([{ message: { content, role: "user" } }])).toBe("What is the total?");
+    });
+
+    it("takes the typed question, not an attached browser page, when both are in the message", () => {
+        const content = [pageMarked("Some page text ".repeat(200)), { text: "Summarise this page", type: "text" }];
+
+        expect(firstUserPromptText([{ message: { content, role: "user" } }])).toBe("Summarise this page");
+    });
+
+    it("takes the question typed before an attachment in one string", () => {
+        const content = "What is this?\n[Attached Document]\n\nExtracted text ".repeat(1);
+
+        expect(firstUserPromptText([{ message: { content, role: "user" } }])).toBe("What is this?");
+    });
+
+    it("keeps the attached text when the message has no question", () => {
+        const content = [documentTextPart("notes.pdf", "Quarterly figures")];
+
+        expect(firstUserPromptText([{ message: { content, role: "user" } }])).toBe("[Document: notes.pdf]\n\nQuarterly figures");
+    });
+});
+
+describe("whitespace in a prompt", () => {
+    it("treats a message that is only whitespace as no prompt", () => {
+        expect(firstUserPromptText([{ message: { content: " ".repeat(20_000), role: "user" } }])).toBeUndefined();
+        expect(firstUserPromptText([{ message: { content: [{ text: " \n\t ".repeat(5000), type: "text" }], role: "user" } }])).toBeUndefined();
+    });
+
+    it("finds a real prompt after more leading whitespace than the read budget, in a string and in parts", () => {
+        expect(firstUserPromptText([{ message: { content: `${" ".repeat(9000)}Plan a trip`, role: "user" } }])).toBe("Plan a trip");
+        expect(
+            firstUserPromptText([
+                {
+                    message: {
+                        content: [
+                            { text: " ".repeat(9000), type: "text" },
+                            { text: "Plan a trip", type: "text" },
+                        ],
+                        role: "user",
+                    },
+                },
+            ]),
+        ).toBe("Plan a trip");
     });
 });
