@@ -10,6 +10,8 @@ import { useCurrentThreadId, useOptimisticStatuses } from "@/features/chat/core/
 import useThreadHandlers from "@/features/chat/thread-list/hooks/use-thread-handlers";
 
 interface ThreadShortcutsListenerProperties {
+    /** Whether the signed-in person owns the open thread. A shared thread's viewer cannot archive or delete it, so the shortcuts do nothing for them. */
+    isOwner?: boolean;
     /** The open thread's own model: archiving goes through the thread's model path, not the globally selected one. */
     model?: string;
     /** The open thread's stored status. A pending archive change in the optimistic map takes precedence. */
@@ -21,7 +23,7 @@ interface ThreadShortcutsListenerProperties {
  * confirms (`use-keyboard-shortcut-handler.ts`). Renders only the confirmation dialog. Mounted by the thread view, which
  * owns the open thread's document, in both its normal and its comparison layout.
  */
-const ThreadShortcutsListener: FC<ThreadShortcutsListenerProperties> = ({ model, status }) => {
+const ThreadShortcutsListener: FC<ThreadShortcutsListenerProperties> = ({ isOwner = false, model, status }) => {
     const { t } = useLingui();
     const currentThreadId = useCurrentThreadId();
     const optimisticStatuses = useOptimisticStatuses();
@@ -32,7 +34,7 @@ const ThreadShortcutsListener: FC<ThreadShortcutsListenerProperties> = ({ model,
 
     useEffect(() => {
         const archive = () => {
-            if (currentThreadId === undefined || currentThreadId === "default") {
+            if (!isOwner || currentThreadId === undefined || currentThreadId === "default") {
                 return;
             }
 
@@ -43,7 +45,7 @@ const ThreadShortcutsListener: FC<ThreadShortcutsListenerProperties> = ({ model,
         };
 
         const askToDelete = () => {
-            if (currentThreadId === undefined || currentThreadId === "default") {
+            if (!isOwner || currentThreadId === undefined || currentThreadId === "default") {
                 return;
             }
 
@@ -57,7 +59,7 @@ const ThreadShortcutsListener: FC<ThreadShortcutsListenerProperties> = ({ model,
             globalThis.removeEventListener("archiveThread", archive);
             globalThis.removeEventListener("deleteThread", askToDelete);
         };
-    }, [currentModel, currentThreadId, model, optimisticStatuses, status, updateThread]);
+    }, [currentModel, currentThreadId, isOwner, model, optimisticStatuses, status, updateThread]);
 
     return (
         <DeleteConfirmationDialog

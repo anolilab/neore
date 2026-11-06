@@ -21,6 +21,7 @@ import type { FC } from "react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import AskAsideShortcutListener from "@/features/chat/aside/ask-aside-shortcut-listener";
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
 import { useChatActions, useChatIsEmpty, useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
@@ -114,6 +115,10 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
     const isEmpty = useChatIsEmpty();
     const { activeStreamId, isStreaming } = useChatIsStreaming();
     const { isNewThread, thread, threadId } = useChatThread();
+    const { hooks } = useAuth();
+    const { data: sessionData } = hooks.useSession();
+    // Only the owner may archive or delete from the keyboard; a shared thread's viewer gets the server's refusal otherwise.
+    const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
 
     const { jwtToken } = useChatActions();
 
@@ -241,7 +246,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
             <>
                 <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
                 <ComposerEffortShortcuts />
-                <ThreadShortcutsListener model={thread?.model} status={thread?.status} />
+                <ThreadShortcutsListener isOwner={isOwner} model={thread?.model} status={thread?.status} />
                 <div className={cn("relative flex h-[calc(100%-40px)]", className)}>
                     {/* Columns — each scrolls independently, divided by borders */}
                     <ComparisonView branches={comparisonBranches} className="min-h-0 flex-1" />
@@ -278,7 +283,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
             <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
             <ComposerEffortShortcuts />
             <CopyLastCodeBlockListener />
-            <ThreadShortcutsListener model={thread?.model} status={thread?.status} />
+            <ThreadShortcutsListener isOwner={isOwner} model={thread?.model} status={thread?.status} />
             <AskAsideShortcutListener />
             <div
                 className={cn("relative h-[calc(100%-40px)]", className)}

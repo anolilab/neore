@@ -89,9 +89,9 @@ const Shortcuts = ({ children }: { children?: ReactNode }) => {
     );
 };
 
-const listener = (props: { model?: string; status?: string } = {}) => (
+const listener = (props: { isOwner?: boolean; model?: string; status?: string } = {}) => (
     <Shortcuts>
-        <ThreadShortcutsListener {...props} />
+        <ThreadShortcutsListener isOwner {...props} />
     </Shortcuts>
 );
 
@@ -172,6 +172,16 @@ describe("thread shortcuts", () => {
         render(listener());
 
         expect(state.handlerThreadId).toBe("t1");
+    });
+
+    it("does nothing for a thread the person does not own, as a shared thread's viewer", () => {
+        render(listener({ isOwner: false, status: "active" }));
+
+        pressArchive();
+        pressDelete();
+
+        expect(state.updateThread).not.toHaveBeenCalled();
+        expect(screen.queryByRole("button", { name: "Confirm delete" })).toBeNull();
     });
 
     it("does nothing when no thread is open", () => {
