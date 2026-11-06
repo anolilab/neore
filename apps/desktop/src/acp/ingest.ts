@@ -365,9 +365,9 @@ export class HostPoster implements SessionObserver {
             return;
         }
 
-        if (this.postedOutput.get(key) !== signature) {
+        // Recorded only once the channel takes it: a dropped output (its queue over the cap) is sent again by the next report.
+        if (this.postedOutput.get(key) !== signature && channel.enqueue(printed)) {
             this.postedOutput.set(key, signature);
-            channel.enqueue(printed);
         }
     }
 

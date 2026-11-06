@@ -98,16 +98,17 @@ export class TurnChannel {
         return this.inflight !== undefined || this.pending.length > 0;
     }
 
-    public enqueue(event: HostEvent): void {
+    /** Whether the event was taken: a sealed or stopped channel, or one over its cap, takes nothing. */
+    public enqueue(event: HostEvent): boolean {
         if (this.sealed || this.stopped) {
-            return;
+            return false;
         }
 
         // Over the cap while the backend is out of reach: output is dropped, but the turn's own start and end are kept.
         if (event.kind !== "turn_start" && event.kind !== "turn_end" && this.pendingJson > MAX_PENDING_JSON) {
             this.dropped += 1;
 
-            return;
+            return false;
         }
 
         const isText = event.kind === "text" || event.kind === "reasoning";
@@ -128,6 +129,8 @@ export class TurnChannel {
         }
 
         this.schedule(Math.max(0, POST_INTERVAL_MS - (this.host.now() - this.lastPostAt)));
+
+        return true;
     }
 
     public append(kind: "reasoning" | "text", delta: string): void {
