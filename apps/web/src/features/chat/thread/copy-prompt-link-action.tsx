@@ -19,7 +19,7 @@ import { showError, showSuccess, showWarning } from "@/lib/toast";
 const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
     const { t } = useLingui();
 
-    const copy = () => {
+    const copy = async () => {
         const prompt = getVisibleUserText({ parts: [...message.parts], text: message.text });
 
         if (!prompt.trim()) {
@@ -37,10 +37,13 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
 
         const link = buildPromptLink(globalThis.location.origin, { model: useModelStore.getState().selectedModel, prompt });
 
-        navigator.clipboard
-            .writeText(link)
-            .then(() => showSuccess(t`Prompt link copied`))
-            .catch(() => showError(t`Could not copy the link`));
+        // A browser without the Clipboard API throws here, synchronously, as a refused write rejects: both are one failure.
+        try {
+            await navigator.clipboard.writeText(link);
+            showSuccess(t`Prompt link copied`);
+        } catch {
+            showError(t`Could not copy the link`);
+        }
     };
 
     return (

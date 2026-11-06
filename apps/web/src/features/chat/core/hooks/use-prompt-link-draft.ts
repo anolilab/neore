@@ -10,15 +10,15 @@ import type { ModelId } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
 import { promptFromLink } from "../utils/prompt-link";
 
+/** The chat search without the prompt link's own parameters: a saved prompt or a message in the same URL stays. */
+const withoutLinkParameters = (search: Record<string, unknown>): Record<string, unknown> =>
+    Object.fromEntries(Object.entries(search).filter(([key]) => key !== "model" && key !== "prompt"));
+
 /**
  * Applies a prompt link once: its prompt becomes the draft (a draft the composer already holds is kept, with a notice),
  * and its model is chosen when the model is enabled and not external. The link's parameters are then removed from the
  * address. It never sends.
  */
-/** The chat search without the prompt link's own parameters: a saved prompt or a message in the same URL stays. */
-const withoutLinkParameters = (search: Record<string, unknown>): Record<string, unknown> =>
-    Object.fromEntries(Object.entries(search).filter(([key]) => key !== "model" && key !== "prompt"));
-
 export const usePromptLinkDraft = ({
     model,
     otherDraftSource = false,
