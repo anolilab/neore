@@ -3,10 +3,9 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@neore/ui/components/dropdown-menu";
-import { skipToken, useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { skipToken, useIsMutating, useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
 import type { FC } from "react";
-import { useRef, useState } from "react";
 
 import { useChatIsRunning, useChatThread } from "@/features/chat/core/context/chat-context";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
@@ -106,6 +105,14 @@ const ComposerThreadPermissionMode: FC = () => {
     const { mutateAsync } = useMutation({
         ...crpc.chat.thread_state.setThreadPermissionMode.mutationOptions(),
         mutationKey: permissionModeSaveKey(threadId ?? ""),
+        // The menu reads the mode from the cached thread: the saved mode must show before the save reads as settled, so the selection
+        // does not fall back to the old stored mode for a moment. TanStack awaits this before it reports the save as done.
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: crpc.chat.functions.getThread.queryKey({ threadId: threadId as never }) });
+            await queryClient.invalidateQueries({
+                queryKey: crpc.chat.thread_state.getEffectivePermissionMode.queryKey({ threadId: threadId as never }),
+            });
+        },
         // Runs before the save stops reading as in flight, so the queue sees the failure before it may release a held prompt: a prompt
         // held for a save that did not land would otherwise go out under the stored mode.
         onError: () => {
@@ -114,9 +121,13 @@ const ComposerThreadPermissionMode: FC = () => {
             }
         },
     });
-    // Tagged with its thread: a selection still saving when the viewer opens another chat must not show there.
-    const [pending, setPending] = useState<{ mode: ThreadPermissionMode; threadId: string }>();
-    const latestSave = useRef(0);
+    // The selection still saving for this chat, read from the query cache: it outlives this control, so a change of chat and back keeps it,
+    // and it leaves the cache once the save settles or fails.
+    const pendingModes = useMutationState({
+        filters: { exact: true, mutationKey: permissionModeSaveKey(threadId ?? ""), status: "pending" },
+        select: (mutation) => (mutation.state.variables as { mode: ThreadPermissionMode }).mode,
+    });
+    const pending = pendingModes.at(-1);
 
     // Until the thread has loaded, the menu is hidden: a host thread must never show an enabled control while its runner is unknown.
     // A locked thread read without its proof is a stub: metadata only, so it has no `userId` (`LOCKED_STUB_KEYS`). The owner's full row
@@ -129,33 +140,16 @@ const ComposerThreadPermissionMode: FC = () => {
 
     const ownMode: ThreadPermissionMode = isMode(thread?.permissionMode) ? thread.permissionMode : "auto";
     const stored: ThreadPermissionMode = isMode(effective) ? effective : ownMode;
-    const shown = pending?.threadId === threadId ? pending.mode : stored;
+    const shown = pending ?? stored;
 
     return (
         <ComposerPermissionMode
             disabled={isRunning}
             mode={shown}
             onModeChange={(mode) => {
-                latestSave.current += 1;
-                const save = latestSave.current;
-
-                setPending({ mode, threadId });
                 mutateAsync({ mode, threadId: threadId as never })
-                    // The menu reads the mode from the cached thread: a saved mode must show without waiting for a refresh.
-                    .then(() => queryClient.invalidateQueries({ queryKey: crpc.chat.functions.getThread.queryKey({ threadId: threadId as never }) }))
-                    .then(() =>
-                        queryClient.invalidateQueries({
-                            queryKey: crpc.chat.thread_state.getEffectivePermissionMode.queryKey({ threadId: threadId as never }),
-                        }),
-                    )
                     .catch((error: unknown) => {
                         showError(error instanceof Error ? error : t`Could not change the permission mode. Please try again.`);
-                    })
-                    .finally(() => {
-                        // Only the newest save clears the selection: an older save finishing must not show the stored mode over a newer pending one.
-                        if (latestSave.current === save) {
-                            setPending(undefined);
-                        }
                     })
                     .catch(() => {});
             }}

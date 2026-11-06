@@ -243,6 +243,31 @@ describe("permission mode control", () => {
         expect(usePromptQueueStore.getState().queues.t1?.paused).toBe(true);
     });
 
+    it("keeps a selection still saving when the viewer goes to another chat and comes back", async () => {
+        state.thread = { _id: "A", permissionMode: "auto" };
+        state.save.mockImplementationOnce(() => new Promise<null>(() => {}));
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        // Keyed by the chat, as the composer that renders it is: a change of chat remounts the control.
+        const control = () => (
+            <QueryClientProvider client={client}>
+                <ComposerThreadPermissionMode key={state.thread?._id} />
+            </QueryClientProvider>
+        );
+        const view = render(control());
+
+        fireEvent.click(await screen.findByRole("button", { name: "Permission mode: Auto" }));
+        fireEvent.click(screen.getByRole("menuitemradio", { name: SUPERVISED_PATTERN }));
+        expect(await screen.findByRole("button", { name: "Permission mode: Supervised" })).toBeTruthy();
+
+        state.thread = { _id: "B", permissionMode: "full" };
+        view.rerender(control());
+        expect(await screen.findByRole("button", { name: "Permission mode: Full access" })).toBeTruthy();
+
+        state.thread = { _id: "A", permissionMode: "auto" };
+        view.rerender(control());
+        expect(await screen.findByRole("button", { name: "Permission mode: Supervised" })).toBeTruthy();
+    });
+
     it("does not show a selection still saving for one chat in another chat that stores a different mode", async () => {
         state.thread = { _id: "t1", permissionMode: "auto" };
         state.save.mockImplementationOnce(() => new Promise<null>(() => {}));
