@@ -49,3 +49,10 @@ export const toggleSkipped = (skipped: ReadonlyArray<string> | undefined, id: Se
 
     return skip ? [...rest, id].slice(-MAX_SKIPPED_SETUP_STEPS) : rest;
 };
+
+export interface SkipVariables {
+    /** The account that made the click. */
+    owner: string | undefined;
+    skipped: boolean;
+    stepId: SetupStepId;
+}

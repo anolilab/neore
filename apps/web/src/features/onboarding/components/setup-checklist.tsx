@@ -4,13 +4,15 @@ import { CardContent } from "@neore/ui/components/card";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 import type { FC } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useCRPC } from "@/lib/lunora/crpc";
 
-import type { SetupStepId } from "../lib/setup-steps";
+import type { SetupStepId, SkipVariables } from "../lib/setup-steps";
 import { deriveSetupSteps, SETUP_STEP_IDS, toggleSkipped } from "../lib/setup-steps";
 
 /** Where each step's action goes: the control on this page, or the guide for the part that happens in the desktop app. */
@@ -20,6 +22,8 @@ const STEP_TARGET: Record<SetupStepId, string> = {
     ssh: "#devices-ssh",
 };
 
+class StaleAccountError extends Error {}
+
 /**
  * First-run setup. The web only explains and links: pairing and agent installs happen in the desktop app's own
  * window, so nothing here makes the desktop do anything.
@@ -27,7 +31,15 @@ const STEP_TARGET: Record<SetupStepId, string> = {
 const SetupChecklist: FC = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
+    const { authClient } = useAuth();
+    const { data: session } = authClient.useSession();
     const queryClient = useQueryClient();
+    // Who is signed in right now, read when a queued save runs: a click belongs to the account that made it.
+    const signedInRef = useRef(session?.user?.id);
+
+    useEffect(() => {
+        signedInRef.current = session?.user?.id;
+    }, [session?.user?.id]);
     const devicesQuery = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
     const settingsQuery = useUserSettings();
     const settingsKey = crpc.auth.functions.getUserSettings.queryOptions({}).queryKey;
@@ -35,11 +47,24 @@ const SetupChecklist: FC = () => {
     // cache is patched one step at a time, never from an earlier snapshot. Two cases read the server instead of guessing:
     // an account with no settings row yet (nothing to patch) and a failed save (whatever is stored is what to show).
     const reloadSettings = async () => await queryClient.invalidateQueries({ queryKey: settingsKey });
+    const saveStep = crpc.auth.setup_steps.setSetupStepSkipped.mutationOptions();
     const setSkipped = useMutation({
-        ...crpc.auth.setup_steps.setSetupStepSkipped.mutationOptions(),
+        ...saveStep,
         // Saves run one after another in click order, so a Skip still on its way can never land after the Resume that followed it.
         scope: { id: "setup-steps-skip" },
-        onMutate: async (args: { skipped: boolean; stepId: SetupStepId }) => {
+        // A save for an account that is no longer signed in is dropped before it is sent.
+        mutationFn: async ({ owner, ...step }: SkipVariables, context) => {
+            if (owner !== signedInRef.current) {
+                throw new StaleAccountError();
+            }
+
+            return (await saveStep.mutationFn?.(step as never, context)) ?? null;
+        },
+        onMutate: async (args: SkipVariables) => {
+            if (args.owner !== signedInRef.current) {
+                return { stale: true };
+            }
+
             // A read still in flight would land after the patch with the value from before the click.
             await queryClient.cancelQueries({ queryKey: settingsKey });
 
@@ -48,8 +73,15 @@ const SetupChecklist: FC = () => {
             if (row) {
                 queryClient.setQueryData(settingsKey, { ...row, setupStepsSkipped: toggleSkipped(row.setupStepsSkipped, args.stepId, args.skipped) });
             }
+
+            return { stale: false };
         },
-        onError: (_error, args: { skipped: boolean; stepId: SetupStepId }) => {
+        onError: (_error, args: SkipVariables, context) => {
+            // The account changed: the cache now belongs to the new one, so nothing is rolled back, reread or announced.
+            if (context?.stale || args.owner !== signedInRef.current) {
+                return;
+            }
+
             // Back to what the click replaced right away; the read that follows settles on whatever is stored.
             queryClient.setQueryData<{ setupStepsSkipped?: string[] } | null>(settingsKey, (row) =>
                 row ? { ...row, setupStepsSkipped: toggleSkipped(row.setupStepsSkipped, args.stepId, !args.skipped) } : row,
@@ -57,7 +89,11 @@ const SetupChecklist: FC = () => {
             toast.error(t`Could not save that choice. Try again.`);
         },
         // Settled either way, the stored list is what the card shows: a read that started before the write cannot outlive it.
-        onSettled: reloadSettings,
+        onSettled: async (_data, _error, args: SkipVariables, context) => {
+            if (!context?.stale && args.owner === signedInRef.current) {
+                await reloadSettings();
+            }
+        },
     });
     // An account with no settings row answers `null`; only `undefined` means the read has not finished. Until both reads
     // have answered, no step has a status: a skip that is stored but not yet read must not show as "To do".
@@ -113,7 +149,7 @@ const SetupChecklist: FC = () => {
                                         <Button
                                             disabled={settingsQuery.isError}
                                             onClick={() => {
-                                                setSkipped.mutate({ skipped: status === "todo", stepId: id });
+                                                setSkipped.mutate({ owner: signedInRef.current, skipped: status === "todo", stepId: id });
                                             }}
                                             size="sm"
                                             variant="ghost"

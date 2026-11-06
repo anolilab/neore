@@ -8,8 +8,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import SetupChecklist from "./setup-checklist";
 
-const { devices, mutate, server, sonnerMock } = vi.hoisted(() => {
+const { account, devices, mutate, server, sonnerMock } = vi.hoisted(() => {
     return {
+        account: { id: "user-a" },
         devices: { current: [] as unknown[], fail: false },
         mutate: vi.fn(),
         server: {
@@ -21,6 +22,20 @@ const { devices, mutate, server, sonnerMock } = vi.hoisted(() => {
             skipped: undefined as string[] | undefined,
         },
         sonnerMock: { toast: vi.fn() },
+    };
+});
+
+vi.mock("@/features/auth/lib/auth-ui-provider", () => {
+    return {
+        useAuth: () => {
+            return {
+                authClient: {
+                    useSession: () => {
+                        return { data: { user: { id: account.id } } };
+                    },
+                },
+            };
+        },
     };
 });
 
@@ -143,6 +158,7 @@ const renderChecklist = (client = newClient()) =>
 describe("<SetupChecklist>", () => {
     beforeEach(() => {
         devices.current = [];
+        account.id = "user-a";
         devices.fail = false;
         server.fail = false;
         server.readFail = false;
@@ -285,6 +301,42 @@ describe("<SetupChecklist>", () => {
         await waitFor(() => expect(sonnerMock.toast).toHaveBeenCalledTimes(1));
         await waitFor(() => expect(screen.getAllByText("(To do)")).toHaveLength(3));
         expect(screen.queryByText("(Skipped)")).toBeNull();
+    });
+
+    it("drops a click whose account has changed before the save runs, touching nothing of the new account", async () => {
+        let release = () => {};
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` is newer than the supported runtimes
+        server.hold = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+
+        const client = newClient();
+        const view = renderChecklist(client);
+
+        await screen.findAllByText("(To do)");
+        // The first click is on its way; the second waits behind it.
+        fireEvent.click(screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }));
+        fireEvent.click(screen.getByRole("button", { name: SKIP_INSTALL_A_CODING_AGENT }));
+        await waitFor(() => expect(mutate).toHaveBeenCalledTimes(1));
+
+        // Another account signs in while they are pending.
+        account.id = "user-b";
+        server.skipped = undefined;
+        client.setQueryData(["getUserSettings"], { setupStepsSkipped: undefined });
+        view.rerender(
+            <QueryClientProvider client={client}>
+                <SetupChecklist />
+            </QueryClientProvider>,
+        );
+        server.hold = undefined;
+        release();
+
+        await waitFor(() => expect(screen.getAllByText("(To do)")).toHaveLength(3));
+        // Only the first request had left; the second never reached the server, and neither touched the new account's list.
+        expect(mutate).toHaveBeenCalledTimes(1);
+        expect(screen.queryByText("(Skipped)")).toBeNull();
+        expect(sonnerMock.toast).not.toHaveBeenCalled();
     });
 
     it("lets the latest click win when Resume follows a Skip that has not been saved yet", async () => {

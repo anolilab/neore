@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { deleteMergedGuest } from "../auth/hooks";
 import { requireOwnCollectionId } from "../knowledge/documents-shared";
 import type { MergeReferences, ShardCall } from "./account-merge";
+import { importShardRows } from "./account-merge";
 import { GLOBAL_USER_COLUMNS, GLOBAL_USER_TABLES_NOT_REASSIGNED, mergeGuestInto, reassignGlobalRows, rewriteOwner, shardLocalTables } from "./account-merge";
 import { schemaWithShardedTables } from "./test-schema";
 
@@ -307,5 +308,45 @@ describe("deleteMergedGuest", () => {
         } finally {
             harness.close();
         }
+    });
+});
+
+describe("importShardRows for userSettings", () => {
+    const run = async (guestRows: Record<string, unknown>[], seed?: Record<string, unknown>) => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            return await harness.run(async (context: any) => {
+                if (seed) {
+                    await context.db.insert("userSettings", seed);
+                }
+
+                await context.runMutation(importShardRows, { from: "guest", rows: guestRows, table: "userSettings", to: "user" });
+
+                const stored = await context.db.query("userSettings").take(10);
+
+                return stored.filter((row: Record<string, unknown>) => row.userId === "user");
+            });
+        } finally {
+            harness.close();
+        }
+    };
+
+    it("adds a guest's skipped steps to the new account's settings and changes nothing else", async () => {
+        const rows = await run([{ _id: "g1", language: "fr-FR", setupStepsSkipped: ["ssh", "agent"], userId: "guest" }], {
+            language: "de-DE",
+            setupStepsSkipped: ["pair", "ssh"],
+            userId: "user",
+        });
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ language: "de-DE", setupStepsSkipped: ["pair", "ssh", "agent"] });
+    });
+
+    it("leaves the new account's settings alone when the guest skipped nothing", async () => {
+        const rows = await run([{ _id: "g1", language: "fr-FR", userId: "guest" }], { language: "de-DE", userId: "user" });
+
+        expect(rows[0]).toMatchObject({ language: "de-DE" });
+        expect(rows[0]?.setupStepsSkipped).toBeUndefined();
     });
 });

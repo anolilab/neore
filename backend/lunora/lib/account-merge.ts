@@ -28,6 +28,7 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
+import { mergeSkippedSteps } from "../auth/lib/setup-step-limits";
 import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
 import schema from "../schema";
@@ -93,6 +94,7 @@ type RawDb = {
     delete: (table: string, id: string) => Promise<void>;
     get: (table: string, id: string) => Promise<unknown>;
     insert: (table: string, document: Record<string, unknown>, options: { allowExplicitId: boolean }) => Promise<string>;
+    patch: (table: string, id: string, fields: Record<string, unknown>) => Promise<void>;
     query: (table: string) => {
         paginate: (options: {
             cursor: string | null;
@@ -124,16 +126,46 @@ export const listShardRowIds = internalQuery
         return rows.map((row) => row._id as string);
     });
 
+/**
+ * The new account keeps its own `userSettings` row, but the guest's skipped first-run steps are a choice the guest made
+ * and would otherwise vanish on sign-up: they are added to the new row's list and nothing else of it changes.
+ */
+const carrySetupSteps = async (db: RawDb, guestRows: Record<string, unknown>[], to: string): Promise<void> => {
+    const skipped = guestRows.flatMap((row) => (Array.isArray(row.setupStepsSkipped) ? (row.setupStepsSkipped as string[]) : []));
+
+    if (skipped.length === 0) {
+        return;
+    }
+
+    const rows = await db.query("userSettings").take(MERGE_PAGE_SIZE);
+    const existing = rows.find((row) => row.userId === to);
+
+    if (existing) {
+        await db.patch("userSettings", existing._id as string, {
+            setupStepsSkipped: mergeSkippedSteps(existing.setupStepsSkipped as string[] | undefined, skipped),
+        });
+    } else {
+        await db.insert("userSettings", { setupStepsSkipped: mergeSkippedSteps(undefined, skipped), userId: to }, { allowExplicitId: false });
+    }
+};
+
 /** On the NEW user's shard: insert `rows` of `table` under their own ids, re-owned. */
 export const importShardRows = internalMutation
     .input({ from: v.string(), rows: v.array(v.any()), table: v.string(), to: v.string() })
     .output(v.object({ imported: v.number() }))
     .mutation(async ({ args, ctx }) => {
+        const db = rawDb(ctx);
+
+        if (args.table === "userSettings") {
+            await carrySetupSteps(db, args.rows as Record<string, unknown>[], args.to);
+
+            return { imported: 0 };
+        }
+
         if (KEEP_NEW_USERS.has(args.table)) {
             return { imported: 0 };
         }
 
-        const db = rawDb(ctx);
         let imported = 0;
 
         for (const row of args.rows as Record<string, unknown>[]) {
