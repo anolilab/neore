@@ -257,19 +257,21 @@ describe("MCP Apps proxy with an OAuth grant", () => {
         expect(response.status).toBe(404);
     });
 
-    it("refuses a call that names no thread, instead of running it under the automatic defaults", async () => {
+    it("runs a call that names no thread under the most restrictive mode, so one that would ask is refused, not rejected", async () => {
+        // A client built before the thread was sent must keep working: the call is not turned away, and a tool that needs an answer
+        // from a person (supervised asks for it) is refused without reaching the server.
         oauthConfig("fresh");
 
         const response = await callMCPToolFromAppHttpAction(
             context,
             new Request("https://backend.example.com/mcp/tool", {
-                body: JSON.stringify({ arguments: {}, serverName: "Notion", toolName: "search" }),
+                body: JSON.stringify({ arguments: {}, serverName: "Notion", toolName: "create_page" }),
                 method: "POST",
             }),
         );
 
-        expect(response.status).toBe(400);
-        expect(state.connects).toBe(0);
+        expect(response.status).not.toBe(400);
+        expect(JSON.stringify(await response.json())).toContain("needs your approval");
     });
 
     it("refuses a thread the caller cannot reach", async () => {

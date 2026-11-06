@@ -5,6 +5,7 @@ import { internal } from "../../_generated/internal";
 import { getCurrentUserInternal } from "../../auth/lib/helper";
 import { findUserMcpServer } from "../../connectors/lib/user-mcp-servers";
 import { callOnShard } from "../../lib/cross-shard";
+import { toolsLogger } from "../../lib/logger";
 import { checkRateLimit } from "../../lib/rate-limiter";
 import { threadShardFor } from "../../lib/thread-shard";
 import { isSafeUrl } from "../tools/utilities";
@@ -103,7 +104,12 @@ const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: s
         return shardKey === userId
             ? await context.runQuery(internal.chat.tool_permissions.getThreadPermissionModeForApp, args)
             : await callOnShard(internal.chat.tool_permissions.getThreadPermissionModeForApp, args, { shardKey });
-    })().catch(() => null);
+    })().catch((error: unknown) => {
+        // Denied as before, but recorded: a failure here would otherwise read as a refused chat, with nothing left for an operator to find.
+        toolsLogger.warn("[MCP] Thread permission mode lookup failed for an app call; denied:", error, { threadId, userId });
+
+        return null;
+    });
 
     if (!found?.allowed) {
         return "denied";
@@ -335,12 +341,9 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
     }
 
     // The app's call runs under the thread's mode, as the model's calls do: the proxy is no way around a supervised thread. A call
-    // that names no thread has no mode to run under, so it is refused rather than given the automatic defaults.
-    if (!threadId) {
-        return Response.json({ error: "Missing threadId" }, { status: 400 });
-    }
-
-    const threadMode = await threadModeFor(context, user._id, threadId);
+    // that names no thread (a client built before the thread was sent) runs under the most restrictive mode: a read-only tool still
+    // runs, and one that would ask is refused, since no person is there to answer it. Rejecting it would break every such client.
+    const threadMode = threadId ? await threadModeFor(context, user._id, threadId) : "supervised";
 
     if (threadMode === "denied") {
         return Response.json({ error: "This chat is not available to you" }, { status: 403 });
