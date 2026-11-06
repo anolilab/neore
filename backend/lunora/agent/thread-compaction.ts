@@ -41,7 +41,8 @@ import { MAX_LENGTH } from "../lib/validators";
 import { isLocalBrowserModel, loadCustomProviders } from "../chat/lib/local-turn";
 import { getThreadRow, walkPath } from "./branch-rows";
 import { hasLiveDeltaStream } from "./thread-streaming";
-import { MAX_SEARCH_PAGES, pathTokens, rowCharacters } from "./handoff-source";
+import { filterOutOrphanedToolMessages } from "./client/search";
+import { replyWindowRows, rowCharacters } from "./handoff-source";
 import { AUTO_COMPACT_MAX_PASSES, COMPACT_MAX_PASSES, compactionFoldCount, compactThresholdTokens } from "./thread-compaction-logic";
 import {
     claimCut,
@@ -106,14 +107,11 @@ export const estimateContext = async (
     // The reader sends an idle summary above a compaction beside it (`idleSummaryAbove`).
     const older = best?.summary.kind === "compact" ? idleSummaryAbove(onPath, best) : undefined;
     const summaryTokens = estimateTokensFromCharacters((best?.summary.summary.length ?? 0) + (older?.summary.summary.length ?? 0));
-    // Successful rows only, as the reply reads them: a failed or unfinished row is not sent to the model.
-    const textTokens = await pathTokens(ctx, thread._id, tip, {
-        cap: Number.MAX_SAFE_INTEGER,
-        maxRows: SUMMARY_RECENT_ROWS,
-        maxWalkPages: MAX_SEARCH_PAGES,
-        successOnly: true,
-        ...(stopAtId && { stopAtId }),
-    });
+    // The rows as the reply reads them: successful ones only (a failed or unfinished row is not sent), and without a tool
+    // result whose call fell out of the window, which the reply drops as orphaned.
+    const window = await replyWindowRows(ctx, thread._id, tip, SUMMARY_RECENT_ROWS, stopAtId);
+    const sent = filterOutOrphanedToolMessages(window as Parameters<typeof filterOutOrphanedToolMessages>[0]) as Row[];
+    const textTokens = estimateTokensFromCharacters(sent.reduce((total, row) => total + rowCharacters(row), 0));
 
     const { rows } = await walkPath(ctx, thread._id, tip, { limit: USAGE_LOOKBACK_ROWS, ...(stopAtId && { stopAtId }) });
     const compactedAt = best?.summary.kind === "compact" ? best.summary.createdAt : undefined;
@@ -509,7 +507,23 @@ export const compactThreadContext = async (
             return pass > 0 ? { compacted: true } : { compacted: false, reason: reason ?? "nothing" };
         }
 
-        if (!(await foldJob(ctx, args, job))) {
+        let stored: boolean;
+
+        try {
+            stored = await foldJob(ctx, args, job);
+        } catch (error) {
+            // A refusal (the daily limit) before the first call reaches the caller. After earlier passes were stored and
+            // charged, the context did change: that is reported, not hidden behind the refusal.
+            if (pass === 0) {
+                throw error;
+            }
+
+            console.warn("[agent/thread-compaction] A later pass was refused; the passes stored so far stand:", error);
+
+            return { compacted: true, reason: "failed" };
+        }
+
+        if (!stored) {
             return { compacted: pass > 0, reason: "failed" };
         }
     }

@@ -231,14 +231,14 @@ export const pathTokens = async (
  * The rows a reply on the path ending at `from` reads as history, oldest first: the newest `limit` of the
  * successful ones, as the reply loader takes them (`agent/client/search.ts`). A failed or pending row is skipped
  * and does not use up the window; a divider is a successful row like any other. Gives up after
- * {@link MAX_SEARCH_PAGES} pages of rows.
+ * {@link MAX_SEARCH_PAGES} pages of rows. With `stopAtId` the window ends below that row (a compaction's cover).
  */
-export const replyWindowRows = async (context: Reader, threadId: Id<"threads">, from: Row | null, limit: number): Promise<Row[]> => {
+export const replyWindowRows = async (context: Reader, threadId: Id<"threads">, from: Row | null, limit: number, stopAtId?: string): Promise<Row[]> => {
     const window: Row[] = [];
     let cursor = from;
 
-    for (let page = 0; cursor && window.length < limit && page < MAX_SEARCH_PAGES; page += 1) {
-        const { next, rows } = await walkPath(context, threadId, cursor, { limit: PAGE_ROWS });
+    for (let page = 0; cursor && cursor._id !== stopAtId && window.length < limit && page < MAX_SEARCH_PAGES; page += 1) {
+        const { next, rows } = await walkPath(context, threadId, cursor, { limit: PAGE_ROWS, ...(stopAtId && { stopAtId }) });
 
         for (const row of rows) {
             if (row.status === "success" && window.length < limit) {

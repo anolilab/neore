@@ -452,6 +452,37 @@ describe("compacting a thread", () => {
         ).rejects.toThrow("daily limit");
         expect(generateText).not.toHaveBeenCalled();
     });
+
+    it("reports the passes it stored when a later pass is refused, instead of the refusal", async () => {
+        expect.assertions(3);
+
+        // Rows long enough that one summarising call cannot read them all: the fold takes more than one pass.
+        await seedThread(20);
+
+        for (const id of rowIds) {
+            await harness.run(async (ctx: any) => await ctx.db.patch("messages", id, { text: "y".repeat(2000) }));
+        }
+
+        let charges = 0;
+        const outcome = await harness.action(
+            async (ctx: any) =>
+                await compactThreadContext(ctx, {
+                    beforeFirstCall: async () => {
+                        charges += 1;
+
+                        if (charges > 1) {
+                            throw new Error("daily limit");
+                        }
+                    },
+                    threadId: threadId as never,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(outcome).toStrictEqual({ compacted: true, reason: "failed" });
+        expect(generateText).toHaveBeenCalledTimes(1);
+        expect(await stored()).toHaveLength(1);
+    });
 });
 
 describe("auto-compact", () => {
@@ -662,6 +693,40 @@ describe("the reported usage after a compaction", () => {
         await harness.run(async (ctx: any) => await ctx.db.patch("messages", rowIds[0], { status: "failed", text: "x".repeat(400_000) }));
 
         expect(await estimate()).toBeLessThan(1000);
+    });
+
+    it("leaves out a tool result whose call fell out of the window, which the reply drops as orphaned", async () => {
+        expect.assertions(1);
+
+        threadId = await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "regular", title: "Tools", userId: OWNER }));
+        rowIds = [];
+
+        const insert = async (fields: Record<string, unknown>) =>
+            await harness.run(async (ctx: any) => await ctx.db.insert("messages", { status: "success", threadId, tool: false, userId: OWNER, ...fields }));
+
+        // The call is the oldest row and falls out of the 100-row window; its large result is the window's first row.
+        await insert({
+            message: { content: [{ input: {}, toolCallId: "t1", toolName: "fetch", type: "tool-call" }], role: "assistant" },
+            order: 0,
+            stepOrder: 0,
+        });
+        await insert({
+            message: { content: [{ output: { type: "text", value: "x" }, toolCallId: "t1", toolName: "fetch", type: "tool-result" }], role: "tool" },
+            order: 0,
+            stepOrder: 1,
+            text: "x".repeat(400_000),
+            tool: true,
+        });
+
+        for (let index = 0; index < 99; index += 1) {
+            const role = index % 2 === 0 ? "user" : "assistant";
+
+            rowIds.push(
+                await insert({ message: { content: `turn ${index}`, role }, order: 1 + Math.floor(index / 2), stepOrder: index % 2, text: `turn ${index}` }),
+            );
+        }
+
+        expect(await estimate()).toBeLessThan(10_000);
     });
 
     it("counts the images of an unanswered prompt, which have no stored text", async () => {
