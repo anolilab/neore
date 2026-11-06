@@ -868,11 +868,6 @@ const runChatStartOnShard = async (
         // requires a full `ActionCtx` because the Thread it returns can generate
         // text, and an HTTP handler's ctx has no `storage`.
 
-        // A new message into a child that waits on an approval request ends that wait: the request is denied and its run ends.
-        if (!isRegenerate) {
-            await context.runMutation(internal.sub_agents.functions.endApprovalWaitForMessage, { threadId: validThreadId });
-        }
-
         // Save message. `metadata.fileIds` is the attachment channel `saveMessages` reads
         // (see `SaveMessagesArgs.metadata` -> `base?.fileIds`), so it is typed, not `any`.
         const attachmentFileIds = body.fileIds && body.fileIds.length > 0 ? body.fileIds : undefined;
@@ -883,6 +878,12 @@ const runChatStartOnShard = async (
             promptMessageId: body.parentId,
             threadId: validThreadId,
         });
+
+        // A new message into a child that waits on an approval request ends that wait, once the message is saved: a failed save
+        // must not end the run first.
+        if (!isRegenerate) {
+            await context.runMutation(internal.sub_agents.functions.endApprovalWaitForMessage, { threadId: validThreadId });
+        }
 
         threadId = validThreadId;
         messageId = result.messageId;

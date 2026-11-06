@@ -865,11 +865,6 @@ export const dispatchWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): 
         await startQueuedRun(ctx, admitted.run);
     }
 
-    // A message into a worker that waits on an approval request ends that wait, so the message is not held behind an answer nobody gives.
-    if (admitted.created && !admitted.idle && args.childThreadId !== undefined) {
-        await endApprovalWaits(ctx, args.childThreadId);
-    }
-
     // A host run starts (or fails) inside the start itself, so the receipt reads the row, not the snapshot admission took.
     const started = admitted.run.runner?.kind === "host" ? await ctx.db.get("subAgentRuns", admitted.run._id) : null;
     const state = started?.status ?? admitted.run.status;
@@ -1407,9 +1402,9 @@ const pendingApprovalRows = async (ctx: Pick<QueryCtx, "db">, childThreadId: str
         .take(APPROVAL_ROWS_SCANNED);
 
 /**
- * Ends the runs of `childThreadId` that wait on an approval request: the owner sent a new message into the child, and nothing
- * will answer the request now. Each run ends as cancelled, so its requests are denied and its parent is told it ended. A
- * worker's loop returned when it paused on the request, so it is marked gone first and the line moves on to the message behind it.
+ * Ends the one-shot runs of `childThreadId` that wait on an approval request: the owner sent a new message into the child, and
+ * nothing will answer the request now. Each run ends as cancelled, so its requests are denied and its parent is told it ended.
+ * Workers never pause on a request (their tools are refused headlessly), so a worker's run is never ended here.
  */
 const endApprovalWaits = async (ctx: MutationCtx, childThreadId: string): Promise<number> => {
     const runIds = new Set<string>();
@@ -1426,22 +1421,12 @@ const endApprovalWaits = async (ctx: MutationCtx, childThreadId: string): Promis
     for (const runId of runIds) {
         const run = await ctx.db.get("subAgentRuns", runId as Id<"subAgentRuns">);
 
-        if (!run || run.childThreadId !== childThreadId || (run.status !== "running" && run.status !== "awaiting")) {
+        if (!run || run.mode === "worker" || run.childThreadId !== childThreadId || (run.status !== "running" && run.status !== "awaiting")) {
             continue;
-        }
-
-        if (run.mode === "worker") {
-            const now = Date.now();
-
-            await patchById(ctx.db, "subAgentRuns", run._id, { loopExitedAt: now, updatedAt: now });
         }
 
         if (await finishRun(ctx, run._id, { kind: "cancelled" })) {
             ended += 1;
-        }
-
-        if (run.mode === "worker") {
-            await startNextWorkerRun(ctx, childThreadId);
         }
     }
 
@@ -1517,6 +1502,9 @@ export const resumeAwaitingRun = internalMutation
     });
 
 /** The text parts of a saved assistant row: what the child answered with. */
+/** The newest rows of a child thread searched for its answer when the last saved row carries none. */
+const ANSWER_WINDOW_ROWS = 20;
+
 const assistantText = (row: Doc<"messages"> | null): string => {
     const message = row?.message as { content?: unknown; role?: string } | undefined;
 
@@ -1554,7 +1542,19 @@ export const completeResumedRun = internalMutation
 
         const run = await ctx.db.get("subAgentRuns", args.runId);
         const row = run && args.lastMessageId !== undefined ? await ctx.db.get("messages", args.lastMessageId as Id<"messages">) : null;
-        const text = row && row.threadId === run?.childThreadId ? assistantText(row) : "";
+        let text = row && row.threadId === run?.childThreadId ? assistantText(row) : "";
+
+        // The last saved row can be a tool result (the step cap ended right after a tool ran): the answer is then the newest
+        // assistant text among the child's recent rows, read within a fixed window.
+        if (text === "" && run?.childThreadId !== undefined) {
+            const recent = await ctx.db
+                .query("messages")
+                .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", run.childThreadId as Id<"threads">))
+                .order("desc")
+                .take(ANSWER_WINDOW_ROWS);
+
+            text = recent.map((candidate) => assistantText(candidate)).find((candidate) => candidate !== "") ?? "";
+        }
 
         return await finishRunFromLoop(ctx, args.runId, { kind: "succeeded", result: text });
     });
@@ -1624,7 +1624,8 @@ export const listSubAgentApprovals = authQuery
             const pending = await pendingApprovalRows(ctx, child._id);
 
             for (const row of pending) {
-                if (row.userId !== userId) {
+                // Only this run's requests: a request of the child's own interactive chat is not the sub-agent's to show.
+                if (row.userId !== userId || row.config.subAgentRunId !== run._id) {
                     continue;
                 }
 

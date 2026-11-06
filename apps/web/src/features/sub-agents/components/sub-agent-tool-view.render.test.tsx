@@ -106,6 +106,10 @@ vi.mock("@/lib/toast", () => {
     return { showError: vi.fn() };
 });
 
+vi.mock("@neore/client-runtime", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("@neore/client-runtime")>()), useUnlockProof: () => "proof-1" };
+});
+
 const part = { input: { task: "Tidy up" }, state: "output-available", toolCallId: "call-1", type: "tool-delegateToSubAgent" } as unknown as ToolPart;
 
 const RUN = { _id: "run-1", childThreadId: "child-1", completedAt: null, createdAt: 0, depth: 1, error: null, result: null, task: "Tidy up" };
@@ -140,7 +144,8 @@ describe("sub-agent card", () => {
 
         render(<SubAgentToolView part={part} />);
 
-        expect(state.listArgs).toStrictEqual([{ parentThreadId: "parent-1" }]);
+        // The parent may be locked: the list is asked with the owner's unlock proof for it.
+        expect(state.listArgs).toStrictEqual([{ parentThreadId: "parent-1", unlockProof: "proof-1" }]);
         expect(screen.getByText(WANTS_TO_RUN)).toBeTruthy();
         // Another child's request belongs on that child's card.
         expect(screen.queryByText(OTHER_TOOL)).toBeNull();

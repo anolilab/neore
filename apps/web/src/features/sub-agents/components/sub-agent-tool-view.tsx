@@ -17,6 +17,7 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import type { ToolPart } from "@neore/chat-ui/types";
+import { useUnlockProof } from "@neore/client-runtime";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
@@ -41,7 +42,9 @@ const TASK_PREVIEW_MAX = 200;
 const SubAgentApprovals: FC<{ parentThreadId: string; runId: string }> = ({ parentThreadId, runId }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
-    const { data } = useQuery(crpc.sub_agents.functions.listSubAgentApprovals.queryOptions({ parentThreadId: parentThreadId as Id<"threads"> }));
+    // A locked parent answers the list only with its unlock proof, as every read of the chat does.
+    const unlockProof = useUnlockProof(parentThreadId);
+    const { data } = useQuery(crpc.sub_agents.functions.listSubAgentApprovals.queryOptions({ parentThreadId: parentThreadId as Id<"threads">, unlockProof }));
     const requests = (data ?? []).filter((request) => request.runId === runId);
 
     return requests.map((request) => {

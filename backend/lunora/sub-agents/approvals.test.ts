@@ -223,31 +223,11 @@ describe("a new message into a child that waits on a request", () => {
         expect(rows[0]?.status).toBe("denied");
     });
 
-    it("ends a worker's waiting run and starts the message queued behind it", async () => {
-        const queuedId = await run(
-            async (context) =>
-                await context.db.insert("subAgentRuns", {
-                    childThreadId: childId,
-                    createdAt: Date.now() + 1,
-                    depth: 1,
-                    mode: "worker",
-                    parentThreadId: parentId,
-                    status: "queued",
-                    task: "Tidy up again",
-                    updatedAt: Date.now(),
-                    userId: OWNER,
-                }),
-        );
-
+    it("never ends a worker's run: a worker does not pause on a request", async () => {
         await run(async (context) => await context.db.patch("subAgentRuns", runId, { mode: "worker" }));
 
-        expect(await internalCall(endApprovalWaitForMessage, { threadId: childId })).toBe(1);
-        expect(await runStatus()).toBe("cancelled");
-
-        // The queued message's run is handed to a job: its status moves on when the job claims it.
-        const started = jobsQueueMessages.filter((message) => JSON.stringify(message.body).includes(queuedId));
-
-        expect(started).toHaveLength(1);
+        expect(await internalCall(endApprovalWaitForMessage, { threadId: childId })).toBe(0);
+        expect(await runStatus()).toBe("running");
     });
 
     it("leaves a child alone when no request of it is open", async () => {
@@ -376,6 +356,38 @@ describe("the continuation's end", () => {
 
         expect(posts).toHaveLength(1);
         expect(JSON.stringify(posts[0].message)).toContain("Removed /tmp/old.txt.");
+    });
+
+    it("answers with the newest assistant text when the continuation's last saved row is a tool result", async () => {
+        await internalCall(resumeAwaitingRun, { runId });
+
+        await run(
+            async (context) =>
+                await context.db.insert("messages", {
+                    message: { content: [{ text: "Removed /tmp/old.txt.", type: "text" }], role: "assistant" },
+                    order: 2,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId: childId,
+                    tool: false,
+                    userId: OWNER,
+                }),
+        );
+        const toolRowId = await run(
+            async (context) =>
+                await context.db.insert("messages", {
+                    message: { content: [{ output: { type: "text", value: "ok" }, toolCallId: "call-1", toolName: TOOL, type: "tool-result" }], role: "tool" },
+                    order: 3,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId: childId,
+                    tool: true,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(await internalCall(completeResumedRun, { lastMessageId: toolRowId, outcome: { kind: "succeeded" }, runId })).toBe(true);
+        expect(await runRow()).toMatchObject({ result: "Removed /tmp/old.txt.", status: "succeeded" });
     });
 
     it("waits again when the continuation stopped on another request", async () => {
