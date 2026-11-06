@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, rm, stat } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -427,6 +427,84 @@ describe("neore login --device", () => {
 
         expect(await run(["login", "--device", "--api-url", BASE, "--confirm-host", "api.test"], context)).not.toBe(EXIT.ok);
         expect(requested.at(-1)).toBe("https://api.test/api/auth/device/revoke");
+    });
+
+    it("leaves the previous config readable and unchanged when the save fails, and revokes the new key", async () => {
+        const requested: string[] = [];
+        const context = contextFor([
+            () => Response.json(CODE_RESPONSE),
+            () => Response.json({ api_key: "nk_new", expires_at: null }),
+            () => Response.json({ apiKeyId: "k2", scopes: [], userId: "u1" }),
+            () => Response.json({ revoked: true }),
+        ]);
+        const inner = context.fetch;
+
+        context.fetch = (async (url: string, init?: RequestInit) => {
+            requested.push(url);
+
+            return await inner(url, init);
+        }) as unknown as typeof fetch;
+
+        const folder = join(directory, "kept");
+
+        await mkdir(folder);
+        context.configFile = join(folder, "config.json");
+        await writeConfig({ apiKey: "nk_old", apiUrl: BASE }, context.configFile);
+        // Nothing can be created beside the config, so the temporary file cannot be written.
+        await chmod(folder, 0o500);
+
+        expect(await run(["login", "--device", "--api-url", BASE, "--confirm-host", "api.test"], context)).not.toBe(EXIT.ok);
+        await chmod(folder, 0o700);
+        expect(await readConfig(context.configFile)).toEqual({ apiKey: "nk_old", apiUrl: BASE });
+        expect(await readdir(folder)).toEqual(["config.json"]);
+        expect(requested.at(-1)).toBe("https://api.test/api/auth/device/revoke");
+    });
+
+    it("sends no second request, and none carrying the code or the key, when a reply redirects to another origin", async () => {
+        const calls: { init?: RequestInit; url: string }[] = [];
+        const context = contextFor([]);
+
+        // Behaves as fetch does: with redirect "error" a 307 throws; otherwise it is followed with the same body.
+        context.fetch = (async (url: string, init?: RequestInit) => {
+            calls.push({ init, url });
+
+            if (calls.length === 1) {
+                if (init?.redirect === "error") {
+                    throw new TypeError("redirect mode is set to error");
+                }
+
+                calls.push({ init, url: "https://evil.test/collect" });
+            }
+
+            return Response.json(CODE_RESPONSE);
+        }) as unknown as typeof fetch;
+
+        expect(await run(["login", "--device", "--api-url", BASE, "--confirm-host", "api.test"], context)).not.toBe(EXIT.ok);
+        expect(calls).toHaveLength(1);
+        expect(calls.every((call) => call.init?.redirect === "error")).toBe(true);
+    });
+
+    it("sets redirect to error on the code, poll and revoke requests alike", async () => {
+        const seen: (RequestInit["redirect"] | undefined)[] = [];
+        const context = contextFor([
+            () => Response.json(CODE_RESPONSE),
+            () => Response.json({ api_key: "nk_new", expires_at: null }),
+            () => Response.json({ error: { code: "unauthorized", message: "no" } }, { status: 401 }),
+            () => Response.json({ revoked: true }),
+        ]);
+        const inner = context.fetch;
+
+        context.fetch = (async (url: string, init?: RequestInit) => {
+            if (url.includes("/api/auth/")) {
+                seen.push(init?.redirect);
+            }
+
+            return await inner(url, init);
+        }) as unknown as typeof fetch;
+
+        await run(["login", "--device", "--api-url", BASE, "--confirm-host", "api.test"], context);
+
+        expect(seen).toEqual(["error", "error", "error"]);
     });
 
     it("tells the person to revoke the key in Settings when it cannot be revoked from here", async () => {

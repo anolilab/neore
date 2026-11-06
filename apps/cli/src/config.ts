@@ -2,13 +2,14 @@
  * Where `neore login` keeps the API key.
  *
  * One JSON file in the OS config directory. The key is a bearer credential, so
- * the directory is created 0700 and the file written 0600 — and re-chmodded on
- * every write, because `writeFile`'s `mode` only applies when the file is
- * CREATED: a pre-existing 0644 file would otherwise stay world-readable.
+ * the directory is created 0700 and every write goes to a new 0600 file that is
+ * renamed over the old one, so a pre-existing 0644 file ends up 0600 too and a
+ * failed write never truncates the saved key.
  *
  * `NEORE_API_KEY` / `NEORE_API_URL` override the file, for CI.
  */
-import { chmod, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { mkdir, open, readFile, rename, rm, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, posix, win32 } from "node:path";
 
@@ -67,14 +68,38 @@ export const readConfig = async (path: string = configPath()): Promise<CliConfig
     }
 };
 
+/**
+ * Written to a temporary file in the same folder (created owner-only, so the key is never readable by others,
+ * not even briefly), flushed, then renamed over the config. A failure before the rename leaves the previous file
+ * exactly as it was; once the rename has happened nothing else here can fail, so a throw means "not saved".
+ */
 export const writeConfig = async (config: CliConfig, path: string = configPath()): Promise<void> => {
     const directory = join(path, "..");
+    const temporary = `${path}.${randomBytes(6).toString("hex")}.tmp`;
 
     await mkdir(directory, { mode: CONFIG_DIR_MODE, recursive: true });
-    await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, { encoding: "utf8", mode: CONFIG_FILE_MODE });
 
-    if (process.platform !== "win32") {
-        await chmod(path, CONFIG_FILE_MODE);
+    try {
+        const handle = await open(temporary, "wx", CONFIG_FILE_MODE);
+
+        try {
+            await handle.writeFile(`${JSON.stringify(config, null, 2)}\n`, "utf8");
+
+            if (process.platform !== "win32") {
+                // The mode of `open` is filtered by the umask; this makes it exact.
+                await handle.chmod(CONFIG_FILE_MODE);
+            }
+
+            await handle.sync();
+        } finally {
+            await handle.close();
+        }
+
+        await rename(temporary, path);
+    } catch (error) {
+        await rm(temporary, { force: true });
+
+        throw error;
     }
 };
 

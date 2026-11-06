@@ -22,7 +22,7 @@ export const DeviceCodeField = ({ isInvalid = false, onChange, value }: { isInva
             </p>
             <Label htmlFor="device-code">{t`Code`}</Label>
             <Input
-                aria-describedby="device-code-hint"
+                aria-describedby={isInvalid ? "device-code-hint device-code-error" : "device-code-hint"}
                 aria-invalid={isInvalid}
                 autoCapitalize="characters"
                 autoComplete="off"
@@ -100,7 +100,7 @@ export const DeviceCodeForm = ({ onCode }: { onCode: (code: string) => void }) =
                 value={typed}
             />
             {hasError && (
-                <p className="text-center text-sm text-red-600" role="alert">
+                <p className="text-center text-sm text-red-600" id="device-code-error" role="alert">
                     {t`The code must contain the letters and digits shown in your terminal.`}
                 </p>
             )}

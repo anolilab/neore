@@ -114,6 +114,8 @@ const post = async (dependencies: DeviceFlowDependencies, baseUrl: string, path:
             body: JSON.stringify(body),
             headers: { Accept: "application/json", "Content-Type": "application/json" },
             method: "POST",
+            // A redirect would resend the device code or the new key (the body) to wherever it points.
+            redirect: "error",
             signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         });
     } catch (error) {

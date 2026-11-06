@@ -69,4 +69,24 @@ describe("DeviceCodeForm", () => {
         fireEvent.click(screen.getByRole("button", { name: "Continue" }));
         expect(onCode).toHaveBeenCalledWith("ABCDEFGH");
     });
+
+    it("ties the error to the field: the description names it while it shows and drops it when it clears", () => {
+        render(<DeviceCodeForm onCode={vi.fn()} />);
+
+        const field = screen.getByLabelText("Code");
+
+        fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+        const alert = screen.getByRole("alert");
+        const described = (field.getAttribute("aria-describedby") ?? "").split(" ");
+
+        expect(described).toContain(alert.id);
+        expect(described).toContain(screen.getByText(HINT).id);
+        expect(field.getAttribute("aria-invalid")).toBe("true");
+
+        fireEvent.change(field, { target: { value: "a" } });
+
+        expect(field.getAttribute("aria-describedby")).toBe(screen.getByText(HINT).id);
+        expect(field.getAttribute("aria-invalid")).toBe("false");
+    });
 });
