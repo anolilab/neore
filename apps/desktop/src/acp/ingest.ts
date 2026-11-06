@@ -537,6 +537,22 @@ export class HostPoster implements SessionObserver {
         }
 
         this.sessions.get(sessionId)?.announceClose();
+        this.forgetStateOf(sessionId);
+    }
+
+    /**
+     * Forgets a session's post bookkeeping once the session has ended and nothing of it is pending or in flight. Without this,
+     * the per-session maps keep every session that ever posted a report for the life of the process.
+     */
+    private forgetStateOf(sessionId: string): void {
+        if (this.pendingState.has(sessionId) || this.stateInFlight.has(sessionId) || this.sessions.get(sessionId)?.isClosed !== true) {
+            return;
+        }
+
+        this.stateSentAt.delete(sessionId);
+        this.stateAttempts.delete(sessionId);
+        this.stateRetryAt.delete(sessionId);
+        this.heldOptions.delete(sessionId);
     }
 
     private bindThread(sessionId: string, threadId: string): void {
@@ -700,6 +716,8 @@ export class HostPoster implements SessionObserver {
             if (this.pendingState.has(sessionId) && !this.stateRetryAt.has(sessionId)) {
                 this.scheduleState(STATE_DEBOUNCE_MS);
             }
+
+            this.forgetStateOf(sessionId);
         }
     }
 

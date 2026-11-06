@@ -1575,6 +1575,24 @@ describe("what the agent reports about itself", () => {
         expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ configOptions: [option], usage: usage(12) });
     });
 
+    it("forgets the bookkeeping of a session that ended once its last report is posted", async () => {
+        const host = poster();
+
+        await open(host);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        host.sessionEnded("s1");
+        await settle(2000);
+
+        // The per-session maps are private: read them to see that nothing is left for the ended session.
+        const bookkeeping = host as unknown as Record<"heldOptions" | "stateAttempts" | "stateRetryAt" | "stateSentAt", Map<string, unknown>>;
+
+        expect(bookkeeping.stateSentAt.has("s1")).toBe(false);
+        expect(bookkeeping.stateAttempts.has("s1")).toBe(false);
+        expect(bookkeeping.stateRetryAt.has("s1")).toBe(false);
+        expect(bookkeeping.heldOptions.has("s1")).toBe(false);
+    });
+
     it("retries a failed report with what was observed, under a fresh issuedAt, when nothing newer is reported", async () => {
         const host = poster();
 

@@ -51,6 +51,11 @@ export class SessionLink {
         clearTimeout(this.closeTimer);
     }
 
+    /** Whether the local session has ended (`close`). */
+    public get isClosed(): boolean {
+        return this.closed;
+    }
+
     /** The local session ended: a `session_open` still being retried must not create a backend session for it. */
     public close(): void {
         this.closed = true;
