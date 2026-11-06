@@ -102,10 +102,10 @@ describe("buildCloudGuidePrompt", () => {
 
 describe("paths with hidden characters", () => {
     it("shows a changed file's hidden character as an escape, so the cleaner keeps the path the agent must name", () => {
-        const prompt = buildHostGuidePrompt(input({ files: [file("src/a‌b.ts")] }));
+        const prompt = buildHostGuidePrompt(input({ files: [file("src/a\u{200C}b.ts")] }));
 
         expect(prompt).toContain(String.raw`"path": "src/a\\u200Cb.ts"`);
-        expect(prompt).not.toContain("‌");
+        expect(prompt).not.toContain("\u{200C}");
     });
 
     it("writes a branch name with a hidden character as an escape, so the agent compares against the same ref", () => {
@@ -132,7 +132,7 @@ describe("paths with hidden characters", () => {
     });
 
     it.each([
-        ["a combining grapheme joiner", "͏"],
+        ["a combining grapheme joiner", "\u{34F}"],
         ["a supplementary variation selector", "\u{E0100}"],
     ])("leaves the prompt unchanged by the cleaner when a path has %s after a letter", (_name, char) => {
         const prompt = buildHostGuidePrompt(input({ files: [file(`src/a${char}b.ts`)] }));

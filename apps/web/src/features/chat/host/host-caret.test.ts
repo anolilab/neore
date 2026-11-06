@@ -10,7 +10,7 @@ describe("caretAfterRemoval", () => {
     });
 
     it("moves a caret back by each removed unit before it", () => {
-        // "ab‮cd": the bidi override sits at 2; a caret after it (3) moves back to 2.
+        // "ab\u{202E}cd": the bidi override sits at 2; a caret after it (3) moves back to 2.
         expect(caretAfterRemoval(3, [{ index: 2, length: 1 }])).toBe(2);
         // A caret at the end of a value with two removals before it.
         expect(

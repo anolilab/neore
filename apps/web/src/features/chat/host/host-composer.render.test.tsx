@@ -169,7 +169,7 @@ describe("the coding-agent composer", () => {
 
         const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
         // 29,998 characters, an emoji (two units) and a trailing joiner: 30,001 units while typed, 30,000 once the joiner goes.
-        const draft = `${"a".repeat(29_998)}\u{1F600}‍`;
+        const draft = `${"a".repeat(29_998)}\u{1F600}\u{200D}`;
 
         fireEvent.change(box, { target: { value: draft } });
 

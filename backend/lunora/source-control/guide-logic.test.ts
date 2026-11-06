@@ -81,7 +81,7 @@ describe("assembleGuide", () => {
     });
 
     it("names a file whose path has a hidden character by its escaped form, and keeps it apart from a name without the character", () => {
-        const hidden = "src/a‌b.ts";
+        const hidden = "src/a\u{200C}b.ts";
         const plain = "src/ab.ts";
         const guide = assembleGuide(
             [file(hidden), file(plain)],
