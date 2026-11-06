@@ -7,7 +7,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { HostToolRow } from "./host-activity";
-import { HostToolCalls } from "./host-activity";
+import { HostPlan, HostToolCalls } from "./host-activity";
 
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -36,6 +36,17 @@ beforeEach(() => {
     Object.defineProperties(HTMLElement.prototype, {
         clientHeight: { configurable: true, get: () => geometry.clientHeight },
         scrollHeight: { configurable: true, get: () => geometry.scrollHeight },
+    });
+});
+
+describe("a coding agent's plan", () => {
+    it("puts each task's status at the logical end of its row, so it sits on the far side in right-to-left text", () => {
+        render(<HostPlan entries={[{ content: "Read the code", priority: "high", status: "completed" }]} />);
+
+        const status = screen.getByText("Done");
+
+        expect(status.className).toContain("ms-auto");
+        expect(status.className).not.toContain("ml-auto");
     });
 });
 

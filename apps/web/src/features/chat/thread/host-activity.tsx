@@ -101,7 +101,7 @@ export const HostPlan: FC<{ entries: HostPlanEntry[] }> = memo(({ entries }) => 
                         <span className={entry.status === "completed" ? "text-muted-foreground line-through" : "text-gray-800 dark:text-gray-200"}>
                             {entry.content}
                         </span>
-                        <span className="text-muted-foreground ml-auto shrink-0 text-xs">{statusText(entry.status)}</span>
+                        <span className="text-muted-foreground ms-auto shrink-0 text-xs">{statusText(entry.status)}</span>
                     </li>
                 ))}
             </ul>
