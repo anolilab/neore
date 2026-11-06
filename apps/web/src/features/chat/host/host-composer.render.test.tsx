@@ -111,13 +111,34 @@ const mount = (data: Record<string, unknown>) => {
     );
 };
 
-// The text is on screen for the person: it is in the document, and no ancestor hides it with `hidden` or `aria-hidden`. jsdom does not
-// apply the stylesheet, so a class that hides it is not seen here.
+// The text is on screen for the person: it is in the document, no ancestor hides it with `hidden` or `aria-hidden`, and neither the text
+// nor an ancestor is hidden by a style (`display: none`, `visibility: hidden` or zero opacity) jsdom computes. A class from a stylesheet
+// the tests do not load is not seen here.
+/** Whether jsdom computes the element to be hidden: `display: none`, `visibility: hidden` or an opacity of zero. */
+const isHiddenByStyle = (element: HTMLElement): boolean => {
+    const style = globalThis.getComputedStyle(element);
+
+    return style.display === "none" || style.visibility === "hidden" || (style.opacity !== "" && Number(style.opacity) === 0);
+};
+
+/** The element and its ancestors, nearest first: the chain a hidden ancestor is found on. */
+const chainOf = (element: HTMLElement): HTMLElement[] => {
+    const chain: HTMLElement[] = [];
+
+    // eslint-disable-next-line testing-library/no-node-access -- walks the ancestor chain for the computed style, which no query does
+    for (let node: HTMLElement | null = element; node !== null; node = node.parentElement) {
+        chain.push(node);
+    }
+
+    return chain;
+};
+
 const expectShown = (element: HTMLElement) => {
     expect(element.isConnected).toBe(true);
     // The ancestor check needs the node itself: no query finds a hidden ancestor.
     // eslint-disable-next-line testing-library/no-node-access -- checks the hiding attributes of the ancestors, which no query does
     expect(element.closest("[hidden], [aria-hidden='true']")).toBeNull();
+    expect(chainOf(element).find((node) => isHiddenByStyle(node))).toBeUndefined();
 };
 
 const session = (fields: Record<string, unknown> = {}) => {
@@ -319,6 +340,41 @@ describe("what the agent reports about itself", () => {
             expect(await screen.findByText("Cost reported by the agent: 0.5 not money!")).toBeTruthy();
         } finally {
             vi.unstubAllGlobals();
+        }
+    });
+});
+
+describe("what counts as shown on screen", () => {
+    it.each([
+        ["an ancestor with display none", { display: "none" }],
+        ["an ancestor with visibility hidden", { visibility: "hidden" }],
+        ["an ancestor with zero opacity", { opacity: "0" }],
+    ])("does not count a message inside %s as shown", (_name, style) => {
+        const hidden = document.createElement("div");
+        const message = document.createElement("span");
+
+        Object.assign(hidden.style, style);
+        message.textContent = "The agent confirmed: Model is now Deep.";
+        hidden.appendChild(message);
+        document.body.appendChild(hidden);
+
+        try {
+            expect(() => expectShown(message)).toThrow();
+        } finally {
+            hidden.remove();
+        }
+    });
+
+    it("counts a message shown in the document as shown", () => {
+        const message = document.createElement("span");
+
+        message.textContent = "Shown";
+        document.body.appendChild(message);
+
+        try {
+            expect(() => expectShown(message)).not.toThrow();
+        } finally {
+            message.remove();
         }
     });
 });
