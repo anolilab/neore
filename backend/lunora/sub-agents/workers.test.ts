@@ -159,7 +159,7 @@ describe("dispatching to a worker", () => {
     });
 
     it("keeps the worker's organization on a follow-up that names none, so the follow-up is capped as the first run was", async () => {
-        const first = await dispatch({ organizationId: "org-x", toolCallId: "call-org-1" });
+        const first = await create({ organizationId: "org-x", toolCallId: "call-org-1" });
         const second = await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-org-2" });
 
         expect(second).toMatchObject({ run: { organizationId: "org-x" } });
