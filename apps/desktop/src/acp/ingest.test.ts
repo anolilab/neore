@@ -736,6 +736,29 @@ describe("a turn", () => {
         expect(printed && "output" in printed ? printed.output.endsWith("END") : false).toBe(true);
     });
 
+    it("keeps two calls whose ids share their first 128 characters as two calls, each with its own output", async () => {
+        const host = poster();
+        const shared = "c".repeat(128);
+        const first = { exit: { code: 0 }, id: `${shared}-a`, kind: "execute", output: "one", status: "completed", title: "A" };
+        const second = { exit: { code: 0 }, id: `${shared}-b`, kind: "execute", output: "two", status: "completed", title: "B" };
+
+        await open(host);
+        host.turnStarted("s1", "t1", "go");
+        host.tool("s1", "t1", first);
+        host.tool("s1", "t1", second);
+        await settle(POST_INTERVAL_MS);
+
+        const tools = (backend.chunks.get("t1") ?? []).filter((event) => event.kind === "tool");
+        const ids = tools.map((event) => (event as { id: string }).id);
+
+        expect(new Set(ids).size).toBe(2);
+        expect(ids.every((id) => Buffer.byteLength(id) <= 128)).toBe(true);
+        const outputs = (backend.chunks.get("t1") ?? []).filter((event) => event.kind === "tool_output").map((event) => (event as { output: string }).output);
+
+        expect(outputs).toHaveLength(2);
+        expect(outputs).toEqual(expect.arrayContaining(["one", "two"]));
+    });
+
     it("never posts twice inside the interval", async () => {
         const host = poster();
 

@@ -24,6 +24,7 @@
  * - **A turn cut off by a restart** is recorded on disk while it runs. On the next start each such turn is ended
  * with the reason `interrupted`, at the `seq` the backend says is next.
  */
+import { createHash } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -124,6 +125,18 @@ export interface RunningTurn {
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * A call id the backend accepts (at most 128 bytes). A longer id is cut and followed by a hash of the whole, so two ids that share a
+ * prefix stay two calls. The cut is at 24 characters, so the result stays under the byte limit for any characters.
+ */
+const boundedCallId = (id: string): string => {
+    if (Buffer.byteLength(id) <= 128) {
+        return id;
+    }
+
+    return `${id.slice(0, 24)}#${createHash("sha256").update(id).digest("hex").slice(0, 32)}`;
+};
 
 export class HostPoster implements SessionObserver {
     private readonly channelHost: ChannelHost;
@@ -343,7 +356,7 @@ export class HostPoster implements SessionObserver {
             return;
         }
 
-        const id = tool.id.slice(0, 128);
+        const id = boundedCallId(tool.id);
 
         channel.enqueue({ id, kind: "tool", status: tool.status, title: tool.title.slice(0, 500), toolKind: tool.kind.slice(0, 64) });
 
