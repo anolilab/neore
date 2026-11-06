@@ -8,12 +8,12 @@
 import { v } from "lunorash/server";
 
 import { parseCustomModelId } from "@neore/ai/models";
-import { stripHiddenText } from "@neore/ai/utils";
 
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { SANDBOX_TOOLS } from "../chat/lib/tool-builder";
 import { AgentRunError } from "../chat/lib/agent-run";
+import { agentPromptText } from "../chat/lib/agent-prompt";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { MAX_LENGTH } from "../lib/validators";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
@@ -31,15 +31,13 @@ const ADMISSION_RETRY_DELAYS_MS = [100, 400];
 const MAX_LOGGED_PROMPT_LENGTH = 2000;
 
 /**
- * The text a run logs: what the agent is given. It has the same hidden-character strip as the headless run, with the same
- * refusal (hidden characters removed and nothing left), so a refused prompt never reaches the agent and logs nothing.
- * Ordinary whitespace is a prompt the agent accepts, so it is logged.
+ * The text a run logs: what the agent is given (`agentPromptText`), capped. A refused prompt never reaches the agent, so it
+ * logs nothing. Ordinary whitespace is a prompt the agent accepts, so it is logged.
  */
 export const promptForLog = (input: string): string | undefined => {
-    const agentInput = stripHiddenText(input);
-    const refused = agentInput.removed > 0 && agentInput.text.trim() === "";
+    const agentInput = agentPromptText(input);
 
-    return refused ? undefined : cutOnCodePoint(agentInput.text, MAX_LOGGED_PROMPT_LENGTH);
+    return agentInput === undefined ? undefined : cutOnCodePoint(agentInput, MAX_LOGGED_PROMPT_LENGTH);
 };
 
 /** A high surrogate at the end of a string: the first half of a pair that a cut would split. */

@@ -20,6 +20,7 @@
  */
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { stripHiddenText } from "@neore/ai/utils";
+import { agentPromptText } from "./agent-prompt";
 import { stepCountIs } from "ai";
 import { LunoraError } from "lunorash/server";
 
@@ -169,15 +170,15 @@ const headlessSkillTools = (
  * here, so this is the one place that keeps hidden characters (tag block, bidi controls) out of what the agent is told.
  */
 const withoutHiddenText = (options: HeadlessRunOptions): HeadlessRunOptions => {
-    const prompt = options.prompt === undefined ? undefined : stripHiddenText(options.prompt);
+    const prompt = options.prompt === undefined ? undefined : agentPromptText(options.prompt);
 
-    if (prompt && prompt.removed > 0 && prompt.text.trim() === "") {
+    if (options.prompt !== undefined && prompt === undefined) {
         throw new LunoraError("BAD_REQUEST", "The prompt is empty after removing hidden characters");
     }
 
     return {
         ...options,
-        ...(prompt && { prompt: prompt.text }),
+        ...(prompt !== undefined && { prompt }),
         ...(options.system !== undefined && { system: stripHiddenText(options.system).text }),
     };
 };

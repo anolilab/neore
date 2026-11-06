@@ -39,10 +39,10 @@ export const eraseTriggersForUser = async (ctx: MutationCtx, userId: string): Pr
 };
 
 /**
- * Triggers per export page. The export walks every page, one workflow step each, so a page's runs (up to
- * `EXPORT_RUNS_PER_TRIGGER` prompts of 2,000 characters each) stay inside one step's state limit however many triggers there are.
+ * Triggers per export page: one. A query reads each run row whole, and a run can hold a webhook body of up to 1 MiB, so one
+ * trigger's `EXPORT_RUNS_PER_TRIGGER` newest runs stay inside a transaction's read limit. Each page is one workflow step.
  */
-const EXPORT_TRIGGER_PAGE = 5;
+const EXPORT_TRIGGER_PAGE = 1;
 /** Runs per trigger in the export, the newest; older runs are history (the same bound as the evals export). */
 const EXPORT_RUNS_PER_TRIGGER = 20;
 
