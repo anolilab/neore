@@ -285,6 +285,18 @@ describe("usePromptLinkDraft", () => {
         expect(harness.showWarning).not.toHaveBeenCalled();
     });
 
+    it("a prompt-only link keeps the chat's custom endpoint model, which the picker lists as no entry", () => {
+        const custom = "custom:ollama/llama3.1:8b";
+
+        useModelStore.setState({ selectedModel: custom as ModelId });
+
+        renderLink({ prompt: "hi" });
+
+        expect(selectedModel()).toBe(custom);
+        expect(useChatUIStore.getState().composerText).toBe("hi");
+        expect(harness.showWarning).not.toHaveBeenCalled();
+    });
+
     it("a link with no model opens a text chat after an image chat, on a text model, never on the image model left selected", () => {
         useModelStore.setState({ newThreadMode: "image", selectedModel: (imageModel?.id ?? "") as ModelId });
 

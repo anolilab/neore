@@ -124,8 +124,11 @@ export const usePromptLinkDraft = ({
                 // visitor's, whatever is stored.
                 const selected = linkableModels.get(state.selectedModel);
                 const selectedIsText = selected !== undefined && (selected.mode ?? "text") === "text" && selected.provider !== "external";
+                // A custom endpoint's model is a text model the picker does not list here: the chat keeps it (its id is `custom:…`, as in
+                // `custom-model-id.ts`, which is not imported here so the registry stays out of this module).
+                const selectedIsCustom = state.selectedModel.startsWith("custom:");
 
-                if (!isAnonymous && !selectedIsText) {
+                if (!isAnonymous && !selectedIsText && !selectedIsCustom) {
                     state.setSelectedModel(DEFAULT_CHAT_MODEL as ModelId, undefined);
                 }
             }
