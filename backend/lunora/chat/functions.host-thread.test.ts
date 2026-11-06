@@ -19,6 +19,7 @@ import {
     getFollowupSuggestions,
     autoTitleChargeKey,
     firstResultOf,
+    lockGuardedGateway,
     refusedBeforeDispatch,
     releaseTitleCharge,
     giveBackTitleCharge,
@@ -158,6 +159,35 @@ describe("the last check before a background model call", () => {
         await expect(harness.run(async (context: any) => await refusedBeforeDispatch(context, locked))).resolves.toBe(true);
         await expect(harness.run(async (context: any) => await refusedBeforeDispatch(context, deleted))).resolves.toBe(true);
         await expect(harness.run(async (context: any) => await refusedBeforeDispatch(context, open))).resolves.toBe(false);
+    });
+});
+
+describe("the gateway a title's model call is sent through", () => {
+    it("sends no request once the chat is locked after the call was admitted, and says it refused", async () => {
+        const cloud = (await harness.run(
+            async (context: any) => await context.db.insert("threads", { model: "gpt-4o", status: "active", title: "Cloud", userId: OWNER }),
+        )) as string;
+        const sent: string[] = [];
+        const inner = async (input: Request | string | URL) => {
+            sent.push(String(input));
+
+            return new Response("{}");
+        };
+
+        await harness.run(async (context: any) => {
+            const gateway = lockGuardedGateway(context, cloud, inner);
+
+            // Open: the request goes out.
+            await gateway.fetch("https://gateway/chat");
+            expect(gateway.refused()).toBe(false);
+
+            // The lock commits after the admission, while the agent prepares the request: the request does not leave.
+            await context.db.patch("threads", cloud, { lockedAt: 1000 });
+            await expect(gateway.fetch("https://gateway/chat")).rejects.toMatchObject({ code: "CONFLICT" });
+            expect(gateway.refused()).toBe(true);
+        });
+
+        expect(sent).toEqual(["https://gateway/chat"]);
     });
 });
 

@@ -85,7 +85,7 @@ import { loadOptimizerModel } from "./lib/optimizer-model-rules";
 import { resolveBackgroundModel } from "./lib/background-model";
 import { byokPaysFor, paidModelRefusal } from "./lib/paid-model";
 import { TEXT_TO_VIDEO_PROVIDERS } from "./lib/video-providers";
-import { gatewayFetch, NO_SERVICE_FETCH } from "../lib/services";
+import { gatewayFetch, NO_SERVICE_FETCH, type ServiceFetch } from "../lib/services";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
 import getAgent from "./lib/get-agent";
 import { holdTtlFrom } from "../lib/claim-once";
@@ -1736,7 +1736,10 @@ const writeGeneratedTitle = async (
     }
 
     const { billedUserId, model, modelFilterRules } = background;
-    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId: billedUserId });
+    // The lock is checked once more as each model request leaves (`lockGuardedGateway`): the agent still reads its context after the
+    // admission below, and a lock committed meanwhile must stop the prompt before it is sent.
+    const gateway = lockGuardedGateway(context, arguments_.threadId, gatewayFetch(context));
+    const agent = await getAgent(model, { gateway: gateway.fetch, modelFilterRules, userId: billedUserId });
 
     const { thread } = await agent.continueThread(context, {
         threadId: arguments_.threadId,
@@ -1785,21 +1788,30 @@ const writeGeneratedTitle = async (
         promptId = admission.promptId;
     } else {
         const { claimedAt } = admission;
-        const textResult = await thread
-            .generateText(
+        let textResult: Awaited<ReturnType<typeof thread.generateText>>;
+
+        try {
+            textResult = await thread.generateText(
                 { prompt: titleModelPrompt(threadTitlePrompt, arguments_.prompt) },
                 {
                     // A regenerate sends the prompt alone: the thread's other messages are not the title's content.
                     ...(arguments_.stateless && { contextOptions: { recentMessages: 0 } }),
                     storageOptions: { saveMessages: "none" },
                 },
-            )
-            .catch(async (error: unknown) => {
-                // The call threw before it answered: nothing was generated, so the charge is given back and a retried run may ask again.
-                await giveBackTitleCharge(context, arguments_.chargeKey, claimedAt);
+            );
+        } catch (error) {
+            // The call threw before it answered: nothing was generated, so the charge is given back and a retried run may ask again.
+            await giveBackTitleCharge(context, arguments_.chargeKey, claimedAt);
 
-                throw error;
-            });
+            // Locked as the request was leaving: nothing was sent, and the run ends here rather than being retried.
+            if (gateway.refused()) {
+                context.log.event("chat.thread_title", { skipped: "locked-at-dispatch" });
+
+                return;
+            }
+
+            throw error;
+        }
 
         title = textResult.text;
         usage = textResult.usage;
@@ -1828,6 +1840,28 @@ const writeGeneratedTitle = async (
     );
 
     context.log.event("chat.thread_title", titleUsageEvent(model, usage, written ? undefined : "changed-before-write"));
+};
+
+/**
+ * The gateway for one thread's background model call, checking the thread again as each request leaves: a locked or deleted thread
+ * (`refusedBeforeDispatch`) gets no request sent, and the call throws instead. `refused` says whether that happened, so the caller can
+ * tell it from a model error. This is the last check before the request: what remains is the request already in flight.
+ */
+export const lockGuardedGateway = (context: ActionContext, threadId: string, inner: ServiceFetch): { fetch: ServiceFetch; refused: () => boolean } => {
+    let refused = false;
+
+    return {
+        fetch: async (input, init) => {
+            if (await refusedBeforeDispatch(context, threadId)) {
+                refused = true;
+
+                throw new LunoraError("CONFLICT", "The chat was locked before its background model request was sent.");
+            }
+
+            return await inner(input, init);
+        },
+        refused: () => refused,
+    };
 };
 
 /** The one event a title run records: the model call's tokens (none for a run that resumed an earlier answer), and why it was not written. */
