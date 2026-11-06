@@ -1473,9 +1473,10 @@ mod tests {
             return;
         };
         // A background child keeps the pipe open past the shell's exit and writes once more later. Guard, not a repro: the
-        // group is killed with the shell, so the late line should never be written at all.
+        // group is killed with the shell, so the late line should never be written at all. The late write is checked both in
+        // the output and as a file, because a writer that survives may write where no reader is left to keep it.
         let terminal = Terminal::start(
-            "echo first; (sleep 1; echo late) & exit 0",
+            "echo first; (sleep 1; echo late > late.txt; echo late) & exit 0",
             &shared,
             &policy,
             &[],
@@ -1490,7 +1491,15 @@ mod tests {
         std::thread::sleep(Duration::from_millis(1500));
 
         assert!(at_end.contains("first"));
+        assert!(
+            !at_end.contains("late"),
+            "a background child printed after the end: {at_end}"
+        );
         assert_eq!(terminal.output().output, at_end);
+        assert!(
+            !shared.join("late.txt").exists(),
+            "a background child wrote a file after the end"
+        );
     }
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
