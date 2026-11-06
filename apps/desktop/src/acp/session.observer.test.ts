@@ -338,6 +338,40 @@ describe("a usage report the agent sends before its session answers", () => {
 
         expect(reported).toContainEqual({ usage: expect.objectContaining({ used: 12_345 }) });
     });
+
+    it("keeps the valid report when a malformed one follows it before the answer", async () => {
+        const reported: { usage?: unknown }[] = [];
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: {
+                ...recorder().observer,
+                sessionState: (_id, patch) => {
+                    reported.push(patch);
+                },
+            },
+            onChange: () => {},
+            process: agent.process,
+        });
+        const started = session.start();
+
+        await expect.poll(() => agent.written.some((frame) => frame.method === "initialize")).toBe(true);
+        agent.say({ id: agent.written.find((frame) => frame.method === "initialize")?.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/new")).toBe(true);
+
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "usage_update", size: 200_000, used: 12_345 } } });
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "usage_update", size: 200_000, used: "lots" } } });
+
+        agent.say({ id: agent.written.find((frame) => frame.method === "session/new")?.id, result: { sessionId: "sess_1" } });
+        await started;
+
+        expect(reported).toEqual([{ usage: { size: 200_000, used: 12_345 } }]);
+    });
 });
 
 describe("a change asked for from the web or the phone", () => {

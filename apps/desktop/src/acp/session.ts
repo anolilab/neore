@@ -952,7 +952,10 @@ export class AgentSession {
         }
 
         if (params.update.sessionUpdate === "usage_update") {
-            this.startupUsage = params;
+            // A malformed report does not replace a valid one sent before it.
+            if (usageOf(params.update, this.options.process.scrub) !== undefined) {
+                this.startupUsage = params;
+            }
         } else {
             this.takeStartupOptions(params.update);
         }
