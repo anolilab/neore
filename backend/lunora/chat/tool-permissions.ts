@@ -210,7 +210,8 @@ const modeFor = (thread: Doc<"threads"> | null, userId: string): ThreadPermissio
 const MAX_LINKS_CHECKED = 50;
 
 export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null, userId: string): Promise<ThreadPermissionMode | null> => {
-    if (!thread) {
+    // A host thread has no mode, and a comparison link must not give it one.
+    if (!thread || thread.runner === "host") {
         return modeFor(thread, userId);
     }
 

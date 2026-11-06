@@ -167,4 +167,11 @@ describe("modeOfThread", () => {
 
         await expect(modeOfThread({ db } as never, threads.child as never, "u1")).resolves.toBeNull();
     });
+
+    it("gives a host thread no mode, even when a comparison link names a supervised parent", async () => {
+        const host = { _id: "host", runner: "host", userId: "u1" };
+        const db = databaseWith([{ branchType: "comparison", parentThreadId: "parent", threadId: "host" }]);
+
+        await expect(modeOfThread({ db } as never, host as never, "u1")).resolves.toBeNull();
+    });
 });
