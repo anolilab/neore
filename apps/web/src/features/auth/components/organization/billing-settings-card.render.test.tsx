@@ -1,16 +1,17 @@
 /**
- * `<BillingSettingsCard>`: only an owner gets the billing form, and the organization's
- * plan buttons start a Team checkout or open the Creem portal for the organization.
+ * `<BillingSettingsCard>`: every member sees the organization's real tier and credit
+ * allowance, only an owner gets the billing form, and the organization's plan buttons
+ * start a Team checkout or open the Creem portal for the organization.
  */
 
-import { QueryClient, QueryClientProvider, skipToken } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => {
     return {
-        billingInfo: undefined as { baseTier?: string; creemSubscriptionId?: string } | undefined,
+        billingInfo: undefined as { baseTier?: string; creditsPerUser?: number; creemSubscriptionId?: string } | undefined,
         isOwner: false,
         openPortal: vi.fn(),
         startCheckout: vi.fn(),
@@ -69,11 +70,10 @@ vi.mock("@/lib/lunora/crpc", () => {
                 auth: {
                     billing: {
                         getBillingInfo: {
-                            // A non-owner's query is `skipToken`: it must never run, so the card cannot read the plan.
-                            queryOptions: (arguments_: unknown) => {
+                            queryOptions: () => {
                                 return {
-                                    queryFn: arguments_ === skipToken ? skipToken : async () => harness.billingInfo ?? null,
-                                    queryKey: ["billing-info", arguments_ === skipToken ? "skipped" : "owner"],
+                                    queryFn: async () => harness.billingInfo ?? null,
+                                    queryKey: ["billing-info"],
                                 };
                             },
                         },
@@ -104,13 +104,18 @@ afterEach(() => {
 });
 
 describe("BillingSettingsCard", () => {
-    it("shows a member the tier read-only, with no billing form to save", async () => {
+    it("shows a member the organization's actual tier and credit allowance, read-only, with no billing form to save", async () => {
         harness.isOwner = false;
+        harness.billingInfo = { baseTier: "enterprise", creditsPerUser: 500 };
         mount();
 
-        expect(await screen.findByText("Only organization owners can manage billing settings")).toBeTruthy();
+        expect(await screen.findByText("enterprise")).toBeTruthy();
+        expect(screen.getByText("500")).toBeTruthy();
+        expect(screen.queryByText("free")).toBeNull();
+        expect(screen.queryByText("100")).toBeNull();
+        expect(screen.getByText("Only organization owners can manage billing settings")).toBeTruthy();
         expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
-        expect(screen.queryByPlaceholderText("Enter billing email")).toBeNull();
+        expect(screen.queryByLabelText("Billing Email")).toBeNull();
         expect(screen.queryByRole("button", { name: "Upgrade organization to Team" })).toBeNull();
     });
 
@@ -127,7 +132,7 @@ describe("BillingSettingsCard", () => {
 
     it("opens the organization portal for an owner whose Team subscription is on Creem", async () => {
         harness.isOwner = true;
-        harness.billingInfo = { baseTier: "team", creemSubscriptionId: "sub_1" };
+        harness.billingInfo = { baseTier: "enterprise", creemSubscriptionId: "sub_1" };
         mount();
 
         fireEvent.click(await screen.findByRole("button", { name: "Manage Team subscription" }));
@@ -142,6 +147,7 @@ describe("BillingSettingsCard", () => {
         harness.updateBillingSettings.mockResolvedValue({});
         mount();
 
+        // The shared form control does not link its label to the input (see sign-in-form.render.test.tsx), so find it by placeholder.
         fireEvent.change(await screen.findByPlaceholderText("Enter billing email"), { target: { value: "billing@acme.test" } });
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
 

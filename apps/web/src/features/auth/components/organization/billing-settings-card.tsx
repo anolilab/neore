@@ -10,7 +10,7 @@ import { Label } from "@neore/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import cn from "@neore/ui/utils/cn";
-import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { useCallback, useState } from "react";
 import * as z from "zod";
@@ -52,7 +52,8 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
 
     const isOwner = hasPermission?.success;
 
-    const { data: billingInfo, isPending: isBillingPending } = useQuery(crpc.auth.billing.getBillingInfo.queryOptions(isOwner ? {} : skipToken));
+    // Every member may read the active organization's tier and credits; only an owner gets the editing controls.
+    const { data: billingInfo, isPending: isBillingPending } = useQuery(crpc.auth.billing.getBillingInfo.queryOptions({}));
 
     const updateBillingMutation = useMutation(crpc.auth.billing.updateBillingSettings.mutationOptions());
     const { isPending: checkoutPending, openPortal, startCheckout } = useCheckout();
@@ -126,8 +127,7 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
     }, []);
 
     const { isSubmitting } = form.state;
-    // A non-owner's billing query is `skipToken`, which TanStack reports as pending forever: only an owner waits on it.
-    const isPending = isPermissionPending || (isOwner === true && isBillingPending);
+    const isPending = isPermissionPending || isBillingPending;
 
     if (!isOwner && !isPending) {
         return (
