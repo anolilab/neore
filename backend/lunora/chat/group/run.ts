@@ -32,6 +32,8 @@ import type { ModelMessage } from "ai";
 import { generateText, Output } from "ai";
 import z from "zod/v4";
 
+import { LunoraError } from "lunorash/server";
+
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
@@ -643,7 +645,7 @@ const loadTurnContext = async (
 
     // Refused before any tool is built: without the thread there is no stored organization to cap the speaker's tools by.
     if (!thread) {
-        throw new Error("The group thread no longer exists.");
+        throw new LunoraError("NOT_FOUND", "The group thread no longer exists.");
     }
 
     const runContext = await loadRunContext(ctx, {

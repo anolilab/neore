@@ -209,7 +209,8 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         // An outside agent's (public API) event mapping drops progress chunks, so its runs write none.
         getMCPTools(selectedServers, { progress: origin === "outside_agent" ? undefined : mcpProgress }),
         // A device problem must never take the run down with it.
-        deviceThreadId === undefined || headless || origin === "outside_agent"
+        // Below `auto` every device tool is removed by the cap, so the device round-trip is skipped.
+        deviceThreadId === undefined || headless || origin === "outside_agent" || permissionCap !== "auto"
             ? noDevices
             : buildDeviceTools(ctx, { threadId: deviceThreadId, userId }).catch((error: unknown) => {
                   toolsLogger.warn("[TOOLS] Device tools unavailable:", error);
