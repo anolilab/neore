@@ -288,6 +288,39 @@ export const updateThread = internalMutation
     });
 
 /**
+ * Writes a generated title, and only while the thread still carries `expectedTitle` and may still be titled (not locked,
+ * deleted or host-run). The check and the patch share one transaction, so a rename committed after the title run's last
+ * check is kept. Answers whether the title was written.
+ */
+export const writeTitleIfUnchanged = async (
+    ctx: Pick<MutationContext, "db">,
+    arguments_: { expectedTitle: string; threadId: Id<"threads">; title: string },
+): Promise<boolean> => {
+    const thread = await ctx.db.get("threads", arguments_.threadId);
+
+    if (!thread || isThreadLocked(thread) || thread.runner === "host" || thread.deletedAt !== undefined) {
+        return false;
+    }
+
+    if ((thread.title ?? "") !== arguments_.expectedTitle) {
+        return false;
+    }
+
+    await ctx.db.patch("threads", arguments_.threadId, { title: arguments_.title });
+
+    return true;
+};
+
+export const setGeneratedTitle = internalMutation
+    .input({
+        expectedTitle: v.string().max(MAX_LENGTH.long),
+        threadId: v.id("threads"),
+        title: v.string().max(MAX_LENGTH.long),
+    })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => await writeTitleIfUnchanged(ctx, args));
+
+/**
  * A continuation the user stopped answers no request any more: the pause it was resumed from ends with it. A newer
  * run on the thread owns `awaitingInput` now (it may have paused again), so it is left alone then.
  */

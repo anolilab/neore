@@ -1757,11 +1757,22 @@ const writeGeneratedTitle = async (
         return;
     }
 
-    await thread.updateMetadata({
+    // The title the run read (a regenerate's click-time title, else the one read above). The write checks it in the same transaction,
+    // so a rename committed since is kept even when the checks above passed a moment earlier.
+    const titleRead = arguments_.expectedTitle ?? metadata.title ?? "";
+    const written = await context.runMutation(internal.agent.threads.setGeneratedTitle, {
+        expectedTitle: titleRead,
+        threadId: arguments_.threadId as Id<"threads">,
         title: textResult.text,
     });
 
-    context.log.event("chat.thread_title", { inputTokens: textResult.usage.inputTokens, model, outputTokens: textResult.usage.outputTokens });
+    // The model was billed whether or not the title was written, so the usage is logged either way.
+    context.log.event("chat.thread_title", {
+        inputTokens: textResult.usage.inputTokens,
+        model,
+        outputTokens: textResult.usage.outputTokens,
+        ...(!written && { skipped: "changed-before-write" }),
+    });
 };
 
 export const createTitleChat = internalAction.input({ prompt: v.string(), threadId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
