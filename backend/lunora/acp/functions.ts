@@ -152,8 +152,9 @@ const withLiveOptions = (report: Infer<typeof vCapabilityReport>, state: Infer<t
         return report;
     }
 
-    const model = options.find((option) => option.category === "model");
-    const hasReasoning = options.some((option) => option.category === "thought_level");
+    // The categories are read without regard to case, as the desktop reads them: the agent's own casing is kept in the stored state.
+    const model = options.find((option) => option.category?.toLowerCase() === "model");
+    const hasReasoning = options.some((option) => option.category?.toLowerCase() === "thought_level");
 
     return {
         ...report,

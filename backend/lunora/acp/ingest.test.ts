@@ -2558,6 +2558,30 @@ describe("what the agent reports about its options", () => {
         expect(await rowOf(threadId)).toMatchObject({ agentState: { configOptions: [option("deep")], usage: { size: 100, used: 1 } }, agentStateAt: 2000 });
     });
 
+    it("reports the models and the reasoning support of options whatever the case of their categories", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, {
+            configOptions: [
+                { ...option("fast"), category: "Model" },
+                { category: "Thought_Level", choices: [{ name: "Low", value: "low" }], currentValue: "low", id: "effort", name: "Effort" },
+            ],
+        });
+
+        await expect(as(ownerId).query(getThreadCapabilities as never, { threadId } as never)).resolves.toMatchObject({
+            groups: {
+                identity: {
+                    models: [
+                        { id: "fast", name: "Fast" },
+                        { id: "deep", name: "Deep" },
+                    ],
+                    reasoningEffort: { degradation: "none", supported: true },
+                },
+            },
+        });
+    });
+
     it("writes nothing when the options repeat, whatever order the keys arrive in", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);
