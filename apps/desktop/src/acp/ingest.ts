@@ -608,9 +608,11 @@ export class HostPoster implements SessionObserver {
             }
 
             // Two seconds between one session's posts, whichever pass runs: a pass another session's timer brings sooner waits for it.
-            const eligibleAt = (this.stateSentAt.get(sessionId) ?? -Infinity) + STATE_DEBOUNCE_MS;
+            // The window counts forward only, so a clock that moved back does not hold the report until it catches up.
+            const sentAt = this.stateSentAt.get(sessionId);
+            const eligibleAt = (sentAt ?? 0) + STATE_DEBOUNCE_MS;
 
-            if (eligibleAt > this.now()) {
+            if (sentAt !== undefined && sentAt <= this.now() && eligibleAt > this.now()) {
                 nextDueAt = Math.min(nextDueAt ?? eligibleAt, eligibleAt);
 
                 continue;

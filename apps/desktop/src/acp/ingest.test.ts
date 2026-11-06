@@ -1479,6 +1479,22 @@ describe("what the agent reports about itself", () => {
         expect(statePosts().filter((entry) => entry.post.sessionId === "s1").map((entry) => entry.at - t0)).toEqual([30_500, 32_500]);
     });
 
+    it("posts a report at its debounce when the desktop clock moved back since the last post, rather than holding it", async () => {
+        const host = poster();
+
+        await open(host);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        clock -= 60_000;
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(2000);
+
+        // The window counts forward from the last post only, so the second report is not held until the clock catches up.
+        expect(statePosts()).toHaveLength(2);
+        expect(statePosts()[1]?.post.events[0]).toMatchObject({ usage: usage(11) });
+    });
+
     it("sends a fresh report at its debounce when it arrived while the post it follows was failing", async () => {
         const host = poster();
         let release = () => {};
