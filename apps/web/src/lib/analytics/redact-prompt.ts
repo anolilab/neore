@@ -9,11 +9,11 @@
  * for byte. An event that names no prompt is returned as the same object, so nothing is copied for it.
  */
 
-/** A prompt parameter's text, in decoded text: a `prompt=` that starts a query, after `?` or `&`. */
-const PROMPT_PARAMETER = /(?:^|[?&])prompt=/i;
+/** A prompt parameter's text, in decoded text: a `prompt=` that starts a query or a fragment, or follows `?`, `&` or `#`. */
+const PROMPT_PARAMETER = /(?:^|[?&#])prompt=/i;
 
 /** A link nested as the value of another parameter starts its own query with `?` or `&`. A value that merely begins `prompt=` is text. */
-const NESTED_PROMPT = /[?&]prompt=/i;
+const NESTED_PROMPT = /[?&#]prompt=/i;
 
 /** A segment that is the prompt parameter itself, once decoded. */
 const PROMPT_SEGMENT = /^prompt=/i;
@@ -30,7 +30,8 @@ const mayNamePrompt = (value: string): boolean => value.includes("%") || PROMPT_
 /** A run of percent-encoded bytes, decoded run by run so a malformed run does not stop the others. */
 const ENCODED_RUN = /(?:%[\da-f]{2})+/gi;
 
-const MAX_DECODE_PASSES = 5;
+/** Decoding stops as soon as a pass changes nothing; this bounds a value that keeps changing. Each pass removes one encoding layer. */
+const MAX_DECODE_PASSES = 64;
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> => {
     if (value === null || typeof value !== "object") {
@@ -83,7 +84,12 @@ const redactSegment = (segment: string, redact: (text: string) => string): strin
     const equals = segment.indexOf("=");
 
     if (equals === -1) {
-        return segment;
+        // No `=` written in the segment: an encoded link may still be the whole of it (a value encoded twice keeps its `=` encoded).
+        if (!NESTED_PROMPT.test(decodeFully(segment))) {
+            return segment;
+        }
+
+        return encodeURIComponent(redact(decodeOnce(segment)));
     }
 
     const rawValue = segment.slice(equals + 1);

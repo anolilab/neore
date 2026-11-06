@@ -262,3 +262,67 @@ describe("a sign-in return link whose prompt has an & or a #", () => {
         expect(redactPromptFromUrl(returnTo(prompt))).toBe("https://app.example.com/auth/sign-in?redirectTo=%2Fchat%3Fmodel%3Dgpt-4o");
     });
 });
+
+/** A link nested inside sign-in return addresses, one level per wrap: each wrap encodes the whole address once more. */
+const wrapped = (inner: string, levels: number): string => {
+    let value = inner;
+
+    for (let level = 0; level < levels; level += 1) {
+        value = `/auth/sign-in?redirectTo=${encodeURIComponent(value)}`;
+    }
+
+    return value;
+};
+
+describe("a prompt link nested several levels deep", () => {
+    const inner = (prompt: string): string => {
+        const link = new URL(buildPromptLink("https://app.example.com", { model: "gpt-4o", prompt }));
+
+        return `${link.pathname}${link.search}`;
+    };
+
+    it.each([
+        ["three levels", 3],
+        ["six levels", 6],
+        ["ten levels", 10],
+    ])("removes the prompt from a link nested %s deep", (_name, levels) => {
+        const cleaned = redactPromptFromUrl(wrapped(inner("deep secret"), levels));
+
+        expect(cleaned).not.toContain("secret");
+        expect(cleaned).toContain("model");
+    });
+
+    it.each([
+        ["an &", "a & secret"],
+        ["a #", "a # secret"],
+    ])("removes the prompt, with %s in it, from a link nested three levels deep", (_name, prompt) => {
+        const cleaned = redactPromptFromUrl(wrapped(inner(prompt), 3));
+
+        expect(cleaned).not.toContain("secret");
+        expect(cleaned).toContain("model");
+    });
+});
+
+describe("a prompt inside an encoded or nested fragment", () => {
+    it.each([
+        ["a plain prompt after the #", "https://app.example.com/chat#prompt=secret", "https://app.example.com/chat"],
+        ["an encoded prompt after the #", "https://app.example.com/chat#prompt%3D%2522secret%2522&model=gpt-4o", "https://app.example.com/chat#model=gpt-4o"],
+        [
+            "a nested link in the fragment, encoded twice",
+            "https://app.example.com/auth/sign-in#redirectTo=%252Fchat%253Fprompt%253Dsecret",
+            "https://app.example.com/auth/sign-in#redirectTo=%252Fchat",
+        ],
+        [
+            "a nested link in the fragment, encoded four times",
+            "https://app.example.com/auth/sign-in?x=1#redirectTo=%25252Fchat%25253Fprompt%25253Dsecret",
+            "https://app.example.com/auth/sign-in?x=1#redirectTo=%25252Fchat",
+        ],
+        [
+            "a link in the query whose # is encoded and hides the prompt",
+            "https://app.example.com/auth/sign-in?redirectTo=%2Fchat%2523prompt%253Dsecret",
+            "https://app.example.com/auth/sign-in?redirectTo=%252Fchat",
+        ],
+    ])("removes %s", (_name, url, expected) => {
+        expect(redactPromptFromUrl(url)).toBe(expected);
+    });
+});
