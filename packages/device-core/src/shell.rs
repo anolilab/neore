@@ -401,6 +401,36 @@ pub fn kill_running() {
     }
 }
 
+/// Whether the child has exited. On Unix the child is left unreaped (`WNOWAIT`), so its process group id stays reserved until the
+/// caller signals the group and reaps it with `wait`.
+fn has_exited(child: &mut Child) -> std::io::Result<bool> {
+    #[cfg(unix)]
+    {
+        // SAFETY: `info` is a plain out-parameter, zeroed first; `WNOWAIT` keeps an exited child a zombie for the caller to reap.
+        let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+        let rc = unsafe {
+            libc::waitid(
+                libc::P_PID,
+                child.id() as libc::id_t,
+                &mut info,
+                libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
+            )
+        };
+
+        if rc == -1 {
+            return Err(std::io::Error::last_os_error());
+        }
+
+        // SAFETY: the call above filled `info`; a zero pid means no state change yet.
+        Ok(unsafe { info.si_pid() } != 0)
+    }
+
+    #[cfg(not(unix))]
+    {
+        Ok(child.try_wait()?.is_some())
+    }
+}
+
 fn kill_tree(child: &mut Child) {
     #[cfg(unix)]
     {
@@ -728,24 +758,20 @@ impl Terminal {
 
         thread::spawn(move || {
             let started = Instant::now();
-            let status = loop {
+            // The leader is observed, not reaped, until its group has been signalled: an unreaped leader keeps its process group id
+            // reserved, so the group signal cannot reach a process that took that id after the leader was gone.
+            loop {
                 let kill = watched.state.lock().unwrap().kill;
 
-                match spawned.child.try_wait() {
-                    Ok(Some(status)) => break Some(status),
-                    Ok(None) if kill || started.elapsed() >= timeout => {
-                        kill_tree(&mut spawned.child);
-                        break spawned.child.wait().ok();
-                    }
-                    Ok(None) => thread::sleep(Duration::from_millis(25)),
-                    Err(_) => {
-                        kill_tree(&mut spawned.child);
-                        break None;
-                    }
+                match has_exited(&mut spawned.child) {
+                    Ok(true) | Err(_) => break,
+                    Ok(false) if kill || started.elapsed() >= timeout => break,
+                    Ok(false) => thread::sleep(Duration::from_millis(25)),
                 }
-            };
+            }
 
             kill_tree(&mut spawned.child);
+            let status = spawned.child.wait().ok();
             #[cfg(unix)]
             drop(spawned.tracked.take());
             finish_readers(readers, &stop);
