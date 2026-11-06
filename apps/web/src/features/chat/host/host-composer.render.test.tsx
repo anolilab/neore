@@ -437,6 +437,51 @@ describe("the options the agent offers", () => {
         expect(model.disabled).toBe(false);
     });
 
+    it("says the agent answered late when its answer comes after the wait, and the option shows the value it gave", async () => {
+        const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        // The page's call failed at the agent's timeout, and the agent's late answer has since changed the option.
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": {
+                agentState: { configOptions: [{ ...MODEL, currentValue: "deep" }] },
+                optionResult: { callId: "call-1", optionId: "model", outcome: "refused", reason: "the agent did not answer", valueId: "deep" },
+                status: "idle",
+            },
+        };
+        await client.invalidateQueries();
+
+        expectShown(await screen.findByText("The agent answered late: Model is now Deep."));
+        expect(screen.queryByText("The agent did not change Model: the agent did not answer")).toBeNull();
+    }, 30_000);
+
+    it("says the option has not caught up when the agent confirmed a value it still does not show, and then frees the control", async () => {
+        const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        // The agent confirmed the value, but the options it reports keep the old one past the page's wait.
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": {
+                agentState: { configOptions: [MODEL] },
+                optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+                status: "idle",
+            },
+        };
+        await client.invalidateQueries();
+
+        expectShown(await screen.findByText(/The agent confirmed Deep, but Model still shows Fast/, undefined, { timeout: 25_000 }));
+        expect(screen.queryByText("The agent confirmed: Model is now Deep.")).toBeNull();
+        expect(model.disabled).toBe(false);
+    }, 40_000);
+
     it("says why the agent refused, and leaves the value as it was", async () => {
         const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;

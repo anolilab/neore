@@ -249,6 +249,24 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
         refused = true;
     } else if (catchingUp) {
         status = t`The agent confirmed. Waiting for ${changed?.name ?? ""} to show ${nameOfValue(changed, answered?.valueId ?? "")}.`;
+    } else if (
+        answered !== undefined &&
+        changed !== undefined &&
+        answered.outcome === "refused" &&
+        answered.reason === "the agent did not answer" &&
+        changed.current === answered.valueId
+    ) {
+        // The agent answered after the wait for it ended, and the option now shows the value it confirmed.
+        status = t`The agent answered late: ${changed.name} is now ${nameOfValue(changed, answered.valueId)}.`;
+    } else if (
+        answered !== undefined &&
+        changed !== undefined &&
+        answered.outcome === "confirmed" &&
+        changed.current !== answered.valueId &&
+        gaveUp === answered.callId
+    ) {
+        // The agent confirmed the change, but the option has not shown it in the time the page waited: say so, not that it changed.
+        status = t`The agent confirmed ${nameOfValue(changed, answered.valueId)}, but ${changed.name} still shows ${nameOfValue(changed, changed.current)}. Check the agent before changing it again.`;
     } else if (answered !== undefined && (answered.outcome === "refused" || changed?.current === answered.valueId)) {
         refused = answered.outcome === "refused";
         status = refused
