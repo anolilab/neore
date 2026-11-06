@@ -97,6 +97,19 @@ const MAX_STARTUP_SESSIONS = 4;
 type StartupRead = { configOptions: AgentOption[]; kind: "config" } | { kind: "mode"; modeId: string } | { kind: "usage"; usage: AgentUsage };
 
 /**
+ * A usage read that leaves out the cost takes the cost of the usage read it replaces, when that one had a cost; a read with a cost keeps its own.
+ */
+const withCarriedUsageCost = (previous: StartupRead[], read: Extract<StartupRead, { kind: "usage" }>): StartupRead => {
+    const earlier = previous.find((entry): entry is Extract<StartupRead, { kind: "usage" }> => entry.kind === "usage");
+
+    if (read.usage.cost !== undefined || earlier?.usage.cost === undefined) {
+        return read;
+    }
+
+    return { kind: "usage", usage: { ...read.usage, cost: earlier.usage.cost } };
+};
+
+/**
  * Reads an update startup can use. Any other kind, and a malformed update (which changes nothing), reads as `undefined`, so it is
  * never kept. The mode id is read with the same check the mode change applies, so a kept id is one it would apply.
  */
@@ -644,7 +657,10 @@ export class AgentSession {
      * one (only the latest counts), and the ids are capped: the most recently updated ones stay.
      */
     private retainStartupRead(sessionId: string, read: StartupRead): void {
-        const kept = (this.startupReads.get(sessionId) ?? []).filter((entry) => entry.kind !== read.kind);
+        const previous = this.startupReads.get(sessionId) ?? [];
+        // The agent's cost is cumulative: a usage report that leaves it out keeps the cost reported before it, as the live path does.
+        const carried = read.kind === "usage" ? withCarriedUsageCost(previous, read) : read;
+        const kept = previous.filter((entry) => entry.kind !== read.kind);
 
         this.startupReads.delete(sessionId);
 
@@ -656,7 +672,7 @@ export class AgentSession {
             }
         }
 
-        this.startupReads.set(sessionId, [...kept, read]);
+        this.startupReads.set(sessionId, [...kept, carried]);
     }
 
     /** Tells the backend what the agent offers now (it keeps the newest of each field and sends them in one post). */
