@@ -219,10 +219,16 @@ const linksOf = async (ctx: QueryCtx, threadId: Id<"threads">) =>
 /**
  * Whether a thread is a LIVE comparison column: one of its comparison links names a parent row that still exists. Its runs take that
  * parent's mode, so a mode set on it would never apply (`setThreadPermissionMode` refuses it). A column whose parent is gone has no
- * parent to take a mode from, so it is not one.
+ * parent to take a mode from, so it is not one. A read that reached the bound may hold a live comparison beyond it, so it counts as one
+ * (the same fail-closed rule as `modeOfThread`, which runs such a thread supervised).
  */
 export const isComparisonColumn = async (ctx: QueryCtx, threadId: Id<"threads">): Promise<boolean> => {
     const links = await linksOf(ctx, threadId);
+
+    if (links.length >= MAX_LINKS_CHECKED) {
+        return true;
+    }
+
     const parents = await Promise.all(
         links.filter((link) => link.branchType === "comparison").map(async (link) => await ctx.db.get("threads", link.parentThreadId)),
     );

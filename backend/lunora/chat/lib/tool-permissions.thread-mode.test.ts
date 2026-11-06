@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { BUILTIN_TOOLS_FILE_EDIT, BUILTIN_TOOLS_READ_ONLY, isThreadPermissionMode } from "./thread-permission-mode";
 import type { ToolDescriptor } from "./tool-permissions";
 import { lowRiskIneligibleReason } from "./low-risk-approval";
-import { modeOfThread } from "../tool-permissions";
+import { isComparisonColumn, modeOfThread } from "../tool-permissions";
 import { resolveToolPermission, resolveToolPermissionWithGrant, toolPermissionKey } from "./tool-permissions";
 
 const builtin = (name: string): ToolDescriptor => {
@@ -221,6 +221,18 @@ describe("modeOfThread", () => {
         ];
 
         await expect(modeOfThread({ db: databaseWith(rows) } as never, threads.child as never, "u1")).resolves.toBe("supervised");
+    });
+
+    it("counts a column whose link rows reach the bound as a comparison column, so the mode setter refuses it", async () => {
+        // The live comparison is the 51st row: the bounded read shows only continuation links, which must not read as "not a column".
+        const rows = [
+            ...Array.from({ length: 50 }, () => {
+                return { branchType: "continuation", parentThreadId: "other", threadId: "child" };
+            }),
+            { branchType: "comparison", parentThreadId: "parent", threadId: "child" },
+        ];
+
+        await expect(isComparisonColumn({ db: databaseWith(rows) } as never, "child" as never)).resolves.toBe(true);
     });
 
     it("fails closed when the link rows reach the read bound without showing a comparison", async () => {
