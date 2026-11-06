@@ -173,9 +173,12 @@ describe("pollForKey", () => {
 
     it("shows the server's reason when the key limit refuses the sign-in", async () => {
         const reason = "You already have 25 API keys. Revoke one in Settings, then try again.";
-        const { deps } = harness([() => oauthError("access_denied", 403, reason)]);
+        const { deps, log } = harness([() => oauthError("access_denied", 403, reason)]);
 
         const error = await pollForKey(deps, BASE, code()).catch((error_: unknown) => error_);
+
+        // One poll, then done: the CLI does not wait out the code's lifetime.
+        expect(log).toHaveLength(1);
 
         expect(error).toMatchObject({ code: "device_denied" });
         expect((error as ApiError).message).toContain(reason);

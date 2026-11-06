@@ -28,7 +28,8 @@ neore login --device --api-url https://api.example.com
 neore login --device --api-url https://api.example.com --confirm-host api.example.com   # no terminal
 ```
 
-The API URL must be https:// (http:// only for localhost). The host check exists because the
+The API URL must be https://. Plain http:// is accepted only for localhost, 127.0.0.1 or [::1], and only with
+`NEORE_HOST_DEV_INSECURE_LOOPBACK` set to 1 (local development). The host check exists because the
 code goes to whatever host the URL names; without a terminal the host must be passed with
 `--confirm-host`, and it must equal the URL's host exactly.
 

@@ -133,8 +133,6 @@ const GUARDED_PATHS = new Set(["/device", "/device/approve", "/device/deny"]);
 /**
  * Guests are disposable and uninvited; a long-lived credential for one outlives both properties. A guest also
  * must not be able to open (claim) or deny a code, which would keep the intended account from approving it.
- * Approval also refuses an account that is already at the key cap, so the page does not report a sign-in that
- * the redemption would refuse; the redemption-time check stays as the backstop.
  */
 const refuseGuestApproval = {
     handler: createAuthMiddleware(async (ctx) => {
@@ -143,16 +141,35 @@ const refuseGuestApproval = {
         if ((session?.user as { isAnonymous?: boolean } | undefined)?.isAnonymous === true) {
             throw oauthError("FORBIDDEN", "access_denied", "Create an account to sign in the CLI.");
         }
-
-        if (ctx.path === "/device/approve" && session?.user.id) {
-            const keys = await ctx.context.adapter.count({ model: "apikey", where: [{ field: "referenceId", value: session.user.id }] });
-
-            if (keys >= MAX_API_KEYS_PER_USER) {
-                throw oauthError("FORBIDDEN", "key_limit", keyLimitMessage);
-            }
-        }
     }),
     matcher: (context: { path?: string }) => GUARDED_PATHS.has(context.path ?? ""),
+};
+
+/**
+ * Approval by an account already at the key cap: the approval itself goes through (the code becomes approved),
+ * and the page is told it cannot finish, so it does not report a sign-in that will not happen. The CLI that is
+ * polling then gets the redemption-time refusal on its next poll, ends at once with the reason, and does not wait
+ * out the 30 minutes of the code.
+ */
+const reportKeyLimitAtApproval = {
+    handler: createAuthMiddleware(async (ctx) => {
+        if (ctx.context.returned instanceof APIError) {
+            return;
+        }
+
+        const session = await getSessionFromCtx(ctx);
+
+        if (!session?.user.id) {
+            return;
+        }
+
+        const keys = await ctx.context.adapter.count({ model: "apikey", where: [{ field: "referenceId", value: session.user.id }] });
+
+        if (keys >= MAX_API_KEYS_PER_USER) {
+            throw oauthError("FORBIDDEN", "key_limit", keyLimitMessage);
+        }
+    }),
+    matcher: (context: { path?: string }) => context.path === "/device/approve",
 };
 
 const keyBodySchema = z.object({
@@ -287,7 +304,7 @@ export const cliDeviceAuth = (options: CliDeviceAuthOptions): BetterAuthPlugin[]
         stock,
         {
             endpoints: { redeemCliDeviceKey: redeemKey(options), revokeCliDeviceKey: revokeKey(options) },
-            hooks: { before: [refuseGuestApproval] },
+            hooks: { after: [reportKeyLimitAtApproval], before: [refuseGuestApproval] },
             id: "neore-cli-device-key",
         } satisfies BetterAuthPlugin,
     ];

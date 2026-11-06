@@ -388,7 +388,7 @@ describe("device-code sign-in for the CLI", () => {
         expect(redeemed.response.status).toBe(200);
     });
 
-    it("refuses an approval from an account at the key cap, so the page does not report a sign-in that cannot finish", async () => {
+    it("tells the page, and then the polling CLI, when the approving account is at the key cap", async () => {
         const harness = build();
         const person = await signUp(harness);
         const context = await harness.auth.$context;
@@ -408,7 +408,15 @@ describe("device-code sign-in for the CLI", () => {
 
         expect(attempt.response.status).toBe(403);
         expect(attempt.body["error"]).toBe("key_limit");
-        expect(await errorOf(poll(harness, code.device_code))).toBe("authorization_pending");
+
+        // The CLI that is polling is told at once, with the reason, rather than waiting out the code's 30 minutes.
+        vi.setSystemTime(Date.now() + 6000);
+
+        const refused = await poll(harness, code.device_code);
+
+        expect(refused.response.status).toBe(403);
+        expect(refused.body["error"]).toBe("access_denied");
+        expect(String(refused.body["error_description"])).toContain("API keys");
     });
 
     it("withdraws its own key when concurrent redemptions pushed the person past the cap, and answers the poll with the refusal", async () => {
