@@ -226,7 +226,7 @@ msgid "{0, plural, one {# line} other {# lines}}"
 msgstr "{0, plural, one {# wiersz} few {# wiersze} many {# wierszy} other {# wiersza}}"
 
 #. placeholder {0}: node.relevantMessages.length
-#: src/features/chat/thread-list/thread-node.tsx:1053
+#: src/features/chat/thread-list/thread-node.tsx:1051
 msgid "{0, plural, one {# match} other {# matches}}"
 msgstr "{0, plural, one {# dopasowanie} few {# dopasowania} many {# dopasowań} other {# dopasowania}}"
 
@@ -720,7 +720,7 @@ msgstr "{0}% wydatków"
 msgid "{0}+ text models, {1}+ image models, and {2}+ video models — from Claude and GPT-5 to Flux and Veo — all included in one plan. Switch between any of them mid-conversation."
 msgstr "Ponad {0} modeli tekstowych, {1} modeli obrazów i {2} modeli wideo — od Claude i GPT-5 po Flux i Veo — wszystko w jednym planie. Przełączaj się między nimi w trakcie rozmowy."
 
-#: src/features/chat/thread-list/thread-node.tsx:257
+#: src/features/chat/thread-list/thread-node.tsx:256
 msgid "{action}: {displayTitle}"
 msgstr ""
 
@@ -733,7 +733,7 @@ msgstr "{activeCount, plural, one {Masz # połączony komunikator} few {Masz # p
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "Aktywne serwery MCP: {activeCount} z {0}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:119
+#: src/features/develop/components/thread-pull-requests.tsx:121
 msgid "{address}: {reason}"
 msgstr ""
 
@@ -994,7 +994,7 @@ msgstr ""
 msgid "{hours} hours"
 msgstr "Godziny: {hours}"
 
-#: src/features/chat/thread-list/thread-node.tsx:320
+#: src/features/chat/thread-list/thread-node.tsx:318
 msgid "{hours}h {minutes}m"
 msgstr "{hours} godz. {minutes} min"
 
@@ -1068,12 +1068,12 @@ msgid "{label} refused this. Your account may lack access."
 msgstr ""
 
 #: src/features/develop/components/thread-pull-requests.tsx:124
-msgid "{linked, plural, one {# pull request linked.} other {# pull requests linked.}}"
-msgstr ""
+#~ msgid "{linked, plural, one {# pull request linked.} other {# pull requests linked.}}"
+#~ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:538
-msgid "{linkedPullRequests} linked pull requests"
-msgstr ""
+#~ msgid "{linkedPullRequests} linked pull requests"
+#~ msgstr ""
 
 #: src/features/chat/goal/composer-goal.tsx:93
 msgid "{maxRounds} rounds"
@@ -1099,7 +1099,7 @@ msgstr "{mins} min"
 msgid "{mins}m {secs}s"
 msgstr "{mins} min {secs} s"
 
-#: src/features/chat/thread-list/thread-node.tsx:323
+#: src/features/chat/thread-list/thread-node.tsx:321
 msgid "{minutes}m"
 msgstr "{minutes} min"
 
@@ -1286,7 +1286,7 @@ msgstr "{seconds} s"
 msgid "{selectedCount, plural, one {# prompt selected} other {# prompts selected}}"
 msgstr "{selectedCount, plural, one {Wybrano # prompt} few {Wybrano # prompty} many {Wybrano # promptów} other {Wybrano # promptu}}"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:75
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:76
 msgid "{selectedCount, plural, one {# thread selected} other {# threads selected}}"
 msgstr "{selectedCount, plural, one {Zaznaczono # wątek} few {Zaznaczono # wątki} many {Zaznaczono # wątków} other {Zaznaczono # wątku}}"
 
@@ -1317,6 +1317,10 @@ msgstr "{star, plural, one {# gwiazdka} few {# gwiazdki} many {# gwiazdek} other
 #: src/features/chat/voice-mode/voice-mode-button.tsx:98
 msgid "{stateLabel} Stop hands-free voice mode"
 msgstr "{stateLabel} Zatrzymaj tryb głosowy bez użycia rąk"
+
+#: src/features/develop/components/thread-pull-requests.tsx:215
+msgid "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
+msgstr ""
 
 #: src/features/chat/link-preview/link-preview-card.tsx:132
 msgid "{title} on {siteName} (opens in a new tab)"
@@ -1451,8 +1455,8 @@ msgid "1 hour"
 msgstr "1 godzina"
 
 #: src/features/chat/thread-list/thread-node.tsx:538
-msgid "1 linked pull request"
-msgstr ""
+#~ msgid "1 linked pull request"
+#~ msgstr ""
 
 #: src/features/marketing/components/landing-page.tsx:335
 msgid "1,000 messages a day"
@@ -2240,7 +2244,7 @@ msgstr ""
 msgid "Add Provider"
 msgstr "Dodaj dostawcę"
 
-#: src/features/develop/components/thread-pull-requests.tsx:175
+#: src/features/develop/components/thread-pull-requests.tsx:193
 msgid "Add pull requests that already exist to this thread. Each one is read from the host with your own connection first."
 msgstr ""
 
@@ -3578,7 +3582,7 @@ msgstr "Stosowanie..."
 msgid "approval"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:534
+#: src/features/chat/thread-list/thread-node.tsx:532
 msgid "Approval"
 msgstr ""
 
@@ -3649,7 +3653,7 @@ msgstr ""
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
 #: src/components/command-palette.tsx:415
 #: src/components/command-palette.tsx:555
-#: src/features/chat/thread-list/thread-node.tsx:113
+#: src/features/chat/thread-list/thread-node.tsx:112
 msgid "Archive thread"
 msgstr "Archiwizuj wątek"
 
@@ -3672,7 +3676,7 @@ msgstr "Czy na pewno chcesz usunąć „{itemName}”? Tej operacji nie można c
 msgid "Are you sure you want to delete {selectedCount, plural, one {# prompt} other {# prompts}}? This action cannot be undone."
 msgstr "Czy na pewno chcesz usunąć {selectedCount, plural, one {# prompt} few {# prompty} many {# promptów} other {# promptu}}? Tej operacji nie można cofnąć."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:151
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:152
 msgid "Are you sure you want to delete {selectedCount, plural, one {# thread} other {# threads}}? This action cannot be undone and will permanently remove all messages in these conversations."
 msgstr "Czy na pewno chcesz usunąć {selectedCount, plural, one {# wątek} few {# wątki} many {# wątków} other {# wątku}}? Tej operacji nie można cofnąć, a wszystkie wiadomości w tych rozmowach zostaną trwale usunięte."
 
@@ -3689,7 +3693,7 @@ msgstr ""
 msgid "Are you sure you want to delete this item? This action cannot be undone."
 msgstr "Czy na pewno chcesz usunąć ten element? Tej operacji nie można cofnąć."
 
-#: src/features/chat/thread-list/thread-node.tsx:1003
+#: src/features/chat/thread-list/thread-node.tsx:1001
 msgid "Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation."
 msgstr "Czy na pewno chcesz usunąć ten wątek? Tej operacji nie można cofnąć, a wszystkie wiadomości w tej rozmowie zostaną trwale usunięte."
 
@@ -5491,7 +5495,7 @@ msgid "Change colors"
 msgstr "Zmień kolory"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:150
-#: src/features/chat/thread-list/thread-node.tsx:806
+#: src/features/chat/thread-list/thread-node.tsx:804
 msgid "Change passcode"
 msgstr ""
 
@@ -5623,12 +5627,12 @@ msgstr "Import czatów nie powiódł się"
 msgid "Chat import finished"
 msgstr "Import czatów zakończony"
 
-#: src/features/chat/thread-list/thread-node.tsx:773
-#: src/features/chat/thread-list/thread-node.tsx:787
+#: src/features/chat/thread-list/thread-node.tsx:771
+#: src/features/chat/thread-list/thread-node.tsx:785
 msgid "Chat lock"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:773
+#: src/features/chat/thread-list/thread-node.tsx:771
 msgid "Chat lock: locked"
 msgstr ""
 
@@ -6012,7 +6016,7 @@ msgstr "Czyszczenie nie powiodło się"
 #: ../../packages/ui/src/components/combobox.tsx:108
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:233
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:252
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:82
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:83
 #: src/features/chat/thread/media-gallery-view.tsx:372
 #: src/features/prompts/components/prompt-list.tsx:615
 #: src/features/settings/components/chat/api-keys-settings.tsx:401
@@ -6173,7 +6177,7 @@ msgstr ""
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:818
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
-#: src/features/develop/components/thread-pull-requests.tsx:212
+#: src/features/develop/components/thread-pull-requests.tsx:238
 #: src/features/evals/components/save-eval-case-action.tsx:95
 #: src/features/prompts/components/prompt-history-dialog.tsx:195
 #: src/features/settings/components/chat/custom-providers-settings.tsx:441
@@ -6421,7 +6425,7 @@ msgstr ""
 msgid "Collapse {title}"
 msgstr "Zwiń {title}"
 
-#: src/features/chat/thread-list/thread-node.tsx:503
+#: src/features/chat/thread-list/thread-node.tsx:501
 msgid "Collapse branches"
 msgstr ""
 
@@ -7518,8 +7522,8 @@ msgstr "Przekształcić w załącznik dla lepszej czytelności?"
 msgid "Convert to Full Account"
 msgstr "Przekształć w pełne konto"
 
-#: src/features/chat/thread-list/thread-node.tsx:943
-#: src/features/chat/thread-list/thread-node.tsx:974
+#: src/features/chat/thread-list/thread-node.tsx:941
+#: src/features/chat/thread-list/thread-node.tsx:972
 msgid "Convert to permanent"
 msgstr "Zmień na stały"
 
@@ -7531,8 +7535,8 @@ msgstr "Przekształć, aby zachować swoje dane"
 msgid "Convert to TypeScript"
 msgstr "Przekształć na TypeScript"
 
-#: src/features/chat/thread-list/thread-node.tsx:943
-#: src/features/chat/thread-list/thread-node.tsx:974
+#: src/features/chat/thread-list/thread-node.tsx:941
+#: src/features/chat/thread-list/thread-node.tsx:972
 msgid "Converting..."
 msgstr "Konwertowanie..."
 
@@ -7920,7 +7924,7 @@ msgstr "Nie udało się wygenerować szkicu. Spróbuj ponownie."
 msgid "Could not import the workflow"
 msgstr "Nie udało się zaimportować przepływu pracy"
 
-#: src/features/develop/components/thread-pull-requests.tsx:133
+#: src/features/develop/components/thread-pull-requests.tsx:136
 msgid "Could not link. Try again."
 msgstr ""
 
@@ -7932,7 +7936,7 @@ msgstr "Nie udało się wczytać obrazu"
 msgid "Could not load statistics for this thread."
 msgstr ""
 
-#: src/features/develop/components/thread-pull-requests.tsx:143
+#: src/features/develop/components/thread-pull-requests.tsx:151
 msgid "Could not load the linked pull requests."
 msgstr ""
 
@@ -8119,7 +8123,7 @@ msgstr "Nie udało się rozpocząć jazdy próbnej."
 msgid "Could not stop the conversation"
 msgstr "Nie udało się zatrzymać rozmowy"
 
-#: src/features/chat/thread-list/thread-node.tsx:579
+#: src/features/chat/thread-list/thread-node.tsx:577
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:148
 msgid "Could not stop the reply. Please try again."
 msgstr ""
@@ -8287,8 +8291,8 @@ msgid "Create bot"
 msgstr ""
 
 #: src/components/command-palette.tsx:403
-#: src/features/chat/thread-list/thread-node.tsx:665
-#: src/features/chat/thread-list/thread-node.tsx:688
+#: src/features/chat/thread-list/thread-node.tsx:663
+#: src/features/chat/thread-list/thread-node.tsx:686
 msgid "Create branch"
 msgstr "Utwórz gałąź"
 
@@ -8440,8 +8444,8 @@ msgstr "Utworzono: {createdAt}"
 msgid "Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access."
 msgstr "Tworzy jednorazowy link ważny przez 7 dni. Kto otworzy go po zalogowaniu, otrzyma dostęp."
 
-#: src/features/chat/thread-list/thread-node.tsx:665
-#: src/features/chat/thread-list/thread-node.tsx:688
+#: src/features/chat/thread-list/thread-node.tsx:663
+#: src/features/chat/thread-list/thread-node.tsx:686
 msgid "Creating branch..."
 msgstr "Tworzenie gałęzi..."
 
@@ -9171,7 +9175,7 @@ msgstr "Deleguj zadania do Devina, inżyniera oprogramowania AI"
 #: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:120
 #: src/features/auth/components/settings/passkey/passkey-cell.tsx:98
 #: src/features/chat/thread-list/group-header.tsx:150
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:99
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:100
 #: src/features/develop/components/draft-comment-card.tsx:60
 #: src/features/evals/components/dataset-panel.tsx:322
 #: src/features/evals/components/evals-page.tsx:163
@@ -9336,7 +9340,7 @@ msgstr "Usuń ustawienie wstępne"
 msgid "Delete preset?"
 msgstr "Usunąć ustawienie wstępne?"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1272
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1274
 msgid "Delete Project"
 msgstr "Usuń projekt"
 
@@ -9411,17 +9415,17 @@ msgstr "Usunąć ten przypadek?"
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
 #: src/components/command-palette.tsx:421
 #: src/components/command-palette.tsx:579
-#: src/features/chat/thread-list/thread-node.tsx:982
-#: src/features/chat/thread-list/thread-node.tsx:1000
+#: src/features/chat/thread-list/thread-node.tsx:980
+#: src/features/chat/thread-list/thread-node.tsx:998
 #: src/features/pages/components/page-comments-panel.tsx:188
 msgid "Delete thread"
 msgstr "Usuń wątek"
 
-#: src/features/chat/thread-list/thread-node.tsx:1015
+#: src/features/chat/thread-list/thread-node.tsx:1013
 msgid "Delete Thread"
 msgstr "Usuń wątek"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:155
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:156
 msgid "Delete Threads"
 msgstr "Usuń wątki"
 
@@ -9445,8 +9449,8 @@ msgstr "{0, plural, one {Usunięto # prompt} few {Usunięto # prompty} many {Usu
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:77
 #: src/components/delete-confirmation-dialog.tsx:65
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:285
-#: src/features/chat/thread-list/thread-node.tsx:982
-#: src/features/chat/thread-list/thread-node.tsx:1000
+#: src/features/chat/thread-list/thread-node.tsx:980
+#: src/features/chat/thread-list/thread-node.tsx:998
 msgid "Deleting..."
 msgstr "Usuwanie..."
 
@@ -9674,7 +9678,7 @@ msgstr "Opis może mieć maksymalnie {SKILL_DESCRIPTION_MAX} znaków"
 msgid "Deselect"
 msgstr "Odznacz"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:78
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:79
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:61
 msgid "Deselect all"
 msgstr "Odznacz wszystko"
@@ -10081,7 +10085,7 @@ msgstr "Nie masz konta?"
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:62
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:110
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:104
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:105
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
 #: src/features/devices/components/devices-settings.tsx:255
 #: src/features/skills/components/bundle-import-dialog.tsx:248
@@ -10226,8 +10230,8 @@ msgstr "Pobierz tekst"
 msgid "Download the Neore desktop app for macOS, Windows and Linux."
 msgstr "Pobierz aplikację desktopową Neore dla macOS, Windows i Linux."
 
-#: src/features/chat/thread-list/thread-node.tsx:870
-#: src/features/chat/thread-list/thread-node.tsx:889
+#: src/features/chat/thread-list/thread-node.tsx:868
+#: src/features/chat/thread-list/thread-node.tsx:887
 msgid "Download thread"
 msgstr "Pobierz wątek"
 
@@ -10235,8 +10239,8 @@ msgstr "Pobierz wątek"
 msgid "Download Word document"
 msgstr "Pobierz dokument Word"
 
-#: src/features/chat/thread-list/thread-node.tsx:870
-#: src/features/chat/thread-list/thread-node.tsx:889
+#: src/features/chat/thread-list/thread-node.tsx:868
+#: src/features/chat/thread-list/thread-node.tsx:887
 msgid "Downloading..."
 msgstr "Pobieranie..."
 
@@ -10318,7 +10322,7 @@ msgid "Drop files here..."
 msgstr "Upuść pliki tutaj..."
 
 #: src/features/chat/thread-list/components/thread-group-renderer.tsx:114
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:329
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:330
 msgid "Drop threads here to add them to this project"
 msgstr "Upuść wątki tutaj, aby dodać je do tego projektu"
 
@@ -11823,7 +11827,7 @@ msgstr "Rozwiń operacje: {groupLabel}"
 msgid "Expand {title}"
 msgstr "Rozwiń {title}"
 
-#: src/features/chat/thread-list/thread-node.tsx:503
+#: src/features/chat/thread-list/thread-node.tsx:501
 msgid "Expand branches"
 msgstr ""
 
@@ -11922,7 +11926,7 @@ msgstr "Zmieniono czas wygaśnięcia na {0}"
 msgid "expired"
 msgstr "wygasło"
 
-#: src/features/chat/thread-list/thread-node.tsx:313
+#: src/features/chat/thread-list/thread-node.tsx:311
 #: src/features/devices/components/devices-settings.tsx:257
 #: src/features/settings/connectors/connector-card.tsx:76
 msgid "Expired"
@@ -11951,7 +11955,7 @@ msgstr "Wygasa"
 msgid "Expires {date}"
 msgstr "Wygasa {date}"
 
-#: src/features/chat/thread-list/thread-node.tsx:1041
+#: src/features/chat/thread-list/thread-node.tsx:1039
 msgid "Expires in {remainingTime}"
 msgstr "Wygasa za {remainingTime}"
 
@@ -12357,7 +12361,7 @@ msgstr "Nie udało się usunąć klucza dostępu"
 msgid "Failed to delete preset"
 msgstr "Nie udało się usunąć ustawienia wstępnego"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:487
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:488
 msgid "Failed to delete project"
 msgstr "Nie udało się usunąć projektu"
 
@@ -12542,7 +12546,7 @@ msgstr "Nie udało się uczynić wątku stałym"
 msgid "Failed to move file"
 msgstr "Nie udało się przenieść pliku"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:996
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:997
 #: src/features/projects/components/move-to-project-dialog.tsx:38
 msgid "Failed to move thread"
 msgstr "Nie udało się przenieść wątku"
@@ -13962,7 +13966,7 @@ msgstr "Francuski (Szwajcaria)"
 msgid "Frequently asked <0>questions</0>."
 msgstr "Najczęściej zadawane <0>pytania</0>."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:116
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:117
 msgid "From"
 msgstr ""
 
@@ -17638,7 +17642,7 @@ msgid "Lines that are not valid JSON"
 msgstr ""
 
 #: src/features/auth/components/settings/providers/provider-cell.tsx:111
-#: src/features/develop/components/thread-pull-requests.tsx:214
+#: src/features/develop/components/thread-pull-requests.tsx:240
 msgid "Link"
 msgstr "Połącz"
 
@@ -17660,16 +17664,20 @@ msgstr "Podgląd linku"
 msgid "Link previews"
 msgstr "Podglądy linków"
 
-#: src/features/develop/components/thread-pull-requests.tsx:169
+#: src/features/develop/components/thread-pull-requests.tsx:177
 msgid "Link pull request"
 msgstr ""
 
-#: src/features/develop/components/thread-pull-requests.tsx:174
+#: src/features/develop/components/thread-pull-requests.tsx:192
 msgid "Link pull requests"
 msgstr ""
 
 #: src/features/develop/components/work-on-pull-request.tsx:88
 msgid "Linked by hand"
+msgstr ""
+
+#: src/features/chat/thread-list/thread-node.tsx:536
+msgid "Linked pull requests: {linkedPullRequests}"
 msgstr ""
 
 #: src/features/develop/components/thread-pull-requests.tsx:64
@@ -17680,8 +17688,8 @@ msgstr ""
 msgid "LinkedIn Post"
 msgstr "Post na LinkedIn"
 
-#: src/features/develop/components/thread-pull-requests.tsx:195
-#: src/features/develop/components/thread-pull-requests.tsx:214
+#: src/features/develop/components/thread-pull-requests.tsx:221
+#: src/features/develop/components/thread-pull-requests.tsx:240
 msgid "Linking…"
 msgstr ""
 
@@ -17986,11 +17994,15 @@ msgstr "Wczytywanie zadań…"
 msgid "Loading the guide"
 msgstr ""
 
+#: src/features/develop/components/thread-pull-requests.tsx:146
+msgid "Loading the linked pull requests…"
+msgstr ""
+
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:59
 msgid "Loading threads"
 msgstr "Wczytywanie wątków"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1055
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1056
 msgid "Loading threads..."
 msgstr "Wczytywanie wątków..."
 
@@ -18082,7 +18094,7 @@ msgstr "Lokalizacja"
 msgid "Location updated"
 msgstr "Zaktualizowano lokalizację"
 
-#: src/features/chat/thread-list/thread-node.tsx:810
+#: src/features/chat/thread-list/thread-node.tsx:808
 msgid "Lock chat"
 msgstr ""
 
@@ -18095,7 +18107,7 @@ msgstr "Zablokuj grupę"
 msgid "Lock node"
 msgstr "Zablokuj węzeł"
 
-#: src/features/chat/thread-list/thread-node.tsx:802
+#: src/features/chat/thread-list/thread-node.tsx:800
 msgid "Lock now"
 msgstr ""
 
@@ -18103,7 +18115,7 @@ msgstr ""
 msgid "Lock this chat"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:255
+#: src/features/chat/thread-list/thread-node.tsx:254
 msgid "Locked chat"
 msgstr ""
 
@@ -18955,8 +18967,8 @@ msgstr "Wiadomości"
 msgid "Messages API (/v1/messages) — Anthropic and services that mirror it."
 msgstr "Messages API (/v1/messages) — Anthropic i usługi, które go odwzorowują."
 
-#: src/features/chat/thread-list/thread-node.tsx:608
-#: src/features/chat/thread-list/thread-node.tsx:620
+#: src/features/chat/thread-list/thread-node.tsx:606
+#: src/features/chat/thread-list/thread-node.tsx:618
 msgid "Messages from {sourceName}"
 msgstr "Wiadomości z {sourceName}"
 
@@ -19280,7 +19292,7 @@ msgstr "Model jest już zablokowany"
 msgid "Model Breakdown"
 msgstr "Podział na modele"
 
-#: src/features/chat/thread-list/thread-node.tsx:530
+#: src/features/chat/thread-list/thread-node.tsx:528
 msgid "Model comparison"
 msgstr "Porównanie modeli"
 
@@ -19664,8 +19676,8 @@ msgstr "Przejdź do następnej komórki"
 msgid "Move to previous cell"
 msgstr "Przejdź do poprzedniej komórki"
 
-#: src/features/chat/thread-list/thread-node.tsx:695
-#: src/features/chat/thread-list/thread-node.tsx:708
+#: src/features/chat/thread-list/thread-node.tsx:693
+#: src/features/chat/thread-list/thread-node.tsx:706
 msgid "Move to project"
 msgstr "Przenieś do projektu"
 
@@ -20751,7 +20763,7 @@ msgstr "Brak wspomnień tego typu."
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "Nie ma jeszcze wspomnień. AI zacznie automatycznie uczyć się z twoich rozmów."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1074
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1075
 msgid "No messages found for"
 msgstr "Nie znaleziono wiadomości dla"
 
@@ -21028,7 +21040,7 @@ msgstr "Brak tekstu do wyświetlenia."
 msgid "No thread has worked on this {requestNoun} yet."
 msgstr ""
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1074
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1075
 msgid "No threads found for"
 msgstr "Nie znaleziono wątków dla"
 
@@ -21036,12 +21048,12 @@ msgstr "Nie znaleziono wątków dla"
 msgid "No threads in this group"
 msgstr "Brak wątków w tej grupie"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:539
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:540
 msgid "No threads were active in that date range."
 msgstr ""
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:273
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1065
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1066
 msgid "No threads yet"
 msgstr "Nie ma jeszcze wątków"
 
@@ -21230,7 +21242,7 @@ msgstr ""
 msgid "Not found"
 msgstr ""
 
-#: src/features/develop/components/thread-pull-requests.tsx:200
+#: src/features/develop/components/thread-pull-requests.tsx:226
 msgid "Not linked"
 msgstr ""
 
@@ -21851,8 +21863,8 @@ msgstr "Otwarte generowanie obrazów"
 msgid "Open in full screen"
 msgstr "Otwórz na pełnym ekranie"
 
-#: src/features/chat/thread-list/thread-node.tsx:716
-#: src/features/chat/thread-list/thread-node.tsx:729
+#: src/features/chat/thread-list/thread-node.tsx:714
+#: src/features/chat/thread-list/thread-node.tsx:727
 msgid "Open in new window"
 msgstr "Otwórz w nowym oknie"
 
@@ -21996,7 +22008,7 @@ msgstr ""
 
 #. placeholder {0}: link.repository
 #. placeholder {1}: link.number
-#: src/features/develop/components/thread-pull-requests.tsx:154
+#: src/features/develop/components/thread-pull-requests.tsx:162
 msgid "Open the pull request {0}#{1}"
 msgstr ""
 
@@ -23336,7 +23348,7 @@ msgstr "Przypnij wiadomość"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
 #: src/components/command-palette.tsx:409
-#: src/features/chat/thread-list/thread-node.tsx:105
+#: src/features/chat/thread-list/thread-node.tsx:104
 msgid "Pin thread"
 msgstr "Przypnij wątek"
 
@@ -23773,8 +23785,8 @@ msgstr "Zaktualizowano ustawienie wstępne"
 msgid "Presets"
 msgstr "Ustawienia wstępne"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1067
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1091
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1068
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1092
 msgid "Press ? for keyboard shortcuts"
 msgstr "Naciśnij ?, aby zobaczyć skróty klawiszowe"
 
@@ -24064,8 +24076,8 @@ msgid "Processing voice input"
 msgstr "Przetwarzanie wejścia głosowego"
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:211
-#: src/features/chat/thread-list/thread-node.tsx:102
-#: src/features/chat/thread-list/thread-node.tsx:110
+#: src/features/chat/thread-list/thread-node.tsx:101
+#: src/features/chat/thread-list/thread-node.tsx:109
 #: src/features/settings/components/privacy/data-export.tsx:101
 msgid "Processing..."
 msgstr "Przetwarzanie..."
@@ -24495,7 +24507,7 @@ msgid "Pull request settings updated"
 msgstr "Zaktualizowano ustawienia pull requestów"
 
 #: src/features/code/components/code-shell.tsx:95
-#: src/features/develop/components/thread-pull-requests.tsx:178
+#: src/features/develop/components/thread-pull-requests.tsx:196
 msgid "Pull requests"
 msgstr ""
 
@@ -24560,7 +24572,7 @@ msgstr "Poziomy złożoności zapytań przypisane przez silnik routingu"
 msgid "Query usage analytics and costs"
 msgstr "Zapytania o analitykę użycia i koszty"
 
-#: src/features/chat/thread-list/thread-node.tsx:534
+#: src/features/chat/thread-list/thread-node.tsx:532
 msgid "Question"
 msgstr ""
 
@@ -25608,7 +25620,7 @@ msgid "Remove or add objects in an image"
 msgstr "Usuń lub dodaj obiekty na obrazie"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:151
-#: src/features/chat/thread-list/thread-node.tsx:807
+#: src/features/chat/thread-list/thread-node.tsx:805
 msgid "Remove passcode"
 msgstr ""
 
@@ -25998,7 +26010,7 @@ msgstr "Zasoby"
 msgid "Response"
 msgstr "Odpowiedź"
 
-#: src/features/chat/thread-list/thread-node.tsx:551
+#: src/features/chat/thread-list/thread-node.tsx:549
 msgid "Response failed - try again"
 msgstr "Odpowiedź nie powiodła się – spróbuj ponownie"
 
@@ -27167,7 +27179,7 @@ msgstr "Szukaj..."
 msgid "Searched the latest messages only"
 msgstr ""
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1081
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1082
 msgid "Searching..."
 msgstr "Wyszukiwanie..."
 
@@ -27261,7 +27273,7 @@ msgid "Select a voice"
 msgstr "Wybierz głos"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-select-cells.tsx:23
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:78
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:79
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:41
 msgid "Select all"
 msgstr "Zaznacz wszystko"
@@ -27292,7 +27304,7 @@ msgstr "Wybierz organizację, aby zarządzać zespołami"
 msgid "Select as reference"
 msgstr "Wybierz jako referencję"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:94
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:95
 msgid "Select by date"
 msgstr ""
 
@@ -27320,7 +27332,7 @@ msgstr "Wybierz obraz jako referencję"
 msgid "Select language"
 msgstr "Wybierz język"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:146
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:147
 msgid "Select matching"
 msgstr ""
 
@@ -27402,7 +27414,7 @@ msgstr "Wybierz charakterystykę obiektywu"
 msgid "Select this reply"
 msgstr "Wybierz tę odpowiedź"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:110
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:111
 msgid "Select threads active in a date range"
 msgstr ""
 
@@ -28554,20 +28566,20 @@ msgstr "Lepsza kompozycja niż w o1"
 msgid "Smooth transitions"
 msgstr "Płynne przejścia"
 
-#: src/features/chat/thread-list/thread-node.tsx:850
+#: src/features/chat/thread-list/thread-node.tsx:848
 msgid "Snooze 1 hour"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:829
-#: src/features/chat/thread-list/thread-node.tsx:843
+#: src/features/chat/thread-list/thread-node.tsx:827
+#: src/features/chat/thread-list/thread-node.tsx:841
 msgid "Snooze thread"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:856
+#: src/features/chat/thread-list/thread-node.tsx:854
 msgid "Snooze until next week"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:852
+#: src/features/chat/thread-list/thread-node.tsx:850
 msgid "Snooze until tomorrow 09:00"
 msgstr ""
 
@@ -29074,7 +29086,7 @@ msgstr "Rozpocznij nowy czat ({0})"
 msgid "Start a new chat to get started"
 msgstr "Rozpocznij nowy czat, aby zacząć"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1066
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1067
 msgid "Start a new conversation to create your first thread"
 msgstr "Rozpocznij nową rozmowę, aby utworzyć pierwszy wątek"
 
@@ -29346,8 +29358,8 @@ msgstr "Zatrzymaj po bieżącym mówcy"
 msgid "Stop and clear the queue"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:568
-#: src/features/chat/thread-list/thread-node.tsx:590
+#: src/features/chat/thread-list/thread-node.tsx:566
+#: src/features/chat/thread-list/thread-node.tsx:588
 #: src/features/chat/thread/composer-input-area.tsx:394
 #: src/features/chat/thread/composer-input-area.tsx:407
 msgid "Stop generating"
@@ -29454,7 +29466,7 @@ msgstr "Streamable HTTP (zalecane)"
 msgid "Streaming"
 msgstr "Strumieniowanie"
 
-#: src/features/chat/thread-list/thread-node.tsx:550
+#: src/features/chat/thread-list/thread-node.tsx:548
 msgid "Streaming..."
 msgstr "Strumieniowanie..."
 
@@ -30182,7 +30194,7 @@ msgstr "Tagi to twoje własne etykiety dla czatów. Filtruj według nich listę 
 msgid "Tags for {threadTitle}"
 msgstr "Tagi dla {threadTitle}"
 
-#: src/features/chat/thread-list/thread-node.tsx:741
+#: src/features/chat/thread-list/thread-node.tsx:739
 msgid "Tags unavailable for temporary chats"
 msgstr "Tagi niedostępne dla czatów tymczasowych"
 
@@ -30466,7 +30478,7 @@ msgstr "Szablony"
 msgid "Temporary"
 msgstr "Tymczasowe"
 
-#: src/features/chat/thread-list/thread-node.tsx:1041
+#: src/features/chat/thread-list/thread-node.tsx:1039
 msgid "Temporary chat"
 msgstr "Czat tymczasowy"
 
@@ -30492,7 +30504,7 @@ msgstr "Przechowywanie czatów tymczasowych (godziny)"
 msgid "Temporary chat settings, {0}"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:753
+#: src/features/chat/thread-list/thread-node.tsx:751
 msgid "Temporary chats expire, so they can't be tagged. Convert it to a permanent chat to add tags."
 msgstr "Czaty tymczasowe wygasają, więc nie można ich tagować. Przekształć czat w stały, aby dodać tagi."
 
@@ -32015,7 +32027,7 @@ msgstr "Anonimowe konta użytkowników ({0}) i wszystkie ich dane zostaną trwal
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "Wszystkie wspomnienia ({0}) i ich dzienne podsumowania zostaną trwale usunięte. AI zacznie uczyć się od nowa od twojej następnej rozmowy."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1262
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1264
 msgid "This will permanently delete the project and all associated threads. This action cannot be undone."
 msgstr "Projekt i wszystkie powiązane wątki zostaną trwale usunięte. Tej operacji nie można cofnąć."
 
@@ -32235,7 +32247,7 @@ msgstr "Tytuł może mieć maksymalnie {TITLE_MAX} znaków"
 msgid "Title Slide"
 msgstr "Slajd tytułowy"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:131
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:132
 msgid "To"
 msgstr ""
 
@@ -32749,7 +32761,7 @@ msgstr "Spróbuj zmienić wyszukiwane hasła."
 #: src/components/error-component.tsx:40
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
-#: src/features/develop/components/thread-pull-requests.tsx:145
+#: src/features/develop/components/thread-pull-requests.tsx:153
 #: src/features/home/components/home-page.tsx:144
 msgid "Try again"
 msgstr "Spróbuj ponownie"
@@ -32787,11 +32799,11 @@ msgstr "Wypróbuj teraz"
 msgid "Try searching for a different term."
 msgstr "Spróbuj wyszukać inne hasło."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1087
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1088
 msgid "Try searching in message content"
 msgstr "Spróbuj wyszukać w treści wiadomości"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1087
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1088
 msgid "Try searching in thread titles or summaries"
 msgstr "Spróbuj wyszukać w tytułach lub podsumowaniach wątków"
 
@@ -33045,7 +33057,7 @@ msgstr "przywróć z archiwum"
 
 #: src/components/command-palette.tsx:415
 #: src/components/command-palette.tsx:555
-#: src/features/chat/thread-list/thread-node.tsx:113
+#: src/features/chat/thread-list/thread-node.tsx:112
 msgid "Unarchive thread"
 msgstr "Przywróć wątek z archiwum"
 
@@ -33179,7 +33191,7 @@ msgid "Unlink"
 msgstr "Odłącz"
 
 #: src/features/chat/lock/locked-chat-gate.tsx:88
-#: src/features/chat/thread-list/thread-node.tsx:805
+#: src/features/chat/thread-list/thread-node.tsx:803
 msgid "Unlock chat"
 msgstr ""
 
@@ -33234,7 +33246,7 @@ msgstr "Odepnij wspomnienie"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
 #: src/components/command-palette.tsx:409
-#: src/features/chat/thread-list/thread-node.tsx:105
+#: src/features/chat/thread-list/thread-node.tsx:104
 msgid "Unpin thread"
 msgstr "Odepnij wątek"
 
@@ -33242,7 +33254,7 @@ msgstr "Odepnij wątek"
 msgid "Unpublish"
 msgstr "Wycofaj publikację"
 
-#: src/features/chat/thread-list/thread-node.tsx:1048
+#: src/features/chat/thread-list/thread-node.tsx:1046
 msgid "Unread"
 msgstr ""
 
@@ -33250,7 +33262,7 @@ msgstr ""
 msgid "Unsaved changes"
 msgstr "Niezapisane zmiany"
 
-#: src/features/chat/thread-list/thread-node.tsx:858
+#: src/features/chat/thread-list/thread-node.tsx:856
 msgid "Unsnooze"
 msgstr ""
 
@@ -34696,8 +34708,8 @@ msgstr "Oczekiwanie na zakończenie przesyłania…"
 msgid "Waiting for you"
 msgstr ""
 
-#: src/features/chat/thread-list/thread-node.tsx:553
-#: src/features/chat/thread-list/thread-node.tsx:560
+#: src/features/chat/thread-list/thread-node.tsx:551
+#: src/features/chat/thread-list/thread-node.tsx:558
 #: src/features/chat/thread/ask-user-prompt.tsx:185
 msgid "Waiting for your answer"
 msgstr "Oczekiwanie na twoją odpowiedź"
@@ -34707,8 +34719,8 @@ msgstr "Oczekiwanie na twoją odpowiedź"
 msgid "Waiting for your answer in {0}"
 msgstr "Czeka na twoją odpowiedź w: {0}"
 
-#: src/features/chat/thread-list/thread-node.tsx:552
-#: src/features/chat/thread-list/thread-node.tsx:559
+#: src/features/chat/thread-list/thread-node.tsx:550
+#: src/features/chat/thread-list/thread-node.tsx:557
 #: src/features/chat/thread/tool-approval.tsx:74
 msgid "Waiting for your approval"
 msgstr "Oczekuje na twoje zatwierdzenie"

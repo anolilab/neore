@@ -725,7 +725,7 @@ export interface ApiTypes {
         };
         pr_thread_attach: {
             attachPullRequests: FunctionReference<"action", { pullRequests: Array<{ number: number; repository: string }>; threadId: string }, { results: Array<{ number: number; repository: string; status: "attached" | "already_linked" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" | "pull_request_full" | "thread_full" }> }>;
-            countsForUser: FunctionReference<"query", {}, { counts: Array<{ count: number; threadId: string }>; truncated: boolean }>;
+            countsForThreads: FunctionReference<"query", { threadIds: Array<string> }, Array<{ count: number; threadId: string }>>;
             listForThread: FunctionReference<"query", { threadId: string }, Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "linked" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }>>;
         };
         pr_threads: {
@@ -1593,7 +1593,7 @@ export const api: ApiTypes = {
         },
         pr_thread_attach: {
             attachPullRequests: { __lunoraRef: "source_control_pr_thread_attach:attachPullRequests" },
-            countsForUser: { __lunoraRef: "source_control_pr_thread_attach:countsForUser" },
+            countsForThreads: { __lunoraRef: "source_control_pr_thread_attach:countsForThreads" },
             listForThread: { __lunoraRef: "source_control_pr_thread_attach:listForThread" },
         },
         pr_threads: {

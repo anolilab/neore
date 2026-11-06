@@ -29219,7 +29219,7 @@
       "usesRateLimit": false,
       "usesRls": false,
       "analyzableBody": true,
-      "exportName": "countsForUser",
+      "exportName": "countsForThreads",
       "file": "source-control/pr-thread-attach",
       "hasEmailArg": false,
       "kind": "query",

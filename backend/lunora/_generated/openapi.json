@@ -49574,10 +49574,10 @@
         "x-lunora-function-kind": "action"
       }
     },
-    "/_lunora/rpc#source_control_pr_thread_attach:countsForUser": {
+    "/_lunora/rpc#source_control_pr_thread_attach:countsForThreads": {
       "post": {
-        "description": "Invoke the `query` `source_control_pr_thread_attach:countsForUser` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "source_control_pr_thread_attach:countsForUser",
+        "description": "Invoke the `query` `source_control_pr_thread_attach:countsForThreads` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "source_control_pr_thread_attach:countsForThreads",
         "requestBody": {
           "content": {
             "application/json": {
@@ -49585,12 +49585,21 @@
                 "additionalProperties": false,
                 "properties": {
                   "args": {
-                    "properties": {},
-                    "required": [],
+                    "properties": {
+                      "threadIds": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "threadIds"
+                    ],
                     "type": "object"
                   },
                   "functionPath": {
-                    "const": "source_control_pr_thread_attach:countsForUser",
+                    "const": "source_control_pr_thread_attach:countsForThreads",
                     "type": "string"
                   },
                   "shardKey": {
@@ -49612,34 +49621,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "counts": {
-                      "items": {
-                        "properties": {
-                          "count": {
-                            "type": "number"
-                          },
-                          "threadId": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "count",
-                          "threadId"
-                        ],
-                        "type": "object"
+                  "items": {
+                    "properties": {
+                      "count": {
+                        "type": "number"
                       },
-                      "type": "array"
+                      "threadId": {
+                        "type": "string"
+                      }
                     },
-                    "truncated": {
-                      "type": "boolean"
-                    }
+                    "required": [
+                      "count",
+                      "threadId"
+                    ],
+                    "type": "object"
                   },
-                  "required": [
-                    "counts",
-                    "truncated"
-                  ],
-                  "type": "object"
+                  "type": "array"
                 }
               }
             },
@@ -49649,7 +49646,7 @@
             "$ref": "#/components/responses/LunoraError"
           }
         },
-        "summary": "query: source_control_pr_thread_attach:countsForUser",
+        "summary": "query: source_control_pr_thread_attach:countsForThreads",
         "tags": [
           "source-control"
         ],
