@@ -76,6 +76,7 @@ const messageOf = (text: string) => ({ id: "message-1", parts: [{ text, type: "t
 
 const textModels = MODEL_REGISTRY.filter((model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external");
 const [textModel, otherTextModel] = textModels;
+const imageModel = MODEL_REGISTRY.find((model) => model.mode === "image" && model.enabled !== false);
 
 const renderAction = (cachedBots?: { _id: string; model: string }[], text = "Summarise this"): void => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -218,7 +219,29 @@ describe("CopyPromptLinkAction", () => {
 
         clickCopy();
 
-        await waitFor(() => expect(harness.showError).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(harness.showError).toHaveBeenCalledWith("Could not read this chat's bot, so no link was copied."));
+        expect(harness.showError).toHaveBeenCalledTimes(1);
+        expect(writeText).not.toHaveBeenCalled();
+        expect(harness.showSuccess).not.toHaveBeenCalled();
+    });
+
+    it("refuses a failed bot-list read on a browser with ClipboardItem too: the write is started, rejected, and says why", async () => {
+        const write = vi.fn(async (items: FakeClipboardItem[]) => {
+            await Promise.all(items.map(async (item) => await item.items["text/plain"]));
+        });
+
+        vi.stubGlobal("ClipboardItem", FakeClipboardItem);
+        Object.defineProperty(navigator, "clipboard", { configurable: true, value: { write, writeText } });
+
+        harness.thread = { botId: "bot-1" };
+        harness.loadBots = () => Promise.reject(new Error("offline"));
+
+        renderAction();
+
+        clickCopy();
+
+        await waitFor(() => expect(harness.showError).toHaveBeenCalledWith("Could not read this chat's bot, so no link was copied."));
+        expect(write).toHaveBeenCalledTimes(1);
         expect(writeText).not.toHaveBeenCalled();
         expect(harness.showSuccess).not.toHaveBeenCalled();
     });
@@ -238,18 +261,19 @@ describe("CopyPromptLinkAction", () => {
         expect(copiedLink().searchParams.get("model")).toBe(ANONYMOUS_FREE_MODEL);
     });
 
-    it("keeps the thread's own model for an anonymous person in image mode, as the composer does", async () => {
-        harness.isAnonymous = true;
-        harness.threadModel = DEFAULT_CHAT_MODEL;
+    it("refuses to copy in image mode, where the composer sends its image model, with the warning, and copies nothing", async () => {
+        expect(imageModel).toBeDefined();
+
+        harness.threadModel = imageModel?.id ?? "";
         useModelStore.setState({ threadModes: new Map([["thread-1", "image"]]) });
 
         renderAction();
 
         clickCopy();
 
-        await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-
-        expect(copiedLink().searchParams.get("model")).toBe(DEFAULT_CHAT_MODEL);
+        await waitFor(() => expect(harness.showWarning).toHaveBeenCalledWith("A prompt link cannot name this chat's model, so no link was copied."));
+        expect(writeText).not.toHaveBeenCalled();
+        expect(harness.showSuccess).not.toHaveBeenCalled();
     });
 
     it("refuses a link for a custom endpoint's model, with a notice, rather than opening it on another model", async () => {

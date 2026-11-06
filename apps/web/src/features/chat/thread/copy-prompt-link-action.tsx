@@ -51,13 +51,19 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
     // The same sentence is the warning when the chat's own model is known now, and the error when a bot's model is read on the click.
     const modelRefused = t`A prompt link cannot name this chat's model, so no link was copied.`;
     const tooLong = t`This message is too long to copy as a prompt link.`;
+    const botUnreadable = t`Could not read this chat's bot, so no link was copied.`;
 
     // A bot chat runs on the bot's current model, which the composer shows; the thread may still store an older one. The bot
     // list is read on the click, not per message row, and is fetched again then: a cached list may predate a model change.
     // The list is owner-only, so a bot this person cannot see gives no model and the composer's own rule stands.
     const freshBotModel = async (): Promise<string | undefined> => {
         // The cached list is not reused: a one-shot read's cache never goes stale on its own, so a model changed elsewhere would show.
-        const bots = await queryClient.fetchQuery({ ...crpc.bots.functions.listBots.queryOptions({}, { live: false }), staleTime: 0 });
+        const bots = await queryClient
+            .fetchQuery({ ...crpc.bots.functions.listBots.queryOptions({}, { live: false }), staleTime: 0 })
+            // A failed read is refused with its own sentence: a link naming the stored model instead would be a different model.
+            .catch(() => {
+                throw new LinkRefusal(botUnreadable);
+            });
 
         return bots.find((bot) => bot._id === botId)?.model;
     };
