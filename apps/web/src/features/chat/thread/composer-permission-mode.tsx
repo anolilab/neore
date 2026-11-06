@@ -114,7 +114,8 @@ const ComposerThreadPermissionMode: FC = () => {
             }
         },
     });
-    const [pending, setPending] = useState<ThreadPermissionMode>();
+    // Tagged with its thread: a selection still saving when the viewer opens another chat must not show there.
+    const [pending, setPending] = useState<{ mode: ThreadPermissionMode; threadId: string }>();
     const latestSave = useRef(0);
 
     // Until the thread has loaded, the menu is hidden: a host thread must never show an enabled control while its runner is unknown.
@@ -128,16 +129,17 @@ const ComposerThreadPermissionMode: FC = () => {
 
     const ownMode: ThreadPermissionMode = isMode(thread?.permissionMode) ? thread.permissionMode : "auto";
     const stored: ThreadPermissionMode = isMode(effective) ? effective : ownMode;
+    const shown = pending?.threadId === threadId ? pending.mode : stored;
 
     return (
         <ComposerPermissionMode
             disabled={isRunning}
-            mode={pending ?? stored}
+            mode={shown}
             onModeChange={(mode) => {
                 latestSave.current += 1;
                 const save = latestSave.current;
 
-                setPending(mode);
+                setPending({ mode, threadId });
                 mutateAsync({ mode, threadId: threadId as never })
                     // The menu reads the mode from the cached thread: a saved mode must show without waiting for a refresh.
                     .then(() => queryClient.invalidateQueries({ queryKey: crpc.chat.functions.getThread.queryKey({ threadId: threadId as never }) }))

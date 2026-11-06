@@ -242,4 +242,29 @@ describe("permission mode control", () => {
         await waitFor(() => expect(showError).toHaveBeenCalled());
         expect(usePromptQueueStore.getState().queues.t1?.paused).toBe(true);
     });
+
+    it("does not show a selection still saving for one chat in another chat that stores a different mode", async () => {
+        state.thread = { _id: "t1", permissionMode: "auto" };
+        state.save.mockImplementationOnce(() => new Promise<null>(() => {}));
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        const view = render(
+            <QueryClientProvider client={client}>
+                <ComposerThreadPermissionMode />
+            </QueryClientProvider>,
+        );
+
+        fireEvent.click(await screen.findByRole("button", { name: "Permission mode: Auto" }));
+        fireEvent.click(screen.getByRole("menuitemradio", { name: SUPERVISED_PATTERN }));
+        expect(await screen.findByRole("button", { name: "Permission mode: Supervised" })).toBeTruthy();
+
+        // The viewer opens a Full access chat before the save settles.
+        state.thread = { _id: "t2", permissionMode: "full" };
+        view.rerender(
+            <QueryClientProvider client={client}>
+                <ComposerThreadPermissionMode />
+            </QueryClientProvider>,
+        );
+
+        expect(await screen.findByRole("button", { name: "Permission mode: Full access" })).toBeTruthy();
+    });
 });
