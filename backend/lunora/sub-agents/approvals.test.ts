@@ -254,6 +254,34 @@ describe("a child that stopped on a request", () => {
         expect(await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER))).toBe(1);
         expect(await runStatus()).toBe("cancelled");
     });
+
+    it("closes every open request of a stopped run, not only the first page of them", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+        await run(async (context) => {
+            for (let index = 0; index < 60; index += 1) {
+                await context.db.insert("toolApprovalRuns", {
+                    approvalId: `bulk-${index}`,
+                    config: CONFIG(),
+                    createdAt: Date.now(),
+                    status: "pending",
+                    threadId: childId,
+                    userId: OWNER,
+                });
+            }
+        });
+
+        expect(await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER))).toBe(1);
+
+        const stillOpen = await run(
+            async (context) =>
+                await context.db
+                    .query("toolApprovalRuns")
+                    .withIndex("by_threadId_status_createdAt", (q: any) => q.eq("threadId", childId).eq("status", "pending"))
+                    .collect(),
+        );
+
+        expect(stillOpen).toHaveLength(0);
+    });
 });
 
 describe("a new message into a child that waits on a request", () => {

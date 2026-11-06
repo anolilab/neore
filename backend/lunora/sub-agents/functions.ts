@@ -1379,15 +1379,32 @@ const APPROVAL_ROWS_SCANNED = 50;
 
 /** Denies a child's unanswered approval requests and clears its waiting state: its run has ended, so nothing will answer them. */
 const closeChildApprovals = async (ctx: MutationCtx, childThreadId: string, runId: Id<"subAgentRuns">, now: number): Promise<void> => {
-    const pending = await pendingApprovalRows(ctx, childThreadId);
-    const own = pending.filter((row) => row.config.subAgentRunId === runId);
+    // Every page of the child's open requests, not only the first: a paused turn can record more than one page of them, and a
+    // request left open here could still be answered with "Always allow" after its run ended.
+    let cursor: string | null = null;
+    let othersOpen = false;
+    let done = false;
 
-    for (const row of own) {
-        await patchById(ctx.db, "toolApprovalRuns", row._id, { resolvedAt: now, resolvedBy: "run-ended", status: "denied" });
+    while (!done) {
+        const page = await ctx.db
+            .query("toolApprovalRuns")
+            .withIndex("by_threadId_status_createdAt", (q) => q.eq("threadId", childThreadId).eq("status", "pending"))
+            .paginate({ cursor, numItems: APPROVAL_ROWS_SCANNED });
+
+        for (const row of page.page) {
+            if (row.config.subAgentRunId === runId) {
+                await patchById(ctx.db, "toolApprovalRuns", row._id, { resolvedAt: now, resolvedBy: "run-ended", status: "denied" });
+            } else {
+                othersOpen = true;
+            }
+        }
+
+        cursor = page.continueCursor;
+        done = page.isDone;
     }
 
     // The child is awaiting input only while some request of it is still open.
-    if (own.length === pending.length) {
+    if (!othersOpen) {
         await clearAwaitingInput(ctx.db, childThreadId as Id<"threads">);
     }
 };
