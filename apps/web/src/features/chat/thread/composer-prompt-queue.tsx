@@ -480,21 +480,18 @@ const ComposerPromptQueue: FC = () => {
         });
     }, []);
 
-    // An emptied queue has nothing to announce, and a later queue in the thread must not repeat the old move.
+    // A move is read out once: it is dropped when the queue empties, when another thread is shown, and when the
+    // queue refills, so a later queue (or returning to this thread) does not repeat it.
     const queueIsEmpty = queue.items.length === 0;
 
     useEffect(() => {
-        if (!queueIsEmpty) {
-            return;
-        }
-
         if (announceFrame.current !== null) {
             globalThis.cancelAnimationFrame(announceFrame.current);
             announceFrame.current = null;
         }
 
         setAnnouncement({ text: "", threadId: undefined });
-    }, [queueIsEmpty]);
+    }, [queueIsEmpty, threadId]);
 
     useEffect(() => {
         const focus = pendingFocus.current;

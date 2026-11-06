@@ -156,6 +156,32 @@ describe("composer prompt queue", () => {
         expect(screen.queryByText("Moved to position 1")).toBeNull();
     });
 
+    it("does not read a move's announcement again when the person returns to its thread", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const threadId of ["thread-1", "thread-2"]) {
+            for (const text of ["one", "two"]) {
+                enqueue(threadId, { attachments: [], text });
+            }
+
+            setPaused(threadId, true);
+        }
+
+        const { rerender } = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Move queued message 2 up"));
+        await nextFrame();
+        expect(screen.getByText("Moved to position 1")).toBeTruthy();
+
+        // Another thread with its own queue is shown, then the first thread again: the old move is not read out again.
+        chat.threadId = "thread-2";
+        rerender(<ComposerPromptQueue />);
+        chat.threadId = "thread-1";
+        rerender(<ComposerPromptQueue />);
+
+        expect(screen.queryByText("Moved to position 1")).toBeNull();
+    });
+
     it("keeps keyboard focus on the moved message's button, so the next move needs no mouse", () => {
         const { enqueue, setPaused } = usePromptQueueStore.getState();
 
