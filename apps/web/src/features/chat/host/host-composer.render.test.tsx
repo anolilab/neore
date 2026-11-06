@@ -176,6 +176,20 @@ describe("the coding-agent composer", () => {
         await waitFor(() => expect(box.value).toBe(""));
     });
 
+    it("does not send the draft a refused paste would have left, and shows the refusal", async () => {
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "a valid draft" } });
+        // A paste over the raw-input limit is refused: the field keeps its draft and says so.
+        fireEvent.change(box, { target: { value: "x".repeat(120_001) } });
+
+        expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
+        fireEvent.keyDown(box, { key: "Enter" });
+        expect(harness.calls).toHaveLength(0);
+    });
+
     it("does not send an empty message", async () => {
         mount(session());
 

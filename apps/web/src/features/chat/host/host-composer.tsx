@@ -129,7 +129,8 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const blocked = status === "ended";
     const overLimit = sendable.length > MAX_HOST_PROMPT_CHARS;
     const limitNote = overLimit || refusedPaste;
-    const canSend = sendable !== "" && !overLimit && !sending && !running && !blocked;
+    // A refused paste keeps the draft it replaced, so the field shows the error and Send must not send that draft.
+    const canSend = sendable !== "" && !overLimit && !refusedPaste && !sending && !running && !blocked;
     const lastEnd = session?.lastEndReason;
     const offerContinue = !running && !blocked && lastEnd !== undefined && CONTINUABLE.has(lastEnd);
 
