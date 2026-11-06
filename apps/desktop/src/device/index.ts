@@ -583,7 +583,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const target = readOptionalDeviceId(deviceId);
         const signed = await requireTransport().manifest(target);
 
-        // This computer's app version rides beside its own manifest, unsigned and display-only (Settings warns when it is old).
+        // This computer's app version rides beside its own manifest, unsigned and display-only, so it does not drive the update notice.
         // A server's manifest is signed here for software running there, so it carries none.
         return target === undefined ? { ...signed, appVersion: app.getVersion() } : signed;
     });
