@@ -11,7 +11,20 @@ describe("isAppVersion", () => {
     });
 
     it("refuses what is not a version", () => {
-        for (const bad of ["", "v1.2.3", "1.2.3+build", "latest", "1..2", "1.2.3.4.5", "1.2.x", "<script>"]) {
+        for (const bad of [
+            "",
+            "v1.2.3",
+            "1.2.3+build",
+            "latest",
+            "1..2",
+            "1.2.3.4.5",
+            "1.2.x",
+            "<script>",
+            "1.2.3\n",
+            "1.2.3-beta.",
+            "1.2.3-beta..1",
+            "1.2.3-beta-",
+        ]) {
             expect(isAppVersion(bad)).toBe(false);
         }
     });
