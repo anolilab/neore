@@ -9,11 +9,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HostToolRow } from "./host-activity";
 import { HostPlan, HostToolCalls } from "./host-activity";
 
+const reader = vi.hoisted(() => {
+    return { locale: "en" };
+});
+
 vi.mock("@lingui/react/macro", () => {
     return {
         Trans: ({ children }: { children: unknown }) => children,
         useLingui: () => {
-            return { i18n: { locale: "en" }, t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+            return {
+                i18n: {
+                    get locale() {
+                        return reader.locale;
+                    },
+                },
+                t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values),
+            };
         },
     };
 });
@@ -100,6 +111,21 @@ describe("a coding agent's tool calls", () => {
         rerender(<HostToolCalls tools={[running("line 1\nline 2")]} />);
 
         expect(box.scrollTop).toBe(0);
+    });
+
+    it("formats a command's exit code for the reader's locale, in the row and in its announcement", () => {
+        const digit = new Intl.NumberFormat("ar-EG").format(1);
+
+        reader.locale = "ar-EG";
+
+        try {
+            render(<HostToolCalls tools={[{ exit: { code: 1 }, id: "c1", output: "", status: "failed", title: "Run tests", toolKind: "execute" }]} />);
+
+            expect(screen.getByText(`Exited with code ${digit}`)).toBeTruthy();
+            expect(within(screen.getByRole("listitem")).getByRole("status").textContent).toBe(`Run tests: Failed. Exited with code ${digit}`);
+        } finally {
+            reader.locale = "en";
+        }
     });
 
     it("keeps a command's status region in place from the start and fills it when the command finishes", () => {

@@ -7,6 +7,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import { formatNumber } from "@neore/ui/utils/locale-format";
 import { CheckCircle2, Circle, Loader2 } from "lucide-react";
 import type { FC } from "react";
 import { memo, useLayoutEffect, useRef } from "react";
@@ -115,7 +116,7 @@ HostPlan.displayName = "HostPlan";
 
 /** One tool call: its title, its status in words, and the tail of what it printed in a region that scrolls on its own. */
 const HostToolCall: FC<{ tool: HostToolRow }> = memo(({ tool }) => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
     const { exit, output, status, title } = tool;
     const outputRef = useRef<HTMLPreElement>(null);
     const rowRef = useRef<HTMLLIElement>(null);
@@ -172,7 +173,8 @@ const HostToolCall: FC<{ tool: HostToolRow }> = memo(({ tool }) => {
     if (exit?.code !== undefined) {
         const { code } = exit;
 
-        exitText = t`Exited with code ${code}`;
+        // The number in the reader's own digits and separators, as the rest of the page shows numbers.
+        exitText = t`Exited with code ${formatNumber(code, i18n.locale)}`;
     } else if (exit?.signal !== undefined) {
         const { signal } = exit;
 
