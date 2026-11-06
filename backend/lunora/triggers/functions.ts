@@ -35,6 +35,7 @@ import type { PayloadFilter } from "./filters";
 import { assertValidFilters, evaluateFilters, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH, MAX_WEBHOOK_BODY_BYTES } from "./filters";
 import type { WebhookPreset } from "./presets";
 import { compileWebhookPreset } from "./presets";
+import { MAX_WEBHOOK_TEMPLATE_LENGTH } from "./webhook-template";
 import { canBeQuiet } from "./quiet";
 import { resolveTimeZone } from "../memory/reflection-logic";
 import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
@@ -382,6 +383,16 @@ const cleanPromptField = <T extends string | undefined>(value: T, label: string)
     return text as T;
 };
 
+/**
+ * A webhook's Input Template is its prompt. A template longer than the room left beside a delivery's body would refuse
+ * every delivery, so it is refused when it is saved (`webhook-template.ts`).
+ */
+const assertWebhookTemplateFits = (type: string, template: string | undefined): void => {
+    if (type === "webhook" && template !== undefined && template.length > MAX_WEBHOOK_TEMPLATE_LENGTH) {
+        throw new LunoraError("BAD_REQUEST", `A webhook's Input Template is at most ${String(MAX_WEBHOOK_TEMPLATE_LENGTH)} characters.`);
+    }
+};
+
 export const createTrigger = authMutation
     .use(rateLimit("triggers/create"))
     .input({
@@ -464,6 +475,8 @@ export const createTrigger = authMutation
 
         const { filters, webhookSignatureScheme } = webhookSetup(args, triggerType);
         const eventSource = await checkedEventSource(context, args.eventSource, triggerType, userId, now);
+
+        assertWebhookTemplateFits(triggerType, args.inputTemplate);
 
         const inserted = await context.db.insert("triggers", {
             botComputer: args.botComputer === true ? true : undefined,
@@ -648,6 +661,9 @@ export const updateTrigger = authMutation
             patch.timezone = requestedZone;
         }
 
+        // A template left as it is is not checked again: one saved before the limit can still be edited in other fields.
+        assertWebhookTemplateFits(trigger.type, args.inputTemplate === trigger.inputTemplate ? undefined : args.inputTemplate);
+
         if (args.inputTemplate !== undefined) patch.inputTemplate = cleanPromptField(args.inputTemplate, "The input");
 
         // Clearing the bot clears its computer and quiet flags too: a routine without a bot has neither.
@@ -682,6 +698,8 @@ export const updateTrigger = authMutation
             ...withoutUndefined(patch),
             // `null` removes the description.
             ...(args.description === null && { description: undefined }),
+            // An empty template removes the stored one; `undefined` leaves it as it is.
+            ...(args.inputTemplate !== undefined && args.inputTemplate.trim() === "" && { inputTemplate: undefined }),
             // `undefined` removes a stale time; enabling recomputes it (`firstRunOf`).
             // Also clears a time a non-schedule trigger stored before this check existed.
             // An event trigger's next check is its own and is never touched here.
@@ -936,11 +954,8 @@ export const testRunTrigger = authAction
         }
 
         const wasEnabled = trigger.enabled === true;
-        // A schedule's or a watcher's input is its template, so only a payload the user typed overrides it (`executeTrigger`).
-        const payload =
-            trigger.type === "schedule" || trigger.type === "event"
-                ? args.testPayload
-                : args.testPayload || trigger.inputTemplate || "Manual test run triggered.";
+        // Every trigger type takes only a payload the user typed: without one, `executeTrigger` builds the input from the template.
+        const payload = args.testPayload;
 
         // The run reads the trigger only when it starts, after this action has returned, so it is told to run a disabled one.
         // `manual`: a quiet routine posts a run the user asked for, whatever the workspace holds.

@@ -65,6 +65,10 @@ import {
 
 /** The template variable a webhook trigger fills with the request body; code, not copy. */
 const PAYLOAD_TOKEN = "{{payload}}";
+/** The placeholders the webhook hint names. Interpolated, not written in the message: braces in a Lingui message id are ICU syntax. */
+const WEBHOOK_BODY_TOKEN = "{{body.field}}";
+const WEBHOOK_HEADER_TOKEN = "{{header.name}}";
+const WEBHOOK_QUERY_TOKEN = "{{query.name}}";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -361,12 +365,18 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                 <div className="space-y-1.5">
                     <Label htmlFor="trigger-input">{t`Input Template`}</Label>
                     <Textarea
+                        aria-describedby={formData.type === "webhook" ? "trigger-input-hint" : undefined}
                         id="trigger-input"
                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onChange({ ...formData, inputTemplate: e.target.value })}
                         placeholder={t`Summarize my inbox and highlight urgent items. Use ${PAYLOAD_TOKEN} for webhook data.`}
                         rows={2}
                         value={formData.inputTemplate}
                     />
+                    {formData.type === "webhook" && (
+                        <p className="text-muted-foreground text-xs" id="trigger-input-hint">
+                            {t`Placeholders: ${PAYLOAD_TOKEN} inserts the whole body, framed as raw text. ${WEBHOOK_BODY_TOKEN} inserts a JSON field, ${WEBHOOK_HEADER_TOKEN} a header and ${WEBHOOK_QUERY_TOKEN} a query parameter, each as quoted data. Headers and the query are not signed, and a credential-looking name is never read. A template is at most 9,500 characters.`}
+                        </p>
+                    )}
                 </div>
 
                 {/* Actions */}
@@ -551,7 +561,8 @@ const TriggerSettings: FC = () => {
                 eventSource: editFormData.type === "event" ? eventSourceFromForm(editFormData.event) : undefined,
                 // The whole set replaces the stored one; an empty set clears it.
                 filters: editFormData.type === "webhook" ? webhookUpdateFilters(editFormData.webhook) : undefined,
-                inputTemplate: editFormData.inputTemplate || undefined,
+                // The form always carries the stored template, so an empty one is a deliberate clear.
+                inputTemplate: editFormData.inputTemplate,
                 model: editFormData.model || undefined,
                 name: editFormData.name,
                 quietWhenEmpty,

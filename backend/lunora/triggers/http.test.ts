@@ -103,10 +103,10 @@ const setup = async (trigger: Record<string, unknown> = SIGNED_TRIGGER) => {
         },
     };
 
-    const post = async (body: string | Uint8Array, headers: Record<string, string>) =>
+    const post = async (body: string | Uint8Array, headers: Record<string, string>, search = "") =>
         await handleTriggerWebhook(
             context as never,
-            new Request("https://x/triggers/webhook/t", { body: body as BodyInit, headers, method: "POST" }),
+            new Request(`https://x/triggers/webhook/t${search}`, { body: body as BodyInit, headers, method: "POST" }),
             triggerId,
         );
 
@@ -154,7 +154,83 @@ afterEach(() => {
     vi.useRealTimers();
 });
 
+/** The rendered prompt's first line, and its framed body at the end. */
+const RENDERED_HEAD = /^Issue "Login broken" from "issues", token "": <webhook-data-[\da-f]{12}>\n/u;
+const RENDERED_FRAME = /<webhook-data-[\da-f]{12}>\n\{"issue":\{"title":"Login broken"\}\}\n<\/webhook-data-[\da-f]{12}>$/u;
+
 describe("trigger webhook signing", () => {
+    it("renders the Input Template from the body, a header and the query, and schedules only the rendered prompt", async () => {
+        const { scheduled, statusOf } = await setup({
+            ...SIGNED_TRIGGER,
+            inputTemplate: "Issue {{body.issue.title}} from {{header.x-github-event}}, token {{header.authorization}}: {{payload}}",
+        });
+        const body = '{"issue":{"title":"Login broken"}}';
+        const headers = { ...(await signedHeaders(body)), authorization: "Bearer s3cret", "x-github-event": "issues" };
+
+        expect(await statusOf(body, headers)).toBe(200);
+        expect(scheduled).toHaveLength(1);
+
+        const [args] = scheduled as { payload: string; webhookPrompt: string }[];
+
+        expect(args?.payload).toBe(body);
+        expect(args?.webhookPrompt).toMatch(RENDERED_HEAD);
+        expect(args?.webhookPrompt).not.toContain("s3cret");
+        expect(args?.webhookPrompt).toMatch(RENDERED_FRAME);
+    });
+
+    it("renders a query parameter from the request URL into the prompt", async () => {
+        const { post, scheduled } = await setup({ ...SIGNED_TRIGGER, inputTemplate: "Room {{query.room}}: {{body.msg}}" });
+        const body = '{"msg":"hi"}';
+
+        const response = await post(body, await signedHeaders(body), "?room=ops");
+
+        expect(response.status).toBe(200);
+
+        const [args] = scheduled as { webhookPrompt: string }[];
+
+        expect(args?.webhookPrompt.startsWith('Room "ops": "hi"')).toBe(true);
+    });
+
+    it("renders a query parameter named __proto__ from the request URL", async () => {
+        const { post, scheduled } = await setup({ ...SIGNED_TRIGGER, inputTemplate: "Value {{query.__proto__}}" });
+        const body = "{}";
+
+        const response = await post(body, await signedHeaders(body), "?__proto__=ops");
+
+        expect(response.status).toBe(200);
+
+        const [args] = scheduled as { webhookPrompt: string }[];
+
+        expect(args?.webhookPrompt.startsWith('Value "ops"')).toBe(true);
+    });
+
+    it("refuses a delivery that cannot be rendered, and its retry is refused the same way rather than taken as a duplicate", async () => {
+        // Three frames of a full-size body are over the prompt limit, so the renderer refuses the delivery.
+        const { post, scheduled } = await setup({ ...SIGNED_TRIGGER, inputTemplate: "{{payload}}".repeat(3) });
+        const body = "y".repeat(10_000);
+        const headers = await signedHeaders(body);
+
+        const first = await post(body, headers);
+        const retry = await post(body, headers);
+
+        expect([first.status, retry.status]).toEqual([422, 422]);
+        expect(scheduled).toHaveLength(0);
+    });
+
+    it("refuses a delivery whose scheduled arguments would exceed the dispatch limit, and gives its claim back", async () => {
+        const { post, scheduled } = await setup();
+        // Every quote is escaped in the scheduled arguments, so this body is near 1.2 MiB there and under the 1 MiB body cap here.
+        const body = '"'.repeat(600_000);
+        const headers = await signedHeaders(body);
+
+        const response = await post(body, headers);
+        // The sender's retry is the same signed delivery: it must be refused again, not taken as a duplicate of the first.
+        const retry = await post(body, headers);
+
+        expect([response.status, retry.status]).toEqual([413, 413]);
+        expect(scheduled).toHaveLength(0);
+    });
+
     it("runs a fresh, correctly signed delivery exactly once — a replay is acknowledged but not run", async () => {
         const { post, scheduled, statusOf } = await setup();
         const body = '{"event":"x"}';

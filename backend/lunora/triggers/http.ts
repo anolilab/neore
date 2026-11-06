@@ -71,6 +71,7 @@ import { decryptKey } from "../lib/encryption";
 import { httpScheduler } from "../lib/http-scheduler";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { decodeStrict, evaluateFilters, MAX_WEBHOOK_BODY_BYTES } from "./filters";
+import { randomFrameId, renderWebhookPrompt } from "./webhook-template";
 import type { WebhookSignatureScheme } from "./validators";
 
 const DIGITS_ONLY = /^\d{1,12}$/u;
@@ -82,6 +83,13 @@ const MAX_DELIVERY_ID_LENGTH = 128;
 const NATIVE_SIGNATURE = /^sha256=[\da-f]{64}$/iu;
 
 /**
+ * Lunora refuses a scheduled dispatch over 1 MiB, after the delivery was acknowledged. The limit here keeps a reserve for the
+ * dispatch envelope around the arguments, so a delivery that would fail there is refused now, with a 413. The envelope's
+ * size is not measured here.
+ */
+const MAX_SCHEDULED_ARGS_BYTES = 1024 * 1024 - 64 * 1024;
+
+/**
  * The trigger fields this handler reads.
  *
  * `internal.triggers.functions.getTriggerInternal` is declared `.output(v.any())`,
@@ -91,8 +99,31 @@ const NATIVE_SIGNATURE = /^sha256=[\da-f]{64}$/iu;
  */
 type WebhookTrigger = Pick<
     Doc<"triggers">,
-    "enabled" | "filters" | "type" | "userId" | "webhookPreviousSecret" | "webhookPreviousSecretExpiresAt" | "webhookSecret" | "webhookSignatureScheme"
+    | "enabled"
+    | "filters"
+    | "inputTemplate"
+    | "type"
+    | "userId"
+    | "webhookPreviousSecret"
+    | "webhookPreviousSecretExpiresAt"
+    | "webhookSecret"
+    | "webhookSignatureScheme"
 >;
+
+/** The request's query parameters, the first value of each name (a credential-looking name is filtered when it is read). */
+const firstQueryValues = (url: string): Record<string, string> => {
+    // No prototype, so a name such as `__proto__` is stored as a key instead of invoking the inherited setter.
+    const query = Object.create(null) as Record<string, string>;
+    const params = new URL(url).searchParams;
+
+    for (const [name, value] of params) {
+        if (!Object.hasOwn(query, name)) {
+            query[name] = value;
+        }
+    }
+
+    return query;
+};
 
 /**
  * Handle an incoming webhook request for a trigger.
@@ -281,16 +312,50 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
             );
         }
 
+        // The prompt is rendered here, where the headers and the query are. Only the rendered text is scheduled, so a
+        // credential-looking header or query value never leaves this request. An empty body with no template keeps the
+        // trigger's own fallback text, so nothing is rendered for it.
+        const webhookPrompt =
+            body || trigger.inputTemplate
+                ? renderWebhookPrompt(
+                      trigger.inputTemplate,
+                      {
+                          body,
+                          headers: Object.fromEntries(request.headers),
+                          jsonText: strictBody ?? "",
+                          query: firstQueryValues(request.url),
+                      },
+                      randomFrameId(),
+                  )
+                : undefined;
+
+        // A delivery that cannot be rendered, or whose scheduled arguments would not fit Lunora's dispatch request, is
+        // refused now and its claim given back: once it is acknowledged, the run could never start. The sender is told.
+        if (webhookPrompt === undefined && (body || trigger.inputTemplate)) {
+            await taken.giveBack();
+
+            return Response.json({ error: "This delivery cannot be rendered into the trigger's Input Template." }, { status: 422 });
+        }
+
+        const scheduled = {
+            ...taken.args,
+            invalidUtf8: strictBody === null ? true : undefined,
+            payload: body || undefined,
+            triggerId: triggerId as Id<"triggers">,
+            webhookPrompt,
+        };
+
+        if (new TextEncoder().encode(JSON.stringify(scheduled)).byteLength > MAX_SCHEDULED_ARGS_BYTES) {
+            await taken.giveBack();
+
+            return Response.json({ error: "This delivery is too large to run." }, { status: 413 });
+        }
+
         // 5. Schedule trigger execution. The claim is already committed, so a
         //    failure here must give it back — otherwise the sender's retry of
         //    this same delivery reads as a replay, and it never runs at all.
         try {
-            await httpScheduler(context).runAfter(0, internal.triggers.execute.executeTrigger, {
-                ...taken.args,
-                invalidUtf8: strictBody === null ? true : undefined,
-                payload: body || undefined,
-                triggerId: triggerId as Id<"triggers">,
-            });
+            await httpScheduler(context).runAfter(0, internal.triggers.execute.executeTrigger, scheduled);
         } catch (error) {
             await taken.giveBack();
 
