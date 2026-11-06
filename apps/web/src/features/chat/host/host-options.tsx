@@ -137,13 +137,26 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
     const [change, setChange] = useState<{ callId?: string; name: string; rowId: string; valueId: string; valueName: string } | undefined>(undefined);
     const [failure, setFailure] = useState<string | undefined>(undefined);
     // Offline, the default network mode would pause the call before the Lunora client sees it, and the client is what queues a write.
-    // Offline, the default network mode would pause the call before the Lunora client sees it, and the client is what queues a write.
     const set = useMutation({ ...crpc.acp.remote.setHostOption.mutationOptions(), networkMode: "always" });
     // The call whose confirmed value never showed in the options, so the wait for it ended.
     const [gaveUp, setGaveUp] = useState<string | undefined>(undefined);
     const rows = rowsOf(state, { mode: t`Mode`, model: t`Model` });
-    const answered = change?.callId !== undefined && optionResult?.callId === change.callId ? optionResult : undefined;
+    // The answer to this page's change, kept once it has been seen: the session keeps only its latest result, which another client's
+    // change can replace. Without this, the page would wait for the answer again.
+    const [ownAnswer, setOwnAnswer] = useState<OptionResult | undefined>(undefined);
+    const changeCallId = change?.callId;
+
+    useEffect(() => {
+        if (changeCallId !== undefined && optionResult !== undefined && optionResult.callId === changeCallId) {
+            setOwnAnswer(optionResult);
+        }
+    }, [changeCallId, optionResult]);
+
+    const answered = changeCallId === undefined ? undefined : [optionResult, ownAnswer].find((result) => result?.callId === changeCallId);
     const changed = change === undefined ? undefined : rows.find((row) => row.id === change.rowId);
+    // The names the change was made with, for the messages that can outlive its row: the agent may have removed the option since.
+    const changeName = changed?.name ?? change?.name ?? "";
+    const changeValueName = changed === undefined ? (change?.valueName ?? "") : nameOfValue(changed, change?.valueId ?? "");
     // The agent's answer reaches the page before the options it changed (the state is posted a moment later): the controls stay
     // off until the option shows the new value, so the row never says "confirmed" over the old one. A bounded wait.
     // A confirmed change waits, once, for its value to show; a call whose value has shown is settled for good, so a later change by the
@@ -208,6 +221,7 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
 
     // The backend sends one of a fixed set of English phrases (`acp/lib/calls.ts`). Each is shown in the person's language.
     const refusalTexts = new Map<string, string>([
+        ["a mode is changed on the computer, not from here", t`a mode is changed on the computer, not from here`],
         ["that session no longer exists", t`that session no longer exists`],
         ["the agent did not accept the change", t`the agent did not accept the change`],
         ["the agent did not answer", t`the agent did not answer`],
@@ -259,7 +273,9 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
         answered !== undefined &&
         changed !== undefined &&
         answered.outcome === "refused" &&
-        answered.reason === "the agent did not answer" &&
+        // A call the backend expired reads "The host did not answer."; the agent may still have applied the change after that.
+        // A call the backend expired reads "The host did not answer."; the agent may still have applied the change after that.
+        (answered.reason === "the agent did not answer" || answered.reason === "The host did not answer.") &&
         changed.current === answered.valueId
     ) {
         // The agent answered after the wait for it ended, and the option now shows the value it confirmed.
@@ -279,12 +295,12 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
     } else if (answered !== undefined && (answered.outcome === "refused" || changed?.current === answered.valueId)) {
         refused = answered.outcome === "refused";
         status = refused
-            ? t`The agent did not change ${changed?.name ?? ""}: ${refusalText(answered.reason)}`
+            ? t`The agent did not change ${changeName}: ${refusalText(answered.reason)}`
             : t`The agent confirmed: ${changed?.name ?? ""} is now ${nameOfValue(changed, answered.valueId)}.`;
     } else if (unknownOutcome) {
-        status = t`No answer came for the change to ${changed?.name ?? ""}. Check the agent before changing it again.`;
+        status = t`No answer came for the change to ${changeName}. Check the agent before changing it again.`;
     } else if (waiting) {
-        status = t`Waiting for the agent to change ${changed?.name ?? ""} to ${nameOfValue(changed, change?.valueId ?? "")}.`;
+        status = t`Waiting for the agent to change ${changeName} to ${changeValueName}.`;
     }
 
     // Without an option left, a pending change or its answer is still shown; nothing is shown when neither is left.
