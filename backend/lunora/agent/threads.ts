@@ -29,7 +29,7 @@ import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as v
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
 import { clearAwaitingInput, patchesWithoutAwaitingInput } from "./table-writes";
-import { deletePullRequestLinksOfThread } from "../source-control/pr-thread-links";
+import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
 import { deleteThreadSummaries } from "./thread-summaries";
 
 export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
@@ -750,6 +750,7 @@ export const softDeleteThread = internalMutation
             deletedAt: ctx.now,
             updatedAt: ctx.now,
         });
+        await setLinksThreadDeleted(ctx, oldThread.userId, args.threadId, true);
         // A coding agent's turn does not outlive the thread it writes into, nor does a goal.
         await endHostThread(ctx, oldThread, ctx.now);
         await endActiveGoals(ctx, args.threadId, "user");
@@ -771,6 +772,7 @@ export const restoreThread = internalMutation
             deletedAt: undefined,
             updatedAt: ctx.now,
         });
+        await setLinksThreadDeleted(ctx, oldThread.userId, args.threadId, false);
 
         // The session the delete ended, if this is a coding agent's thread, can take turns again.
         if (oldThread.deleted) {
