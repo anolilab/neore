@@ -16,7 +16,7 @@ import type { ModelId } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import { buildPromptLink, readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 
-import { useComposerModelEntries } from "./use-composer-models";
+import { FLAG_WAIT_MS, useComposerModelEntries } from "./use-composer-models";
 
 const harness = vi.hoisted(() => {
     return {
@@ -211,7 +211,15 @@ describe("a prompt link and the user's blocked models", () => {
     describe("a model behind a feature flag", () => {
         const flagged = { ...textModels[0], featureFlag: "beta-models", id: "flagged-text-model" };
 
+        /** Lets the reads answer: they resolve on the microtask queue, and react-query's notifications on a zero-delay timer. */
+        const settle = async (): Promise<void> => {
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(0);
+            });
+        };
+
         beforeEach(() => {
+            vi.useFakeTimers();
             harness.catalog = [...textModels, flagged];
             harness.posthog = {
                 flagsEndpointWasHit: false,
@@ -224,15 +232,15 @@ describe("a prompt link and the user's blocked models", () => {
             };
         });
 
-        it("waits until the flags are known, then selects the usable model a link names: nothing is refused before the flags load", async () => {
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it("waits until the flags are known, then selects the usable model a link names", async () => {
             const { result } = renderHook(() => useLinkWithComposerList(flagged.id), { wrapper });
 
-            // Let the catalog and the user's rules answer; the flags have not, so the list is still not final and the link waits.
-            await act(async () => {
-                await new Promise((resolve) => {
-                    setTimeout(resolve, 50);
-                });
-            });
+            // The catalog and the rules have answered; the flags have not, so the list is not final and the link waits.
+            await settle();
             expect(result.current.settled).toBe(false);
             expect(harness.showWarning).not.toHaveBeenCalled();
 
@@ -242,39 +250,44 @@ describe("a prompt link and the user's blocked models", () => {
                 harness.flagCallback?.();
             });
 
-            await waitFor(() => expect(result.current.settled).toBe(true));
-            await waitFor(() => expect(selectedModel()).toBe(flagged.id));
+            await settle();
+            expect(result.current.settled).toBe(true);
+            expect(selectedModel()).toBe(flagged.id);
             expect(harness.showWarning).not.toHaveBeenCalled();
-        }, 15_000);
+        });
 
         it("a flag request that fails decides the link at once, without the wait", async () => {
             const { result } = renderHook(() => useLinkWithComposerList(flagged.id), { wrapper });
 
-            await act(async () => {
-                await new Promise((resolve) => {
-                    setTimeout(resolve, 50);
-                });
-            });
+            await settle();
             expect(result.current.settled).toBe(false);
 
             act(() => {
                 harness.flagCallback?.(undefined, undefined, { errorsLoading: true });
             });
 
-            await waitFor(() => expect(result.current.settled).toBe(true));
+            await settle();
+            expect(result.current.settled).toBe(true);
             expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
             expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
-        }, 5000);
+        });
 
         it("when the flags never arrive, the link decides after the wait without the flagged model, and its prompt still applies", async () => {
             const { result } = renderHook(() => useLinkWithComposerList(flagged.id), { wrapper });
 
-            await waitFor(() => expect(result.current.settled).toBe(true), { timeout: 8000 });
-            await waitFor(() => expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE), { timeout: 8000 });
+            await settle();
+            expect(result.current.settled).toBe(false);
 
+            // The clock, not the wall clock, moves past the wait.
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(FLAG_WAIT_MS);
+            });
+
+            expect(result.current.settled).toBe(true);
+            expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
             expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
             expect(useChatUIStore.getState().composerText).toBe("hi");
-        }, 15_000);
+        });
     });
 
     it("the list keeps its identity across re-renders while its entries do not change", async () => {

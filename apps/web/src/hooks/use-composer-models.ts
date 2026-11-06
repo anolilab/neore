@@ -18,7 +18,7 @@ import { useBlockedCreators } from "./use-model-filter-rules";
  * How long a link waits for PostHog's feature flags before it decides without them. A model behind a flag is hidden until the flags
  * arrive, as the picker hides it, so after this wait the link refuses such a model rather than wait for flags that may never come.
  */
-const FLAG_WAIT_MS = 1500;
+export const FLAG_WAIT_MS = 1500;
 
 /** The list while the user's rules are not known: a failed read. A link then selects no model, so it cannot select one the user blocked. */
 const NO_MODELS: GatewayModel[] = [];
