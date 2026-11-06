@@ -369,6 +369,31 @@ describe("chat index route", () => {
             expect(harness.showWarning).not.toHaveBeenCalled();
         });
 
+        it("a missing saved prompt leaves the chat's draft in place, and the link is refused with the draft-kept notice", async () => {
+            useChatUIStore.getState().setComposerText("my draft");
+            harness.savedPrompt = null;
+            openUrl(linkWith({ promptId: "saved-1" }));
+
+            mountPage();
+
+            await waitFor(() => expect(harness.showWarning).toHaveBeenCalledWith("Your draft is kept. The prompt from the link was not added."));
+            expect(useChatUIStore.getState().composerText).toBe("my draft");
+        });
+
+        it("a saved prompt with invalid settings leaves the chat's draft in place, and the link is refused with the draft-kept notice", async () => {
+            useChatUIStore.getState().setComposerText("my draft");
+            harness.savedPrompt = { content: "saved text", enabledFeatures: undefined, model: "not-a-model", reasoningEffort: undefined };
+            harness.validation = () => {
+                return { errors: { model: "unavailable" }, isValid: false };
+            };
+            openUrl(linkWith({ promptId: "saved-1" }));
+
+            mountPage();
+
+            await waitFor(() => expect(harness.showWarning).toHaveBeenCalledWith("Your draft is kept. The prompt from the link was not added."));
+            expect(useChatUIStore.getState().composerText).toBe("my draft");
+        });
+
         it("a saved prompt whose settings are invalid applies nothing, so the link's prompt is drafted", async () => {
             harness.savedPrompt = { content: "saved text", enabledFeatures: undefined, model: "not-a-model", reasoningEffort: undefined };
             harness.validation = () => {

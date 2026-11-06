@@ -72,7 +72,8 @@ export const usePromptLinkDraft = ({
 }): void => {
     const { t } = useLingui();
     const navigate = useNavigate();
-    const appliedRef = useRef(false);
+    // The link last applied on this mounted page, by its text and model: a different link is a new one, and applies on its own terms.
+    const appliedKeyRef = useRef<string | undefined>(undefined);
 
     useEffect(() => {
         if (!ready) {
@@ -82,18 +83,22 @@ export const usePromptLinkDraft = ({
         // The first time the link can be decided, whatever else owns the draft has been read: the caller may now stop treating it as owned.
         onDecided?.();
 
-        // The link's parameters are gone once it is applied, so the next link on this mounted page applies too.
+        // No link in the address: the next link on this mounted page starts afresh.
         if (prompt === undefined && model === undefined) {
-            appliedRef.current = false;
+            appliedKeyRef.current = undefined;
 
             return;
         }
 
-        if (appliedRef.current) {
+        // A link is applied once. A later link with other text or another model is a new link: it is decided on its own terms, not on the
+        // refusal or the selection of the one before it.
+        const linkKey = JSON.stringify([prompt, model]);
+
+        if (appliedKeyRef.current === linkKey) {
             return;
         }
 
-        appliedRef.current = true;
+        appliedKeyRef.current = linkKey;
 
         // The link's model is chosen only when nothing else owns this chat's draft: a kept or refused draft keeps the model the
         // person chose, and so does a saved prompt named in the URL.

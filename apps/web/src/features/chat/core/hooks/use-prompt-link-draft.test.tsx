@@ -148,6 +148,34 @@ describe("usePromptLinkDraft", () => {
         expect(harness.navigate).toHaveBeenCalledTimes(1);
     });
 
+    it("a second link naming an available model, after a first link refused one, applies on its own terms", () => {
+        let available: LinkableModel | undefined;
+
+        for (const entry of OFFERED_TEXT_MODELS.values()) {
+            if (entry.id !== DEFAULT_CHAT_MODEL) {
+                available = entry;
+                break;
+            }
+        }
+
+        expect(available).toBeDefined();
+
+        // The first link names a model the picker does not offer: it is refused, with its notice, and the draft is the first link's.
+        const { rerender } = renderLink({ model: "not-a-real-model", prompt: "first" });
+
+        expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+        expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
+
+        // The person clears the draft; the second link, with no link in the address in between, names an available model.
+        useChatUIStore.getState().setComposerText("");
+        harness.showWarning.mockReset();
+        rerender({ model: available?.id, prompt: "second" });
+
+        expect(useChatUIStore.getState().composerText).toBe("second");
+        expect(selectedModel()).toBe(available?.id);
+        expect(harness.showWarning).not.toHaveBeenCalled();
+    });
+
     it("applies a second link on the mounted page once the first link's parameters are gone", () => {
         const { rerender } = renderLink({ prompt: "first" });
 
