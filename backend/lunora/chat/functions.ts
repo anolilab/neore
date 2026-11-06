@@ -1926,8 +1926,10 @@ export const titleUsageEvent = (model: string, usage: { inputTokens?: number; ou
 };
 
 /**
- * The billing key of one automatic title job. The job's id is fixed when it is scheduled, so its retries share the key and later
- * jobs for the same thread do not: a locked-after-answer skip leaves its key held, and a later message must still be able to title.
+ * The billing key of one automatic title job. A charge is held until its job settles: a written title keeps it, so a retry is refused,
+ * and a refused or failed run gives it back. Keyed per thread, one job's held charge would refuse every other automatic job on that
+ * thread for its whole TTL. Keyed per job, the job's retries (they share its id) are refused by its own charge, and no other job is.
+ * A job queued without an id keeps the per-thread key.
  */
 export const autoTitleChargeKey = (threadId: string, jobId: string | undefined): string =>
     jobId === undefined ? `${threadId}:auto-title` : `${threadId}:auto-title:${jobId}`;
