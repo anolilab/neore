@@ -341,6 +341,33 @@ describe("a session's terminals", () => {
         expect(requested[0]).toMatchObject({ complete: false });
     });
 
+    it("keeps a cancelled command's final output readable until the agent releases it", async () => {
+        const { finish, host } = fakeHost();
+        const { agent, session } = await open({ gate: allow([]), host });
+        const first = await busy(agent, session);
+
+        create(agent, 5);
+
+        const created = await answerTo(agent, 5);
+        const { terminalId } = created.result as { terminalId: string };
+
+        session.cancel();
+        agent.say({ id: first.id, result: { stopReason: "cancelled" } });
+        finish({ exitCode: null, signal: "SIGKILL" });
+
+        // The command's core handle is freed once it has ended and its output is read, not when the agent releases it.
+        await expect.poll(() => host.release.mock.calls.length).toBe(1);
+
+        agent.say({ id: 6, method: "terminal/wait_for_exit", params: { sessionId: "sess_1", terminalId } });
+        expect(await answerTo(agent, 6)).toMatchObject({ result: { exitCode: null, signal: "SIGKILL" } });
+
+        agent.say({ id: 7, method: "terminal/output", params: { sessionId: "sess_1", terminalId } });
+        expect(await answerTo(agent, 7)).toMatchObject({ result: { output: "building...\nok" } });
+
+        agent.say({ id: 8, method: "terminal/release", params: { sessionId: "sess_1", terminalId } });
+        expect(await answerTo(agent, 8)).not.toHaveProperty("error");
+    });
+
     it("does not end an agent that answered the cancel in time, while a killed command's result is still due", async () => {
         const events: { kind: string; reason?: string }[] = [];
         const observer: SessionObserver = {

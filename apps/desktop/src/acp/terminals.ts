@@ -194,6 +194,15 @@ export const createRequestOf = (params: Record<string, unknown>): { cwd?: string
     };
 };
 
+/**
+ * Whether a terminal holds one of a session's slots: until the agent releases it, or, once a cancel has ended its command, not at all
+ * (the cancel's result is kept for the agent to read, but it no longer takes a slot).
+ */
+const holdsSlot = (terminal: OpenTerminal): boolean => !terminal.released && (!terminal.cancelled || terminal.ended === undefined);
+
+/** Whether a terminal's result is kept only for the rows that show it: the agent released it, or a cancel ended it and freed its handle. */
+const retired = (terminal: OpenTerminal): boolean => terminal.released || (terminal.cancelled === true && terminal.freed);
+
 interface OpenTerminal {
     /** Killed because its turn was cancelled: once it has ended and its result is kept, nothing else needs its slot. */
     cancelled?: boolean;
@@ -231,7 +240,7 @@ export class SessionTerminals {
         let count = this.starting;
 
         for (const terminal of this.open.values()) {
-            if (!terminal.released) {
+            if (holdsSlot(terminal)) {
                 count += 1;
             }
         }
@@ -288,6 +297,11 @@ export class SessionTerminals {
             throw new RpcError(INVALID_PARAMS, "that terminal was released");
         }
 
+        // A cancelled command's handle is freed once its result is kept: the result is what the agent reads until it releases the terminal.
+        if (terminal.freed && terminal.ended !== undefined) {
+            return { exitStatus: terminal.ended.exit, output: terminal.ended.output, truncated: terminal.ended.truncated };
+        }
+
         return this.host.output(terminal.handle);
     }
 
@@ -299,7 +313,8 @@ export class SessionTerminals {
     public kill(terminalId: string): void {
         const terminal = this.require(terminalId);
 
-        if (!terminal.released) {
+        // A command that has ended, and whose handle is freed, has nothing left to kill.
+        if (!terminal.released && !terminal.freed) {
             this.host.kill(terminal.handle);
         }
     }
@@ -406,7 +421,7 @@ export class SessionTerminals {
 
     /** Forgets the oldest results of terminals that ended and were released, past the last {@link KEPT_RESULTS}. */
     private prune(): void {
-        const done = [...this.open].filter(([, terminal]) => terminal.released && terminal.ended !== undefined);
+        const done = [...this.open].filter(([, terminal]) => retired(terminal) && terminal.ended !== undefined);
 
         const oldest = done.slice(0, Math.max(0, done.length - KEPT_RESULTS));
 
@@ -446,17 +461,13 @@ export class SessionTerminals {
                 // The rows are told first: releasing prunes, and a cancelled command's result must still be there to show.
                 this.ended(terminalId);
 
-                // A command released while it ran keeps its handle until now, after its output was read.
-                if (current.released) {
+                // A command released while it ran keeps its handle until now, after its output was read. A cancelled one gives its handle
+                // and its slot up here too, but not its result: the agent reads that until it releases the terminal.
+                if (current.released || current.cancelled) {
                     this.freeHandle(current);
                 }
 
-                // A cancelled turn may never release what it started: its result is kept for the row, and its slot is freed here.
-                if (current.cancelled) {
-                    this.release(terminalId);
-                } else {
-                    this.prune();
-                }
+                this.prune();
             }
         } catch {
             // The core no longer has it (stopped on quit): nothing will show it.
