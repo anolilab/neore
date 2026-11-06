@@ -408,6 +408,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                                         aria-describedby={describedBy || undefined}
                                         aria-invalid={tooLong[index] || !!formatMessage || saveError !== null || loadFailureShown || undefined}
                                         aria-required="true"
+                                        autoCapitalize="off"
                                         autoComplete="new-password"
                                         autoCorrect="off"
                                         id={inputId}

@@ -2042,7 +2042,7 @@ msgstr "Añade un modelo..."
 
 #: src/features/chat/thread/ask-user-questions.tsx:64
 msgid "Add a note (optional)…"
-msgstr ""
+msgstr "Añade una nota (opcional)…"
 
 #: src/features/workflow/components/nodes/comment-node.tsx:106
 msgid "Add a note..."
@@ -3318,7 +3318,7 @@ msgstr "Respuesta"
 
 #: src/features/chat/thread/ask-user-prompt.tsx:306
 msgid "Answer every question with a choice or a note to send."
-msgstr ""
+msgstr "Responde a cada pregunta con una opción o una nota para enviar."
 
 #: src/features/settings/connectors/messenger/messenger-page.tsx:83
 msgid "Answer messages to a WeChat Official Account (safe mode). Beta: not yet tested against a live account."
@@ -21217,7 +21217,7 @@ msgstr "Nota para la próxima ejecución (opcional)"
 #. placeholder {0}: entry.question
 #: src/features/chat/thread/ask-user-questions.tsx:60
 msgid "Note for: {0}"
-msgstr ""
+msgstr "Nota para: {0}"
 
 #: src/features/settings/components/chat/agent-settings.tsx:243
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
@@ -30732,7 +30732,7 @@ msgstr "El archivo contiene demasiados archivos."
 
 #: src/features/chat/thread/ask-user-prompt.tsx:213
 msgid "The assistant has a few questions"
-msgstr ""
+msgstr "El asistente tiene algunas preguntas"
 
 #: src/features/chat/thread/ask-user-prompt.tsx:213
 msgid "The assistant has a question"
