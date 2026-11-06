@@ -63,6 +63,47 @@ describe("configOptionsOf", () => {
         expect(configOptionsOf(entries, plain)).toBeUndefined();
     });
 
+    it("reads no more of a long choice list than it keeps: the first 100 choices, and the current one when it comes later", () => {
+        const reads = { names: 0 };
+        const choices = Array.from({ length: 300 }, (_unused, index) => {
+            return {
+                get name() {
+                    reads.names += 1;
+
+                    return `C${String(index)}`;
+                },
+                value: `c${String(index)}`,
+            };
+        });
+        const [option] = configOptionsOf([select("l", { currentValue: "c250", options: choices })], plain) ?? [];
+
+        // The first 99 choices and the current one, which the agent sent after the first 100.
+        const kept = Array.from({ length: 99 }, (_unused, index) => `c${String(index)}`);
+
+        expect(option?.choices.map((choice) => choice.value)).toEqual([...kept, "c250"]);
+        // A name is read for each choice kept and for the current one, not for each of the 300 the agent sent.
+        expect(reads.names).toBeLessThanOrEqual(MAX_CHOICES + 1);
+    });
+
+    it("reads no more of a long legacy model list than it keeps, the current model included", () => {
+        const reads = { names: 0 };
+        const models = Array.from({ length: 300 }, (_unused, index) => {
+            return {
+                modelId: `m${String(index)}`,
+                get name() {
+                    reads.names += 1;
+
+                    return "M";
+                },
+            };
+        });
+        const report = optionsOf({ models: { availableModels: models, currentModelId: "m250" } }, plain);
+        const kept = Array.from({ length: 99 }, (_unused, index) => `m${String(index)}`);
+
+        expect(report.models?.available.map((entry) => entry.id)).toEqual([...kept, "m250"]);
+        expect(reads.names).toBeLessThanOrEqual(MAX_CHOICES + 1);
+    });
+
     it("keeps an option with no current selection, with its choices, since the backend accepts an empty current value", () => {
         const [option] = configOptionsOf([select("m", { currentValue: "" })], plain) ?? [];
 
