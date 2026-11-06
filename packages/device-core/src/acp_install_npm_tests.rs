@@ -179,8 +179,8 @@ fn a_verified_download_is_installed_without_scripts_and_pinned_with_its_hashes()
         .contains("--ignore-scripts"));
     assert_eq!(
         Path::new(&agent.command),
-        fs::canonicalize(&node).unwrap(),
-        "the command is the interpreter resolved"
+        node,
+        "the command is the interpreter as found"
     );
     assert_eq!(
         agent.args,
@@ -225,10 +225,7 @@ fn a_changed_added_or_removed_file_refuses_the_start_and_says_so() {
         .join("cli.js");
     let untouched = state.acp_spawn_plan("fixture", None).unwrap();
 
-    assert_eq!(
-        Path::new(&untouched.command),
-        fs::canonicalize(&node).unwrap()
-    );
+    assert_eq!(Path::new(&untouched.command), node);
 
     fs::write(&script, "console.log('changed');\n").unwrap();
     let changed = state.acp_spawn_plan("fixture", None).unwrap_err();
@@ -922,8 +919,8 @@ fn a_node_reached_through_a_link_with_another_name_installs() {
 
     assert_eq!(
         Path::new(&view.agents[0].command),
-        fs::canonicalize(&nodejs).unwrap(),
-        "the recorded command is the file the link resolves to"
+        link,
+        "the recorded command is the link, by its own name"
     );
     assert!(state.acp_spawn_plan("fixture", None).is_ok());
 }
@@ -1125,26 +1122,61 @@ fn starting_an_install_leaves_clearing_old_trash_to_a_thread() {
     let dir = guard.path().to_path_buf();
     let trash = dir.join("acp-agents/.trash");
     let foreign = trash.join("99999999-0");
-    let own = trash.join(format!("{}-7", std::process::id()));
+    let own = trash.join(format!("{}-7", crate::acp_install::run_id()));
+    // A crashed run whose pid this process now has: same pid, another run.
+    let reused_pid = trash.join(format!("{}.1-0", std::process::id()));
 
     fs::create_dir_all(foreign.join("node_modules")).unwrap();
     fs::create_dir_all(&own).unwrap();
+    fs::create_dir_all(reused_pid.join("node_modules")).unwrap();
     state.acp_install_stage().unwrap();
 
     let cleared = (0..100).any(|_| {
-        if foreign.exists() {
+        if foreign.exists() || reused_pid.exists() {
             std::thread::sleep(Duration::from_millis(50));
         }
 
-        !foreign.exists()
+        !foreign.exists() && !reused_pid.exists()
     });
 
     assert!(
         cleared,
-        "an earlier process's trash is deleted in the background"
+        "an earlier run's trash is deleted in the background, a reused pid included"
     );
     assert!(
         own.exists(),
         "this process's own trash is left to its own thread"
     );
+}
+
+#[test]
+fn a_multi_call_node_shim_is_recorded_by_the_name_it_runs_under() {
+    let (state, guard) = state("node-shim");
+    let dir = guard.path().to_path_buf();
+    let (real, npm, _) = fake_tools(&dir);
+    let shim = dir.join("version-shim");
+    let link = dir.join("bin-node/node");
+
+    // Decides what to be from the name it was started as, as mise and Volta shims do.
+    fs::write(
+        &shim,
+        "#!/bin/sh\ncase \"$(basename \"$0\")\" in node) echo node-ok ;; *) echo shim-needs-a-name >&2; exit 3 ;; esac\n",
+    )
+    .unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        fs::set_permissions(&shim, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    fs::remove_file(&real).unwrap();
+    fs::create_dir_all(link.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(&shim, &link).unwrap();
+
+    let view = state
+        .acp_install_npm(request_for(&state, &link, &npm, "1.0.0"))
+        .unwrap();
+    let output = Command::new(&view.agents[0].command).output().unwrap();
+
+    assert!(output.status.success(), "the recorded command runs as node");
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "node-ok");
 }

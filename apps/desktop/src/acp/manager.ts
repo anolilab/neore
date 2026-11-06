@@ -75,8 +75,14 @@ export class AcpManager {
     /** Starts that have asked for a plan and not yet registered a session; they hold a place under `MAX_SESSIONS`. */
     private starting = 0;
 
-    /** Bumped whenever approvals may have been revoked (`closeUnapproved`): a plan made across a bump is made again. */
-    private revocations = 0;
+    /** What each agent's approval and program looked like at the last `closeUnapproved`, by key. */
+    private readonly approvalState = new Map<string, string>();
+
+    /** Bumped for an agent whose approval or installed program may have changed: a plan of it made across a bump is made again. */
+    private readonly revocations = new Map<string, number>();
+
+    /** Agents with a plan being made now; an agent not seen before counts as changed for them. */
+    private readonly planning = new Set<string>();
 
     /** The hook runner of each session that has one; it lives and dies with the session. */
     private readonly runners = new Map<string, HookRunner>();
@@ -284,7 +290,7 @@ export class AcpManager {
      * approval is gone (revoked, or dropped because the agent's command or `PATH` changed).
      */
     public async closeUnapproved(view: Pick<AcpView, "agents" | "consents">): Promise<void> {
-        this.revocations += 1;
+        this.noteApprovalChanges(view);
 
         const covered = (agentKey: string, folder: string): boolean =>
             view.agents.some((agent) => agent.key === agentKey)
@@ -366,12 +372,22 @@ export class AcpManager {
      * check and the spawn that follows.
      */
     private async planCurrent(agentKey: string, folder: string | null): Promise<SpawnPlan> {
+        this.planning.add(agentKey);
+
+        try {
+            return await this.planUntilCurrent(agentKey, folder);
+        } finally {
+            this.planning.delete(agentKey);
+        }
+    }
+
+    private async planUntilCurrent(agentKey: string, folder: string | null): Promise<SpawnPlan> {
         for (let attempt = 0; ; attempt += 1) {
-            const before = this.revocations;
+            const before = this.revocations.get(agentKey) ?? 0;
             // eslint-disable-next-line no-await-in-loop -- each plan depends on the approvals as they are now
             const plan = await this.options.plan(agentKey, folder);
 
-            if (before === this.revocations) {
+            if (before === (this.revocations.get(agentKey) ?? 0)) {
                 return plan;
             }
 
@@ -384,6 +400,40 @@ export class AcpManager {
             if (attempt >= 3) {
                 throw new Error("The agent's approvals changed while it started. Try again.");
             }
+        }
+    }
+
+    /**
+     * Bumps the counter of every agent whose approval, program or install differs from the last view (or that
+     * was not seen before, or is gone). Edits of other agents, and of this one's name or variables, bump nothing.
+     */
+    private noteApprovalChanges(view: Pick<AcpView, "agents" | "consents">): void {
+        const next = new Map<string, string>();
+
+        for (const agent of view.agents) {
+            const folders = view.consents
+                .filter((consent) => consent.agentKey === agent.key)
+                .map((consent) => consent.folderPath);
+
+            folders.sort((left, right) => left.localeCompare(right));
+
+            next.set(agent.key, JSON.stringify([agent.command, agent.args, agent.install?.version ?? null, agent.install?.sha256 ?? null, agent.install?.treeSha256 ?? null, folders]));
+        }
+
+        const keys = new Set([...this.approvalState.keys(), ...this.planning, ...next.keys()]);
+
+        for (const key of keys) {
+            const prior = this.approvalState.get(key);
+
+            if (prior !== next.get(key) || (prior === undefined && this.planning.has(key))) {
+                this.revocations.set(key, (this.revocations.get(key) ?? 0) + 1);
+            }
+        }
+
+        this.approvalState.clear();
+
+        for (const [key, state] of next) {
+            this.approvalState.set(key, state);
         }
     }
 

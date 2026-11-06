@@ -490,7 +490,7 @@ impl DeviceState {
         let trash = self.install_root().join(TRASH_DIR);
         let target = trash.join(format!(
             "{}-{}",
-            std::process::id(),
+            run_id(),
             TRASHED.fetch_add(1, Ordering::Relaxed)
         ));
         let moved = fs::create_dir_all(&trash).and_then(|()| fs::rename(path, &target));
@@ -595,11 +595,25 @@ fn remove_stale(staging: &Path) {
     }
 }
 
-/// Deletes what an earlier process left in `trash`, in the background. Entries are named `<pid>-<n>`; this
-/// process's own are being deleted by the thread that made them.
+/// Names this run in the trash: the pid alone is reused by the operating system, so a crashed run's tree would be
+/// taken for a live one's. The start time in nanoseconds makes it unique per run.
+pub(crate) fn run_id() -> &'static str {
+    static ID: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+    ID.get_or_init(|| {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |elapsed| elapsed.as_nanos());
+
+        format!("{}.{nanos}", std::process::id())
+    })
+}
+
+/// Deletes what an earlier run left in `trash`, in the background. Entries are named `<run id>-<n>`; this run's
+/// own are being deleted by the thread that made them.
 fn sweep_trash(trash: PathBuf) {
     std::thread::spawn(move || {
-        let own = format!("{}-", std::process::id());
+        let own = format!("{}-", run_id());
         let Ok(entries) = fs::read_dir(&trash) else {
             return;
         };

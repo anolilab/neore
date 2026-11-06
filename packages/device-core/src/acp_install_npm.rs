@@ -679,12 +679,10 @@ impl DeviceState {
 
         let mut agent = AcpAgent {
             args,
-            // The interpreter the person's PATH pointed at, resolved: a link a package manager re-points later
-            // (a Node upgrade or switch) must not change which Node runs a pinned agent.
-            command: fs::canonicalize(node)
-                .unwrap_or_else(|_| node.to_path_buf())
-                .to_string_lossy()
-                .into_owned(),
+            // The interpreter as found, by the name `node`: a multi-call shim (mise, Volta) decides what to run
+            // from the name it is started under, so its resolved target would not run a program. The confirmed
+            // identity was checked in `validate`; a link that is re-pointed later is the person's own change.
+            command: node.to_string_lossy().into_owned(),
             env: EnvVars(request.env.clone()),
             install: Some(AcpInstall {
                 index_integrity: Some(request.integrity.clone()),

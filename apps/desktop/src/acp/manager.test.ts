@@ -496,4 +496,33 @@ describe("starts that wait for their plan", () => {
         expect(made).toHaveLength(4);
         expect(made.every((folder) => !existsSync(folder))).toBe(true);
     });
+
+    it("is not held up by updates of other agents or of this one's unrelated settings during a slow plan", async () => {
+        const calls: number[] = [];
+        const cwd = scratch.dir;
+        const unrelated = { agents: [{ args: [], command: "other", envNames: [], install: null, key: "other", label: "Other" }], consents: [] };
+        const mine = { args: [], command: "fake", envNames: [], install: null, key: "fake", label: "Fake" };
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    calls.push(calls.length);
+
+                    if (calls.length === 1) {
+                        for (let index = 0; index < 4; index += 1) {
+                            // eslint-disable-next-line no-await-in-loop -- the updates arrive one after another
+                            await target.closeUnapproved({ agents: [...unrelated.agents, { ...mine, envNames: [`V${String(index)}`], label: `Fake ${String(index)}` }], consents: [] });
+                        }
+                    }
+
+                    return { args: [], command: "neore-no-such-agent", cwd, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
+                },
+            },
+        );
+
+        // The agent is known before the slow plan starts.
+        await target.closeUnapproved({ agents: [...unrelated.agents, mine], consents: [] });
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow(MISSING_COMMAND);
+        expect(calls).toHaveLength(1);
+    });
 });
