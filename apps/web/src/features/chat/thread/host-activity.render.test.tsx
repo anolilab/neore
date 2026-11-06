@@ -72,6 +72,16 @@ describe("a coding agent's tool calls", () => {
         expect(box.scrollTop).toBe(0);
     });
 
+    it("moves the reader's focus to the tool row when its output is cleared while they are in it", () => {
+        const { rerender } = render(<HostToolCalls tools={[running("line 1")]} />);
+
+        outputBox().focus();
+        rerender(<HostToolCalls tools={[running("")]} />);
+
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this asserts
+        expect(document.activeElement).toBe(screen.getByRole("listitem"));
+    });
+
     it("follows the newest lines again once the reader is back at the bottom", () => {
         const { rerender } = render(<HostToolCalls tools={[running("line 1")]} />);
         const box = outputBox();
