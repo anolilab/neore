@@ -1145,20 +1145,28 @@ describe("run prompts", () => {
         expect(cleared?.prompt).toBeUndefined();
     });
 
-    it("exports a trigger with the prompt its settled run was given, and never its webhook secret", async () => {
+    it("exports a trigger with the prompt and payload its settled run was given, and never its webhook secret", async () => {
         const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
 
         await harness.run(
-            async (ctx: any) => await ctx.db.insert("triggerExecutions", { prompt: "Summarise the issue", startedAt: 5, status: "completed", triggerId }),
+            async (ctx: any) =>
+                await ctx.db.insert("triggerExecutions", {
+                    payload: '{"ref":"main"}',
+                    prompt: "Summarise the issue",
+                    startedAt: 5,
+                    status: "completed",
+                    triggerId,
+                }),
         );
 
         const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(collectTriggersForExport, { userId: "user-a" }))) as {
-            triggers: { name: string; runs: { prompt: string | null }[] }[];
+            triggers: { name: string; runs: { payload: string | null; prompt: string | null }[] }[];
         };
         const [trigger] = exported.triggers;
 
         expect(trigger?.name).toBe("Hook");
         expect(trigger?.runs[0]?.prompt).toBe("Summarise the issue");
+        expect(trigger?.runs[0]?.payload).toBe('{"ref":"main"}');
         expect(trigger).not.toHaveProperty("webhookSecret");
     });
 

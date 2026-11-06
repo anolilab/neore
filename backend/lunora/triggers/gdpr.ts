@@ -47,7 +47,7 @@ const EXPORT_TRIGGER_PAGE = 1;
 const EXPORT_RUNS_PER_TRIGGER = 20;
 
 /**
- * One page of the user's triggers, their settings and their newest runs with the prompts those runs were given
+ * One page of the user's triggers, their settings and their newest runs with the prompts and webhook bodies those runs were given
  * (`executeTrigger`). The webhook secrets are left out. A prompt is cleared 30 days after its run settles
  * (`pruneExpiredRunPrompts`), so the export holds what is still kept. `cursor` is `null` on the last page.
  */
@@ -90,6 +90,7 @@ export const collectTriggersForExport = internalQuery
                             return {
                                 completedAt: run.completedAt ?? null,
                                 error: run.error ?? null,
+                                payload: run.payload ?? null,
                                 prompt: run.prompt ?? null,
                                 startedAt: run.startedAt,
                                 status: run.status,
