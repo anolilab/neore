@@ -55,6 +55,18 @@ export const HostPlan: FC<{ entries: HostPlanEntry[] }> = memo(({ entries }) => 
         return null;
     }
 
+    /**
+     * What is spoken about the plan: the count, singular or plural, and the task in progress when there is one. Each sentence is one
+     * translatable message, so a translator orders the whole announcement, not its pieces.
+     */
+    const announcement = (done: number, total: number, inProgress: string | undefined): string => {
+        if (inProgress === undefined) {
+            return total === 1 ? t`${done} of ${total} task done` : t`${done} of ${total} tasks done`;
+        }
+
+        return total === 1 ? t`${done} of ${total} task done. In progress: ${inProgress}` : t`${done} of ${total} tasks done. In progress: ${inProgress}`;
+    };
+
     const statusText = (status: HostPlanStatus): string => {
         if (status === "completed") {
             return t`Done`;
@@ -72,8 +84,7 @@ export const HostPlan: FC<{ entries: HostPlanEntry[] }> = memo(({ entries }) => 
             <h3 className="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">{t`Plan`}</h3>
             {/* Only the progress is spoken, so a change is announced without reading the whole list again. */}
             <span className="sr-only" role="status">
-                {total === 1 ? t`${done} of ${total} task done` : t`${done} of ${total} tasks done`}
-                {current === undefined ? "" : `. ${t`In progress`}: ${current.content}`}
+                {announcement(done, total, current?.content)}
             </span>
             {/* A styled list loses its list semantics in some browsers, so the role is said out loud. */}
             {/* eslint-disable-next-line jsx-a11y/no-redundant-roles */}
