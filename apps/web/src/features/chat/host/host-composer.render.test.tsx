@@ -378,6 +378,19 @@ describe("the options the agent offers", () => {
         expect(screen.getByText("Ask")).toBeTruthy();
     });
 
+    it("gives a new session in the thread its own options, not the change still waiting on the old session", async () => {
+        const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        // The thread's newest session is another one: the old session's answer never comes, so its wait must not carry over.
+        client.setQueryData(["acp.functions.getHostSession", { threadId: "thread-1" }], { _id: "session-2", agentState: { configOptions: [MODEL] }, status: "idle" });
+
+        await waitFor(() => expect((screen.getByLabelText("Model") as unknown as HTMLSelectElement).disabled).toBe(false));
+    });
+
     it("hands a change to the client while the browser is offline, so the client can queue it", async () => {
         mountWith({ agentState: { configOptions: [MODEL, EFFORT] } }, { callId: "call-1", sent: true });
 
