@@ -15,25 +15,41 @@ import { LunoraError } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
-import type { SecretUse } from "../tools/request-secret-constants";
+import type { SecretFormat, SecretUse } from "../tools/request-secret-constants";
 import {
     REQUEST_SECRET_TOOL_NAME,
     SECRET_DECLINED_REASON,
-    SECRET_SERVER_MOVED,
+    SECRET_FIELD_NAME_RE,
+    SECRET_FIELDS_MAX,
+    SECRET_FORMAT_INVALID,
     SECRET_HEADER_VALUE_FORBIDDEN_RE,
     SECRET_LABEL_MAX,
+    SECRET_SERVER_MOVED,
+    secretFormatProblem,
 } from "../tools/request-secret-constants";
 import { invalidSecretUse, secretValueMax, storeRequestedSecret } from "./secret-requests";
 import type { ClaimResult } from "./tool-approval-claim";
 import { claimToolApproval, findPendingRequestOnLatestTurn } from "./tool-approval-claim";
 
-export type SecretReply = { kind: "decline" } | { kind: "save"; value: string };
+/** `value` answers the first field; `more` the others, in the order the request listed them. */
+export type SecretReply = { kind: "decline" } | { kind: "save"; more?: ReadonlyArray<{ expectedUrl: string; value: string }>; value: string };
 
-export type SecretClaim = ClaimResult & { ref?: string; use?: SecretUse };
+/** `ref` for a request with one destination; `refs` (by field name) for one with `fields`. */
+export type SecretClaim = ClaimResult & { ref?: string; refs?: Record<string, string>; savesProviderKey?: boolean; use?: SecretUse };
 
 interface StoredRequest {
+    fields?: unknown;
+    format?: unknown;
     label?: unknown;
     use?: unknown;
+}
+
+/** One secret the request asks for, read back from the call's saved input. */
+interface AskedField {
+    format?: SecretFormat;
+    label: string;
+    name?: string;
+    use: SecretUse;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
@@ -52,6 +68,60 @@ const asUse = (value: unknown): SecretUse | undefined => {
     }
 
     return undefined;
+};
+
+const asFormat = (value: unknown): SecretFormat | undefined => {
+    if (!isRecord(value)) {
+        return undefined;
+    }
+
+    return {
+        ...(typeof value.prefix === "string" && value.prefix.length > 0 && { prefix: value.prefix }),
+        ...(typeof value.minLength === "number" && Number.isSafeInteger(value.minLength) && value.minLength > 0 && { minLength: value.minLength }),
+    };
+};
+
+/** The secrets the saved call asked for: its `fields`, or the one `use`. `undefined` when the input names no valid destination. */
+const askedFields = (input: StoredRequest): AskedField[] | undefined => {
+    if (input.fields === undefined) {
+        const use = asUse(input.use);
+
+        return use === undefined || invalidSecretUse(use) !== undefined
+            ? undefined
+            : [{ format: asFormat(input.format), label: typeof input.label === "string" ? input.label.slice(0, SECRET_LABEL_MAX) : "Secret", use }];
+    }
+
+    if (!Array.isArray(input.fields) || input.fields.length === 0 || input.fields.length > SECRET_FIELDS_MAX || input.use !== undefined) {
+        return undefined;
+    }
+
+    const names = new Set<string>();
+    const fields: AskedField[] = [];
+
+    for (const raw of input.fields as unknown[]) {
+        const field = isRecord(raw) ? raw : {};
+        const use = asUse(field.use);
+
+        if (
+            use === undefined ||
+            invalidSecretUse(use) !== undefined ||
+            typeof field.name !== "string" ||
+            !SECRET_FIELD_NAME_RE.test(field.name) ||
+            names.has(field.name)
+        ) {
+            return undefined;
+        }
+
+        names.add(field.name);
+        fields.push({
+            format: asFormat(field.format),
+            label: typeof field.label === "string" ? field.label.slice(0, SECRET_LABEL_MAX) : field.name,
+            name: field.name,
+            use,
+        });
+    }
+
+    return fields;
 };
 
 /** The destination with the address of the server it names, which must be exactly one of the owner's saved ones. */
@@ -122,12 +192,12 @@ export const claimSecretAnswer = async (
         return claim;
     }
 
-    // The call's own input names the destination: the card showed it, and the value is bound to it.
+    // The call's own input names the destination(s): the card showed them, and each value is bound to its own.
     const requested = await findPendingRequestOnLatestTurn(ctx, threadId, approvalId);
     const input = (isRecord(requested?.input) ? requested.input : {}) as StoredRequest;
-    const asked = asUse(input.use);
+    const asked = askedFields(input);
 
-    if (asked === undefined || invalidSecretUse(asked) !== undefined) {
+    if (asked === undefined) {
         throw new LunoraError("BAD_REQUEST", "This secret request has no valid destination");
     }
 
@@ -140,33 +210,76 @@ export const claimSecretAnswer = async (
         );
     }
 
-    const value = reply.value.trim();
+    const answers = [{ expectedUrl, value: reply.value }, ...(reply.more ?? [])];
 
-    if (value.length === 0 || value.length > secretValueMax(asked)) {
-        throw new LunoraError("BAD_REQUEST", "Provide a value that fits where it is going");
+    if (answers.length !== asked.length) {
+        throw new LunoraError("BAD_REQUEST", "Provide a value for every field of the request");
     }
 
-    if (asked.kind === "mcp_header" && SECRET_HEADER_VALUE_FORBIDDEN_RE.test(value)) {
-        throw new LunoraError("BAD_REQUEST", "A header value cannot contain a line break, a control character or a character above U+00FF");
+    // Every value is checked before the first is stored, so a refusal leaves nothing behind (a throw also rolls the claim back).
+    const prepared: { field: AskedField; use: SecretUse; value: string }[] = [];
+
+    for (const [index, field] of asked.entries()) {
+        const { expectedUrl: fieldUrl, value: raw } = answers[index]!;
+        const value = raw.trim();
+
+        if (value.length === 0 || value.length > secretValueMax(field.use)) {
+            throw new LunoraError("BAD_REQUEST", "Provide a value that fits where it is going");
+        }
+
+        const problem = secretFormatProblem(value, field.format);
+
+        if (problem !== undefined) {
+            // Names the rule, never the value.
+            throw new LunoraError(
+                "BAD_REQUEST",
+                problem === "prefix"
+                    ? `The value does not start with "${field.format?.prefix ?? ""}", as the request requires. Check it and try again`
+                    : `The value is shorter than the ${field.format?.minLength ?? 0} characters the request requires. Check it and try again`,
+                { data: { code: SECRET_FORMAT_INVALID, field: index } },
+            );
+        }
+
+        if (field.use.kind === "mcp_header" && SECRET_HEADER_VALUE_FORBIDDEN_RE.test(value)) {
+            throw new LunoraError("BAD_REQUEST", "A header value cannot contain a line break, a control character or a character above U+00FF");
+        }
+
+        prepared.push({ field, use: await withServerUrl(ctx, claim.ownerId, field.use, fieldUrl), value });
     }
 
-    const use = await withServerUrl(ctx, claim.ownerId, asked, expectedUrl);
+    const refs: string[] = [];
 
-    const label = typeof input.label === "string" ? input.label.slice(0, SECRET_LABEL_MAX) : "Secret";
-    const ref = await storeRequestedSecret(ctx, {
-        approvalId,
-        label,
-        now,
-        ...(claim.config.replyKey !== undefined && { replyKey: claim.config.replyKey }),
-        threadId,
-        use,
-        userId: claim.ownerId,
-        value,
-    });
+    for (const { field, use, value } of prepared) {
+        refs.push(
+            await storeRequestedSecret(ctx, {
+                approvalId,
+                label: field.label,
+                now,
+                ...(claim.config.replyKey !== undefined && { replyKey: claim.config.replyKey }),
+                threadId,
+                use,
+                userId: claim.ownerId,
+                value,
+            }),
+        );
+    }
 
-    return { ...claim, ref, use };
+    if (input.fields === undefined) {
+        return { ...claim, ref: refs[0]!, savesProviderKey: prepared[0]!.use.kind === "provider_key", use: prepared[0]!.use };
+    }
+
+    return {
+        ...claim,
+        refs: Object.fromEntries(asked.map((field, index) => [field.name!, refs[index]!])),
+        savesProviderKey: prepared.some(({ use }) => use.kind === "provider_key"),
+    };
 };
 
 /** What `resumeClaimedRun` gets: the reference for a saved value, a denial for a decline — never the value. */
-export const secretResumeArgs = (claim: SecretClaim & { kind: "claimed" }): { answer: string; approved: true } | { approved: false; denyReason: string } =>
-    claim.ref === undefined ? { approved: false, denyReason: SECRET_DECLINED_REASON } : { answer: claim.ref, approved: true };
+export const secretResumeArgs = (claim: SecretClaim & { kind: "claimed" }): { answer: string; approved: true } | { approved: false; denyReason: string } => {
+    if (claim.refs !== undefined) {
+        return { answer: JSON.stringify(claim.refs), approved: true };
+    }
+
+    return claim.ref === undefined ? { approved: false, denyReason: SECRET_DECLINED_REASON } : { answer: claim.ref, approved: true };
+};

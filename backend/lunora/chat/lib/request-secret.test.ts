@@ -229,6 +229,20 @@ describe("the pause", () => {
         expect(inputSchema.safeParse({ label: "Token", use: PROVIDER_USE, value: "sk-oops" }).success).toBe(false);
         expect(inputSchema.safeParse({ label: "", use: PROVIDER_USE }).success).toBe(false);
     });
+
+    it("takes a format, or several named fields instead of one destination, and refuses a mix", async () => {
+        const { default: requestSecretTool } = await import("../tools/request-secret");
+        const { inputSchema } = requestSecretTool as unknown as ToolDefinition;
+        const user = { label: "User", name: "user", use: HEADER_USE };
+        const pass = { format: { prefix: "p-" }, label: "Pass", name: "pass", use: { ...HEADER_USE, header: "X-Pass" } };
+
+        expect(inputSchema.safeParse({ ...SECRET_INPUT, format: { prefix: "sk-" } }).success).toBe(true);
+        expect(inputSchema.safeParse({ fields: [user, pass], label: "Login" }).success).toBe(true);
+        expect(inputSchema.safeParse({ fields: [user, user], label: "Login" }).success).toBe(false);
+        expect(inputSchema.safeParse({ fields: [user], label: "Login", use: HEADER_USE }).success).toBe(false);
+        expect(inputSchema.safeParse({ fields: [{ ...user, value: "x" }], label: "Login" }).success).toBe(false);
+        expect(inputSchema.safeParse({ label: "Login" }).success).toBe(false);
+    });
 });
 
 describe("permissions", () => {
@@ -391,6 +405,18 @@ describe("resuming the run", () => {
 
         expect(resume).toStrictEqual({ answer: (claim as { ref: string }).ref, approved: true });
         expect(JSON.stringify(resume)).not.toContain(SECRET);
+    });
+
+    it("a card with several fields resumes the run with the references by field name, and the model reads only those", async () => {
+        const { createAnsweredRequestSecretTool } = await import("../tools/request-secret");
+        const refs = { password: "sec_b", username: "sec_a" };
+        const resume = secretResumeArgs({ kind: "claimed", refs } as never);
+
+        expect(resume).toStrictEqual({ answer: JSON.stringify(refs), approved: true });
+
+        const answered = createAnsweredRequestSecretTool((resume as { answer: string }).answer) as unknown as ToolDefinition;
+
+        expect(await answered.execute({}, {}, { toolCallId: "call-sec-2" })).toStrictEqual({ refs, status: "saved" });
     });
 
     it("a decline resumes it with a denial and a reason", async () => {

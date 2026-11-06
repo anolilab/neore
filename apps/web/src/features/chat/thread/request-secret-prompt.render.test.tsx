@@ -118,15 +118,20 @@ const NO_SERVER = /no saved MCP server named Files/u;
 
 const header = { header: "Authorization", kind: "mcp_header", server: "Files" } as const;
 
-const part = (use: unknown): ToolPart =>
-    ({ approval: { id: "approval-1" }, input: { label: "Files token", use }, state: "approval-requested", type: "tool-requestSecret" }) as unknown as ToolPart;
+const part = (use: unknown, extra: Record<string, unknown> = {}): ToolPart =>
+    ({
+        approval: { id: "approval-1" },
+        input: { label: "Files token", ...(use !== undefined && { use }), ...extra },
+        state: "approval-requested",
+        type: "tool-requestSecret",
+    }) as unknown as ToolPart;
 
-const mountCard = (use: unknown, children?: ReactNode) => {
+const mountCard = (use: unknown, children?: ReactNode, extra?: Record<string, unknown>) => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     render(
         <QueryClientProvider client={client}>
-            <RequestSecretPrompt part={part(use)} />
+            <RequestSecretPrompt part={part(use, extra)} />
             {children}
         </QueryClientProvider>,
     );
@@ -315,6 +320,63 @@ describe("the secret request card", () => {
         expect(await screen.findByText(SERVERS_NOT_LOADED)).toBeTruthy();
         expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(true);
         expect(screen.getByRole("button", { name: RETRY })).toBeTruthy();
+    });
+
+    it("toggles the field between password and text with the show/hide button", () => {
+        mountCard({ kind: "provider_key", provider: "openai" });
+
+        const field = screen.getByPlaceholderText("Paste it here — it is not shown in the chat");
+
+        expect(field.getAttribute("type")).toBe("password");
+
+        fireEvent.click(screen.getByRole("button", { name: "Show Files token" }));
+        expect(field.getAttribute("type")).toBe("text");
+
+        fireEvent.click(screen.getByRole("button", { name: "Hide Files token" }));
+        expect(field.getAttribute("type")).toBe("password");
+    });
+
+    it("refuses a value that misses the declared prefix before sending, and accepts one that fits", () => {
+        mountCard({ kind: "provider_key", provider: "openai" }, undefined, { format: { prefix: "sk-" } });
+
+        const field = screen.getByPlaceholderText("Paste it here — it is not shown in the chat");
+
+        fireEvent.change(field, { target: { value: "nope-123" } });
+        expect(screen.getByText("This does not look right: it must start with sk-.").getAttribute("role")).toBe("alert");
+        expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(true);
+        fireEvent.submit(field);
+        expect(answer).not.toHaveBeenCalled();
+
+        fireEvent.change(field, { target: { value: "sk-123" } });
+        expect(screen.queryByText("This does not look right: it must start with sk-.")).toBeNull();
+        expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it("asks for every field of a card with several, and sends them together in one answer", async () => {
+        const fields = [
+            { label: "Username", name: "username", use: { kind: "provider_key", provider: "openai" } },
+            { label: "Password", name: "password", use: { kind: "provider_key", provider: "groq" } },
+        ];
+
+        mountCard(undefined, undefined, { fields });
+
+        const [first, second] = screen.getAllByPlaceholderText("Paste it here — it is not shown in the chat");
+
+        expect(first!.getAttribute("type")).toBe("password");
+        expect(second!.getAttribute("type")).toBe("password");
+
+        fireEvent.change(first!, { target: { value: "alice" } });
+        expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(true);
+
+        fireEvent.change(second!, { target: { value: SECRET } });
+        fireEvent.click(screen.getByRole("button", { name: "Show Password" }));
+        expect(second!.getAttribute("type")).toBe("text");
+        expect(first!.getAttribute("type")).toBe("password");
+
+        fireEvent.click(screen.getByRole("button", { name: SAVE }));
+
+        await waitFor(() => expect(answer).toHaveBeenCalledTimes(1));
+        expect(answer.mock.calls[0]?.[0]).toMatchObject({ expectedUrl: "", more: [{ expectedUrl: "", value: SECRET }], value: "alice" });
     });
 
     it("shows a visible focus ring on the card, where focus lands after a send", () => {

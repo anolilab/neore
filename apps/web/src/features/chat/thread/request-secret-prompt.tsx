@@ -6,10 +6,12 @@
  *
  * The card shows what is asked for, why, and where the value will go. While the
  * call waits (`approval-requested`) the owner types the value into a password
- * field and saves it, or declines. The value goes to the server in one call
- * (`answerSecretRequest`) that stores it encrypted and resumes the run with only
- * an opaque reference: it is cleared from this component the moment it is sent,
- * is never shown again, and is kept out of analytics capture.
+ * field (one per secret the request lists, each with a show/hide toggle) and
+ * saves it, or declines. A format the request declares is checked here before
+ * anything is sent; the server checks it again. The values go to the server in
+ * one call (`answerSecretRequest`) that stores each encrypted and resumes the run
+ * with only opaque references: they are cleared from this component the moment
+ * they are sent, are never shown again, and are kept out of analytics capture.
  *
  * Only the thread owner can answer: the value is stored for them and used with
  * their keys and servers. Anyone else sees the request read-only.
@@ -17,11 +19,13 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import type { SecretFormat } from "@neore/backend/request-secret-limits";
+import { secretFormatProblem } from "@neore/backend/request-secret-limits";
 import type { ToolPart } from "@neore/chat-ui/types";
 import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
-import { KeyRound, X } from "lucide-react";
+import { Eye, EyeOff, KeyRound, X } from "lucide-react";
 import type { FC, FormEvent } from "react";
 import { useId, useRef, useState } from "react";
 
@@ -39,11 +43,24 @@ type SecretUse = { header: string; kind: "mcp_header"; server: string } | { kind
 
 type Server = { address: string; kind: "found"; url: string } | { kind: "ambiguous" } | { kind: "failed" } | { kind: "loading" } | { kind: "missing" };
 
+interface RequestedField {
+    format?: SecretFormat;
+    label?: string;
+    name?: string;
+    use?: SecretUse;
+}
+
 interface RequestSecretInput {
+    fields?: RequestedField[];
+    format?: SecretFormat;
     label?: string;
     purpose?: string;
     use?: SecretUse;
 }
+
+/** The secrets the call asks for: its `fields`, or the one destination of a plain request. */
+const requestedFields = (input: RequestSecretInput): RequestedField[] =>
+    Array.isArray(input.fields) ? input.fields : [{ format: input.format, label: input.label, use: input.use }];
 
 type Submitted = "decline" | "save";
 
@@ -85,12 +102,12 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const { hooks } = useAuth();
     const { data: sessionData } = hooks.useSession();
     const headingId = useId();
-    const valueId = useId();
-    const destinationId = useId();
-    const tooLongId = useId();
+    const fieldId = useId();
     const saveErrorId = useId();
     const loadErrorId = useId();
-    const [draft, setDraft] = useState("");
+    const [drafts, setDrafts] = useState<string[]>([]);
+    // Which fields are shown as plain text; hidden again once the answer is sent.
+    const [revealed, setRevealed] = useState<ReadonlySet<number>>(() => new Set());
     // Shown in the card, tied to the field: the typed value is cleared on send, so the person must know to type it again.
     const [saveError, setSaveError] = useState<string | null>(null);
     const [submitted, setSubmitted] = useState<Submitted | null>(null);
@@ -109,10 +126,13 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
 
     const input = (typeof part.input === "object" && part.input !== null ? part.input : {}) as RequestSecretInput;
     const label = input.label ?? "";
+    const fields = requestedFields(input);
+    const several = Array.isArray(input.fields);
     const approvalId = part.approval?.id;
     // A public viewer's thread copy has no `userId`, so it never matches.
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
     const isWaiting = part.state === "approval-requested" && submitted === null && !closed;
+    const usesServer = fields.some((field) => field.use?.kind === "mcp_header");
     // Only the owner's servers are the destination, and only the owner's card needs them: for anyone else (a
     // collaborator, a public view) the query never runs. For the owner it is the one the composer and Settings read.
     const {
@@ -122,92 +142,143 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         isFetching: preferencesFetching,
         isSuccess: preferencesLoaded,
         refetch: retryPreferences,
-    } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions(isOwner && isWaiting && input.use?.kind === "mcp_header" ? {} : skipToken));
+    } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions(isOwner && isWaiting && usesServer ? {} : skipToken));
     // A user who never saved a server has no `mcpServers` (or no row at all): once the read has answered, that is an empty list, not "still loading".
     const savedServers = preferences?.mcpServers ?? (preferencesLoaded ? [] : undefined);
-    const server = input.use?.kind === "mcp_header" && isOwner ? resolveServer(savedServers, input.use.server, preferencesFailed) : undefined;
+    const servers = fields.map((field) =>
+        field.use?.kind === "mcp_header" && isOwner ? resolveServer(savedServers, field.use.server, preferencesFailed) : undefined,
+    );
     // A retry with nothing cached puts the query back to loading; the failure line and its button stay through it, so focus is not lost and the wait is announced.
-    const loadFailureShown = server?.kind === "failed" || (server?.kind === "loading" && preferencesFetching && preferenceFailures > 0);
-    const valueMax = input.use?.kind === "provider_key" ? PROVIDER_KEY_MAX : HEADER_VALUE_MAX;
-    // Checked before anything is sent: the card clears the draft once it goes, and the server would refuse it after that.
-    const tooLong = draft.trim().length > valueMax;
+    const loadFailureShown = servers.some(
+        (server) => server?.kind === "failed" || (server?.kind === "loading" && preferencesFetching && preferenceFailures > 0),
+    );
+    const valueMaxOf = (field: RequestedField) => (field.use?.kind === "provider_key" ? PROVIDER_KEY_MAX : HEADER_VALUE_MAX);
+    const draftOf = (index: number) => (drafts[index] ?? "").trim();
+    // Checked before anything is sent: the card clears the drafts once they go, and the server would refuse them after that.
+    const tooLong = fields.map((field, index) => draftOf(index).length > valueMaxOf(field));
+    const formatProblems = fields.map((field, index) => (draftOf(index).length > 0 ? secretFormatProblem(draftOf(index), field.format) : undefined));
     // A header goes to one saved server, found by name when the answer arrives: without exactly one the server refuses it.
-    const destinationReady = server === undefined || server.kind === "found";
+    const destinationReady = servers.every((server) => server === undefined || server.kind === "found");
     const canAnswer = isOwner && isWaiting && !!approvalId && !!threadId && !isPending;
+    const complete = fields.every((_field, index) => draftOf(index).length > 0);
+    const valid = complete && !tooLong.includes(true) && formatProblems.every((problem) => problem === undefined);
 
-    let destination = "";
+    const destinationOf = (field: RequestedField, server: Server | undefined): string => {
+        const { use } = field;
 
-    if (input.use?.kind === "provider_key") {
-        const provider = providerLabel(input.use.provider) ?? input.use.provider;
+        if (use?.kind === "provider_key") {
+            const provider = providerLabel(use.provider) ?? use.provider;
 
-        destination = t`Will be saved as your ${provider} API key`;
-    } else if (input.use?.kind === "mcp_header") {
-        const { header, server: serverName } = input.use;
+            return t`Will be saved as your ${provider} API key`;
+        }
+
+        if (use?.kind !== "mcp_header") {
+            return "";
+        }
+
+        const { header, server: serverName } = use;
 
         switch (server?.kind) {
             case "ambiguous": {
-                destination = t`More than one of your MCP servers is named ${serverName}. Rename one in Settings first, or decline.`;
-
-                break;
-            }
-            case "failed": {
-                destination = t`Set as the ${header} header on your ${serverName} MCP server`;
-
-                break;
+                return t`More than one of your MCP servers is named ${serverName}. Rename one in Settings first, or decline.`;
             }
             case "found": {
                 const { address } = server;
 
-                destination = t`Set as the ${header} header on your ${serverName} MCP server (${address})`;
-
-                break;
+                return t`Set as the ${header} header on your ${serverName} MCP server (${address})`;
             }
             case "missing": {
-                destination = t`You have no saved MCP server named ${serverName}. Add it in Settings first, or decline.`;
-
-                break;
+                return t`You have no saved MCP server named ${serverName}. Add it in Settings first, or decline.`;
             }
             default: {
-                destination = t`Set as the ${header} header on your ${serverName} MCP server`;
+                return t`Set as the ${header} header on your ${serverName} MCP server`;
             }
         }
-    }
+    };
+
+    const formatMessageOf = (field: RequestedField, problem: "min_length" | "prefix" | undefined): string => {
+        if (problem === "prefix") {
+            const prefix = field.format?.prefix ?? "";
+
+            return t`This does not look right: it must start with ${prefix}.`;
+        }
+
+        if (problem === "min_length") {
+            const minLength = field.format?.minLength ?? 0;
+
+            return t`This is too short: at least ${minLength} characters.`;
+        }
+
+        return "";
+    };
+
+    const setDraft = (index: number, value: string) => setDrafts((current) => Object.assign([...current], { [index]: value }));
+
+    const toggleReveal = (index: number) =>
+        setRevealed((current) => {
+            const next = new Set(current);
+
+            if (!next.delete(index)) {
+                next.add(index);
+            }
+
+            return next;
+        });
 
     const send = (reply: Submitted) => {
         if (!approvalId || !threadId) {
             return;
         }
 
-        const value = reply === "save" ? draft.trim() : null;
+        const values = reply === "save" ? fields.map((_field, index) => draftOf(index)) : null;
 
-        if (value !== null && value.length > valueMax) {
+        if (values !== null && (!valid || !destinationReady)) {
             return;
         }
 
-        // The address the card displayed: the server refuses a header save if the saved server has moved since (empty when there is no server to name).
-        const expectedUrl = value !== null && server?.kind === "found" ? server.url : "";
+        // The address each card field displayed: the server refuses a header save if the saved server has moved since (empty when there is no server to name).
+        const urlOf = (index: number) => {
+            const server = servers[index];
 
-        // Cleared before the call returns: the value lives in this component for no longer than the keystrokes.
-        setDraft("");
+            return values !== null && server?.kind === "found" ? server.url : "";
+        };
+        const more =
+            values === null
+                ? []
+                : values.slice(1).map((value, index) => {
+                      return { expectedUrl: urlOf(index + 1), value };
+                  });
+
+        // Cleared before the call returns: the values live in this component for no longer than the keystrokes.
+        setDrafts([]);
+        setRevealed(new Set());
         setSaveError(null);
         setSubmitted(reply);
         groupRef.current?.focus();
         mutate(
-            { approvalId, expectedUrl, threadId: threadId as Id<"threads">, value },
+            { approvalId, expectedUrl: urlOf(0), ...(more.length > 0 && { more }), threadId: threadId as Id<"threads">, value: values?.[0] ?? null },
             {
                 onError: (error) => {
                     setSubmitted(null);
 
-                    if ((error as { data?: { code?: string } }).data?.code === "TOOL_REQUEST_ABANDONED") {
+                    const code = (error as { data?: { code?: string } }).data?.code;
+
+                    if (code === "TOOL_REQUEST_ABANDONED") {
                         setClosed(true);
 
                         return;
                     }
 
                     // The saved server's address moved since the card showed it: the card's copy is stale, so load the current one.
-                    if ((error as { data?: { code?: string } }).data?.code === "SECRET_SERVER_MOVED") {
+                    if (code === "SECRET_SERVER_MOVED") {
                         setSaveError(t`This server's address changed. Check the address below and save again.`);
                         void retryPreferences();
+
+                        return;
+                    }
+
+                    if (code === "SECRET_FORMAT_INVALID") {
+                        setSaveError(t`A value does not have the format this request asks for, so nothing was saved. Check it and enter it again.`);
 
                         return;
                     }
@@ -223,7 +294,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const onSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        if (draft.trim().length > 0 && !tooLong && canAnswer && destinationReady) {
+        if (valid && canAnswer && destinationReady) {
             send("save");
         }
     };
@@ -233,7 +304,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     if (part.state === "output-denied" || submitted === "decline") {
         statusText = t`Declined — continuing without it`;
     } else if (part.state === "output-available") {
-        statusText = t`Saved — the assistant can use it once, in this reply`;
+        statusText = several ? t`Saved — the assistant can use each once, in this reply` : t`Saved — the assistant can use it once, in this reply`;
     } else if (submitted || part.state === "approval-responded") {
         statusText = t`Saved — continuing`;
     } else if (closed) {
@@ -259,9 +330,9 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         {label || t`The assistant needs a secret`}
                     </p>
                     {input.purpose && <p className="text-muted-foreground text-sm">{input.purpose}</p>}
-                    {destination && (
-                        <p className="text-muted-foreground text-xs" id={destinationId}>
-                            {destination}
+                    {!several && destinationOf(fields[0] ?? {}, servers[0]) && (
+                        <p className="text-muted-foreground text-xs" id={`${fieldId}-0-destination`}>
+                            {destinationOf(fields[0] ?? {}, servers[0])}
                         </p>
                     )}
                     <p aria-live="polite" className="text-muted-foreground text-xs" role="status">
@@ -271,30 +342,75 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
             </div>
 
             {canAnswer && (
-                // `ph-no-capture` keeps the field out of PostHog's autocapture and recordings.
-                <form className="ph-no-capture mt-3 flex flex-col gap-2" onSubmit={onSubmit}>
-                    <label className="sr-only" htmlFor={valueId}>
-                        {label || t`Secret`}
-                    </label>
-                    <Input
-                        aria-describedby={
-                            [destination ? destinationId : "", tooLong ? tooLongId : "", saveError ? saveErrorId : "", loadFailureShown ? loadErrorId : ""]
-                                .filter(Boolean)
-                                .join(" ") || undefined
-                        }
-                        aria-invalid={tooLong || saveError !== null || loadFailureShown || undefined}
-                        autoComplete="new-password"
-                        autoCorrect="off"
-                        id={valueId}
-                        maxLength={HEADER_VALUE_MAX}
-                        name="requested-secret"
-                        onChange={(event) => setDraft(event.target.value)}
-                        placeholder={t`Paste it here — it is not shown in the chat`}
-                        size="sm"
-                        spellCheck={false}
-                        type="password"
-                        value={draft}
-                    />
+                // `ph-no-capture` keeps the fields out of PostHog's autocapture and recordings.
+                <form className="ph-no-capture mt-3 flex flex-col gap-3" onSubmit={onSubmit}>
+                    {fields.map((field, index) => {
+                        const inputId = `${fieldId}-${index}`;
+                        const destination = destinationOf(field, servers[index]);
+                        const formatMessage = formatMessageOf(field, formatProblems[index]);
+                        const valueMax = valueMaxOf(field);
+                        const fieldLabel = field.label || label || t`Secret`;
+                        const shown = revealed.has(index);
+                        const describedBy = [
+                            destination ? `${inputId}-destination` : "",
+                            tooLong[index] === true ? `${inputId}-too-long` : "",
+                            formatMessage ? `${inputId}-format` : "",
+                            saveError ? saveErrorId : "",
+                            loadFailureShown ? loadErrorId : "",
+                        ]
+                            .filter(Boolean)
+                            .join(" ");
+
+                        return (
+                            <div className="flex flex-col gap-1" key={field.name ?? "secret"}>
+                                <label className={several ? "text-sm font-medium" : "sr-only"} htmlFor={inputId}>
+                                    {fieldLabel}
+                                </label>
+                                {several && destination && (
+                                    <p className="text-muted-foreground text-xs" id={`${inputId}-destination`}>
+                                        {destination}
+                                    </p>
+                                )}
+                                <div className="flex items-center gap-1">
+                                    <Input
+                                        aria-describedby={describedBy || undefined}
+                                        aria-invalid={tooLong[index] || !!formatMessage || saveError !== null || loadFailureShown || undefined}
+                                        autoComplete="new-password"
+                                        autoCorrect="off"
+                                        id={inputId}
+                                        maxLength={HEADER_VALUE_MAX}
+                                        name={`requested-secret-${field.name ?? "value"}`}
+                                        onChange={(event) => setDraft(index, event.target.value)}
+                                        placeholder={t`Paste it here — it is not shown in the chat`}
+                                        size="sm"
+                                        spellCheck={false}
+                                        type={shown ? "text" : "password"}
+                                        value={drafts[index] ?? ""}
+                                    />
+                                    <Button
+                                        aria-label={shown ? t`Hide ${fieldLabel}` : t`Show ${fieldLabel}`}
+                                        aria-pressed={shown}
+                                        onClick={() => toggleReveal(index)}
+                                        size="icon-sm"
+                                        type="button"
+                                        variant="ghost"
+                                    >
+                                        {shown ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+                                    </Button>
+                                </div>
+                                {tooLong[index] && (
+                                    <p className="text-destructive text-xs" id={`${inputId}-too-long`} role="alert">
+                                        {t`This is too long: up to ${valueMax} characters.`}
+                                    </p>
+                                )}
+                                {formatMessage && (
+                                    <p className="text-destructive text-xs" id={`${inputId}-format`} role="alert">
+                                        {formatMessage}
+                                    </p>
+                                )}
+                            </div>
+                        );
+                    })}
                     {loadFailureShown && (
                         <div className="flex flex-wrap items-center gap-2">
                             <p className="text-destructive text-xs" id={loadErrorId} role="alert">
@@ -320,13 +436,8 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                             {saveError}
                         </p>
                     )}
-                    {tooLong && (
-                        <p className="text-destructive text-xs" id={tooLongId} role="alert">
-                            {t`This is too long: up to ${valueMax} characters.`}
-                        </p>
-                    )}
                     <div className="flex flex-wrap gap-2">
-                        <Button disabled={draft.trim().length === 0 || tooLong || !destinationReady} size="sm" type="submit">
+                        <Button disabled={!valid || !destinationReady} size="sm" type="submit">
                             <KeyRound aria-hidden="true" />
                             {t`Save`}
                         </Button>

@@ -1787,6 +1787,10 @@ msgstr "Quando crei questo trigger verranno generati un URL del webhook e un sec
 msgid "A usage alert was triggered"
 msgstr ""
 
+#: src/features/chat/thread/request-secret-prompt.tsx:274
+msgid "A value does not have the format this request asks for, so nothing was saved. Check it and enter it again."
+msgstr "Un valore non ha il formato richiesto da questa richiesta, quindi non è stato salvato nulla. Controllalo e inseriscilo di nuovo."
+
 #: src/features/develop/components/watched-repositories.tsx:38
 msgid "A webhook only tells Neore to look again sooner. Polling keeps working without one."
 msgstr ""
@@ -3316,7 +3320,7 @@ msgstr "Rispondi ai messaggi di un WeChat Official Account (modalità sicura). B
 msgid "Answer ready"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:303
+#: src/features/chat/thread/ask-user-prompt.tsx:134
 msgid "Answer sent — continuing"
 msgstr "Risposta inviata — si continua"
 
@@ -3324,7 +3328,7 @@ msgstr "Risposta inviata — si continua"
 msgid "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 msgstr "Rispondi ai messaggi WhatsApp tramite il tuo numero WhatsApp Business (Meta Cloud API). Le risposte seguono la regola delle 24 ore di WhatsApp."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:299
+#: src/features/chat/thread/ask-user-prompt.tsx:130
 msgid "Answered"
 msgstr "Risposta data"
 
@@ -3843,7 +3847,7 @@ msgstr ""
 msgid "Attach as file"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:437
+#: src/features/chat/thread/ask-user-prompt.tsx:262
 msgid "Attach file"
 msgstr "Allega file"
 
@@ -3851,7 +3855,7 @@ msgstr "Allega file"
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "Allega file o intere raccolte che l’IA potrà consultare e citare in questa conversazione."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:388
+#: src/features/chat/thread/ask-user-prompt.tsx:219
 msgid "Attached files"
 msgstr "File allegati"
 
@@ -3859,15 +3863,15 @@ msgstr "File allegati"
 msgid "Attached image"
 msgstr "Immagine allegata"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:344
+#: src/features/chat/thread/ask-user-prompt.tsx:175
 msgid "Attached:"
 msgstr "Allegato:"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:425
+#: src/features/chat/thread/ask-user-prompt.tsx:250
 msgid "Attaching files…"
 msgstr "Allegando i file…"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:437
+#: src/features/chat/thread/ask-user-prompt.tsx:262
 msgid "Attaching…"
 msgstr "Allegando…"
 
@@ -6191,7 +6195,7 @@ msgstr "Chiudi traduzione"
 msgid "Closed"
 msgstr "Chiuso"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:240
+#: src/features/chat/thread/request-secret-prompt.tsx:304
 msgid "Closed — the conversation moved on. Ask again in the chat."
 msgstr ""
 
@@ -7724,7 +7728,7 @@ msgstr ""
 msgid "Could not answer the question. Try again."
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:215
+#: src/features/chat/thread/request-secret-prompt.tsx:279
 msgid "Could not answer. Please try again."
 msgstr ""
 
@@ -7733,12 +7737,12 @@ msgid "Could not apply the changes"
 msgstr "Impossibile applicare le modifiche"
 
 #. placeholder {0}: failed.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:283
+#: src/features/chat/thread/use-ask-user-attachments.ts:186
 msgid "Could not attach {0}. The other files were attached; try those again."
 msgstr "Impossibile allegare {0}. Gli altri file sono stati allegati; riprova con quelli."
 
 #. placeholder {0}: failed.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:284
+#: src/features/chat/thread/use-ask-user-attachments.ts:187
 msgid "Could not attach {0}. Try those again."
 msgstr "Impossibile allegare {0}. Riprova."
 
@@ -8024,7 +8028,7 @@ msgstr ""
 msgid "Could not send your answer."
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:147
+#: src/features/chat/thread/ask-user-prompt.tsx:97
 #: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "Impossibile inviare la tua risposta. Riprova."
@@ -8869,11 +8873,11 @@ msgid "Debug an error or review my code..."
 msgstr "Correggi un errore o rivedi il mio codice..."
 
 #: src/features/chat/host/host-composer.tsx:69
-#: src/features/chat/thread/request-secret-prompt.tsx:335
+#: src/features/chat/thread/request-secret-prompt.tsx:439
 msgid "Decline"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:234
+#: src/features/chat/thread/request-secret-prompt.tsx:298
 msgid "Declined — continuing without it"
 msgstr ""
 
@@ -9872,7 +9876,7 @@ msgstr "Chiave pubblica Discord"
 
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:54
 #: src/features/changelog/components/changelog-card.tsx:59
-#: src/features/chat/thread/ask-user-prompt.tsx:445
+#: src/features/chat/thread/ask-user-prompt.tsx:270
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:202
@@ -9908,7 +9912,7 @@ msgstr "Ignora segreto del webhook"
 msgid "Dismissed"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:301
+#: src/features/chat/thread/ask-user-prompt.tsx:132
 msgid "Dismissed — continuing without an answer"
 msgstr "Ignorata — si continua senza risposta"
 
@@ -11222,7 +11226,7 @@ msgstr "Inserisci la chiave API"
 msgid "Enter the endpoint URL first"
 msgstr "Inserisci prima l'URL dell'endpoint"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:411
+#: src/features/chat/thread/ask-user-prompt.tsx:236
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "Invio per inviare, Maiusc+Invio per andare a capo."
 
@@ -13360,7 +13364,7 @@ msgstr "Il nome del file non può essere vuoto"
 msgid "Files"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:427
+#: src/features/chat/thread/ask-user-prompt.tsx:252
 msgid "Files cannot be attached in a locked chat."
 msgstr "Non è possibile allegare file in una chat bloccata."
 
@@ -15170,6 +15174,10 @@ msgstr ""
 msgid "Hidden in Model Picker"
 msgstr ""
 
+#: src/features/chat/thread/request-secret-prompt.tsx:384
+msgid "Hide {fieldLabel}"
+msgstr "Nascondi {fieldLabel}"
+
 #: src/components/model-picker/model-picker.tsx:1163
 msgid "Hide {name} from model picker"
 msgstr ""
@@ -16632,7 +16640,7 @@ msgstr "Potrebbe essere scaduto, revocato o già usato. Chiedi un nuovo link."
 msgid "It opened a different session than its own, so the conversation was handed over"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:215
+#: src/features/chat/thread/request-secret-prompt.tsx:279
 msgid "It was not saved. Paste it again and save."
 msgstr ""
 
@@ -17937,7 +17945,7 @@ msgstr "Caricamento..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:320
 #: src/features/chat/thread/memory-usage-action.tsx:46
-#: src/features/chat/thread/request-secret-prompt.tsx:314
+#: src/features/chat/thread/request-secret-prompt.tsx:423
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
@@ -19428,7 +19436,7 @@ msgstr "Più passaggi = qualità più alta, generazione più lunga"
 msgid "More than a proxy — an intelligent layer between your app and every LLM provider."
 msgstr "Più di un proxy: uno strato intelligente tra la tua app e ogni provider di LLM."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:149
+#: src/features/chat/thread/request-secret-prompt.tsx:181
 msgid "More than one of your MCP servers is named {serverName}. Rename one in Settings first, or decline."
 msgstr ""
 
@@ -21166,7 +21174,7 @@ msgid "Not set"
 msgstr "Non impostato"
 
 #. placeholder {0}: unreadFiles.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:348
+#: src/features/chat/thread/ask-user-prompt.tsx:179
 msgid "Not shown to this model: {0}"
 msgstr "Non mostrati a questo modello: {0}"
 
@@ -21575,7 +21583,7 @@ msgstr "Solo i proprietari dell'organizzazione possono gestire le impostazioni d
 msgid "Only participants you @mention answer."
 msgstr "Rispondono solo i partecipanti che @menzioni."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:193
+#: src/features/chat/thread/use-ask-user-attachments.ts:96
 msgid "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
 msgstr "Solo immagini PNG, JPEG, WEBP o GIF e PDF fino a 10 MB, 20 MB in totale e al massimo quattro."
 
@@ -22351,7 +22359,7 @@ msgstr ""
 msgid "Or from a terminal:"
 msgstr "Oppure da un terminale:"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:377
+#: src/features/chat/thread/ask-user-prompt.tsx:208
 msgid "Or type your own answer…"
 msgstr "Oppure scrivi la tua risposta…"
 
@@ -22909,7 +22917,7 @@ msgstr "Incolla l’URL dell’immagine"
 msgid "Paste image URL..."
 msgstr "Incolla l’URL dell’immagine..."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:292
+#: src/features/chat/thread/request-secret-prompt.tsx:377
 msgid "Paste it here — it is not shown in the chat"
 msgstr ""
 
@@ -23592,11 +23600,11 @@ msgstr "Ragionamento e rispetto delle istruzioni di livello premium"
 msgid "Premium-tier reasoning transparency"
 msgstr "Trasparenza del ragionamento di livello premium"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:305
+#: src/features/chat/thread/ask-user-prompt.tsx:136
 msgid "Preparing a question…"
 msgstr "Preparazione di una domanda…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:242
+#: src/features/chat/thread/request-secret-prompt.tsx:306
 msgid "Preparing a request…"
 msgstr ""
 
@@ -25340,7 +25348,7 @@ msgstr "Rimuovere «{0}»?"
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
 #: src/features/chat/group/group-participant-bar.tsx:210
-#: src/features/chat/thread/ask-user-prompt.tsx:393
+#: src/features/chat/thread/ask-user-prompt.tsx:224
 #: src/features/prompts/components/thread-variables-config.tsx:232
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
@@ -25990,7 +25998,7 @@ msgid "retry"
 msgstr ""
 
 #: src/features/chat/thread/chat-error.tsx:56
-#: src/features/chat/thread/request-secret-prompt.tsx:311
+#: src/features/chat/thread/request-secret-prompt.tsx:420
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
@@ -26526,7 +26534,7 @@ msgstr "Arabia Saudita"
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:165
-#: src/features/chat/thread/request-secret-prompt.tsx:331
+#: src/features/chat/thread/request-secret-prompt.tsx:435
 #: src/features/develop/components/draft-comment-card.tsx:43
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -26633,11 +26641,15 @@ msgstr "Salva workflow"
 msgid "Saved"
 msgstr "Salvato"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:238
+#: src/features/chat/thread/request-secret-prompt.tsx:302
 msgid "Saved — continuing"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:236
+#: src/features/chat/thread/request-secret-prompt.tsx:300
+msgid "Saved — the assistant can use each once, in this reply"
+msgstr "Salvato: l'assistente può usare ciascuno una volta, in questa risposta"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:300
 msgid "Saved — the assistant can use it once, in this reply"
 msgstr ""
 
@@ -27058,7 +27070,7 @@ msgstr "postazione/mese"
 msgid "secret"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:277
+#: src/features/chat/thread/request-secret-prompt.tsx:345
 #: src/features/develop/components/watched-repositories.tsx:33
 msgid "Secret"
 msgstr ""
@@ -27376,7 +27388,7 @@ msgstr "Invia un messaggio per iniziare"
 msgid "Send a new verification link"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:441
+#: src/features/chat/thread/ask-user-prompt.tsx:266
 msgid "Send answer"
 msgstr "Invia risposta"
 
@@ -27572,12 +27584,11 @@ msgstr "Sessioni revocate"
 msgid "Set a password for your account"
 msgstr "Imposta una password per il tuo account"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:154
-#: src/features/chat/thread/request-secret-prompt.tsx:171
+#: src/features/chat/thread/request-secret-prompt.tsx:192
 msgid "Set as the {header} header on your {serverName} MCP server"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:161
+#: src/features/chat/thread/request-secret-prompt.tsx:186
 msgid "Set as the {header} header on your {serverName} MCP server ({address})"
 msgstr ""
 
@@ -27773,6 +27784,10 @@ msgstr "Testo breve"
 #: src/features/settings/lib/settings-keywords.ts:45
 msgid "shortcut"
 msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:384
+msgid "Show {fieldLabel}"
+msgstr "Mostra {fieldLabel}"
 
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:63
 msgid "Show {hidden} more lines"
@@ -29729,7 +29744,7 @@ msgstr "Suggerisci idee video per un canale YouTube di tecnologia"
 msgid "Suggested"
 msgstr "Suggeriti"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:353
+#: src/features/chat/thread/ask-user-prompt.tsx:184
 #: src/features/skills/components/skill-builder-dialog.tsx:235
 msgid "Suggested answers"
 msgstr "Risposte suggerite"
@@ -30685,7 +30700,7 @@ msgstr "L’archivio contiene un percorso di file non sicuro."
 msgid "The archive holds too many files."
 msgstr "L’archivio contiene troppi file."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:327
+#: src/features/chat/thread/ask-user-prompt.tsx:158
 msgid "The assistant has a question"
 msgstr "L'assistente ha una domanda"
 
@@ -30693,7 +30708,7 @@ msgstr "L'assistente ha una domanda"
 msgid "The assistant is asking for a secret"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:259
+#: src/features/chat/thread/request-secret-prompt.tsx:323
 msgid "The assistant needs a secret"
 msgstr ""
 
@@ -31488,6 +31503,10 @@ msgstr "Questo file CSV sembra vuoto o non valido."
 msgid "This diff is cut short."
 msgstr ""
 
+#: src/features/chat/thread/request-secret-prompt.tsx:201
+msgid "This does not look right: it must start with {prefix}."
+msgstr "Non sembra corretto: deve iniziare con {prefix}."
+
 #: src/features/local-models/components/ollama-model-manager.tsx:177
 msgid "This endpoint is not Ollama. Model management is available for Ollama only — in LM Studio, download models in the app."
 msgstr "Questo endpoint non è Ollama. La gestione dei modelli è disponibile solo per Ollama: in LM Studio scarica i modelli dall'app."
@@ -31571,9 +31590,18 @@ msgstr ""
 msgid "This is how your organization appears to members"
 msgstr "Così la tua organizzazione appare ai membri"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:325
+#. placeholder {0}: valueMaxOf(field)
+#: src/features/chat/thread/request-secret-prompt.tsx:395
+#~ msgid "This is too long: up to {0} characters."
+#~ msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:396
 msgid "This is too long: up to {valueMax} characters."
 msgstr ""
+
+#: src/features/chat/thread/request-secret-prompt.tsx:207
+msgid "This is too short: at least {minLength} characters."
+msgstr "È troppo corto: almeno {minLength} caratteri."
 
 #: src/features/auth/components/organization/organization-slug-card.tsx:109
 #: src/features/auth/components/organization/organization-slug-card.tsx:159
@@ -31731,7 +31759,7 @@ msgstr "Questa selezione è troppo grande per essere importata in una volta. Imp
 msgid "This server requires sign-in. Save it, then choose Sign in."
 msgstr "Questo server richiede l'accesso. Salvalo, poi scegli Accedi."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:209
+#: src/features/chat/thread/request-secret-prompt.tsx:267
 msgid "This server's address changed. Check the address below and save again."
 msgstr ""
 
@@ -32185,7 +32213,7 @@ msgid "too large"
 msgstr "troppo grande"
 
 #. placeholder {0}: tooLarge.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:277
+#: src/features/chat/thread/use-ask-user-attachments.ts:180
 msgid "Too large to attach: {0}. Reduce the file and attach it again."
 msgstr "Troppo grande da allegare: {0}. Riduci il file e allegalo di nuovo."
 
@@ -32737,7 +32765,7 @@ msgstr ""
 msgid "Type to search"
 msgstr "Digita per cercare"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:377
+#: src/features/chat/thread/ask-user-prompt.tsx:208
 msgid "Type your answer…"
 msgstr "Scrivi la tua risposta…"
 
@@ -34483,11 +34511,11 @@ msgstr "In attesa dell'output…"
 msgid "Waiting for the agent…"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:244
+#: src/features/chat/thread/request-secret-prompt.tsx:308
 msgid "Waiting for the owner"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:307
+#: src/features/chat/thread/ask-user-prompt.tsx:138
 msgid "Waiting for the owner to answer"
 msgstr "In attesa della risposta del proprietario"
 
@@ -34502,13 +34530,13 @@ msgstr "In attesa dell'approvazione del proprietario"
 msgid "Waiting for uploads to complete…"
 msgstr "In attesa del completamento dei caricamenti…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:244
+#: src/features/chat/thread/request-secret-prompt.tsx:308
 msgid "Waiting for you"
 msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
-#: src/features/chat/thread/ask-user-prompt.tsx:307
+#: src/features/chat/thread/ask-user-prompt.tsx:138
 msgid "Waiting for your answer"
 msgstr "In attesa della tua risposta"
 
@@ -34939,7 +34967,7 @@ msgstr "Ampiamente affidabile per i carichi di lavoro di produzione"
 msgid "Width"
 msgstr "Larghezza"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:143
+#: src/features/chat/thread/request-secret-prompt.tsx:170
 msgid "Will be saved as your {provider} API key"
 msgstr ""
 
@@ -35328,7 +35356,7 @@ msgstr "Non hai ancora file di conoscenza indicizzati."
 msgid "You have no projects yet."
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:166
+#: src/features/chat/thread/request-secret-prompt.tsx:189
 msgid "You have no saved MCP server named {serverName}. Add it in Settings first, or decline."
 msgstr ""
 
@@ -35454,7 +35482,7 @@ msgstr "Il tuo account e tutti i dati associati sono in fase di eliminazione. L'
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "Il tuo spazio di lavoro IA <0>inizia qui.</0>"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:369
+#: src/features/chat/thread/ask-user-prompt.tsx:200
 msgid "Your answer"
 msgstr "La tua risposta"
 
@@ -35462,7 +35490,7 @@ msgstr "La tua risposta"
 msgid "Your answer in Neore has finished."
 msgstr "La risposta in Neore è pronta."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:337
+#: src/features/chat/thread/ask-user-prompt.tsx:168
 msgid "Your answer:"
 msgstr "La tua risposta:"
 
@@ -35660,7 +35688,7 @@ msgstr ""
 msgid "Your review was requested"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:301
+#: src/features/chat/thread/request-secret-prompt.tsx:410
 msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."
 msgstr ""
 

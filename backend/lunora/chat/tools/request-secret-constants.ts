@@ -57,14 +57,52 @@ export const SECRET_DECLINED_REASON =
  */
 export type SecretUse = { header: string; kind: "mcp_header"; server: string; url?: string } | { kind: "provider_key"; provider: string };
 
-export interface RequestSecretInput {
+/** The most fields one card asks for. */
+export const SECRET_FIELDS_MAX = 5;
+
+/** A field's key in the result the model reads (`{ refs: { username: "sec_…" } }`). */
+export const SECRET_FIELD_NAME_RE = /^[A-Za-z][\w-]{0,39}$/u;
+
+export const SECRET_FORMAT_PREFIX_MAX = 64;
+
+/** `error.data.code` of the refusal when a value does not fit the format the request declared; `error.data.field` is the field's index. */
+export const SECRET_FORMAT_INVALID = "SECRET_FORMAT_INVALID";
+
+/** What a value must look like before it is stored. Declared by the tool, checked on the card and again on the server. */
+export interface SecretFormat {
+    minLength?: number;
+    prefix?: string;
+}
+
+/** One secret of a card that asks for several; each is stored as its own secret, behind its own reference. */
+export interface SecretField {
+    format?: SecretFormat;
     label: string;
-    purpose?: string;
+    name: string;
     use: SecretUse;
 }
 
-/** What the model reads: a reference and a status, never the value. */
-export type RequestSecretOutput = { message: string; status: "unavailable" } | { ref: string; status: "saved" };
+/** A single request names its destination in `use`; one that asks for several secrets lists `fields` instead. */
+export interface RequestSecretInput {
+    fields?: SecretField[];
+    format?: SecretFormat;
+    label: string;
+    purpose?: string;
+    use?: SecretUse;
+}
+
+/** Why a value does not fit its format, or `undefined` when it does. The value is never part of the answer. */
+export const secretFormatProblem = (value: string, format: SecretFormat | undefined): "min_length" | "prefix" | undefined => {
+    if (format?.prefix !== undefined && !value.startsWith(format.prefix)) {
+        return "prefix";
+    }
+
+    return format?.minLength !== undefined && value.length < format.minLength ? "min_length" : undefined;
+};
+
+/** What the model reads: references and a status, never the value. A card with `fields` answers with `refs` keyed by field name. */
+export type RequestSecretOutput =
+    { message: string; status: "unavailable" } | { ref: string; status: "saved" } | { refs: Record<string, string>; status: "saved" };
 
 /** Why a reference could not be used. */
 export type SecretFailure = "abandoned" | "destination_missing" | "expired" | "not_found" | "unreadable" | "used" | "wrong_run" | "wrong_use";

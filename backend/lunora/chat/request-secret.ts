@@ -32,7 +32,7 @@ import { claimSecretAnswer, secretResumeArgs } from "./lib/request-secret-claim"
 import { consumeAsMcpHeader, consumeAsProviderKey } from "./lib/secret-consumers";
 import { discardThreadSecrets, replyKeyOfStream, sweepExpiredSecrets } from "./lib/secret-requests";
 import { resumeClaimedRun } from "./lib/tool-approval-resume";
-import { SECRET_HEADER_VALUE_MAX, SECRET_REF_MAX } from "./tools/request-secret-constants";
+import { SECRET_FIELDS_MAX, SECRET_HEADER_VALUE_MAX, SECRET_REF_MAX } from "./tools/request-secret-constants";
 
 /** Rows removed per sweep; a backlog drains over the next passes. */
 const SWEEP_BATCH = 200;
@@ -57,6 +57,19 @@ export const answerSecretRequest = authMutation
         approvalId: v.string().check((value) => value.length > 0 && value.length <= 256, { message: "Invalid approval id" }),
         /** The address of the MCP server the card displayed; the save is refused when that server now lives elsewhere. */
         expectedUrl: v.string().max(MAX_LENGTH.url),
+        /** The other fields of a card that asks for several secrets, in the request's order (`value` answers the first). Sensitive like `value`. */
+        more: v.optional(
+            v.sensitive(
+                v
+                    .array(
+                        v.object({
+                            expectedUrl: v.string().max(MAX_LENGTH.url),
+                            value: v.string().check((value) => value.length <= SECRET_HEADER_VALUE_MAX * 2, { message: "Value too long" }),
+                        }),
+                    )
+                    .max(SECRET_FIELDS_MAX - 1),
+            ),
+        ),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         /**
@@ -71,13 +84,13 @@ export const answerSecretRequest = authMutation
         ),
     })
     .output(v.object({ alreadyResolved: v.boolean(), streamId: v.union(v.string(), v.null()) }))
-    .mutation(async ({ args: { approvalId, expectedUrl, threadId, unlockProof, value }, ctx }) => {
+    .mutation(async ({ args: { approvalId, expectedUrl, more, threadId, unlockProof, value }, ctx }) => {
         const claim = await claimSecretAnswer(ctx, {
             approvalId,
             callerId: ctx.user.userId,
             expectedUrl,
             now: ctx.now,
-            reply: value === null ? { kind: "decline" } : { kind: "save", value },
+            reply: value === null ? { kind: "decline" } : { kind: "save", value, ...(more !== undefined && { more }) },
             threadId,
             unlockProof,
         });
@@ -90,7 +103,7 @@ export const answerSecretRequest = authMutation
         await noteShardActivity(ctx, claim.ownerId);
 
         // A provider key counts against the same budget as saving one in Settings. A throw rolls the claim back.
-        if (claim.use?.kind === "provider_key") {
+        if (claim.savesProviderKey) {
             await rateLimitGuard({ ...ctx, rateLimitKey: "byok/save", user: ctx.user });
         }
 
