@@ -68,6 +68,7 @@ beforeEach(() => {
 
         return UPLOAD_ID;
     });
+    isSafariUserAgent.mockReturnValue(true);
 });
 
 describe(uploadChatAttachment, () => {
@@ -192,17 +193,23 @@ describe(createLunoraAttachmentAdapter, () => {
         expect(downscaleOversizedImage).toHaveBeenCalledWith(expect.objectContaining({ name: "IMG_11.jpg" }));
     });
 
-    it("sends a HEIC photo unchanged in a browser that cannot decode it, and does not decode it", async () => {
+    it("sends a HEIC photo unchanged in a browser that cannot decode it, and the server's refusal rejects the upload", async () => {
         isSafariUserAgent.mockReturnValue(false);
         heicToJpegBlob.mockClear();
-        const adapter = createLunoraAttachmentAdapter(client().lunora);
+        const { lunora } = client({
+            finalize: async () => {
+                throw serverError("CHAT_UPLOAD_UNSUPPORTED_TYPE");
+            },
+        });
+        const adapter = createLunoraAttachmentAdapter(lunora);
         const file = new File(["heic"], "IMG_10.HEIC", { type: "image/heic" });
 
-        await adapter.upload({ file });
+        const error = await adapter.upload({ file }).catch((error_: unknown) => error_);
 
+        expect(error).toBeInstanceOf(AttachmentUploadError);
+        expect(error).toMatchObject({ fileName: "IMG_10.HEIC", reason: "unsupported" });
         expect(heicToJpegBlob).not.toHaveBeenCalled();
-        expect(uploadFile).toHaveBeenCalledWith(file, expect.anything());
-        isSafariUserAgent.mockReturnValue(true);
+        expect(uploadFile).toHaveBeenCalledWith(file, expect.objectContaining({ contentType: "image/heic" }));
     });
 
     it("refuses a HEIC photo over the source ceiling before it is decoded", async () => {
