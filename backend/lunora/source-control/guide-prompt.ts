@@ -144,6 +144,10 @@ const instructionsOf = (instructions: string): string => (instructions.trim() ==
  * at a time and stops when the next character would not fit, so a large diff costs no more than the budget.
  */
 const boundedPatch = (patch: string, budget: number): string => {
+    if (budget <= 0) {
+        return "";
+    }
+
     let shown = "";
 
     for (const char of patch.slice(0, PATCH_FILE_MAX_CHARS)) {
