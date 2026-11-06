@@ -25,7 +25,7 @@ use device_core::envelope::Signed;
 use device_core::fs::MediaRead;
 use device_core::install::{Bundle, Root};
 use device_core::media::Kind;
-use device_core::shell::Terminal;
+use device_core::shell::{self, Terminal};
 use device_core::{DeviceState, Event};
 use napi::bindgen_prelude::{
     spawn_blocking, Buffer, Env, Error, Function, PromiseRaw, Result, ToNapiValue,
@@ -115,6 +115,8 @@ const MAX_TERMINALS: usize = 32;
 
 /// The longest a `acpTerminalWait` waits: past the longest a terminal may run, so it always settles with the exit.
 const TERMINAL_WAIT: Duration = Duration::from_secs(11 * 60);
+/// How long quitting waits for the agent's terminals to end once their groups are signalled.
+const STOP_WAIT: Duration = Duration::from_secs(2);
 
 /// The terminals coding agents started, by handle.
 type Terminals = Arc<Mutex<HashMap<u64, Arc<Terminal>>>>;
@@ -787,7 +789,7 @@ impl DeviceCore {
             // Shutdown has begun (`stop` drains under this lock, after setting the flag): the command just started is killed here,
             // since nothing else will reach it.
             if stopping.load(Ordering::SeqCst) {
-                terminal.kill();
+                terminal.signal_now();
 
                 return Err("the app is shutting down".into());
             }
@@ -875,9 +877,16 @@ impl DeviceCore {
         // sees the flag and kills its own command.
         self.stopping.store(true, Ordering::SeqCst);
 
-        for (_, terminal) in self.terminals.lock().unwrap().drain() {
-            terminal.kill();
-        }
+        let ended: Vec<Arc<Terminal>> = self
+            .terminals
+            .lock()
+            .unwrap()
+            .drain()
+            .map(|(_, terminal)| terminal)
+            .collect();
+
+        // Signalled here, not left to the watchers: quitting exits the process right after this returns.
+        shell::end_now(ended.iter().map(|terminal| terminal.as_ref()), STOP_WAIT);
     }
 }
 
