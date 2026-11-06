@@ -239,6 +239,13 @@ export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null,
     // Every link is read, not the first: a child with a comparison link and another link must still take its parent's mode, whichever
     // is listed first. The rows per child are few; the bound only keeps a runaway row count from being read whole.
     const links = await linksOf(ctx, thread._id);
+
+    // A read that hit the bound may have cut off links, and a cut-off comparison could be the restrictive one: whatever the rows read
+    // show, the thread cannot be shown to have only the comparison it shows, so it runs supervised.
+    if (links.length >= MAX_LINKS_CHECKED) {
+        return "supervised";
+    }
+
     const comparisons = links.filter((link) => link.branchType === "comparison");
 
     // Two comparison links name two parents, and neither one's mode is the column's: fail closed rather than take whichever is listed first.
@@ -247,11 +254,6 @@ export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null,
     }
 
     const [comparison] = comparisons;
-
-    // A read that hit the bound may have cut off a comparison link: the thread cannot be shown to have none, so it runs supervised.
-    if (!comparison && links.length >= MAX_LINKS_CHECKED) {
-        return "supervised";
-    }
 
     // A comparison column always runs under its parent's mode, even one it holds of its own: the shared composer changes the parent's,
     // so a mode saved on the column would otherwise hold while the parent's changes never reach it.

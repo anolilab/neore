@@ -137,7 +137,8 @@ describe("modeOfThread", () => {
             query: () => {
                 return {
                     withIndex: () => {
-                        return { take: async () => links };
+                        // As the index read does: at most `count` rows, in order.
+                        return { take: async (count: number) => links.slice(0, count) };
                     },
                 };
             },
@@ -206,6 +207,20 @@ describe("modeOfThread", () => {
         ]);
 
         await expect(modeOfThread({ db } as never, threads.child as never, "u1")).resolves.toBe("supervised");
+    });
+
+    it("fails closed when the link rows reach the read bound, even with a permissive comparison among the rows read", async () => {
+        // The first comparison is permissive (full). A restrictive one sits beyond the bound and is never read: the child must not run full.
+        threads.permissive = { _id: "permissive", permissionMode: "full", userId: "u1" };
+        const rows = [
+            { branchType: "comparison", parentThreadId: "permissive", threadId: "child" },
+            ...Array.from({ length: 49 }, () => {
+                return { branchType: "continuation", parentThreadId: "other", threadId: "child" };
+            }),
+            { branchType: "comparison", parentThreadId: "parent", threadId: "child" },
+        ];
+
+        await expect(modeOfThread({ db: databaseWith(rows) } as never, threads.child as never, "u1")).resolves.toBe("supervised");
     });
 
     it("fails closed when the link rows reach the read bound without showing a comparison", async () => {
