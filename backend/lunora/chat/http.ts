@@ -589,9 +589,11 @@ const runChatStartOnShard = async (
     const guestNote =
         body.guestMessageId === undefined
             ? undefined
-            : await context
-                  .runQuery(internal.chat.guest_links.getGuestNoteForSend, { messageId: body.guestMessageId as Id<"threadGuestMessages">, userId })
-                  .catch(() => null);
+            : // A failed lookup propagates to the endpoint's error handling: only a completed lookup that finds no eligible note is a 400.
+              await context.runQuery(internal.chat.guest_links.getGuestNoteForSend, {
+                  messageId: body.guestMessageId as Id<"threadGuestMessages">,
+                  userId,
+              });
 
     if (body.guestMessageId !== undefined && (!guestNote || guestNote.status !== "held" || guestNote.threadId !== validThreadId)) {
         return Response.json({ error: "That guest note is not waiting in this chat." }, { status: 400 });
