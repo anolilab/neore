@@ -1225,7 +1225,7 @@ msgstr "{providerName} · ご自身の API キー"
 msgid "{providerName} · your own Bedrock account ({region})"
 msgstr "{providerName} · ご自身の Bedrock アカウント（{region}）"
 
-#: src/features/chat/thread/request-secret-prompt.tsx
+#: src/features/chat/thread/request-secret-prompt.tsx:307
 msgid "{refusedLabel} does not have the format this request asks for, so nothing was saved. Enter it again."
 msgstr "{refusedLabel} はこのリクエストの形式に合っていないため、何も保存されませんでした。もう一度入力してください。"
 
@@ -1630,7 +1630,7 @@ msgstr ""
 msgid "A chat is waiting for your answer"
 msgstr "チャットがあなたの回答を待っています"
 
-#: src/features/tasks/components/task-form-dialog.tsx:81
+#: src/features/tasks/components/task-form-dialog.tsx:82
 msgid "A coding agent needs a repository to work on"
 msgstr "コーディングエージェントには作業対象のリポジトリが必要です"
 
@@ -1791,7 +1791,7 @@ msgstr "このトリガーを作成すると、固有の Webhook URL とシー�
 msgid "A usage alert was triggered"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:301
+#: src/features/chat/thread/request-secret-prompt.tsx:308
 msgid "A value does not have the format this request asks for, so nothing was saved. Check it and enter it again."
 msgstr "値がこのリクエストの求める形式に合っていないため、何も保存されませんでした。確認してもう一度入力してください。"
 
@@ -2016,6 +2016,7 @@ msgid "Activity per month"
 msgstr "月別アクティビティ"
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:225
+#: src/features/projects/components/project-repositories.tsx:172
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:102
 #: src/features/workflow/components/gallery/publish-dialog.tsx:220
 msgid "Add"
@@ -2642,7 +2643,7 @@ msgstr "外部コンテンツ参照後"
 #: src/features/evals/components/dataset-panel.tsx:102
 #: src/features/layout/lib/dashboard-page-names.ts:14
 #: src/features/settings/lib/settings-navigation.ts:93
-#: src/features/tasks/components/task-form-dialog.tsx:299
+#: src/features/tasks/components/task-form-dialog.tsx:308
 msgid "Agent"
 msgstr "エージェント"
 
@@ -3192,7 +3193,7 @@ msgstr "賛成派と懐疑派が2ラウンドにわたって賛否を論じ、�
 msgid "An agent (skill)"
 msgstr "エージェント（スキル）"
 
-#: src/features/tasks/components/task-form-dialog.tsx:169
+#: src/features/tasks/components/task-form-dialog.tsx:170
 msgid "An agent works the task on its own, then a verifier checks the result against your success criteria."
 msgstr "エージェントがタスクを自律的に処理し、その後検証役が結果を成功基準と照らし合わせます。"
 
@@ -3488,7 +3489,7 @@ msgid "App Secret from your Meta app's App settings > Basic, used to verify X-Hu
 msgstr "Meta アプリの「App settings > Basic」にある App Secret（X-Hub-Signature-256 の検証に使用）"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:316
-#: src/features/projects/components/project-form-dialog.tsx:232
+#: src/features/projects/components/project-form-dialog.tsx:233
 #: src/features/settings/components/account/account-settings.tsx:154
 #: src/features/settings/lib/settings-keywords.ts:27
 msgid "Appearance"
@@ -3824,7 +3825,7 @@ msgid "Aspect Ratio"
 msgstr "アスペクト比"
 
 #: src/features/tasks/components/task-detail-dialog.tsx:221
-#: src/features/tasks/components/task-form-dialog.tsx:234
+#: src/features/tasks/components/task-form-dialog.tsx:235
 msgid "Assigned to"
 msgstr "担当"
 
@@ -4739,7 +4740,7 @@ msgstr "ブレインストーミング"
 #: ../../packages/chat-ui/src/chat/message-item.tsx:203
 #: src/features/chat/core/hooks/use-thread-manager.ts:134
 #: src/features/chat/core/hooks/use-thread-manager.ts:147
-#: src/features/tasks/components/task-form-dialog.tsx:281
+#: src/features/tasks/components/task-form-dialog.tsx:290
 #: src/features/workflow/types/index.ts:425
 #: src/features/workflow/types/index.ts:429
 msgid "Branch"
@@ -4786,7 +4787,7 @@ msgstr "ブラジル"
 msgid "Break down complex tasks into numbered steps with progress tracking. Ideal for multi-step projects and development tasks."
 msgstr "複雑なタスクを番号付きのステップに分解し、進捗を追跡します。多段階のプロジェクトや開発タスクに最適です。"
 
-#: src/features/projects/components/project-form-dialog.tsx:220
+#: src/features/projects/components/project-form-dialog.tsx:221
 msgid "Brief description of this project"
 msgstr "このプロジェクトの簡単な説明"
 
@@ -5214,7 +5215,7 @@ msgstr "カナダ"
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
 #: src/features/projects/components/move-to-project-dialog.tsx:95
-#: src/features/projects/components/project-form-dialog.tsx:390
+#: src/features/projects/components/project-form-dialog.tsx:392
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
@@ -5240,7 +5241,7 @@ msgstr "カナダ"
 #: src/features/slides/components/slide-editor-dialog.tsx:113
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
-#: src/features/tasks/components/task-form-dialog.tsx:501
+#: src/features/tasks/components/task-form-dialog.tsx:510
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
@@ -5571,7 +5572,7 @@ msgstr "チャット"
 msgid "Chat · Images · Video · Audio · Documents"
 msgstr "チャット · 画像 · 動画 · 音声 · ドキュメント"
 
-#: src/features/tasks/components/task-form-dialog.tsx:110
+#: src/features/tasks/components/task-form-dialog.tsx:111
 msgid "Chat agent"
 msgstr "チャットエージェント"
 
@@ -5944,7 +5945,7 @@ msgstr ""
 msgid "Claude Code"
 msgstr ""
 
-#: src/features/tasks/components/task-form-dialog.tsx:111
+#: src/features/tasks/components/task-form-dialog.tsx:112
 msgid "Claude Code (coding agent)"
 msgstr "Claude Code（コーディングエージェント）"
 
@@ -6021,7 +6022,7 @@ msgid "Clear mask"
 msgstr "マスクをクリア"
 
 #: src/features/skills/components/skill-form-dialog.tsx:373
-#: src/features/tasks/components/task-form-dialog.tsx:358
+#: src/features/tasks/components/task-form-dialog.tsx:367
 msgid "Clear model"
 msgstr "モデルをクリア"
 
@@ -6211,7 +6212,7 @@ msgstr "翻訳を閉じる"
 msgid "Closed"
 msgstr "クローズ"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:331
+#: src/features/chat/thread/request-secret-prompt.tsx:339
 msgid "Closed — the conversation moved on. Ask again in the chat."
 msgstr ""
 
@@ -6357,6 +6358,10 @@ msgstr "Alibaba の特化型 30B コーディングモデルを必要とする�
 msgid "Coding tasks requiring Mistral's specialized development-focused model"
 msgstr "Mistral の開発特化型モデルを必要とするコーディングタスク"
 
+#: src/features/projects/components/project-repositories.tsx:76
+msgid "Coding-agent runs in this project offer these repositories, with the default preselected."
+msgstr "このプロジェクトのコーディングエージェントの実行では、これらのリポジトリが表示され、既定のものが事前に選択されます。"
+
 #: src/lib/model-descriptions.ts:59
 msgid "Coding-specialized model from Alibaba"
 msgstr "Alibaba のコーディング特化モデル"
@@ -6445,7 +6450,7 @@ msgid "Colombia"
 msgstr "コロンビア"
 
 #: src/features/canvas/canvas-panel.tsx:123
-#: src/features/projects/components/project-form-dialog.tsx:239
+#: src/features/projects/components/project-form-dialog.tsx:240
 msgid "Color"
 msgstr "色"
 
@@ -6857,7 +6862,7 @@ msgstr "タスク実行を強化する高度な AI エージェントモジュ�
 msgid "Configure chat behavior and preferences."
 msgstr "チャットの動作と設定を構成します。"
 
-#: src/features/projects/components/project-form-dialog.tsx:343
+#: src/features/projects/components/project-form-dialog.tsx:344
 msgid "Configure default model, reasoning effort, and features for new chats created in this project."
 msgstr "このプロジェクトで作成する新しいチャットの既定のモデル、推論レベル、機能を設定します。"
 
@@ -7293,7 +7298,7 @@ msgstr "コンテンツスライド"
 msgid "Context"
 msgstr "コンテキスト"
 
-#: src/features/projects/components/project-form-dialog.tsx:317
+#: src/features/projects/components/project-form-dialog.tsx:318
 msgid "Context / Instructions"
 msgstr "コンテキスト / 指示"
 
@@ -7744,7 +7749,7 @@ msgstr ""
 msgid "Could not answer the question. Try again."
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:306
+#: src/features/chat/thread/request-secret-prompt.tsx:314
 msgid "Could not answer. Please try again."
 msgstr ""
 
@@ -8183,7 +8188,7 @@ msgstr "このメッセージから新しいブランチを作成します。後
 msgid "Create a new organization to collaborate with your team"
 msgstr "チームで共同作業するための新しい組織を作成します"
 
-#: src/features/projects/components/project-form-dialog.tsx:185
+#: src/features/projects/components/project-form-dialog.tsx:186
 msgid "Create a new project to group related chats with shared context."
 msgstr "関連するチャットを共有コンテキストでまとめる新しいプロジェクトを作成します。"
 
@@ -8319,8 +8324,8 @@ msgstr "PR を作成"
 msgid "Create project"
 msgstr "プロジェクトを作成"
 
-#: src/features/projects/components/project-form-dialog.tsx:183
-#: src/features/projects/components/project-form-dialog.tsx:403
+#: src/features/projects/components/project-form-dialog.tsx:184
+#: src/features/projects/components/project-form-dialog.tsx:405
 msgid "Create Project"
 msgstr "プロジェクトを作成"
 
@@ -8339,7 +8344,7 @@ msgstr "スキルを作成"
 msgid "Create Skill"
 msgstr "スキルを作成"
 
-#: src/features/tasks/components/task-form-dialog.tsx:504
+#: src/features/tasks/components/task-form-dialog.tsx:513
 msgid "Create task"
 msgstr "タスクを作成"
 
@@ -8509,7 +8514,7 @@ msgstr "クロアチア語（クロアチア）"
 msgid "Cron Expression"
 msgstr "Cron 式"
 
-#: src/features/tasks/components/task-form-dialog.tsx:457
+#: src/features/tasks/components/task-form-dialog.tsx:466
 msgid "Cron expression (UTC)"
 msgstr "Cron 式（UTC）"
 
@@ -8600,7 +8605,7 @@ msgstr "現在制限中"
 msgid "Custom"
 msgstr "カスタム"
 
-#: src/features/tasks/components/task-form-dialog.tsx:101
+#: src/features/tasks/components/task-form-dialog.tsx:102
 msgid "Custom (cron)"
 msgstr "カスタム（cron）"
 
@@ -8688,7 +8693,7 @@ msgstr "よく使う操作のキーボードショートカットをカスタマ
 msgid "Customize the appearance of the application."
 msgstr "アプリケーションの外観をカスタマイズします。"
 
-#: src/features/projects/components/project-form-dialog.tsx:233
+#: src/features/projects/components/project-form-dialog.tsx:234
 msgid "Customize the visual appearance of this project."
 msgstr "このプロジェクトの見た目をカスタマイズします。"
 
@@ -8889,11 +8894,11 @@ msgid "Debug an error or review my code..."
 msgstr "エラーのデバッグやコードレビューなど..."
 
 #: src/features/chat/host/host-composer.tsx:72
-#: src/features/chat/thread/request-secret-prompt.tsx:485
+#: src/features/chat/thread/request-secret-prompt.tsx:495
 msgid "Decline"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:325
+#: src/features/chat/thread/request-secret-prompt.tsx:333
 msgid "Declined — continuing without it"
 msgstr ""
 
@@ -8989,12 +8994,13 @@ msgid "DeepSeek's experimental advanced chat LLM with thinking"
 msgstr "DeepSeek の思考機能付き実験的な高度チャット LLM"
 
 #: src/features/appearance/components/appearance-controls.tsx:164
+#: src/features/projects/components/project-repositories.tsx:97
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:75
 msgid "Default"
 msgstr "既定"
 
-#: src/features/tasks/components/task-form-dialog.tsx:302
-#: src/features/tasks/components/task-form-dialog.tsx:314
+#: src/features/tasks/components/task-form-dialog.tsx:311
+#: src/features/tasks/components/task-form-dialog.tsx:323
 msgid "Default agent"
 msgstr "既定のエージェント"
 
@@ -9003,13 +9009,18 @@ msgstr "既定のエージェント"
 msgid "Default AI Response Language"
 msgstr "AI の既定の応答言語"
 
-#: src/features/projects/components/project-form-dialog.tsx:341
+#: src/features/projects/components/project-form-dialog.tsx:342
 msgid "Default AI Settings"
 msgstr "既定の AI 設定"
 
-#: src/features/tasks/components/task-form-dialog.tsx:286
+#: src/features/projects/components/project-repositories.tsx:153
+#: src/features/tasks/components/task-form-dialog.tsx:295
 msgid "Default branch"
 msgstr "既定のブランチ"
+
+#: src/features/projects/components/project-repositories.tsx:92
+msgid "Default branch:"
+msgstr "既定のブランチ:"
 
 #: src/features/settings/components/account/account-settings.tsx:237
 #: src/features/settings/lib/settings-keywords.ts:30
@@ -9032,7 +9043,7 @@ msgstr "既定の言語を更新しました"
 msgid "default model"
 msgstr ""
 
-#: src/features/projects/components/project-form-dialog.tsx:351
+#: src/features/projects/components/project-form-dialog.tsx:352
 msgid "Default Model"
 msgstr "既定のモデル"
 
@@ -9490,7 +9501,7 @@ msgstr "データ収集を拒否"
 msgid "Depart:"
 msgstr "出発:"
 
-#: src/features/tasks/components/task-form-dialog.tsx:392
+#: src/features/tasks/components/task-form-dialog.tsx:401
 msgid "Depends on"
 msgstr "依存先"
 
@@ -9599,7 +9610,7 @@ msgstr "ワークフローを説明してください...例：「テキストか
 #: src/features/develop/components/pull-request-view.tsx:72
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
-#: src/features/projects/components/project-form-dialog.tsx:213
+#: src/features/projects/components/project-form-dialog.tsx:214
 #: src/features/prompts/components/prompt-form-dialog.tsx:266
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
@@ -10025,7 +10036,7 @@ msgstr ""
 msgid "does not exist"
 msgstr ""
 
-#: src/features/tasks/components/task-form-dialog.tsx:104
+#: src/features/tasks/components/task-form-dialog.tsx:105
 msgid "Does not repeat"
 msgstr "繰り返さない"
 
@@ -10364,7 +10375,7 @@ msgstr "例：コードレビュアー"
 msgid "e.g. Every Monday, summarise new GitHub issues in my repo and draft replies for the urgent ones"
 msgstr "例：毎週月曜日に、リポジトリの新しい GitHub Issue を要約し、緊急のものへの返信を下書きする"
 
-#: src/features/tasks/components/task-form-dialog.tsx:225
+#: src/features/tasks/components/task-form-dialog.tsx:226
 msgid "e.g. Lists at least five sources, each with a link"
 msgstr "例：少なくとも 5 つの情報源を、それぞれリンク付きで挙げている"
 
@@ -10400,7 +10411,7 @@ msgstr "例：仕事"
 msgid "e.g., Emphasize concise outputs, target a beginner audience..."
 msgstr "例：簡潔な出力を重視する、初心者向けにする..."
 
-#: src/features/projects/components/project-form-dialog.tsx:201
+#: src/features/projects/components/project-form-dialog.tsx:202
 msgid "e.g., Financial Planning"
 msgstr "例：資産計画"
 
@@ -10604,7 +10615,7 @@ msgstr "編集モード"
 msgid "Edit preset"
 msgstr "プリセットを編集"
 
-#: src/features/projects/components/project-form-dialog.tsx:183
+#: src/features/projects/components/project-form-dialog.tsx:184
 msgid "Edit Project"
 msgstr "プロジェクトを編集"
 
@@ -10638,7 +10649,7 @@ msgstr "画像の特定の領域を編集"
 msgid "Edit specific regions of an image with AI"
 msgstr "AI で画像の特定の領域を編集"
 
-#: src/features/tasks/components/task-form-dialog.tsx:168
+#: src/features/tasks/components/task-form-dialog.tsx:169
 msgid "Edit task"
 msgstr "タスクを編集"
 
@@ -11556,7 +11567,7 @@ msgstr "イベント"
 msgid "Every 6 hours"
 msgstr "6 時間ごと"
 
-#: src/features/tasks/components/task-form-dialog.tsx:102
+#: src/features/tasks/components/task-form-dialog.tsx:103
 msgid "Every day at 09:00 UTC"
 msgstr "毎日 09:00 UTC"
 
@@ -11564,7 +11575,7 @@ msgstr "毎日 09:00 UTC"
 msgid "Every day at 8 AM"
 msgstr "毎日午前 8 時"
 
-#: src/features/tasks/components/task-form-dialog.tsx:103
+#: src/features/tasks/components/task-form-dialog.tsx:104
 msgid "Every hour"
 msgstr "毎時"
 
@@ -12673,7 +12684,7 @@ msgstr "設定を保存できませんでした"
 msgid "Failed to save skill"
 msgstr "スキルを保存できませんでした"
 
-#: src/features/tasks/components/task-form-dialog.tsx:154
+#: src/features/tasks/components/task-form-dialog.tsx:155
 msgid "Failed to save task"
 msgstr "タスクを保存できませんでした"
 
@@ -14644,7 +14655,7 @@ msgstr "ページ一覧へ移動"
 #: src/features/chat/goal/composer-goal.tsx:73
 #: src/features/chat/goal/goal-notes.tsx:70
 #: src/features/chat/goal/goal-notes.tsx:77
-#: src/features/tasks/components/task-form-dialog.tsx:325
+#: src/features/tasks/components/task-form-dialog.tsx:334
 msgid "Goal"
 msgstr "目標"
 
@@ -15194,7 +15205,7 @@ msgstr "メッセージから非表示の文字を削除しました。"
 msgid "Hidden in Model Picker"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:425
+#: src/features/chat/thread/request-secret-prompt.tsx:434
 msgid "Hide {fieldLabel}"
 msgstr "{fieldLabel}を隠す"
 
@@ -15532,7 +15543,7 @@ msgstr "Neore は ChatGPT と何が違いますか？"
 msgid "How long temporary chats are kept before being automatically deleted. Default: 24 hours."
 msgstr "一時チャットが自動削除されるまでの保持期間です。既定：24 時間。"
 
-#: src/features/tasks/components/task-form-dialog.tsx:493
+#: src/features/tasks/components/task-form-dialog.tsx:502
 msgid "How often the agent retries with the verifier's feedback before asking you to review."
 msgstr "レビューを依頼する前に、エージェントが検証役のフィードバックをもとに再試行する回数です。"
 
@@ -15630,7 +15641,7 @@ msgstr "アイスランド語"
 msgid "Icelandic (Iceland)"
 msgstr "アイスランド語（アイスランド）"
 
-#: src/features/projects/components/project-form-dialog.tsx:274
+#: src/features/projects/components/project-form-dialog.tsx:275
 msgid "Icon"
 msgstr "アイコン"
 
@@ -16351,12 +16362,12 @@ msgstr ""
 #: src/features/skills/components/skill-builder-review.tsx:166
 #: src/features/skills/components/skill-form-dialog.tsx:274
 #: src/features/tasks/components/task-detail-dialog.tsx:231
-#: src/features/tasks/components/task-form-dialog.tsx:201
+#: src/features/tasks/components/task-form-dialog.tsx:202
 msgid "Instructions"
 msgstr "指示"
 
 #: src/features/skills/components/skill-form-dialog.tsx:69
-#: src/features/tasks/components/task-form-dialog.tsx:72
+#: src/features/tasks/components/task-form-dialog.tsx:73
 msgid "Instructions are required"
 msgstr "指示は必須です"
 
@@ -16368,7 +16379,7 @@ msgstr "指示が長すぎます"
 msgid "Instructions for the AI..."
 msgstr "AI への指示..."
 
-#: src/features/tasks/components/task-form-dialog.tsx:75
+#: src/features/tasks/components/task-form-dialog.tsx:76
 msgid "Instructions must be {INSTRUCTIONS_MAX} characters or less"
 msgstr "指示は {INSTRUCTIONS_MAX} 文字以内で入力してください"
 
@@ -16660,7 +16671,7 @@ msgstr "有効期限切れ、取り消し済み、または使用済みの可能
 msgid "It opened a different session than its own, so the conversation was handed over"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:306
+#: src/features/chat/thread/request-secret-prompt.tsx:314
 msgid "It was not saved. Paste it again and save."
 msgstr ""
 
@@ -17965,7 +17976,7 @@ msgstr "読み込んでいます..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:320
 #: src/features/chat/thread/memory-usage-action.tsx:46
-#: src/features/chat/thread/request-secret-prompt.tsx:469
+#: src/features/chat/thread/request-secret-prompt.tsx:479
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
@@ -18271,9 +18282,17 @@ msgstr "生成間で被写体の一貫性を維持"
 msgid "Major improvements in reasoning and instruction following"
 msgstr "推論と指示追従が大幅に向上"
 
+#: src/features/projects/components/project-repositories.tsx:100
+msgid "Make {name} the default repository"
+msgstr "{name} を既定のリポジトリにする"
+
 #: src/features/admin/components/user-cell.tsx:115
 msgid "Make Admin"
 msgstr "管理者にする"
+
+#: src/features/projects/components/project-repositories.tsx:109
+msgid "Make default"
+msgstr "既定にする"
 
 #: src/features/canvas/components/canvas-toolbar.tsx:30
 msgid "Make longer"
@@ -19179,7 +19198,7 @@ msgstr "モード:"
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
 #: src/features/settings/components/chat/bots-settings.tsx:135
 #: src/features/settings/components/chat/usage-settings.tsx:316
-#: src/features/tasks/components/task-form-dialog.tsx:352
+#: src/features/tasks/components/task-form-dialog.tsx:361
 #: src/features/workflow/components/nodes/ai-node.tsx:34
 #: src/features/workflow/components/nodes/background-removal-node.tsx:63
 #: src/features/workflow/components/nodes/character-ref-node.tsx:144
@@ -19349,7 +19368,7 @@ msgstr ""
 msgid "MoE"
 msgstr "MoE"
 
-#: src/features/tasks/components/task-form-dialog.tsx:106
+#: src/features/tasks/components/task-form-dialog.tsx:107
 msgid "Mondays at 09:00 UTC"
 msgstr "毎週月曜日 09:00 UTC"
 
@@ -20221,7 +20240,7 @@ msgstr "新しいプロンプト"
 msgid "New tag"
 msgstr "新しいタグ"
 
-#: src/features/tasks/components/task-form-dialog.tsx:168
+#: src/features/tasks/components/task-form-dialog.tsx:169
 #: src/features/tasks/components/tasks-page.tsx:205
 msgid "New task"
 msgstr "新しいタスク"
@@ -20597,8 +20616,8 @@ msgstr "ナレッジベースにはまだファイルがありません。上か
 msgid "No focal length selected"
 msgstr "焦点距離が選択されていません"
 
-#: src/features/tasks/components/task-form-dialog.tsx:328
-#: src/features/tasks/components/task-form-dialog.tsx:340
+#: src/features/tasks/components/task-form-dialog.tsx:337
+#: src/features/tasks/components/task-form-dialog.tsx:349
 msgid "No goal"
 msgstr "目標なし"
 
@@ -20724,7 +20743,7 @@ msgstr "最適化されたプロンプトを受信できませんでした"
 msgid "No options found."
 msgstr "オプションが見つかりません。"
 
-#: src/features/tasks/components/task-form-dialog.tsx:396
+#: src/features/tasks/components/task-form-dialog.tsx:405
 msgid "No other tasks yet."
 msgstr "他のタスクはまだありません。"
 
@@ -20777,6 +20796,11 @@ msgstr ""
 #: src/features/sub-agents/components/worker-list.tsx:94
 msgid "No progress: {0}"
 msgstr ""
+
+#: src/features/projects/components/project-repo-picker.tsx:49
+#: src/features/projects/components/project-repo-picker.tsx:89
+msgid "No project"
+msgstr "プロジェクトなし"
 
 #: src/features/projects/components/move-to-project-dialog.tsx:89
 msgid "No projects available. Create a project first."
@@ -21084,8 +21108,8 @@ msgstr "なし"
 msgid "None — show the answers only"
 msgstr "なし — 回答のみ表示"
 
-#: src/features/tasks/components/task-form-dialog.tsx:368
-#: src/features/tasks/components/task-form-dialog.tsx:380
+#: src/features/tasks/components/task-form-dialog.tsx:377
+#: src/features/tasks/components/task-form-dialog.tsx:389
 msgid "None (top-level task)"
 msgstr "なし（最上位のタスク）"
 
@@ -21711,7 +21735,7 @@ msgstr "始値"
 msgid "Open {modelName} in full thread"
 msgstr "{modelName} をスレッド全体で開く"
 
-#: src/features/tasks/components/task-form-dialog.tsx:292
+#: src/features/tasks/components/task-form-dialog.tsx:301
 msgid "Open a pull request with the change (GitHub, needs the GitHub connector)"
 msgstr "変更を含むプルリクエストを作成（GitHub、GitHub コネクタが必要）"
 
@@ -22036,7 +22060,7 @@ msgstr ""
 msgid "OpenAI"
 msgstr "OpenAI"
 
-#: src/features/tasks/components/task-form-dialog.tsx:112
+#: src/features/tasks/components/task-form-dialog.tsx:113
 msgid "OpenAI Codex (coding agent)"
 msgstr "OpenAI Codex（コーディングエージェント）"
 
@@ -22325,6 +22349,7 @@ msgstr "最適化されたプロンプト"
 msgid "Optimizing..."
 msgstr "最適化しています..."
 
+#: src/features/projects/components/project-repositories.tsx:159
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:160
 msgid "optional"
 msgstr "任意"
@@ -22342,7 +22367,7 @@ msgid "Optional. Criteria the judge grades the answer against."
 msgstr "任意。ジャッジが回答を採点する基準です。"
 
 #: src/features/evals/components/run-dialog.tsx:215
-#: src/features/tasks/components/task-form-dialog.tsx:355
+#: src/features/tasks/components/task-form-dialog.tsx:364
 msgid "Optional. Defaults to the skill's preferred model, then the default model."
 msgstr "任意。既定ではスキルの推奨モデル、次に既定のモデルが使われます。"
 
@@ -22942,7 +22967,7 @@ msgstr "画像 URL を貼り付け"
 msgid "Paste image URL..."
 msgstr "画像 URL を貼り付け..."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:418
+#: src/features/chat/thread/request-secret-prompt.tsx:427
 msgid "Paste it here — it is not shown in the chat"
 msgstr ""
 
@@ -23166,6 +23191,10 @@ msgstr "評価するモデルを選択してください。"
 #: src/routes/_shortcut/pages/index.tsx:12
 msgid "Pick a page on the left, or create one with the + button."
 msgstr "左からページを選ぶか、+ ボタンで作成してください。"
+
+#: src/features/projects/components/project-repo-picker.tsx:113
+msgid "Pick a repository"
+msgstr "リポジトリを選択"
 
 #: src/features/evals/components/run-dialog.tsx:197
 msgid "Pick a skill"
@@ -23629,7 +23658,7 @@ msgstr "プレミアムクラスの推論の透明性"
 msgid "Preparing a question…"
 msgstr "質問を準備中…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:333
+#: src/features/chat/thread/request-secret-prompt.tsx:341
 msgid "Preparing a request…"
 msgstr ""
 
@@ -24116,13 +24145,21 @@ msgstr "進捗"
 msgid "Progress of {toolName}"
 msgstr ""
 
+#: src/features/projects/components/project-repo-picker.tsx:61
+msgid "Project"
+msgstr "プロジェクト"
+
 #: src/features/chat/thread-list/group-header.tsx:136
 msgid "Project actions"
 msgstr "プロジェクトの操作"
 
-#: src/features/projects/components/project-form-dialog.tsx:322
+#: src/features/projects/components/project-form-dialog.tsx:323
 msgid "Project Context"
 msgstr "プロジェクトのコンテキスト"
+
+#: src/features/projects/components/project-repo-picker.tsx:100
+msgid "Project repository"
+msgstr "プロジェクトのリポジトリ"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:521
 msgid "Projects"
@@ -25349,8 +25386,8 @@ msgstr "サインイン状態を保持"
 #: src/features/chat/thread/composer-input.tsx:404
 #: src/features/devices/components/devices-settings.tsx:206
 #: src/features/devices/components/devices-settings.tsx:212
-#: src/features/projects/components/project-form-dialog.tsx:263
-#: src/features/projects/components/project-form-dialog.tsx:304
+#: src/features/projects/components/project-form-dialog.tsx:264
+#: src/features/projects/components/project-form-dialog.tsx:305
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
 #: src/features/settings/components/chat/favorite-models-settings.tsx:186
 #: src/features/settings/components/chat/native-providers-settings.tsx:723
@@ -25403,6 +25440,7 @@ msgid "Remove {modelId} from blocked list"
 msgstr "{modelId} をブロックリストから削除"
 
 #: src/features/pages/components/page-share-dialog.tsx:185
+#: src/features/projects/components/project-repositories.tsx:113
 msgid "Remove {name}"
 msgstr "{name} を削除"
 
@@ -25626,11 +25664,11 @@ msgstr "修正の指示："
 msgid "repair round"
 msgstr "修正ラウンド"
 
-#: src/features/tasks/components/task-form-dialog.tsx:478
+#: src/features/tasks/components/task-form-dialog.tsx:487
 msgid "Repair rounds"
 msgstr "修正ラウンド数"
 
-#: src/features/tasks/components/task-form-dialog.tsx:425
+#: src/features/tasks/components/task-form-dialog.tsx:434
 msgid "Repeat"
 msgstr "繰り返し"
 
@@ -25706,7 +25744,12 @@ msgstr "返信の準備ができました"
 msgid "Repos, issues, PRs, and code search"
 msgstr "リポジトリ、Issue、PR、コード検索"
 
-#: src/features/tasks/components/task-form-dialog.tsx:263
+#: src/features/projects/components/project-repositories.tsx:75
+msgid "Repositories"
+msgstr "リポジトリ"
+
+#: src/features/projects/components/project-repositories.tsx:133
+#: src/features/tasks/components/task-form-dialog.tsx:272
 msgid "Repository"
 msgstr "リポジトリ"
 
@@ -26023,7 +26066,7 @@ msgid "retry"
 msgstr ""
 
 #: src/features/chat/thread/chat-error.tsx:56
-#: src/features/chat/thread/request-secret-prompt.tsx:466
+#: src/features/chat/thread/request-secret-prompt.tsx:476
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
@@ -26438,7 +26481,7 @@ msgstr "実行しています..."
 msgid "Runs ({0})"
 msgstr "実行（{0}）"
 
-#: src/features/tasks/components/task-form-dialog.tsx:255
+#: src/features/tasks/components/task-form-dialog.tsx:256
 msgid "Runs in a cloud sandbox for up to 20 minutes on your own {keyProvider} API key (Settings → API keys). Private GitHub repositories need the GitHub connector."
 msgstr "ご自身の {keyProvider} API キー（設定 → API キー）を使い、クラウドのサンドボックスで最大 20 分間実行されます。非公開の GitHub リポジトリには GitHub コネクタが必要です。"
 
@@ -26559,7 +26602,7 @@ msgstr "サウジアラビア"
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:165
-#: src/features/chat/thread/request-secret-prompt.tsx:481
+#: src/features/chat/thread/request-secret-prompt.tsx:491
 #: src/features/develop/components/draft-comment-card.tsx:43
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -26613,7 +26656,7 @@ msgstr "ケースを保存"
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:247
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
-#: src/features/tasks/components/task-form-dialog.tsx:504
+#: src/features/tasks/components/task-form-dialog.tsx:513
 #: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "変更を保存"
@@ -26666,15 +26709,15 @@ msgstr "ワークフローを保存"
 msgid "Saved"
 msgstr "保存済み"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:329
+#: src/features/chat/thread/request-secret-prompt.tsx:337
 msgid "Saved — continuing"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:327
+#: src/features/chat/thread/request-secret-prompt.tsx:335
 msgid "Saved — the assistant can use each once, in this reply"
 msgstr "保存しました。アシスタントはこの返信の中でそれぞれ一度だけ使えます"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:327
+#: src/features/chat/thread/request-secret-prompt.tsx:335
 msgid "Saved — the assistant can use it once, in this reply"
 msgstr ""
 
@@ -26689,7 +26732,7 @@ msgstr "「{0}」に保存しました"
 
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
-#: src/features/projects/components/project-form-dialog.tsx:407
+#: src/features/projects/components/project-form-dialog.tsx:409
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -27095,8 +27138,8 @@ msgstr "シート/月"
 msgid "secret"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:372
-#: src/features/chat/thread/request-secret-prompt.tsx:388
+#: src/features/chat/thread/request-secret-prompt.tsx:380
+#: src/features/chat/thread/request-secret-prompt.tsx:396
 #: src/features/develop/components/watched-repositories.tsx:33
 msgid "Secret"
 msgstr ""
@@ -27185,8 +27228,8 @@ msgid "Select all cells"
 msgstr "すべてのセルを選択"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:431
-#: src/features/projects/components/project-form-dialog.tsx:286
-#: src/features/projects/components/project-form-dialog.tsx:299
+#: src/features/projects/components/project-form-dialog.tsx:287
+#: src/features/projects/components/project-form-dialog.tsx:300
 msgid "Select an icon"
 msgstr "アイコンを選択"
 
@@ -27811,7 +27854,7 @@ msgstr "短文テキスト"
 msgid "shortcut"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:425
+#: src/features/chat/thread/request-secret-prompt.tsx:434
 msgid "Show {fieldLabel}"
 msgstr "{fieldLabel}を表示"
 
@@ -29743,7 +29786,7 @@ msgstr "月額 $8 で登録すると、すべてのモデルを利用できま�
 msgid "Substantially improved reasoning, vision, and instruction following"
 msgstr "推論、ビジョン、指示追従が大幅に向上"
 
-#: src/features/tasks/components/task-form-dialog.tsx:365
+#: src/features/tasks/components/task-form-dialog.tsx:374
 msgid "Subtask of"
 msgstr "親タスク"
 
@@ -29753,11 +29796,11 @@ msgstr "{parentTitle} のサブタスク"
 
 #: src/features/tasks/components/goal-form-dialog.tsx:121
 #: src/features/tasks/components/task-detail-dialog.tsx:236
-#: src/features/tasks/components/task-form-dialog.tsx:220
+#: src/features/tasks/components/task-form-dialog.tsx:221
 msgid "Success criteria"
 msgstr "成功基準"
 
-#: src/features/tasks/components/task-form-dialog.tsx:66
+#: src/features/tasks/components/task-form-dialog.tsx:67
 msgid "Success criteria must be {CRITERIA_MAX} characters or less"
 msgstr "成功基準は {CRITERIA_MAX} 文字以内で入力してください"
 
@@ -30746,7 +30789,7 @@ msgstr "アシスタントから質問があります"
 msgid "The assistant is asking for a secret"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:350
+#: src/features/chat/thread/request-secret-prompt.tsx:358
 msgid "The assistant needs a secret"
 msgstr ""
 
@@ -30782,7 +30825,7 @@ msgstr ""
 msgid "The change is too large to show in full."
 msgstr "変更が大きすぎるため、すべてを表示できません。"
 
-#: src/features/tasks/components/task-form-dialog.tsx:256
+#: src/features/tasks/components/task-form-dialog.tsx:257
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "チャットエージェントがツールを使ってタスクを処理します。スキルに従わせることもできます。"
 
@@ -31188,7 +31231,7 @@ msgstr "タグ「{pendingDeleteName}」は、このタグが付いたすべて�
 msgid "The task and its run history are removed. Tasks that depend on it stop waiting for it."
 msgstr "タスクとその実行履歴が削除されます。このタスクに依存するタスクは待機しなくなります。"
 
-#: src/features/tasks/components/task-form-dialog.tsx:394
+#: src/features/tasks/components/task-form-dialog.tsx:403
 msgid "The task waits until every selected task is done."
 msgstr "選択したすべてのタスクが完了するまで、このタスクは待機します。"
 
@@ -31229,7 +31272,7 @@ msgstr "なりすましはユーザーに通知されません"
 msgid "The verifier did not pass this result after the allowed repair rounds. Approve it as is, reject it, or send it back with a note."
 msgstr "許可された修正ラウンドを経ても、検証役はこの結果を合格にしませんでした。そのまま承認するか、却下するか、メモを付けて差し戻してください。"
 
-#: src/features/tasks/components/task-form-dialog.tsx:229
+#: src/features/tasks/components/task-form-dialog.tsx:230
 msgid "The verifier passes the result only if every criterion is met."
 msgstr "すべての基準を満たした場合のみ、検証役は結果を合格にします。"
 
@@ -31505,11 +31548,11 @@ msgstr ""
 msgid "This connection needs to be renewed."
 msgstr "この接続は更新が必要です。"
 
-#: src/features/projects/components/project-form-dialog.tsx:326
+#: src/features/projects/components/project-form-dialog.tsx:327
 msgid "This context will be automatically added to each chat in your project. You can include instructions, background information, or any shared knowledge."
 msgstr "このコンテキストは、プロジェクト内の各チャットに自動的に追加されます。指示、背景情報、共有の知識などを含めることができます。"
 
-#: src/features/projects/components/project-form-dialog.tsx:331
+#: src/features/projects/components/project-form-dialog.tsx:332
 msgid "This context will be prepended to the system prompt for all chats in this project."
 msgstr "このコンテキストは、このプロジェクトのすべてのチャットでシステムプロンプトの先頭に追加されます。"
 
@@ -31633,7 +31676,7 @@ msgstr "メンバーに表示される組織の名前です"
 #~ msgid "This is too long: up to {0} characters."
 #~ msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:437
+#: src/features/chat/thread/request-secret-prompt.tsx:447
 msgid "This is too long: up to {valueMax} characters."
 msgstr ""
 
@@ -32089,10 +32132,10 @@ msgstr "タイムゾーン"
 msgid "Timezone updated"
 msgstr "タイムゾーンを更新しました"
 
-#: src/features/projects/components/project-form-dialog.tsx:194
+#: src/features/projects/components/project-form-dialog.tsx:195
 #: src/features/slides/components/slide-editor-dialog.tsx:90
 #: src/features/tasks/components/goal-form-dialog.tsx:88
-#: src/features/tasks/components/task-form-dialog.tsx:183
+#: src/features/tasks/components/task-form-dialog.tsx:184
 msgid "Title"
 msgstr "タイトル"
 
@@ -32101,11 +32144,11 @@ msgid "Title (optional)"
 msgstr "タイトル（任意）"
 
 #: src/features/tasks/components/goal-form-dialog.tsx:43
-#: src/features/tasks/components/task-form-dialog.tsx:84
+#: src/features/tasks/components/task-form-dialog.tsx:85
 msgid "Title is required"
 msgstr "タイトルは必須です"
 
-#: src/features/tasks/components/task-form-dialog.tsx:87
+#: src/features/tasks/components/task-form-dialog.tsx:88
 msgid "Title must be {TITLE_MAX} characters or less"
 msgstr "タイトルは {TITLE_MAX} 文字以内で入力してください"
 
@@ -33204,7 +33247,7 @@ msgstr "期間を更新"
 msgid "Update failed"
 msgstr "更新に失敗しました"
 
-#: src/features/projects/components/project-form-dialog.tsx:403
+#: src/features/projects/components/project-form-dialog.tsx:405
 msgid "Update Project"
 msgstr "プロジェクトを更新"
 
@@ -33238,7 +33281,7 @@ msgstr "このメンバーのロールを更新します"
 msgid "Update your account email address"
 msgstr "アカウントのメールアドレスを更新します"
 
-#: src/features/projects/components/project-form-dialog.tsx:185
+#: src/features/projects/components/project-form-dialog.tsx:186
 msgid "Update your project details below."
 msgstr "以下でプロジェクトの詳細を更新してください。"
 
@@ -33563,7 +33606,7 @@ msgstr "AI でプロンプトを最適化して、より良い結果を得まし
 msgid "Use all enabled MCP servers"
 msgstr "有効なすべての MCP サーバーを使用"
 
-#: src/features/tasks/components/task-form-dialog.tsx:78
+#: src/features/tasks/components/task-form-dialog.tsx:79
 msgid "Use an https:// git URL or GitHub owner/repo"
 msgstr "https:// の git URL または GitHub の owner/repo を使用してください"
 
@@ -33584,7 +33627,7 @@ msgstr "ユースケース"
 msgid "Use Drawing"
 msgstr "描画を使用"
 
-#: src/features/tasks/components/task-form-dialog.tsx:69
+#: src/features/tasks/components/task-form-dialog.tsx:70
 msgid "Use five cron fields, e.g. \"0 9 * * 1\" for Mondays at 09:00 UTC"
 msgstr "5 つの cron フィールドを使用します。例：「0 9 * * 1」は毎週月曜日 09:00 UTC"
 
@@ -34550,7 +34593,7 @@ msgstr "出力を待っています…"
 msgid "Waiting for the agent…"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:335
+#: src/features/chat/thread/request-secret-prompt.tsx:343
 msgid "Waiting for the owner"
 msgstr ""
 
@@ -34569,7 +34612,7 @@ msgstr "オーナーの承認を待っています"
 msgid "Waiting for uploads to complete…"
 msgstr "アップロードの完了を待っています…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:335
+#: src/features/chat/thread/request-secret-prompt.tsx:343
 msgid "Waiting for you"
 msgstr ""
 
@@ -34738,7 +34781,7 @@ msgstr "WeChat EncodingAESKey"
 msgid "WeChat Token"
 msgstr "WeChat Token"
 
-#: src/features/tasks/components/task-form-dialog.tsx:105
+#: src/features/tasks/components/task-form-dialog.tsx:106
 msgid "Weekdays at 09:00 UTC"
 msgstr "平日 09:00 UTC"
 
@@ -34844,7 +34887,7 @@ msgid "What should the agent change?"
 msgstr ""
 
 #: src/features/skills/components/skill-builder-dialog.tsx:208
-#: src/features/tasks/components/task-form-dialog.tsx:208
+#: src/features/tasks/components/task-form-dialog.tsx:209
 msgid "What should the agent do?"
 msgstr "エージェントに何をさせますか？"
 
@@ -35728,7 +35771,7 @@ msgstr ""
 msgid "Your review was requested"
 msgstr ""
 
-#: src/features/chat/thread/request-secret-prompt.tsx:456
+#: src/features/chat/thread/request-secret-prompt.tsx:466
 msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."
 msgstr ""
 
