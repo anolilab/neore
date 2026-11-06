@@ -266,6 +266,13 @@ describe("a change the agent reports", () => {
         expect(withCurrentMode(cased, "b", plain).configOptions?.[0]?.currentValue).toBe("b");
     });
 
+    it("returns the same state for the current mode again, or for one the agent does not list", () => {
+        const moved = withCurrentMode(raw, "code", plain);
+
+        expect(withCurrentMode(moved, "code", plain)).toBe(moved);
+        expect(withCurrentMode(raw, "unlisted", plain)).toBe(raw);
+    });
+
     it("moves a mode option whose category the agent capitalises, as the computer and the web read it", () => {
         const capitalised = optionsOf(
             {

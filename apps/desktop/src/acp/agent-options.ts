@@ -249,7 +249,10 @@ export const resolveOptions = (raw: RawOptions): SessionStatePatch => {
     };
 };
 
-/** `current_mode_update`: the mode the agent is in now. The legacy state, and the mode option when the agent has one, follow. */
+/**
+ * `current_mode_update`: the mode the agent is in now. The legacy state, and the mode option when the agent has one, follow. An id that
+ * changes neither (the current mode again, or one the agent does not list) returns the same object, so a caller can tell nothing moved.
+ */
 export const withCurrentMode = (raw: RawOptions, modeId: unknown, scrub: Scrub): RawOptions => {
     const id = idOf(modeId, scrub);
 
@@ -257,9 +260,18 @@ export const withCurrentMode = (raw: RawOptions, modeId: unknown, scrub: Scrub):
         return raw;
     }
 
+    const legacyMoves = raw.modes !== undefined && raw.modes.current !== id && raw.modes.available.some((mode) => mode.id === id);
+    const optionMoves = (raw.configOptions ?? []).some(
+        (option) => option.category?.toLowerCase() === "mode" && option.currentValue !== id && option.choices.some((choice) => choice.value === id),
+    );
+
+    if (!legacyMoves && !optionMoves) {
+        return raw;
+    }
+
     return {
         ...raw,
-        ...raw.modes !== undefined && { modes: { ...raw.modes, current: id } },
+        ...raw.modes !== undefined && legacyMoves && { modes: { ...raw.modes, current: id } },
         ...raw.configOptions !== undefined && {
             configOptions: raw.configOptions.map((option) =>
                 option.category?.toLowerCase() === "mode" && option.choices.some((choice) => choice.value === id) ? { ...option, currentValue: id } : option,

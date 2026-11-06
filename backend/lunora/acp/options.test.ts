@@ -309,6 +309,17 @@ describe("setHostOption", () => {
         await expect(setOption(threadId, { optionId: "model", valueId: "fast" })).resolves.toMatchObject({ sent: true });
     });
 
+    it("names the computer's refusal to change a mode, rather than a generic one", async () => {
+        const { device, threadId } = await readySession({ configOptions: [MODEL] });
+        const { callId } = (await setOption(threadId, { optionId: "model", valueId: "deep" })) as Row;
+
+        await complete(device, callId, { error: "refused: a mode is changed on the computer, not from here", status: "failed" });
+
+        const view = (await as(ownerId).query(getHostSession as never, { threadId } as never)) as Row;
+
+        expect(view.optionResult).toMatchObject({ callId, outcome: "refused", reason: "a mode is changed on the computer, not from here" });
+    });
+
     it("never shows text it did not sign: a relay's or a device's own error is replaced by a fixed reason", async () => {
         const { device, threadId } = await readySession({ configOptions: [MODEL] });
         const { callId } = (await setOption(threadId, { optionId: "model", valueId: "deep" })) as Row;

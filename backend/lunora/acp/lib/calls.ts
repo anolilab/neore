@@ -89,6 +89,7 @@ export const endStartingSession = async (ctx: MutationCtx, deviceId: Id<"devices
  * else a failed call carries (a relay's exception, a device's own message) can quote the environment, so it is never shown.
  */
 const OPTION_REASONS: ReadonlySet<string> = new Set([
+    "a mode is changed on the computer, not from here",
     "that session no longer exists",
     "the agent did not accept the change",
     "the agent did not answer",

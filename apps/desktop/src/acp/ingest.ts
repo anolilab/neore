@@ -176,6 +176,9 @@ export class HostPoster implements SessionObserver {
     /** The change-only fields (options, legacy states, command list) of a report that was dropped: the next report carries them. */
     private readonly heldOptions = new Map<string, SessionStatePatch>();
 
+    /** Sessions whose option fields the backend refused once and that are waiting on the next report: a second refusal is not held again. */
+    private readonly optionsRefused = new Set<string>();
+
     /** The text of each running turn, kept for the references its reply makes (capped). */
     private readonly texts = new Map<string, string>();
 
@@ -599,6 +602,39 @@ export class HostPoster implements SessionObserver {
         this.stateAttempts.delete(sessionId);
         this.stateRetryAt.delete(sessionId);
         this.heldOptions.delete(sessionId);
+        this.optionsRefused.delete(sessionId);
+    }
+
+    /**
+     * What an accepted or refused post leaves of its option fields. The agent sends options only on change, so when the backend refuses
+     * a post carrying them, the usage that follows would leave it without them: they are kept for the next report. Options refused a
+     * second time are not kept again, so a persistent refusal cannot hold back the usage after them.
+     */
+    private settleOptionsOf(sessionId: string, result: PostResult, sent: PendingState): void {
+        const options = changeOnlyFieldsOf(sent);
+
+        if (result.kind !== "refused" || Object.keys(options).length === 0) {
+            this.optionsRefused.delete(sessionId);
+
+            return;
+        }
+
+        if (this.optionsRefused.has(sessionId)) {
+            this.optionsRefused.delete(sessionId);
+
+            return;
+        }
+
+        this.optionsRefused.add(sessionId);
+
+        // A newer report already waiting carries the options under its own, which take precedence.
+        const waiting = this.pendingState.get(sessionId);
+
+        if (waiting === undefined) {
+            this.heldOptions.set(sessionId, options);
+        } else {
+            this.pendingState.set(sessionId, { ...options, ...waiting });
+        }
     }
 
     private bindThread(sessionId: string, threadId: string): void {
@@ -800,6 +836,8 @@ export class HostPoster implements SessionObserver {
         } else {
             this.stateRetryAt.delete(sessionId);
             this.stateAttempts.delete(sessionId);
+
+            this.settleOptionsOf(sessionId, result, pending);
         }
     }
 
