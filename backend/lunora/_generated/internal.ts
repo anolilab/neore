@@ -1171,7 +1171,7 @@ export interface InternalApiTypes {
             updateTriggerStats: FunctionReference<"mutation", { error?: string; lastTriggeredAt?: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }, null>;
         };
         gdpr: {
-            collectTriggersForExport: FunctionReference<"query", { userId: string }, { triggers: Array<unknown> }>;
+            collectTriggersForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; triggers: Array<unknown> }>;
         };
         quiet_inputs: {
             loadQuietSnapshot: FunctionReference<"query", { since: number; userId: string }, { events: Array<{ createdAt: number; type: string }>; needsYou: Array<{ at: number; kind: string; title: string }>; running: Array<{ at: number; kind: string; title: string }>; threads: Array<{ title?: string; updatedAt: number }> }>;

@@ -23,6 +23,7 @@ import type { Id } from "../../_generated/dataModel";
 import { onUserShard } from "../../lib/workflow-shard";
 import { stepDedupId } from "./dedup-id";
 import { collectAllGuides, collectAllPullRequestThreads, collectAllReviewDrafts } from "../../source-control/export-pages";
+import { collectAllTriggers } from "../../triggers/export-pages";
 
 export interface ExportParams {
     requestId: Id<"gdprRequests">;
@@ -102,10 +103,16 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             "collect-evals",
             async () => await context.run(internal.evals.gdpr.collectEvalsForExport, { userId }, { dedupId: stepDedupId(scope, "collect-evals") }),
         );
-        const triggers = await context.step.do(
-            "collect-triggers",
-            async () => await context.run(internal.triggers.gdpr.collectTriggersForExport, { userId }, { dedupId: stepDedupId(scope, "collect-triggers") }),
-        );
+        // A page per step, as the other paged collectors: a page of runs with their prompts stays inside the step's size limit.
+        // The first step keeps the old name, so a recorded pre-paging result replays as the only page.
+        const triggers = await collectAllTriggers(async (cursor, page) => {
+            const name = page === 0 ? "collect-triggers" : `collect-triggers-${String(page)}`;
+
+            return await context.step.do(
+                name,
+                async () => await context.run(internal.triggers.gdpr.collectTriggersForExport, { cursor, userId }, { dedupId: stepDedupId(scope, name) }),
+            );
+        });
         // A page per step, so no checkpoint outgrows the log's size limit however many drafts there are. The first
         // step keeps the old name: an in-flight run's recorded result has no cursor and reads as the only page.
         const reviewDrafts = await collectAllReviewDrafts(async (cursor, page) => {

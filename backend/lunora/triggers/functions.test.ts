@@ -28,6 +28,7 @@ import {
     updateTriggerStats,
 } from "./functions";
 import { collectTriggersForExport } from "./gdpr";
+import { collectAllTriggers } from "./export-pages";
 import { MAX_ACTIVE_EVENT_WATCHERS } from "./event-sources/types";
 import { compileWebhookPreset } from "./presets";
 import { findNextCronTime } from "./schedule";
@@ -1128,6 +1129,22 @@ describe("run prompts", () => {
         expect(trigger?.name).toBe("Hook");
         expect(trigger?.runs[0]?.prompt).toBe("Summarise the issue");
         expect(trigger).not.toHaveProperty("webhookSecret");
+    });
+
+    it("exports every trigger across the export pages, with the settings a bot routine keeps", async () => {
+        for (let n = 0; n < 7; n += 1) {
+            await as().mutation(createTrigger as never, { model: "m", name: `Hook ${String(n)}`, type: "webhook" } as never);
+        }
+
+        const exported = (await harness.run(async (ctx: any) => {
+            const pages = await collectAllTriggers(async (cursor) => await ctx.runQuery(collectTriggersForExport, { cursor, userId: "user-a" }));
+
+            return pages.triggers as { botId: unknown; name: string; quietWhenEmpty: unknown; searchMode: unknown }[];
+        })) as { botId: unknown; name: string; quietWhenEmpty: unknown; searchMode: unknown }[];
+
+        expect(exported).toHaveLength(7);
+        expect(new Set(exported.map((trigger) => trigger.name)).size).toBe(7);
+        expect(exported[0]).toMatchObject({ botId: null, quietWhenEmpty: null, searchMode: null });
     });
 });
 

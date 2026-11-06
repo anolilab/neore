@@ -8,6 +8,7 @@ import { v } from "lunorash/server";
 
 import { internalQuery, type MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, full } from "../gdpr/batch";
+import { MAX_LENGTH } from "../lib/validators";
 
 /** Triggers with their run history. A trigger whose history is longer than one batch stays for the next round. */
 export const eraseTriggersForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
@@ -37,29 +38,35 @@ export const eraseTriggersForUser = async (ctx: MutationCtx, userId: string): Pr
     return { hasMore: hasMore || full(triggers) };
 };
 
-/** Triggers in the export, the newest first. A longer list is kept in the app, not exported in full. */
-const EXPORT_TRIGGERS_PER_USER = 50;
+/**
+ * Triggers per export page. The export walks every page, one workflow step each, so a page's runs (up to
+ * `EXPORT_RUNS_PER_TRIGGER` prompts of 2,000 characters each) stay inside one step's state limit however many triggers there are.
+ */
+const EXPORT_TRIGGER_PAGE = 5;
 /** Runs per trigger in the export, the newest; older runs are history (the same bound as the evals export). */
 const EXPORT_RUNS_PER_TRIGGER = 20;
 
 /**
- * The user's triggers, their settings and their newest runs with the prompts those runs were given (`executeTrigger`).
- * The webhook secrets are left out. A prompt is cleared 30 days after its run settles (`pruneExpiredRunPrompts`), so the
- * export holds what is still kept.
+ * One page of the user's triggers, their settings and their newest runs with the prompts those runs were given
+ * (`executeTrigger`). The webhook secrets are left out. A prompt is cleared 30 days after its run settles
+ * (`pruneExpiredRunPrompts`), so the export holds what is still kept. `cursor` is `null` on the last page.
  */
 export const collectTriggersForExport = internalQuery
-    .input({ userId: v.string() })
-    .output(v.object({ triggers: v.array(v.any()) }))
-    .query(async ({ args: { userId }, ctx }) => {
-        const triggers = await ctx.db
+    .input({
+        cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.object({ cursor: v.union(v.string(), v.null()), triggers: v.array(v.any()) }))
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        const page = await ctx.db
             .query("triggers")
             .withIndex("by_userId_organizationId", (q) => q.eq("userId", userId))
-            .order("desc")
-            .take(EXPORT_TRIGGERS_PER_USER);
+            .paginate({ cursor: cursor ?? null, numItems: EXPORT_TRIGGER_PAGE });
 
         return {
+            cursor: page.isDone ? null : page.continueCursor,
             triggers: await Promise.all(
-                triggers.map(async (trigger) => {
+                page.page.map(async (trigger) => {
                     const runs = await ctx.db
                         .query("triggerExecutions")
                         .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", trigger._id))
@@ -67,6 +74,8 @@ export const collectTriggersForExport = internalQuery
                         .take(EXPORT_RUNS_PER_TRIGGER);
 
                     return {
+                        botComputer: trigger.botComputer ?? null,
+                        botId: trigger.botId ?? null,
                         createdAt: trigger.createdAt,
                         cronExpression: trigger.cronExpression,
                         description: trigger.description,
@@ -76,6 +85,7 @@ export const collectTriggersForExport = internalQuery
                         inputTemplate: trigger.inputTemplate,
                         model: trigger.model,
                         name: trigger.name,
+                        quietWhenEmpty: trigger.quietWhenEmpty ?? null,
                         runs: runs.map((run) => {
                             return {
                                 completedAt: run.completedAt ?? null,
@@ -86,6 +96,7 @@ export const collectTriggersForExport = internalQuery
                                 threadId: run.threadId ?? null,
                             };
                         }),
+                        searchMode: trigger.searchMode ?? null,
                         systemPrompt: trigger.systemPrompt,
                         timezone: trigger.timezone,
                         type: trigger.type,

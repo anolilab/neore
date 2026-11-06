@@ -42,10 +42,10 @@ export const promptForLog = (input: string): string | undefined => {
     return refused ? undefined : cutOnCodePoint(agentInput.text, MAX_LOGGED_PROMPT_LENGTH);
 };
 
-/** The first `max` UTF-16 units, without a surrogate pair cut in two: a lone high surrogate at the end is dropped. */
 /** A high surrogate at the end of a string: the first half of a pair that a cut would split. */
 const TRAILING_HIGH_SURROGATE = /[\uD800-\uDBFF]$/u;
 
+/** The first `max` UTF-16 units, without a surrogate pair cut in two: a lone high surrogate at the end is dropped. */
 export const cutOnCodePoint = (text: string, max: number): string => {
     const cut = text.slice(0, max);
 

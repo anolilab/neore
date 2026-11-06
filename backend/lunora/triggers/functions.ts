@@ -1376,12 +1376,6 @@ const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, s
     return pause;
 };
 
-/**
- * Closes an execution and tells the owner. A run is counted toward the trigger's failure
- * streak once, on the `running` to settled transition of its own execution row: a
- * redelivered call finds it already settled. `userFixable` marks a failure only the owner
- * can cure; any other failure leaves the streak where it was.
- */
 /** How long a run keeps its saved prompt after it settles. The run row, its status and its thread stay; only the prompt text goes. */
 export const RUN_PROMPT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -1408,6 +1402,12 @@ export const pruneExpiredRunPrompts = internalMutation
         return null;
     });
 
+/**
+ * Closes an execution and tells the owner. A run is counted toward the trigger's failure
+ * streak once, on the `running` to settled transition of its own execution row: a
+ * redelivered call finds it already settled. `userFixable` marks a failure only the owner
+ * can cure; any other failure leaves the streak where it was.
+ */
 export const updateExecution = internalMutation
     .input({
         error: v.optional(v.string()),
