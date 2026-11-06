@@ -29,3 +29,10 @@ export const vVerdict = v.object({
     reasons: v.array(v.string()),
     repairInstructions: v.optional(v.string()),
 });
+
+/**
+ * Why the sweep let a recurring task's slot pass without a run: the previous run
+ * was still queued or running, its result waits on a review, or it waits on its
+ * dependencies.
+ */
+export const vTaskSkipReason = v.union(v.literal("still_running"), v.literal("awaiting_review"), v.literal("blocked"));

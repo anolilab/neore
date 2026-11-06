@@ -1389,6 +1389,10 @@ msgstr "+ さらに {moreLines} 行"
 msgid "+{remaining} more"
 msgstr "+ 他 {remaining} 件"
 
+#: src/features/tasks/components/task-skipped-slot.tsx:26
+msgid "<0>{date}</0> · {why}"
+msgstr "<0>{date}</0>・{why}"
+
 #: src/features/workflow/components/canvas/node-search-dialog.tsx:241
 msgid "<0>↑↓</0> Navigate"
 msgstr "<0>↑↓</0> 移動"
@@ -3564,7 +3568,7 @@ msgstr ""
 
 #: src/features/chat/thread/tool-approval.tsx:128
 #: src/features/develop/components/review-panel.tsx:64
-#: src/features/tasks/components/task-detail-dialog.tsx:102
+#: src/features/tasks/components/task-detail-dialog.tsx:103
 msgid "Approve"
 msgstr "承認"
 
@@ -3831,7 +3835,7 @@ msgstr "アスペクト比"
 msgid "Aspect Ratio"
 msgstr "アスペクト比"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:221
+#: src/features/tasks/components/task-detail-dialog.tsx:222
 #: src/features/tasks/components/task-form-dialog.tsx:234
 msgid "Assigned to"
 msgstr "担当"
@@ -3915,7 +3919,7 @@ msgstr "添付のみ"
 msgid "Attachments:"
 msgstr "添付ファイル："
 
-#: src/features/tasks/components/task-detail-dialog.tsx:154
+#: src/features/tasks/components/task-detail-dialog.tsx:155
 msgid "Attempt"
 msgstr "試行"
 
@@ -5292,7 +5296,7 @@ msgstr "選択をキャンセル"
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:164
 #: src/features/develop/components/checks-tab.tsx:76
 #: src/features/evals/components/run-status.tsx:12
-#: src/features/tasks/components/task-detail-dialog.tsx:132
+#: src/features/tasks/components/task-detail-dialog.tsx:133
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:62
 #: src/features/workflow/components/canvas/workflow-controls.tsx:50
 msgid "Cancelled"
@@ -9784,7 +9788,7 @@ msgstr "ひし形"
 msgid "Dictation language updated"
 msgstr "音声入力の言語を更新しました"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:134
+#: src/features/tasks/components/task-detail-dialog.tsx:135
 msgid "Did not pass"
 msgstr "不合格"
 
@@ -11443,7 +11447,7 @@ msgstr "エラー率"
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:56
 #: src/features/settings/connectors/connector-card.tsx:75
 #: src/features/slides/components/presentation-viewer.tsx:267
-#: src/features/tasks/components/task-detail-dialog.tsx:133
+#: src/features/tasks/components/task-detail-dialog.tsx:134
 msgid "Error"
 msgstr "エラー"
 
@@ -12735,7 +12739,7 @@ msgstr "タスクを開始できませんでした"
 msgid "Failed to stop impersonation"
 msgstr "なりすましを終了できませんでした"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:74
+#: src/features/tasks/components/task-detail-dialog.tsx:75
 msgid "Failed to submit the review"
 msgstr "レビューを送信できませんでした"
 
@@ -16358,7 +16362,7 @@ msgstr ""
 #: src/features/skills/components/skill-builder-diff.tsx:31
 #: src/features/skills/components/skill-builder-review.tsx:166
 #: src/features/skills/components/skill-form-dialog.tsx:274
-#: src/features/tasks/components/task-detail-dialog.tsx:231
+#: src/features/tasks/components/task-detail-dialog.tsx:232
 #: src/features/tasks/components/task-form-dialog.tsx:201
 msgid "Instructions"
 msgstr "指示"
@@ -17134,7 +17138,7 @@ msgstr "最終アクティビティ {lastActivityAgo}"
 msgid "Last confirmed {0}"
 msgstr "最終確認 {0}"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:254
+#: src/features/tasks/components/task-detail-dialog.tsx:255
 msgid "Last error"
 msgstr "最新のエラー"
 
@@ -17168,6 +17172,10 @@ msgstr "先月"
 #: src/features/code/components/host-details.tsx:34
 msgid "Last seen"
 msgstr ""
+
+#: src/features/tasks/components/task-skipped-slot.tsx:23
+msgid "Last skipped run"
+msgstr "最後にスキップされた実行"
 
 #: src/features/slides/components/full-screen-presentation-viewer.tsx:432
 msgid "Last slide"
@@ -17218,7 +17226,7 @@ msgstr "Kling の最新かつ最も高性能なモデル"
 msgid "Latest Codex generation with improved capabilities"
 msgstr "機能が向上した最新の Codex 世代"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:40
+#: src/features/tasks/components/task-detail-dialog.tsx:41
 msgid "Latest coding agent run"
 msgstr "最新のコーディングエージェントの実行"
 
@@ -17302,7 +17310,7 @@ msgstr "Alibaba の最新ミディアム品質モデル"
 msgid "Latest OpenAI reasoning with GPT-5.2's transparent thinking capabilities"
 msgstr "GPT-5.2 の透明な思考機能を備えた OpenAI の最新推論モデル"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:248
+#: src/features/tasks/components/task-detail-dialog.tsx:249
 msgid "Latest result"
 msgstr "最新の結果"
 
@@ -17883,7 +17891,7 @@ msgstr "プレビューを読み込んでいます…"
 msgid "Loading run…"
 msgstr "実行を読み込んでいます…"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:146
+#: src/features/tasks/components/task-detail-dialog.tsx:147
 msgid "Loading runs…"
 msgstr "実行一覧を読み込んでいます…"
 
@@ -20486,7 +20494,7 @@ msgstr "クリーンアップの実行履歴はまだありません"
 msgid "No code block in the latest reply"
 msgstr ""
 
-#: src/features/tasks/components/task-detail-dialog.tsx:47
+#: src/features/tasks/components/task-detail-dialog.tsx:48
 msgid "No coding agent run yet."
 msgstr "コーディングエージェントの実行はまだありません。"
 
@@ -21228,7 +21236,7 @@ msgstr "メモ"
 msgid "Note (optional)"
 msgstr "メモ（任意）"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:96
+#: src/features/tasks/components/task-detail-dialog.tsx:97
 msgid "Note for the next run (optional)"
 msgstr "次回の実行へのメモ（任意）"
 
@@ -21845,7 +21853,7 @@ msgstr "新しいタブでプレビューを開く"
 msgid "Open Prompts"
 msgstr "プロンプトを開く"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:170
+#: src/features/tasks/components/task-detail-dialog.tsx:171
 msgid "Open run thread"
 msgstr "実行のスレッドを開く"
 
@@ -22830,7 +22838,7 @@ msgstr "合格"
 
 #: src/features/develop/components/checks-tab.tsx:81
 #: src/features/evals/components/model-comparison.tsx:111
-#: src/features/tasks/components/task-detail-dialog.tsx:135
+#: src/features/tasks/components/task-detail-dialog.tsx:136
 msgid "Passed"
 msgstr "合格"
 
@@ -25243,7 +25251,7 @@ msgstr "一般ユーザー"
 #: src/features/auth/components/organization/accept-invitation-card.tsx:186
 #: src/features/auth/components/organization/user-invitations-card.tsx:121
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:201
-#: src/features/tasks/components/task-detail-dialog.tsx:110
+#: src/features/tasks/components/task-detail-dialog.tsx:111
 msgid "Reject"
 msgstr "拒否"
 
@@ -25627,15 +25635,15 @@ msgid "Reorder sort"
 msgstr "並べ替えの順序を変更"
 
 #. placeholder {0}: run.round
-#: src/features/tasks/components/task-detail-dialog.tsx:154
+#: src/features/tasks/components/task-detail-dialog.tsx:155
 msgid "Repair {0}"
 msgstr "修正 {0}"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:186
+#: src/features/tasks/components/task-detail-dialog.tsx:187
 msgid "Repair instructions:"
 msgstr "修正の指示："
 
-#: src/features/tasks/components/task-detail-dialog.tsx:126
+#: src/features/tasks/components/task-detail-dialog.tsx:127
 msgid "repair round"
 msgstr "修正ラウンド"
 
@@ -26006,7 +26014,7 @@ msgstr "最新のチャットを再開しています"
 msgid "Retention period updated to {hours} hours"
 msgstr "保持期間を {hours} 時間に更新しました"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:127
+#: src/features/tasks/components/task-detail-dialog.tsx:128
 msgid "retried after review"
 msgstr "レビュー後に再試行"
 
@@ -26041,7 +26049,7 @@ msgstr ""
 #: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/settings/components/chat/agent-settings.tsx:224
-#: src/features/tasks/components/task-detail-dialog.tsx:106
+#: src/features/tasks/components/task-detail-dialog.tsx:107
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
 #: src/lib/toast.ts:171
@@ -26069,7 +26077,7 @@ msgstr ""
 msgid "Retry upload of {attachmentName}"
 msgstr ""
 
-#: src/features/tasks/components/task-detail-dialog.tsx:106
+#: src/features/tasks/components/task-detail-dialog.tsx:107
 msgid "Retry with note"
 msgstr "メモを付けて再試行"
 
@@ -26148,7 +26156,7 @@ msgstr "レビュー, セキュリティ"
 msgid "Review: {reason}"
 msgstr ""
 
-#: src/features/tasks/components/task-detail-dialog.tsx:242
+#: src/features/tasks/components/task-detail-dialog.tsx:243
 msgid "Reviewer note"
 msgstr "レビュアーのメモ"
 
@@ -26368,7 +26376,7 @@ msgstr "ドライランを実行"
 msgid "Run from {0}"
 msgstr "{0} の実行"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:142
+#: src/features/tasks/components/task-detail-dialog.tsx:143
 msgid "Run history"
 msgstr "実行履歴"
 
@@ -26423,7 +26431,7 @@ msgstr "ワークフローを実行すると、ここに実行履歴が表示さ
 #: src/features/home/components/home-page.tsx:177
 #: src/features/home/components/home-page.tsx:183
 #: src/features/settings/components/chat/trigger-settings.tsx:178
-#: src/features/tasks/components/task-detail-dialog.tsx:136
+#: src/features/tasks/components/task-detail-dialog.tsx:137
 #: src/features/tasks/components/task-status.tsx:20
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:66
 #: src/features/workflow/components/canvas/workflow-controls.tsx:54
@@ -28338,6 +28346,18 @@ msgstr "スキップ済み"
 msgid "Skipped files that are not chat exports: {0}"
 msgstr "チャットのエクスポートではないファイルをスキップしました：{0}"
 
+#: src/features/tasks/components/task-skipped-slot.tsx:15
+msgid "skipped: still running"
+msgstr "スキップ: まだ実行中"
+
+#: src/features/tasks/components/task-skipped-slot.tsx:13
+msgid "skipped: waiting for your review"
+msgstr "スキップ: あなたのレビュー待ち"
+
+#: src/features/tasks/components/task-skipped-slot.tsx:14
+msgid "skipped: waiting on its dependencies"
+msgstr "スキップ: 依存タスク待ち"
+
 #: src/features/settings/components/chat/trigger-settings.tsx:265
 msgid "Skips a run when your workspace has had no new activity since the routine last posted. A skipped run creates no chat and sends no notification."
 msgstr ""
@@ -29084,15 +29104,15 @@ msgstr "<0>{0}</0> に開始。共有された会話では、ツールの詳細�
 msgid "Started here"
 msgstr ""
 
-#: src/features/tasks/components/task-detail-dialog.tsx:125
+#: src/features/tasks/components/task-detail-dialog.tsx:126
 msgid "started manually"
 msgstr "手動で開始"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:128
+#: src/features/tasks/components/task-detail-dialog.tsx:129
 msgid "started on schedule"
 msgstr "スケジュールで開始"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:124
+#: src/features/tasks/components/task-detail-dialog.tsx:125
 msgid "started when its dependencies finished"
 msgstr "依存タスクの完了時に開始"
 
@@ -29764,7 +29784,7 @@ msgid "Subtask of {parentTitle}"
 msgstr "{parentTitle} のサブタスク"
 
 #: src/features/tasks/components/goal-form-dialog.tsx:121
-#: src/features/tasks/components/task-detail-dialog.tsx:236
+#: src/features/tasks/components/task-detail-dialog.tsx:237
 #: src/features/tasks/components/task-form-dialog.tsx:220
 msgid "Success criteria"
 msgstr "成功基準"
@@ -30153,11 +30173,11 @@ msgstr "対象モデル（任意）"
 msgid "Task"
 msgstr ""
 
-#: src/features/tasks/components/task-detail-dialog.tsx:77
+#: src/features/tasks/components/task-detail-dialog.tsx:78
 msgid "Task approved"
 msgstr "タスクを承認しました"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:209
+#: src/features/tasks/components/task-detail-dialog.tsx:210
 msgid "Task details, your review and the run history."
 msgstr "タスクの詳細、あなたのレビュー、実行履歴。"
 
@@ -30190,11 +30210,11 @@ msgstr "タスクのレビューが必要です：{title}"
 msgid "Task Planning Module"
 msgstr "タスク計画モジュール"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:77
+#: src/features/tasks/components/task-detail-dialog.tsx:78
 msgid "Task queued for another run"
 msgstr "タスクを再実行の待機列に追加しました"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:77
+#: src/features/tasks/components/task-detail-dialog.tsx:78
 msgid "Task rejected"
 msgstr "タスクを却下しました"
 
@@ -31241,7 +31261,7 @@ msgstr "「{fileName}」のアップロードの有効期限が切れました�
 msgid "The user will not be notified of the impersonation"
 msgstr "なりすましはユーザーに通知されません"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:93
+#: src/features/tasks/components/task-detail-dialog.tsx:94
 msgid "The verifier did not pass this result after the allowed repair rounds. Approve it as is, reject it, or send it back with a note."
 msgstr "許可された修正ラウンドを経ても、検証役はこの結果を合格にしませんでした。そのまま承認するか、却下するか、メモを付けて差し戻してください。"
 
@@ -31854,7 +31874,7 @@ msgstr "このスプレッドシートは空か、解析できませんでした
 msgid "This sub-agent run is no longer available."
 msgstr "このサブエージェントの実行は利用できなくなりました。"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:149
+#: src/features/tasks/components/task-detail-dialog.tsx:150
 msgid "This task has not run yet."
 msgstr "このタスクはまだ実行されていません。"
 
@@ -33935,7 +33955,7 @@ msgstr "確認コードは必須です"
 msgid "Verification code sent to your email"
 msgstr "確認コードをメールで送信しました"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:92
+#: src/features/tasks/components/task-detail-dialog.tsx:93
 msgid "Verification could not run, so nobody has checked this result. Review the answer yourself: approve it as is, reject it, or send it back with a note."
 msgstr "検証を実行できなかったため、この結果は誰もチェックしていません。回答をご自身で確認し、そのまま承認するか、却下するか、メモを付けて差し戻してください。"
 
@@ -33948,11 +33968,11 @@ msgstr "確認メールを送信しました"
 msgid "Verification Token from Events & Callbacks > Encryption Strategy"
 msgstr "「Events & Callbacks > Encryption Strategy」にある Verification Token"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:178
+#: src/features/tasks/components/task-detail-dialog.tsx:179
 msgid "Verifier: not passed"
 msgstr "検証役：不合格"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:178
+#: src/features/tasks/components/task-detail-dialog.tsx:179
 msgid "Verifier: passed"
 msgstr "検証役：合格"
 
@@ -35719,7 +35739,7 @@ msgid "Your rating"
 msgstr "あなたの評価"
 
 #: src/features/develop/components/review-panel.tsx:196
-#: src/features/tasks/components/task-detail-dialog.tsx:88
+#: src/features/tasks/components/task-detail-dialog.tsx:89
 msgid "Your review"
 msgstr "あなたのレビュー"
 

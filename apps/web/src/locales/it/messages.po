@@ -1389,6 +1389,10 @@ msgstr "+{moreLines} altre righe"
 msgid "+{remaining} more"
 msgstr "+{remaining} altri"
 
+#: src/features/tasks/components/task-skipped-slot.tsx:26
+msgid "<0>{date}</0> · {why}"
+msgstr "<0>{date}</0> · {why}"
+
 #: src/features/workflow/components/canvas/node-search-dialog.tsx:241
 msgid "<0>↑↓</0> Navigate"
 msgstr "<0>↑↓</0> Naviga"
@@ -3564,7 +3568,7 @@ msgstr ""
 
 #: src/features/chat/thread/tool-approval.tsx:128
 #: src/features/develop/components/review-panel.tsx:64
-#: src/features/tasks/components/task-detail-dialog.tsx:102
+#: src/features/tasks/components/task-detail-dialog.tsx:103
 msgid "Approve"
 msgstr "Approva"
 
@@ -3831,7 +3835,7 @@ msgstr "Proporzioni"
 msgid "Aspect Ratio"
 msgstr "Proporzioni"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:221
+#: src/features/tasks/components/task-detail-dialog.tsx:222
 #: src/features/tasks/components/task-form-dialog.tsx:234
 msgid "Assigned to"
 msgstr "Assegnata a"
@@ -3915,7 +3919,7 @@ msgstr "Solo allegato"
 msgid "Attachments:"
 msgstr "Allegati:"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:154
+#: src/features/tasks/components/task-detail-dialog.tsx:155
 msgid "Attempt"
 msgstr "Tentativo"
 
@@ -5292,7 +5296,7 @@ msgstr "Annulla selezione"
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:164
 #: src/features/develop/components/checks-tab.tsx:76
 #: src/features/evals/components/run-status.tsx:12
-#: src/features/tasks/components/task-detail-dialog.tsx:132
+#: src/features/tasks/components/task-detail-dialog.tsx:133
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:62
 #: src/features/workflow/components/canvas/workflow-controls.tsx:50
 msgid "Cancelled"
@@ -9784,7 +9788,7 @@ msgstr "Rombo"
 msgid "Dictation language updated"
 msgstr "Lingua di dettatura aggiornata"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:134
+#: src/features/tasks/components/task-detail-dialog.tsx:135
 msgid "Did not pass"
 msgstr "Non superato"
 
@@ -11443,7 +11447,7 @@ msgstr "Err%"
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:56
 #: src/features/settings/connectors/connector-card.tsx:75
 #: src/features/slides/components/presentation-viewer.tsx:267
-#: src/features/tasks/components/task-detail-dialog.tsx:133
+#: src/features/tasks/components/task-detail-dialog.tsx:134
 msgid "Error"
 msgstr "Errore"
 
@@ -12735,7 +12739,7 @@ msgstr "Impossibile avviare l'attività"
 msgid "Failed to stop impersonation"
 msgstr "Impossibile interrompere l'impersonificazione"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:74
+#: src/features/tasks/components/task-detail-dialog.tsx:75
 msgid "Failed to submit the review"
 msgstr "Impossibile inviare la revisione"
 
@@ -16358,7 +16362,7 @@ msgstr ""
 #: src/features/skills/components/skill-builder-diff.tsx:31
 #: src/features/skills/components/skill-builder-review.tsx:166
 #: src/features/skills/components/skill-form-dialog.tsx:274
-#: src/features/tasks/components/task-detail-dialog.tsx:231
+#: src/features/tasks/components/task-detail-dialog.tsx:232
 #: src/features/tasks/components/task-form-dialog.tsx:201
 msgid "Instructions"
 msgstr "Istruzioni"
@@ -17134,7 +17138,7 @@ msgstr "Ultima attività {lastActivityAgo}"
 msgid "Last confirmed {0}"
 msgstr "Ultima conferma {0}"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:254
+#: src/features/tasks/components/task-detail-dialog.tsx:255
 msgid "Last error"
 msgstr "Ultimo errore"
 
@@ -17168,6 +17172,10 @@ msgstr "Mese scorso"
 #: src/features/code/components/host-details.tsx:34
 msgid "Last seen"
 msgstr ""
+
+#: src/features/tasks/components/task-skipped-slot.tsx:23
+msgid "Last skipped run"
+msgstr "Ultima esecuzione saltata"
 
 #: src/features/slides/components/full-screen-presentation-viewer.tsx:432
 msgid "Last slide"
@@ -17218,7 +17226,7 @@ msgstr "Il più recente e capace di Kling"
 msgid "Latest Codex generation with improved capabilities"
 msgstr "L’ultima generazione di Codex con capacità migliorate"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:40
+#: src/features/tasks/components/task-detail-dialog.tsx:41
 msgid "Latest coding agent run"
 msgstr "Ultima esecuzione dell'agente di coding"
 
@@ -17302,7 +17310,7 @@ msgstr "Il più recente modello di qualità media di Alibaba"
 msgid "Latest OpenAI reasoning with GPT-5.2's transparent thinking capabilities"
 msgstr "Il ragionamento OpenAI più recente, con il pensiero trasparente di GPT-5.2"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:248
+#: src/features/tasks/components/task-detail-dialog.tsx:249
 msgid "Latest result"
 msgstr "Ultimo risultato"
 
@@ -17883,7 +17891,7 @@ msgstr "Caricamento anteprima…"
 msgid "Loading run…"
 msgstr "Caricamento dell'esecuzione…"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:146
+#: src/features/tasks/components/task-detail-dialog.tsx:147
 msgid "Loading runs…"
 msgstr "Caricamento delle esecuzioni…"
 
@@ -20486,7 +20494,7 @@ msgstr "Ancora nessuna pulizia eseguita"
 msgid "No code block in the latest reply"
 msgstr ""
 
-#: src/features/tasks/components/task-detail-dialog.tsx:47
+#: src/features/tasks/components/task-detail-dialog.tsx:48
 msgid "No coding agent run yet."
 msgstr "Ancora nessuna esecuzione dell'agente di coding."
 
@@ -21228,7 +21236,7 @@ msgstr "Nota"
 msgid "Note (optional)"
 msgstr "Nota (facoltativa)"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:96
+#: src/features/tasks/components/task-detail-dialog.tsx:97
 msgid "Note for the next run (optional)"
 msgstr "Nota per la prossima esecuzione (facoltativa)"
 
@@ -21845,7 +21853,7 @@ msgstr "Apri anteprima in una nuova scheda"
 msgid "Open Prompts"
 msgstr "Apri Prompt"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:170
+#: src/features/tasks/components/task-detail-dialog.tsx:171
 msgid "Open run thread"
 msgstr "Apri la conversazione dell'esecuzione"
 
@@ -22830,7 +22838,7 @@ msgstr "superato"
 
 #: src/features/develop/components/checks-tab.tsx:81
 #: src/features/evals/components/model-comparison.tsx:111
-#: src/features/tasks/components/task-detail-dialog.tsx:135
+#: src/features/tasks/components/task-detail-dialog.tsx:136
 msgid "Passed"
 msgstr "Superato"
 
@@ -25243,7 +25251,7 @@ msgstr "Utenti normali"
 #: src/features/auth/components/organization/accept-invitation-card.tsx:186
 #: src/features/auth/components/organization/user-invitations-card.tsx:121
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:201
-#: src/features/tasks/components/task-detail-dialog.tsx:110
+#: src/features/tasks/components/task-detail-dialog.tsx:111
 msgid "Reject"
 msgstr "Rifiuta"
 
@@ -25627,15 +25635,15 @@ msgid "Reorder sort"
 msgstr "Riordina ordinamento"
 
 #. placeholder {0}: run.round
-#: src/features/tasks/components/task-detail-dialog.tsx:154
+#: src/features/tasks/components/task-detail-dialog.tsx:155
 msgid "Repair {0}"
 msgstr "Correzione {0}"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:186
+#: src/features/tasks/components/task-detail-dialog.tsx:187
 msgid "Repair instructions:"
 msgstr "Istruzioni di correzione:"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:126
+#: src/features/tasks/components/task-detail-dialog.tsx:127
 msgid "repair round"
 msgstr "ciclo di correzione"
 
@@ -26006,7 +26014,7 @@ msgstr "Ripresa dell'ultima chat"
 msgid "Retention period updated to {hours} hours"
 msgstr "Periodo di conservazione aggiornato a {hours} ore"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:127
+#: src/features/tasks/components/task-detail-dialog.tsx:128
 msgid "retried after review"
 msgstr "ritentato dopo la revisione"
 
@@ -26041,7 +26049,7 @@ msgstr ""
 #: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/settings/components/chat/agent-settings.tsx:224
-#: src/features/tasks/components/task-detail-dialog.tsx:106
+#: src/features/tasks/components/task-detail-dialog.tsx:107
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
 #: src/lib/toast.ts:171
@@ -26069,7 +26077,7 @@ msgstr ""
 msgid "Retry upload of {attachmentName}"
 msgstr ""
 
-#: src/features/tasks/components/task-detail-dialog.tsx:106
+#: src/features/tasks/components/task-detail-dialog.tsx:107
 msgid "Retry with note"
 msgstr "Riprova con una nota"
 
@@ -26148,7 +26156,7 @@ msgstr "revisione, sicurezza"
 msgid "Review: {reason}"
 msgstr ""
 
-#: src/features/tasks/components/task-detail-dialog.tsx:242
+#: src/features/tasks/components/task-detail-dialog.tsx:243
 msgid "Reviewer note"
 msgstr "Nota del revisore"
 
@@ -26368,7 +26376,7 @@ msgstr "Avvia prova"
 msgid "Run from {0}"
 msgstr "Esecuzione del {0}"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:142
+#: src/features/tasks/components/task-detail-dialog.tsx:143
 msgid "Run history"
 msgstr "Cronologia delle esecuzioni"
 
@@ -26423,7 +26431,7 @@ msgstr "Esegui il workflow per vedere qui la cronologia delle esecuzioni."
 #: src/features/home/components/home-page.tsx:177
 #: src/features/home/components/home-page.tsx:183
 #: src/features/settings/components/chat/trigger-settings.tsx:178
-#: src/features/tasks/components/task-detail-dialog.tsx:136
+#: src/features/tasks/components/task-detail-dialog.tsx:137
 #: src/features/tasks/components/task-status.tsx:20
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:66
 #: src/features/workflow/components/canvas/workflow-controls.tsx:54
@@ -28338,6 +28346,18 @@ msgstr "Saltato"
 msgid "Skipped files that are not chat exports: {0}"
 msgstr "File che non sono export di chat, saltati: {0}"
 
+#: src/features/tasks/components/task-skipped-slot.tsx:15
+msgid "skipped: still running"
+msgstr "saltata: ancora in esecuzione"
+
+#: src/features/tasks/components/task-skipped-slot.tsx:13
+msgid "skipped: waiting for your review"
+msgstr "saltata: in attesa della tua revisione"
+
+#: src/features/tasks/components/task-skipped-slot.tsx:14
+msgid "skipped: waiting on its dependencies"
+msgstr "saltata: in attesa delle sue dipendenze"
+
 #: src/features/settings/components/chat/trigger-settings.tsx:265
 msgid "Skips a run when your workspace has had no new activity since the routine last posted. A skipped run creates no chat and sends no notification."
 msgstr ""
@@ -29084,15 +29104,15 @@ msgstr "Iniziata il <0>{0}</0>. I dettagli degli strumenti e gli allegati sono n
 msgid "Started here"
 msgstr ""
 
-#: src/features/tasks/components/task-detail-dialog.tsx:125
+#: src/features/tasks/components/task-detail-dialog.tsx:126
 msgid "started manually"
 msgstr "avviata manualmente"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:128
+#: src/features/tasks/components/task-detail-dialog.tsx:129
 msgid "started on schedule"
 msgstr "avviata secondo pianificazione"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:124
+#: src/features/tasks/components/task-detail-dialog.tsx:125
 msgid "started when its dependencies finished"
 msgstr "avviata al termine delle sue dipendenze"
 
@@ -29764,7 +29784,7 @@ msgid "Subtask of {parentTitle}"
 msgstr "Sottoattività di {parentTitle}"
 
 #: src/features/tasks/components/goal-form-dialog.tsx:121
-#: src/features/tasks/components/task-detail-dialog.tsx:236
+#: src/features/tasks/components/task-detail-dialog.tsx:237
 #: src/features/tasks/components/task-form-dialog.tsx:220
 msgid "Success criteria"
 msgstr "Criteri di successo"
@@ -30153,11 +30173,11 @@ msgstr "Modello di destinazione (facoltativo)"
 msgid "Task"
 msgstr ""
 
-#: src/features/tasks/components/task-detail-dialog.tsx:77
+#: src/features/tasks/components/task-detail-dialog.tsx:78
 msgid "Task approved"
 msgstr "Attività approvata"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:209
+#: src/features/tasks/components/task-detail-dialog.tsx:210
 msgid "Task details, your review and the run history."
 msgstr "Dettagli dell'attività, la tua revisione e la cronologia delle esecuzioni."
 
@@ -30190,11 +30210,11 @@ msgstr "L'attività richiede la tua revisione: {title}"
 msgid "Task Planning Module"
 msgstr "Modulo di pianificazione delle attività"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:77
+#: src/features/tasks/components/task-detail-dialog.tsx:78
 msgid "Task queued for another run"
 msgstr "Attività in coda per un'altra esecuzione"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:77
+#: src/features/tasks/components/task-detail-dialog.tsx:78
 msgid "Task rejected"
 msgstr "Attività rifiutata"
 
@@ -31241,7 +31261,7 @@ msgstr "Il caricamento di «{fileName}» è scaduto. Allegalo di nuovo."
 msgid "The user will not be notified of the impersonation"
 msgstr "L'utente non verrà avvisato dell'impersonificazione"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:93
+#: src/features/tasks/components/task-detail-dialog.tsx:94
 msgid "The verifier did not pass this result after the allowed repair rounds. Approve it as is, reject it, or send it back with a note."
 msgstr "Il verificatore non ha approvato questo risultato dopo i cicli di correzione consentiti. Approvalo così com'è, rifiutalo o rimandalo indietro con una nota."
 
@@ -31854,7 +31874,7 @@ msgstr "Questo foglio di calcolo sembra vuoto o non è stato possibile analizzar
 msgid "This sub-agent run is no longer available."
 msgstr "Questa esecuzione del sub-agente non è più disponibile."
 
-#: src/features/tasks/components/task-detail-dialog.tsx:149
+#: src/features/tasks/components/task-detail-dialog.tsx:150
 msgid "This task has not run yet."
 msgstr "Questa attività non è ancora stata eseguita."
 
@@ -33935,7 +33955,7 @@ msgstr "Il codice di verifica è obbligatorio"
 msgid "Verification code sent to your email"
 msgstr "Codice di verifica inviato alla tua email"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:92
+#: src/features/tasks/components/task-detail-dialog.tsx:93
 msgid "Verification could not run, so nobody has checked this result. Review the answer yourself: approve it as is, reject it, or send it back with a note."
 msgstr "Non è stato possibile eseguire la verifica, quindi nessuno ha controllato questo risultato. Rivedi tu la risposta: approvala così com'è, rifiutala o rimandala indietro con una nota."
 
@@ -33948,11 +33968,11 @@ msgstr "Email di verifica inviata"
 msgid "Verification Token from Events & Callbacks > Encryption Strategy"
 msgstr "Verification Token da Events & Callbacks > Encryption Strategy"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:178
+#: src/features/tasks/components/task-detail-dialog.tsx:179
 msgid "Verifier: not passed"
 msgstr "Verificatore: non superato"
 
-#: src/features/tasks/components/task-detail-dialog.tsx:178
+#: src/features/tasks/components/task-detail-dialog.tsx:179
 msgid "Verifier: passed"
 msgstr "Verificatore: superato"
 
@@ -35719,7 +35739,7 @@ msgid "Your rating"
 msgstr "La tua valutazione"
 
 #: src/features/develop/components/review-panel.tsx:196
-#: src/features/tasks/components/task-detail-dialog.tsx:88
+#: src/features/tasks/components/task-detail-dialog.tsx:89
 msgid "Your review"
 msgstr "La tua revisione"
 

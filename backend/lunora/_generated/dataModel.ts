@@ -1655,6 +1655,8 @@ export interface Doc_tasks {
     instructions: string;
     lastError?: string;
     lastRunThreadId?: string;
+    lastSkippedAt?: number;
+    lastSkipReason?: "still_running" | "awaiting_review" | "blocked";
     maxRepairRounds: number;
     model?: string;
     nextRunAt?: number;
@@ -4649,6 +4651,8 @@ export interface Insert_tasks {
     instructions: string;
     lastError?: string;
     lastRunThreadId?: string;
+    lastSkippedAt?: number;
+    lastSkipReason?: "still_running" | "awaiting_review" | "blocked";
     maxRepairRounds: number;
     model?: string;
     nextRunAt?: number;

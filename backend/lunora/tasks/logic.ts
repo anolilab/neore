@@ -8,7 +8,7 @@ import type { ModelCandidate } from "../skills/builder-logic";
 import { isSelectableTextModel } from "../skills/builder-logic";
 import type { SkillModelCandidate } from "../skills/slash-command";
 import { resolveSkillModel } from "../skills/slash-command";
-import { getNextCronTime } from "../triggers/schedule";
+import { findNextCronTime, getNextCronTime } from "../triggers/schedule";
 
 export const TASK_STATUSES = ["todo", "queued", "running", "needs_review", "done", "failed", "blocked"] as const;
 
@@ -455,7 +455,12 @@ export const computeGoalProgress = (statuses: ReadonlyArray<TaskStatus>): GoalPr
 /** Every recurrence fires at least this far apart, whatever the expression says — each firing is a full agent run. */
 export const MIN_RECURRENCE_INTERVAL_MS = 15 * 60_000;
 
-/** The next time a recurring task should re-run after `after`. */
+/**
+ * The next time a recurring task should re-run after `after`. The sweep passes
+ * its own `now`, never the slot it is serving: a sweep that was down for several
+ * slots then runs ONE catch-up and moves on to the next future slot, never a
+ * burst of the missed ones (`tasks/AGENTS.md`).
+ */
 export const nextRecurrenceAt = (cronExpression: string, after: number): number => {
     let next = getNextCronTime(cronExpression, after);
 
@@ -465,6 +470,55 @@ export const nextRecurrenceAt = (cronExpression: string, after: number): number 
     }
 
     return next;
+};
+
+/** How far back {@link latestSlotAtOrBefore} walks: a week of slots at the 15-minute floor is a bounded walk. */
+const SLOT_WALK_WINDOW_MS = 7 * 24 * 60 * 60_000;
+
+/**
+ * The slot the scheduler would run next after `after` (the same floor as {@link nextRecurrenceAt}), or
+ * `undefined` when the expression matches no date. Unlike `nextRecurrenceAt` it never falls back to "an hour
+ * later": that fallback keeps a schedule ticking but is not a slot that was ever due.
+ */
+const nextRealSlot = (cronExpression: string, after: number): number | undefined => {
+    let next = findNextCronTime(cronExpression, after);
+
+    for (let guard = 0; next !== undefined && next - after < MIN_RECURRENCE_INTERVAL_MS && guard < 60; guard += 1) {
+        next = findNextCronTime(cronExpression, next);
+    }
+
+    return next;
+};
+
+/**
+ * The latest slot a skip records: the most recent slot the scheduler would have run at or before `now`,
+ * walked on its own grid from the due slot `from`. Only real slots count: none before the task existed
+ * (`createdAt`), none of a schedule that matches no date (`undefined` then: nothing was skipped). A `from`
+ * older than a week starts the walk at the first slot in that week, so a long outage stays a short walk;
+ * an expression with no match costs one search, not one per fallback hour.
+ */
+export const latestSlotAtOrBefore = (cronExpression: string, from: number, now: number, createdAt: number): number | undefined => {
+    const earliest = Math.max(createdAt, now - SLOT_WALK_WINDOW_MS);
+    // The due slot itself, when it is a real slot inside the window; else the first real slot in the window.
+    const start = from >= earliest && findNextCronTime(cronExpression, from - 1) === from ? from : findNextCronTime(cronExpression, earliest - 1);
+
+    if (start === undefined || start > now) {
+        return undefined;
+    }
+
+    let latest = start;
+
+    for (let guard = 0; guard < 1000; guard += 1) {
+        const next = nextRealSlot(cronExpression, latest);
+
+        if (next === undefined || next > now) {
+            break;
+        }
+
+        latest = next;
+    }
+
+    return latest;
 };
 
 /** Recurrences one user may start per sweep, so a user with many due tasks cannot hold everyone else back. */
@@ -499,3 +553,18 @@ const AT_REST: ReadonlySet<TaskStatus> = new Set(["done", "failed", "todo"]);
 
 /** A due recurrence only re-queues a task that is at rest; one still in flight or awaiting review is left alone. */
 export const shouldRecurNow = (status: TaskStatus): boolean => AT_REST.has(status);
+
+export type TaskSkipReason = "awaiting_review" | "blocked" | "still_running";
+
+/** Why a due slot cannot start a task in `status`, or `undefined` when it can. */
+export const recurrenceSkipReason = (status: TaskStatus): TaskSkipReason | undefined => {
+    if (shouldRecurNow(status)) {
+        return undefined;
+    }
+
+    if (status === "needs_review") {
+        return "awaiting_review";
+    }
+
+    return status === "blocked" ? "blocked" : "still_running";
+};
