@@ -24,16 +24,46 @@ const excerptOf = (text: string): string => {
     return flat.length > EXCERPT_CHARS ? `${flat.slice(0, EXCERPT_CHARS)}…` : flat;
 };
 
-export interface QuoteChipOptions {
-    /** The link's label, and the notice when the quoted reply is not on screen. Translated by the composer. */
-    labels: { goToReply: string; notOnScreen: string };
+export interface QuoteChipLabels {
+    goToReply: string;
+    notOnScreen: string;
 }
+
+export interface QuoteChipOptions {
+    /**
+     * The link's label, and the notice when the quoted reply is not on screen. A getter, so each read is in the current
+     * locale: the composer's editor is not recreated on a locale switch, and `refreshQuoteChipLabels` repaints the chips
+     * already drawn.
+     */
+    labels: () => QuoteChipLabels;
+}
+
+/** Repaints each drawn chip's link label, for chips drawn before a locale change. */
+const repaints = new WeakMap<HTMLElement, () => void>();
+
+export const refreshQuoteChipLabels = (root: HTMLElement): void => {
+    for (const chip of root.querySelectorAll<HTMLElement>(":scope [data-quote-chip]")) {
+        repaints.get(chip)?.();
+    }
+};
 
 const QuoteChip = Node.create<QuoteChipOptions>({
     addAttributes() {
         return {
-            messageId: { default: "" },
-            text: { default: "" },
+            messageId: {
+                default: "",
+                parseHTML: (element) => element.dataset.messageId ?? "",
+                renderHTML: ({ messageId }) => {
+                    return { "data-message-id": String(messageId ?? "") };
+                },
+            },
+            text: {
+                default: "",
+                parseHTML: (element) => element.dataset.quoteText ?? "",
+                renderHTML: ({ text }) => {
+                    return { "data-quote-text": String(text ?? "") };
+                },
+            },
         };
     },
 
@@ -44,6 +74,9 @@ const QuoteChip = Node.create<QuoteChipOptions>({
             const dom = document.createElement("div");
             const excerpt = document.createElement("span");
             const source = document.createElement("button");
+            const paint = (): void => {
+                source.textContent = labels().goToReply;
+            };
 
             dom.dataset.quoteChip = "";
             dom.contentEditable = "false";
@@ -52,14 +85,15 @@ const QuoteChip = Node.create<QuoteChipOptions>({
             excerpt.textContent = excerptOf(String(node.attrs.text ?? ""));
             source.type = "button";
             source.className = "text-primary shrink-0 underline-offset-2 hover:underline";
-            source.textContent = labels.goToReply;
+            paint();
             source.addEventListener("click", () => {
                 if (!scrollToMessage(String(node.attrs.messageId ?? ""))) {
-                    showWarning(labels.notOnScreen);
+                    showWarning(labels().notOnScreen);
                 }
             });
             dom.appendChild(excerpt);
             dom.appendChild(source);
+            repaints.set(dom, paint);
 
             return { dom };
         };
@@ -75,8 +109,17 @@ const QuoteChip = Node.create<QuoteChipOptions>({
         return [{ tag: "div[data-quote-chip]" }];
     },
 
-    renderHTML({ HTMLAttributes }) {
-        return ["div", mergeAttributes(HTMLAttributes, { "data-quote-chip": "" })];
+    /**
+     * The quoted lines are part of the HTML, so a copy into a rich-text app pastes them (the node view is not serialised).
+     * The quote text and reply id stay as data attributes, so pasting the HTML back into the composer rebuilds the chip.
+     */
+    renderHTML({ HTMLAttributes, node }) {
+        const lines = String(node.attrs.text ?? "")
+            .trim()
+            .replaceAll("\r\n", "\n")
+            .split("\n");
+
+        return ["div", mergeAttributes(HTMLAttributes, { "data-quote-chip": "" }), ["blockquote", {}, ...lines.map((line) => ["p", {}, line])]];
     },
 
     renderText({ node }) {
@@ -85,7 +128,9 @@ const QuoteChip = Node.create<QuoteChipOptions>({
 
     addOptions() {
         return {
-            labels: { goToReply: "Go to reply", notOnScreen: "The quoted reply is not on screen" },
+            labels: () => {
+                return { goToReply: "Go to reply", notOnScreen: "The quoted reply is not on screen" };
+            },
         };
     },
 

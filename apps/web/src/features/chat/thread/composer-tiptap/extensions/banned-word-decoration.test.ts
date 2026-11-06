@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import BannedWordDecoration, { bannedWordPluginKey } from "./banned-word-decoration";
 import QuoteChip from "./quote-chip";
 
-const labels = { goToReply: "Go to reply", notOnScreen: "Not on screen" };
+const labels = () => {
+    return { goToReply: "Go to reply", notOnScreen: "Not on screen" };
+};
 
 describe("banned-word decorations", () => {
     let editor: Editor | undefined;
