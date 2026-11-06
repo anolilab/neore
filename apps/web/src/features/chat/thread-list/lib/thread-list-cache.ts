@@ -105,6 +105,7 @@ const THREAD_FIELDS = [
     "lockedAt",
     "model",
     "projectId",
+    "runner",
     "source",
     "statelessMode",
     "status",

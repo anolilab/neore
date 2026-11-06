@@ -1781,7 +1781,7 @@ const activeBranchPrompt = async (
     context: ActionContext,
     threadId: string,
     activeLeafMessageId: string | undefined,
-): Promise<string | undefined | "too-long"> => {
+): Promise<{ kind: "prompt"; text: string | undefined } | { kind: "too-long" }> => {
     if (activeLeafMessageId !== undefined) {
         const pathIds = await context.runQuery(internal.agent.branches.getActivePathIds, {
             leafMessageId: activeLeafMessageId as Id<"messages">,
@@ -1790,11 +1790,11 @@ const activeBranchPrompt = async (
 
         // A stored leaf that is gone leaves no branch to read: every branch's prompt is not this thread's title.
         if (pathIds === null) {
-            return undefined;
+            return { kind: "prompt", text: undefined };
         }
 
         if (pathIds === "too-long") {
-            return "too-long";
+            return { kind: "too-long" };
         }
 
         for (let start = 0; start < Math.min(pathIds.length, REGENERATE_TITLE_WINDOW); start += TITLE_PROMPT_PAGE) {
@@ -1805,11 +1805,11 @@ const activeBranchPrompt = async (
             const prompt = firstUserPromptText(rows.filter((row) => row !== null).filter((row) => row.status === "success"));
 
             if (prompt) {
-                return prompt;
+                return { kind: "prompt", text: prompt };
             }
         }
 
-        return undefined;
+        return { kind: "prompt", text: undefined };
     }
 
     let cursor: string | null = null;
@@ -1826,7 +1826,7 @@ const activeBranchPrompt = async (
         const prompt = firstUserPromptText(page);
 
         if (prompt) {
-            return prompt;
+            return { kind: "prompt", text: prompt };
         }
 
         if (isDone) {
@@ -1836,7 +1836,7 @@ const activeBranchPrompt = async (
         cursor = continueCursor;
     }
 
-    return undefined;
+    return { kind: "prompt", text: undefined };
 };
 
 /**
@@ -1863,13 +1863,15 @@ export const regenerateTitleChat = internalAction
         }
 
         // The active branch's history only: an edited prompt on another branch must not supply the title.
-        const prompt = await activeBranchPrompt(context, arguments_.threadId, thread.activeLeafMessageId);
+        const branch = await activeBranchPrompt(context, arguments_.threadId, thread.activeLeafMessageId);
 
-        if (prompt === "too-long") {
+        if (branch.kind === "too-long") {
             context.log.event("chat.thread_title", { skipped: "path-too-long" });
 
             return;
         }
+
+        const prompt = branch.text;
 
         if (!prompt) {
             context.log.event("chat.thread_title", { skipped: "no-user-prompt" });
