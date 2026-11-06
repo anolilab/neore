@@ -28665,8 +28665,16 @@
                         "type": "array"
                       },
                       "transport": {
-                        "const": "ssh",
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "const": "ssh",
+                            "type": "string"
+                          },
+                          {
+                            "const": "headless",
+                            "type": "string"
+                          }
+                        ]
                       },
                       "updateRequired": {
                         "type": "boolean"

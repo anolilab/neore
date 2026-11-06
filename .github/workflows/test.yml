@@ -523,6 +523,12 @@ jobs:
                   NEORE_REQUIRE_SSHD: "${{ matrix.os != 'windows-latest' && '1' || '' }}"
               run: "cargo test --manifest-path packages/device-core/Cargo.toml"
 
+            # `neore-host pair|run|unpair` (a machine that pairs itself by code) is behind the `headless` feature,
+            # which a default build does not compile, so its tests run here.
+            - name: "Run cargo test for the headless host"
+              shell: "bash"
+              run: "cargo test --manifest-path packages/device-core/Cargo.toml --features headless --lib headless"
+
             # Records whether this runner's OpenSSH can multiplex (ControlMaster), for the plan's S5 note. The
             # step fails when it cannot reach a verdict (no sshd, no login), so a broken setup gets fixed.
             - name: "Measure ssh ControlMaster (Windows)"

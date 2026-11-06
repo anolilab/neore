@@ -30,6 +30,8 @@ pub mod engine;
 pub mod envelope;
 pub mod frame;
 pub mod fs;
+#[cfg(feature = "headless")]
+pub mod headless;
 #[cfg(feature = "keychain")]
 pub mod hmac;
 pub mod host;

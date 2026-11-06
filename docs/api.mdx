@@ -61,6 +61,7 @@ The CLI lives in `apps/cli` (`pnpm --filter @neore/cli build`, then `node apps/c
 
 ```bash
 neore login --api-url https://api.example.com   # paste the key when prompted
+neore login --device --api-url https://api.example.com   # or sign in by code (see below)
 neore doctor                                     # config, connectivity, key validity
 neore chat "What changed in my tasks today?"     # streams to stdout
 neore chat                                       # interactive session (/new, /exit)
@@ -79,3 +80,5 @@ neore models
 Every command takes `--json` for machine-readable output (NDJSON for streams). The key is stored in the OS config directory (`$XDG_CONFIG_HOME/neore/config.json`, `~/Library/Application Support/neore/`, or `%APPDATA%\neore\`) with `0600` permissions; `neore doctor` flags a looser file. `NEORE_API_KEY` and `NEORE_API_URL` override it, for CI. Prefer the prompt or stdin over `--key`, which ends up in shell history.
 
 Exit codes: `0` ok, `1` error, `2` usage, `3` auth or missing scope, `4` not found, `5` rate or daily limit, `6` network.
+
+`neore login --device` signs in without pasting a key, and works over SSH because it opens no browser and listens on no port. Before it sends anything it asks you to type the API host (without a terminal, pass `--confirm-host <host>`), and the URL must be `https://` (`http://` only for localhost). It then prints a URL and a short code; open the URL on any device, sign in, and approve the code. The CLI then receives its own read-only API key, named `Neore CLI on <hostname>`, valid for a year and revocable in Settings. A code lives 30 minutes and the CLI polls every 5 seconds. A code that is denied, expired or already used ends the command with exit code `1` and a message that says which.

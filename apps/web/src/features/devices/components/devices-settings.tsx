@@ -43,8 +43,8 @@ interface DeviceView {
     /** Unset: offered in any chat. A list: only threads of these projects (empty: nowhere). */
     projectIds?: string[];
     toolNames: string[];
-    /** `ssh`: a server this desktop reaches over SSH and speaks for. */
-    transport?: "ssh";
+    /** `ssh`: a server this desktop reaches over SSH and speaks for. `headless`: a machine that paired itself by code. */
+    transport?: "headless" | "ssh";
     /** The computer reported a protocol older than the backend serves: it gets no calls until it is updated. */
     updateRequired?: boolean;
     viaDeviceId?: string;
@@ -185,6 +185,7 @@ const DeviceRow: FC<{
             <div className="flex items-center gap-2">
                 {isThisComputer && <Badge variant="outline">{t`This computer`}</Badge>}
                 {device.transport === "ssh" && <Badge variant="outline">{t`Server over SSH`}</Badge>}
+                {device.transport === "headless" && <Badge variant="outline">{t`Headless machine`}</Badge>}
                 <Badge variant={online ? "default" : "secondary"}>{online ? t`Online` : t`Offline`}</Badge>
                 {reconnect?.phase === "gaveUp" && <Badge variant="destructive">{t`Connection lost`}</Badge>}
                 {(reconnect?.phase === "waiting" || reconnect?.phase === "connecting") && <Badge variant="secondary">{t`Reconnecting`}</Badge>}

@@ -10,18 +10,24 @@ import { limitFlag, requireArgument, UsageError } from "./args";
 import { ApiError, hintFor, NeoreClient, stripTrailingSlashes } from "./client";
 import type { CliConfig } from "./config";
 import { deleteConfig, insecurePermissions, readConfig, resolveCredentials, writeConfig } from "./config";
+import { formatUserCode, pollForKey, requestDeviceCode } from "./device-login";
 import type { Io } from "./render";
 import { formatDate, formatTable, paint, printJson, renderStream, shouldUseColor } from "./render";
 
 export interface Context {
     configFile: string;
     fetch: typeof fetch;
+    /** What this machine calls itself; sent with a sign-in code so the person approving can recognise it. */
+    hostname: string;
     io: Io;
+    /** Epoch ms; injected so the sign-in poll runs without real time in tests. */
+    now: () => number;
     readFile: (path: string) => Promise<Uint8Array>;
     /** One line of user input, or `null` at EOF. `secret` suppresses echo. */
     readLine: (prompt: string, options?: { secret?: boolean }) => Promise<string | null>;
     /** All of stdin, when it is piped; `null` when it is a terminal. */
     readStdin: () => Promise<string | null>;
+    sleep: (ms: number) => Promise<void>;
     stdinIsTTY: boolean;
 }
 
@@ -186,21 +192,94 @@ export const chat = async (context: Context, { args, flags }: ParsedCommand): Pr
 
 // ─── Account ────────────────────────────────────────────────────────────────
 
+/** Show the code, then wait for the person to approve it elsewhere. Resolves with the new key. */
+const deviceLogin = async (context: Context, apiUrl: string): Promise<string> => {
+    const code = await requestDeviceCode(context, apiUrl, context.hostname);
+    const minutes = Math.max(1, Math.round((code.expiresAtMs - context.now()) / 60_000));
+
+    context.io.stderr.write(
+        [
+            "To sign in, open this page in a browser on any device and sign in to your account:",
+            `  ${code.verificationUri}`,
+            "Then enter this code:",
+            `  ${formatUserCode(code.userCode)}`,
+            `Or open this link, which has the code filled in: ${code.verificationUriComplete}`,
+            `Waiting for approval (the code expires in ${String(minutes)} minutes; Ctrl-C cancels)...`,
+            "",
+        ].join("\n"),
+    );
+
+    const key = await pollForKey(context, apiUrl, code);
+
+    return key.apiKey;
+};
+
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "[::1]", "localhost"]);
+
+/** Device sign-in receives a fresh key in a response, so it is HTTPS only; plain HTTP is for a server on this machine. */
+const assertDeviceUrl = (apiUrl: string): void => {
+    const { hostname, protocol } = new URL(apiUrl);
+
+    if (protocol !== "https:" && !(protocol === "http:" && LOOPBACK_HOSTS.has(hostname))) {
+        throw new UsageError("--device needs an https:// API URL (http:// is accepted only for localhost).");
+    }
+};
+
+/**
+ * The device code goes to whatever host the URL names, so the person confirms that host first: they type it
+ * (a plain string comparison), or a script passes it as `--confirm-host`. Nothing is sent before it matches.
+ */
+const confirmDeviceHost = async (context: Context, apiUrl: string, confirmed: string | undefined): Promise<void> => {
+    const { host } = new URL(apiUrl);
+
+    if (confirmed !== undefined) {
+        if (confirmed !== host) {
+            throw new UsageError(`--confirm-host ${confirmed} does not match the API host ${host}.`);
+        }
+
+        return;
+    }
+
+    if (!context.stdinIsTTY) {
+        throw new UsageError(
+            `--device sends a sign-in code to ${host} and needs you to confirm that host, which takes a terminal. Without one, run: neore login --device --api-url ${apiUrl} --confirm-host ${host}`,
+        );
+    }
+
+    context.io.stderr.write(`The sign-in code will be sent to ${host}.\n`);
+
+    const typed = ((await context.readLine("Type that host to continue: ")) ?? "").trim();
+
+    if (typed !== host) {
+        throw new UsageError("The host did not match; nothing was sent.");
+    }
+};
+
 export const login = async (context: Context, { flags }: ParsedCommand): Promise<void> => {
+    if (flags.device && flags.key !== undefined) {
+        throw new UsageError("--device signs in by code; it does not take a key.");
+    }
+
     const existing = await readConfig(context.configFile);
-    const apiUrl = (
-        flags["api-url"] ??
-        context.io.env["NEORE_API_URL"] ??
-        existing.apiUrl ??
-        (await context.readLine("API URL (e.g. https://api.example.com): ")) ??
-        ""
-    ).trim();
+    const configured = flags["api-url"] ?? context.io.env["NEORE_API_URL"] ?? existing.apiUrl;
+
+    // Without a terminal nobody can type the URL: a device sign-in must not wait on stdin for it.
+    if (configured === undefined && flags.device && !context.stdinIsTTY) {
+        throw new UsageError("--device needs the API URL and there is no terminal to ask for it. Pass --api-url <url> or set NEORE_API_URL.");
+    }
+
+    const apiUrl = (configured ?? (await context.readLine("API URL (e.g. https://api.example.com): ")) ?? "").trim();
 
     if (!apiUrl || !URL.canParse(apiUrl)) {
         throw new UsageError("An absolute API URL is required (--api-url).");
     }
 
-    let apiKey = flags.key?.trim();
+    if (flags.device) {
+        assertDeviceUrl(apiUrl);
+        await confirmDeviceHost(context, apiUrl, flags["confirm-host"]);
+    }
+
+    let apiKey = flags.device ? await deviceLogin(context, apiUrl) : flags.key?.trim();
 
     if (!apiKey) {
         const entered = context.stdinIsTTY ? await context.readLine("Paste your API key: ", { secret: true }) : await context.readStdin();
@@ -212,11 +291,36 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
         throw new UsageError("No API key given. Create one in Settings → API keys.");
     }
 
-    // Verify BEFORE saving, so a typo never replaces a working key.
-    const me = await new NeoreClient({ apiKey, baseUrl: apiUrl, fetch: context.fetch }).request<{ scopes: string[]; userId: string }>("GET", "/me");
+    // The key is verified BEFORE it replaces a saved one, so a failed check never costs a working key. The one
+    // exception is a device sign-in with nothing saved: its code is spent, so the issued key is kept rather than lost.
+    const replaced = existing.apiKey;
+    const isDevice = Boolean(flags.device);
+
+    if (isDevice && !replaced) {
+        await writeConfig({ apiKey, apiUrl }, context.configFile);
+    }
+
+    let me: { scopes: string[]; userId: string };
+
+    try {
+        me = await new NeoreClient({ apiKey, baseUrl: apiUrl, fetch: context.fetch }).request<{ scopes: string[]; userId: string }>("GET", "/me");
+    } catch (error) {
+        if (isDevice && replaced) {
+            context.io.stderr.write(
+                "The new key could not be checked, so the saved key was left as it was. The new key is active: revoke it in Settings -> API keys, then run `neore login --device` again.\n",
+            );
+        }
+
+        throw error;
+    }
+
     const config: CliConfig = { apiKey, apiUrl };
 
     await writeConfig(config, context.configFile);
+
+    if (isDevice && replaced && replaced !== apiKey && existing.apiUrl === apiUrl) {
+        context.io.stderr.write("The key this replaces is still valid; revoke it in Settings -> API keys if nothing else uses it.\n");
+    }
 
     if (flags.json) {
         printJson(context.io, { apiUrl, configFile: context.configFile, scopes: me.scopes });

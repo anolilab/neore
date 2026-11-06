@@ -23,7 +23,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { deleteShardRoute, setShardRoute, shardRouteOwner } from "../lib/shard-routes";
-import { decryptKey, encryptKey } from "../lib/encryption";
+import { decryptKey } from "../lib/encryption";
 import {
     ACP_CLAIM_LEASE_MS,
     DEVICE_SIGNATURE_WINDOW_MS,
@@ -32,10 +32,11 @@ import {
     MAX_DEVICES_PER_USER,
     MAX_MANIFEST_BYTES,
 } from "./lib/constants";
+import { assertRoomForDevice, insertDevice } from "./lib/register";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
 import { filterOwnProjectIds } from "./lib/scope";
 import { claimWindowMs, expireOpenCalls, isAcpTool, isDeviceOutdated, isForwardPhase } from "./lib/state";
-import { capUtf8, clockSkewData, clockSkewMessage, generateDeviceSecret, isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "./lib/signing";
+import { capUtf8, clockSkewData, clockSkewMessage, isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "./lib/signing";
 import { vDeviceCallView, vDevicePlatform, vDeviceView, vDeviceCallStatusView } from "./validators";
 
 const vDeviceName = v.string().check((value) => value.trim().length > 0 && value.length <= 80, { message: "Name must be 1-80 characters" });
@@ -119,37 +120,29 @@ export const registerDevice = authMutation
             throw new LunoraError("FORBIDDEN", "This account is being deleted");
         }
 
-        const { page: existing } = await ctx.db.devices.findMany({ limit: MAX_DEVICES_PER_USER + 1, where: { userId } });
-
-        if (existing.length >= MAX_DEVICES_PER_USER) {
-            throw new LunoraError("BAD_REQUEST", `At most ${String(MAX_DEVICES_PER_USER)} devices can be paired. Remove one first.`);
-        }
+        await assertRoomForDevice(ctx, userId);
 
         // A server is paired by a desktop of the caller's that is itself paired directly: no chains.
         if (args.viaDeviceId !== undefined) {
             const desktop = await requireOwnDevice(ctx, args.viaDeviceId, userId);
 
-            if (desktop.encryptedSecret === undefined) {
+            // A headless machine (or another server) is paired directly too, but speaks for itself: no relay of ours
+            // claims calls for what hangs off it, so a server under it could never answer.
+            if (desktop.encryptedSecret === undefined || desktop.transport !== undefined) {
                 throw new LunoraError("FORBIDDEN", "The desktop is not paired");
             }
         }
 
-        const secret = generateDeviceSecret();
-        const deviceId = await ctx.db.insert("devices", {
-            createdAt: ctx.now,
-            encryptedSecret: await encryptKey(secret, "device-secrets"),
+        const { deviceId, secret } = await insertDevice(ctx, {
             name: args.name.trim(),
             platform: args.platform,
             userId,
             ...(args.viaDeviceId !== undefined && { transport: "ssh" as const, viaDeviceId: args.viaDeviceId }),
         });
 
-        // The host ingest has no session: it finds this device's owner, hence its shard, from this row.
-        await setShardRoute(ctx, "device", deviceId as string, userId);
-
         ctx.log.event("devices.register_device", { platform: args.platform, ssh: args.viaDeviceId !== undefined });
 
-        return { deviceId: deviceId as string, secret };
+        return { deviceId, secret };
     });
 
 /** The caller's paired devices. Online state is the client's to derive from `lastSeenAt` (`DEVICE_ONLINE_WINDOW_MS`). */

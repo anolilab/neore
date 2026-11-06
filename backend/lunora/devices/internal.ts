@@ -3,23 +3,25 @@
  * reach, creating and signing a call, the state the waiting tool polls, and
  * the housekeeping sweep. Called by the tool proxy (`chat/lib/device-tools.ts`).
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { ACP_CLEARED } from "../acp/lib/constants";
 import { HOST_DID_NOT_ANSWER, onAcpCallEnded } from "../acp/lib/calls";
+import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { threadHandoffTaint, threadSummaryTaint } from "../agent/thread-summary-taint";
 import { decryptKey } from "../lib/encryption";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
-import { DEVICE_CALL_DEADLINE_MS, DEVICE_CALL_RETENTION_MS, MAX_DEVICE_INPUT_BYTES, MAX_OPEN_CALLS_PER_DEVICE } from "./lib/constants";
+import { DEVICE_CALL_DEADLINE_MS, DEVICE_CALL_RETENTION_MS, MAX_DEVICE_INPUT_BYTES, MAX_DEVICES_PER_USER, MAX_OPEN_CALLS_PER_DEVICE } from "./lib/constants";
 import { isDeviceInScope, resolveThreadProject } from "./lib/scope";
 import { signDevicePayload, utf8Length } from "./lib/signing";
+import { assertRoomForDevice, insertDevice } from "./lib/register";
 import { mergeTaint } from "./lib/taint";
 import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
-import { vDeviceCallStatus, vDeviceManifestTool, vDeviceTaintSource } from "./validators";
+import { vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource } from "./validators";
 
 type ThreadRow = Pick<Doc<"threads">, "deleted" | "externalThreadId" | "groupChat" | "isPublic" | "userId">;
 
@@ -303,4 +305,85 @@ export const sweepDeviceCalls = internalMutation
         await Promise.all(old.map(async (call) => await ctx.db.delete("deviceCalls", call._id)));
 
         return null;
+    });
+
+/** The device already registered for this redeemed code, if any. */
+const findDeviceForCode = async (ctx: Pick<QueryCtx, "db">, userId: string, codeId: string) => {
+    const { page } = await ctx.db.devices.findMany({ limit: MAX_DEVICES_PER_USER + 1, where: { userId } });
+
+    return page.find((device) => device.pairedByCode === codeId && device.encryptedSecret !== undefined);
+};
+
+/** The account must be a real one and not being deleted: checked before anything is handed out, a retry included. */
+const assertAccountMayPair = async (ctx: QueryCtx, userId: string): Promise<void> => {
+    const account = await ctx.db.user.findFirst({ consistency: "primary", where: { _id: ctx.db.asId("user", userId) } });
+
+    if (!account || account.isAnonymous === true) {
+        throw new LunoraError("FORBIDDEN", "Pairing a device requires an account");
+    }
+
+    if (await isAccountDeletionUnderway(ctx, userId)) {
+        throw new LunoraError("FORBIDDEN", "This account is being deleted");
+    }
+};
+
+/**
+ * Before a pairing code is spent (`auth/cli-device-auth.ts`, `POST /device/host`): refuses an account that could not
+ * take the device, so the code stays unclaimed and the person can free a slot first. Runs on the account's shard.
+ */
+export const checkHeadlessPairing = internalQuery
+    .input({ codeId: v.optional(v.string().max(MAX_LENGTH.id)), userId: v.string().max(MAX_LENGTH.short) })
+    .output(v.null())
+    .query(async ({ args, ctx }) => {
+        // The account checks come first, always: a retry must not be handed a secret after deletion began.
+        await assertAccountMayPair(ctx, args.userId);
+
+        // A retried poll of a code whose device already exists is finishing that pairing: its own device must not
+        // count against the cap (`registerHeadlessDevice` hands it back).
+        if (args.codeId !== undefined && (await findDeviceForCode(ctx, args.userId, args.codeId))) {
+            return null;
+        }
+
+        await assertRoomForDevice(ctx, args.userId);
+
+        return null;
+    });
+
+/**
+ * Registers the machine that redeemed an approved pairing code as a device of the approving account. The secret is
+ * returned to the code redemption, which hands it to that machine in its response. Idempotent per redeemed code: if
+ * the first reply was lost (a timeout after this committed) the redemption retries with the same `codeId` and gets
+ * the device and secret it already made, not a second device. Only the redemption route calls this, after the
+ * plugin's one-time claim of the code (a retry first puts the code back).
+ */
+export const registerHeadlessDevice = internalMutation
+    .input({
+        codeId: v.string().max(MAX_LENGTH.id),
+        name: v.string().max(MAX_LENGTH.short),
+        platform: vDevicePlatform,
+        userId: v.string().max(MAX_LENGTH.short),
+    })
+    .output(v.object({ deviceId: v.string(), secret: v.string() }))
+    .mutation(async ({ args, ctx }) => {
+        await assertAccountMayPair(ctx, args.userId);
+
+        const existing = await findDeviceForCode(ctx, args.userId, args.codeId);
+
+        if (existing?.encryptedSecret) {
+            return { deviceId: existing._id as string, secret: await decryptKey(existing.encryptedSecret, "device-secrets") };
+        }
+
+        await assertRoomForDevice(ctx, args.userId);
+
+        const registered = await insertDevice(ctx, {
+            name: args.name,
+            pairedByCode: args.codeId,
+            platform: args.platform,
+            transport: "headless",
+            userId: args.userId,
+        });
+
+        ctx.log.event("devices.register_headless_device", { platform: args.platform });
+
+        return registered;
     });

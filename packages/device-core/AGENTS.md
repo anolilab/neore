@@ -38,3 +38,4 @@ The rules for working in `packages/device-core/`. The detail and reasoning are i
 - Join every thread a launch spawns before its request ends.
 - Narrowing shared folders drops out-of-folder approvals (`apply_update`, `reviewApprovals`); removing a server or unpairing ends sessions FIRST (`ServerAgents.remove`).
 - The person's variables can never replace `SSH_AUTH_SOCK`.
+- **A machine that pairs itself by code** (`src/headless/`, `/device/host` in `backend/lunora/auth/cli-device-auth.ts`, `registerHeadlessDevice`): a `transport: "headless"` device with its OWN secret. The secret crosses only https (plain http loopback is debug-build + `NEORE_HOST_DEV_INSECURE_LOOPBACK=1` only), appears in the redemption response and nowhere else, and is kept where the owner was told before approving (keychain, else a 0600 file in a 0700 folder). An unreadable pairing is refused, never re-made. `pair`/`run`/`unpair` share one lock. Details: `README.md`.

@@ -176,6 +176,28 @@ export const connectorDefinitions = sqliteTable("connectorDefinitions", {
     by_status: index("by_status").on(t.status),
 }));
 
+export const deviceCode = sqliteTable("deviceCode", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    clientId: text("clientId"),
+    deviceCode: text("deviceCode").notNull(),
+    expiresAt: real("expiresAt").notNull(),
+    hostname: text("hostname"),
+    lastPolledAt: real("lastPolledAt"),
+    platform: text("platform"),
+    pollingInterval: real("pollingInterval"),
+    scope: text("scope"),
+    status: text("status").notNull(),
+    storage: text("storage"),
+    userCode: text("userCode").notNull(),
+    userId: text("userId"),
+}, (t) => ({
+    deviceCode: index("deviceCode").on(t.deviceCode),
+    expiresAt: index("expiresAt").on(t.expiresAt),
+    userCode: index("userCode").on(t.userCode),
+    userId: index("userId").on(t.userId),
+}));
+
 export const documentHistory = sqliteTable("documentHistory", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

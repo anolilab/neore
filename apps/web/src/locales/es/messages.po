@@ -1650,6 +1650,10 @@ msgstr "Un editor de documentos que piensa contigo."
 msgid "A few questions first"
 msgstr "Primero, unas preguntas"
 
+#: src/routes/auth/device.tsx:210
+msgid "A file only its owner can read (no keychain available)"
+msgstr ""
+
 #: src/features/skills/components/skill-import-dialog.tsx:202
 msgid "A GitHub link to a skill folder or its SKILL.md, a skills.sh link, or an npx skills add command. Only the SKILL.md is imported; scripts and other files in the skill are not."
 msgstr ""
@@ -2044,7 +2048,7 @@ msgstr "Añade una nota..."
 msgid "Add a note…"
 msgstr "Añade una nota…"
 
-#: src/features/devices/components/devices-settings.tsx:342
+#: src/features/devices/components/devices-settings.tsx:343
 msgid "Add a server over SSH"
 msgstr ""
 
@@ -2372,7 +2376,7 @@ msgstr "Añadido:"
 msgid "Adding documents… {0} of {1}"
 msgstr "Añadiendo documentos… {0} de {1}"
 
-#: src/features/devices/components/devices-settings.tsx:324
+#: src/features/devices/components/devices-settings.tsx:325
 msgid "Adding the server was cancelled on this computer."
 msgstr ""
 
@@ -2384,7 +2388,7 @@ msgstr "Añadiendo tus respuestas anteriores…"
 msgid "Adding…"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:355
+#: src/features/devices/components/devices-settings.tsx:356
 msgid "Address"
 msgstr ""
 
@@ -2623,7 +2627,7 @@ msgstr "Después de activar la conexión aquí, obtendrás una URL de webhook pa
 msgid "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 msgstr "Después de activar la conexión aquí, obtendrás una URL de webhook para configurarla como Request URL en Event Subscriptions de tu app de Slack."
 
-#: src/features/devices/components/devices-settings.tsx:271
+#: src/features/devices/components/devices-settings.tsx:272
 msgid "After outside content"
 msgstr "Tras contenido externo"
 
@@ -3316,7 +3320,7 @@ msgstr "Responde mensajes de una cuenta oficial de WeChat (modo seguro). Beta: a
 msgid "Answer ready"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:303
+#: src/features/chat/thread/ask-user-prompt.tsx:134
 msgid "Answer sent — continuing"
 msgstr "Respuesta enviada — continuando"
 
@@ -3324,7 +3328,7 @@ msgstr "Respuesta enviada — continuando"
 msgid "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 msgstr "Responde mensajes de WhatsApp con tu número de WhatsApp Business (Meta Cloud API). Las respuestas siguen la regla de 24 horas de WhatsApp."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:299
+#: src/features/chat/thread/ask-user-prompt.tsx:130
 msgid "Answered"
 msgstr "Respondida"
 
@@ -3541,6 +3545,8 @@ msgstr ""
 #: src/features/chat/thread/tool-approval.tsx:121
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:102
+#: src/routes/auth/device.tsx:245
+#: src/routes/auth/device.tsx:285
 msgid "Approve"
 msgstr "Aprobar"
 
@@ -3558,6 +3564,18 @@ msgstr ""
 
 #: src/features/chat/thread/tool-auto-approval.tsx:19
 msgid "Approved automatically — low risk"
+msgstr ""
+
+#: src/routes/auth/device.tsx:135
+msgid "Approved. Return to the machine: it is being paired and will say when it is done. You can close this tab."
+msgstr ""
+
+#: src/routes/auth/device.tsx:138
+msgid "Approved. Return to your terminal: the command line is signed in. You can close this tab."
+msgstr ""
+
+#: src/routes/auth/device.tsx:118
+msgid "Approving…"
 msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:246
@@ -3843,7 +3861,7 @@ msgstr ""
 msgid "Attach as file"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:437
+#: src/features/chat/thread/ask-user-prompt.tsx:262
 msgid "Attach file"
 msgstr "Adjuntar archivo"
 
@@ -3851,7 +3869,7 @@ msgstr "Adjuntar archivo"
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "Adjunta archivos o colecciones completas para que la IA los consulte y cite en esta conversación."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:388
+#: src/features/chat/thread/ask-user-prompt.tsx:219
 msgid "Attached files"
 msgstr "Archivos adjuntos"
 
@@ -3859,15 +3877,15 @@ msgstr "Archivos adjuntos"
 msgid "Attached image"
 msgstr "Imagen adjunta"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:344
+#: src/features/chat/thread/ask-user-prompt.tsx:175
 msgid "Attached:"
 msgstr "Adjunto:"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:425
+#: src/features/chat/thread/ask-user-prompt.tsx:250
 msgid "Attaching files…"
 msgstr "Adjuntando archivos…"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:437
+#: src/features/chat/thread/ask-user-prompt.tsx:262
 msgid "Attaching…"
 msgstr "Adjuntando…"
 
@@ -5693,6 +5711,10 @@ msgstr ""
 msgid "Checking image safety..."
 msgstr "Comprobando la seguridad de la imagen..."
 
+#: src/routes/auth/device.tsx:398
+msgid "Checking the code…"
+msgstr ""
+
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:43
 msgid "Checking..."
 msgstr "Comprobando..."
@@ -6209,6 +6231,8 @@ msgid "Cloudflare Workers AI models run wherever Cloudflare has capacity, so any
 msgstr "Los modelos de Cloudflare Workers AI se ejecutan donde Cloudflare tenga capacidad, así que cualquier regla de región los oculta."
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:40
+#: src/features/auth/components/device-code-parts.tsx:18
+#: src/features/auth/components/device-code-parts.tsx:50
 #: src/features/canvas/canvas-panel.tsx:754
 #: src/features/chat/thread/composer-search-mode.tsx:56
 #: src/features/code/components/code-workspace.tsx:219
@@ -6217,6 +6241,7 @@ msgstr "Los modelos de Cloudflare Workers AI se ejecutan donde Cloudflare tenga 
 #: src/features/workflow/types/index.ts:451
 #: src/features/workflow/types/index.ts:455
 #: src/routes/_shortcut/code/index.tsx:16
+#: src/routes/auth/device.tsx:214
 msgid "Code"
 msgstr "Código"
 
@@ -6817,6 +6842,7 @@ msgstr "Perspectiva comprimida"
 msgid "Compressing context..."
 msgstr "Comprimiendo el contexto..."
 
+#: src/features/auth/components/device-code-parts.tsx:46
 #: src/features/settings/components/chat/bots-settings.tsx:140
 msgid "Computer"
 msgstr ""
@@ -6970,7 +6996,7 @@ msgstr "Conecta un nodo de audio/archivo como entrada"
 msgid "Connect an image node as input"
 msgstr "Conecta un nodo de imagen como entrada"
 
-#: src/features/devices/components/devices-settings.tsx:373
+#: src/features/devices/components/devices-settings.tsx:374
 msgid "Connect and add"
 msgstr ""
 
@@ -7123,7 +7149,7 @@ msgstr "Error de conexión. Comprueba tu conexión a internet e inténtalo de nu
 msgid "Connection failed"
 msgstr "Error de conexión"
 
-#: src/features/devices/components/devices-settings.tsx:189
+#: src/features/devices/components/devices-settings.tsx:190
 msgid "Connection lost"
 msgstr ""
 
@@ -7318,6 +7344,7 @@ msgstr "Generación contextual"
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
 #: src/features/chat/host/host-composer.tsx:186
 #: src/features/skills/components/skill-builder-dialog.tsx:328
+#: src/routes/auth/device.tsx:89
 msgid "Continue"
 msgstr "Continuar"
 
@@ -7712,7 +7739,7 @@ msgstr "Aplicaciones sensibles al coste que necesitan la fiabilidad de la IA de 
 msgid "Costa Rica"
 msgstr "Costa Rica"
 
-#: src/features/devices/components/devices-settings.tsx:334
+#: src/features/devices/components/devices-settings.tsx:335
 msgid "Could not add the server."
 msgstr ""
 
@@ -7733,12 +7760,12 @@ msgid "Could not apply the changes"
 msgstr "No se pudieron aplicar los cambios"
 
 #. placeholder {0}: failed.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:283
+#: src/features/chat/thread/use-ask-user-attachments.ts:186
 msgid "Could not attach {0}. The other files were attached; try those again."
 msgstr "No se pudo adjuntar {0}. Los demás archivos se adjuntaron; inténtalo de nuevo con esos."
 
 #. placeholder {0}: failed.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:284
+#: src/features/chat/thread/use-ask-user-attachments.ts:187
 msgid "Could not attach {0}. Try those again."
 msgstr "No se pudo adjuntar {0}. Inténtalo de nuevo."
 
@@ -7919,7 +7946,7 @@ msgstr "No se pudo abrir como página"
 msgid "Could not open the pull request."
 msgstr "No se pudo abrir la pull request."
 
-#: src/features/devices/components/devices-settings.tsx:438
+#: src/features/devices/components/devices-settings.tsx:439
 msgid "Could not pair this computer. Try again."
 msgstr "No se pudo vincular este ordenador. Inténtalo de nuevo."
 
@@ -7962,7 +7989,7 @@ msgstr "No se pudo leer ese chat. Si está bloqueado, desbloquéalo primero."
 msgid "Could not refine the draft. Try again."
 msgstr "No se pudo refinar el borrador. Inténtalo de nuevo."
 
-#: src/features/devices/components/devices-settings.tsx:219
+#: src/features/devices/components/devices-settings.tsx:220
 msgid "Could not remove the device."
 msgstr "No se pudo eliminar el dispositivo."
 
@@ -8024,7 +8051,7 @@ msgstr ""
 msgid "Could not send your answer."
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:147
+#: src/features/chat/thread/ask-user-prompt.tsx:97
 #: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "No se pudo enviar tu respuesta. Inténtalo de nuevo."
@@ -9429,7 +9456,7 @@ msgstr "Tareas exigentes que requieren el modelo GLM de vanguardia más potente 
 msgid "Demanding tasks where maximum AI capability and refined reasoning matter most"
 msgstr "Tareas exigentes en las que la máxima capacidad de IA y un razonamiento refinado son lo más importante"
 
-#: src/features/devices/components/devices-settings.tsx:256
+#: src/features/devices/components/devices-settings.tsx:257
 msgid "Denied"
 msgstr "Denegado"
 
@@ -9440,6 +9467,14 @@ msgstr "Denegado: se continúa sin ella"
 #: src/features/devices/components/device-tool-call.tsx:198
 msgid "Denied on {device}"
 msgstr "Denegado en {device}"
+
+#: src/routes/auth/device.tsx:130
+msgid "Denied. The command line was not signed in. You can close this tab."
+msgstr ""
+
+#: src/routes/auth/device.tsx:136
+msgid "Denied. The machine was not paired. You can close this tab."
+msgstr ""
 
 #: src/features/chat/core/utils/language-utilities.ts:346
 msgid "Denmark"
@@ -9454,6 +9489,8 @@ msgid "Density updated"
 msgstr ""
 
 #: src/features/chat/thread/tool-approval.tsx:125
+#: src/routes/auth/device.tsx:236
+#: src/routes/auth/device.tsx:276
 msgid "Deny"
 msgstr "Denegar"
 
@@ -9465,6 +9502,10 @@ msgstr "Denegar {tool}"
 #: src/features/settings/components/chat/model-filter-settings.tsx:397
 msgid "Deny Data Collection"
 msgstr "Denegar la recopilación de datos"
+
+#: src/routes/auth/device.tsx:118
+msgid "Denying…"
+msgstr ""
 
 #: src/features/chat/thread/widgets/flight-widget.tsx:142
 msgid "Depart:"
@@ -9719,7 +9760,7 @@ msgstr "Desarrolladores que necesitan buenas capacidades de programación y de u
 msgid "Development"
 msgstr "Desarrollo"
 
-#: src/features/devices/components/devices-settings.tsx:513
+#: src/features/devices/components/devices-settings.tsx:514
 msgid "Device activity"
 msgstr "Actividad de dispositivos"
 
@@ -9727,11 +9768,11 @@ msgstr "Actividad de dispositivos"
 msgid "Device name"
 msgstr "Nombre del dispositivo"
 
-#: src/features/devices/components/devices-settings.tsx:222
+#: src/features/devices/components/devices-settings.tsx:223
 msgid "Device removed"
 msgstr "Dispositivo eliminado"
 
-#: src/features/devices/components/devices-settings.tsx:448
+#: src/features/devices/components/devices-settings.tsx:449
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "Dispositivos"
@@ -9872,10 +9913,10 @@ msgstr "Clave pública de Discord"
 
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:54
 #: src/features/changelog/components/changelog-card.tsx:59
-#: src/features/chat/thread/ask-user-prompt.tsx:445
+#: src/features/chat/thread/ask-user-prompt.tsx:270
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
-#: src/features/devices/components/devices-settings.tsx:202
+#: src/features/devices/components/devices-settings.tsx:203
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "Descartar"
@@ -9908,7 +9949,7 @@ msgstr "Descartar secreto del webhook"
 msgid "Dismissed"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:301
+#: src/features/chat/thread/ask-user-prompt.tsx:132
 msgid "Dismissed — continuing without an answer"
 msgstr "Descartada — continuando sin respuesta"
 
@@ -10022,7 +10063,7 @@ msgstr "¿No tienes una cuenta?"
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:104
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
-#: src/features/devices/components/devices-settings.tsx:255
+#: src/features/devices/components/devices-settings.tsx:256
 #: src/features/skills/components/bundle-import-dialog.tsx:248
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
 #: src/features/sub-agents/components/worker-run-log.tsx:28
@@ -11132,6 +11173,10 @@ msgstr ""
 msgid "enter"
 msgstr ""
 
+#: src/routes/auth/device.tsx:108
+msgid "Enter a different code"
+msgstr ""
+
 #: src/features/local-models/components/ollama-model-manager.tsx:106
 msgid "Enter a model name such as llama3.2 or qwen3:8b"
 msgstr "Introduce un nombre de modelo como llama3.2 o qwen3:8b"
@@ -11218,11 +11263,15 @@ msgstr "Introduce texto..."
 msgid "Enter the API key"
 msgstr "Introduce la clave de API"
 
+#: src/features/auth/components/device-code-parts.tsx:16
+msgid "Enter the code that `neore login --device` shows in your terminal, then choose Continue."
+msgstr ""
+
 #: src/features/settings/components/chat/custom-providers-settings.tsx:113
 msgid "Enter the endpoint URL first"
 msgstr "Introduce primero la URL del endpoint"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:411
+#: src/features/chat/thread/ask-user-prompt.tsx:236
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "Intro para enviar, Mayús+Intro para una nueva línea."
 
@@ -11858,7 +11907,7 @@ msgid "expired"
 msgstr "caducado"
 
 #: src/features/chat/thread-list/thread-node.tsx:308
-#: src/features/devices/components/devices-settings.tsx:257
+#: src/features/devices/components/devices-settings.tsx:258
 #: src/features/settings/connectors/connector-card.tsx:76
 msgid "Expired"
 msgstr "Caducado"
@@ -12116,7 +12165,7 @@ msgstr "fallido"
 #: src/features/chat/thread-list/thread-status-icon.tsx:88
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/develop/components/checks-tab.tsx:77
-#: src/features/devices/components/devices-settings.tsx:258
+#: src/features/devices/components/devices-settings.tsx:259
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:175
@@ -13360,7 +13409,7 @@ msgstr "El nombre del archivo no puede estar vacío"
 msgid "Files"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:427
+#: src/features/chat/thread/ask-user-prompt.tsx:252
 msgid "Files cannot be attached in a locked chat."
 msgstr "No se pueden adjuntar archivos en un chat bloqueado."
 
@@ -15122,6 +15171,10 @@ msgstr "Título"
 msgid "Heading and bullets"
 msgstr "Título y viñetas"
 
+#: src/features/devices/components/devices-settings.tsx:188
+msgid "Headless machine"
+msgstr ""
+
 #: src/routes/admin/gateway/index.tsx:36
 msgid "Healthy"
 msgstr "Correcto"
@@ -16824,7 +16877,7 @@ msgstr ""
 msgid "Kenya"
 msgstr "Kenia"
 
-#: src/features/devices/components/devices-settings.tsx:367
+#: src/features/devices/components/devices-settings.tsx:368
 msgid "Key file (optional, absolute path)"
 msgstr ""
 
@@ -17417,11 +17470,11 @@ msgstr ""
 msgid "Let replies use tools"
 msgstr "Permitir herramientas en las respuestas"
 
-#: src/features/devices/components/devices-settings.tsx:447
+#: src/features/devices/components/devices-settings.tsx:448
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Permite que el agente use archivos, un terminal y servidores MCP locales en tu propio ordenador mediante la aplicación de escritorio de Neore. Cada acción te pide permiso primero en ese ordenador, y nada se ejecuta desde chats compartidos ni tareas en segundo plano."
 
-#: src/features/devices/components/devices-settings.tsx:505
+#: src/features/devices/components/devices-settings.tsx:506
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr ""
 
@@ -17941,6 +17994,7 @@ msgstr "Cargando..."
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
+#: src/routes/auth/device.tsx:361
 #: src/routes/auth/extension.tsx:66
 msgid "Loading…"
 msgstr "Cargando…"
@@ -18206,6 +18260,10 @@ msgstr "Macedonio (Macedonia del Norte)"
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:97
 msgid "Mach-O binary"
 msgstr "Binario Mach-O"
+
+#: src/routes/auth/device.tsx:200
+msgid "Machine"
+msgstr ""
 
 #: src/features/local-models/components/local-setup-guide.tsx:76
 msgid "macOS"
@@ -19669,11 +19727,11 @@ msgstr "Silenciar"
 msgid "my data"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:412
+#: src/features/devices/components/devices-settings.tsx:413
 msgid "My Linux computer"
 msgstr "Mi ordenador Linux"
 
-#: src/features/devices/components/devices-settings.tsx:412
+#: src/features/devices/components/devices-settings.tsx:413
 msgid "My Mac"
 msgstr "Mi Mac"
 
@@ -19685,7 +19743,7 @@ msgstr "Mi servidor MCP"
 msgid "My skills"
 msgstr "Mis habilidades"
 
-#: src/features/devices/components/devices-settings.tsx:412
+#: src/features/devices/components/devices-settings.tsx:413
 msgid "My Windows PC"
 msgstr "Mi PC con Windows"
 
@@ -19711,7 +19769,7 @@ msgstr ""
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:478
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:351
+#: src/features/devices/components/devices-settings.tsx:352
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
@@ -20527,7 +20585,7 @@ msgstr "Sin descripción"
 msgid "No description provided."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:499
+#: src/features/devices/components/devices-settings.tsx:500
 msgid "No devices paired."
 msgstr "No hay dispositivos vinculados."
 
@@ -21166,7 +21224,7 @@ msgid "Not set"
 msgstr "Sin asignar"
 
 #. placeholder {0}: unreadFiles.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:348
+#: src/features/chat/thread/ask-user-prompt.tsx:179
 msgid "Not shown to this model: {0}"
 msgstr "Este modelo no las vio: {0}"
 
@@ -21198,7 +21256,7 @@ msgstr "Nota: los módulos se aplican por conversación, no por mensaje. Activa 
 msgid "Nothing found"
 msgstr "No se encontró nada"
 
-#: src/features/devices/components/devices-settings.tsx:250
+#: src/features/devices/components/devices-settings.tsx:251
 msgid "Nothing has run on a device yet."
 msgstr "Todavía no se ha ejecutado nada en un dispositivo."
 
@@ -21347,7 +21405,7 @@ msgstr "Oficial"
 
 #: src/features/code/components/code-shell.tsx:81
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:188
+#: src/features/devices/components/devices-settings.tsx:189
 #: src/routes/admin/gateway/index.tsx:37
 msgid "Offline"
 msgstr "Sin conexión"
@@ -21550,7 +21608,7 @@ msgstr "La contraseña de un solo uso es obligatoria"
 
 #: src/features/code/components/code-shell.tsx:81
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:188
+#: src/features/devices/components/devices-settings.tsx:189
 msgid "Online"
 msgstr "En línea"
 
@@ -21562,6 +21620,14 @@ msgstr "Solo se pueden comparar modelos de {0}. Borra la selección para cambiar
 #: src/features/marketing/data/models-data.ts:1208
 msgid "Only 3B activated per token for efficiency"
 msgstr "Solo 3B activados por token para mayor eficiencia"
+
+#: src/features/auth/components/device-code-parts.tsx:55
+msgid "Only continue if you started this just now by running `neore login --device`, and the code above matches the one in your terminal."
+msgstr ""
+
+#: src/routes/auth/device.tsx:218
+msgid "Only continue if you started this just now by running `neore-host pair` on a machine you own, and the code above matches the one it shows. The machine tells you where it actually stored the secret when it is done."
+msgstr ""
 
 #: src/features/evals/components/run-comparison.tsx:54
 msgid "Only in one run"
@@ -21575,7 +21641,7 @@ msgstr "Solo los propietarios de la organización pueden gestionar la facturaci�
 msgid "Only participants you @mention answer."
 msgstr "Solo responden los participantes que @menciones."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:193
+#: src/features/chat/thread/use-ask-user-attachments.ts:96
 msgid "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
 msgstr "Solo imágenes PNG, JPEG, WEBP o GIF, y PDF de hasta 10 MB; 20 MB en total y cuatro como máximo."
 
@@ -21773,7 +21839,7 @@ msgstr ""
 msgid "Open Model Picker"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:452
+#: src/features/devices/components/devices-settings.tsx:453
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "Abre Neore en la aplicación de escritorio para vincular este ordenador. Los dispositivos que ya vinculaste aparecen abajo."
 
@@ -22351,7 +22417,7 @@ msgstr ""
 msgid "Or from a terminal:"
 msgstr "O desde una terminal:"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:377
+#: src/features/chat/thread/ask-user-prompt.tsx:208
 msgid "Or type your own answer…"
 msgstr "O escribe tu propia respuesta…"
 
@@ -22671,15 +22737,19 @@ msgstr "Pinta sobre las áreas que quieres editar. Las regiones blancas se regen
 msgid "Pair one in Settings"
 msgstr ""
 
+#: src/routes/auth/device.tsx:194
+msgid "Pair this machine?"
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:190
 msgid "Paired"
 msgstr "Vinculado"
 
-#: src/features/devices/components/devices-settings.tsx:485
+#: src/features/devices/components/devices-settings.tsx:486
 msgid "Paired devices"
 msgstr "Dispositivos vinculados"
 
-#: src/features/devices/components/devices-settings.tsx:428
+#: src/features/devices/components/devices-settings.tsx:429
 msgid "Pairing was cancelled on this computer."
 msgstr "La vinculación se canceló en este ordenador."
 
@@ -23406,7 +23476,7 @@ msgstr "Estética pulida de Hollywood"
 msgid "Popular"
 msgstr "Popular"
 
-#: src/features/devices/components/devices-settings.tsx:363
+#: src/features/devices/components/devices-settings.tsx:364
 msgid "Port"
 msgstr ""
 
@@ -23592,7 +23662,7 @@ msgstr "Razonamiento y seguimiento de instrucciones de nivel premium"
 msgid "Premium-tier reasoning transparency"
 msgstr "Transparencia de razonamiento de nivel premium"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:305
+#: src/features/chat/thread/ask-user-prompt.tsx:136
 msgid "Preparing a question…"
 msgstr "Preparando una pregunta…"
 
@@ -24957,7 +25027,7 @@ msgstr "Volver a conectar"
 msgid "Reconnect {0}"
 msgstr "Volver a conectar {0}"
 
-#: src/features/devices/components/devices-settings.tsx:190
+#: src/features/devices/components/devices-settings.tsx:191
 msgid "Reconnecting"
 msgstr ""
 
@@ -25314,8 +25384,8 @@ msgstr "Recordarme"
 #: src/features/chat/thread/composer-input.tsx:341
 #: src/features/chat/thread/composer-input.tsx:395
 #: src/features/chat/thread/composer-input.tsx:404
-#: src/features/devices/components/devices-settings.tsx:206
-#: src/features/devices/components/devices-settings.tsx:212
+#: src/features/devices/components/devices-settings.tsx:207
+#: src/features/devices/components/devices-settings.tsx:213
 #: src/features/projects/components/project-form-dialog.tsx:263
 #: src/features/projects/components/project-form-dialog.tsx:304
 #: src/features/settings/components/chat/custom-providers-settings.tsx:652
@@ -25332,7 +25402,7 @@ msgid "Remove \"{0}\"?"
 msgstr "¿Eliminar \"{0}\"?"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:229
+#: src/features/devices/components/devices-settings.tsx:230
 msgid "Remove “{0}”?"
 msgstr "¿Eliminar «{0}»?"
 
@@ -25340,7 +25410,7 @@ msgstr "¿Eliminar «{0}»?"
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
 #: src/features/chat/group/group-participant-bar.tsx:210
-#: src/features/chat/thread/ask-user-prompt.tsx:393
+#: src/features/chat/thread/ask-user-prompt.tsx:224
 #: src/features/prompts/components/thread-variables-config.tsx:232
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
@@ -27067,6 +27137,10 @@ msgstr ""
 msgid "Secret access key"
 msgstr "Clave de acceso secreta"
 
+#: src/routes/auth/device.tsx:208
+msgid "Secret kept in"
+msgstr ""
+
 #: src/features/settings/components/chat/trigger-settings.tsx:623
 msgid "Secret rotated"
 msgstr ""
@@ -27376,7 +27450,7 @@ msgstr "Envía un mensaje para empezar"
 msgid "Send a new verification link"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:441
+#: src/features/chat/thread/ask-user-prompt.tsx:266
 msgid "Send answer"
 msgstr "Enviar respuesta"
 
@@ -27456,7 +27530,7 @@ msgstr "Enviando tu mensaje y esperando la respuesta"
 msgid "Sending…"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:259
+#: src/features/devices/components/devices-settings.tsx:260
 msgid "Sent"
 msgstr "Enviado"
 
@@ -27508,7 +27582,7 @@ msgstr "Serbio (Serbia)"
 msgid "Serif"
 msgstr "Serif"
 
-#: src/features/devices/components/devices-settings.tsx:331
+#: src/features/devices/components/devices-settings.tsx:332
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr ""
 
@@ -27548,7 +27622,7 @@ msgstr "Base de datos Postgres serverless con ramificación"
 msgid "servers"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:506
+#: src/features/devices/components/devices-settings.tsx:507
 msgid "Servers over SSH"
 msgstr ""
 
@@ -27699,7 +27773,7 @@ msgstr "compartida"
 msgid "Shared conversation"
 msgstr "Conversación compartida"
 
-#: src/features/devices/components/devices-settings.tsx:480
+#: src/features/devices/components/devices-settings.tsx:481
 msgid "Shared folders and local servers…"
 msgstr "Carpetas compartidas y servidores locales…"
 
@@ -27964,6 +28038,7 @@ msgstr "Barra lateral derecha"
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/marketing/components/landing-page.tsx:1058
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
+#: src/routes/auth/device.tsx:373
 #: src/routes/auth/extension.tsx:78
 msgid "Sign in"
 msgstr "Iniciar sesión"
@@ -27986,6 +28061,15 @@ msgstr ""
 #: src/features/settings/components/chat/mcp-settings.tsx:486
 msgid "Sign in on another site?"
 msgstr "¿Iniciar sesión en otro sitio?"
+
+#: src/routes/auth/device.tsx:87
+#: src/routes/auth/device.tsx:413
+msgid "Sign in the command line"
+msgstr ""
+
+#: src/routes/auth/device.tsx:254
+msgid "Sign in the command line?"
+msgstr ""
 
 #: src/features/develop/components/failure-notice.tsx:18
 msgid "Sign in to {label} again"
@@ -28089,6 +28173,10 @@ msgstr "Regístrate para desbloquear todos los modelos"
 #: src/features/settings/components/chat/mcp/server-list.tsx:98
 msgid "Sign-in expired"
 msgstr "La sesión ha caducado"
+
+#: src/features/auth/components/device-code-parts.tsx:44
+msgid "Sign-in request"
+msgstr ""
 
 #: src/features/layout/components/nav-user.tsx:292
 msgid "Sign-out failed. Please try again."
@@ -29729,7 +29817,7 @@ msgstr "Sugiere ideas de videos para un canal de tecnología en YouTube"
 msgid "Suggested"
 msgstr "Sugeridos"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:353
+#: src/features/chat/thread/ask-user-prompt.tsx:184
 #: src/features/skills/components/skill-builder-dialog.tsx:235
 msgid "Suggested answers"
 msgstr "Respuestas sugeridas"
@@ -29957,6 +30045,10 @@ msgstr "Sintetizador (combina las respuestas)"
 #: src/features/chat/group/group-mode-options.tsx:44
 msgid "Synthesizer (weighs both sides)"
 msgstr "Sintetizador (sopesa ambas partes)"
+
+#: src/routes/auth/device.tsx:204
+msgid "System"
+msgstr ""
 
 #: src/features/settings/components/chat/default-models-settings.tsx:81
 #: src/features/settings/components/chat/default-models-settings.tsx:119
@@ -30580,6 +30672,10 @@ msgstr ""
 msgid "That computer is not online."
 msgstr ""
 
+#: src/routes/auth/device.tsx:183
+msgid "That did not go through. Try again."
+msgstr ""
+
 #: src/features/develop/components/guide-tab.tsx:145
 msgid "That did not work. Try again."
 msgstr ""
@@ -30636,7 +30732,7 @@ msgstr ""
 msgid "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 msgstr "La EncodingAESKey de 43 caracteres (el cifrado de mensajes debe estar en modo seguro)"
 
-#: src/features/devices/components/devices-settings.tsx:213
+#: src/features/devices/components/devices-settings.tsx:214
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "El agente ya no podrá pedirle nada a este dispositivo. Su registro de actividad se conserva hasta que caduque."
 
@@ -30685,7 +30781,7 @@ msgstr "El archivo contiene una ruta de archivo no segura."
 msgid "The archive holds too many files."
 msgstr "El archivo contiene demasiados archivos."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:327
+#: src/features/chat/thread/ask-user-prompt.tsx:158
 msgid "The assistant has a question"
 msgstr "El asistente tiene una pregunta"
 
@@ -30733,9 +30829,17 @@ msgstr "El cambio es demasiado grande para mostrarlo completo."
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "El agente de chat trabaja la tarea con sus herramientas y, opcionalmente, sigue una habilidad."
 
+#: src/lib/auth/device-problem-messages.ts:14
+msgid "The code could not be checked right now. Try again in a moment."
+msgstr ""
+
 #: src/features/coding-agents/components/coding-agent-tool-view.tsx:41
 msgid "The coding agent could not start."
 msgstr "El agente de programación no pudo iniciarse."
+
+#: src/routes/auth/device.tsx:256
+msgid "The command line on the computer below will be signed in as {email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings."
+msgstr ""
 
 #: src/features/evals/components/model-comparison.tsx:62
 msgid "The comparison could not be loaded."
@@ -30985,6 +31089,10 @@ msgstr "El servidor local no respondió a tiempo. ¿Todavía está cargando el m
 msgid "The local server does not have this model. Pull it first (Ollama: ollama pull <model>) or pick another one."
 msgstr "El servidor local no tiene este modelo. Descárgalo primero (Ollama: ollama pull <model>) o elige otro."
 
+#: src/routes/auth/device.tsx:196
+msgid "The machine below will be paired as a device of {email}. It receives its own device secret, once, directly from the server; this page never sees it. Revoke it any time in Settings, Devices."
+msgstr ""
+
 #: src/features/skills/components/skill-builder-review.tsx:257
 msgid "The MCP registry could not be reached, so server suggestions may be missing."
 msgstr "No se pudo acceder al registro MCP, así que pueden faltar sugerencias de servidores."
@@ -31038,6 +31146,10 @@ msgstr "La app de Neore en este dispositivo iniciará sesión como {0}. Continú
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:117
 msgid "The new passcode needs {MIN_PASSCODE_LENGTH} characters, typed twice the same."
+msgstr ""
+
+#: src/routes/auth/device.tsx:210
+msgid "The operating system keychain"
 msgstr ""
 
 #: src/features/pages/components/page-agent-dialog.tsx:64
@@ -31406,6 +31518,22 @@ msgstr ""
 #~ msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
 #~ msgstr ""
 
+#: src/routes/auth/device.tsx:159
+msgid "This code has already been answered."
+msgstr ""
+
+#: src/lib/auth/device-problem-messages.ts:10
+msgid "This code has expired. Run `neore login --device` or `neore-host pair` again, whichever you started, to get a new one."
+msgstr ""
+
+#: src/lib/auth/device-problem-messages.ts:11
+msgid "This code is not valid, or it was already used. Run `neore login --device` or `neore-host pair` again, whichever you started, to get a new one."
+msgstr ""
+
+#: src/routes/auth/device.tsx:151
+msgid "This code was opened with a different account. Sign in with that account, or run `neore login --device` again."
+msgstr ""
+
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:294
 msgid "This collection is shared with you by a member of your organization. You can attach it to chats and projects; only its owner can change its files."
 msgstr "Un miembro de tu organización ha compartido esta colección contigo. Puedes adjuntarla a chats y proyectos; solo su propietario puede cambiar sus archivos."
@@ -31423,20 +31551,20 @@ msgstr "Este ordenador"
 msgid "This computer did not resume its own session, so the conversation was handed over"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:457
+#: src/features/devices/components/devices-settings.tsx:458
 msgid "This computer is not paired yet."
 msgstr "Este ordenador aún no está vinculado."
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:473
+#: src/features/devices/components/devices-settings.tsx:474
 msgid "This computer is paired as “{0}”."
 msgstr "Este ordenador está vinculado como «{0}»."
 
-#: src/features/devices/components/devices-settings.tsx:457
+#: src/features/devices/components/devices-settings.tsx:458
 msgid "This computer is paired with another account."
 msgstr "Este ordenador está vinculado a otra cuenta."
 
-#: src/features/devices/components/devices-settings.tsx:435
+#: src/features/devices/components/devices-settings.tsx:436
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "Este ordenador está vinculado. Elige en la aplicación de escritorio qué carpetas compartir."
 
@@ -31738,6 +31866,10 @@ msgstr ""
 #: src/features/settings/components/chat/mcp/server-form.tsx:178
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
 msgstr "La entrada del registro de este servidor pide los valores de abajo. Completan la URL y los encabezados."
+
+#: src/lib/auth/device-problem-messages.ts:13
+msgid "This session cannot use a code: a guest session, or an admin impersonating someone, cannot approve one. Sign in to your own account, then open the code again."
+msgstr ""
 
 #: src/features/chat/host/host-composer.tsx:171
 #: src/features/chat/host/host-send-errors.ts:19
@@ -32185,7 +32317,7 @@ msgid "too large"
 msgstr "demasiado grande"
 
 #. placeholder {0}: tooLarge.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:277
+#: src/features/chat/thread/use-ask-user-attachments.ts:180
 msgid "Too large to attach: {0}. Reduce the file and attach it again."
 msgstr "Demasiado grande para adjuntar: {0}. Reduce el archivo y adjúntalo de nuevo."
 
@@ -32562,6 +32694,8 @@ msgstr "Prueba a ajustar los términos de búsqueda."
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/home/components/home-page.tsx:144
+#: src/routes/auth/device.tsx:104
+#: src/routes/auth/device.tsx:352
 msgid "Try again"
 msgstr "Reintentar"
 
@@ -32737,7 +32871,7 @@ msgstr ""
 msgid "Type to search"
 msgstr "Escribe para buscar"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:377
+#: src/features/chat/thread/ask-user-prompt.tsx:208
 msgid "Type your answer…"
 msgstr "Escribe tu respuesta…"
 
@@ -32965,6 +33099,12 @@ msgstr "Un enfoque único del modelado del lenguaje"
 #: src/features/settings/components/chat/model-filter-settings.tsx:29
 msgid "United States"
 msgstr "Estados Unidos"
+
+#: src/features/auth/components/device-code-parts.tsx:47
+#: src/routes/auth/device.tsx:201
+#: src/routes/auth/device.tsx:205
+msgid "unknown"
+msgstr ""
 
 #: src/features/admin/components/user-sessions-dialog.tsx:74
 #: src/features/admin/components/user-sessions-dialog.tsx:118
@@ -33562,7 +33702,7 @@ msgstr "Usar los modelos permitidos de la organización"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "Usa estos atajos de teclado para navegar e interactuar con la tabla de datos de forma más eficiente."
 
-#: src/features/devices/components/devices-settings.tsx:467
+#: src/features/devices/components/devices-settings.tsx:468
 msgid "Use this computer for agent tools"
 msgstr "Usar este ordenador para las herramientas del agente"
 
@@ -33602,7 +33742,7 @@ msgstr "usuario"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:359
+#: src/features/devices/components/devices-settings.tsx:360
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/nav-user.tsx:340
 #: src/features/layout/components/sidebar-shortcut.tsx:212
@@ -34467,7 +34607,7 @@ msgstr ""
 msgid "Waiting for {device} to pick this up…"
 msgstr "Esperando a que {device} lo reciba…"
 
-#: src/features/devices/components/devices-settings.tsx:254
+#: src/features/devices/components/devices-settings.tsx:255
 msgid "Waiting for approval"
 msgstr "Esperando aprobación"
 
@@ -34487,7 +34627,7 @@ msgstr ""
 msgid "Waiting for the owner"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:307
+#: src/features/chat/thread/ask-user-prompt.tsx:138
 msgid "Waiting for the owner to answer"
 msgstr "Esperando la respuesta del propietario"
 
@@ -34508,7 +34648,7 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
-#: src/features/chat/thread/ask-user-prompt.tsx:307
+#: src/features/chat/thread/ask-user-prompt.tsx:138
 msgid "Waiting for your answer"
 msgstr "Esperando tu respuesta"
 
@@ -34543,6 +34683,10 @@ msgstr ""
 #: src/features/develop/components/watched-repositories.tsx:144
 #: src/features/develop/components/watched-repositories.tsx:145
 msgid "Watched repositories"
+msgstr ""
+
+#: src/routes/auth/device.tsx:343
+msgid "We could not check that you are signed in. Try again in a moment."
 msgstr ""
 
 #: src/features/chat/core/context/chat-context.tsx:709
@@ -34789,7 +34933,7 @@ msgstr "¿Cómo debería llamarte la IA?"
 msgid "What should the guide pay attention to?"
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:513
+#: src/features/devices/components/devices-settings.tsx:514
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "Lo que el agente pidió a tus dispositivos en los últimos 30 días."
 
@@ -34959,7 +35103,7 @@ msgstr "Con correo/contraseña"
 msgid "With this, it fires when the text starts to contain the phrase, not on every change."
 msgstr ""
 
-#: src/features/devices/components/devices-settings.tsx:369
+#: src/features/devices/components/devices-settings.tsx:370
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr ""
 
@@ -35032,6 +35176,8 @@ msgstr ""
 #: src/features/chat/thread/streaming-placeholder.tsx:631
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
+#: src/routes/auth/device.tsx:245
+#: src/routes/auth/device.tsx:285
 msgid "Working…"
 msgstr "Trabajando…"
 
@@ -35247,6 +35393,10 @@ msgstr "Estás añadiendo documentos demasiado rápido. Espera un momento e int�
 msgid "You are browsing as a guest. Sign in with your account to connect the extension."
 msgstr "Estás navegando como invitado. Inicia sesión con tu cuenta para conectar la extensión."
 
+#: src/routes/auth/device.tsx:371
+msgid "You are browsing as a guest. Sign in with your account to sign in the command line."
+msgstr ""
+
 #: src/features/admin/components/impersonation-banner.tsx:55
 msgid "You are currently impersonating a user"
 msgstr "Estás suplantando a un usuario"
@@ -35446,6 +35596,10 @@ msgstr ""
 msgid "Your {label} sign-in has expired. Connect it again."
 msgstr ""
 
+#: src/lib/auth/device-problem-messages.ts:12
+msgid "Your account already has the maximum number of API keys, so the command line was not signed in. Revoke one in Settings, then run `neore login --device` again."
+msgstr ""
+
 #: src/features/auth/components/settings/account/delete-account-card.tsx:56
 msgid "Your account and all associated data are being deleted. This cannot be cancelled."
 msgstr "Tu cuenta y todos los datos asociados se están eliminando. No se puede cancelar."
@@ -35454,7 +35608,7 @@ msgstr "Tu cuenta y todos los datos asociados se están eliminando. No se puede 
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "Tu espacio de trabajo de IA <0>empieza aquí.</0>"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:369
+#: src/features/chat/thread/ask-user-prompt.tsx:200
 msgid "Your answer"
 msgstr "Tu respuesta"
 
@@ -35462,7 +35616,7 @@ msgstr "Tu respuesta"
 msgid "Your answer in Neore has finished."
 msgstr "Tu respuesta en Neore ha terminado."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:337
+#: src/features/chat/thread/ask-user-prompt.tsx:168
 msgid "Your answer:"
 msgstr "Tu respuesta:"
 
