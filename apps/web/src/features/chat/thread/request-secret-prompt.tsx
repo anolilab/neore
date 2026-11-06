@@ -416,7 +416,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                                         aria-describedby={describedBy || undefined}
                                         aria-invalid={tooLong[index] || !!formatMessage || saveError !== null || loadFailureShown || undefined}
                                         aria-required="true"
-                                        autoCapitalize="off"
+                                        autoCapitalize="none"
                                         autoComplete="new-password"
                                         autoCorrect="off"
                                         id={inputId}
@@ -433,6 +433,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                                     <Button
                                         aria-label={shown ? t`Hide ${fieldLabel}` : t`Show ${fieldLabel}`}
                                         aria-pressed={shown}
+                                        className="max-sm:size-11"
                                         onClick={() => toggleReveal(index)}
                                         size="icon-sm"
                                         type="button"

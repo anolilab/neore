@@ -151,15 +151,33 @@ describe("the secret request card", () => {
         answer.mockClear();
     });
 
-    it("keeps the keyboard from capitalising a revealed secret, which would change its first letter", () => {
+    it("keeps the keyboard and autofill from changing a secret, hidden or revealed", () => {
         mountCard({ kind: "provider_key", provider: "openai" });
 
         const input = screen.getByPlaceholderText("Paste it here — it is not shown in the chat");
+        const keyboardAttributes = () => {
+            return {
+                autocapitalize: input.getAttribute("autocapitalize"),
+                autocomplete: input.getAttribute("autocomplete"),
+                autocorrect: input.getAttribute("autocorrect"),
+                spellcheck: input.getAttribute("spellcheck"),
+            };
+        };
+        const guarded = { autocapitalize: "none", autocomplete: "new-password", autocorrect: "off", spellcheck: "false" };
+
+        expect(input.getAttribute("type")).toBe("password");
+        expect(keyboardAttributes()).toStrictEqual(guarded);
 
         fireEvent.click(screen.getByRole("button", { name: SHOW_REVEAL }));
 
         expect(input.getAttribute("type")).toBe("text");
-        expect(input.getAttribute("autocapitalize")).toBe("off");
+        expect(keyboardAttributes()).toStrictEqual(guarded);
+    });
+
+    it("gives the reveal control a 44 by 44 pixel touch target on phones", () => {
+        mountCard({ kind: "provider_key", provider: "openai" });
+
+        expect(screen.getByRole("button", { name: SHOW_REVEAL }).className).toContain("max-sm:size-11");
     });
 
     it("keeps the value out of the mutation cache once the answer is sent", async () => {
