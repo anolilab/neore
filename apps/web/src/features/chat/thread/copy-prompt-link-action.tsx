@@ -20,6 +20,21 @@ import type { UIMessage } from "@/lib/agent";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError, showSuccess, showWarning } from "@/lib/toast";
 
+/**
+ * Writes the link `link` produces. Where the browser has ClipboardItem the write starts at once and carries the pending
+ * text: a browser that ties a clipboard write to the click (Safari) refuses one that waits on a network answer first. Where
+ * it does not, the link is awaited and written as text.
+ */
+const writeLink = (link: () => Promise<string>): Promise<void> => {
+    if (typeof ClipboardItem === "function" && typeof navigator.clipboard?.write === "function") {
+        const text = link().then((value) => new Blob([value], { type: "text/plain" }));
+
+        return navigator.clipboard.write([new ClipboardItem({ "text/plain": text })]);
+    }
+
+    return link().then((value) => navigator.clipboard.writeText(value));
+};
+
 const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
     const { t } = useLingui();
     // Read from the chat's thread context, not a hook of its own: a message row renders without the auth provider.
@@ -27,16 +42,14 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     const botId = thread?.botId ?? null;
+    const isBotChat = typeof botId === "string" && botId.length > 0;
 
-    // A bot chat runs on the bot's current model, which the composer shows (`composer-model-selector.tsx`); the thread
-    // may still store an older one. The bot list is read on the click, not per message row, so a long thread does not
-    // subscribe every row to it.
-    const liveBotModel = async (): Promise<string | undefined> => {
-        if (typeof botId !== "string" || botId.length === 0) {
-            return undefined;
-        }
-
-        const bots = await queryClient.fetchQuery(crpc.bots.functions.listBots.queryOptions({}, { live: false }));
+    // A bot chat runs on the bot's current model, which the composer shows; the thread may still store an older one. The bot
+    // list is read on the click, not per message row, and is fetched again then: a cached list may predate a model change.
+    // The list is owner-only, so a bot this person cannot see gives no model and the composer's own rule stands.
+    const freshBotModel = async (): Promise<string | undefined> => {
+        // The cached list is not reused: a one-shot read's cache never goes stale on its own, so a model changed elsewhere would show.
+        const bots = await queryClient.fetchQuery({ ...crpc.bots.functions.listBots.queryOptions({}, { live: false }), staleTime: 0 });
 
         return bots.find((bot) => bot._id === botId)?.model;
     };
@@ -57,6 +70,16 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
         });
     };
 
+    const copyLink = async (link: () => Promise<string>): Promise<void> => {
+        // A browser without the Clipboard API throws here, as a refused write rejects: both are one failure.
+        try {
+            await writeLink(link);
+            showSuccess(t`Prompt link copied`);
+        } catch {
+            showError(t`Could not copy the link`);
+        }
+    };
+
     const copy = async () => {
         const prompt = getVisibleUserText({ parts: [...message.parts], text: message.text });
 
@@ -73,23 +96,32 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
             return;
         }
 
-        // A browser without the Clipboard API throws here, synchronously, as a refused write rejects: both are one failure.
-        try {
-            const linkModel = shownModel(await liveBotModel());
+        // A link can only name a model the composer takes for text. A custom endpoint's model is not one, so the link is refused
+        // rather than opening on another model. A chat that is not a bot chat knows its model now, so that refusal is decided
+        // before anything reaches the clipboard and its notice is exact.
+        if (!isBotChat) {
+            const linkModel = shownModel(undefined);
 
-            // A link can only name a model the composer takes for text. A custom endpoint's model is not one, so the link is
-            // refused rather than opening on another model.
             if (!carriableLinkModel(linkModel)) {
                 showWarning(t`A prompt link cannot name this chat's model, so no link was copied.`);
 
                 return;
             }
 
-            await navigator.clipboard.writeText(buildPromptLink(globalThis.location.origin, { model: linkModel, prompt }));
-            showSuccess(t`Prompt link copied`);
-        } catch {
-            showError(t`Could not copy the link`);
+            await copyLink(() => Promise.resolve(buildPromptLink(globalThis.location.origin, { model: linkModel, prompt })));
+
+            return;
         }
+
+        await copyLink(async () => {
+            const linkModel = shownModel(await freshBotModel());
+
+            if (!carriableLinkModel(linkModel)) {
+                throw new Error("A prompt link cannot name this bot's model.");
+            }
+
+            return buildPromptLink(globalThis.location.origin, { model: linkModel, prompt });
+        });
     };
 
     return (

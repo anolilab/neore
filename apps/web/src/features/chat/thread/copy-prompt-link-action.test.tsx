@@ -7,7 +7,7 @@ import { MODEL_REGISTRY } from "@neore/ai/models";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { FC, ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 
@@ -16,6 +16,8 @@ import CopyPromptLinkAction from "./copy-prompt-link-action";
 const harness = vi.hoisted(() => {
     return {
         bots: [] as { _id: string; model: string }[],
+        /** The bot list the click reads: the default answers at once with `bots`; a test replaces it to hold or fail the read. */
+        loadBots: (): Promise<{ _id: string; model: string }[]> => Promise.resolve([]),
         isAnonymous: false,
         showError: vi.fn(),
         showSuccess: vi.fn(),
@@ -51,7 +53,8 @@ vi.mock("@/lib/lunora/crpc", () => {
                     functions: {
                         listBots: {
                             queryOptions: () => {
-                                return { queryFn: () => harness.bots, queryKey: ["listBots"] };
+                                // A one-shot read (`live: false`) never goes stale on its own: a cached list is reused until refetched.
+                                return { queryFn: () => harness.loadBots(), queryKey: ["listBots"], staleTime: Infinity };
                             },
                         },
                     },
@@ -71,13 +74,14 @@ vi.mock("@/lib/toast", () => {
 
 const message = { id: "message-1", parts: [{ text: "Summarise this", type: "text" }], role: "user", text: "Summarise this" } as never;
 
-const textModel = MODEL_REGISTRY.find((model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external");
+const textModels = MODEL_REGISTRY.filter((model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external");
+const [textModel, otherTextModel] = textModels;
 
 const renderAction = (cachedBots?: { _id: string; model: string }[]): void => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const Wrapper: FC<{ children: ReactNode }> = ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 
-    // The bot list is read from the shared cache, as the composer reads it: seeded before the first click.
+    // The bot list is also in the shared cache, as the composer reads it: seeded before the first click.
     if (cachedBots) {
         client.setQueryData(["listBots"], cachedBots);
     }
@@ -95,6 +99,15 @@ const writeText = vi.fn<(text: string) => Promise<void>>();
 /** The link the clipboard received, read back through the URL the way the route reads it. */
 const copiedLink = (): URL => new URL(writeText.mock.calls[0]?.[0] ?? "");
 
+/** A ClipboardItem as a browser that has one: its values are read when the write runs, so a pending value is allowed. */
+class FakeClipboardItem {
+    readonly items: Record<string, Promise<Blob>>;
+
+    constructor(items: Record<string, Promise<Blob>>) {
+        this.items = items;
+    }
+}
+
 describe("CopyPromptLinkAction", () => {
     beforeEach(() => {
         writeText.mockReset();
@@ -104,10 +117,15 @@ describe("CopyPromptLinkAction", () => {
         harness.showSuccess.mockReset();
         harness.showWarning.mockReset();
         harness.bots = [];
+        harness.loadBots = () => Promise.resolve(harness.bots);
         harness.isAnonymous = false;
         harness.thread = { botId: null };
         harness.threadModel = DEFAULT_CHAT_MODEL;
         useModelStore.setState({ newThreadMode: "text", threadModes: new Map() });
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
     });
 
     it("names the chat's own model when the chat is not a bot chat", async () => {
@@ -137,6 +155,72 @@ describe("CopyPromptLinkAction", () => {
         await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
 
         expect(copiedLink().searchParams.get("model")).toBe(textModel?.id);
+    });
+
+    it("names the bot's model from a fresh read, not a cached list that predates a model change", async () => {
+        expect(textModel).toBeDefined();
+        expect(otherTextModel).toBeDefined();
+
+        harness.thread = { botId: "bot-1" };
+        harness.threadModel = DEFAULT_CHAT_MODEL;
+        harness.bots = [{ _id: "bot-1", model: otherTextModel?.id ?? "" }];
+
+        renderAction([{ _id: "bot-1", model: textModel?.id ?? "" }]);
+
+        clickCopy();
+
+        await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+
+        expect(copiedLink().searchParams.get("model")).toBe(otherTextModel?.id);
+    });
+
+    it("starts the clipboard write on the click, before a bot list that has not answered", async () => {
+        const write = vi.fn(async (items: FakeClipboardItem[]) => {
+            await Promise.all(items.map(async (item) => await item.items["text/plain"]));
+        });
+        let answerBots: (() => void) | undefined;
+
+        vi.stubGlobal("ClipboardItem", FakeClipboardItem);
+        Object.defineProperty(navigator, "clipboard", { configurable: true, value: { write, writeText } });
+
+        harness.thread = { botId: "bot-1" };
+        harness.bots = [{ _id: "bot-1", model: textModel?.id ?? "" }];
+        harness.loadBots = () =>
+            new Promise((resolve) => {
+                answerBots = () => resolve(harness.bots);
+            });
+
+        renderAction();
+
+        clickCopy();
+
+        // The write is already in flight: nothing has been awaited before it started.
+        expect(write).toHaveBeenCalledTimes(1);
+
+        answerBots?.();
+
+        await waitFor(() => expect(harness.showSuccess).toHaveBeenCalledWith("Prompt link copied"));
+
+        const item = write.mock.calls[0]?.[0][0];
+        const blob = await item?.items["text/plain"];
+        const text = await blob?.text();
+
+        expect(new URL(text ?? "").searchParams.get("model")).toBe(textModel?.id);
+        expect(writeText).not.toHaveBeenCalled();
+    });
+
+    it("reports a failed bot-list read and copies nothing, rather than naming the stored model", async () => {
+        harness.thread = { botId: "bot-1" };
+        harness.threadModel = DEFAULT_CHAT_MODEL;
+        harness.loadBots = () => Promise.reject(new Error("offline"));
+
+        renderAction();
+
+        clickCopy();
+
+        await waitFor(() => expect(harness.showError).toHaveBeenCalledTimes(1));
+        expect(writeText).not.toHaveBeenCalled();
+        expect(harness.showSuccess).not.toHaveBeenCalled();
     });
 
     it("names the free model on an anonymous text chat, whatever model the thread stores, as the composer shows", async () => {
