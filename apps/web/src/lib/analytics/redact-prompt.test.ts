@@ -138,3 +138,17 @@ describe("a prompt link on a sign-in route", () => {
         expect(payload).toContain("/auth/sign-in");
     });
 });
+
+describe("the exact sign-in inputs from the review", () => {
+    it.each([
+        ["relative", "/auth/sign-in?redirectTo=%2Fchat%3Fprompt%3D%2522hi%2522", "/auth/sign-in?redirectTo=%2Fchat"],
+        [
+            "absolute",
+            "https://app.example.com/auth/sign-in?redirectTo=%2Fchat%3Fprompt%3D%2522hi%2522",
+            "https://app.example.com/auth/sign-in?redirectTo=%2Fchat",
+        ],
+        ["email code, with the model after", "/auth/email-otp?redirectTo=%2Fchat%3Fprompt%3D%2522hi%2522&model=x", "/auth/email-otp?redirectTo=%2Fchat"],
+    ])("removes the nested prompt from a %s sign-in URL", (_name, input, expected) => {
+        expect(redactPromptFromUrl(input)).toBe(expected);
+    });
+});
