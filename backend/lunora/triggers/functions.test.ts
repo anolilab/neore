@@ -1176,7 +1176,10 @@ describe("run prompts", () => {
         }
 
         const exported = (await harness.run(async (ctx: any) => {
-            const pages = await collectAllTriggers(async (cursor) => await ctx.runQuery(collectTriggersForExport, { cursor, userId: "user-a" }));
+            const pages = await collectAllTriggers(
+                async (cursor) => await ctx.runQuery(collectTriggersForExport, { cursor, userId: "user-a" }),
+                Number.MAX_SAFE_INTEGER,
+            );
 
             return pages.triggers as { botId: unknown; name: string; quietWhenEmpty: unknown; searchMode: unknown }[];
         })) as { botId: unknown; name: string; quietWhenEmpty: unknown; searchMode: unknown }[];
@@ -1184,6 +1187,12 @@ describe("run prompts", () => {
         expect(exported).toHaveLength(7);
         expect(new Set(exported.map((trigger) => trigger.name)).size).toBe(7);
         expect(exported[0]).toMatchObject({ botId: null, quietWhenEmpty: null, searchMode: null });
+    });
+
+    it("refuses a trigger history past the export limit, as the ACP history is", async () => {
+        const page = { cursor: "more", triggers: [{ name: "x".repeat(100) }] };
+
+        await expect(collectAllTriggers(async () => page, 50)).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
     });
 });
 

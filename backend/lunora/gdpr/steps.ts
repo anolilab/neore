@@ -563,6 +563,7 @@ export const generateExportFile = internalAction
                 args.triggers ??
                 (await collectAllTriggers(
                     async (cursor) => await context.runQuery(internal.triggers.gdpr.collectTriggersForExport, { cursor, userId: args.userId }),
+                    MAX_EXPORT_BYTES,
                 )),
             usageDaily: activity?.usageDaily ?? [],
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
