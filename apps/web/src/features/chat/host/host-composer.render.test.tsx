@@ -4,7 +4,7 @@
  */
 
 import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => {
@@ -92,6 +92,9 @@ const { default: HostComposer } = await import("./host-composer");
 const ALWAYS = /always/iu;
 const CUT = /too long to show whole/u;
 const STILL_SHOWS_FAST = /The agent confirmed Deep, but Model still shows Fast/u;
+/** The page's catch-up wait for a confirmed value to show, in `host-options.tsx` (`CATCH_UP_MS`). */
+const CATCH_UP_MS = 15_000;
+const WAITING_FOR_CATCH_UP = /Waiting for Model to show Deep/u;
 
 const OPTIONS = [
     { kind: "allow_once", name: "Allow", optionId: "r1-allow" },
@@ -616,21 +619,37 @@ describe("the options the agent offers", () => {
         fireEvent.change(model, { target: { value: "deep" } });
         await waitFor(() => expect(model.disabled).toBe(true));
 
-        // The agent confirmed the value, but the options it reports keep the old one past the page's wait.
-        harness.data = {
-            ...harness.data,
-            "acp.functions.getHostSession": {
-                agentState: { configOptions: [MODEL] },
-                optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
-                status: "idle",
-            },
-        };
-        await client.invalidateQueries();
+        // The page's wait for the value to show is a timer of CATCH_UP_MS: the clock is driven past it, not waited out.
+        vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ["setTimeout", "clearTimeout"] });
 
-        expectShown(await screen.findByText(STILL_SHOWS_FAST, undefined, { timeout: 25_000 }));
+        try {
+            // The agent confirmed the value, but the options it reports keep the old one past the page's wait.
+            harness.data = {
+                ...harness.data,
+                "acp.functions.getHostSession": {
+                    agentState: { configOptions: [MODEL] },
+                    optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+                    status: "idle",
+                },
+            };
+            await client.invalidateQueries();
+            expectShown(await screen.findByText(WAITING_FOR_CATCH_UP));
+
+            // Flush the effect that starts the wait, then drive the clock past it.
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(0);
+            });
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(CATCH_UP_MS);
+            });
+        } finally {
+            vi.useRealTimers();
+        }
+
+        expectShown(await screen.findByText(STILL_SHOWS_FAST));
         expect(screen.queryByText("The agent confirmed: Model is now Deep.")).toBeNull();
         expect(model.disabled).toBe(false);
-    }, 40_000);
+    });
 
     it("says why the agent refused, and leaves the value as it was", async () => {
         const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
