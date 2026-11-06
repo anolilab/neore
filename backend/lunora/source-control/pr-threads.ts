@@ -46,12 +46,20 @@ export const vPullRequestThread = v.object({
 
 type PullRequestThread = Doc<"pullRequestThreads">;
 
-/** The title a link may show: none of a locked chat's own, whatever the row stored before the lock. */
-export const shownTitle = (row: PullRequestThread, thread: Pick<Doc<"threads">, "lockedAt"> | null | undefined): string =>
-    thread && isThreadLocked(thread) ? LOCKED_THREAD_TITLE : row.title;
+/**
+ * The title a link shows: the chat's current one, and none of it while the chat is locked, whatever the row stored.
+ * Without the thread read, the stored title.
+ */
+export const shownTitle = (row: PullRequestThread, thread: Pick<Doc<"threads">, "lockedAt" | "title"> | null | undefined): string => {
+    if (!thread) {
+        return row.title;
+    }
+
+    return isThreadLocked(thread) ? LOCKED_THREAD_TITLE : (thread.title ?? row.title);
+};
 
 /** The row as the client reads it. Never the owner column: it is the caller's own by construction. */
-export const toOutput = (row: PullRequestThread, thread?: Pick<Doc<"threads">, "lockedAt"> | null) => {
+export const toOutput = (row: PullRequestThread, thread?: Pick<Doc<"threads">, "lockedAt" | "title"> | null) => {
     return {
         ...(row.baseBranch !== undefined && { baseBranch: row.baseBranch }),
         createdAt: row.createdAt,
@@ -298,7 +306,10 @@ export const recordOpenedPullRequest = internalMutation
             number: address.number,
             repository: address.repository,
             threadId: args.threadId as Id<"threads">,
-            title: isThreadLocked(thread) ? LOCKED_THREAD_TITLE : (thread.title ?? `${address.repository}#${String(address.number)}`),
+            // A locked chat's title is its content: the row keeps the address instead, and a read shows the live title.
+            title: isThreadLocked(thread)
+                ? `${address.repository}#${String(address.number)}`
+                : (thread.title ?? `${address.repository}#${String(address.number)}`),
             url: pullRequestUrl(address.repository, address.number),
             userId: args.userId,
         });

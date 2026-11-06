@@ -293,7 +293,9 @@ describe("the thread list and the sidebar counts", () => {
         await record(threadId, A, [link(7)]);
 
         expect(await as(B).query(countsForThreads as never, { threadIds: [threadId] } as never)).toEqual([]);
-        await expect(as(A).query(countsForThreads as never, { threadIds: Array.from({ length: 201 }, (_, index) => `${threadId}-${String(index)}`) } as never)).rejects.toThrow();
+        await expect(
+            as(A).query(countsForThreads as never, { threadIds: Array.from({ length: 201 }, (_, index) => `${threadId}-${String(index)}`) } as never),
+        ).rejects.toThrow();
     });
 
     it("shows no title of a locked chat, however the link stored it", async () => {
@@ -306,6 +308,34 @@ describe("the thread list and the sidebar counts", () => {
 
         expect(listed.map((row: any) => row.title)).toEqual(["Locked chat"]);
         expect(((await as(A).query(listForThread as never, { threadId } as never)) as any[])[0].title).toBe("Locked chat");
+
+        // Unlocked again, the chat's own title shows: the lock never left its placeholder behind.
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: null }));
+
+        const unlocked = (await as(A).query(listForPullRequest as never, { number: 7, repository: "octo/hello" } as never)) as any[];
+
+        expect(unlocked.map((row: any) => row.title)).toEqual(["a thread"]);
+    });
+
+    it("gives no badge to a thread past the per-thread read, rather than a partial count", async () => {
+        const threadId = await threadOf(A);
+
+        await harness.run(async (ctx: any) => {
+            for (let number = 1; number <= 26; number += 1) {
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: number,
+                    kind: "opened",
+                    number,
+                    repository: "octo/hello",
+                    threadId,
+                    title: "t",
+                    url: `https://github.com/octo/hello/pull/${String(number)}`,
+                    userId: A,
+                });
+            }
+        });
+
+        expect(await as(A).query(countsForThreads as never, { threadIds: [threadId] } as never)).toEqual([]);
     });
 
     it("stores and finds a pull request whatever the case it was typed in", async () => {

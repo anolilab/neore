@@ -14,7 +14,7 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import type { GithubTokenOutcome } from "../connectors/lib/github-token";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { authAction, authQuery, rateLimit } from "../lib/crpc";
-import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
+import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import { linksFor, MAX_THREADS_PER_PULL_REQUEST, partitionLinks, pullRequestUrl, requireAddress, toOutput, vPullRequestThread } from "./pr-threads";
@@ -111,8 +111,10 @@ export const recordAttachedPullRequests = internalMutation
                 repository: address.repository,
                 threadId: thread._id,
                 // The thread's title, as every other kind of link stores it: the header and the Work-on list read this field.
-                // A locked chat's title is its content: the link never keeps a copy of it.
-                title: isThreadLocked(thread) ? LOCKED_THREAD_TITLE : (thread.title ?? `${address.repository}#${String(address.number)}`),
+                // A locked chat's title is its content: the row keeps the address instead, and a read shows the live title.
+                title: isThreadLocked(thread)
+                    ? `${address.repository}#${String(address.number)}`
+                    : (thread.title ?? `${address.repository}#${String(address.number)}`),
                 url: pullRequestUrl(address.repository, address.number),
                 userId: args.userId,
             });
@@ -251,8 +253,8 @@ export const listForThread = authQuery
 /**
  * How many pull requests each of the given threads is linked to, for the sidebar's badges: the sidebar asks once, for
  * the threads it shows, and each row reads its number from that one answer. Link rows only, a few per thread, so a
- * change to a thread or its size never re-runs or outgrows it; a thread past the per-thread read shows that read's
- * count. A deleted thread is not in the sidebar, and a link its soft delete flagged is not counted.
+ * change to a thread or its size never re-runs or outgrows it; a thread past the per-thread read is left out, so its
+ * badge is never a partial count. A deleted thread is not in the sidebar, and a link its soft delete flagged is not counted.
  */
 export const countsForThreads = authQuery
     .input({
@@ -270,7 +272,13 @@ export const countsForThreads = authQuery
             const rows = await ctx.db
                 .query("pullRequestThreads")
                 .withIndex("by_user_and_threadId", (q) => q.eq("userId", ctx.user.userId).eq("threadId", threadId as Id<"threads">))
-                .take(MAX_COUNT_ROWS_PER_THREAD);
+                .take(MAX_COUNT_ROWS_PER_THREAD + 1);
+
+            // Past the read, the number would be a part of the whole: that thread shows no badge rather than a wrong one.
+            if (rows.length > MAX_COUNT_ROWS_PER_THREAD) {
+                continue;
+            }
+
             // A pull request counts once per thread, however many links name it.
             const distinct = new Set(rows.filter((row) => row.threadDeleted !== true).map((row) => `${row.repository}#${String(row.number)}`));
 

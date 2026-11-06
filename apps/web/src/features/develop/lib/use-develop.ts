@@ -1,7 +1,7 @@
 import { api } from "@neore/backend/api";
 import type { InboxSection } from "@neore/backend/source-control/types";
 import { LIVE_META_KEY } from "@neore/client-runtime";
-import { skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
@@ -160,15 +160,18 @@ const MAX_COUNT_THREADS = 200;
 
 /**
  * How many pull requests each of the given threads is linked to, read ONCE for a whole list (the sidebar), not per
- * row. The ids are sorted so the query keeps one identity while the list only reorders, and nothing is asked until
+ * row. The first 200 in list order are kept, then sorted so the query keeps one identity while the list only reorders,
+ * and nothing is asked until
  * the page has painted, so the sidebar does not add to the queries the first paint waits for.
  */
 export const usePullRequestCounts = (threadIds: ReadonlyArray<string>, ready: boolean): ReadonlyMap<string, number> => {
     const crpc = useCRPC();
-    const sorted = useMemo(() => [...new Set(threadIds)].toSorted((left, right) => left.localeCompare(right)).slice(0, MAX_COUNT_THREADS), [threadIds]);
-    const { data } = useQuery(
-        crpc.source_control.pr_thread_attach.countsForThreads.queryOptions(ready && sorted.length > 0 ? { threadIds: sorted } : skipToken),
-    );
+    const sorted = useMemo(() => [...new Set(threadIds)].slice(0, MAX_COUNT_THREADS).toSorted((left, right) => left.localeCompare(right)), [threadIds]);
+    const { data } = useQuery({
+        ...crpc.source_control.pr_thread_attach.countsForThreads.queryOptions(ready && sorted.length > 0 ? { threadIds: sorted } : skipToken),
+        // The visible set changes as groups open and threads come and go: the last counts stay until the new ones arrive.
+        placeholderData: keepPreviousData,
+    });
 
     return useMemo(() => new Map((data ?? []).map((row) => [row.threadId, row.count])), [data]);
 };
