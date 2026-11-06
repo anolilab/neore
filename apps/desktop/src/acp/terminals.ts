@@ -29,6 +29,9 @@ const INVISIBLE = /[\p{Cc}\p{Cf}\u{2028}\u{2029}]/u;
 const KEPT_RESULTS = 16;
 const MAX_ENV = 64;
 const ENV_NAME = /^[A-Z_a-z]\w{0,127}$/u;
+/** The names Neore keeps for itself, and NODE_OPTIONS, case-insensitively (the core's list, in `agent_env.rs`). */
+const RESERVED_ENV = /^(?:NEORE_|ELECTRON_|NODE_OPTIONS$)/iu;
+const MAX_ENV_VALUE_BYTES = 8 * 1024;
 /** A word the shell reads back unchanged without quotes. */
 const PLAIN_WORD = /^[\w%+,./:=@-]+$/u;
 
@@ -130,6 +133,12 @@ const envOf = (env: unknown): [string, string][] => {
 
     return (env as unknown[]).map((entry) => {
         if (!isRecord(entry) || typeof entry.name !== "string" || typeof entry.value !== "string" || !ENV_NAME.test(entry.name) || entry.value.includes("\0")) {
+            throw new RpcError(INVALID_PARAMS, "invalid environment variable");
+        }
+
+        // What the core refuses after the approval (`validate_env_var`): refused here, so the person is never asked to approve a
+        // command that cannot start. Reserved names are Neore's and Electron's, and NODE_OPTIONS loads code; the value is bounded.
+        if (RESERVED_ENV.test(entry.name) || Buffer.byteLength(entry.value) > MAX_ENV_VALUE_BYTES) {
             throw new RpcError(INVALID_PARAMS, "invalid environment variable");
         }
 

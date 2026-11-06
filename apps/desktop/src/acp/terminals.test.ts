@@ -48,6 +48,11 @@ describe(createRequestOf, () => {
             { command: "echo\u{202E}eil" },
             { command: "ls\u{200D}x" },
             { command: "ls", cwd: "/work\u{2066}x" },
+            // Names the core refuses after the approval, and a value over its size: refused before anyone is asked.
+            { command: "ls", env: [{ name: "NEORE_TOKEN", value: "x" }] },
+            { command: "ls", env: [{ name: "electron_run_as_node", value: "1" }] },
+            { command: "ls", env: [{ name: "NODE_OPTIONS", value: "--require x" }] },
+            { command: "ls", env: [{ name: "BIG", value: "v".repeat(8193) }] },
             { command: "x".repeat(4001) },
             // The line fits, but not with the variables in front of it: the person must read whole what they allow.
             { command: "ls", env: Array.from({ length: 10 }, (_, index) => { return { name: `V${String(index)}`, value: "v".repeat(400) }; }) },
