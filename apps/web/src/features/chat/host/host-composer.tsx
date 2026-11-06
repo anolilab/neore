@@ -97,7 +97,9 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
 
     const messages = useHostSendErrorMessages();
 
-    const send = async (prompt: string) => {
+    // `draft` is the editable text the prompt came from, as it was when the send began: a success clears the box only if
+    // the person has not typed since.
+    const send = async (prompt: string, draft: string = prompt) => {
         // One request id per message: a retry of a lost answer finds the first try, not a second turn. A different
         // text (an edit after a failure, or Continue) is a different message and gets its own, or the backend would
         // call it a repeat of the first and drop it.
@@ -119,9 +121,8 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                 setRefusedPaste(false);
             }
 
-            // Continue sends a fixed prompt: a draft being typed beside it stays.
-            // Compared as the server cleaned it, so a draft whose only extra text is a removed joiner still clears.
-            setText((current) => (stripHiddenText(current).text.trim() === prompt ? "" : current));
+            // Continue sends a fixed prompt: a draft being typed beside it stays. Edits made while the send was pending stay too.
+            setText((current) => (current === draft ? "" : current));
 
             return;
         }
@@ -147,7 +148,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
         }
 
         event.preventDefault();
-        void send(sendable);
+        void send(sendable, text);
     };
 
     const answerRequest = (request: PendingRequest, optionId: string) => {
@@ -260,7 +261,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     <Button
                         disabled={!canSend}
                         onClick={() => {
-                            send(sendable);
+                            send(sendable, text);
                         }}
                         type="button"
                     >

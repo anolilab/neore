@@ -210,6 +210,32 @@ describe("the coding-agent composer", () => {
         expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
     });
 
+    it("keeps a joiner typed while a send is pending, and does not clear the draft it did not send", async () => {
+        let open: () => void = () => undefined;
+
+        harness.gate = new Promise<void>((resolve) => {
+            open = () => {
+                resolve();
+            };
+        });
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "x\u{1F600}" } });
+        fireEvent.click(screen.getByRole("button", { name: "Send" }));
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+
+        // The person keeps going while the send is pending: a joiner continues the emoji sequence.
+        fireEvent.change(box, { target: { value: "x\u{1F600}\u{200D}" } });
+        open();
+        harness.gate = undefined;
+
+        // Wait for the send to finish (Send is off while it is pending), then check what the box holds.
+        await waitFor(() => expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(false));
+        expect(box.value).toBe("x\u{1F600}\u{200D}");
+    });
+
     it("does not send the draft a refused paste would have left, and shows the refusal", async () => {
         mount(session());
 
@@ -222,6 +248,11 @@ describe("the coding-agent composer", () => {
         expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
         fireEvent.keyDown(box, { key: "Enter" });
         expect(harness.calls).toHaveLength(0);
+        // The field keeps its draft, is marked invalid, and says why as its accessible description.
+        expect(box.value).toBe("a valid draft");
+        expect(box.getAttribute("aria-invalid")).toBe("true");
+        expect(box.getAttribute("aria-describedby")).toBe("host-composer-limit");
+        expect(screen.getAllByRole("status").map((element) => element.id)).toContain("host-composer-limit");
     });
 
     it("does not send an empty message", async () => {
