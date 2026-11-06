@@ -21,6 +21,10 @@ interface ContextUsageMeterProps {
  * The context ring and its tooltip, with no source of its own: the cloud composer feeds it the thread's usage and the
  * model's window, a host thread the figures its agent reported (`agentState.usage`).
  */
+/** A percentage with one decimal, in the locale's number format. A call, not a name, in the tooltip keeps its message id. */
+const formatPercent = (value: number, locale: string): string =>
+    new Intl.NumberFormat(locale, { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(value);
+
 const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindow, detail, usedTokens }) => {
     const { i18n, t } = useLingui();
 
@@ -37,7 +41,7 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
     }, [usedTokens, contextWindow]);
 
     // The percentage in the person's number format: a comma in German, not the period `toFixed` always writes.
-    const percent = new Intl.NumberFormat(i18n.locale, { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(percentage);
+    const percent = formatPercent(percentage, i18n.locale);
 
     // SVG circle parameters
     const size = 16;
@@ -110,7 +114,7 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
                 <div className="space-y-1.5">
                     <div className="font-medium">{t`Context Usage`}</div>
                     <div className="text-muted-foreground text-xs">
-                        {t`${formatTokenCount(usedTokens)} of ${formatTokenCount(contextWindow)} tokens used (${percentage.toFixed(1)}%)`}
+                        {t`${formatTokenCount(usedTokens)} of ${formatTokenCount(contextWindow)} tokens used (${formatPercent(percentage, i18n.locale)}%)`}
                     </div>
                     {detail !== undefined && <div className="text-muted-foreground text-xs">{detail}</div>}
                     {isAtCapacity && (
