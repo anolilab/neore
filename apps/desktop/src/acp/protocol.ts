@@ -164,10 +164,6 @@ export const openNewSession = async (
     }
 };
 
-/** Opens a session in `cwd` and returns the agent's session id. */
-export const newSession = async (connection: JsonRpcConnection, cwd: string, timeoutMs = STARTUP_TIMEOUT_MS): Promise<string> =>
-    ((await openNewSession(connection, cwd, timeoutMs)) as { sessionId: string }).sessionId;
-
 const SET_OPTION_TIMEOUT_MS = 10_000;
 
 /** `session/set_config_option` for a list option: the answer carries every option with its new value. */
