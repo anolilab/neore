@@ -1556,6 +1556,25 @@ describe("what the agent reports about itself", () => {
         expect(statePosts()).toHaveLength(MAX_STATE_ATTEMPTS);
     });
 
+    it("sends the options of a dropped report with the session's next report, since the agent sends options only on change", async () => {
+        const host = poster();
+        const option = { category: "model", choices: [{ name: "Fast", value: "fast" }], currentValue: "fast", id: "model", name: "Model" };
+        let failing = true;
+
+        await open(host);
+        backend.respond = (post) => ((post.events[0] as { kind?: string } | undefined)?.kind === "session_state" && failing ? Response.json({ error: "x" }, { status: 503 }) : undefined);
+        host.sessionState("s1", { configOptions: [option], usage: usage(10) });
+        await settleInSteps(10 * 60_000);
+
+        expect(statePosts()).toHaveLength(MAX_STATE_ATTEMPTS);
+
+        failing = false;
+        host.sessionState("s1", { usage: usage(12) });
+        await settle(2000);
+
+        expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ configOptions: [option], usage: usage(12) });
+    });
+
     it("retries a failed report with what was observed, under a fresh issuedAt, when nothing newer is reported", async () => {
         const host = poster();
 
