@@ -138,14 +138,15 @@ const choicesOf = (options: unknown, scrub: Scrub, current: string): AgentOption
     return fitKeeping(choices, (choice) => choice.value === current, MAX_CHOICES, Infinity);
 };
 
-/** One option, if it is a list the person can choose from. A boolean option, or one with no usable id or value, is left out. */
+/** One option, if it is a list the person can choose from. A boolean option, or one with no usable id or current value, is left out; an empty current value is kept. */
 const optionOf = (entry: unknown, scrub: Scrub): AgentOption | undefined => {
     if (!isRecord(entry) || (entry.type !== undefined && entry.type !== "select")) {
         return undefined;
     }
 
     const id = idOf(entry.id, scrub);
-    const currentValue = idOf(entry.currentValue, scrub);
+    // An empty current value is no selection, which the backend accepts: the option keeps its choices. Any other value is read as an id.
+    const currentValue = entry.currentValue === "" ? "" : idOf(entry.currentValue, scrub);
 
     if (id === undefined || currentValue === undefined) {
         return undefined;
