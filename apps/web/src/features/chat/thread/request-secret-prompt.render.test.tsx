@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import RequestSecretPrompt from "./request-secret-prompt";
 
+const SHOW_REVEAL = /^Show /u;
+
 const SECRET = "sk-live-0123456789-supersecret";
 
 const { answer, preferencesRow, readFails, readHold, readPreferences, servers, thread } = vi.hoisted(() => {
@@ -147,6 +149,17 @@ describe("the secret request card", () => {
         readFails.current = false;
         readPreferences.mockClear();
         answer.mockClear();
+    });
+
+    it("keeps the keyboard from capitalising a revealed secret, which would change its first letter", () => {
+        mountCard({ kind: "provider_key", provider: "openai" });
+
+        const input = screen.getByPlaceholderText("Paste it here — it is not shown in the chat");
+
+        fireEvent.click(screen.getByRole("button", { name: SHOW_REVEAL }));
+
+        expect(input.getAttribute("type")).toBe("text");
+        expect(input.getAttribute("autocapitalize")).toBe("off");
     });
 
     it("keeps the value out of the mutation cache once the answer is sent", async () => {
@@ -370,18 +383,20 @@ describe("the secret request card", () => {
 
         mountCard(undefined, undefined, { fields });
 
-        const [first, second] = screen.getAllByPlaceholderText("Paste it here — it is not shown in the chat");
+        // Each input is found by its own label, so a label that stops pointing at its field fails here.
+        const first = screen.getByLabelText("Username");
+        const second = screen.getByLabelText("Password");
 
-        expect(first!.getAttribute("type")).toBe("password");
-        expect(second!.getAttribute("type")).toBe("password");
+        expect(first.getAttribute("type")).toBe("password");
+        expect(second.getAttribute("type")).toBe("password");
 
-        fireEvent.change(first!, { target: { value: "alice" } });
+        fireEvent.change(first, { target: { value: "alice" } });
         expect((screen.getByRole("button", { name: SAVE }) as HTMLButtonElement).disabled).toBe(true);
 
-        fireEvent.change(second!, { target: { value: SECRET } });
+        fireEvent.change(second, { target: { value: SECRET } });
         fireEvent.click(screen.getByRole("button", { name: "Show Password" }));
-        expect(second!.getAttribute("type")).toBe("text");
-        expect(first!.getAttribute("type")).toBe("password");
+        expect(second.getAttribute("type")).toBe("text");
+        expect(first.getAttribute("type")).toBe("password");
 
         fireEvent.click(screen.getByRole("button", { name: SAVE }));
 
