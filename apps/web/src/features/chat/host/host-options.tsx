@@ -208,6 +208,7 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
 
     // The backend sends one of a fixed set of English phrases (`acp/lib/calls.ts`). Each is shown in the person's language.
     const refusalTexts = new Map<string, string>([
+        ["a mode is changed on the computer, not from here", t`a mode is changed on the computer, not from here`],
         ["that session no longer exists", t`that session no longer exists`],
         ["the agent did not accept the change", t`the agent did not accept the change`],
         ["the agent did not answer", t`the agent did not answer`],
