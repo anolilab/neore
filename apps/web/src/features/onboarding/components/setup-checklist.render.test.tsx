@@ -18,6 +18,7 @@ const { account, devices, mutate, server, sonnerMock } = vi.hoisted(() => {
             hold: undefined as Promise<void> | undefined,
             noRow: false,
             readFail: false,
+            frozen: undefined as { value: unknown } | undefined,
             readHold: undefined as Promise<void> | undefined,
             skipped: undefined as string[] | undefined,
         },
@@ -67,9 +68,14 @@ vi.mock("@/lib/lunora/crpc", () => {
                 auth: {
                     functions: {
                         getUserSettings: {
-                            queryOptions: () => {
+                            queryOptions: (_args?: unknown, options?: { live?: boolean }) => {
                                 return {
                                     queryFn: async () => {
+                                        // A live read answers from the open subscription: the list as of its last push.
+                                        if (options?.live !== false && server.frozen) {
+                                            return server.frozen.value;
+                                        }
+
                                         await server.readHold;
 
                                         if (server.readFail) {
@@ -164,6 +170,7 @@ describe("<SetupChecklist>", () => {
         server.readFail = false;
         server.readHold = undefined;
         server.hold = undefined;
+        server.frozen = undefined;
         server.noRow = false;
         server.skipped = undefined;
         mutate.mockClear();
@@ -337,6 +344,36 @@ describe("<SetupChecklist>", () => {
         expect(mutate).toHaveBeenCalledTimes(1);
         expect(screen.queryByText("(Skipped)")).toBeNull();
         expect(sonnerMock.toast).not.toHaveBeenCalled();
+    });
+
+    it("keeps a saved skip on screen when the live subscription's update arrives after the save settles", async () => {
+        const client = newClient();
+
+        renderChecklist(client);
+        await screen.findAllByText("(To do)");
+        // The subscription still holds the list from before the click.
+        server.frozen = { value: { setupStepsSkipped: undefined } };
+        fireEvent.click(screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }));
+
+        await waitFor(() => expect(server.skipped).toEqual(["ssh"]));
+        expect(await screen.findByText("(Skipped)")).toBeTruthy();
+
+        // Its push arrives later, carrying the saved list.
+        server.frozen = { value: { setupStepsSkipped: ["ssh"] } };
+        client.setQueryData(["getUserSettings"], { setupStepsSkipped: ["ssh"] });
+
+        expect(await screen.findByText("(Skipped)")).toBeTruthy();
+    });
+
+    it("shows a first skip that creates the settings row when the subscription has not pushed yet", async () => {
+        server.noRow = true;
+        renderChecklist();
+        await screen.findAllByText("(To do)");
+        server.frozen = { value: null };
+        fireEvent.click(screen.getByRole("button", { name: SKIP_ADD_AN_SSH_SERVER }));
+
+        expect(await screen.findByText("(Skipped)")).toBeTruthy();
+        expect(server.skipped).toEqual(["ssh"]);
     });
 
     it("lets the latest click win when Resume follows a Skip that has not been saved yet", async () => {

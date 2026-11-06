@@ -46,7 +46,28 @@ const SetupChecklist: FC = () => {
     // One step per call: the server applies it to the list it holds, so another tab's skip is never overwritten. The
     // cache is patched one step at a time, never from an earlier snapshot. Two cases read the server instead of guessing:
     // an account with no settings row yet (nothing to patch) and a failed save (whatever is stored is what to show).
-    const reloadSettings = async () => await queryClient.invalidateQueries({ queryKey: settingsKey });
+    // The live settings query answers a refetch from its open subscription, which still holds the value from before the
+    // write until the server's push arrives, and that would put the old list back over the click. So the stored list is read
+    // once, straight from the server, and written into the shared cache; the push that follows carries the same list.
+    const storedSettings = crpc.auth.functions.getUserSettings.queryOptions({}, { live: false });
+    const unsettledSaves = useRef(0);
+    const reloadSettings = async () => {
+        if (unsettledSaves.current > 0) {
+            // A later save is queued behind this one: its own settle reads the list that includes both.
+            return;
+        }
+
+        try {
+            const stored = await (storedSettings.queryFn as (() => Promise<unknown>) | undefined)?.();
+
+            if (unsettledSaves.current === 0) {
+                queryClient.setQueryData(settingsKey, stored ?? null);
+            }
+        } catch {
+            // Say so through the query's own error state, which has the retry.
+            await queryClient.invalidateQueries({ queryKey: settingsKey });
+        }
+    };
     const saveStep = crpc.auth.setup_steps.setSetupStepSkipped.mutationOptions();
     const setSkipped = useMutation({
         ...saveStep,
@@ -61,6 +82,8 @@ const SetupChecklist: FC = () => {
             return (await saveStep.mutationFn?.(step as never, context)) ?? null;
         },
         onMutate: async (args: SkipVariables) => {
+            unsettledSaves.current += 1;
+
             if (args.owner !== signedInRef.current) {
                 return { stale: true };
             }
@@ -90,6 +113,8 @@ const SetupChecklist: FC = () => {
         },
         // Settled either way, the stored list is what the card shows: a read that started before the write cannot outlive it.
         onSettled: async (_data, _error, args: SkipVariables, context) => {
+            unsettledSaves.current -= 1;
+
             if (!context?.stale && args.owner === signedInRef.current) {
                 await reloadSettings();
             }
