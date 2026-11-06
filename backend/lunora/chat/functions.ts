@@ -2955,16 +2955,23 @@ export const branchThread = authAction
         const newThreadId: string = newThread._id;
 
         // A branch keeps the mode its source runs under (its own, or a comparison parent's): a stricter mode must not drop to the defaults.
-        const sourceMode = await context.runQuery(internal.chat.tool_permissions.getThreadPermissionMode, {
-            threadId: parentThread._id as Id<"threads">,
-            userId,
-        });
-
-        if (sourceMode) {
-            await context.runMutation(internal.chat.thread_state.copyThreadPermissionMode, {
-                mode: sourceMode,
-                threadId: newThreadId,
+        try {
+            const sourceMode = await context.runQuery(internal.chat.tool_permissions.getThreadPermissionMode, {
+                threadId: parentThread._id as Id<"threads">,
+                userId,
             });
+
+            if (sourceMode) {
+                await context.runMutation(internal.chat.thread_state.copyThreadPermissionMode, {
+                    mode: sourceMode,
+                    threadId: newThreadId,
+                });
+            }
+        } catch (error) {
+            // Nothing has been copied into the branch yet: without this it would stay as an empty chat the user never asked for.
+            await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: newThreadId as Id<"threads"> });
+
+            throw error;
         }
 
         // A fork of a bot chat stays that bot's chat: its runs need the bot's persona and scoped memory.

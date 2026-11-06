@@ -74,6 +74,24 @@ vi.mock("../lib/audit-triggers", async (importOriginal) => {
     };
 });
 
+// Fails only the mode copy of a branch (`copyThreadPermissionMode` writes `permissionMode`), after the new thread exists.
+const failModeCopy = vi.hoisted(() => ({ on: false }));
+
+vi.mock("../agent/table-writes", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../agent/table-writes")>();
+
+    return {
+        ...original,
+        patchThread: (...args: Parameters<typeof original.patchThread>) => {
+            if (failModeCopy.on && "permissionMode" in args[2]) {
+                throw new Error("mode copy failed");
+            }
+
+            return original.patchThread(...args);
+        },
+    };
+});
+
 vi.mock("../auth", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../auth")>()),
@@ -534,5 +552,28 @@ describe("an unlocked chat returns its content through the composite read", () =
 
     it("and refuses the same read without a proof, with the locked code", async () => {
         await expect(as(OWNER).query(getThreadWithData as never, { threadId } as never)).rejects.toMatchObject({ data: { code: THREAD_LOCKED_CODE } });
+    });
+});
+
+describe("branching a chat under a permission mode", () => {
+    it("removes the new thread when its mode cannot be copied, rather than leaving an empty chat behind", async () => {
+        const source = await harness.run(
+            async (context: any) =>
+                await context.db.insert("threads", { model: "gpt-4o", permissionMode: "supervised", status: "active", title: "Source", userId: OWNER }),
+        );
+        const ownedThreads = async () =>
+            await harness.run(async (context: any) => (await context.db.query("threads").collect()).filter((row: any) => row.userId === OWNER).length);
+
+        const before = await ownedThreads();
+
+        failModeCopy.on = true;
+
+        try {
+            await expect(as(OWNER).action(branchThread as never, { threadId: source } as never)).rejects.toThrow("mode copy failed");
+        } finally {
+            failModeCopy.on = false;
+        }
+
+        expect(await ownedThreads()).toBe(before);
     });
 });
