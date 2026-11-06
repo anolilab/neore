@@ -1187,7 +1187,7 @@ describe("POST /hosts/send", () => {
         await expect(post({ requestId: "r", text: " ".repeat(3), threadId: "t" })).resolves.toBe(400);
         await expect(post({ requestId: "r", text: "x".repeat(30_001), threadId: "t" })).resolves.toBe(400);
         // A body far past a prompt's worth is refused unread, with or without a Content-Length.
-        await expect(post({ extra: "x".repeat(200_000), requestId: "r", text: "hi", threadId: "t" })).resolves.toBe(413);
+        await expect(post({ extra: "x".repeat(800_000), requestId: "r", text: "hi", threadId: "t" })).resolves.toBe(413);
         await expect(post({ requestId: "", text: "hi", threadId: "t" })).resolves.toBe(400);
         await expect(post({ requestId: "r", text: "hi", threadId: "t", unlockProof: 5 })).resolves.toBe(400);
         await expect(post({ requestId: "r", text: "hi", threadId: "t", unlockProof: "x".repeat(5000) })).resolves.toBe(400);

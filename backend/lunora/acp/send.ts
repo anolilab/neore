@@ -39,8 +39,13 @@ const DUPLICATE_SCAN_STREAMS = 50;
 const SEND_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
 /** The prompt on the wire. The signed call carries it whole and caps its input at 32 KiB, which is what refuses a longer one. */
 const MAX_SEND_CHARS = 30_000;
-/** A prompt of that many characters is at most four bytes each; the rest of the body is three short fields. */
-const MAX_SEND_BODY_BYTES = 130_000;
+/**
+ * The most text a composer may paste before it cleans it: four times the prompt limit, in UTF-16 units (`host-input.ts`).
+ * The body is capped before its hidden characters are removed, so the cap covers that much text at its worst: a control
+ * character is six bytes in JSON, and the signed fields are a few hundred bytes more.
+ */
+const MAX_SEND_RAW_UNITS = 4 * MAX_SEND_CHARS;
+const MAX_SEND_BODY_BYTES = MAX_SEND_RAW_UNITS * 6 + 1024;
 
 const vSendResult = v.union(
     v.object({ messageId: v.string(), outcome: v.literal("sent"), streamId: v.string() }),
