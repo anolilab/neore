@@ -36,8 +36,8 @@ export const reportFromHandshake = (capabilities: AgentCapabilities, now: number
     };
 };
 
-/** The first option the agent filed under a category, if it sent any. */
-const optionIn = (options: SessionStatePatch, category: string) => options.configOptions?.find((option) => option.category === category);
+/** The first option the agent filed under a category, if it sent any. The category is read without regard to case, as the backend reads it. */
+const optionIn = (options: SessionStatePatch, category: string) => options.configOptions?.find((option) => option.category?.toLowerCase() === category);
 
 /**
  * What the agent offered when it opened the session (`agent-options.ts#resolveOptions`), added to its handshake report: the
