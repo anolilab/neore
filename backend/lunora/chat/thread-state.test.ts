@@ -307,7 +307,7 @@ describe("getThreadPermissionModeForApp", () => {
         expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, mode: null });
     });
 
-    it("gives a comparison column its parent's mode until the column has one of its own", async () => {
+    it("keeps a comparison column on its parent's mode even once the column has one of its own", async () => {
         const child: string = await harness.run(
             async (context: any) => await context.db.insert("threads", { status: "active", title: "Column", updatedAt: 1, userId: OWNER }),
         );
@@ -330,6 +330,6 @@ describe("getThreadPermissionModeForApp", () => {
             await context.db.patch("threads", child, { permissionMode: "auto" });
         });
 
-        expect(await modeOf()).toBe("auto");
+        expect(await modeOf()).toBe("supervised");
     });
 });

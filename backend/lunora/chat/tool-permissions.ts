@@ -203,9 +203,8 @@ const modeFor = (thread: Doc<"threads"> | null, userId: string): ThreadPermissio
 };
 
 /**
- * A comparison column is a thread of its own, but the mode is chosen once, on the comparison it belongs to: a thread with no mode of
- * its own takes its comparison parent's. Child threads are created with none, so the parent's choice reaches the first send and every
- * follow-up alike.
+ * A comparison column is a thread of its own, but the mode is chosen once, on the comparison it belongs to: a column always takes its
+ * comparison parent's mode, whatever mode it holds. The parent's choice therefore reaches the first send and every follow-up alike.
  */
 /** Relationship rows read for one thread when its mode is resolved. */
 const MAX_LINKS_CHECKED = 50;
