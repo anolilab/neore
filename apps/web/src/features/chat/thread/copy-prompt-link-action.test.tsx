@@ -5,6 +5,7 @@
 import { ANONYMOUS_FREE_MODEL, DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { MODEL_REGISTRY } from "@neore/ai/models";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { defaultParseSearch } from "@tanstack/react-router";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { FC, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -118,6 +119,9 @@ const writeText = vi.fn<(text: string) => Promise<void>>();
 /** The link the clipboard received, read back through the URL the way the route reads it. */
 const copiedLink = (): URL => new URL(writeText.mock.calls[0]?.[0] ?? "");
 
+/** The prompt the copied link opens, as the route reads it (the router parses the query). */
+const routePrompt = (): unknown => (defaultParseSearch(copiedLink().search) as { prompt?: unknown }).prompt;
+
 /** A ClipboardItem as a browser that has one: its values are read when the write runs, so a pending value is allowed. */
 class FakeClipboardItem {
     readonly items: Record<string, Promise<Blob>>;
@@ -162,7 +166,7 @@ describe("CopyPromptLinkAction", () => {
         await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
 
         expect(copiedLink().pathname).toBe("/chat");
-        expect(copiedLink().searchParams.get("prompt")).toBe("Summarise this");
+        expect(routePrompt()).toBe("Summarise this");
         expect(copiedLink().searchParams.get("model")).toBe(DEFAULT_CHAT_MODEL);
         expect(harness.showSuccess).toHaveBeenCalledWith("Prompt link copied");
     });
@@ -331,7 +335,7 @@ describe("CopyPromptLinkAction", () => {
         clickCopy();
 
         await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-        expect(copiedLink().searchParams.get("prompt")).toBe(text);
+        expect(routePrompt()).toBe(text);
     });
 
     it("refuses that same long message in a bot chat with the same sentence, as an error, and copies nothing", async () => {

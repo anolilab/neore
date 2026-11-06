@@ -1,11 +1,15 @@
+import { defaultParseSearch } from "@tanstack/react-router";
 import { describe, expect, it } from "vitest";
 
 import { buildPromptLink, isPromptLinkTooLong, PROMPT_LINK_MAX_CHARS, PROMPT_LINK_MAX_QUERY_CHARS, promptFromLink, readPromptLinkSearch } from "./prompt-link";
 
 const ORIGIN = "https://app.example.com";
 
-/** The search a link carries, read back the way the route reads it. */
-const searchOf = (link: string): Record<string, string> => Object.fromEntries(new URL(link).searchParams);
+/** The search a link carries, as the route receives it: the router's own parse of the query, not the raw strings. */
+const searchOf = (link: string): Record<string, unknown> => defaultParseSearch(new URL(link).search);
+
+/** The prompt a link opens, read back the way the route reads it. */
+const promptOf = (prompt: string): unknown => readPromptLinkSearch(searchOf(buildPromptLink(ORIGIN, { prompt }))).prompt;
 
 describe(buildPromptLink, () => {
     it("builds a new-chat link whose search reads back to the same prompt and model", () => {
@@ -17,6 +21,10 @@ describe(buildPromptLink, () => {
 
     it("leaves the model out when none is given", () => {
         expect(buildPromptLink(ORIGIN, { prompt: "hi" })).not.toContain("model=");
+    });
+
+    it.each(["42", "true", '{"a":1}', "42.0", '"quoted"', "null", "[1,2]", "007"])("opens the prompt %s as that exact text", (prompt) => {
+        expect(promptOf(prompt)).toBe(prompt);
     });
 
     it("opens a long non-Latin prompt that the copy accepts, unchanged", () => {
@@ -92,6 +100,13 @@ describe(readPromptLinkSearch, () => {
 
     it("drops blank and non-text values", () => {
         expect(readPromptLinkSearch({ model: "  ", prompt: " ".repeat(3) })).toEqual({});
-        expect(readPromptLinkSearch({ model: 3, prompt: { text: "x" } })).toEqual({});
+        expect(readPromptLinkSearch({ model: 3, prompt: () => "x" })).toEqual({});
+    });
+
+    it("reads a hand-written number, boolean, object or null as the text it most likely was", () => {
+        expect(readPromptLinkSearch({ prompt: 42 })).toEqual({ prompt: "42" });
+        expect(readPromptLinkSearch({ prompt: true })).toEqual({ prompt: "true" });
+        expect(readPromptLinkSearch({ prompt: { a: 1 } })).toEqual({ prompt: '{"a":1}' });
+        expect(readPromptLinkSearch({ prompt: null })).toEqual({ prompt: "null" });
     });
 });

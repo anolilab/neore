@@ -5,6 +5,7 @@
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { MODEL_REGISTRY } from "@neore/ai/models";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { defaultParseSearch } from "@tanstack/react-router";
 import { render, waitFor } from "@testing-library/react";
 import type { ComponentType, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,8 +30,11 @@ const harness = vi.hoisted(() => {
     };
 });
 
-vi.mock("@tanstack/react-router", () => {
+vi.mock("@tanstack/react-router", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+
     return {
+        ...actual,
         createFileRoute: () => (options: Record<string, unknown>) => {
             return {
                 options,
@@ -137,7 +141,7 @@ const openUrl = (url: string): void => {
     const validate = Route.options.validateSearch as unknown as ValidateSearch;
 
     harness.locationSearch = search;
-    harness.search = validate(Object.fromEntries(new URLSearchParams(search)));
+    harness.search = validate(defaultParseSearch(search));
 };
 
 /** A link built by the copy side, with `extra` parameters added to its address (a handoff flag, a saved prompt). */
@@ -290,7 +294,7 @@ describe("chat index route", () => {
             const link = new URL(`https://app.example.com/chat?model=${encodeURIComponent(textModel?.id ?? "")}&prompt=%20%20%20`);
 
             harness.locationSearch = link.search;
-            harness.search = (fresh.Route.options.validateSearch as unknown as ValidateSearch)(Object.fromEntries(link.searchParams));
+            harness.search = (fresh.Route.options.validateSearch as unknown as ValidateSearch)(defaultParseSearch(link.search));
 
             const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
             const Page = fresh.Route.options.component as ComponentType;
@@ -307,7 +311,7 @@ describe("chat index route", () => {
             const link = new URL(`https://app.example.com/chat?model=${encodeURIComponent(textModel?.id ?? "")}`);
 
             harness.locationSearch = link.search;
-            harness.search = (fresh.Route.options.validateSearch as unknown as ValidateSearch)(Object.fromEntries(link.searchParams));
+            harness.search = (fresh.Route.options.validateSearch as unknown as ValidateSearch)(defaultParseSearch(link.search));
 
             const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
             const Page = fresh.Route.options.component as ComponentType;
@@ -323,7 +327,7 @@ describe("chat index route", () => {
             const link = new URL(buildPromptLink("https://app.example.com", { model: textModel?.id, prompt: "from the link" }));
 
             harness.locationSearch = link.search;
-            harness.search = (fresh.Route.options.validateSearch as unknown as ValidateSearch)(Object.fromEntries(link.searchParams));
+            harness.search = (fresh.Route.options.validateSearch as unknown as ValidateSearch)(defaultParseSearch(link.search));
 
             const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
             const Page = fresh.Route.options.component as ComponentType;
@@ -336,6 +340,14 @@ describe("chat index route", () => {
     });
 
     describe("a copied link read from its own query string", () => {
+        it.each(["42", "true", '{"a":1}'])("opens a copied message that reads as %s as that exact text, not blank", async (prompt) => {
+            openUrl(buildPromptLink("https://app.example.com", { prompt }));
+
+            mountPage();
+
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe(prompt));
+        });
+
         it("opens the copied text, cleaned, as the draft on the copied model", async () => {
             const link = buildPromptLink("https://app.example.com", {
                 model: textModel?.id,

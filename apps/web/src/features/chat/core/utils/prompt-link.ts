@@ -4,8 +4,9 @@ import { stripHiddenText } from "@neore/ai/utils";
  * A prompt link opens a new chat with a draft in the composer. It never sends: the person reads the draft and sends
  * it themselves.
  *
- * Link format: `/chat?prompt=<text>&model=<model id>`. The draft does not carry a project yet: a project is assigned
- * to a thread after it exists, so no new-chat setter takes one.
+ * Link format: `/chat?prompt="<text as a JSON string>"&model=<model id>`. The text is quoted because the router reads any query
+ * value that looks like JSON as that JSON (a number, `true`, an object); a quoted string comes back as exactly the text.
+ * The draft does not carry a project yet: a project is assigned to a thread after it exists, so no new-chat setter takes one.
  */
 
 /** The longest prompt a link may carry, counted in code points (what a person counts as characters). A longer one is cut, never sent whole. */
@@ -31,7 +32,7 @@ export const promptFromLink = (raw: string): string => firstCodePoints(cleanedPr
 
 /** The query a link carries for `prompt` and `model`, encoded as the link carries it. */
 const linkQuery = (prompt: string, model: string | undefined): string => {
-    const params = new URLSearchParams({ prompt });
+    const params = new URLSearchParams({ prompt: JSON.stringify(prompt) });
 
     if (model) {
         params.set("model", model);
@@ -51,8 +52,34 @@ export const isPromptLinkTooLong = (raw: string, model?: string): boolean => {
 };
 
 /** The search values a prompt link carries, trimmed and capped; absent or blank values are dropped. */
+
+/**
+ * The text a route's `prompt` search value stands for. The router has already read the value, so a link this app built gives the
+ * text (a JSON string, see the link format), and a hand-written number, boolean, object or null gives the text it most likely
+ * was. Anything else is no prompt.
+ */
+const promptText = (value: unknown): string => {
+    if (typeof value === "string") {
+        return promptFromLink(value);
+    }
+
+    if (value === null) {
+        return "null";
+    }
+
+    if (typeof value === "number" || typeof value === "boolean") {
+        return promptFromLink(String(value));
+    }
+
+    if (typeof value === "object") {
+        return promptFromLink(JSON.stringify(value));
+    }
+
+    return "";
+};
+
 export const readPromptLinkSearch = (search: { model?: unknown; prompt?: unknown }): { model?: string; prompt?: string } => {
-    const prompt = typeof search.prompt === "string" ? promptFromLink(search.prompt) : "";
+    const prompt = promptText(search.prompt);
 
     // A link without a usable prompt is not a prompt link: its model is not carried either, so it changes nothing.
     if (prompt === "") {
