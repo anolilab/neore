@@ -9,6 +9,7 @@ import { heicToJpegBlob } from "./heic-decode";
  */
 const HEIC_TYPES: ReadonlySet<string> = new Set(["image/heic", "image/heif"]);
 const HEIC_NAME_RE = /\.(?:heic|heif)$/iu;
+const EXTENSION_RE = /\.[^./\\]+$/u;
 const JPEG_QUALITY = 0.92;
 
 /**
@@ -22,7 +23,8 @@ export const isHeicFile = (file: Pick<File, "name" | "type">): boolean => {
 };
 
 /** The name a converted photo is uploaded under: the same name with a `.jpg` extension. */
-export const jpegNameFor = (name: string): string => `${name.replace(HEIC_NAME_RE, "")}.jpg`;
+/** The name a converted photo is uploaded under: the name without its extension, with a `.jpg` one. */
+export const jpegNameFor = (name: string): string => `${name.replace(EXTENSION_RE, "")}.jpg`;
 
 /** Whether this browser decodes HEIC, which makes it the one that converts it here. */
 export const canConvertHeic = (): boolean => isSafariUserAgent(globalThis.navigator?.userAgent);
