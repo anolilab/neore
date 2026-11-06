@@ -24,6 +24,7 @@ import { deleteMessage } from "./messages";
 import { deleteChatFileLinksForThread } from "./files";
 import { deleteStreamsPageForThreadId } from "./streams";
 import { isThreadLocked, toLockedThreadStub } from "../lib/thread-lock";
+import { threadGateOutcome } from "../chat/lib/thread-gate";
 import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread, resolveThreadReadAccess, type ThreadPermission } from "./thread-read-access";
 import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadPatchFields, vThreadStatus } from "./validators";
 import { systemDb } from "../lib/rls/scope";
@@ -288,13 +289,14 @@ export const updateThread = internalMutation
     });
 
 /**
- * Writes a generated title, and only while the thread still carries `expectedTitle` and may still be titled (not locked,
- * deleted or host-run). The check and the patch share one transaction, so a rename committed after the title run's last
- * check is kept. Answers whether the title was written.
+ * Writes a generated title, and only while the thread still carries `expectedTitle`, may still be titled (not locked, deleted
+ * or host-run), and, when there is a `requestedBy`, that user still holds admin access. The access is read here, in the same
+ * transaction as the compare and the patch, so a grant revoked after the job's own check cannot still write. Answers whether the
+ * title was written.
  */
 export const writeTitleIfUnchanged = async (
     ctx: Pick<MutationContext, "db">,
-    arguments_: { expectedTitle: string; threadId: Id<"threads">; title: string },
+    arguments_: { expectedTitle: string; requestedBy?: string; threadId: Id<"threads">; title: string },
 ): Promise<boolean> => {
     const thread = await ctx.db.get("threads", arguments_.threadId);
 
@@ -306,6 +308,14 @@ export const writeTitleIfUnchanged = async (
         return false;
     }
 
+    if (arguments_.requestedBy !== undefined) {
+        const access = await threadGateOutcome(ctx, { level: "admin", threadId: arguments_.threadId, userId: arguments_.requestedBy });
+
+        if (access !== "ok") {
+            return false;
+        }
+    }
+
     await ctx.db.patch("threads", arguments_.threadId, { title: arguments_.title });
 
     return true;
@@ -314,6 +324,7 @@ export const writeTitleIfUnchanged = async (
 export const setGeneratedTitle = internalMutation
     .input({
         expectedTitle: v.string().max(MAX_LENGTH.long),
+        requestedBy: v.optional(v.string()),
         threadId: v.id("threads"),
         title: v.string().max(MAX_LENGTH.long),
     })

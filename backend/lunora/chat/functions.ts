@@ -48,7 +48,7 @@ import type { MessageDoc, ThreadDoc } from "../agent/validators";
 import type { UIMessage } from "../agent/ui-messages";
 import { docsToModelMessages, listMessagesByThreadIdHandler, storeFile, toUIMessages } from "../agent/client";
 import { autoRepairJsonMiddleware } from "../agent/client/middleware";
-import { listActivePathPage, withBranchInfo } from "../agent/branches";
+import { listActivePathPage, TITLE_PATH_LIMIT, withBranchInfo } from "../agent/branches";
 import { candidatesOnActivePath } from "../agent/branch-rows";
 import {
     redactThreadForPublicViewer,
@@ -87,7 +87,7 @@ import { TEXT_TO_VIDEO_PROVIDERS } from "./lib/video-providers";
 import { gatewayFetch, NO_SERVICE_FETCH } from "../lib/services";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
 import getAgent from "./lib/get-agent";
-import { firstUserPromptText } from "./lib/first-user-prompt";
+import { firstUserPrompt } from "./lib/first-user-prompt";
 import { getMessageFileIds, loadNsfwStatuses, redactUIMessagesForPublicViewer } from "./lib/public-thread";
 import { buildReasoningProviderOptions } from "./lib/reasoning-options";
 import {
@@ -1580,15 +1580,12 @@ export const convertTemporaryToPermanent = authMutation
     });
 
 /**
- * Whether the leaf a title was read from is still on the thread's active path. The leaf moves on along its own path when a
- * message is added or a reply is in progress; it is switched away from only when the path no longer runs through it.
+ * Whether the prompt a title was read from is still on the thread's active path. Regenerating a later reply or editing a later
+ * prompt moves the leaf, but the prompt stays on the path; editing the first prompt takes it onto another branch, which is what
+ * this refuses. An unbranched thread has no leaf, so its rows are its path.
  */
-const stillOnActivePath = async (context: ActionContext, threadId: string, currentLeaf: string | undefined, capturedLeaf: string | null): Promise<boolean> => {
-    if (capturedLeaf === null || currentLeaf === undefined) {
-        return capturedLeaf === null && currentLeaf === undefined;
-    }
-
-    if (currentLeaf === capturedLeaf) {
+const promptStillOnActivePath = async (context: ActionContext, threadId: string, currentLeaf: string | undefined, promptId: string): Promise<boolean> => {
+    if (currentLeaf === undefined) {
         return true;
     }
 
@@ -1597,7 +1594,7 @@ const stillOnActivePath = async (context: ActionContext, threadId: string, curre
         threadId: threadId as Id<"threads">,
     });
 
-    return Array.isArray(ids) && ids.includes(capturedLeaf);
+    return Array.isArray(ids) && ids.includes(promptId);
 };
 
 /**
@@ -1605,9 +1602,9 @@ const stillOnActivePath = async (context: ActionContext, threadId: string, curre
  * gone, locked, deleted or host-run; it was renamed or moved to another branch since the regenerate was asked; or the
  * requester no longer has admin access. Checked before the model sees the prompt and again before the title is written.
  */
-const titleIneligibility = async (
+export const titleIneligibility = async (
     context: ActionContext,
-    arguments_: { expectedLeaf?: string | null; expectedTitle?: string; requestedBy?: string; threadId: string },
+    arguments_: { expectedPromptId?: string; expectedTitle?: string; requestedBy?: string; threadId: string },
 ): Promise<string | undefined> => {
     const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: arguments_.threadId as Id<"threads"> });
 
@@ -1620,8 +1617,8 @@ const titleIneligibility = async (
     }
 
     if (
-        arguments_.expectedLeaf !== undefined &&
-        !(await stillOnActivePath(context, arguments_.threadId, thread.activeLeafMessageId, arguments_.expectedLeaf))
+        arguments_.expectedPromptId !== undefined &&
+        !(await promptStillOnActivePath(context, arguments_.threadId, thread.activeLeafMessageId, arguments_.expectedPromptId))
     ) {
         return "branch-switched";
     }
@@ -1650,7 +1647,7 @@ const titleIneligibility = async (
 const writeGeneratedTitle = async (
     context: ActionContext,
     arguments_: {
-        expectedLeaf?: string | null;
+        expectedPromptId?: string;
         expectedTitle?: string;
         force: boolean;
         prompt: string;
@@ -1748,31 +1745,37 @@ const writeGeneratedTitle = async (
     );
 
     // The model answered after the checks above: the thread may have been locked, deleted, become host-run, been renamed,
-    // switched branch, or lost the requester's write access since. Each of those keeps the thread as it is, and the log says why.
+    // switched branch, or lost the requester's write access since. Each of those keeps the thread as it is.
     const afterModel = await titleIneligibility(context, arguments_);
 
-    if (afterModel) {
-        context.log.event("chat.thread_title", { skipped: `${afterModel}-after-generation` });
+    // The title the run read (a regenerate's click-time title, else the one read above). The write checks it, and the requester's
+    // admin access, in the same transaction, so a rename or a revoked grant committed since is kept.
+    const written =
+        afterModel === undefined &&
+        (await context.runMutation(internal.agent.threads.setGeneratedTitle, {
+            expectedTitle: arguments_.expectedTitle ?? metadata.title ?? "",
+            requestedBy: arguments_.requestedBy,
+            threadId: arguments_.threadId as Id<"threads">,
+            title: textResult.text,
+        }));
 
-        return;
-    }
+    // The model was billed whether or not the title was written: one event carries its usage, with the reason when it was not written.
+    const skipped = written ? undefined : skippedReason(afterModel);
 
-    // The title the run read (a regenerate's click-time title, else the one read above). The write checks it in the same transaction,
-    // so a rename committed since is kept even when the checks above passed a moment earlier.
-    const titleRead = arguments_.expectedTitle ?? metadata.title ?? "";
-    const written = await context.runMutation(internal.agent.threads.setGeneratedTitle, {
-        expectedTitle: titleRead,
-        threadId: arguments_.threadId as Id<"threads">,
-        title: textResult.text,
-    });
+    context.log.event("chat.thread_title", titleUsageEvent(model, textResult.usage, skipped));
+};
 
-    // The model was billed whether or not the title was written, so the usage is logged either way.
-    context.log.event("chat.thread_title", {
-        inputTokens: textResult.usage.inputTokens,
+/** Why a title model call's title was not written: the post-generation check's reason, or the write's own refusal. */
+const skippedReason = (afterModel: string | undefined): string => (afterModel === undefined ? "changed-before-write" : `${afterModel}-after-generation`);
+
+/** The one usage event a title model call records, whether its title was written or skipped (`skipped` names why it was not). */
+export const titleUsageEvent = (model: string, usage: { inputTokens?: number; outputTokens?: number }, skipped?: string) => {
+    return {
+        inputTokens: usage.inputTokens,
         model,
-        outputTokens: textResult.usage.outputTokens,
-        ...(!written && { skipped: "changed-before-write" }),
-    });
+        outputTokens: usage.outputTokens,
+        ...(skipped !== undefined && { skipped }),
+    };
 };
 
 export const createTitleChat = internalAction.input({ prompt: v.string(), threadId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
@@ -1780,7 +1783,8 @@ export const createTitleChat = internalAction.input({ prompt: v.string(), thread
 });
 
 /** The most rows read, oldest first, while looking for a title's prompt, and the page they are read in. */
-const REGENERATE_TITLE_WINDOW = 500;
+/** The first user prompt a title is read from, and the id of the message it came from (`undefined` when the row has none). */
+type TitlePrompt = { id: string | undefined; text: string };
 const TITLE_PROMPT_PAGE = 50;
 
 /**
@@ -1805,41 +1809,44 @@ const activeBranchPrompt = async (
     context: ActionContext,
     threadId: string,
     activeLeafMessageId: string | undefined,
-): Promise<{ kind: "prompt"; text: string | undefined } | { kind: "too-long" }> => {
+): Promise<{ kind: "prompt"; prompt?: TitlePrompt } | { kind: "too-long" }> => {
     if (activeLeafMessageId !== undefined) {
         const pathIds = await context.runQuery(internal.agent.branches.getActivePathIds, {
             leafMessageId: activeLeafMessageId as Id<"messages">,
             threadId: threadId as Id<"threads">,
         });
 
-        // A stored leaf that is gone leaves no branch to read: every branch's prompt is not this thread's title.
+        // No rows at all: a stored leaf that is gone falls back to the thread's own active path (`getActivePathIds`).
         if (pathIds === null) {
-            return { kind: "prompt", text: undefined };
+            return { kind: "prompt" };
         }
 
         if (pathIds === "too-long") {
             return { kind: "too-long" };
         }
 
-        for (let start = 0; start < Math.min(pathIds.length, REGENERATE_TITLE_WINDOW); start += TITLE_PROMPT_PAGE) {
+        // The whole path, which is at most TITLE_PATH_LIMIT rows: a prompt that sits past the first page is still found.
+        for (let start = 0; start < pathIds.length; start += TITLE_PROMPT_PAGE) {
             const rows = await context.runQuery(internal.agent.messages.getMessagesByIds, {
                 messageIds: pathIds.slice(start, start + TITLE_PROMPT_PAGE) as Id<"messages">[],
                 threadId: threadId as Id<"threads">,
             });
-            const prompt = firstUserPromptText(rows.filter((row) => row !== null).filter((row) => row.status === "success"));
+            const prompt = firstUserPrompt(rows.filter((row) => row !== null).filter((row) => row.status === "success"));
 
             if (prompt) {
-                return { kind: "prompt", text: prompt };
+                return { kind: "prompt", prompt };
             }
         }
 
-        return { kind: "prompt", text: undefined };
+        return { kind: "prompt" };
     }
 
+    // Unbranched: the rows are the path, read from the first row. Reading to the limit with no prompt and rows still left is "too long",
+    // not "no prompt": the prompt may be further on.
     let cursor: string | null = null;
 
-    for (let read = 0; read < REGENERATE_TITLE_WINDOW; read += TITLE_PROMPT_PAGE) {
-        const { continueCursor, isDone, page }: { continueCursor: string | null; isDone: boolean; page: Parameters<typeof firstUserPromptText>[0] } =
+    for (let read = 0; read < TITLE_PATH_LIMIT; read += TITLE_PROMPT_PAGE) {
+        const { continueCursor, isDone, page }: { continueCursor: string | null; isDone: boolean; page: Parameters<typeof firstUserPrompt>[0] } =
             await context.runQuery(internal.agent.messages.listMessagesByThreadIdInternal, {
                 excludeToolMessages: true,
                 order: "asc",
@@ -1847,20 +1854,20 @@ const activeBranchPrompt = async (
                 statuses: ["success"],
                 threadId: threadId as Id<"threads">,
             });
-        const prompt = firstUserPromptText(page);
+        const prompt = firstUserPrompt(page);
 
         if (prompt) {
-            return { kind: "prompt", text: prompt };
+            return { kind: "prompt", prompt };
         }
 
         if (isDone) {
-            break;
+            return { kind: "prompt" };
         }
 
         cursor = continueCursor;
     }
 
-    return { kind: "prompt", text: undefined };
+    return { kind: "too-long" };
 };
 
 /**
@@ -1893,19 +1900,18 @@ const runRegenerateTitle = async (context: ActionContext, arguments_: { expected
         return;
     }
 
-    const prompt = branch.text;
-
-    if (!prompt) {
+    if (!branch.prompt) {
         context.log.event("chat.thread_title", { skipped: "no-user-prompt" });
 
         return;
     }
 
+    // The write checks that this prompt is still on the active path, not the leaf: a later reply regenerated keeps the title.
     await writeGeneratedTitle(context, {
-        expectedLeaf: thread.activeLeafMessageId ?? null,
+        expectedPromptId: branch.prompt.id,
         expectedTitle: arguments_.expectedTitle,
         force: true,
-        prompt,
+        prompt: branch.prompt.text,
         requestedBy: arguments_.userId,
         stateless: true,
         threadId: arguments_.threadId,
@@ -1986,6 +1992,14 @@ export const regenerateThreadTitle = authAction
             throw new LunoraError("CONFLICT", "A locked chat keeps its title, so it cannot be regenerated.");
         }
 
+        // A regenerate already running for this thread is refused before the prompt is read: the read is the costly part, and the
+        // claim is the answer. The claim is still taken atomically below, so a race between two requests is decided there.
+        if (await context.runQuery(internal.lib.claim_once.claimHeld, { key: threadId, scope: REGENERATE_TITLE_SCOPE })) {
+            context.log.event("chat.regenerate_title", { refused: "in-flight" });
+
+            throw new LunoraError("CONFLICT", "A title is already being generated for this chat. Try again when it finishes.");
+        }
+
         // Refused here, where the owner can see why: a path past the read's limit, or no user prompt to title the chat from. The job
         // finds the same prompt again, so nothing is scheduled for a regenerate that would change nothing.
         const branch = await activeBranchPrompt(context, threadId, thread.activeLeafMessageId);
@@ -1994,7 +2008,7 @@ export const regenerateThreadTitle = authAction
             throw new LunoraError("CONFLICT", "This chat is too long to retitle from its first prompt.");
         }
 
-        if (!branch.text) {
+        if (!branch.prompt) {
             throw new LunoraError("CONFLICT", "This chat has no user prompt to title it from.");
         }
 
@@ -2041,6 +2055,16 @@ export const regenerateThreadTitle = authAction
  */
 const THREAD_CATEGORIES = ["coding", "writing", "research", "analysis", "brainstorming", "math", "learning", "business", "creative", "general"] as const;
 
+/**
+ * Whether a background model call for this thread must not be dispatched now: the thread is gone, locked or deleted. It reads the
+ * thread again, so a lock committed during the job's setup is seen. The call itself is not covered: the agent's request runs after this.
+ */
+export const refusedBeforeDispatch = async (context: ActionContext, threadId: string): Promise<boolean> => {
+    const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
+
+    return !thread || isThreadLocked(thread) || thread.deletedAt !== undefined;
+};
+
 export const createCategoryChat = internalAction.input({ prompt: v.string(), threadId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
     // As in `createTitleChat`: a thread that is gone is skipped, not retried.
     const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
@@ -2077,6 +2101,13 @@ export const createCategoryChat = internalAction.input({ prompt: v.string(), thr
 
     // Don't re-categorize if already set
     if (metadata.category) {
+        return;
+    }
+
+    // Read again right before the call: the lock checked above ran before the model setup.
+    if (await refusedBeforeDispatch(context, arguments_.threadId)) {
+        context.log.event("chat.thread_category", { skipped: "refused-before-dispatch" });
+
         return;
     }
 
@@ -2140,6 +2171,13 @@ export const createSummarizeChat = internalAction.input({ threadId: v.string(), 
         threadId: thread.threadId,
         userId,
     });
+
+    // Read again right before the call: the messages were read after the lock check at entry. Nothing below awaits before the call.
+    if (await refusedBeforeDispatch(context, arguments_.threadId)) {
+        context.log.event("chat.thread_summary", { skipped: "refused-before-dispatch" });
+
+        return;
+    }
 
     // Limit messages for summarization to avoid memory issues
     // Take the last 50 messages (or fewer if the conversation is shorter)

@@ -65,7 +65,7 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { internalMutation } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { patchRow } from "./patch";
 
 /**
@@ -384,6 +384,12 @@ export const retryReleaseKey = internalMutation
 
         return null;
     });
+
+/** {@link hasClaim} as a read, for a caller that wants to refuse before it does any work. Taking the claim is still the atomic step. */
+export const claimHeld = internalQuery
+    .input({ key: v.string(), scope: v.string() })
+    .output(v.boolean())
+    .query(async ({ args: { key, scope }, ctx }) => await hasClaim(ctx, scope, key));
 
 export const releaseKey = internalMutation
     .input({ claimedAt: v.optional(v.number()), key: v.string(), scope: v.string() })

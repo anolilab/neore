@@ -174,9 +174,12 @@ export const getActivePathIds = internalQuery
     .input({ leafMessageId: v.id("messages"), threadId: v.id("threads") })
     .output(v.union(v.null(), v.array(v.string()), v.literal("too-long")))
     .query(async ({ args, ctx }) => {
-        const leaf = await ctx.db.get("messages", args.leafMessageId);
+        // The stored leaf, or, when its row is gone, the thread's own active path as the thread view shows it (`resolveLeafRow`).
+        // Taking the path from the leaf alone would read as "no rows" and refuse a thread that still has its prompts on screen.
+        const stored = await ctx.db.get("messages", args.leafMessageId);
+        const leaf = stored && stored.threadId === args.threadId ? stored : await resolveLeafRow(ctx, args.threadId, args.leafMessageId);
 
-        if (!leaf || leaf.threadId !== args.threadId) {
+        if (!leaf) {
             return null;
         }
 

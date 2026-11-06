@@ -26,8 +26,10 @@ const threadWith = async (fields: Record<string, unknown> = {}) =>
         async (context: any) => await context.db.insert("threads", { model: "gpt-4o", status: "active", title: "Old", userId: OWNER, ...fields }),
     )) as string;
 
-const writeTitle = async (threadId: string, expectedTitle: string) =>
-    await harness.run(async (context: any) => await writeTitleIfUnchanged(context, { expectedTitle, threadId: threadId as Id<"threads">, title: "Generated" }));
+const writeTitle = async (threadId: string, expectedTitle: string, requestedBy?: string) =>
+    await harness.run(
+        async (context: any) => await writeTitleIfUnchanged(context, { expectedTitle, requestedBy, threadId: threadId as Id<"threads">, title: "Generated" }),
+    );
 
 const titleOf = async (threadId: string): Promise<string | undefined> => {
     const thread = (await harness.run(async (context: any) => await context.db.get("threads", threadId))) as { title?: string };
@@ -86,5 +88,31 @@ describe("writing a title to a thread that is gone", () => {
         await harness.run(async (context: any) => await context.db.delete("threads", threadId));
 
         await expect(writeTitle(threadId, "Old")).resolves.toBe(false);
+    });
+});
+
+describe("writing a generated title for a requester", () => {
+    const GRANTEE = "user-grantee";
+
+    it("writes for an admin grantee, and refuses the write once the grant is revoked, keeping the title", async () => {
+        const threadId = await threadWith({ title: "Old" });
+        const grantId = (await harness.run(
+            async (context: any) => await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "admin", threadId, userId: GRANTEE }),
+        )) as string;
+
+        await expect(writeTitle(threadId, "Old", GRANTEE)).resolves.toBe(true);
+
+        await harness.run(async (context: any) => await context.db.delete("threadAccess", grantId));
+
+        // The grant is revoked after the job's own check: the write itself refuses, so the title it generated is not kept.
+        await expect(writeTitle(threadId, "Generated", GRANTEE)).resolves.toBe(false);
+        await expect(titleOf(threadId)).resolves.toBe("Generated");
+    });
+
+    it("writes for the owner, who holds admin access without a grant", async () => {
+        const threadId = await threadWith({ title: "Old" });
+
+        await expect(writeTitle(threadId, "Old", OWNER)).resolves.toBe(true);
+        await expect(titleOf(threadId)).resolves.toBe("Generated");
     });
 });

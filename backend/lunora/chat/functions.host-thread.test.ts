@@ -8,8 +8,18 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 
+import { BRANCH_ROOT } from "../agent/branch-tree";
 import schema from "../schema";
-import { branchThread, continueThread, generateSummary, getFollowupSuggestions, regenerateThreadTitle } from "./functions";
+import {
+    branchThread,
+    continueThread,
+    generateSummary,
+    getFollowupSuggestions,
+    refusedBeforeDispatch,
+    regenerateThreadTitle,
+    titleIneligibility,
+    titleUsageEvent,
+} from "./functions";
 
 const OWNER = "user-owner";
 
@@ -73,6 +83,32 @@ afterEach(() => {
     harness.close();
 });
 
+/**
+ * Appends a message to a thread's tree: a row with no parent is a root; any other row is linked by `parentMessageId`, as a branch stores
+ * it. A parent must come before its child in storage order (`order` rises down a branch), so every row takes the next order.
+ */
+let lastOrder = 0;
+
+const appendMessage = async (thread: string, parent: string | undefined, fields: Record<string, unknown>): Promise<string> => {
+    lastOrder += 1;
+
+    const order = lastOrder;
+
+    return (await harness.run(
+        async (context: any) =>
+            await context.db.insert("messages", {
+                order,
+                status: "success",
+                stepOrder: 0,
+                threadId: thread,
+                tool: false,
+                userId: OWNER,
+                ...(parent !== undefined && { parentMessageId: parent }),
+                ...fields,
+            }),
+    )) as string;
+};
+
 describe("a host-run thread", () => {
     it("has no summary generated from its messages", async () => {
         await expect(harness.withIdentity({ userId: OWNER }).action(generateSummary as never, { threadId } as never)).rejects.toMatchObject({
@@ -96,6 +132,23 @@ describe("a host-run thread", () => {
         await expect(harness.withIdentity({ userId: OWNER }).action(branchThread as never, { threadId } as never)).rejects.toMatchObject({
             code: "CONFLICT",
         });
+    });
+});
+
+describe("the last check before a background model call", () => {
+    const insertCloud = async (fields: Record<string, unknown>) =>
+        (await harness.run(
+            async (context: any) => await context.db.insert("threads", { model: "gpt-4o", status: "active", title: "Cloud", userId: OWNER, ...fields }),
+        )) as string;
+
+    it("refuses a locked or deleted thread just before the call, and allows an open one", async () => {
+        const locked = await insertCloud({ lockedAt: 1000 });
+        const deleted = await insertCloud({ deletedAt: 1000 });
+        const open = await insertCloud({});
+
+        await expect(harness.run(async (context: any) => await refusedBeforeDispatch(context, locked))).resolves.toBe(true);
+        await expect(harness.run(async (context: any) => await refusedBeforeDispatch(context, deleted))).resolves.toBe(true);
+        await expect(harness.run(async (context: any) => await refusedBeforeDispatch(context, open))).resolves.toBe(false);
     });
 });
 
@@ -179,7 +232,7 @@ describe("regenerating the title of a cloud thread", () => {
         expect(keys.filter((key) => key === cloud)).toHaveLength(1);
     });
 
-    it("refuses a stored leaf that no longer exists, rather than titling from another branch", async () => {
+    it("titles a chat whose stored leaf is gone from the path the thread shows, not refused as having no prompt", async () => {
         const cloud = await cloudThread();
 
         await harness.run(async (context: any) => {
@@ -197,10 +250,84 @@ describe("regenerating the title of a cloud thread", () => {
             await context.db.patch("threads", cloud, { activeLeafMessageId: gone });
         });
 
-        await expect(harness.withIdentity({ userId: OWNER }).action(regenerateThreadTitle as never, { threadId: cloud } as never)).rejects.toMatchObject({
-            code: "CONFLICT",
+        await expect(harness.withIdentity({ userId: OWNER }).action(regenerateThreadTitle as never, { threadId: cloud } as never)).resolves.toEqual({
+            success: true,
         });
-        expect(await regenerateClaimKeys()).not.toContain(cloud);
+        expect(await regenerateClaimKeys()).toContain(cloud);
+    });
+
+    it("refuses a duplicate click at the claim, before it reads the prompt", async () => {
+        const cloud = await cloudThread();
+        const owner = harness.withIdentity({ userId: OWNER });
+
+        await owner.action(regenerateThreadTitle as never, { threadId: cloud } as never);
+
+        // The prompt is gone, so a read would find none: only the claim can explain the refusal.
+        await harness.run(async (context: any) => {
+            const rows = await context.db.query("messages").collect();
+
+            for (const row of rows) {
+                if (row.threadId === cloud) {
+                    await context.db.delete("messages", row._id);
+                }
+            }
+        });
+
+        await expect(owner.action(regenerateThreadTitle as never, { threadId: cloud } as never)).rejects.toMatchObject({
+            message: expect.stringContaining("already being generated"),
+        });
+    });
+
+    it("titles a long branched chat from a prompt past the first page of its path", async () => {
+        const cloud = await insertThread({});
+        let parent: string | undefined;
+
+        for (let index = 0; index < 520; index += 1) {
+            parent = await appendMessage(cloud, parent, { message: { content: `Reply ${index}`, role: "assistant" } });
+        }
+
+        const prompt = await appendMessage(cloud, parent, { message: { content: "Plan a trip to Lisbon", role: "user" } });
+        const reply = await appendMessage(cloud, prompt, { message: { content: "Sure", role: "assistant" } });
+
+        await harness.run(async (context: any) => await context.db.patch("threads", cloud, { activeLeafMessageId: reply }));
+
+        await expect(harness.withIdentity({ userId: OWNER }).action(regenerateThreadTitle as never, { threadId: cloud } as never)).resolves.toEqual({
+            success: true,
+        });
+    });
+
+    it("keeps a title while its prompt is still on the active path, and drops it once the prompt is on another branch", async () => {
+        const cloud = await insertThread({});
+        const prompt = await appendMessage(cloud, undefined, { message: { content: "Plan a trip", role: "user" } });
+
+        await appendMessage(cloud, prompt, { message: { content: "Sure", role: "assistant" } });
+
+        // A later reply regenerated: the leaf moved to a sibling reply, but the prompt is still on the path.
+        const regenerated = await appendMessage(cloud, prompt, { message: { content: "Certainly", role: "assistant" } });
+
+        await harness.run(async (context: any) => await context.db.patch("threads", cloud, { activeLeafMessageId: regenerated }));
+        await expect(harness.run(async (context: any) => await titleIneligibility(context, { expectedPromptId: prompt, threadId: cloud }))).resolves.toBe(
+            undefined,
+        );
+
+        // The first prompt was edited: the edit is another root, so the original prompt is on no path now.
+        // The edit is a root of its own: marked BRANCH_ROOT, so it does not adopt the row before it in storage order.
+        const edited = await appendMessage(cloud, BRANCH_ROOT, { message: { content: "Plan a trip to Porto", role: "user" } });
+
+        await harness.run(async (context: any) => await context.db.patch("threads", cloud, { activeLeafMessageId: edited }));
+        await expect(harness.run(async (context: any) => await titleIneligibility(context, { expectedPromptId: prompt, threadId: cloud }))).resolves.toBe(
+            "branch-switched",
+        );
+    });
+
+    it("records a title call's tokens and model whether or not the title was written", () => {
+        expect(titleUsageEvent("model-a", { inputTokens: 5, outputTokens: 2 })).toStrictEqual({ inputTokens: 5, model: "model-a", outputTokens: 2 });
+        expect(titleUsageEvent("model-a", { inputTokens: 5, outputTokens: 2 }, "changed-before-write")).toStrictEqual({
+            inputTokens: 5,
+            model: "model-a",
+            outputTokens: 2,
+            skipped: "changed-before-write",
+        });
     });
 
     it("does not coalesce requests for different threads", async () => {
