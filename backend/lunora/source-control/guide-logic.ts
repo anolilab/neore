@@ -209,20 +209,29 @@ const DEFAULT_IGNORABLE = /\p{Default_Ignorable_Code_Point}/u;
  * escape already written in the source reads differently from the character it spells. Line breaks and tabs stay as they
  * are, so a patch keeps its shape. A patch's text is evidence for the model: it is shown, not removed.
  */
-export const showHiddenText = (value: string): string =>
-    [...value]
-        .map((char) => {
-            if (char === BACKSLASH) {
-                return BACKSLASH + BACKSLASH;
-            }
+/**
+ * One character as a patch shows it. A backslash is doubled only where it could read as an escape: before a `u`, or before a
+ * character that is itself written as one. Other backslashes (a regex's `\d`, a string's `\n`) read as written. `next` is
+ * the character after it.
+ */
+export const showHiddenChar = (char: string, next: string | undefined): string => {
+    if (char === BACKSLASH) {
+        return next === "u" || (next !== undefined && NEEDS_LOOK.test(next)) ? BACKSLASH + BACKSLASH : char;
+    }
 
-            if (!NEEDS_LOOK.test(char) || (VISIBLE_LETTER.test(char) && !DEFAULT_IGNORABLE.test(char))) {
-                return char;
-            }
+    if (!NEEDS_LOOK.test(char) || (VISIBLE_LETTER.test(char) && !DEFAULT_IGNORABLE.test(char))) {
+        return char;
+    }
 
-            return UNSHOWN_IN_PATH.test(char) || removedByCleaner(char) ? escapeChar(char) : char;
-        })
-        .join("");
+    return UNSHOWN_IN_PATH.test(char) || removedByCleaner(char) ? escapeChar(char) : char;
+};
+
+/** `value` with each character shown as `showHiddenChar` shows it. */
+export const showHiddenText = (value: string): string => {
+    const chars = [...value];
+
+    return chars.map((char, index) => showHiddenChar(char, chars[index + 1])).join("");
+};
 
 /** A character escaped as `\uXXXX`, or `\u{XXXXX}` past the BMP. */
 const escapeChar = (char: string): string => {

@@ -168,6 +168,12 @@ describe("assembleGuide", () => {
         expect(written).not.toBe(real);
     });
 
+    it("doubles a backslash only where it could read as an escape", () => {
+        expect(showHiddenText(String.raw`\d+\n`)).toBe(String.raw`\d+\n`);
+        expect(showHiddenText(String.raw`\u200B`)).toBe(String.raw`\\u200B`);
+        expect(showHiddenText(`\\\u{200B}`)).toBe(String.raw`\\\u200B`);
+    });
+
     it("escapes an invisible letter such as a Hangul filler, which is a letter but is not shown", () => {
         expect(showHiddenText("a\u{3164}b")).toBe(String.raw`a\u3164b`);
         expect(showHiddenText("a\u{115F}b")).toBe(String.raw`a\u115Fb`);

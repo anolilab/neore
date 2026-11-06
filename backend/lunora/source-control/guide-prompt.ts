@@ -13,7 +13,7 @@ import { stripHiddenText } from "@neore/ai/utils";
 import { MAX_DEVICE_INPUT_BYTES } from "../devices/lib/constants";
 import { utf8Length } from "../devices/lib/signing";
 import type { GuideFile } from "./guide-logic";
-import { encodePath, isMechanicalFile, showHiddenText } from "./guide-logic";
+import { encodePath, isMechanicalFile, showHiddenChar } from "./guide-logic";
 
 export interface GuidePromptInput {
     baseBranch: string;
@@ -154,8 +154,10 @@ const boundedPatch = (patch: string, budget: number): string => {
 
     let shown = "";
 
-    for (const char of patch.slice(0, PATCH_FILE_MAX_CHARS)) {
-        const piece = showHiddenText(char);
+    const chars = [...patch.slice(0, PATCH_FILE_MAX_CHARS)];
+
+    for (const [index, char] of chars.entries()) {
+        const piece = showHiddenChar(char, chars[index + 1]);
 
         if (shown.length + piece.length > limit) {
             break;
