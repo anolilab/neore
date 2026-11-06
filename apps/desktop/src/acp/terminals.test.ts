@@ -168,4 +168,31 @@ describe(SessionTerminals, () => {
         expect(release).toHaveBeenCalledWith(7);
         expect(terminals.live).toBe(0);
     });
+
+    it("waits on the core once per command, however often the agent asks for its exit", async () => {
+        const exit = { exitCode: 3, signal: null };
+        const finishes: ((status: typeof exit) => void)[] = [];
+        const host = {
+            kill: vi.fn(),
+            output: vi.fn(),
+            release: vi.fn(),
+            start: vi.fn(async () => 5),
+            wait: vi.fn(
+                async () =>
+                    await new Promise<typeof exit>((resolve) => {
+                        finishes.push(resolve);
+                    }),
+            ),
+        };
+        const terminals = new SessionTerminals(host as never, () => {});
+        const id = await terminals.create(request);
+        // Asked while the command still runs: each ask must share the one wait the terminal already has in the core.
+        const asks = [terminals.waitForExit(id), terminals.waitForExit(id), terminals.waitForExit(id)];
+
+        finishes[0]?.(exit);
+
+        await expect(Promise.all(asks)).resolves.toEqual([exit, exit, exit]);
+        expect(host.wait).toHaveBeenCalledTimes(1);
+    });
+
 });

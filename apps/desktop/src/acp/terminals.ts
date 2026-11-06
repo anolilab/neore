@@ -199,6 +199,8 @@ interface OpenTerminal {
     cancelled?: boolean;
     /** Set once the command ended: what it printed (raw) and how it ended, for the tool row that shows it. */
     ended?: { exit: TerminalExitStatus; output: string; truncated: boolean };
+    /** How the command ended. The one core wait for this terminal: every `terminal/wait_for_exit` shares it. */
+    exited: Promise<TerminalExitStatus>;
     handle: number;
     released: boolean;
     /** The turn that started the command: a cancel of that turn stops it, and no other turn's. */
@@ -266,7 +268,7 @@ export class SessionTerminals {
         }
 
         const terminalId = `term_${randomUUID()}`;
-        const terminal: OpenTerminal = { handle, released: false, turnId };
+        const terminal: OpenTerminal = { exited: this.host.wait(handle), handle, released: false, turnId };
 
         this.open.set(terminalId, terminal);
         this.watch(terminalId, terminal);
@@ -285,14 +287,9 @@ export class SessionTerminals {
         return this.host.output(terminal.handle);
     }
 
+    /** How the command ended, once it has. Asking again does not start another wait in the core: each one holds a thread there. */
     public async waitForExit(terminalId: string): Promise<TerminalExitStatus> {
-        const terminal = this.require(terminalId);
-
-        if (terminal.ended !== undefined) {
-            return terminal.ended.exit;
-        }
-
-        return await this.host.wait(terminal.handle);
+        return await this.require(terminalId).exited;
     }
 
     public kill(terminalId: string): void {
@@ -375,7 +372,7 @@ export class SessionTerminals {
     /** Records how the command ended (its output is read now, before a release can free it) and says so. */
     private async watch(terminalId: string, terminal: OpenTerminal): Promise<void> {
         try {
-            const exit = await this.host.wait(terminal.handle);
+            const exit = await terminal.exited;
             let output = "";
             let truncated = false;
 
