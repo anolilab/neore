@@ -474,10 +474,7 @@ export const runChatStart = async (
 
     // The shape is checked here. `runChatStartOnShard` then refuses with 400 any id that is not one of the caller's held notes in
     // the target chat (`getGuestNoteForSend`), and saves that note's own text.
-    if (
-        body.guestMessageId !== undefined &&
-        (typeof body.guestMessageId !== "string" || body.guestMessageId.length === 0 || body.guestMessageId.length > 200)
-    ) {
+    if (body.guestMessageId !== undefined && !isValidDocumentIdFormat(body.guestMessageId)) {
         return Response.json({ error: "Invalid guestMessageId" }, { status: 400 });
     }
 
