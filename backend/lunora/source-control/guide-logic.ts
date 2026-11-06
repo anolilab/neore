@@ -210,13 +210,13 @@ const DEFAULT_IGNORABLE = /\p{Default_Ignorable_Code_Point}/u;
  * are, so a patch keeps its shape. A patch's text is evidence for the model: it is shown, not removed.
  */
 /**
- * One character as a patch shows it. A backslash is doubled only where it could read as an escape: before a `u`, or before a
- * character that is itself written as one. Other backslashes (a regex's `\d`, a string's `\n`) read as written. `next` is
+ * One character as a patch shows it. A backslash is doubled only where it could read as an escape: before another backslash,
+ * before a `u`, or before a character that is itself written as one. Other backslashes (a regex's `\d`, a string's `\n`) read as written. `next` is
  * the character after it.
  */
 export const showHiddenChar = (char: string, next: string | undefined): string => {
     if (char === BACKSLASH) {
-        return next === "u" || (next !== undefined && NEEDS_LOOK.test(next)) ? BACKSLASH + BACKSLASH : char;
+        return next === BACKSLASH || next === "u" || (next !== undefined && NEEDS_LOOK.test(next)) ? BACKSLASH + BACKSLASH : char;
     }
 
     if (!NEEDS_LOOK.test(char) || (VISIBLE_LETTER.test(char) && !DEFAULT_IGNORABLE.test(char))) {

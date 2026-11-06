@@ -174,6 +174,13 @@ describe("assembleGuide", () => {
         expect(showHiddenText(`\\\u{200B}`)).toBe(String.raw`\\\u200B`);
     });
 
+    it("shows a backslash run before a u differently from a backslash before a hidden character", () => {
+        const literal = showHiddenText(String.raw`\\u200B`);
+        const real = showHiddenText("\\\u{200B}");
+
+        expect(literal).not.toBe(real);
+    });
+
     it("escapes an invisible letter such as a Hangul filler, which is a letter but is not shown", () => {
         expect(showHiddenText("a\u{3164}b")).toBe(String.raw`a\u3164b`);
         expect(showHiddenText("a\u{115F}b")).toBe(String.raw`a\u115Fb`);
