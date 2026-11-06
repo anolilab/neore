@@ -1017,7 +1017,11 @@ export class AgentSession {
             // A terminal that printed nothing (or was released before its output was read) keeps what the call's own content showed.
             const fromTerminal = ended === undefined || ended.output === "" ? undefined : cutTerminal(ended, this.options.process.secretLength);
             const printed = fromTerminal ?? this.toolOutput.get(tool.id);
-            const output = printed === undefined ? undefined : outputTail(printed, scrub);
+            // While the call runs, its own text may end in the middle of a configured value that the next update completes: that edge
+            // is held back, as the reply text is. Once the call is final, or its terminal has ended, the text is final and shown whole.
+            const running = (tool.status === "pending" || tool.status === "in_progress") && fromTerminal === undefined;
+            const holdback = running ? Math.max(0, this.options.process.secretLength - 1) : 0;
+            const output = printed === undefined ? undefined : outputTail(printed, scrub, holdback);
             const exit = ended === undefined ? undefined : exitReport(ended.exit);
 
             this.observe((observer) =>

@@ -29,6 +29,18 @@ describe(terminalIdOf, () => {
 });
 
 describe(outputTail, () => {
+    it("holds back the trailing characters that may start a configured value, while the call runs", () => {
+        const scrub = (value: string) => value.replaceAll("TOKEN-123", "***");
+
+        // "building TOKEN-" ends in the first part of a value: its last eight characters are not posted, the rest is.
+        expect(outputTail("building TOKEN-", scrub, 8)).toBe("buildin");
+    });
+
+    it("does not post half of a character outside the basic plane at the held-back edge", () => {
+        // Holding back one unit splits the emoji, so its first half would end the tail.
+        expect(outputTail("ab😀", (value) => value, 1)).toBe("ab");
+    });
+
     it("does not start a tail on half of a character outside the basic plane", () => {
         // The cut falls between the two halves of an emoji, so the unshortened tail would start on its second half.
         const raw = `${"x".repeat(10)}😀${"y".repeat(MAX_TOOL_OUTPUT_CHARS - 1)}`;

@@ -63,14 +63,21 @@ export const cutTerminal = (ended: { output: string; truncated: boolean }, secre
 
 /** A lone low surrogate at the start: the second half of a character the cut split. */
 const LOW_SURROGATE = /^[\uDC00-\uDFFF]/u;
+/** A lone high surrogate at the end: the first half of a character the holdback split. */
+const HIGH_SURROGATE = /[\uD800-\uDBFF]$/u;
 
 /**
- * The tail a row shows: masked whole first, then cut, so the cut never leaves part of a masked value. The cut counts UTF-16
- * units, so it can fall between the halves of a character outside the basic plane; such a tail starts without its second
- * half, which is one unit shorter than the limit and never a lone surrogate.
+ * The tail a row shows: masked whole first, then cut, so the cut never leaves part of a masked value. While a call still runs,
+ * `holdback` characters at the end are not shown: they may be the start of a configured value that the next update completes
+ * (the reply text is held back the same way, `observeDelta`). The cut counts UTF-16 units, so it can fall between the halves of
+ * a character outside the basic plane; the tail then starts, or the held-back edge ends, without a lone surrogate, and is at most
+ * one unit shorter than the limit.
  */
-export const outputTail = (raw: string, scrub: (value: string) => string): string => {
-    const tail = scrub(raw).slice(-MAX_TOOL_OUTPUT_CHARS);
+export const outputTail = (raw: string, scrub: (value: string) => string, holdback = 0): string => {
+    const scrubbed = scrub(raw);
+    const shown = scrubbed.slice(0, Math.max(0, scrubbed.length - holdback));
+    const tail = shown.slice(-MAX_TOOL_OUTPUT_CHARS);
+    const start = LOW_SURROGATE.test(tail) ? tail.slice(1) : tail;
 
-    return LOW_SURROGATE.test(tail) ? tail.slice(1) : tail;
+    return HIGH_SURROGATE.test(start) ? start.slice(0, -1) : start;
 };
