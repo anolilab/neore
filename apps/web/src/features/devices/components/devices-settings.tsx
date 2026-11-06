@@ -246,7 +246,7 @@ export const DeviceRow: FC<{
                     </p>
                 )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
                 {isThisComputer && <Badge variant="outline">{t`This computer`}</Badge>}
                 {device.transport === "ssh" && <Badge variant="outline">{t`Server over SSH`}</Badge>}
                 <Badge variant={online ? "default" : "secondary"}>{online ? t`Online` : t`Offline`}</Badge>
