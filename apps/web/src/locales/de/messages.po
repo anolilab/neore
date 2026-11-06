@@ -6666,7 +6666,7 @@ msgid "compact"
 msgstr "kompakt"
 
 #: src/features/appearance/components/appearance-controls.tsx:108
-#: src/features/chat/compaction/compaction-chip.tsx:73
+#: src/features/chat/compaction/compaction-chip.tsx:74
 msgid "Compact"
 msgstr "Komprimieren"
 
@@ -6698,7 +6698,7 @@ msgstr "Kompaktes Modell mit transparentem Denken"
 msgid "Compact reasoning tasks requiring Arcee's efficient small model"
 msgstr "Kompakte Reasoning-Aufgaben, die Arcees effizientes kleines Modell erfordern"
 
-#: src/features/chat/compaction/compaction-chip.tsx:64
+#: src/features/chat/compaction/compaction-chip.tsx:65
 msgid "Compact the conversation before the next prompt"
 msgstr "Die Unterhaltung vor der nächsten Nachricht komprimieren"
 
@@ -8054,7 +8054,7 @@ msgstr "Vorschau nicht möglich · Zum Herunterladen klicken"
 msgid "Could not pull {0}: {1}"
 msgstr "{0} konnte nicht heruntergeladen werden: {1}"
 
-#: src/features/chat/core/context/chat-context.tsx:658
+#: src/features/chat/core/context/chat-context.tsx:662
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr ""
 
@@ -18110,7 +18110,7 @@ msgstr "Wird geladen…"
 msgid "local"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:707
+#: src/features/chat/core/context/chat-context.tsx:711
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "Lokale Modelle verarbeiten nur Text. Entferne die Anhänge, um zu senden."
 
@@ -25860,7 +25860,7 @@ msgstr "Antworten"
 msgid "Reply complete"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:625
+#: src/features/chat/core/context/chat-context.tsx:626
 msgid "Reply ready"
 msgstr "Antwort bereit"
 
@@ -31645,7 +31645,7 @@ msgstr "Dieser Chat kann nicht komprimiert werden."
 msgid "This chat could not be found."
 msgstr ""
 
-#: src/features/chat/compaction/compaction-chip.tsx:77
+#: src/features/chat/compaction/compaction-chip.tsx:78
 msgid "This chat has been idle, so the model's cache has expired. Condense the older messages to make the next reply cheaper. Your chat is unchanged."
 msgstr "Dieser Chat war inaktiv, daher ist der Cache des Modells abgelaufen. Komprimiere die älteren Nachrichten, damit die nächste Antwort günstiger wird. Dein Chat bleibt unverändert."
 
@@ -34831,7 +34831,7 @@ msgstr ""
 msgid "Watched repositories"
 msgstr ""
 
-#: src/features/chat/core/context/chat-context.tsx:709
+#: src/features/chat/core/context/chat-context.tsx:713
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "Wir konnten deine Sitzung nicht rechtzeitig bestätigen. Deine Nachricht ist noch im Eingabefeld. Bitte versuche erneut, sie zu senden."
 
@@ -35749,7 +35749,7 @@ msgstr "Dein KI-Arbeitsbereich <0>beginnt hier.</0>"
 msgid "Your answer"
 msgstr "Deine Antwort"
 
-#: src/features/chat/core/context/chat-context.tsx:625
+#: src/features/chat/core/context/chat-context.tsx:626
 msgid "Your answer in Neore has finished."
 msgstr "Die Antwort in Neore ist fertig."
 
@@ -35878,7 +35878,7 @@ msgstr "Dein lokaler Server hat geantwortet, diese Website aber abgelehnt (CORS)
 msgid "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgstr "Dein Standort (z. B. „New York, USA“, „Berlin, Deutschland“)."
 
-#: src/features/chat/core/context/chat-context.tsx:706
+#: src/features/chat/core/context/chat-context.tsx:710
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Deine Nachricht enthält unangemessene Inhalte und kann nicht gesendet werden."
 
