@@ -5,7 +5,7 @@
 import { ANONYMOUS_FREE_MODEL, DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { MODEL_REGISTRY } from "@neore/ai/models";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { FC, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -90,10 +90,28 @@ const renderAction = (cachedBots?: { _id: string; model: string }[], text = "Sum
     render(<CopyPromptLinkAction message={messageOf(text)} />, { wrapper: Wrapper });
 };
 
-/** Clicks the rendered "Copy prompt link" control, as a person does. */
+/**
+ * Clicks the rendered "Copy prompt link" control with the events a person's click produces: the pointer and mouse go down, the
+ * control takes focus, then the pointer and mouse go up and the click fires. Those are the events a click dispatches in a
+ * browser; this does not use the user-event library, which this repository does not depend on.
+ */
 const clickCopy = (): void => {
-    fireEvent.click(screen.getByRole("button", { name: "Copy prompt link" }));
+    const button = screen.getByRole("button", { name: "Copy prompt link" });
+
+    fireEvent.pointerDown(button);
+    fireEvent.mouseDown(button);
+    act(() => {
+        button.focus();
+    });
+    fireEvent.pointerUp(button);
+    fireEvent.mouseUp(button);
+    fireEvent.click(button);
 };
+
+/** Stands in for the ResizeObserver that the tooltip positions itself with; the environment's own stand-in is not constructible. */
+function ResizeObserverStub() {
+    return { disconnect: () => undefined, observe: () => undefined, unobserve: () => undefined };
+}
 
 const writeText = vi.fn<(text: string) => Promise<void>>();
 
@@ -111,6 +129,8 @@ class FakeClipboardItem {
 
 describe("CopyPromptLinkAction", () => {
     beforeEach(() => {
+        // Focus opens the control's tooltip, which positions itself with a ResizeObserver: the environment's stand-in is not constructible.
+        vi.stubGlobal("ResizeObserver", vi.fn(ResizeObserverStub));
         writeText.mockReset();
         writeText.mockResolvedValue(undefined);
         Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
@@ -318,6 +338,21 @@ describe("CopyPromptLinkAction", () => {
         clickCopy();
 
         await waitFor(() => expect(harness.showError).toHaveBeenCalledWith("This message is too long to copy as a prompt link."));
+        expect(writeText).not.toHaveBeenCalled();
+    });
+
+    it("names the model notice, not the generic copy error, when a bot's model cannot go in a link", async () => {
+        expect(imageModel).toBeDefined();
+
+        harness.thread = { botId: "bot-1" };
+        harness.bots = [{ _id: "bot-1", model: imageModel?.id ?? "" }];
+
+        renderAction(harness.bots);
+
+        clickCopy();
+
+        await waitFor(() => expect(harness.showError).toHaveBeenCalledWith("A prompt link cannot name this chat's model, so no link was copied."));
+        expect(harness.showError).not.toHaveBeenCalledWith("Could not copy the link");
         expect(writeText).not.toHaveBeenCalled();
     });
 
