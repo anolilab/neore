@@ -718,6 +718,26 @@ describe("the options the agent offers", () => {
         expect(mutations()).toHaveLength(0);
     });
 
+    it("shows a mode option read-only whatever the case of its category, since the computer refuses that change", async () => {
+        const MODE = {
+            category: "Mode",
+            choices: [
+                { name: "Ask", value: "ask" },
+                { name: "Code", value: "code" },
+            ],
+            currentValue: "ask",
+            id: "mode",
+            name: "Mode",
+        };
+
+        mountWith({ agentState: { configOptions: [MODE, MODEL] } });
+
+        expect(await screen.findByLabelText("Model")).toBeTruthy();
+        expect(screen.queryByLabelText("Mode")).toBeNull();
+        expect(screen.getByText("Ask", { selector: "span" })).toBeTruthy();
+        expect(mutations()).toHaveLength(0);
+    });
+
     it("keeps the controls off once the session has ended", async () => {
         mountWith({ agentState: { configOptions: [MODEL] }, status: "ended" });
 
