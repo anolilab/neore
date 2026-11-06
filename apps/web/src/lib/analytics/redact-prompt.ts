@@ -33,6 +33,12 @@ const ENCODED_RUN = /(?:%[\da-f]{2})+/gi;
 /** Decoding stops as soon as a pass changes nothing; this bounds a value that keeps changing. Each pass removes one encoding layer. */
 const MAX_DECODE_PASSES = 64;
 
+/**
+ * A fragment longer than this is not scanned. Its `#` signs each recurse once, so an unbounded fragment can overflow the stack, and a
+ * long one costs time in every pass. A fragment over the bound is removed whole: the prompt must not survive in it.
+ */
+const MAX_FRAGMENT_SCAN_CHARS = 2048;
+
 const isPlainObject = (value: unknown): value is Record<string, unknown> => {
     if (value === null || typeof value !== "object") {
         return false;
@@ -147,7 +153,13 @@ export const redactPromptFromUrl = (value: string): string => {
     const hashAt = value.indexOf("#");
     const body = hashAt === -1 ? value : value.slice(0, hashAt);
     const fragment = hashAt === -1 ? undefined : value.slice(hashAt + 1);
-    const cleanedFragment = fragment === undefined ? undefined : redactPromptFromUrl(fragment);
+    let cleanedFragment: string | undefined;
+
+    if (fragment !== undefined) {
+        // A fragment too long to scan is removed whole, so a `#`-heavy or huge fragment cannot overflow the stack or stall the scrubber.
+        cleanedFragment = fragment.length > MAX_FRAGMENT_SCAN_CHARS ? "" : redactPromptFromUrl(fragment);
+    }
+
     // A fragment that held only the prompt leaves no `#` behind.
     const tail = cleanedFragment === undefined || (cleanedFragment === "" && fragment !== "") ? "" : `#${cleanedFragment}`;
 

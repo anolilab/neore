@@ -401,3 +401,45 @@ describe("free text with a ? before a prompt link", () => {
         expect(cleaned).toBe(expected);
     });
 });
+
+describe("a fragment too long to scan", () => {
+    it("removes a long fragment that holds a prompt, and keeps the query before it, without throwing", () => {
+        const fragment = `${"notes&".repeat(5000)}prompt=secret`;
+        const input = `/chat?model=gpt-4o#${fragment}`;
+
+        expect(() => redactPromptFromUrl(input)).not.toThrow();
+        expect(redactPromptFromUrl(input)).toBe("/chat?model=gpt-4o");
+    });
+
+    it("removes a fragment of many # signs that holds a prompt, without throwing", () => {
+        const input = `/chat?prompt=secret#${"#".repeat(200_000)}prompt=secret`;
+
+        expect(() => redactPromptFromUrl(input)).not.toThrow();
+
+        const cleaned = redactPromptFromUrl(input);
+
+        expect(cleaned).not.toContain("secret");
+        expect(cleaned).toBe("/chat");
+    });
+
+    it("removes a long encoded fragment that holds a prompt, with no prompt text left in the result", () => {
+        const input = `/chat#${"%20x".repeat(10_000)}%26prompt%3Dsecret`;
+        const cleaned = redactPromptFromUrl(input);
+
+        expect(cleaned).not.toContain("secret");
+        expect(cleaned).toBe("/chat");
+    });
+
+    it("still scans a fragment under the bound: the prompt goes and the rest of the fragment stays", () => {
+        const kept = "x&".repeat(1000);
+
+        expect(redactPromptFromUrl(`/chat#${kept}&prompt=secret`)).toBe(`/chat#${kept}`);
+    });
+
+    it("scans the deepest fragment under the bound, of # signs, without overflowing the stack", () => {
+        const input = `/chat#${"#".repeat(2030)}&prompt=secret`;
+
+        expect(() => redactPromptFromUrl(input)).not.toThrow();
+        expect(redactPromptFromUrl(input)).not.toContain("secret");
+    });
+});
