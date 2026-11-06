@@ -1860,15 +1860,23 @@ export const titleUsageEvent = (model: string, usage: { inputTokens?: number; ou
     };
 };
 
-export const createTitleChat = internalAction.input({ prompt: v.string(), threadId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
-    // The automatic title is written once per thread (it only fills a title that is still the default), so its billing key is the thread.
-    await writeGeneratedTitle(context, {
-        chargeKey: `${arguments_.threadId}:auto-title`,
-        force: false,
-        prompt: arguments_.prompt,
-        threadId: arguments_.threadId,
+/**
+ * The billing key of one automatic title job. The job's id is fixed when it is scheduled, so its retries share the key and later
+ * jobs for the same thread do not: a locked-after-answer skip leaves its key held, and a later message must still be able to title.
+ */
+export const autoTitleChargeKey = (threadId: string, jobId: string | undefined): string =>
+    jobId === undefined ? `${threadId}:auto-title` : `${threadId}:auto-title:${jobId}`;
+
+export const createTitleChat = internalAction
+    .input({ jobId: v.optional(v.string().max(MAX_LENGTH.id)), prompt: v.string(), threadId: v.string() })
+    .action(async ({ args: arguments_, ctx: context }) => {
+        await writeGeneratedTitle(context, {
+            chargeKey: autoTitleChargeKey(arguments_.threadId, arguments_.jobId),
+            force: false,
+            prompt: arguments_.prompt,
+            threadId: arguments_.threadId,
+        });
     });
-});
 
 /** The first user prompt a title is read from, and the id of the message it came from (`undefined` when the row has none). */
 type TitlePrompt = { id: string | undefined; text: string };

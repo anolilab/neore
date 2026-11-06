@@ -17,6 +17,7 @@ import {
     generateSummary,
     getFollowupSuggestions,
     admitTitleCharge,
+    autoTitleChargeKey,
     promptById,
     refusedBeforeDispatch,
     releaseTitleCharge,
@@ -178,6 +179,17 @@ describe("the prompt a title is written from, and the charge for it", () => {
 
         await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toEqual(expect.any(Number));
         await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toBeNull();
+    });
+
+    it("gives each automatic title job its own charge, so a later message on the thread can still title it", async () => {
+        const first = await harness.run(async (context: any) => await admitTitleCharge(context, autoTitleChargeKey("thread-z", "job-a"), OWNER));
+        const second = await harness.run(async (context: any) => await admitTitleCharge(context, autoTitleChargeKey("thread-z", "job-b"), OWNER));
+
+        expect(first).toEqual(expect.any(Number));
+        expect(second).toEqual(expect.any(Number));
+
+        // A retry of the same job carries the same id, and is refused.
+        await expect(harness.run(async (context: any) => await admitTitleCharge(context, autoTitleChargeKey("thread-z", "job-a"), OWNER))).resolves.toBeNull();
     });
 
     it("gives a charge back when its call threw before answering, so a retry may ask, and a stale give-back takes nothing", async () => {

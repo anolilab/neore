@@ -369,7 +369,7 @@ export interface InternalApiTypes {
             createSummarizeChat: FunctionReference<"action", { threadId: string; userId: string }, void>;
             createThreadRelationship: FunctionReference<"mutation", { branchPoint?: number; branchType?: "branch" | "continuation" | "comparison"; parentThreadId: string; threadId: string }, void>;
             createThreadWithInitialMessage: FunctionReference<"mutation", { autoModel?: boolean; customSystemPrompt?: string; enabledFeatures?: Array<string>; fileIds?: Array<string>; language?: string; messageContent: Array<Record<string, unknown>>; mode?: "text" | "image" | "video"; model: string; reasoningEffort?: number; retentionHours?: number; statelessMode?: boolean; temporary?: boolean; title?: string; userId: string }, { messageId: string; threadId: string; }>;
-            createTitleChat: FunctionReference<"action", { prompt: string; threadId: string }, void>;
+            createTitleChat: FunctionReference<"action", { jobId?: string; prompt: string; threadId: string }, void>;
             deleteThreadRelationship: FunctionReference<"mutation", { threadId: string }, null>;
             editImage: FunctionReference<"action", { imageUrl: string; mask?: string; operation: string; prompt?: string }, { resultUrl: string; }>;
             gateThreadAction: FunctionReference<"query", { level: "read" | "write" | "admin"; threadId: Id<"threads">; unlockProof?: string; userId: string }, { activeAgent?: { kind: "model"; model: string }; botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: "denied" | "locked" | "ok" }>;

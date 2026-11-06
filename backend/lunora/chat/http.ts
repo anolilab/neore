@@ -809,9 +809,18 @@ const runChatStartOnShard = async (
         const prompt = body.prompt ?? " ";
 
         for (const job of startTitleJobs(contentType, isNewThread)) {
-            const reference = job === "title" ? internal.chat.functions.createTitleChat : internal.chat.functions.createCategoryChat;
+            if (job === "title") {
+                // A fresh id per scheduled title job: its retries carry the same id (and so the same billing key), a later message's job does not.
+                const jobId = crypto.randomUUID();
 
-            titleJobs.push(async () => await httpScheduler(context).runAfter(0, reference, { prompt, threadId: titleThreadId }));
+                titleJobs.push(
+                    async () => await httpScheduler(context).runAfter(0, internal.chat.functions.createTitleChat, { jobId, prompt, threadId: titleThreadId }),
+                );
+            } else {
+                titleJobs.push(
+                    async () => await httpScheduler(context).runAfter(0, internal.chat.functions.createCategoryChat, { prompt, threadId: titleThreadId }),
+                );
+            }
         }
     };
 
