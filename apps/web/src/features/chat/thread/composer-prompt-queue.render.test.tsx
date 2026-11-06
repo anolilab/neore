@@ -120,6 +120,27 @@ describe("composer prompt queue", () => {
         expect(chat.sendMessage).toHaveBeenCalledWith("queued", []);
     });
 
+    it("keeps keyboard focus on the moved message's button, so the next move needs no mouse", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two", "three"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        // Focus, then activate it as a keyboard user would: the chip moves in the DOM, and focus must follow it.
+        const up = screen.getByLabelText("Move queued message 3 up");
+
+        act(() => up.focus());
+        fireEvent.click(up);
+
+        // Focus has no Testing Library query: the active element is the only way to read where focus landed.
+        // eslint-disable-next-line testing-library/no-node-access
+        expect(document.activeElement).toBe(screen.getByLabelText("Move queued message 2 up"));
+    });
+
     it("moves a queued message up and down with its buttons, and sends the moved one first", async () => {
         const { enqueue, setPaused } = usePromptQueueStore.getState();
 
