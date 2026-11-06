@@ -85,6 +85,39 @@ describe("configOptionsOf", () => {
         ).toHaveLength(1);
     });
 
+    it("keeps the current choice in a list cut to the bound, when the agent lists it last", () => {
+        const choices = Array.from({ length: 150 }, (_unused, index) => ({ name: "C", value: `c${String(index)}` }));
+        const [option] = configOptionsOf([select("l", { currentValue: "c149", options: choices })], plain) ?? [];
+
+        expect(option?.choices).toHaveLength(MAX_CHOICES);
+        expect(option?.choices.map((choice) => choice.value)).toContain("c149");
+        expect(option?.currentValue).toBe("c149");
+    });
+
+    it("keeps the current choice in a list cut by bytes, when the agent lists it last", () => {
+        const valueOf = (id: string, choice: number) => `${id}-${String(choice)}-${"x".repeat(100)}`;
+        const wide = (id: string) =>
+            select(id, {
+                currentValue: valueOf(id, 99),
+                options: Array.from({ length: 100 }, (_unused, choice) => ({ name: "é".repeat(200), value: valueOf(id, choice) })),
+            });
+        const options = configOptionsOf([wide("a"), wide("b")], plain) ?? [];
+
+        // The first option takes most of the budget, so the second one is cut; its current choice is listed last and still kept.
+        expect(options[1]?.choices.length).toBeLessThan(100);
+        expect(options[1]?.choices.map((choice) => choice.value)).toContain(valueOf("b", 99));
+        expect(new TextEncoder().encode(JSON.stringify(options)).length).toBeLessThanOrEqual(64 * 1024);
+    });
+
+    it("keeps the current model in a legacy list cut to the bound, when the agent lists it last", () => {
+        const models = Array.from({ length: 150 }, (_unused, index) => ({ modelId: `m${String(index)}`, name: "M" }));
+        const report = optionsOf({ models: { availableModels: models, currentModelId: "m149" } }, plain);
+
+        expect(report.models?.available).toHaveLength(MAX_CHOICES);
+        expect(report.models?.available.map((entry) => entry.id)).toContain("m149");
+        expect(report.models?.current).toBe("m149");
+    });
+
     it("keeps an id of up to 128 UTF-8 bytes, and drops one the computer would refuse", () => {
         // 64 two-byte characters are 128 bytes: kept. 65 are 130 bytes, which the computer refuses after the change is sent.
         const offered = (id: string) => configOptionsOf([select(id)], plain);
