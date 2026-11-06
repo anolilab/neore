@@ -135,7 +135,9 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
     // The change this view made last: its answer is shown, and the controls stay off until the agent has given it.
     const [change, setChange] = useState<{ callId?: string; rowId: string; valueId: string } | undefined>(undefined);
     const [failure, setFailure] = useState<string | undefined>(undefined);
-    const set = useMutation(crpc.acp.remote.setHostOption.mutationOptions());
+    // Offline, the default network mode would pause the call before the Lunora client sees it, and the client is what queues a write.
+    // Offline, the default network mode would pause the call before the Lunora client sees it, and the client is what queues a write.
+    const set = useMutation({ ...crpc.acp.remote.setHostOption.mutationOptions(), networkMode: "always" });
     // The call whose confirmed value never showed in the options, so the wait for it ended.
     const [gaveUp, setGaveUp] = useState<string | undefined>(undefined);
     const rows = rowsOf(state, { mode: t`Mode`, model: t`Model` });

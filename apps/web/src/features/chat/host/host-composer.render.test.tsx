@@ -3,7 +3,7 @@
  * permission buttons send only an option the agent offered (allow once, decline), by the ids the backend gave.
  */
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -376,6 +376,23 @@ describe("the options the agent offers", () => {
         await screen.findByRole("list", { name: "Agent options" });
         expect(screen.queryByLabelText("Mode")).toBeNull();
         expect(screen.getByText("Ask")).toBeTruthy();
+    });
+
+    it("hands a change to the client while the browser is offline, so the client can queue it", async () => {
+        mountWith({ agentState: { configOptions: [MODEL, EFFORT] } }, { callId: "call-1", sent: true });
+
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        onlineManager.setOnline(false);
+
+        try {
+            fireEvent.change(model, { target: { value: "deep" } });
+
+            // The mutation is not paused by the offline state: the client receives it, and queues it.
+            await waitFor(() => expect(mutations()).toHaveLength(1));
+        } finally {
+            onlineManager.setOnline(true);
+        }
     });
 
     it("renders no options row for an agent that reported none", async () => {
