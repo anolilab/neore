@@ -13,6 +13,7 @@ import {
     findUnblockedDependents,
     initialRunStatus,
     isTaskModelAllowed,
+    latestSlotAtOrBefore,
     MIN_RECURRENCE_INTERVAL_MS,
     nextRecurrenceAt,
     parseVerifierOutput,
@@ -331,5 +332,45 @@ describe(pickFairRecurrences, () => {
 
     it("stops at the overall total", () => {
         expect(pickFairRecurrences(due("abcdef"), 2, 3).map((task) => task.userId)).toStrictEqual(["a", "b", "c"]);
+    });
+});
+
+describe(latestSlotAtOrBefore, () => {
+    const HOUR = 60 * 60_000;
+    const nine = Date.UTC(2026, 10, 6, 9);
+
+    it("is the most recent slot at or before now", () => {
+        expect(latestSlotAtOrBefore("0 * * * *", nine, nine + 2 * HOUR + 59_000, 0)).toBe(nine + 2 * HOUR);
+    });
+
+    it("is the due slot itself when no later slot has passed", () => {
+        expect(latestSlotAtOrBefore("0 * * * *", nine, nine + 30 * 60_000, 0)).toBe(nine);
+    });
+
+    it("counts only slots the scheduler would run, at least 15 minutes apart", () => {
+        expect(latestSlotAtOrBefore("*/5 * * * *", nine, nine + 12 * 60_000, 0)).toBe(nine);
+        expect(latestSlotAtOrBefore("*/5 * * * *", nine, nine + 16 * 60_000, 0)).toBe(nine + 15 * 60_000);
+    });
+
+    it("never records a slot from before the task was created", () => {
+        const created = nine + 5 * HOUR + 20 * 60_000;
+        const slot = latestSlotAtOrBefore("0 * * * *", nine, nine + 8 * HOUR + 10 * 60_000, created);
+
+        expect(slot).toBe(nine + 8 * HOUR);
+        expect(latestSlotAtOrBefore("0 9 * * *", nine, nine + 3 * HOUR, nine + HOUR)).toBeUndefined();
+    });
+
+    it("stays a short walk after a long outage and still lands on the latest slot", () => {
+        const yearLater = nine + 365 * 24 * HOUR;
+
+        expect(latestSlotAtOrBefore("* * * * *", nine, yearLater + 20 * 60_000, 0)).toBeGreaterThan(yearLater);
+        expect(latestSlotAtOrBefore("0 * * * *", nine, yearLater + 30 * 60_000, 0)).toBe(yearLater);
+    });
+
+    it("records nothing for a schedule that matches no date, after a single search", () => {
+        const started = performance.now();
+
+        expect(latestSlotAtOrBefore("0 0 30 2 *", nine, nine + 30 * 24 * HOUR, 0)).toBeUndefined();
+        expect(performance.now() - started).toBeLessThan(2000);
     });
 });

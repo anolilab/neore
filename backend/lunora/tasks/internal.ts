@@ -35,7 +35,7 @@ import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries"
 import { canReadSkill } from "../skills/access";
 import { vSkillConfig } from "../skills/validators";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } from "./account";
-import type { TaskStatus } from "./logic";
+import type { TaskSkipReason, TaskStatus } from "./logic";
 import {
     canTransition,
     decideAfterVerdict,
@@ -46,8 +46,9 @@ import {
     MAX_RECURRENCES_PER_USER_PER_SWEEP,
     MAX_TASKS_PER_USER,
     nextRecurrenceAt,
+    latestSlotAtOrBefore,
     pickFairRecurrences,
-    shouldRecurNow,
+    recurrenceSkipReason,
 } from "./logic";
 import { vTaskRunOrigin, vVerdict } from "./validators";
 import { vCodingAgentAssignment } from "../coding-agents/validators";
@@ -67,6 +68,17 @@ const STALE_QUEUED_MS = 15 * 60_000;
 
 /** A running round that stopped reporting — longer than any 25-step Deep Work run. */
 const STALE_RUNNING_MS = 60 * 60_000;
+
+const STALE_AFTER_MS = { queued: STALE_QUEUED_MS, running: STALE_RUNNING_MS } as const;
+
+const STALE_MESSAGE = {
+    queued: "The run never started. Try running the task again.",
+    running: "The run stopped responding and was abandoned. Try running the task again.",
+} as const;
+
+/** Why a task's round counts as dead (`updatedAt` is its last sign of life), or `undefined` when it does not. */
+const staleRoundMessage = (task: Doc<"tasks">, now: number): string | undefined =>
+    (task.status === "queued" || task.status === "running") && task.updatedAt < now - STALE_AFTER_MS[task.status] ? STALE_MESSAGE[task.status] : undefined;
 
 const RESULT_SUMMARY_MAX = 600;
 
@@ -145,9 +157,24 @@ const summarise = (answer: string | undefined): string | undefined => {
 
 // ─── Runner hand-offs ────────────────────────────────────────────────────────
 
+/**
+ * What every path that fails a task writes: the error, and no `resultSummary`,
+ * so an earlier run's result is never shown as the outcome of the one that
+ * failed (`tasks/AGENTS.md`). The earlier answer stays on its own `taskRuns` row.
+ */
+const failedTaskPatch = (lastError: string, now: number) => {
+    return {
+        activeCycle: undefined,
+        lastError,
+        resultSummary: undefined,
+        status: "failed" as const,
+        updatedAt: now,
+    };
+};
+
 /** Ends a cycle before its round runs, with `lastError` saying why. No `taskRuns` row: nothing ran. */
 const refuseRound = async (ctx: MutationCtx, task: Doc<"tasks">, lastError: string): Promise<void> => {
-    await patchById(ctx.db, "tasks", task._id, { activeCycle: undefined, lastError, status: "failed", updatedAt: Date.now() });
+    await patchById(ctx.db, "tasks", task._id, failedTaskPatch(lastError, Date.now()));
 };
 
 const vClaim = v.union(
@@ -390,7 +417,7 @@ export const completeRound = internalMutation
             const error = outcome.error.slice(0, 2000);
 
             await ctx.db.patch("taskRuns", run._id, { ...runResult, error, status: "error" });
-            await patchById(ctx.db, "tasks", task._id, { activeCycle: undefined, lastError: error, lastRunThreadId, status: "failed", updatedAt: now });
+            await patchById(ctx.db, "tasks", task._id, { ...failedTaskPatch(error, now), lastRunThreadId });
             await notifyTaskRound(ctx, task, run, "failure", error, args.threadId ?? run.threadId);
 
             return "failed";
@@ -523,15 +550,61 @@ export const resolveTaskSkill = internalQuery
 // ─── Periodic work ───────────────────────────────────────────────────────────
 
 /**
- * Due recurrences and stale rounds. Rides on the trigger schedule's
+ * Stale rounds, then due recurrences. Rides on the trigger schedule's
  * every-minute tick (`triggers/schedule.ts:checkDueTriggers`) rather than a cron
  * of its own.
+ *
+ * Stale rounds go first: after an outage a round that stopped reporting is
+ * failed before its slot is looked at, so the slot starts the catch-up run
+ * instead of being skipped as "still running".
  */
 export const checkDueTasks = internalMutation
     .input({})
     .output(v.null())
     .mutation(async ({ ctx }) => {
         const { now } = ctx;
+
+        const failStaleTask = async (task: Doc<"tasks">, message: string): Promise<void> => {
+            const cycle = task.activeCycle;
+
+            if (cycle) {
+                const runs = await ctx.db
+                    .query("taskRuns")
+                    .withIndex("by_cycle_and_round", (q) => q.eq("cycle", cycle))
+                    .take(20);
+
+                for (const run of runs) {
+                    if (run.status === "running") {
+                        await ctx.db.patch("taskRuns", run._id, { completedAt: now, error: message, status: "error" });
+                    }
+                }
+            }
+
+            await patchById(ctx.db, "tasks", task._id, failedTaskPatch(message, now));
+            // The inbox keeps the trace: a recurring task's catch-up may start in this same sweep, which clears
+            // `lastError`, and a round that never started has no run row to show it.
+            await notifyQuietly(ctx, {
+                body: message,
+                dedupeKey: `task-stale:${task._id}:${cycle ?? String(task.updatedAt)}`,
+                emailOutcome: true,
+                link: "/tasks",
+                outcome: "failure",
+                title: task.title,
+                type: "task",
+                userId: task.userId,
+            });
+        };
+
+        for (const status of ["queued", "running"] as const) {
+            const stale = await ctx.db
+                .query("tasks")
+                .withIndex("by_status_and_updatedAt", (q) => q.eq("status", status).lt("updatedAt", now - STALE_AFTER_MS[status]))
+                .take(SWEEP_BATCH);
+
+            for (const task of stale) {
+                await failStaleTask(task, STALE_MESSAGE[status]);
+            }
+        }
 
         const due = pickFairRecurrences(
             await ctx.db
@@ -544,19 +617,44 @@ export const checkDueTasks = internalMutation
 
         const statusesByUser = new Map<string, Map<string, TaskStatus>>();
 
-        for (const task of due) {
-            if (task.nextRunAt === undefined || !task.cronExpression) {
+        for (const dueTask of due) {
+            if (dueTask.nextRunAt === undefined || !dueTask.cronExpression) {
                 continue;
             }
 
-            // Advance first, whatever happens next, so a task that cannot start
-            // now is not re-examined every minute. `updatedAt` is left alone: only a
-            // task that really starts changes, and a quiet routine reads it as activity.
-            await ctx.db.patch("tasks", task._id, { nextRunAt: nextRecurrenceAt(task.cronExpression, now) });
+            let task = dueTask;
+            const stale = staleRoundMessage(task, now);
 
-            if (!shouldRecurNow(task.status)) {
+            // A dead round the bounded batch above did not reach: failed here, so its slot is the catch-up
+            // rather than a slot skipped as "still running".
+            if (stale) {
+                await failStaleTask(task, stale);
+                task = { ...task, activeCycle: undefined, status: "failed" };
+            }
+
+            // Advance first, from `now`, whatever happens next: a task that cannot start is not
+            // re-examined every minute, and slots missed while the sweep was down collapse into
+            // this one run. `updatedAt` is left alone, including on a skip: only a task that
+            // really starts changes, and the stale-round check above reads `updatedAt` as the
+            // run's last sign of life.
+            const advance = { nextRunAt: nextRecurrenceAt(dueTask.cronExpression, now) };
+            // The skip a slot this sweep cannot run leaves on the task: the latest real slot, or nothing when the
+            // schedule had no real slot to skip. Bounded work, so a skipped task never holds up the rest of the batch.
+            const { cronExpression, nextRunAt: dueSlot } = dueTask;
+            const skipRecord = (reason: TaskSkipReason) => {
+                const at = latestSlotAtOrBefore(cronExpression, dueSlot, now, dueTask.createdAt);
+
+                return at === undefined ? {} : { lastSkippedAt: at, lastSkipReason: reason };
+            };
+            const skipped = recurrenceSkipReason(task.status);
+
+            if (skipped) {
+                await ctx.db.patch("tasks", task._id, { ...advance, ...skipRecord(skipped) });
+
                 continue;
             }
+
+            await ctx.db.patch("tasks", task._id, advance);
 
             let statusById = statusesByUser.get(task.userId);
 
@@ -565,41 +663,21 @@ export const checkDueTasks = internalMutation
                 statusesByUser.set(task.userId, statusById);
             }
 
+            statusById.set(task._id as string, task.status);
+
             const landed = await startTask(ctx, task, "schedule", statusById, now);
 
             if (landed) {
                 statusById.set(task._id as string, landed);
             }
-        }
 
-        const failStale = async (status: "queued" | "running", olderThan: number, message: string): Promise<void> => {
-            const stale = await ctx.db
-                .query("tasks")
-                .withIndex("by_status_and_updatedAt", (q) => q.eq("status", status).lt("updatedAt", olderThan))
-                .take(SWEEP_BATCH);
+            // Its dependencies are not done: this slot does not run now, so it is recorded like any other skip.
+            const blockedSkip = landed === "blocked" ? skipRecord("blocked") : {};
 
-            for (const task of stale) {
-                const cycle = task.activeCycle;
-
-                if (cycle) {
-                    const runs = await ctx.db
-                        .query("taskRuns")
-                        .withIndex("by_cycle_and_round", (q) => q.eq("cycle", cycle))
-                        .take(20);
-
-                    for (const run of runs) {
-                        if (run.status === "running") {
-                            await ctx.db.patch("taskRuns", run._id, { completedAt: now, error: message, status: "error" });
-                        }
-                    }
-                }
-
-                await patchById(ctx.db, "tasks", task._id, { activeCycle: undefined, lastError: message, status: "failed", updatedAt: now });
+            if ("lastSkippedAt" in blockedSkip) {
+                await ctx.db.patch("tasks", task._id, blockedSkip);
             }
-        };
-
-        await failStale("queued", now - STALE_QUEUED_MS, "The run never started. Try running the task again.");
-        await failStale("running", now - STALE_RUNNING_MS, "The run stopped responding and was abandoned. Try running the task again.");
+        }
 
         return null;
     });
