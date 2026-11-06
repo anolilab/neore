@@ -83,6 +83,8 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const id = threadId as Id<"threads">;
     const [text, setText] = useState("");
     const [sending, setSending] = useState(false);
+    // Set when a paste was refused, so the field keeps saying why until the next accepted edit (the toast fades).
+    const [refusedPaste, setRefusedPaste] = useState(false);
     const attempt = useRef<{ id: string; text: string } | undefined>(undefined);
     const { data: session } = useQuery(crpc.acp.functions.getHostSession.queryOptions({ threadId }));
     const { data: live } = useQuery(crpc.chat.streaming.getActiveStreamForThread.queryOptions({ threadId: id }));
@@ -109,6 +111,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
 
         if (result.ok) {
             attempt.current = undefined;
+            setRefusedPaste(false);
             // Continue sends a fixed prompt: a draft being typed beside it stays.
             setText((current) => (current.trim() === prompt ? "" : current));
 
@@ -122,6 +125,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const status = session?.status;
     const blocked = status === "ended";
     const overLimit = trimmed.length > MAX_HOST_PROMPT_CHARS;
+    const limitNote = overLimit || refusedPaste;
     const canSend = trimmed !== "" && !overLimit && !sending && !running && !blocked;
     const lastEnd = session?.lastEndReason;
     const offerContinue = !running && !blocked && lastEnd !== undefined && CONTINUABLE.has(lastEnd);
@@ -193,8 +197,8 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
             )}
             <div className="flex items-end gap-2">
                 <textarea
-                    aria-describedby={overLimit ? "host-composer-limit" : undefined}
-                    aria-invalid={overLimit || undefined}
+                    aria-describedby={limitNote ? "host-composer-limit" : undefined}
+                    aria-invalid={limitNote || undefined}
                     aria-label={t`Message to the coding agent`}
                     className="bg-background min-h-11 flex-1 resize-none rounded-lg border px-3 py-2 text-sm disabled:opacity-60"
                     disabled={blocked}
@@ -206,10 +210,13 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
 
                         // Refused before any scan: the controlled value stays as it was.
                         if (exceedsRawInputLimit(value, MAX_HOST_PROMPT_CHARS)) {
+                            setRefusedPaste(true);
                             toast.error(messages.too_large);
 
                             return;
                         }
+
+                        setRefusedPaste(false);
 
                         const { removed, text: clean } = stripHiddenText(value, { keepTrailingJoiner: true });
 
@@ -248,7 +255,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     </Button>
                 )}
             </div>
-            {overLimit && (
+            {limitNote && (
                 <p className="text-destructive text-xs" id="host-composer-limit" role="status">
                     {messages.too_large}
                 </p>
