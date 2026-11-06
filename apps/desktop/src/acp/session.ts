@@ -436,8 +436,13 @@ export class AgentSession {
 
         this.cancelRequested = true;
         this.connection.notify(METHOD.cancel, { sessionId: this.agentSessionId });
-        // What the turn started in a terminal stops with it.
-        this.terminals?.killAll();
+        // What the turn started in a terminal stops with it, and nothing an earlier turn started.
+        const cancelledTurn = this.current?.id;
+
+        if (cancelledTurn !== undefined) {
+            this.terminals?.killTurn(cancelledTurn);
+        }
+
         // The spec requires pending permission requests to be answered `cancelled`.
         this.options.gate.cancelSession(this.id);
 
@@ -1310,7 +1315,7 @@ export class AgentSession {
                 line,
                 ...cwd !== undefined && { cwd },
                 ...outputByteLimit !== undefined && { outputByteLimit },
-            });
+            }, this.current?.id);
 
             // The turn was cancelled while the command was starting: killAll missed it, so it ends here.
             if (this.cancelRequested) {

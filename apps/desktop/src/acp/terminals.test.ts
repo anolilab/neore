@@ -48,6 +48,7 @@ describe(createRequestOf, () => {
             { command: "echo\u{202E}eil" },
             { command: "ls\u{200D}x" },
             { command: "ls", cwd: "/work\u{2066}x" },
+            // A line break in a command is how a heredoc reads; the terminal runs it as the agent wrote it.
             // Names the core refuses after the approval, and a value over its size: refused before anyone is asked.
             { command: "ls", env: [{ name: "NEORE_TOKEN", value: "x" }] },
             { command: "ls", env: [{ name: "electron_run_as_node", value: "1" }] },
@@ -59,6 +60,11 @@ describe(createRequestOf, () => {
         ]) {
             expect(() => createRequestOf(params)).toThrow();
         }
+    });
+
+    it("reads a command with a line break or a tab, as the agent wrote it, and refuses a carriage return", () => {
+        expect(createRequestOf({ args: ["commit", "-m", "a\nb\tc"], command: "git" }).line).toContain("\n");
+        expect(() => createRequestOf({ command: "ls\rrm" })).toThrow();
     });
 
     it("ignores an output limit that is not a positive whole number", () => {
@@ -84,6 +90,22 @@ describe(SessionTerminals, () => {
         return { host, release, resolvers };
     };
     const request = { agentKey: "a", env: [], folder: "/w", line: "ls" } as never;
+
+    it("kills the commands of the turn that was cancelled, and leaves an earlier turn's running", async () => {
+        const { host, resolvers } = deferredHost();
+        const terminals = new SessionTerminals(host as never, () => {});
+        const earlier = terminals.create(request, "turn-1");
+        const current = terminals.create(request, "turn-2");
+
+        resolvers[0]?.(10);
+        resolvers[1]?.(11);
+        await Promise.all([earlier, current]);
+
+        terminals.killTurn("turn-2");
+
+        expect(host.kill).toHaveBeenCalledTimes(1);
+        expect(host.kill).toHaveBeenCalledWith(11);
+    });
 
     it("holds a slot while a command is starting", async () => {
         const { host, resolvers } = deferredHost();

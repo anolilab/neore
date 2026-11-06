@@ -23,8 +23,11 @@ export const MAX_SESSION_TERMINALS = 4;
  */
 const MAX_SHOWN_BYTES = 4000;
 
-/** Control, format and line-separator characters: text a reader cannot see as it runs. */
-const INVISIBLE = /[\p{Cc}\p{Cf}\u{2028}\u{2029}]/u;
+/**
+ * Text a reader cannot see as it runs. A line break and a tab are how a command reads (a heredoc, an aligned argument), so they pass;
+ * a carriage return, every other control character, every format character and a line or paragraph separator are refused.
+ */
+const INVISIBLE = /[\p{Cf}\u{2028}\u{2029}]|(?![\n\t])\p{Cc}/u;
 /** Ended terminals whose results a session keeps after their release, for the tool rows that show them. */
 const KEPT_RESULTS = 16;
 const MAX_ENV = 64;
@@ -192,6 +195,8 @@ interface OpenTerminal {
     ended?: { exit: TerminalExitStatus; output: string; truncated: boolean };
     handle: number;
     released: boolean;
+    /** The turn that started the command: a cancel of that turn stops it, and no other turn's. */
+    turnId: string | undefined;
 }
 
 /** One session's terminals. Ids are minted here, never the core's handles, so an agent can name only its own. */
@@ -223,7 +228,7 @@ export class SessionTerminals {
     }
 
     /** Starts one terminal the person allowed, and returns its id at once. */
-    public async create(request: TerminalStart): Promise<string> {
+    public async create(request: TerminalStart, turnId?: string): Promise<string> {
         if (this.live >= MAX_SESSION_TERMINALS) {
             throw new Error(`at most ${String(MAX_SESSION_TERMINALS)} terminals at once; release one first`);
         }
@@ -255,7 +260,7 @@ export class SessionTerminals {
         }
 
         const terminalId = `term_${randomUUID()}`;
-        const terminal: OpenTerminal = { handle, released: false };
+        const terminal: OpenTerminal = { handle, released: false, turnId };
 
         this.open.set(terminalId, terminal);
         this.watch(terminalId, terminal);
@@ -309,10 +314,10 @@ export class SessionTerminals {
         return this.open.get(terminalId)?.ended;
     }
 
-    /** The turn was cancelled: every command still running is killed. */
-    public killAll(): void {
+    /** The turn was cancelled: the commands that turn started and are still running are killed, and no other turn's. */
+    public killTurn(turnId: string): void {
         for (const terminal of this.open.values()) {
-            if (!terminal.released && terminal.ended === undefined) {
+            if (!terminal.released && terminal.ended === undefined && terminal.turnId === turnId) {
                 this.host.kill(terminal.handle);
             }
         }
