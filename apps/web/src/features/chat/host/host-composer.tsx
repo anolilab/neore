@@ -87,6 +87,8 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const [refusedPaste, setRefusedPaste] = useState(false);
     // Counts the refusals, so a send clears only those that came before it, not one made while it was in flight.
     const refusals = useRef(0);
+    // The box's text as the last change left it, read by a send that finishes after the person has typed.
+    const boxText = useRef("");
     const attempt = useRef<{ id: string; text: string } | undefined>(undefined);
     const { data: session } = useQuery(crpc.acp.functions.getHostSession.queryOptions({ threadId }));
     const { data: live } = useQuery(crpc.chat.streaming.getActiveStreamForThread.queryOptions({ threadId: id }));
@@ -117,12 +119,16 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
         if (result.ok) {
             attempt.current = undefined;
 
-            if (refusals.current === refusalsBefore) {
-                setRefusedPaste(false);
-            }
+            // Continue sends a fixed prompt, and a draft typed while a send was pending is not the one sent: the box and any
+            // refusal stay as they are. Only the draft that was sent clears, and a refusal that came before the send lapses with it.
+            if (boxText.current === draft) {
+                boxText.current = "";
+                setText("");
 
-            // Continue sends a fixed prompt: a draft being typed beside it stays. Edits made while the send was pending stay too.
-            setText((current) => (current === draft ? "" : current));
+                if (refusals.current === refusalsBefore) {
+                    setRefusedPaste(false);
+                }
+            }
 
             return;
         }
@@ -246,6 +252,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                             queueMicrotask(() => element.setSelectionRange(start, end));
                         }
 
+                        boxText.current = clean;
                         setText(clean);
                     }}
                     onKeyDown={onKeyDown}

@@ -5,6 +5,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => {
@@ -28,7 +29,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 vi.mock("sonner", () => {
-    return { toast: { error: vi.fn(), success: vi.fn() } };
+    return { toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() } };
 });
 
 vi.mock("./host-send", () => {
@@ -255,6 +256,20 @@ describe("the coding-agent composer", () => {
         expect(screen.getAllByRole("status").map((element) => element.id)).toContain("host-composer-limit");
     });
 
+    it("removes hidden characters typed into the draft, keeps the caret where it was, and says so", async () => {
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        // A bidi override typed between "a" and "b", with the caret at the end: the field keeps "ab", and the caret
+        // stays at the end of the text, one unit left of where the removed character was counted.
+        fireEvent.change(box, { target: { value: "a\u{202E}b" } });
+
+        expect(box.value).toBe("ab");
+        await waitFor(() => expect(box.selectionStart).toBe(2));
+        expect(toast.info).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ id: "host-composer-hidden-text" }));
+    });
+
     it("does not send an empty message", async () => {
         mount(session());
 
@@ -293,6 +308,21 @@ describe("the coding-agent composer", () => {
         await waitFor(() =>
             expect(harness.calls[0]).toEqual(["send", { requestId: expect.any(String), text: "Continue where you left off.", threadId: "thread-1" }]),
         );
+    });
+
+    it("keeps a paste refusal when Continue succeeds, since the draft it refused is still in the box", async () => {
+        mount(session({ lastEndReason: "interrupted" }));
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "a valid draft" } });
+        fireEvent.change(box, { target: { value: "x".repeat(120_001) } });
+        fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+        await waitFor(() => expect(screen.getAllByRole("status").map((element) => element.id)).toContain("host-composer-limit"));
+        expect(box.getAttribute("aria-invalid")).toBe("true");
+        expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
     });
 
     it("offers no Continue after a turn that finished or was stopped", async () => {
