@@ -91,7 +91,7 @@ export interface RawOptions {
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** An id the agent chose, kept only whole: empty, too long or changed by the scrub reads as no id. */
-const idOf = (value: unknown, scrub: Scrub): string | undefined => {
+export const idOf = (value: unknown, scrub: Scrub): string | undefined => {
     if (typeof value !== "string" || value === "" || new TextEncoder().encode(value).length > MAX_ID_BYTES) {
         return undefined;
     }
