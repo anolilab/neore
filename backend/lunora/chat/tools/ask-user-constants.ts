@@ -11,6 +11,9 @@ export const ASK_USER_CHOICE_MAX = 200;
 
 export const ASK_USER_MAX_CHOICES = 6;
 
+/** Most questions one `askUser` call may ask in its single card. */
+export const ASK_USER_MAX_QUESTIONS = 4;
+
 /** The longest free-text answer the user may send back. */
 export const ASK_USER_ANSWER_MAX = 4000;
 
@@ -32,9 +35,31 @@ export const ASK_USER_IMAGE_MAX_BYTES = 3_932_160;
 /** Every file of one answer together, in bytes: the bytes are held in memory for the one model call. */
 export const ASK_USER_FILES_TOTAL_MAX_BYTES = 20 * 1024 * 1024;
 
+/** One question of a multi-question call. */
+export interface AskUserQuestion {
+    choices?: string[];
+    /** `true` lets the user pick several choices; absent or `false` picks one. */
+    multiSelect?: boolean;
+    question: string;
+}
+
+/**
+ * Either the legacy form (`question` + `choices`) or `questions`, never both: the tool's schema refuses a call that
+ * carries both or neither.
+ */
 export interface AskUserInput {
     choices?: string[];
+    question?: string;
+    questions?: AskUserQuestion[];
+}
+
+/** The user's reply to one question of a multi-question call. */
+export interface AskUserQuestionAnswer {
+    note?: string;
+    /** The question's text, repeated so the answer reads on its own. */
     question: string;
+    /** The choices picked, in the question's order; empty when the user only typed a note. */
+    selected: string[];
 }
 
 /** A file the user attached to the answer, read from storage for one model call. */
@@ -52,4 +77,6 @@ export interface AskUserAttachedFile {
 }
 
 export type AskUserOutput =
-    { answer: string; answered: true; attachedFiles?: AskUserAttachedFile[]; unreadFiles?: string[] } | { answered: false; message: string };
+    | { answer: string; answered: true; attachedFiles?: AskUserAttachedFile[]; unreadFiles?: string[] }
+    | { answered: true; answers: AskUserQuestionAnswer[]; attachedFiles?: AskUserAttachedFile[]; unreadFiles?: string[] }
+    | { answered: false; message: string };
