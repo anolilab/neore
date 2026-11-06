@@ -184,4 +184,31 @@ describe("composer prompt queue", () => {
         expect(chat.sendMessage).toHaveBeenCalledTimes(1);
         expect(chat.sendMessage).toHaveBeenCalledWith("queued", []);
     });
+
+    it("says why Send next is unavailable while the mode saves, and returns to queued once it has", async () => {
+        chat.error = undefined;
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+        // Held, so the queue stays put once the save ends: this checks the text, not a send.
+        usePromptQueueStore.getState().setPaused(chat.threadId, true);
+
+        const view = render(<ComposerPromptQueue />);
+        const status = () => screen.getByRole("status");
+        const sendNext = () => screen.getByRole("button", { name: "Send next" }) as HTMLButtonElement;
+
+        expect(status().textContent).toBe("1 queued");
+        expect(sendNext().disabled).toBe(false);
+
+        chat.saving = true;
+        view.rerender(<ComposerPromptQueue />);
+
+        expect(status().textContent).toBe("1 queued — waiting for the permission mode to save");
+        expect(sendNext().disabled).toBe(true);
+
+        chat.saving = false;
+        view.rerender(<ComposerPromptQueue />);
+
+        expect(status().textContent).toBe("1 queued");
+        expect(sendNext().disabled).toBe(false);
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
 });

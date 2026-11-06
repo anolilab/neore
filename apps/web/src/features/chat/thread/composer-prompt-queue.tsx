@@ -445,6 +445,11 @@ const ComposerPromptQueue: FC = () => {
         statusText = <Plural one="# steering — the reply reads it at its next step" other="# steering — the reply reads them at its next step" value={count} />;
     }
 
+    // "Send next" is disabled while the permission mode saves: say why, and that the queue moves on once it has.
+    if (modeSaving && !isStreaming) {
+        statusText = t`${count} queued — waiting for the permission mode to save`;
+    }
+
     return (
         <div className="mx-2 mt-2 flex flex-wrap items-center gap-1.5">
             <span aria-live="polite" className="text-muted-foreground flex items-center gap-1 text-xs" role="status">
