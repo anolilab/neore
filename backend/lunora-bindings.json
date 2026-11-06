@@ -50,11 +50,6 @@
       "type": "r2"
     },
     {
-      "binding": "ADVISOR_COMPANION",
-      "resource": "neore-backend-advisor",
-      "type": "service"
-    },
-    {
       "binding": "SERVICE_BROWSER_RENDERER",
       "resource": "browser-renderer",
       "type": "service"
