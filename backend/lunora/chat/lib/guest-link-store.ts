@@ -30,7 +30,6 @@ export const newGuestToken = (): string => `${crypto.randomUUID()}${crypto.rando
 /** A token's stored form: only this ever reaches the database. */
 export const hashGuestToken = async (token: string): Promise<string> => await sha256Hex(token);
 
-/** The text a guest may leave, trimmed, or `null` when it is empty or over the cap. */
 /** The shape of a mention as the group parser reads one (`chat/group/logic.ts`), without its participant list. */
 const GUEST_MENTION_SHAPE = /(?:^|[^\w@.])@[a-z0-9]/i;
 
@@ -49,6 +48,7 @@ export const unsendableGuestText = (text: string): string | undefined => {
     return GUEST_MENTION_SHAPE.test(plain) ? "A message cannot @mention anyone." : undefined;
 };
 
+/** The text a guest may leave, trimmed, or `null` when it is empty or over the cap. */
 export const cleanGuestText = (text: string): string | null => {
     // Hidden characters can carry instructions the person never sees: they go, as they do from an ordinary prompt.
     const trimmed = stripHiddenText(text).text.trim();

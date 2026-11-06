@@ -605,6 +605,11 @@ const runChatStartOnShard = async (
         return Response.json({ error: unsendable }, { status: 400 });
     }
 
+    // A note is sent as text, into a text reply. A media model would mark it sent without queuing that reply.
+    if (guestNote && contentType !== "text") {
+        return Response.json({ error: "A guest note can only be sent to a text model." }, { status: 400 });
+    }
+
     // Build message content
     const messageContent: any[] = [];
 
