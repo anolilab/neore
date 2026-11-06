@@ -14,7 +14,16 @@
  * - **No `authenticate`.** Neore stores no credential for an agent. An agent that needs a login is told so in
  * plain words; the user signs in with the agent's own tool.
  */
-import type { InitializeRequest, InitializeResponse, ListSessionsRequest, LoadSessionRequest, NewSessionRequest, PromptRequest } from "@agentclientprotocol/sdk";
+import type {
+    InitializeRequest,
+    InitializeResponse,
+    ListSessionsRequest,
+    LoadSessionRequest,
+    NewSessionRequest,
+    PromptRequest,
+    SetSessionConfigOptionRequest,
+    SetSessionModeRequest,
+} from "@agentclientprotocol/sdk";
 
 import type { JsonRpcConnection } from "./jsonrpc";
 import { RpcError } from "./rpc-error";
@@ -31,6 +40,8 @@ export const METHOD = {
     prompt: "session/prompt",
     requestPermission: "session/request_permission",
     sessionUpdate: "session/update",
+    setConfigOption: "session/set_config_option",
+    setMode: "session/set_mode",
 } as const;
 
 /** `AUTH_REQUIRED` in the ACP error codes. */
@@ -43,14 +54,36 @@ class AgentVersionError extends Error {}
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
-const withTimeout = async <Value>(promise: Promise<Value>, ms: number, message: string): Promise<Value> => {
+/**
+ * Hands the answer of a request that outlived its timeout to `onLate`, once `isExpired` says the timeout has passed. Nothing waits
+ * for it: the caller has already been answered.
+ */
+const deliverLate = <Value>(promise: Promise<Value>, isExpired: () => boolean, onLate: (value: Value) => void): void => {
+    // Fire and forget: nothing awaits the late answer, and the caller has already been answered.
+    /* eslint-disable unicorn/prefer-await */
+    promise
+        .then((value) => isExpired() ? onLate(value) : undefined)
+        .catch(() => {});
+    /* eslint-enable unicorn/prefer-await */
+};
+
+const withTimeout = async <Value>(promise: Promise<Value>, ms: number, message: string, onLate?: (value: Value) => void): Promise<Value> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let expired = false;
+
+    // The timeout does not cancel the request: an answer that arrives after it is handed to `onLate`, not dropped.
+    if (onLate !== undefined) {
+        deliverLate(promise, () => expired, onLate);
+    }
 
     try {
         return await Promise.race([
             promise,
             new Promise<never>((_resolve, reject) => {
-                timer = setTimeout(() => reject(new Error(message)), ms);
+                timer = setTimeout(() => {
+                    expired = true;
+                    reject(new Error(message));
+                }, ms);
             }),
         ]);
     } finally {
@@ -105,8 +138,12 @@ export const initialize = async (connection: JsonRpcConnection, appVersion: stri
     };
 };
 
-/** Opens a session in `cwd` and returns the agent's session id. */
-export const newSession = async (connection: JsonRpcConnection, cwd: string, timeoutMs = STARTUP_TIMEOUT_MS): Promise<string> => {
+/** Opens a session in `cwd`; `response` is the agent's whole answer, which carries the options it offers. */
+export const openNewSession = async (
+    connection: JsonRpcConnection,
+    cwd: string,
+    timeoutMs = STARTUP_TIMEOUT_MS,
+): Promise<{ response: Record<string, unknown>; sessionId: string }> => {
     const params: NewSessionRequest = { cwd, mcpServers: [] };
 
     try {
@@ -116,7 +153,7 @@ export const newSession = async (connection: JsonRpcConnection, cwd: string, tim
             throw new Error("the agent did not return a session id");
         }
 
-        return response.sessionId;
+        return { response, sessionId: response.sessionId };
     } catch (error) {
         if (error instanceof RpcError && error.code === AUTH_REQUIRED) {
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
@@ -125,6 +162,35 @@ export const newSession = async (connection: JsonRpcConnection, cwd: string, tim
 
         throw error;
     }
+};
+
+const SET_OPTION_TIMEOUT_MS = 10_000;
+
+/** `session/set_config_option` for a list option: the answer carries every option with its new value. */
+export const setConfigOption = async (
+    connection: JsonRpcConnection,
+    sessionId: string,
+    configId: string,
+    value: string,
+    timeoutMs = SET_OPTION_TIMEOUT_MS,
+    onLate?: (answer: unknown) => void,
+): Promise<unknown> => {
+    const params: SetSessionConfigOptionRequest = { configId, sessionId, value };
+
+    return await withTimeout(connection.request(METHOD.setConfigOption, params), timeoutMs, "the agent did not answer", onLate);
+};
+
+/** `session/set_mode`, for an agent that offers modes only through the legacy state. */
+export const setMode = async (
+    connection: JsonRpcConnection,
+    sessionId: string,
+    modeId: string,
+    timeoutMs = SET_OPTION_TIMEOUT_MS,
+    onLate?: (answer: unknown) => void,
+): Promise<unknown> => {
+    const params: SetSessionModeRequest = { modeId, sessionId };
+
+    return await withTimeout(connection.request(METHOD.setMode, params), timeoutMs, "the agent did not answer", onLate);
 };
 
 export const promptParams = (sessionId: string, text: string): PromptRequest => {
@@ -189,11 +255,11 @@ export const listSessions = async (connection: JsonRpcConnection, cwd: string, t
  * collects the notifications. Call only when the agent advertised `loadSession`. A replay is as long as the session, so
  * the deadline is generous.
  */
-export const loadSession = async (connection: JsonRpcConnection, sessionId: string, cwd: string, timeoutMs = LOAD_TIMEOUT_MS): Promise<void> => {
+export const loadSession = async (connection: JsonRpcConnection, sessionId: string, cwd: string, timeoutMs = LOAD_TIMEOUT_MS): Promise<unknown> => {
     const params: LoadSessionRequest = { cwd, mcpServers: [], sessionId };
 
     try {
-        await withTimeout(connection.request(METHOD.loadSession, params), timeoutMs, "the agent did not finish loading the session");
+        return await withTimeout(connection.request(METHOD.loadSession, params), timeoutMs, "the agent did not finish loading the session");
     } catch (error) {
         if (error instanceof RpcError && error.code === AUTH_REQUIRED) {
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment

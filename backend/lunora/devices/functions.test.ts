@@ -903,8 +903,8 @@ describe("the relay", () => {
         await expect(createCall({ deviceId, threadId, userId: ownerId })).resolves.toEqual({ error: "busy" });
     });
 
-    it("takes only the four coding-agent call names for one, so no other acp_ tool gets their window", () => {
-        for (const name of ["acp_start", "acp_send", "acp_cancel", "acp_permission_answer"]) {
+    it("takes only the five coding-agent call names for one, so no other acp_ tool gets their window", () => {
+        for (const name of ["acp_start", "acp_send", "acp_cancel", "acp_permission_answer", "acp_set_config"]) {
             expect(isAcpTool(name)).toBe(true);
             expect(claimWindowMs(name)).toBe(ACP_CLAIM_WINDOW_MS);
         }

@@ -22,6 +22,7 @@ import ContextUsageMeter from "@/features/chat/thread/context-usage-meter";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import DiffCommentsDraft from "./diff-comments-draft";
+import HostOptions from "./host-options";
 import { MAX_HOST_PROMPT_CHARS, sendHostMessage } from "./host-send";
 import useHostSendErrorMessages from "./host-send-errors";
 import { formatReportedCost } from "./reported-cost";
@@ -199,6 +200,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     />
                 </div>
             )}
+            <HostOptions ended={blocked} key={threadId} optionResult={session?.optionResult} state={session?.agentState} threadId={threadId} />
             <div className="flex items-end gap-2">
                 <textarea
                     aria-label={t`Message to the coding agent`}

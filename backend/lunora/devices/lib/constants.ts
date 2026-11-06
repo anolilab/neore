@@ -11,7 +11,7 @@ export const DEVICE_ONLINE_WINDOW_MS = 75_000;
 export const DEVICE_CLAIM_WINDOW_MS = 20_000;
 
 /**
- * `acp_*` calls (a coding agent's start, send, cancel and permission answers) are not device tools: they have
+ * `acp_*` calls (a coding agent's start, send, cancel, permission answers and option changes) are not device tools: they have
  * their own claim window and their own open-call budget, so a stuck send never blocks the cancel.
  */
 export const ACP_CLAIM_WINDOW_MS = 60_000;
@@ -20,7 +20,7 @@ export const MAX_OPEN_ACP_CALLS_PER_DEVICE = 3;
 export const MAX_OPEN_ACP_CANCELS_PER_DEVICE = 3;
 
 /** The coding-agent call kinds, and the only names `isAcpTool` takes for one. A device cannot advertise any of them as a tool. */
-export const ACP_TOOLS: ReadonlyArray<string> = ["acp_start", "acp_send", "acp_cancel", "acp_permission_answer"];
+export const ACP_TOOLS: ReadonlyArray<string> = ["acp_start", "acp_send", "acp_cancel", "acp_permission_answer", "acp_set_config"];
 
 /**
  * A claimed `acp_*` call is a lease: not completed within this, it goes back to `pending` and can be claimed

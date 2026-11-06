@@ -13,7 +13,7 @@ import { authQuery } from "../lib/crpc";
 import { vCapabilityReport } from "../lib/capability-report";
 import { MAX_LENGTH } from "../lib/validators";
 import { isHostRunThread } from "./lib/host-thread";
-import { vAcpAgentState, vAcpSessionStatus, vHostEndReason } from "./validators";
+import { vAcpAgentState, vAcpOptionResult, vAcpSessionStatus, vHostEndReason } from "./validators";
 
 const MAX_LISTED_SESSIONS = 50;
 
@@ -46,6 +46,7 @@ const vHostSessionDetail = v.object({
     folderLabel: v.string(),
     lastEndReason: v.optional(vHostEndReason),
     lastEventAt: v.optional(v.number()),
+    optionResult: v.optional(vAcpOptionResult),
     status: vAcpSessionStatus,
     threadId: v.string(),
 });
@@ -133,8 +134,42 @@ export const getHostSession = authQuery
             ...toView(row),
             ...(row.agentState !== undefined && { agentState: row.agentState }),
             ...(last?.hostEndReason !== undefined && { lastEndReason: last.hostEndReason }),
+            ...(row.optionResult !== undefined && { optionResult: row.optionResult }),
         };
     });
+
+const NATIVE_REASONING = { degradation: "none", supported: true } as const;
+const NOT_OFFERED_REASONING = { reason: "not_offered", supported: false } as const;
+
+/**
+ * The report with the model choices and the reasoning option the agent offers now. The agent can change its options after it
+ * opens, and the report it opened with would describe choices it no longer offers. Without options in the stored state, the report stands.
+ */
+const withLiveOptions = (report: Infer<typeof vCapabilityReport>, state: Infer<typeof vAcpAgentState> | undefined): Infer<typeof vCapabilityReport> => {
+    const options = state?.configOptions;
+
+    if (options === undefined) {
+        return report;
+    }
+
+    const model = options.find((option) => option.category === "model");
+    const hasReasoning = options.some((option) => option.category === "thought_level");
+
+    return {
+        ...report,
+        groups: {
+            ...report.groups,
+            identity: {
+                ...report.groups.identity,
+                models:
+                    model?.choices.map((choice) => {
+                        return { id: choice.value, name: choice.name };
+                    }) ?? [],
+                reasoningEffort: hasReasoning ? NATIVE_REASONING : NOT_OFFERED_REASONING,
+            },
+        },
+    };
+};
 
 /**
  * What the runner of a thread can do (provider-capabilities.md §6): the report its host sent for a host
@@ -174,5 +209,5 @@ export const getThreadCapabilities = authQuery
             where: { threadId: access.thread._id, userId: ctx.user.userId },
         });
 
-        return session?.capabilities ?? unknownCapabilityReport(0);
+        return withLiveOptions(session?.capabilities ?? unknownCapabilityReport(0), session?.agentState);
     });

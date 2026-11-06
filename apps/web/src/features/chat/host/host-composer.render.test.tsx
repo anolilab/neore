@@ -101,6 +101,15 @@ const mount = (data: Record<string, unknown>) => {
     );
 };
 
+// The text is on screen for the person: it is in the document, and no ancestor hides it with `hidden` or `aria-hidden`. jsdom does not
+// apply the stylesheet, so a class that hides it is not seen here.
+const expectShown = (element: HTMLElement) => {
+    expect(element.isConnected).toBe(true);
+    // The ancestor check needs the node itself: no query finds a hidden ancestor.
+    // eslint-disable-next-line testing-library/no-node-access -- checks the hiding attributes of the ancestors, which no query does
+    expect(element.closest("[hidden], [aria-hidden='true']")).toBeNull();
+};
+
 const session = (fields: Record<string, unknown> = {}) => {
     return { "acp.functions.getHostSession": { status: "idle", ...fields } };
 };
@@ -301,5 +310,238 @@ describe("what the agent reports about itself", () => {
         } finally {
             vi.unstubAllGlobals();
         }
+    });
+});
+
+describe("the options the agent offers", () => {
+    const MODEL = {
+        category: "model",
+        choices: [
+            { name: "Fast", value: "fast" },
+            { name: "Deep", value: "deep" },
+        ],
+        currentValue: "fast",
+        id: "model",
+        name: "Model",
+    };
+    const EFFORT = {
+        category: "thought_level",
+        choices: [
+            { name: "Low", value: "low" },
+            { name: "High", value: "high" },
+        ],
+        currentValue: "high",
+        id: "effort",
+        name: "Reasoning effort",
+    };
+
+    const mountWith = (fields: Record<string, unknown>, result?: unknown) => {
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+        harness.data = { ...session(fields), ...(result !== undefined && { "acp.remote.setHostOption:result": result }) };
+        render(
+            <QueryClientProvider client={client}>
+                <HostComposer threadId="thread-1" />
+            </QueryClientProvider>,
+        );
+
+        return client;
+    };
+
+    const mutations = () => harness.calls.filter(([name]) => name === "acp.remote.setHostOption");
+
+    it("shows each option with its current value under a name, and nothing when the agent reported none", async () => {
+        mountWith({ agentState: { configOptions: [MODEL, EFFORT] } });
+
+        expect(((await screen.findByLabelText("Model")) as unknown as HTMLSelectElement).value).toBe("fast");
+        expect((screen.getByLabelText("Reasoning effort") as unknown as HTMLSelectElement).value).toBe("high");
+        expect(screen.getByRole("list", { name: "Agent options" })).toBeTruthy();
+    });
+
+    it("renders no options row for an agent that reported none", async () => {
+        mountWith({});
+
+        await screen.findByLabelText("Message to the coding agent");
+        expect(screen.queryByRole("list", { name: "Agent options" })).toBeNull();
+    });
+
+    it("queues the chosen value for the option and keeps every control off until the agent has answered", async () => {
+        mountWith({ agentState: { configOptions: [MODEL, EFFORT] } }, { callId: "call-1", sent: true });
+
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+
+        await waitFor(() => expect(mutations()).toHaveLength(1));
+        expect(mutations()[0]?.[1]).toEqual({ optionId: "model", threadId: "thread-1", valueId: "deep" });
+        await waitFor(() => expect(model.disabled).toBe(true));
+        expect((screen.getByLabelText("Reasoning effort") as unknown as HTMLSelectElement).disabled).toBe(true);
+        expectShown(screen.getByText("Waiting for the agent to change Model to Deep."));
+    });
+
+    it("says in words that the agent confirmed the change, and frees the controls", async () => {
+        const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": {
+                agentState: { configOptions: [{ ...MODEL, currentValue: "deep" }] },
+                optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+                status: "idle",
+            },
+        };
+        await client.invalidateQueries();
+
+        expectShown(await screen.findByText("The agent confirmed: Model is now Deep."));
+        expect(model.disabled).toBe(false);
+        expect(model.value).toBe("deep");
+    });
+
+    it("does not say confirmed over the old value: it waits for the option to show the new one", async () => {
+        const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        // The agent's answer is in, but the options it changed have not arrived yet.
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": {
+                agentState: { configOptions: [MODEL] },
+                optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+                status: "idle",
+            },
+        };
+        await client.invalidateQueries();
+
+        expectShown(await screen.findByText("The agent confirmed. Waiting for Model to show Deep."));
+        expect(screen.queryByText("The agent confirmed: Model is now Deep.")).toBeNull();
+        expect(model.disabled).toBe(true);
+
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": {
+                agentState: { configOptions: [{ ...MODEL, currentValue: "deep" }] },
+                optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+                status: "idle",
+            },
+        };
+        await client.invalidateQueries();
+
+        expectShown(await screen.findByText("The agent confirmed: Model is now Deep."));
+        expect(model.disabled).toBe(false);
+    });
+
+    it("says the agent answered late when its answer comes after the wait, and the option shows the value it gave", async () => {
+        const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        // The page's call failed at the agent's timeout, and the agent's late answer has since changed the option.
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": {
+                agentState: { configOptions: [{ ...MODEL, currentValue: "deep" }] },
+                optionResult: { callId: "call-1", optionId: "model", outcome: "refused", reason: "the agent did not answer", valueId: "deep" },
+                status: "idle",
+            },
+        };
+        await client.invalidateQueries();
+
+        expectShown(await screen.findByText("The agent answered late: Model is now Deep."));
+        expect(screen.queryByText("The agent did not change Model: the agent did not answer")).toBeNull();
+    }, 30_000);
+
+    it("says the option has not caught up when the agent confirmed a value it still does not show, and then frees the control", async () => {
+        const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        // The agent confirmed the value, but the options it reports keep the old one past the page's wait.
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": {
+                agentState: { configOptions: [MODEL] },
+                optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+                status: "idle",
+            },
+        };
+        await client.invalidateQueries();
+
+        expectShown(await screen.findByText(/The agent confirmed Deep, but Model still shows Fast/, undefined, { timeout: 25_000 }));
+        expect(screen.queryByText("The agent confirmed: Model is now Deep.")).toBeNull();
+        expect(model.disabled).toBe(false);
+    }, 40_000);
+
+    it("says why the agent refused, and leaves the value as it was", async () => {
+        const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": {
+                agentState: { configOptions: [MODEL] },
+                optionResult: { callId: "call-1", optionId: "model", outcome: "refused", reason: "the agent did not accept the change", valueId: "deep" },
+                status: "idle",
+            },
+        };
+        await client.invalidateQueries();
+
+        expectShown(await screen.findByText("The agent did not change Model: the agent did not accept the change"));
+        expect(model.disabled).toBe(false);
+        expect(model.value).toBe("fast");
+    });
+
+    it("tells the person when the change was not sent, with the reason, and frees the control", async () => {
+        mountWith({ agentState: { configOptions: [MODEL] } }, { reason: "offline", sent: false });
+
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+
+        expect(await screen.findByText("Your computer is offline. Open Neore on it and try again.")).toBeTruthy();
+        expect(model.disabled).toBe(false);
+    });
+
+    it("shows the legacy model state without a way to change it, and lets the legacy modes be chosen", async () => {
+        mountWith({
+            agentState: {
+                modes: {
+                    available: [
+                        { id: "ask", name: "Ask" },
+                        { id: "code", name: "Code" },
+                    ],
+                    current: "ask",
+                },
+                models: { available: [{ id: "m1", name: "M1" }], current: "m1" },
+            },
+        });
+
+        expect(await screen.findByText("M1")).toBeTruthy();
+        expect(screen.queryByLabelText("Model")).toBeNull();
+
+        fireEvent.change(screen.getByLabelText("Mode"), { target: { value: "code" } });
+
+        await waitFor(() => expect(mutations()).toHaveLength(1));
+        // No option id: the value is a mode of the legacy state.
+        expect(mutations()[0]?.[1]).toEqual({ threadId: "thread-1", valueId: "code" });
+    });
+
+    it("keeps the controls off once the session has ended", async () => {
+        mountWith({ agentState: { configOptions: [MODEL] }, status: "ended" });
+
+        expect(((await screen.findByLabelText("Model")) as unknown as HTMLSelectElement).disabled).toBe(true);
     });
 });

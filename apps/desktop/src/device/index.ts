@@ -451,7 +451,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     };
 
     /** Carries out one command the backend sent, after its receipt is written (`acp/commands.ts`). */
-    const applyCommand = (command: AcpCommand, call: AppliedCall): "accepted" | typeof HELD => {
+    const applyCommand = (command: AcpCommand, call: AppliedCall): "accepted" | Promise<"accepted"> | typeof HELD => {
         const core = requireCore();
 
         // A command made for one of this computer's servers runs against that server's own agents and holds.
@@ -473,6 +473,14 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             case "send": {
                 // Sent now, or held until the session opens (`acp/early-sends.ts`).
                 return (server?.early ?? requireEarly()).submit(command, call);
+            }
+            case "setConfig": {
+                // The agent's answer is the confirmation; a change it could not make refuses the call with the reason.
+                return (async () => {
+                    await (server?.acp ?? requireAcp()).setOption(command.sessionId, command.optionId, command.valueId);
+
+                    return "accepted" as const;
+                })();
             }
             case "start": {
                 // The agent takes a while to start. The command is accepted now and stays in the receipt log until the

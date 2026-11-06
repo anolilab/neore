@@ -15,8 +15,10 @@ import { randomUUID } from "node:crypto";
 import type { CapabilityReport } from "@neore/ai/capabilities";
 import { capabilityOf, isAvailable } from "@neore/ai/capabilities";
 
+import type { RawOptions } from "./agent-options";
+import { configOptionsOf, isOffered, optionsOf, resolveOptions, withCurrentMode, withOptionValue } from "./agent-options";
 import { usageOf } from "./agent-state";
-import { reportFromHandshake } from "./capabilities";
+import { reportFromHandshake, withOptionCapabilities } from "./capabilities";
 import { TurnChanges } from "./changes";
 import { childEventOf, childParentOf, completionText, contentText, isRecord, text, toolIdOf } from "./child-updates";
 import type { ChildEvent } from "./children";
@@ -27,7 +29,7 @@ import type { PermissionGate, PermissionOutcome } from "./permission";
 import { describePermission, offeredOptions } from "./permission";
 import type { AgentProcess } from "./process";
 import type { Handshake } from "./protocol";
-import { initialize, loadSession, METHOD, newSession, promptParams } from "./protocol";
+import { initialize, loadSession, METHOD, openNewSession, promptParams, setConfigOption, setMode } from "./protocol";
 import { INVALID_PARAMS, METHOD_NOT_FOUND, RpcError } from "./rpc-error";
 import { Turn } from "./turn";
 import type { SessionSnapshot, SessionStatus, SessionSummary, StopReason, ToolState, ToolStatus } from "./types";
@@ -160,6 +162,23 @@ export class AgentSession {
     /** What the agent reported at the handshake. Unset until it has. */
     private report: CapabilityReport | undefined;
 
+    /** What the agent offers (its model, reasoning effort, mode ...), as it last said; unset until the session is open. */
+    private offered: RawOptions = {};
+
+    /**
+     * Bumped whenever the agent sends its own list of options (`configOptions`) or of modes, so an answer older than that list does
+     * not replace it. The two are counted apart: a mode update says nothing about a model answer, and must not refuse it.
+     */
+    private configVersion = 0;
+
+    private modeVersion = 0;
+
+    /** Counts the option changes asked for, so a late answer to an earlier one does not replace a later one. */
+    private optionRequests = 0;
+
+    /** Whether the startup updates are the saved session's (while it loads) or a fresh session's (once it is opened). */
+    private startupPhase: "loading" | "opening" = "opening";
+
     /** What happened to the saved session the backend asked to load; unset when it asked for none. */
     private reattach: HostSessionInfo["reattach"];
 
@@ -197,6 +216,11 @@ export class AgentSession {
             this.report = this.options.capabilityReport?.(this.agent) ?? reportFromHandshake(this.agent.capabilities, Date.now());
             this.agentSessionId = await this.openAgentSession();
 
+            // What the agent offered is known now, so the report says whether it has models, reasoning effort and modes.
+            if (this.report !== undefined) {
+                this.report = withOptionCapabilities(this.report, resolveOptions(this.offered));
+            }
+
             // The agent can exit while the last answer is on its way; that session is over, not ready.
             if (this.status === "ended") {
                 throw new Error(this.endReason ?? "the agent ended during startup");
@@ -231,6 +255,73 @@ export class AgentSession {
 
             this.observe((observer) => observer.sessionOpened(this.id, opened, this.options.threadId));
         }
+
+        this.reportOptions();
+    }
+
+    /**
+     * Changes one of the agent's options for the backend's `acp_set_config`: `optionId` names a list option, and without it
+     * `valueId` is a mode of the legacy state. Only a value the agent itself offered is sent. Refuses with a fixed phrase,
+     * never with the agent's own words (they can quote its environment); the agent's answer is the confirmation.
+     */
+    public async setOption(optionId: string | undefined, valueId: string): Promise<void> {
+        if (this.status === "ended" || this.status === "starting") {
+            throw new Error("this session is not open");
+        }
+
+        if (!isOffered(this.offered, optionId, valueId)) {
+            throw new Error("the agent does not offer that choice");
+        }
+
+        let answer: unknown;
+        const versionAtRequest = this.versionOf(optionId);
+
+        this.optionRequests += 1;
+        const request = this.optionRequests;
+
+        // The timeout does not cancel the agent's request: an answer that arrives after it is applied here and reported, so what the
+        // person sees follows what the agent did.
+        const onLate = (late: unknown): void => {
+            // An answer older than a list the agent has sent since, or than a later change asked for, is not applied: that is what is
+            // true now.
+            if (this.status === "ended" || this.versionOf(optionId) !== versionAtRequest || request !== this.optionRequests) {
+                return;
+            }
+
+            this.applyOptionAnswer(optionId, valueId, late);
+            this.reportOptions();
+        };
+
+        try {
+            answer = optionId === undefined ? await setMode(this.connection, this.agentSessionId, valueId, undefined, onLate) : await setConfigOption(this.connection, this.agentSessionId, optionId, valueId, undefined, onLate);
+        } catch (error) {
+            // The agent's own words can quote its environment: only a fixed phrase leaves, and the cause stays out of it.
+            const timedOut = (error as Error).message === "the agent did not answer";
+
+            // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error
+            throw new Error(timedOut ? "the agent did not answer" : "the agent did not accept the change");
+        }
+
+        // The agent sent its own list while this was outstanding, and that list is newer than the answer: it stands. It must show the
+        // value asked for, or the change was not made.
+        if (this.versionOf(optionId) !== versionAtRequest) {
+            this.reportOptions();
+
+            if (!this.showsValue(optionId, valueId)) {
+                throw new Error("the agent did not apply the change");
+            }
+
+            return;
+        }
+
+        // The agent's list is what is true now; if it still shows another value, the change was not made.
+        if (!this.applyOptionAnswer(optionId, valueId, answer)) {
+            this.reportOptions();
+
+            throw new Error("the agent did not apply the change");
+        }
+
+        this.reportOptions();
     }
 
     /** `turnId` is the id the backend gave the turn (`acp_send`): the turn keeps it, and the backend hears it was received. */
@@ -372,30 +463,97 @@ export class AgentSession {
         };
     }
 
+    /** The version of the list a change to `optionId` is answered against: the modes for the legacy mode state, else the options. */
+    private versionOf(optionId: string | undefined): number {
+        return optionId === undefined ? this.modeVersion : this.configVersion;
+    }
+
+    /** Applies the agent's answer to a change to what the session offers. False when the answer still shows another value. */
+    private applyOptionAnswer(optionId: string | undefined, valueId: string, answer: unknown): boolean {
+        if (optionId === undefined) {
+            this.offered = withCurrentMode(this.offered, valueId, this.options.process.scrub);
+
+            return true;
+        }
+
+        // The answer lists every option with its new value; one that is not a list means only this value moved.
+        const listed = configOptionsOf(isRecord(answer) ? answer.configOptions : undefined, this.options.process.scrub);
+
+        this.offered = listed === undefined ? withOptionValue(this.offered, optionId, valueId) : { ...this.offered, configOptions: listed };
+
+        return listed === undefined || listed.find((option) => option.id === optionId)?.currentValue === valueId;
+    }
+
+    /** Whether what the session offers now shows the value asked for. */
+    private showsValue(optionId: string | undefined, valueId: string): boolean {
+        if (optionId === undefined) {
+            return this.offered.modes?.current === valueId;
+        }
+
+        return this.offered.configOptions?.find((option) => option.id === optionId)?.currentValue === valueId;
+    }
+
     /** The agent's session: the saved one when asked for and loadable, else a new one (`reattach` says which, and why not). */
     private async openAgentSession(): Promise<string> {
         const { folder, resumeSessionId, startupTimeoutMs } = this.options;
 
         if (resumeSessionId === undefined) {
-            return await newSession(this.connection, folder, startupTimeoutMs);
+            return await this.openFresh(folder, startupTimeoutMs);
         }
 
         // No `session/load` frame goes to an agent that did not say it loads them.
+        this.startupPhase = "loading";
+
         if (isAvailable(capabilityOf(this.report, "sessions.load"))) {
             try {
-                await loadSession(this.connection, resumeSessionId, folder);
+                // What the agent sent while it loaded is older than its answer: the answer's fields win.
+                this.offered = { ...this.offered, ...optionsOf(await loadSession(this.connection, resumeSessionId, folder), this.options.process.scrub) };
                 this.reattach = { loaded: true };
 
                 return resumeSessionId;
             } catch {
                 // The agent's own error can quote its environment: the backend is told that it failed (a code), not its text.
                 this.reattach = { loaded: false, reason: "load_failed" };
+                this.offered = {};
             }
         } else {
             this.reattach = { loaded: false, reason: "load_unsupported" };
         }
 
-        return await newSession(this.connection, folder, startupTimeoutMs);
+        this.startupPhase = "opening";
+
+        return await this.openFresh(folder, startupTimeoutMs);
+    }
+
+    private async openFresh(folder: string, timeoutMs?: number): Promise<string> {
+        const { response, sessionId } = await openNewSession(this.connection, folder, timeoutMs);
+
+        this.offered = { ...this.offered, ...optionsOf(response, this.options.process.scrub) };
+
+        return sessionId;
+    }
+
+    private takeStartupOptions(update: Record<string, unknown>): void {
+        const { scrub } = this.options.process;
+
+        if (update.sessionUpdate === "config_option_update") {
+            const configOptions = configOptionsOf(update.configOptions, scrub);
+
+            if (configOptions !== undefined) {
+                this.offered = { ...this.offered, configOptions };
+            }
+        } else if (update.sessionUpdate === "current_mode_update") {
+            this.offered = withCurrentMode(this.offered, update.currentModeId, scrub);
+        }
+    }
+
+    /** Tells the backend what the agent offers now (it keeps the newest of each field and sends them in one post). */
+    private reportOptions(): void {
+        const options = resolveOptions(this.offered);
+
+        if (Object.keys(options).length > 0) {
+            this.observe((observer) => observer.sessionState?.(this.id, options));
+        }
     }
 
     /** Drops the prompts still waiting. The ones the backend queued are told their turn was cancelled, so no stream waits on them. */
@@ -748,6 +906,21 @@ export class AgentSession {
     // ─── From the agent ────────────────────────────────────────────────────
 
     private onNotification(method: string, params: unknown): void {
+        // While the session opens its id is not known yet, and an agent may send its options before it answers. They are
+        // kept, older than the answer, so the answer's own fields replace them.
+        if (this.agentSessionId === "" && this.status === "starting" && method === METHOD.sessionUpdate && isRecord(params) && isRecord(params.update)) {
+            // While the saved session loads, only its updates count. Once a fresh session is opened, the saved id's late updates are
+            // the failed load's, and the fresh session's own updates are the ones that count.
+            const { resumeSessionId } = this.options;
+            const counts = resumeSessionId === undefined || (this.startupPhase === "loading" ? params.sessionId === resumeSessionId : params.sessionId !== resumeSessionId);
+
+            if (counts) {
+                this.takeStartupOptions(params.update);
+            }
+
+            return;
+        }
+
         if (method !== METHOD.sessionUpdate || !isRecord(params) || params.sessionId !== this.agentSessionId || !isRecord(params.update)) {
             return;
         }
@@ -773,6 +946,24 @@ export class AgentSession {
                 turn?.append("thought", contentText(update.content));
                 this.observeDelta(turn, "thought", false);
                 break;
+            }
+            case "config_option_update": {
+                const configOptions = configOptionsOf(update.configOptions, this.options.process.scrub);
+
+                if (configOptions !== undefined) {
+                    this.offered = { ...this.offered, configOptions };
+                    this.configVersion += 1;
+                    this.reportOptions();
+                }
+
+                return;
+            }
+            case "current_mode_update": {
+                this.offered = withCurrentMode(this.offered, update.currentModeId, this.options.process.scrub);
+                this.modeVersion += 1;
+                this.reportOptions();
+
+                return;
             }
             case "tool_call":
             case "tool_call_update": {
