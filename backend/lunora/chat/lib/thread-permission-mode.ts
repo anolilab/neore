@@ -12,6 +12,12 @@ export type ThreadPermissionMode = "auto" | "auto-edit" | "full" | "supervised";
 
 export const THREAD_PERMISSION_MODES: ReadonlyArray<ThreadPermissionMode> = ["supervised", "auto-edit", "auto", "full"];
 
+/**
+ * The error code of a refused mode save on a comparison column (`setThreadPermissionMode`). The column's mode is the comparison's, so the
+ * save changed nothing: the client tells it apart from a save that failed by this code, not by its message.
+ */
+export const COMPARISON_COLUMN_MODE_CODE = "COMPARISON_COLUMN_MODE";
+
 /** What an absent value means. */
 export const DEFAULT_THREAD_PERMISSION_MODE: ThreadPermissionMode = "auto";
 

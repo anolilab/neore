@@ -4,7 +4,7 @@
  * grantees, so every procedure here is owner-only and none touches `updatedAt`
  * (the lists sort by it). Writes go through `agent/table-writes.ts`.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import { markThreadViewedAt, patchThread, setThreadSnooze } from "../agent/table-writes";
 import { requireOwnedThreadIgnoringLock } from "../agent/thread-read-access";
@@ -13,6 +13,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { throwBadRequest } from "../lib/error-helpers";
 import { redact } from "../lib/audit-triggers";
 import { appendDocumentHistory } from "../lib/document-history";
+import { COMPARISON_COLUMN_MODE_CODE } from "./lib/thread-permission-mode";
 import { isSnoozeInRange } from "./lib/thread-state-logic";
 import { isComparisonColumn, modeOfThread } from "./tool-permissions";
 
@@ -108,7 +109,10 @@ export const setThreadPermissionMode = authMutation
 
         // A column's runs take its comparison's mode, so a mode saved here would never apply: it is changed on the comparison instead.
         if (await isComparisonColumn(context, thread._id)) {
-            return throwBadRequest("A comparison column takes its comparison's mode: change the mode on the comparison");
+            // Typed, so the client tells this refusal (nothing changed) from a save that failed.
+            throw new LunoraError("BAD_REQUEST", "A comparison column takes its comparison's mode: change the mode on the comparison", {
+                data: { code: COMPARISON_COLUMN_MODE_CODE },
+            });
         }
 
         if (thread.permissionMode !== mode) {

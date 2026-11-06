@@ -8,6 +8,7 @@ import { patchThread } from "../agent/table-writes";
 import { getThread, updateThread } from "../agent/threads";
 import schema from "../schema";
 import { isSnoozeInRange, SNOOZE_MAX_MS } from "./lib/thread-state-logic";
+import { COMPARISON_COLUMN_MODE_CODE } from "./lib/thread-permission-mode";
 import { markThreadViewed, setThreadPermissionMode, snoozeThread, unsnoozeThread } from "./thread-state";
 import { modeOfThread, threadModeForApp } from "./tool-permissions";
 
@@ -15,7 +16,6 @@ const OWNER = "user-owner";
 const GRANTEE = "user-grantee";
 const STRANGER = "user-stranger";
 const NOT_FOUND_PATTERN = /Thread not found/;
-const COMPARISON_PATTERN = /comparison/;
 const DAY = 24 * 60 * 60 * 1000;
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -260,7 +260,9 @@ describe("setThreadPermissionMode", () => {
             });
         });
 
-        await expect(as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId: column } as never)).rejects.toThrow(COMPARISON_PATTERN);
+        await expect(as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId: column } as never)).rejects.toMatchObject({
+            data: { code: COMPARISON_COLUMN_MODE_CODE },
+        });
 
         const row = await harness.run(async (context: any) => await context.db.get("threads", column));
 
