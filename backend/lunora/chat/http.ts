@@ -346,6 +346,9 @@ export const chatStartHttpAction = async (context: HttpActionCtx, request: Reque
     return await runChatStart(context, body, signingSecret);
 };
 
+/** A mention as the group parser reads one (`chat/group/logic.ts`): refused in a guest's note, which cannot choose a speaker. */
+const GUEST_MENTION_RE = /(?:^|[^\w@.])@[a-z0-9]/i;
+
 /** The `/chat/start` request body. Also built by the public API's chat route. */
 export interface ChatStartBody {
     /** New thread only: each send routes to a model the gateway picks (`chat/lib/auto-model.ts`). An existing thread keeps its own setting. */
@@ -599,6 +602,12 @@ const runChatStartOnShard = async (
     // A guest's note is never a command: text that starts with "/" could select one of the owner's skills or commands.
     if (guestNote && stripHiddenText(guestNote.text).text.trimStart().startsWith("/")) {
         return Response.json({ error: "A guest note that starts with / cannot be sent." }, { status: 400 });
+    }
+
+    // Nor can it @mention: in a group chat a mention picks who answers, which is the owner's choice. The shape matches the
+    // parser's (`chat/group/logic.ts`), without its participant list, so any mention a guest writes is refused.
+    if (guestNote && GUEST_MENTION_RE.test(stripHiddenText(guestNote.text).text)) {
+        return Response.json({ error: "A guest note cannot @mention anyone." }, { status: 400 });
     }
 
     // Build message content

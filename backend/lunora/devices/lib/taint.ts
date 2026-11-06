@@ -94,6 +94,10 @@ const goalNoteTaint = (content: unknown): DeviceTaintSource[] => {
 const isHostText = (part: { providerMetadata?: unknown; providerOptions?: unknown }): boolean =>
     [part.providerMetadata, part.providerOptions].some((meta) => (meta as { neore?: { runner?: unknown } } | undefined)?.neore?.runner === "host");
 
+/** A text part the server marked as a guest's words (`chat/lib/attached-text.ts`). */
+const isGuestText = (part: { providerOptions?: unknown }): boolean =>
+    (part.providerOptions as { neore?: { guestText?: unknown } } | undefined)?.neore?.guestText === true;
+
 /**
  * The sorted, de-duplicated taint of a message list. Reads only `role`,
  * `content[].type`, `content[].toolName`, a host-text mark on an assistant text part,
@@ -132,6 +136,11 @@ export const computeTaint = (messages: ReadonlyArray<MessageLike> | undefined): 
         const parts = message.content as ReadonlyArray<{ providerMetadata?: unknown; providerOptions?: unknown; toolName?: unknown; type?: unknown }>;
 
         for (const part of parts) {
+            // A guest's note the owner sent on is the guest's words, not the owner's: a call prompted by it is not trusted.
+            if (message.role === "user" && isGuestText(part)) {
+                found.add("files");
+            }
+
             if (message.role === "assistant" && part.type === "text" && isHostText(part)) {
                 // A coding agent's own text, posted from a paired computer: it read files and command output there.
                 found.add("device");
