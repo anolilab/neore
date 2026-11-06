@@ -22,7 +22,9 @@ import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
+import { AgentRunError, LEFT_ORGANIZATION_MESSAGE } from "../chat/lib/agent-run";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
+import { readPermissionCap } from "../chat/lib/run-permission-cap";
 import { wrapUntrusted } from "../coding-agents/agent-output";
 import type { VerifierVerdict } from "./logic";
 import { buildTaskPrompt, buildVerifierPrompt, isPassingFallback, parseVerifierOutput, resolveTaskModel, VERIFIER_SYSTEM_PROMPT } from "./logic";
@@ -199,14 +201,17 @@ const runAgent = async (
  * STARTS it: the round stays `running`, and `finishCodingAgentRound` completes
  * it when the run ends. A task is explicit consent, so the chat tool's `ask`
  * default does not apply; the run's own admission checks (one at a time, rate
- * limit, BYOK key) do.
+ * limit, BYOK key) do. It never reaches `runHeadlessAgent`, so the organization's
+ * checks are made here: its owner must still be a member, and its cap must be
+ * `auto`, since the agent approves its own tools out of the backend's reach.
  */
-const startCodingAgentRound = async (
+export const startCodingAgentRound = async (
     ctx: ActionCtx,
     claim: {
         codingAgent: { agent: "claude_code" | "codex"; branch?: string; openPr?: boolean; repoUrl: string };
         goal?: { description?: string; successCriteria?: string; title: string };
         instructions: string;
+        organizationId?: string;
         repair?: { previousAnswer?: string; reasons: string[]; repairInstructions?: string };
         reviewNote?: string;
         runId: Id<"taskRuns">;
@@ -216,7 +221,18 @@ const startCodingAgentRound = async (
     },
     taskId: Id<"tasks">,
 ): Promise<void> => {
-    const { codingAgent, userId } = claim;
+    const { codingAgent, organizationId, userId } = claim;
+
+    if (organizationId) {
+        if (!(await ctx.runQuery(internal.auth.organization_policy.isOrganizationMemberQuery, { organizationId, userId }))) {
+            throw new AgentRunError("left-organization", LEFT_ORGANIZATION_MESSAGE);
+        }
+
+        if ((await readPermissionCap(ctx, organizationId)) !== "auto") {
+            throw new TaskRunError("Your organization's tool policy does not allow a coding agent to run on its own, so this task cannot start one.");
+        }
+    }
+
     const created = await ctx.runMutation(internal.coding_agents.functions.createRun, {
         agent: codingAgent.agent,
         ...(codingAgent.branch && { branch: codingAgent.branch }),
@@ -330,7 +346,7 @@ export const runTaskRound = internalAction
             } catch (error) {
                 console.error(`[Tasks] Round ${String(args.round)} of task ${args.taskId} could not start its coding agent:`, error);
                 await ctx.runMutation(internal.tasks.internal.completeRound, {
-                    outcome: { error: taskErrorMessage(error, undefined), kind: "error" },
+                    outcome: { error: taskErrorMessage(error, undefined), kind: "error", ...(stopsRecurrence(error) && { stopsRecurrence: true as const }) },
                     runId: claim.runId,
                 });
             }
