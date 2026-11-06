@@ -728,6 +728,23 @@ fn signal_name(signal: i32) -> String {
         libc::SIGSEGV => "SIGSEGV".into(),
         libc::SIGPIPE => "SIGPIPE".into(),
         libc::SIGTERM => "SIGTERM".into(),
+        // Names from the libc constants, so each matches its own platform's number (these differ between Linux and macOS).
+        libc::SIGILL => "SIGILL".into(),
+        libc::SIGTRAP => "SIGTRAP".into(),
+        libc::SIGBUS => "SIGBUS".into(),
+        libc::SIGFPE => "SIGFPE".into(),
+        libc::SIGUSR1 => "SIGUSR1".into(),
+        libc::SIGUSR2 => "SIGUSR2".into(),
+        libc::SIGALRM => "SIGALRM".into(),
+        libc::SIGCHLD => "SIGCHLD".into(),
+        libc::SIGCONT => "SIGCONT".into(),
+        libc::SIGSTOP => "SIGSTOP".into(),
+        libc::SIGTSTP => "SIGTSTP".into(),
+        libc::SIGTTIN => "SIGTTIN".into(),
+        libc::SIGTTOU => "SIGTTOU".into(),
+        libc::SIGXCPU => "SIGXCPU".into(),
+        libc::SIGXFSZ => "SIGXFSZ".into(),
+        libc::SIGSYS => "SIGSYS".into(),
         other => format!("SIG{other}"),
     }
 }
@@ -912,6 +929,18 @@ mod tests {
         } else {
             NetworkTier::Off
         }
+    }
+
+    #[test]
+    fn a_signal_that_ends_a_command_is_named_on_each_platform() {
+        assert_eq!(signal_name(libc::SIGILL), "SIGILL");
+        assert_eq!(signal_name(libc::SIGTRAP), "SIGTRAP");
+        assert_eq!(signal_name(libc::SIGBUS), "SIGBUS");
+        assert_eq!(signal_name(libc::SIGFPE), "SIGFPE");
+        assert_eq!(signal_name(libc::SIGSYS), "SIGSYS");
+        assert_eq!(signal_name(libc::SIGUSR1), "SIGUSR1");
+        // A number nothing names is still shown as a number.
+        assert_eq!(signal_name(1000), "SIG1000");
     }
 
     #[test]
