@@ -4,10 +4,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-const LINKED_PULL_REQUESTS = /linked pull requests/u;
+const LINKED_PULL_REQUESTS = /Linked pull requests/u;
 
 const linkedPullRequests = vi.hoisted(() => {
-    return { count: 0 as number | null };
+    return { count: 0 };
 });
 
 vi.mock("@lingui/core/macro", () => {
@@ -30,9 +30,9 @@ vi.mock("@neore/backend/api", () => {
     return { api: {} };
 });
 
-vi.mock("@/features/develop/lib/use-develop", () => {
+vi.mock("@/features/develop/components/pull-request-counts", () => {
     return {
-        useThreadPullRequestCount: () => linkedPullRequests.count,
+        usePullRequestCount: () => linkedPullRequests.count,
     };
 });
 
@@ -190,14 +190,14 @@ const baseProps = {
 };
 
 describe("ThreadNode", () => {
-    it("shows the linked pull request count with an accessible label, and no count when the read is partial", () => {
+    it("shows the linked pull request count with an accessible label, and none for a thread with no link", () => {
         linkedPullRequests.count = 2;
         const { unmount } = render(<ThreadNode {...baseProps} />);
 
-        expect(screen.getByLabelText("2 linked pull requests").textContent).toContain("2");
+        expect(screen.getByLabelText("Linked pull requests: 2").textContent).toContain("2");
         unmount();
 
-        linkedPullRequests.count = null;
+        linkedPullRequests.count = 0;
         render(<ThreadNode {...baseProps} />);
 
         expect(screen.queryByLabelText(LINKED_PULL_REQUESTS)).toBeNull();

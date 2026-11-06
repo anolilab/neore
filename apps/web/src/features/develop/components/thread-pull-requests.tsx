@@ -1,7 +1,6 @@
 "use client";
 
-import { plural } from "@lingui/core/macro";
-import { useLingui } from "@lingui/react/macro";
+import { Plural, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Alert, AlertDescription, AlertTitle } from "@neore/ui/components/alert";
 import { Button } from "@neore/ui/components/button";
@@ -49,7 +48,8 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
     const [open, setOpen] = useState(false);
     const [text, setText] = useState("");
     // `success` is what was linked; `failures` names each pull request that was not, with the reason.
-    const [success, setSuccess] = useState<string | null>(null);
+    // A count is kept as a number and worded at render, so it reads in the language the person chose.
+    const [success, setSuccess] = useState<number | string | null>(null);
     const [failures, setFailures] = useState<string[]>([]);
     const [inputProblem, setInputProblem] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -111,17 +111,20 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
             const failed = outcome.results.filter((result) => result.status !== "attached" && result.status !== "already_linked");
 
             // Every failure is named with its reason, and the input is kept, so a retry does not mean typing the addresses again.
-            setFailures(
-                failed.map((result) => {
-                    const address = `${result.repository}#${String(result.number)}`;
-                    const reason = statusText[result.status];
+            // A pull request entered twice fails twice the same way: it is named once, which also keeps each line's key unique.
+            setFailures([
+                ...new Set(
+                    failed.map((result) => {
+                        const address = `${result.repository}#${String(result.number)}`;
+                        const reason = statusText[result.status];
 
-                    return t`${address}: ${reason}`;
-                }),
-            );
+                        return t`${address}: ${reason}`;
+                    }),
+                ),
+            ]);
 
             if (linked > 0) {
-                setSuccess(plural(linked, { one: "# pull request linked.", other: "# pull requests linked." }));
+                setSuccess(linked);
             } else if (alreadyLinked) {
                 setSuccess(statusText.already_linked);
             }
@@ -138,6 +141,11 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
 
     return (
         <div className="flex flex-wrap items-center gap-2">
+            {links.isPending && links.fetchStatus === "fetching" && (
+                <span className="sr-only" role="status">
+                    {t`Loading the linked pull requests…`}
+                </span>
+            )}
             {links.isError && (
                 <p className="text-destructive inline-flex items-center gap-2 text-xs" role="alert">
                     {t`Could not load the linked pull requests.`}
@@ -168,7 +176,17 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
             <Button onClick={() => setOpen(true)} size="sm" variant="ghost">
                 {t`Link pull request`}
             </Button>
-            <Dialog onOpenChange={setOpen} open={open}>
+            <Dialog
+                onOpenChange={(next) => {
+                    // A new visit starts clean: the last visit's result is not this one's.
+                    if (next) {
+                        reset();
+                    }
+
+                    setOpen(next);
+                }}
+                open={open}
+            >
                 <DialogPopup>
                     <DialogHeader>
                         <DialogTitle>{t`Link pull requests`}</DialogTitle>
@@ -191,7 +209,15 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
                         />
                     </div>
                     <div aria-live="polite" className="px-6" role="status">
-                        {success !== null && <p className="text-sm">{success}</p>}
+                        {success !== null && (
+                            <p className="text-sm">
+                                {typeof success === "number" ? (
+                                    <Plural one="# pull request linked." other="# pull requests linked." value={success} />
+                                ) : (
+                                    success
+                                )}
+                            </p>
+                        )}
                         {busy && <p className="text-muted-foreground text-sm">{t`Linking…`}</p>}
                     </div>
                     {failures.length > 0 && (

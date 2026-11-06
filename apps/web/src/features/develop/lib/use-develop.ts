@@ -2,6 +2,7 @@ import { api } from "@neore/backend/api";
 import type { InboxSection } from "@neore/backend/source-control/types";
 import { LIVE_META_KEY } from "@neore/client-runtime";
 import { skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { createLunoraActionQueryOptions, useAction, useCRPC, useLunora } from "@/lib/lunora/crpc";
@@ -154,43 +155,20 @@ export const useThreadPullRequests = (threadId: string | undefined) => {
 /** Attaches existing pull requests to a thread by hand. The host reads each one first; a refusal is reported per pull request. */
 export const useAttachPullRequests = () => useAction(api.source_control.pr_thread_attach.attachPullRequests);
 
-interface PullRequestCounts {
-    counts: { count: number; threadId: string }[];
-    truncated: boolean;
-}
-
-// Every sidebar row reads the same query result: index it once, so a row is a lookup rather than a search of all of them.
-const indexOfCounts = new WeakMap<PullRequestCounts, Map<string, number>>();
-
-const countOf = (read: PullRequestCounts, threadId: string): number => {
-    let index = indexOfCounts.get(read);
-
-    if (index === undefined) {
-        index = new Map(read.counts.map((row) => [row.threadId, row.count]));
-        indexOfCounts.set(read, index);
-    }
-
-    return index.get(threadId) ?? 0;
-};
+/** Threads one count read asks for: the backend's own cap. The rows past it show no badge. */
+const MAX_COUNT_THREADS = 200;
 
 /**
- * How many pull requests one thread is linked to, for its sidebar badge. One shared subscription for every row, and
- * none until the page has painted, so the sidebar does not add to the queries the first paint waits for.
+ * How many pull requests each of the given threads is linked to, read ONCE for a whole list (the sidebar), not per
+ * row. The ids are sorted so the query keeps one identity while the list only reorders, and nothing is asked until
+ * the page has painted, so the sidebar does not add to the queries the first paint waits for.
  */
-export const useThreadPullRequestCount = (threadId: string, ready: boolean): number | null => {
+export const usePullRequestCounts = (threadIds: ReadonlyArray<string>, ready: boolean): ReadonlyMap<string, number> => {
     const crpc = useCRPC();
-    const { data } = useQuery({
-        ...crpc.source_control.pr_thread_attach.countsForUser.queryOptions({}),
-        enabled: ready,
-        // `null` when the read hit its row cap: a thread's count may then be partial, so the sidebar shows no number.
-        select: (read: PullRequestCounts): number | null => {
-            if (read.truncated) {
-                return null;
-            }
+    const sorted = useMemo(() => [...new Set(threadIds)].toSorted((left, right) => left.localeCompare(right)).slice(0, MAX_COUNT_THREADS), [threadIds]);
+    const { data } = useQuery(
+        crpc.source_control.pr_thread_attach.countsForThreads.queryOptions(ready && sorted.length > 0 ? { threadIds: sorted } : skipToken),
+    );
 
-            return countOf(read, threadId);
-        },
-    });
-
-    return data === undefined ? 0 : data;
+    return useMemo(() => new Map((data ?? []).map((row) => [row.threadId, row.count])), [data]);
 };

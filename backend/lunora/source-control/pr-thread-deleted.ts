@@ -1,8 +1,8 @@
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 
-/** Bounds the read: a thread past this many links would be only partly marked, which no real thread reaches. */
-const MAX_LINKS_OF_THREAD = 200;
+/** Link rows read per page; every page is read, so no link of the thread is left unmarked. */
+const LINK_PAGE_SIZE = 100;
 
 /**
  * Marks every link of a thread with whether the thread is deleted. The sidebar count reads link rows only, so the thread's delete and
@@ -14,12 +14,23 @@ export const setLinksThreadDeleted = async (ctx: MutationCtx, userId: string | u
         return;
     }
 
-    const links = await ctx.db
-        .query("pullRequestThreads")
-        .withIndex("by_user_and_threadId", (q) => q.eq("userId", userId).eq("threadId", threadId))
-        .take(MAX_LINKS_OF_THREAD);
+    // Agent-opened links have no per-thread cap, so the rows are paged to the end rather than read up to a bound.
+    let cursor: string | null = null;
 
-    for (const link of links) {
-        await ctx.db.patch("pullRequestThreads", link._id, { threadDeleted: deleted });
+    for (;;) {
+        const page = await ctx.db
+            .query("pullRequestThreads")
+            .withIndex("by_user_and_threadId", (q) => q.eq("userId", userId).eq("threadId", threadId))
+            .paginate({ cursor, numItems: LINK_PAGE_SIZE });
+
+        for (const link of page.page) {
+            await ctx.db.patch("pullRequestThreads", link._id, { threadDeleted: deleted });
+        }
+
+        if (page.isDone) {
+            return;
+        }
+
+        cursor = page.continueCursor;
     }
 };

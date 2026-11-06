@@ -14,6 +14,7 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import type { GithubTokenOutcome } from "../connectors/lib/github-token";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { authAction, authQuery, rateLimit } from "../lib/crpc";
+import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import { linksFor, MAX_THREADS_PER_PULL_REQUEST, partitionLinks, pullRequestUrl, requireAddress, toOutput, vPullRequestThread } from "./pr-threads";
@@ -25,8 +26,10 @@ const MAX_ATTACH_PER_CALL = 10;
 const MAX_LINKS_PER_THREAD = 20;
 /** Link rows one thread's list reads: above the attach cap, so an agent-opened link past it still shows. */
 const MAX_LINKS_READ_PER_THREAD = 100;
-/** Link rows the sidebar counts read. The index is by thread, not by age: when this cap is reached the counts are not exact, and say so. */
-const MAX_COUNT_ROWS = 500;
+/** Threads one count read takes: the sidebar asks for the rows it shows, up to this many. */
+const MAX_COUNT_THREADS = 200;
+/** Link rows read per thread for its badge: above the attach cap, so a thread's badge is whole unless agents opened many more. */
+const MAX_COUNT_ROWS_PER_THREAD = 25;
 
 const vAddress = v.object({ number: v.number(), repository: v.string().max(MAX_LENGTH.key) });
 
@@ -108,7 +111,8 @@ export const recordAttachedPullRequests = internalMutation
                 repository: address.repository,
                 threadId: thread._id,
                 // The thread's title, as every other kind of link stores it: the header and the Work-on list read this field.
-                title: thread.title ?? `${address.repository}#${String(address.number)}`,
+                // A locked chat's title is its content: the link never keeps a copy of it.
+                title: isThreadLocked(thread) ? LOCKED_THREAD_TITLE : (thread.title ?? `${address.repository}#${String(address.number)}`),
                 url: pullRequestUrl(address.repository, address.number),
                 userId: args.userId,
             });
@@ -226,7 +230,7 @@ export const listForThread = authQuery
             .query("pullRequestThreads")
             .withIndex("by_user_and_threadId", (q) => q.eq("userId", ctx.user.userId).eq("threadId", args.threadId as Id<"threads">))
             .take(MAX_LINKS_READ_PER_THREAD);
-        const { live } = await partitionLinks(ctx, rows);
+        const { live, threads } = await partitionLinks(ctx, rows);
 
         // A pull request that is linked twice to one thread (an agent's link and a hand link) is one entry, the newest.
         const seen = new Set<string>();
@@ -241,39 +245,39 @@ export const listForThread = authQuery
 
                 return !duplicate;
             })
-            .map((row) => toOutput(row));
+            .map((row) => toOutput(row, threads.get(row.threadId)));
     });
 
-/** How many live pull requests each of your threads is linked to, for the sidebar's badges. Asked after first paint. */
-export const countsForUser = authQuery
-    .input({})
-    .output(v.object({ counts: v.array(v.object({ count: v.number(), threadId: v.string() })), truncated: v.boolean() }))
-    .query(async ({ ctx }) => {
-        // Link rows only: a deleted thread's links carry `threadDeleted`, so the count reads no thread document.
-        const rows = await ctx.db
-            .query("pullRequestThreads")
-            .withIndex("by_user_and_threadId", (q) => q.eq("userId", ctx.user.userId))
-            .take(MAX_COUNT_ROWS);
-        const counts = new Map<string, number>();
-        // A pull request counts once per thread, however many links name it.
-        const seen = new Set<string>();
+/**
+ * How many pull requests each of the given threads is linked to, for the sidebar's badges: the sidebar asks once, for
+ * the threads it shows, and each row reads its number from that one answer. Link rows only, a few per thread, so a
+ * change to a thread or its size never re-runs or outgrows it; a thread past the per-thread read shows that read's
+ * count. A deleted thread is not in the sidebar, and a link its soft delete flagged is not counted.
+ */
+export const countsForThreads = authQuery
+    .input({
+        threadIds: v
+            .array(v.string().max(MAX_LENGTH.id))
+            .check((value) => value.length <= MAX_COUNT_THREADS, { message: "Ask for at most 200 threads at a time" }),
+    })
+    .output(v.array(v.object({ count: v.number(), threadId: v.string() })))
+    .query(async ({ args, ctx }) => {
+        const counts: { count: number; threadId: string }[] = [];
 
-        const live = rows.filter((link) => link.threadDeleted !== true);
+        const threadIds = new Set(args.threadIds);
 
-        for (const row of live) {
-            const key = `${row.threadId}|${row.repository}#${String(row.number)}`;
+        for (const threadId of threadIds) {
+            const rows = await ctx.db
+                .query("pullRequestThreads")
+                .withIndex("by_user_and_threadId", (q) => q.eq("userId", ctx.user.userId).eq("threadId", threadId as Id<"threads">))
+                .take(MAX_COUNT_ROWS_PER_THREAD);
+            // A pull request counts once per thread, however many links name it.
+            const distinct = new Set(rows.filter((row) => row.threadDeleted !== true).map((row) => `${row.repository}#${String(row.number)}`));
 
-            if (!seen.has(key)) {
-                seen.add(key);
-                counts.set(row.threadId, (counts.get(row.threadId) ?? 0) + 1);
+            if (distinct.size > 0) {
+                counts.push({ count: distinct.size, threadId });
             }
         }
 
-        return {
-            counts: [...counts].map(([threadId, count]) => {
-                return { count, threadId };
-            }),
-            // At the cap there may be rows past it: a thread's count is then not known to be whole.
-            truncated: rows.length >= MAX_COUNT_ROWS,
-        };
+        return counts;
     });

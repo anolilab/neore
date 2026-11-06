@@ -11,7 +11,8 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import { insertThread } from "../agent/table-writes";
 import schema from "../schema";
 import { GITHUB_WEB_ORIGIN } from "./drivers/github";
-import { attachPullRequests, countsForUser, listForThread, recordAttachedPullRequests } from "./pr-thread-attach";
+import { attachPullRequests, countsForThreads, listForThread, recordAttachedPullRequests } from "./pr-thread-attach";
+import { listForPullRequest } from "./pr-threads";
 import { setLinksThreadDeleted } from "./pr-thread-deleted";
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -254,15 +255,14 @@ describe("the thread list and the sidebar counts", () => {
 
         expect(listed.map((row: any) => `${row.repository}#${String(row.number)}`)).toEqual(["octo/world#9", "octo/hello#7"]);
 
-        const counts = await as(A).query(countsForUser as never, {} as never);
+        const counts = await as(A).query(countsForThreads as never, { threadIds: [threadId, otherId] } as never);
 
-        expect(counts).toEqual({
-            counts: expect.arrayContaining([
+        expect(counts).toEqual(
+            expect.arrayContaining([
                 { count: 2, threadId },
                 { count: 1, threadId: otherId },
             ]),
-            truncated: false,
-        });
+        );
     });
 
     it("does not count links whose thread is deleted", async () => {
@@ -274,7 +274,7 @@ describe("the thread list and the sidebar counts", () => {
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", deletedId, { deleted: true, deletedAt: 1 }));
         await harness.run(async (ctx: any) => await setLinksThreadDeleted(ctx, A, deletedId as never, true));
 
-        expect(await as(A).query(countsForUser as never, {} as never)).toEqual({ counts: [{ count: 1, threadId }], truncated: false });
+        expect(await as(A).query(countsForThreads as never, { threadIds: [threadId, deletedId] } as never)).toEqual([{ count: 1, threadId }]);
     });
 
     it("counts a restored thread's links again", async () => {
@@ -284,7 +284,39 @@ describe("the thread list and the sidebar counts", () => {
         await harness.run(async (ctx: any) => await setLinksThreadDeleted(ctx, A, threadId as never, true));
         await harness.run(async (ctx: any) => await setLinksThreadDeleted(ctx, A, threadId as never, false));
 
-        expect(await as(A).query(countsForUser as never, {} as never)).toEqual({ counts: [{ count: 1, threadId }], truncated: false });
+        expect(await as(A).query(countsForThreads as never, { threadIds: [threadId] } as never)).toEqual([{ count: 1, threadId }]);
+    });
+
+    it("counts only the asking user's links, and refuses a list longer than the sidebar asks for", async () => {
+        const threadId = await threadOf(A);
+
+        await record(threadId, A, [link(7)]);
+
+        expect(await as(B).query(countsForThreads as never, { threadIds: [threadId] } as never)).toEqual([]);
+        await expect(as(A).query(countsForThreads as never, { threadIds: Array.from({ length: 201 }, (_, index) => `${threadId}-${String(index)}`) } as never)).rejects.toThrow();
+    });
+
+    it("shows no title of a locked chat, however the link stored it", async () => {
+        const threadId = await threadOf(A);
+
+        await record(threadId, A, [link(7)]);
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: 1 }));
+
+        const listed = (await as(A).query(listForPullRequest as never, { number: 7, repository: "octo/hello" } as never)) as any[];
+
+        expect(listed.map((row: any) => row.title)).toEqual(["Locked chat"]);
+        expect(((await as(A).query(listForThread as never, { threadId } as never)) as any[])[0].title).toBe("Locked chat");
+    });
+
+    it("stores and finds a pull request whatever the case it was typed in", async () => {
+        const threadId = await threadOf(A);
+
+        await record(threadId, A, [link(5, "Octo/Hello")]);
+
+        const found = (await as(A).query(listForPullRequest as never, { number: 5, repository: "octo/hello" } as never)) as any[];
+
+        expect(found).toHaveLength(1);
+        expect(await record(threadId, A, [link(5, "octo/HELLO")])).toEqual([{ number: 5, repository: "octo/hello", status: "already_linked" }]);
     });
 
     it("does not list one user's links to another user's thread", async () => {
