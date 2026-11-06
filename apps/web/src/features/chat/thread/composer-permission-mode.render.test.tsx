@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { showError } from "@/lib/toast";
 
 import ComposerThreadPermissionMode, { usePermissionModeSaving } from "./composer-permission-mode";
@@ -113,6 +114,7 @@ beforeEach(() => {
     state.thread = { _id: "t1", permissionMode: "full" };
     state.save.mockClear();
     state.effective = null;
+    usePromptQueueStore.setState({ queues: {} });
 });
 afterEach(() => {
     vi.unstubAllGlobals();
@@ -224,5 +226,20 @@ describe("permission mode control", () => {
             });
         });
         expect(showError).not.toHaveBeenCalled();
+    });
+
+    it("holds the queued prompts when the save fails, so they do not go out under the stored mode", async () => {
+        state.save.mockImplementationOnce(async () => {
+            throw new Error("save refused");
+        });
+        usePromptQueueStore.getState().hydrate("t1");
+        usePromptQueueStore.getState().enqueue("t1", { attachments: [], text: "queued" });
+
+        renderControl();
+        fireEvent.click(await screen.findByRole("button", { name: "Permission mode: Full access" }));
+        fireEvent.click(screen.getByRole("menuitemradio", { name: SUPERVISED_PATTERN }));
+
+        await waitFor(() => expect(showError).toHaveBeenCalled());
+        expect(usePromptQueueStore.getState().queues.t1?.paused).toBe(true);
     });
 });

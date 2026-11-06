@@ -9,6 +9,7 @@ import type { FC } from "react";
 import { useRef, useState } from "react";
 
 import { useChatIsRunning, useChatThread } from "@/features/chat/core/context/chat-context";
+import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
@@ -105,6 +106,13 @@ const ComposerThreadPermissionMode: FC = () => {
     const { mutateAsync } = useMutation({
         ...crpc.chat.thread_state.setThreadPermissionMode.mutationOptions(),
         mutationKey: permissionModeSaveKey(threadId ?? ""),
+        // Runs before the save stops reading as in flight, so the queue sees the failure before it may release a held prompt: a prompt
+        // held for a save that did not land would otherwise go out under the stored mode.
+        onError: () => {
+            if (threadId) {
+                usePromptQueueStore.getState().setPaused(threadId, true);
+            }
+        },
     });
     const [pending, setPending] = useState<ThreadPermissionMode>();
     const latestSave = useRef(0);
