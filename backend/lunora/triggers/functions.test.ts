@@ -275,12 +275,8 @@ describe("trigger schedules", () => {
     });
 
     it("clears a stored input template when an update sets it to empty, and keeps it when an update leaves it out", async () => {
-        const { triggerId } = (await as().mutation(
-            createTrigger as never,
-            { inputTemplate: "Old {{body.x}}", model: "m", name: "Hook", type: "webhook" } as never,
-        )) as {
-            triggerId: string;
-        };
+        const hook = { inputTemplate: "Old {{body.x}}", model: "m", name: "Hook", type: "webhook" };
+        const { triggerId } = (await as().mutation(createTrigger as never, hook as never)) as { triggerId: string };
 
         await as().mutation(updateTrigger as never, { name: "Hook", triggerId } as never);
         const kept = await readTrigger(triggerId);
