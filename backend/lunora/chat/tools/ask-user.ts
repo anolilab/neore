@@ -40,7 +40,11 @@ const inputSchema = z
                     .object({
                         choices: choicesSchema.optional(),
                         multiSelect: z.boolean().optional().meta({ description: "True when the user may pick several choices" }),
-                        question: z.string().min(1).max(ASK_USER_QUESTION_MAX),
+                        question: z
+                            .string()
+                            .min(1)
+                            .max(ASK_USER_QUESTION_MAX)
+                            .refine((value) => value.trim().length > 0, { error: "A question needs text" }),
                     })
                     .strict(),
             )
@@ -51,7 +55,7 @@ const inputSchema = z
     })
     .strict()
     .refine((input) => (input.questions === undefined ? input.question !== undefined : input.question === undefined && input.choices === undefined), {
-        message: "Pass either `question` (with optional `choices`) or `questions`, not both and not neither",
+        error: "Pass either `question` (with optional `choices`) or `questions`, not both and not neither",
     });
 
 const DESCRIPTION = `Ask the user a question and wait for their answer before continuing.

@@ -31,6 +31,13 @@ export const normalizeAskUserAnswer = (answer: string): string | undefined => {
     return trimmed.length > 0 && trimmed.length <= ASK_USER_ANSWER_MAX ? trimmed : undefined;
 };
 
+/** A question's choices as the card shows them: trimmed, non-blank, each once, in the model's order. */
+const canonicalChoices = (choices: ReadonlyArray<string> | undefined): string[] => {
+    const trimmed = (choices ?? []).map((choice) => choice.trim()).filter((choice) => choice.length > 0);
+
+    return [...new Set(trimmed)];
+};
+
 /**
  * The replies of a multi-question card checked against the questions the model asked, and joined to them: one reply
  * per question, every selection one of that question's choices (one at most unless it is multi-select), and each
@@ -45,18 +52,20 @@ export const resolveQuestionAnswers = (
     }
 
     return questions.map((asked, index) => {
-        const { note: rawNote, selected: picked } = replies[index] ?? { selected: [] };
-        const selected = (asked.choices ?? []).filter((choice) => picked.includes(choice));
-        const note = rawNote?.trim();
+        const reply = replies[index] ?? { selected: [] };
+        // The choices as the card shows them (trimmed, each once), so a pick of a shown choice always matches.
+        const selected = canonicalChoices(asked.choices).filter((choice) => reply.selected.includes(choice));
 
-        // `selected` keeps each of the question's choices once, so a pick that is repeated or unknown makes the counts differ.
-        if (selected.length !== picked.length) {
+        // A pick that is repeated or unknown makes the counts differ.
+        if (selected.length !== reply.selected.length) {
             throw new LunoraError("BAD_REQUEST", "A selected choice is not one of the question's choices");
         }
 
         if (selected.length > 1 && asked.multiSelect !== true) {
             throw new LunoraError("BAD_REQUEST", "This question takes one choice");
         }
+
+        const note = reply.note?.trim();
 
         if (note !== undefined && note.length > ASK_USER_ANSWER_MAX) {
             throw new LunoraError("BAD_REQUEST", `Notes take up to ${String(ASK_USER_ANSWER_MAX)} characters`);

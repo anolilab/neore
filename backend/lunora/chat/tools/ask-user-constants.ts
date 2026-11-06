@@ -55,11 +55,11 @@ export interface AskUserInput {
 
 /** The user's reply to one question of a multi-question call. */
 export interface AskUserQuestionAnswer {
+    note?: string;
     /** The question's text, repeated so the answer reads on its own. */
     question: string;
     /** The choices picked, in the question's order; empty when the user only typed a note. */
     selected: string[];
-    note?: string;
 }
 
 /** A file the user attached to the answer, read from storage for one model call. */

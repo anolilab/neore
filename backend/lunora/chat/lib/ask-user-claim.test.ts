@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../../schema";
 import { ASK_USER_ANSWER_MAX } from "../tools/ask-user-constants";
-import type { AskUserReply } from "./ask-user-claim";
+import { type AskUserReply, resolveQuestionAnswers } from "./ask-user-claim";
 import { claimAskUserAnswer, normalizeAskUserAnswer } from "./ask-user-claim";
 import { collectApprovalRequestIds, collectAskUserApprovalIds } from "./tool-approval-claim";
 
@@ -24,8 +24,8 @@ vi.mock("../../agent/client", () => {
 const loadTool = async () => await import("../tools/ask-user");
 
 interface ToolDefinition {
-    inputSchema: { safeParse: (input: unknown) => { success: boolean } };
     execute: (context: unknown, input: unknown, options: unknown) => Promise<unknown>;
+    inputSchema: { safeParse: (input: unknown) => { success: boolean } };
     needsApproval: unknown;
 }
 
@@ -207,7 +207,20 @@ describe("askUser input", () => {
         expect(inputSchema.safeParse({ choices: ["A"], ...MULTI_INPUT }).success).toBe(false);
         expect(inputSchema.safeParse({}).success).toBe(false);
         expect(inputSchema.safeParse({ questions: [] }).success).toBe(false);
-        expect(inputSchema.safeParse({ questions: Array.from({ length: 5 }, () => ({ question: "Q?" })) }).success).toBe(false);
+        expect(
+            inputSchema.safeParse({
+                questions: Array.from({ length: 5 }, () => {
+                    return { question: "Q?" };
+                }),
+            }).success,
+        ).toBe(false);
+        expect(inputSchema.safeParse({ questions: [{ question: " ".repeat(3) }] }).success).toBe(false);
+    });
+
+    it("matches a pick against the choices as the card shows them, trimmed and each once", () => {
+        const questions = [{ choices: [" Blue ", "Blue", "Red"], multiSelect: false, question: "Colour?" }];
+
+        expect(resolveQuestionAnswers(questions, [{ selected: ["Blue"] }])).toStrictEqual([{ question: "Colour?", selected: ["Blue"] }]);
     });
 });
 
@@ -215,7 +228,9 @@ describe("multi-question askUser", () => {
     beforeEach(async () => {
         // Replace the single question of the outer setup with a two-question card (the second is multi-select).
         await harness.run(async (ctx: any) => {
-            for (const row of await ctx.db.query("messages").collect()) {
+            const rows = await ctx.db.query("messages").collect();
+
+            for (const row of rows) {
                 await ctx.db.delete("messages", row._id);
             }
         });

@@ -301,6 +301,11 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                             {t`Enter to send, Shift+Enter for a new line.`}
                         </p>
                     )}
+                    {questions && !allAnswered && (
+                        <p className="text-muted-foreground text-xs" id={`${hintId}-answers`}>
+                            {t`Answer every question with a choice or a note to send.`}
+                        </p>
+                    )}
                     <input
                         accept={ASK_USER_FILE_TYPES.join(",")}
                         aria-hidden="true"
@@ -327,7 +332,12 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                             <Paperclip aria-hidden="true" />
                             {uploading ? t`Attaching…` : t`Attach file`}
                         </Button>
-                        <Button disabled={uploading || (questions ? !allAnswered : draft.trim().length === 0)} size="sm" type="submit">
+                        <Button
+                            aria-describedby={questions && !allAnswered ? `${hintId}-answers` : undefined}
+                            disabled={uploading || (questions ? !allAnswered : draft.trim().length === 0)}
+                            size="sm"
+                            type="submit"
+                        >
                             <Send aria-hidden="true" />
                             {t`Send answer`}
                         </Button>
