@@ -292,6 +292,18 @@ describe("MCP Apps proxy with an OAuth grant", () => {
         expect(asks.status).toBe(403);
     });
 
+    it("lets an owner's app call through, reading the thread on the caller's own shard without crossing to another", async () => {
+        // The route runs on the caller's shard (`onCallerShard`), which is the owner's shard for the owner's own thread: no cross-shard call.
+        oauthConfig("fresh");
+        state.shard = "alice";
+        state.thread = { allowed: true, mode: "auto" };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(200);
+        expect(state.crossed).toEqual([]);
+    });
+
     it("refuses a thread the caller cannot reach", async () => {
         oauthConfig("fresh");
         state.thread = { allowed: false, mode: null };
