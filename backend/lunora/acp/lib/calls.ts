@@ -19,7 +19,7 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import type { MutationCtx } from "../../_generated/server";
 import { isForwardHostState, updateHostStream } from "../../chat/streaming/persistent/host";
-import { isAcpTool, OPEN_CALL_STATUSES } from "../../devices/lib/state";
+import { isAcpTool, OPEN_CALL_PAGE, OPEN_CALL_STATUSES } from "../../devices/lib/state";
 import { START_GRACE_MS } from "./constants";
 import { finishHostTurn } from "./finish";
 import { markReattachFailed } from "./reattach";
@@ -137,14 +137,21 @@ const recordOptionResult = async (ctx: MutationCtx, call: Call, input: Record<st
  * here, as it would from the computer. Other calls keep the ending they always had.
  */
 export const recordRemovedDeviceOptions = async (ctx: MutationCtx, deviceId: Id<"devices">, now: number): Promise<void> => {
+    // Every open call, page by page: a change beyond the first page would otherwise get no answer before its call expires.
     for (const status of OPEN_CALL_STATUSES) {
-        const { page } = await ctx.db.deviceCalls.findMany({ limit: 50, where: { deviceId, status } });
+        let cursor: string | undefined;
 
-        for (const call of page) {
-            if (call.toolName === "acp_set_config") {
-                await recordOptionResult(ctx, call, inputOf(call), { error: "the device was removed", status: "failed" }, now);
+        do {
+            const page = await ctx.db.deviceCalls.findMany({ cursor, limit: OPEN_CALL_PAGE, where: { deviceId, status } });
+
+            for (const call of page.page) {
+                if (call.toolName === "acp_set_config") {
+                    await recordOptionResult(ctx, call, inputOf(call), { error: "the device was removed", status: "failed" }, now);
+                }
             }
-        }
+
+            cursor = page.isDone ? undefined : (page.continueCursor ?? undefined);
+        } while (cursor);
     }
 };
 
