@@ -404,7 +404,11 @@ describe("the options the agent offers", () => {
         await waitFor(() => expect(model.disabled).toBe(true));
 
         // The thread's newest session is another one: the old session's answer never comes, so its wait must not carry over.
-        client.setQueryData(["acp.functions.getHostSession", { threadId: "thread-1" }], { _id: "session-2", agentState: { configOptions: [MODEL] }, status: "idle" });
+        client.setQueryData(["acp.functions.getHostSession", { threadId: "thread-1" }], {
+            _id: "session-2",
+            agentState: { configOptions: [MODEL] },
+            status: "idle",
+        });
 
         await waitFor(() => expect((screen.getByLabelText("Model") as unknown as HTMLSelectElement).disabled).toBe(false));
     });
