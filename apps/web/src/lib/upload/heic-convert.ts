@@ -22,7 +22,6 @@ export const isHeicFile = (file: Pick<File, "name" | "type">): boolean => {
     return type === "" ? HEIC_NAME_RE.test(file.name) : HEIC_TYPES.has(type);
 };
 
-/** The name a converted photo is uploaded under: the same name with a `.jpg` extension. */
 /** The name a converted photo is uploaded under: the name without its extension, with a `.jpg` one. */
 export const jpegNameFor = (name: string): string => `${name.replace(EXTENSION_RE, "")}.jpg`;
 
