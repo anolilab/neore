@@ -35,9 +35,10 @@ import { Plural, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
-import { ChevronDownIcon, ChevronUpIcon, CornerDownRightIcon, ListOrderedIcon, PaperclipIcon, SendIcon, XIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronUpIcon, CornerDownRightIcon, GripVerticalIcon, ListOrderedIcon, PaperclipIcon, SendIcon, XIcon } from "lucide-react";
+import { useReducedMotion } from "motion/react";
 import type { FC, ReactNode } from "react";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useChatActions, useChatError, useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
@@ -265,21 +266,29 @@ const QueueChip: FC<{
 }> = ({ blockedDown, blockedUp, count, onMove, onRemove, position, prompt }) => {
     const { t } = useLingui();
     const pending = Boolean(prompt.steer?.pending);
-    const { isDragging, listeners, setNodeRef, transform, transition } = useSortable({ disabled: pending, id: prompt.id });
+    const { isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ disabled: pending, id: prompt.id });
+    // Reduced motion: the chip still moves, without the sliding transition.
+    const reduceMotion = useReducedMotion();
     const preview = prompt.text.trim() || t`(attachments only)`;
     const attachmentCount = prompt.attachments.length;
     const droppedCount = prompt.droppedAttachments ?? 0;
 
     return (
         <li
-            className={`bg-muted/60 flex max-w-full min-w-0 items-center gap-1.5 rounded-full border py-0.5 pr-0.5 pl-2.5 text-xs ${pending ? "" : "cursor-grab"} ${isDragging ? "opacity-50" : ""}`}
+            className={`bg-muted/60 flex max-w-full min-w-0 items-center gap-1.5 rounded-full border py-0.5 pr-0.5 pl-2.5 text-xs ${isDragging ? "opacity-50" : ""}`}
+            data-queue-chip-id={prompt.id}
             ref={setNodeRef}
-            style={{ transform: CSS.Transform.toString(transform), transition }}
-            {...listeners}
+            style={{ transform: CSS.Transform.toString(transform), transition: reduceMotion ? undefined : transition }}
         >
             <span aria-hidden="true" className="text-muted-foreground tabular-nums">
                 {position}.
             </span>
+            {/* The only drag surface: `touch-none` keeps a touch drag from scrolling the page, and the buttons stay free for taps. */}
+            {!pending && (
+                <span aria-hidden="true" className="text-muted-foreground flex cursor-grab touch-none items-center" ref={setActivatorNodeRef} {...listeners}>
+                    <GripVerticalIcon className="size-3" />
+                </span>
+            )}
             {prompt.steer && (
                 <span className="text-muted-foreground flex items-center">
                     <CornerDownRightIcon aria-hidden="true" className="size-3" />
@@ -304,6 +313,7 @@ const QueueChip: FC<{
             <button
                 aria-label={t`Move queued message ${position} up`}
                 className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
+                data-move-up=""
                 disabled={pending || position === 1 || blockedUp}
                 onClick={() => onMove(prompt.id, -1)}
                 type="button"
@@ -313,6 +323,7 @@ const QueueChip: FC<{
             <button
                 aria-label={t`Move queued message ${position} down`}
                 className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
+                data-move-down=""
                 disabled={pending || position === count || blockedDown}
                 onClick={() => onMove(prompt.id, 1)}
                 type="button"
@@ -441,13 +452,52 @@ const ComposerPromptQueue: FC = () => {
         [removePrompt, threadId],
     );
 
+    // The chip a keyboard move was made from, so its button can take focus again once React has moved the chip.
+    const pendingFocus = useRef<{ id: string; step: -1 | 1 } | null>(null);
+    const [announcement, setAnnouncement] = useState("");
+
+    useEffect(() => {
+        const focus = pendingFocus.current;
+
+        if (!focus) {
+            return;
+        }
+
+        pendingFocus.current = null;
+
+        const chip = [...document.querySelectorAll<HTMLElement>("[data-queue-chip-id]")].find((element) => element.dataset.queueChipId === focus.id);
+        // The button in the direction of the move, or the other one when the chip reached an end.
+        const sameWay = chip?.querySelector<HTMLButtonElement>(focus.step < 0 ? "[data-move-up]" : "[data-move-down]");
+        const otherWay = chip?.querySelector<HTMLButtonElement>(focus.step < 0 ? "[data-move-down]" : "[data-move-up]");
+
+        if (sameWay && !sameWay.disabled) {
+            sameWay.focus();
+        } else if (otherWay && !otherWay.disabled) {
+            otherWay.focus();
+        }
+    });
+
     const handleMove = useCallback(
         (id: string, step: -1 | 1) => {
-            if (threadId) {
-                usePromptQueueStore.getState().move(threadId, id, { step });
+            if (!threadId) {
+                return;
+            }
+
+            const from = (usePromptQueueStore.getState().queues[threadId]?.items ?? []).findIndex((item) => item.id === id);
+
+            usePromptQueueStore.getState().move(threadId, id, { step });
+
+            const to = (usePromptQueueStore.getState().queues[threadId]?.items ?? []).findIndex((item) => item.id === id);
+
+            if (from !== -1 && to !== from) {
+                setAnnouncement(t`Moved to position ${to + 1}`);
+            }
+
+            if (document.activeElement?.closest("[data-queue-chip-id]")) {
+                pendingFocus.current = { id, step };
             }
         },
-        [threadId],
+        [t, threadId],
     );
 
     // A small distance before a drag starts, so a click on a chip's buttons stays a click.
@@ -459,10 +509,16 @@ const ComposerPromptQueue: FC = () => {
             const toIndex = over ? items.findIndex((item) => item.id === over.id) : -1;
 
             if (threadId && toIndex !== -1) {
+                const from = items.findIndex((item) => item.id === active.id);
+
                 usePromptQueueStore.getState().move(threadId, String(active.id), toIndex);
+
+                if (from !== -1 && toIndex !== from) {
+                    setAnnouncement(t`Moved to position ${toIndex + 1}`);
+                }
             }
         },
-        [threadId],
+        [t, threadId],
     );
 
     const handleSendNext = useCallback(() => {
@@ -492,6 +548,9 @@ const ComposerPromptQueue: FC = () => {
             <span aria-live="polite" className="text-muted-foreground flex items-center gap-1 text-xs" role="status">
                 <ListOrderedIcon aria-hidden="true" className="size-3.5" />
                 {statusText}
+            </span>
+            <span aria-live="polite" className="sr-only" role="status">
+                {announcement}
             </span>
             <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd} sensors={sensors}>
                 <SortableContext items={queue.items.map((prompt) => prompt.id)} strategy={rectSortingStrategy}>

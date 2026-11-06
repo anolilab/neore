@@ -42,6 +42,10 @@ msgstr "，未读"
 msgid "...and {0} more"
 msgstr "……还有 {0} 个"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx
+msgid "Moved to position {0}"
+msgstr "已移动到第 {0} 位"
+
 #. placeholder {0}: prompt.name
 #: src/features/prompts/components/variable-fill-dialog.tsx:128
 msgid "\"{0}\" has variables that need values."

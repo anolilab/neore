@@ -42,6 +42,10 @@ msgstr ", non lue"
 msgid "...and {0} more"
 msgstr "... et {0} de plus"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx
+msgid "Moved to position {0}"
+msgstr "Déplacé en position {0}"
+
 #. placeholder {0}: prompt.name
 #: src/features/prompts/components/variable-fill-dialog.tsx:128
 msgid "\"{0}\" has variables that need values."

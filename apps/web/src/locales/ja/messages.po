@@ -42,6 +42,10 @@ msgstr "、未読"
 msgid "...and {0} more"
 msgstr "…他 {0} 件"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx
+msgid "Moved to position {0}"
+msgstr "{0} 番目に移動しました"
+
 #. placeholder {0}: prompt.name
 #: src/features/prompts/components/variable-fill-dialog.tsx:128
 msgid "\"{0}\" has variables that need values."
