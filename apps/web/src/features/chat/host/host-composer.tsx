@@ -230,6 +230,19 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
         setText(next.text);
     };
 
+    // A caret move that lands in another slash query lists other commands: the highlight starts again at the first, as an edit does.
+    // A move within the same query keeps it.
+    const moveCaret = (element: HTMLTextAreaElement) => {
+        const position = caretOf(element);
+        const moved = slashAtCursor(text, position);
+
+        if (moved?.start !== slash?.start || moved?.query !== slash?.query) {
+            setActiveIndex(0);
+        }
+
+        setCursor(position);
+    };
+
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
         const chosen = choices[active];
 
@@ -426,10 +439,10 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                             boxText.current = clean;
                             setText(clean);
                         }}
-                        onClick={(event) => setCursor(caretOf(event.currentTarget))}
+                        onClick={(event) => moveCaret(event.currentTarget)}
                         onFocus={() => setFocused(true)}
                         onKeyDown={onKeyDown}
-                        onKeyUp={(event) => setCursor(caretOf(event.currentTarget))}
+                        onKeyUp={(event) => moveCaret(event.currentTarget)}
                         placeholder={t`Message the agent on your computer`}
                         ref={box}
                         role="combobox"

@@ -662,6 +662,29 @@ describe("the agent's slash commands", () => {
         expect(harness.calls).toEqual([]);
     });
 
+    it("starts at the first command of a new query when the caret moves into another slash, rather than keeping the highlight", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        // The highlight is on the second command of the whole list (review), then the caret moves into the `/re` before it.
+        typeInto(box, "/re and /");
+        fireEvent.keyDown(box, { key: "ArrowDown" });
+        expect(box.getAttribute("aria-activedescendant")).toBe(screen.getAllByRole("option")[1]?.id);
+
+        box.setSelectionRange(3, 3);
+        fireEvent.keyUp(box);
+
+        // The list is now the two commands of `/re`: Enter picks its first, review, not the second one the highlight used to name.
+        expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+            expect.stringContaining("/review"),
+            expect.stringContaining("/resume"),
+        ]);
+        fireEvent.keyDown(box, { key: "Enter" });
+
+        await waitFor(() => expect(box.value).toBe("/review and /"));
+    });
+
     it("places the caret after a command that is already typed, when picking it changes no text", async () => {
         mount(withCommands());
 
