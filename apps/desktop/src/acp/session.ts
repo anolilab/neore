@@ -80,6 +80,12 @@ interface QueuedPrompt {
     turnId?: string;
 }
 
+/** An update the agent sent while the session opened, with the session it names. */
+interface StartupUpdate {
+    sessionId: unknown;
+    update: Record<string, unknown>;
+}
+
 export interface SessionOptions {
     agentKey: string;
     agentLabel: string;
@@ -180,7 +186,10 @@ export class AgentSession {
     private startupPhase: "loading" | "opening" = "opening";
 
     /** The newest usage report sent before the session answered, reported once it has opened. */
-    private startupUsage: Record<string, unknown> | undefined;
+    private startupUsage: StartupUpdate | undefined;
+
+    /** A fresh session's updates sent before its answer: its id is known only then, so they count once it has answered (`openFresh`). */
+    private readonly startupUpdates: StartupUpdate[] = [];
 
     /** What happened to the saved session the backend asked to load; unset when it asked for none. */
     private reattach: HostSessionInfo["reattach"];
@@ -561,6 +570,13 @@ export class AgentSession {
     private async openFresh(folder: string, timeoutMs?: number): Promise<string> {
         const { response, sessionId } = await openNewSession(this.connection, folder, timeoutMs);
 
+        // What the agent sent for this session before its answer is older than the answer, which wins below.
+        for (const startup of this.startupUpdates.splice(0)) {
+            if (startup.sessionId === sessionId) {
+                this.takeOwnStartupUpdate(startup);
+            }
+        }
+
         this.offered = { ...this.offered, ...optionsOf(response, this.options.process.scrub) };
 
         return sessionId;
@@ -939,25 +955,36 @@ export class AgentSession {
     // ─── From the agent ────────────────────────────────────────────────────
 
     /**
-     * An update that arrives while the session opens, before its id is known. While the saved session loads, only its updates
-     * count; once a fresh session is opened, the saved id's late updates are the failed load's. The options are taken at once; the
-     * newest usage report is kept for `start` to report.
+     * An update that arrives while the session opens, before its id is known. While the saved session loads, its id is known and only
+     * its updates count. A fresh session's id is known only once it answers, so its updates wait for that (`openFresh`).
      */
     private takeStartupUpdate(params: Record<string, unknown>): void {
-        const { resumeSessionId } = this.options;
-        const counts = resumeSessionId === undefined || (this.startupPhase === "loading" ? params.sessionId === resumeSessionId : params.sessionId !== resumeSessionId);
-
-        if (!counts || !isRecord(params.update)) {
+        if (!isRecord(params.update)) {
             return;
         }
 
-        if (params.update.sessionUpdate === "usage_update") {
-            // A malformed report does not replace a valid one sent before it.
-            if (usageOf(params.update, this.options.process.scrub) !== undefined) {
-                this.startupUsage = params;
-            }
-        } else {
-            this.takeStartupOptions(params.update);
+        if (this.startupPhase !== "loading") {
+            this.startupUpdates.push({ sessionId: params.sessionId, update: params.update });
+
+            return;
+        }
+
+        if (params.sessionId === this.options.resumeSessionId) {
+            this.takeOwnStartupUpdate({ sessionId: params.sessionId, update: params.update });
+        }
+    }
+
+    /** An update of this session: an option change is taken now, and the newest valid usage report is kept for `start` to report. */
+    private takeOwnStartupUpdate(startup: StartupUpdate): void {
+        if (startup.update.sessionUpdate !== "usage_update") {
+            this.takeStartupOptions(startup.update);
+
+            return;
+        }
+
+        // A malformed report does not replace a valid one sent before it.
+        if (usageOf(startup.update, this.options.process.scrub) !== undefined) {
+            this.startupUsage = startup;
         }
     }
 
