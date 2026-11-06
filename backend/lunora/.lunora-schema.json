@@ -125,6 +125,224 @@
           "optional": false,
           "unique": false
         },
+        "agentState": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "configOptions": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "object",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "fields": {
+                  "category": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": true,
+                    "unique": false,
+                    "refined": true
+                  },
+                  "choices": {
+                    "kind": "array",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "of": {
+                      "kind": "object",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "fields": {
+                        "name": {
+                          "kind": "string",
+                          "nullable": false,
+                          "optional": false,
+                          "unique": false,
+                          "refined": true
+                        },
+                        "value": {
+                          "kind": "string",
+                          "nullable": false,
+                          "optional": false,
+                          "unique": false,
+                          "refined": true
+                        }
+                      }
+                    },
+                    "refined": true
+                  },
+                  "currentValue": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "refined": true
+                  },
+                  "id": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "refined": true
+                  },
+                  "name": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "refined": true
+                  }
+                }
+              },
+              "refined": true
+            },
+            "models": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "available": {
+                  "kind": "array",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "of": {
+                    "kind": "object",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "fields": {
+                      "id": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "refined": true
+                      },
+                      "name": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "refined": true
+                      }
+                    }
+                  },
+                  "refined": true
+                },
+                "current": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                }
+              }
+            },
+            "modes": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "available": {
+                  "kind": "array",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "of": {
+                    "kind": "object",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "fields": {
+                      "id": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "refined": true
+                      },
+                      "name": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "refined": true
+                      }
+                    }
+                  },
+                  "refined": true
+                },
+                "current": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                }
+              }
+            },
+            "usage": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "cost": {
+                  "kind": "object",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "fields": {
+                    "amount": {
+                      "kind": "number",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "refined": true
+                    },
+                    "currency": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "refined": true
+                    }
+                  }
+                },
+                "size": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "used": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                }
+              }
+            }
+          }
+        },
+        "agentStateAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "capabilities": {
           "kind": "object",
           "nullable": false,
@@ -2663,6 +2881,70 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "optionResult": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "at": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "callId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "refined": true
+            },
+            "optionId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
+            },
+            "outcome": {
+              "kind": "union",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"confirmed\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"refused\""
+                }
+              ]
+            },
+            "reason": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
+            },
+            "valueId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "refined": true
+            }
+          }
         },
         "status": {
           "kind": "union",
@@ -17692,6 +17974,232 @@
                       "kind": "string",
                       "nullable": false,
                       "optional": true,
+                      "unique": false,
+                      "refined": true
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "at": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "configOptions": {
+                  "kind": "array",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "of": {
+                    "kind": "object",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "fields": {
+                      "category": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": true,
+                        "unique": false,
+                        "refined": true
+                      },
+                      "choices": {
+                        "kind": "array",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "of": {
+                          "kind": "object",
+                          "nullable": false,
+                          "optional": false,
+                          "unique": false,
+                          "fields": {
+                            "name": {
+                              "kind": "string",
+                              "nullable": false,
+                              "optional": false,
+                              "unique": false,
+                              "refined": true
+                            },
+                            "value": {
+                              "kind": "string",
+                              "nullable": false,
+                              "optional": false,
+                              "unique": false,
+                              "refined": true
+                            }
+                          }
+                        },
+                        "refined": true
+                      },
+                      "currentValue": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "refined": true
+                      },
+                      "id": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "refined": true
+                      },
+                      "name": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "refined": true
+                      }
+                    }
+                  },
+                  "refined": true
+                },
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"session_state\""
+                },
+                "models": {
+                  "kind": "object",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "fields": {
+                    "available": {
+                      "kind": "array",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "of": {
+                        "kind": "object",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "fields": {
+                          "id": {
+                            "kind": "string",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "refined": true
+                          },
+                          "name": {
+                            "kind": "string",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "refined": true
+                          }
+                        }
+                      },
+                      "refined": true
+                    },
+                    "current": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "refined": true
+                    }
+                  }
+                },
+                "modes": {
+                  "kind": "object",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "fields": {
+                    "available": {
+                      "kind": "array",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "of": {
+                        "kind": "object",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "fields": {
+                          "id": {
+                            "kind": "string",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "refined": true
+                          },
+                          "name": {
+                            "kind": "string",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "refined": true
+                          }
+                        }
+                      },
+                      "refined": true
+                    },
+                    "current": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "refined": true
+                    }
+                  }
+                },
+                "usage": {
+                  "kind": "object",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "fields": {
+                    "cost": {
+                      "kind": "object",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false,
+                      "fields": {
+                        "amount": {
+                          "kind": "number",
+                          "nullable": false,
+                          "optional": false,
+                          "unique": false,
+                          "refined": true
+                        },
+                        "currency": {
+                          "kind": "string",
+                          "nullable": false,
+                          "optional": false,
+                          "unique": false,
+                          "refined": true
+                        }
+                      }
+                    },
+                    "size": {
+                      "kind": "number",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "refined": true
+                    },
+                    "used": {
+                      "kind": "number",
+                      "nullable": false,
+                      "optional": false,
                       "unique": false,
                       "refined": true
                     }
