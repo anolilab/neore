@@ -153,7 +153,15 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         admittedRun,
     );
 
-    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers, permissionCap] = await Promise.all([
+    // The cap first: under `off` every tool is removed, so no MCP or connector work (token refresh included) starts.
+    // A failed read caps at `ask` (`org-policy.md` §6a).
+    const permissionCap = await readRunPermissionCap(ctx, { organizationId, threadId });
+
+    if (permissionCap === "off") {
+        return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
+    }
+
+    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers] = await Promise.all([
         ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),
         ctx.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId }),
         // A run nobody is at inherits no time-boxed allow, so it does not even read them.
@@ -175,14 +183,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
             return [];
         }),
-        // The organization's cap on every tool this run may use (`org-policy.md` §6a); a failed read caps at `ask`.
-        readRunPermissionCap(ctx, { organizationId, threadId }),
     ]);
-
-    // Under `off` every tool is removed below, so there is nothing to connect to or discover.
-    if (permissionCap === "off") {
-        return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
-    }
 
     // Bearer tokens for servers the user signed in to. The FULL list, so a grant
     // whose server was removed is recognised as orphaned and revoked.
