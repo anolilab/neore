@@ -458,6 +458,12 @@ const ComposerPromptQueue: FC = () => {
     const pendingFocus = useRef<{ id: string; step: -1 | 1 } | null>(null);
     const [announcement, setAnnouncement] = useState("");
 
+    // Cleared first and set on the next frame, so the same text said twice in a row is announced again.
+    const announce = useCallback((text: string) => {
+        setAnnouncement("");
+        globalThis.requestAnimationFrame(() => setAnnouncement(text));
+    }, []);
+
     useEffect(() => {
         const focus = pendingFocus.current;
 
@@ -492,14 +498,14 @@ const ComposerPromptQueue: FC = () => {
             const to = (usePromptQueueStore.getState().queues[threadId]?.items ?? []).findIndex((item) => item.id === id);
 
             if (from !== -1 && to !== from) {
-                setAnnouncement(t`Moved to position ${to + 1}`);
+                announce(t`Moved to position ${to + 1}`);
             }
 
             if (document.activeElement?.closest("[data-queue-chip-id]")) {
                 pendingFocus.current = { id, step };
             }
         },
-        [t, threadId],
+        [announce, t, threadId],
     );
 
     // A small distance before a drag starts, so a click on a chip's buttons stays a click.
@@ -519,11 +525,11 @@ const ComposerPromptQueue: FC = () => {
                 const to = (usePromptQueueStore.getState().queues[threadId]?.items ?? []).findIndex((item) => item.id === active.id);
 
                 if (from !== -1 && to !== from) {
-                    setAnnouncement(t`Moved to position ${to + 1}`);
+                    announce(t`Moved to position ${to + 1}`);
                 }
             }
         },
-        [t, threadId],
+        [announce, t, threadId],
     );
 
     const handleSendNext = useCallback(() => {
