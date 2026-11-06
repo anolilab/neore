@@ -287,7 +287,11 @@ describe("/chat/start organization", () => {
 
         return {
             ...base,
-            auth: { getIdentity: async () => {return { sessionId: "session-1", userId: OWNER }} },
+            auth: {
+                getIdentity: async () => {
+                    return { sessionId: "session-1", userId: OWNER };
+                },
+            },
             mutations,
             runMutation: async (reference: { __lunoraRef: string }, args: any) => {
                 mutations.push(reference.__lunoraRef);
