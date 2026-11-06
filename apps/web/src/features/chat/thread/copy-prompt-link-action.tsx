@@ -2,7 +2,7 @@
 
 /**
  * "Copy prompt link" for a user message: a link that opens a new chat with that message as its draft, on the model the
- * composer uses now. The link never sends.
+ * composer shows now. The link never sends.
  */
 
 import { useLingui } from "@lingui/react/macro";
@@ -13,14 +13,17 @@ import { LinkIcon } from "lucide-react";
 import type { FC } from "react";
 
 import { useChatThread } from "@/features/chat/core/context/chat-context";
-import { buildPromptLink, isPromptLinkTooLong } from "@/features/chat/core/utils/prompt-link";
+import { useModelStore } from "@/features/chat/core/stores/model-store";
+import { composerModelOf, composerModeOf } from "@/features/chat/core/utils/composer-model";
+import { buildPromptLink, carriableLinkModel, isPromptLinkTooLong } from "@/features/chat/core/utils/prompt-link";
 import type { UIMessage } from "@/lib/agent";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError, showSuccess, showWarning } from "@/lib/toast";
 
 const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
     const { t } = useLingui();
-    const { model, thread } = useChatThread();
+    // Read from the chat's thread context, not a hook of its own: a message row renders without the auth provider.
+    const { isAnonymous, model, thread, threadId } = useChatThread();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     const botId = thread?.botId ?? null;
@@ -36,6 +39,22 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
         const bots = await queryClient.fetchQuery(crpc.bots.functions.listBots.queryOptions({}, { live: false }));
 
         return bots.find((bot) => bot._id === botId)?.model;
+    };
+
+    /** The model the composer shows right now, read at the click: the same rule the composer's picker uses. */
+    const shownModel = (botModel: string | undefined): string => {
+        const store = useModelStore.getState();
+
+        return composerModelOf({
+            botModel,
+            isAnonymous,
+            mode: composerModeOf({
+                newThreadMode: store.newThreadMode,
+                threadId,
+                threadMode: threadId ? store.threadModes.get(threadId) : undefined,
+            }),
+            threadModel: model,
+        });
     };
 
     const copy = async () => {
@@ -56,10 +75,17 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
 
         // A browser without the Clipboard API throws here, synchronously, as a refused write rejects: both are one failure.
         try {
-            // The model the composer shows: the bot's for a bot chat, else the chat's own (the thread's, or the picker's choice).
-            const link = buildPromptLink(globalThis.location.origin, { model: (await liveBotModel()) ?? model, prompt });
+            const linkModel = shownModel(await liveBotModel());
 
-            await navigator.clipboard.writeText(link);
+            // A link can only name a model the composer takes for text. A custom endpoint's model is not one, so the link is
+            // refused rather than opening on another model.
+            if (!carriableLinkModel(linkModel)) {
+                showWarning(t`A prompt link cannot name this chat's model, so no link was copied.`);
+
+                return;
+            }
+
+            await navigator.clipboard.writeText(buildPromptLink(globalThis.location.origin, { model: linkModel, prompt }));
             showSuccess(t`Prompt link copied`);
         } catch {
             showError(t`Could not copy the link`);

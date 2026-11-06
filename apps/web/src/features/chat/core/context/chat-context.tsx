@@ -912,14 +912,18 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
 
     // --- Split context values with individual useMemo ---
 
+    // Anonymity rides the thread context so a message row can read it without an auth provider of its own (the copy action).
+    const isAnonymous = sessionData?.user?.isAnonymous === true;
+
     const threadContextValue = useMemo((): ChatThreadContextValue => {
         return {
+            isAnonymous,
             isNewThread,
             model,
             thread,
             threadId,
         };
-    }, [threadId, thread, isNewThread, model]);
+    }, [threadId, thread, isNewThread, model, isAnonymous]);
 
     const messagesContextValue = useMemo((): ChatMessagesContextValue => {
         return {

@@ -1,7 +1,6 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
-import { ANONYMOUS_FREE_MODEL } from "@neore/ai/constants";
 import { enabledModelOf } from "@neore/ai/models";
 import { Switch } from "@neore/ui/components/switch";
 import { skipToken, useQuery } from "@tanstack/react-query";
@@ -12,6 +11,7 @@ import { ModelPickerButton } from "@/components/model-picker";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useChatIsRunning, useChatThread } from "@/features/chat/core/context/chat-context";
 import { MIN_COMPARISON_MODELS, useModelStore } from "@/features/chat/core/stores/model-store";
+import { composerModelOf, composerModeOf } from "@/features/chat/core/utils/composer-model";
 import AgentSwitchConfirmDialog from "@/features/chat/model-settings/agent-switch-confirm-dialog";
 import useModelCombobox from "@/features/chat/model-settings/use-model-combobox";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -54,13 +54,13 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
     // Get current composer mode to show mode-appropriate model for anonymous users
     const storeNewThreadMode = useModelStore((state) => state.newThreadMode);
     const storeThreadMode = useModelStore((state) => state.threadModes.get(threadId || ""));
-    const currentMode = threadId ? (storeThreadMode ?? "text") : storeNewThreadMode;
+    const currentMode = composerModeOf({ newThreadMode: storeNewThreadMode, threadId, threadMode: storeThreadMode });
 
     // For anonymous users: only show the free router model in text mode.
     // In image/video/audio modes, show the actual model selected by the mode switch
     // so the picker button reflects the correct mode-appropriate model.
-    // A bot chat shows the bot's current model: runs use it, while the thread may still store an older one.
-    const effectiveModelId = liveBot?.model ?? (isAnonymous && currentMode === "text" ? ANONYMOUS_FREE_MODEL : model);
+    // The same rule the copied prompt link uses (`core/utils/composer-model.ts`).
+    const effectiveModelId = composerModelOf({ botModel: liveBot?.model, isAnonymous, mode: currentMode, threadModel: model });
     const comparisonMode = useModelStore((state) => state.comparisonMode);
     const selectedModelsForComparison = useModelStore((state) => state.selectedModelsForComparison);
     const setComparisonMode = useModelStore((state) => state.setComparisonMode);

@@ -60,6 +60,8 @@ export interface ThreadData extends ThreadOwnerState {
 // --- Split Context Types ---
 
 export interface ChatThreadContextValue {
+    /** The signed-in person is an anonymous guest (the composer shows the free model for a text chat). */
+    isAnonymous: boolean;
     isNewThread: boolean;
     model: string;
     thread: ThreadData | null | undefined;
