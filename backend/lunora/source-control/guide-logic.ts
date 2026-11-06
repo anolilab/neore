@@ -182,6 +182,22 @@ const record = (value: unknown): Record<string, unknown> | null =>
 
 const text = (value: unknown, max: number): string => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
+/** The characters a path cannot show: controls, format and private-use characters, surrogates, and variation selectors. */
+const HIDDEN_IN_PATH = /[\p{Cc}\p{Cf}\p{Co}\p{Cs}\u{FE00}-\u{FE0F}]/gu;
+
+/**
+ * A changed file's path as the guide reads it. Each hidden character is written as a `\uXXXX` escape, so the prompt shows
+ * the exact path and the agent's answer names it the same way, and two files whose names differ only by a hidden character
+ * stay two files. The prompt and the answer both go through this, so either spelling of the same path matches.
+ * A literal backslash-u sequence in a real path would read the same as its escape: an accepted edge.
+ */
+export const pathKey = (path: string): string =>
+    path.replaceAll(HIDDEN_IN_PATH, (char) => {
+        const hex = (char.codePointAt(0) ?? 0).toString(16).toUpperCase();
+
+        return hex.length > 4 ? String.raw`\u{${hex}}` : String.raw`\u${hex.padStart(4, "0")}`;
+    });
+
 const wholeLine = (value: unknown): number | null => (typeof value === "number" && Number.isSafeInteger(value) && value >= 1 ? value : null);
 
 const sideOf = (value: unknown): GuideSide | null => (value === "new" || value === "old" ? value : null);
@@ -247,7 +263,7 @@ const modelStopsOf = (value: unknown, byPath: Map<string, GuideFile>, lines: Map
 
         for (const entryNamed of named) {
             const fileEntry = record(entryNamed);
-            const path = text(fileEntry?.path, 1024);
+            const path = pathKey(text(fileEntry?.path, 1024));
             const known = byPath.get(path);
 
             // A path the pull request does not change, a mechanical file, or one the stop already names is not a place to read.
@@ -256,7 +272,8 @@ const modelStopsOf = (value: unknown, byPath: Map<string, GuideFile>, lines: Map
             }
 
             seen.add(path);
-            files.push({ path, ranges: rangesOf(fileEntry?.ranges, path, lines) });
+            // The stop names the file as the pull request does, not as the escaped key spells it.
+            files.push({ path: known.path, ranges: rangesOf(fileEntry?.ranges, path, lines) });
         }
 
         if (files.length > 0) {
@@ -290,25 +307,26 @@ const proposalsOf = (value: unknown, byPath: Map<string, GuideFile>, lines: Map<
         const id = `proposal-${String(proposals.length + 1)}`;
 
         if (candidate?.kind === "comment") {
-            const path = text(candidate.path, 1024);
+            const key = pathKey(text(candidate.path, 1024));
+            const known = byPath.get(key);
             const body = text(candidate.body, MAX_COMMENT);
             const line = wholeLine(candidate.line);
             const side = sideOf(candidate.side);
 
-            if (!byPath.has(path) || body === "" || line === null || side === null) {
+            if (!known || body === "" || line === null || side === null) {
                 continue;
             }
 
             const startLine = wholeLine(candidate.startLine);
-            const shown = linesOf(lines, path, side);
-            const hunks = side === "new" ? lines.get(path)?.newHunks : lines.get(path)?.oldHunks;
+            const shown = linesOf(lines, key, side);
+            const hunks = side === "new" ? lines.get(key)?.newHunks : lines.get(key)?.oldHunks;
 
             // A comment the host would refuse (a line outside the diff, or a range across two hunks) is not worth proposing.
             if (!shown.has(line) || (startLine !== null && (startLine >= line || !shown.has(startLine) || hunks?.get(startLine) !== hunks?.get(line)))) {
                 continue;
             }
 
-            proposals.push({ body, id, kind: "comment", line, path, side, startLine, status: "proposed" });
+            proposals.push({ body, id, kind: "comment", line, path: known.path, side, startLine, status: "proposed" });
         } else if (candidate?.kind === "label" && labels < MAX_LABEL_PROPOSALS) {
             // eslint-disable-next-line no-control-regex -- a label with a control character is not a label
             const name = text(candidate.name, MAX_LABEL).replaceAll(/[\u{0}-\u{1F}\u{7F}]/gu, "");
@@ -332,8 +350,8 @@ const proposalsOf = (value: unknown, byPath: Map<string, GuideFile>, lines: Map<
  * `files` is the FULL list of changed files, not the subset whose patches fit the prompt.
  */
 export const assembleGuide = (files: ReadonlyArray<GuideFile>, output: unknown, leftOut: number): AssembledGuide => {
-    const byPath = new Map(files.map((entry) => [entry.path, entry]));
-    const lines = new Map(files.map((entry) => [entry.path, parsePatchLines(entry.patch)]));
+    const byPath = new Map(files.map((entry) => [pathKey(entry.path), entry]));
+    const lines = new Map(files.map((entry) => [pathKey(entry.path), parsePatchLines(entry.patch)]));
     const answer = record(output);
     const modelStops = modelStopsOf(answer?.stops, byPath, lines);
 

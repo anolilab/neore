@@ -80,6 +80,28 @@ describe("assembleGuide", () => {
         expect(skipped.toSorted((a, b) => a.localeCompare(b))).toEqual(["src/binary.png", "src/skipped.ts"]);
     });
 
+    it("names a file whose path has a hidden character by its escaped form, and keeps it apart from a name without the character", () => {
+        const hidden = "src/a‌b.ts";
+        const plain = "src/ab.ts";
+        const guide = assembleGuide(
+            [file(hidden), file(plain)],
+            {
+                proposals: [],
+                stops: [
+                    { explanation: "", files: [{ path: String.raw`src/a\u200Cb.ts` }], role: "core", title: "Hidden" },
+                    { explanation: "", files: [{ path: plain }], role: "dependent", title: "Plain" },
+                ],
+                summary: "",
+            },
+            0,
+        );
+        const placed = guide.stops.flatMap((stop) => stop.files.map((entry) => entry.path));
+
+        // The stop reports the real path, so the file is found in the pull request, and nothing is left uncovered.
+        expect(placed.toSorted((a, b) => a.localeCompare(b))).toEqual([hidden, plain].toSorted((a, b) => a.localeCompare(b)));
+        expect(guide.stops.some((stop) => stop.kind === "uncovered")).toBe(false);
+    });
+
     it("orders core, then dependents, then mechanical changes, then what is not covered", () => {
         const guide = assembleGuide(files, { ...output, stops: [...output.stops].toReversed() }, 0);
 

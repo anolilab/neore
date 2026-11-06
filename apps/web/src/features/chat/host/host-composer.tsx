@@ -113,7 +113,8 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
             attempt.current = undefined;
             setRefusedPaste(false);
             // Continue sends a fixed prompt: a draft being typed beside it stays.
-            setText((current) => (current.trim() === prompt ? "" : current));
+            // Compared as the server cleaned it, so a draft whose only extra text is a removed joiner still clears.
+            setText((current) => (stripHiddenText(current).text.trim() === prompt ? "" : current));
 
             return;
         }

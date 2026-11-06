@@ -12,7 +12,7 @@ import { render } from "@neore/ai/prompts/optimizer";
 import { MAX_DEVICE_INPUT_BYTES } from "../devices/lib/constants";
 import { utf8Length } from "../devices/lib/signing";
 import type { GuideFile } from "./guide-logic";
-import { isMechanicalFile } from "./guide-logic";
+import { isMechanicalFile, pathKey } from "./guide-logic";
 
 export interface GuidePromptInput {
     baseBranch: string;
@@ -78,11 +78,11 @@ const RULES = `You write a reading guide for one pull request.
 
 const fileEntry = (file: GuideFile, patch: string | undefined): string => {
     const fields = [
-        `"path": ${quote(file.path)}`,
+        `"path": ${quote(pathKey(file.path))}`,
         `"status": "${file.status}"`,
         `"additions": ${String(file.additions)}`,
         `"deletions": ${String(file.deletions)}`,
-        ...(file.previousPath === null ? [] : [`"previousPath": ${quote(file.previousPath)}`]),
+        ...(file.previousPath === null ? [] : [`"previousPath": ${quote(pathKey(file.previousPath))}`]),
         ...(isMechanicalFile(file) ? ['"mechanical": true'] : []),
         ...(patch === undefined ? [] : [`"patch": ${quote(patch)}`]),
     ];
@@ -95,7 +95,7 @@ const threadEntry = (thread: GuidePromptInput["threads"][number]): string => {
         .slice(0, MAX_THREAD_COMMENTS)
         .map((comment) => `{ "author": ${quote(comment.authorLogin)}, "body": ${quote(comment.body.slice(0, COMMENT_MAX_CHARS))} }`);
 
-    return `{ "path": ${quote(thread.path)}, "comments": [${comments.join(", ")}] }`;
+    return `{ "path": ${quote(pathKey(thread.path))}, "comments": [${comments.join(", ")}] }`;
 };
 
 const pullRequestEntry = (input: GuidePromptInput, bodyMax: number): string =>

@@ -89,6 +89,15 @@ describe("buildCloudGuidePrompt", () => {
     });
 });
 
+describe("paths with hidden characters", () => {
+    it("shows a changed file's hidden character as an escape, so the cleaner keeps the path the agent must name", () => {
+        const prompt = buildHostGuidePrompt(input({ files: [file("src/a‌b.ts")] }));
+
+        expect(prompt).toContain(String.raw`"path": "src/a\\u200Cb.ts"`);
+        expect(prompt).not.toContain("‌");
+    });
+});
+
 describe("buildHostGuidePrompt", () => {
     it("fits one signed call however many files there are", () => {
         const many = Array.from({ length: 3000 }, (_, index) => file(`packages/some/deep/path/file-${String(index)}.ts`));

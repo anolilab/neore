@@ -172,6 +172,8 @@ describe("the coding-agent composer", () => {
         fireEvent.click(send);
         await waitFor(() => expect(harness.calls).toHaveLength(1));
         expect((harness.calls[0]?.[1] as { text: string }).text).toBe(`${"a".repeat(29_998)}\u{1F600}`);
+        // The sent text clears from the box, joiner and all.
+        await waitFor(() => expect(box.value).toBe(""));
     });
 
     it("does not send an empty message", async () => {
