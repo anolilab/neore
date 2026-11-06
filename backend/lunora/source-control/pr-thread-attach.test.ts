@@ -39,7 +39,10 @@ vi.mock("../auth", async (importOriginal) => {
 });
 
 const { host, registry } = vi.hoisted(() => {
-    return { host: { outcome: { status: "not_found" } as Record<string, unknown>, reads: 0 }, registry: new Map<string, unknown>() };
+    return {
+        host: { outcome: { status: "not_found" } as Record<string, unknown>, reads: 0, renewals: 0, renewOnFirstRead: false, tokens: [] as string[] },
+        registry: new Map<string, unknown>(),
+    };
 });
 
 // The action reaches its own internal query by reference: resolve it to the registered procedure.
@@ -50,7 +53,16 @@ vi.mock("../connectors/lib/github-token", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../connectors/lib/github-token")>()),
         resolveGithubToken: async () => {
-            return { accessToken: "test-token" };
+            const renewed = { accessToken: "renewed-token", renew: async () => renewed };
+
+            return {
+                accessToken: "test-token",
+                renew: async () => {
+                    host.renewals += 1;
+
+                    return renewed;
+                },
+            };
         },
     };
 });
@@ -58,8 +70,14 @@ vi.mock("../connectors/lib/github-token", async (importOriginal) => {
 vi.mock("./read-host", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("./read-host")>()),
-        readFromHost: async () => {
+        readFromHost: async (_driver: unknown, token: { accessToken: string; renew: () => Promise<unknown> }) => {
             host.reads += 1;
+            host.tokens.push(token.accessToken);
+
+            // The first read's token is refused once, as a host does with an expired one.
+            if (host.renewOnFirstRead && host.reads === 1) {
+                await token.renew();
+            }
 
             return host.outcome;
         },
@@ -190,6 +208,23 @@ describe("attaching by hand: the host read and the request limits", () => {
 
         await expect(attach(A, threadId, eleven)).rejects.toThrow("Attach at most 10 pull requests at a time");
         expect(host.reads).toBe(0);
+    });
+
+    it("renews the token once for a batch: the reads after a renewal start from the new token", async () => {
+        const threadId = await threadOf(A);
+
+        Object.assign(host, { outcome: { status: "ok", title: "x" }, reads: 0, renewals: 0, renewOnFirstRead: true, tokens: [] });
+
+        await attach(A, threadId, [
+            { number: 1, repository: "octo/hello" },
+            { number: 2, repository: "octo/hello" },
+            { number: 3, repository: "octo/hello" },
+        ]);
+
+        expect(host.renewals).toBe(1);
+        expect(host.tokens).toEqual(["test-token", "renewed-token", "renewed-token"]);
+
+        host.renewOnFirstRead = false;
     });
 
     it("refuses another user's thread before any host read", async () => {

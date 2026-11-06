@@ -11,6 +11,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalMutation, internalQuery } from "../_generated/server";
+import type { GithubTokenOutcome } from "../connectors/lib/github-token";
 import { resolveGithubToken } from "../connectors/lib/github-token";
 import { authAction, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
@@ -156,7 +157,19 @@ export const attachPullRequests = authAction
 
         // Every address is checked before the first host call, so a malformed one costs no reads.
         const addresses = args.pullRequests.map((pr) => requireAddress(pr.repository, pr.number));
-        const token = await resolveGithubToken(ctx, ctx.user.userId);
+        // A token renewed during one read is the one the next read starts from, so a batch refreshes it once.
+        const remember = (outcome: GithubTokenOutcome): GithubTokenOutcome =>
+            "problem" in outcome
+                ? outcome
+                : {
+                      accessToken: outcome.accessToken,
+                      renew: async () => {
+                          token = remember(await outcome.renew());
+
+                          return token;
+                      },
+                  };
+        let token = remember(await resolveGithubToken(ctx, ctx.user.userId));
         const reads = [];
 
         for (const address of addresses) {

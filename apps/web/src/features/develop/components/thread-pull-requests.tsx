@@ -138,6 +138,14 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
 
     return (
         <div className="flex flex-wrap items-center gap-2">
+            {links.isError && (
+                <p className="text-destructive inline-flex items-center gap-2 text-xs" role="alert">
+                    {t`Could not load the linked pull requests.`}
+                    <Button onClick={async () => await links.refetch()} size="sm" variant="ghost">
+                        {t`Try again`}
+                    </Button>
+                </p>
+            )}
             {(links.data ?? []).length > 0 && (
                 <ul className="flex flex-wrap items-center gap-2">
                     {(links.data ?? []).map((link) => (
