@@ -241,6 +241,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
             <>
                 <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
                 <ComposerEffortShortcuts />
+                <ThreadShortcutsListener model={thread?.model} status={thread?.status} />
                 <div className={cn("relative flex h-[calc(100%-40px)]", className)}>
                     {/* Columns — each scrolls independently, divided by borders */}
                     <ComparisonView branches={comparisonBranches} className="min-h-0 flex-1" />
@@ -277,7 +278,7 @@ const Thread: FC<ThreadProps> = ({ className, initialMessage, maxWidth = "65ch" 
             <TextSelectionMenu isTextModel={composerMode === "text"} threadId={threadId} />
             <ComposerEffortShortcuts />
             <CopyLastCodeBlockListener />
-            <ThreadShortcutsListener />
+            <ThreadShortcutsListener model={thread?.model} status={thread?.status} />
             <AskAsideShortcutListener />
             <div
                 className={cn("relative h-[calc(100%-40px)]", className)}

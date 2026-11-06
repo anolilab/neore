@@ -14,6 +14,7 @@ const row = (threadId: string, extra: Partial<BranchNode> = {}): BranchNode => {
         createdAt: 1,
         depth: 0,
         lastReplyAt: 500,
+        scheduled: false,
         status: "active",
         threadId,
         title: threadId,

@@ -6,20 +6,29 @@ import { useEffect, useState } from "react";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
 import useCurrentModel from "@/features/chat/core/hooks/use-current-model";
-import { useCurrentThreadId, useThreadMetadata } from "@/features/chat/core/stores/thread-store-hooks";
+import { useCurrentThreadId, useOptimisticStatuses } from "@/features/chat/core/stores/thread-store-hooks";
 import useThreadHandlers from "@/features/chat/thread-list/hooks/use-thread-handlers";
+
+interface ThreadShortcutsListenerProperties {
+    /** The open thread's own model: archiving goes through the thread's model path, not the globally selected one. */
+    model?: string;
+    /** The open thread's stored status. A pending archive change in the optimistic map takes precedence. */
+    status?: string;
+}
 
 /**
  * Archives or restores the open thread on the `archiveThread` shortcut, and deletes it on `deleteThread` after the owner
- * confirms (`use-keyboard-shortcut-handler.ts`). Renders only the confirmation dialog.
+ * confirms (`use-keyboard-shortcut-handler.ts`). Renders only the confirmation dialog. Mounted by the thread view, which
+ * owns the open thread's document, in both its normal and its comparison layout.
  */
-const ThreadShortcutsListener: FC = () => {
+const ThreadShortcutsListener: FC<ThreadShortcutsListenerProperties> = ({ model, status }) => {
     const { t } = useLingui();
     const currentThreadId = useCurrentThreadId();
-    const threadMetadata = useThreadMetadata();
+    const optimisticStatuses = useOptimisticStatuses();
     const currentModel = useCurrentModel();
-    const { handleDeleteThread, updateThread } = useThreadHandlers(() => {});
-    const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+    const { handleDeleteThread, updateThread } = useThreadHandlers(() => {}, currentThreadId);
+    // The thread the delete was asked for. The route can change while the dialog is open, so confirming uses this, not the live thread.
+    const [deleteTargetId, setDeleteTargetId] = useState<string | undefined>(undefined);
 
     useEffect(() => {
         const archive = () => {
@@ -27,9 +36,10 @@ const ThreadShortcutsListener: FC = () => {
                 return;
             }
 
-            const isArchived = threadMetadata.get(currentThreadId)?.status === "archived";
+            // A second press before the first update settles reads the pending status, so it toggles back rather than repeating.
+            const effectiveStatus = optimisticStatuses.get(currentThreadId) ?? status;
 
-            updateThread(currentThreadId, currentModel, isArchived ? "active" : "archived");
+            updateThread(currentThreadId, model ?? currentModel, effectiveStatus === "archived" ? "active" : "archived");
         };
 
         const askToDelete = () => {
@@ -37,7 +47,7 @@ const ThreadShortcutsListener: FC = () => {
                 return;
             }
 
-            setIsConfirmingDelete(true);
+            setDeleteTargetId(currentThreadId);
         };
 
         globalThis.addEventListener("archiveThread", archive);
@@ -47,20 +57,24 @@ const ThreadShortcutsListener: FC = () => {
             globalThis.removeEventListener("archiveThread", archive);
             globalThis.removeEventListener("deleteThread", askToDelete);
         };
-    }, [currentModel, currentThreadId, threadMetadata, updateThread]);
+    }, [currentModel, currentThreadId, model, optimisticStatuses, status, updateThread]);
 
     return (
         <DeleteConfirmationDialog
             description={t`Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation.`}
             onConfirm={() => {
-                if (currentThreadId !== undefined) {
-                    handleDeleteThread(currentThreadId);
+                if (deleteTargetId !== undefined) {
+                    handleDeleteThread(deleteTargetId);
                 }
 
-                setIsConfirmingDelete(false);
+                setDeleteTargetId(undefined);
             }}
-            onOpenChange={setIsConfirmingDelete}
-            open={isConfirmingDelete}
+            onOpenChange={(open) => {
+                if (!open) {
+                    setDeleteTargetId(undefined);
+                }
+            }}
+            open={deleteTargetId !== undefined}
             title={t`Delete thread?`}
         />
     );

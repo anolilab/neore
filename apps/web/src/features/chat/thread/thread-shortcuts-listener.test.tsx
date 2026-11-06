@@ -15,7 +15,8 @@ import ThreadShortcutsListener from "./thread-shortcuts-listener";
 const state = vi.hoisted(() => {
     return {
         handleDeleteThread: vi.fn(),
-        metadata: new Map<string, { status: string }>(),
+        handlerThreadId: undefined as string | undefined,
+        optimistic: new Map<string, string>(),
         threadId: "t1" as string | undefined,
         updateThread: vi.fn(),
     };
@@ -48,7 +49,7 @@ vi.mock("@/features/keyboard/components/keyboard-shortcuts-sheet", () => {
 vi.mock("@/features/chat/core/stores/thread-store-hooks", () => {
     return {
         useCurrentThreadId: () => state.threadId,
-        useThreadMetadata: () => state.metadata,
+        useOptimisticStatuses: () => state.optimistic,
     };
 });
 
@@ -58,7 +59,9 @@ vi.mock("@/features/chat/core/hooks/use-current-model", () => {
 
 vi.mock("@/features/chat/thread-list/hooks/use-thread-handlers", () => {
     return {
-        default: () => {
+        default: (_setLoadingStates: unknown, threadId?: string) => {
+            state.handlerThreadId = threadId;
+
             return { handleDeleteThread: state.handleDeleteThread, updateThread: state.updateThread };
         },
     };
@@ -86,6 +89,12 @@ const Shortcuts = ({ children }: { children?: ReactNode }) => {
     );
 };
 
+const listener = (props: { model?: string; status?: string } = {}) => (
+    <Shortcuts>
+        <ThreadShortcutsListener {...props} />
+    </Shortcuts>
+);
+
 const pressArchive = (): void => {
     fireEvent.keyDown(document.body, { code: "KeyA", ctrlKey: true, key: "A", shiftKey: true });
 };
@@ -98,42 +107,46 @@ describe("thread shortcuts", () => {
     beforeEach(() => {
         state.handleDeleteThread.mockReset();
         state.updateThread.mockReset();
-        state.metadata = new Map();
+        state.optimistic = new Map();
         state.threadId = "t1";
+        state.handlerThreadId = undefined;
     });
 
-    it("the archive shortcut archives the open thread", () => {
-        render(
-            <Shortcuts>
-                <ThreadShortcutsListener />
-            </Shortcuts>,
-        );
+    it("the archive shortcut archives the open thread on the global model when the thread has none", () => {
+        render(listener({ status: "active" }));
 
         pressArchive();
 
         expect(state.updateThread).toHaveBeenCalledWith("t1", "model-x", "archived");
     });
 
-    it("the archive shortcut restores the open thread when it is already archived", () => {
-        state.metadata = new Map([["t1", { status: "archived" }]]);
-
-        render(
-            <Shortcuts>
-                <ThreadShortcutsListener />
-            </Shortcuts>,
-        );
+    it("the archive shortcut archives through the open thread's own model, not the globally selected one", () => {
+        render(listener({ model: "thread-model", status: "active" }));
 
         pressArchive();
 
-        expect(state.updateThread).toHaveBeenCalledWith("t1", "model-x", "active");
+        expect(state.updateThread).toHaveBeenCalledWith("t1", "thread-model", "archived");
+    });
+
+    it("the archive shortcut restores the open thread when its stored status is archived", () => {
+        render(listener({ model: "thread-model", status: "archived" }));
+
+        pressArchive();
+
+        expect(state.updateThread).toHaveBeenCalledWith("t1", "thread-model", "active");
+    });
+
+    it("a second archive press while the first is pending restores, reading the pending status", () => {
+        state.optimistic.set("t1", "archived");
+        render(listener({ model: "thread-model", status: "active" }));
+
+        pressArchive();
+
+        expect(state.updateThread).toHaveBeenCalledWith("t1", "thread-model", "active");
     });
 
     it("the delete shortcut asks first and deletes only after the owner confirms", () => {
-        render(
-            <Shortcuts>
-                <ThreadShortcutsListener />
-            </Shortcuts>,
-        );
+        render(listener());
 
         pressDelete();
 
@@ -144,14 +157,27 @@ describe("thread shortcuts", () => {
         expect(state.handleDeleteThread).toHaveBeenCalledWith("t1");
     });
 
+    it("deletes the thread the dialog was opened for, even if the route moved to another thread meanwhile", () => {
+        const view = render(listener());
+
+        pressDelete();
+        state.threadId = "t2";
+        view.rerender(listener());
+        fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+        expect(state.handleDeleteThread).toHaveBeenCalledWith("t1");
+    });
+
+    it("hands the open thread to the thread handlers, so deleting it leaves its route", () => {
+        render(listener());
+
+        expect(state.handlerThreadId).toBe("t1");
+    });
+
     it("does nothing when no thread is open", () => {
         state.threadId = undefined;
 
-        render(
-            <Shortcuts>
-                <ThreadShortcutsListener />
-            </Shortcuts>,
-        );
+        render(listener());
 
         pressArchive();
         pressDelete();

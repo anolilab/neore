@@ -226,6 +226,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                 const row = thread as {
                     awaitingInput?: "approval" | "question";
                     lastReplyAt?: number;
+                    lastUserMessageAt?: number;
                     scheduled?: boolean;
                     snoozedUntil?: number;
                     status?: string;
@@ -238,6 +239,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                         {
                             awaitingInput: row.awaitingInput,
                             lastReplyAt: row.lastReplyAt,
+                            lastUserMessageAt: row.lastUserMessageAt,
                             scheduled: row.scheduled,
                             snoozedUntil: row.snoozedUntil,
                             status: row.status ?? "active",
