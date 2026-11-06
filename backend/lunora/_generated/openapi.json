@@ -23115,6 +23115,30 @@
                       "expectedUrl": {
                         "type": "string"
                       },
+                      "more": {
+                        "items": {
+                          "properties": {
+                            "expectedUrl": {
+                              "type": "string",
+                              "writeOnly": true,
+                              "format": "password"
+                            },
+                            "value": {
+                              "type": "string",
+                              "writeOnly": true,
+                              "format": "password"
+                            }
+                          },
+                          "required": [
+                            "expectedUrl",
+                            "value"
+                          ],
+                          "type": "object",
+                          "writeOnly": true
+                        },
+                        "type": "array",
+                        "writeOnly": true
+                      },
                       "threadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",
