@@ -34,6 +34,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Plural, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
+import cn from "@neore/ui/utils/cn";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { ChevronDownIcon, ChevronUpIcon, CornerDownRightIcon, GripVerticalIcon, ListOrderedIcon, PaperclipIcon, SendIcon, XIcon } from "lucide-react";
 import { useReducedMotion } from "motion/react";
@@ -277,7 +278,10 @@ const QueueChip: FC<{
 
     return (
         <li
-            className={`bg-muted/60 flex max-w-full min-w-0 items-center gap-1.5 rounded-full border py-0.5 pr-0.5 pl-2.5 text-xs ${isDragging ? "opacity-50" : ""}`}
+            className={cn(
+                "bg-muted/60 flex max-w-full min-w-0 items-center gap-1.5 rounded-full border py-0.5 pr-0.5 pl-2.5 text-xs",
+                isDragging && "opacity-50",
+            )}
             data-queue-chip-id={prompt.id}
             ref={setNodeRef}
             style={{ transform: CSS.Transform.toString(transform), transition: reduceMotion ? undefined : transition }}
