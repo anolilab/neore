@@ -45,12 +45,14 @@ const SetupChecklist: FC = () => {
     }, [session?.user?.id]);
     // Pairing happens in the desktop app, outside this page, and the list can be a one-shot read that nothing pushes to:
     // while the pairing step is still open the list is read again on focus and every few seconds, then left alone.
+    const settingsQuery = useUserSettings();
     const devicesQuery = useQuery({
         ...crpc.devices.functions.listDevices.queryOptions({}),
-        refetchInterval: (query) => (detectSetupDone(query.state.data).pair ? false : PAIRING_POLL_MS),
+        // A skipped pairing step is not open, so it is not polled either.
+        refetchInterval: (query) =>
+            detectSetupDone(query.state.data).pair || settingsQuery.data?.setupStepsSkipped?.includes("pair") ? false : PAIRING_POLL_MS,
         refetchOnWindowFocus: "always",
     });
-    const settingsQuery = useUserSettings();
     const settingsKey = crpc.auth.functions.getUserSettings.queryOptions({}).queryKey;
     // One step per call: the server applies it to the list it holds, so another tab's skip is never overwritten. The
     // cache is patched one step at a time, never from an earlier snapshot. Two cases read the server instead of guessing:
