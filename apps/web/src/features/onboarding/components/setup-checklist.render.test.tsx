@@ -12,7 +12,14 @@ const { devices, mutate, server, sonnerMock } = vi.hoisted(() => {
     return {
         devices: { current: [] as unknown[], fail: false },
         mutate: vi.fn(),
-        server: { fail: false, readFail: false, hold: undefined as Promise<void> | undefined, noRow: false, skipped: undefined as string[] | undefined },
+        server: {
+            fail: false,
+            hold: undefined as Promise<void> | undefined,
+            noRow: false,
+            readFail: false,
+            readHold: undefined as Promise<void> | undefined,
+            skipped: undefined as string[] | undefined,
+        },
         sonnerMock: { toast: vi.fn() },
     };
 });
@@ -48,6 +55,8 @@ vi.mock("@/lib/lunora/crpc", () => {
                             queryOptions: () => {
                                 return {
                                     queryFn: async () => {
+                                        await server.readHold;
+
                                         if (server.readFail) {
                                             throw new Error("offline");
                                         }
@@ -137,6 +146,7 @@ describe("<SetupChecklist>", () => {
         devices.fail = false;
         server.fail = false;
         server.readFail = false;
+        server.readHold = undefined;
         server.hold = undefined;
         server.noRow = false;
         server.skipped = undefined;
@@ -214,12 +224,33 @@ describe("<SetupChecklist>", () => {
         expect(await screen.findByText("(Skipped)")).toBeTruthy();
     });
 
+    it("shows no step status while the settings read is pending, so a stored skip never reads as To do", async () => {
+        let release = () => {};
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` is newer than the supported runtimes
+        server.readHold = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        server.skipped = ["ssh"];
+        renderChecklist();
+
+        await screen.findAllByText("(Checking)");
+        expect(screen.queryByText("(To do)")).toBeNull();
+        expect(screen.queryByText("(Skipped)")).toBeNull();
+        expect(screen.queryByRole("button", { name: SKIP })).toBeNull();
+
+        release();
+
+        expect(await screen.findByText("(Skipped)")).toBeTruthy();
+        expect(screen.getByRole("button", { name: RESUME_ADD_AN_SSH_SERVER })).toBeTruthy();
+    });
+
     it("explains a failed settings read and retries it", async () => {
         server.readFail = true;
         renderChecklist();
 
         expect(await screen.findByText(COULD_NOT_LOAD)).toBeTruthy();
-        expect((screen.getAllByRole("button", { name: SKIP })[0] as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.queryByRole("button", { name: SKIP })).toBeNull();
 
         server.readFail = false;
         fireEvent.click(screen.getByRole("button", { name: RETRY }));

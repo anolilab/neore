@@ -59,9 +59,10 @@ const SetupChecklist: FC = () => {
         // Settled either way, the stored list is what the card shows: a read that started before the write cannot outlive it.
         onSettled: reloadSettings,
     });
-    // An account with no settings row answers `null`; only `undefined` means the read has not finished.
+    // An account with no settings row answers `null`; only `undefined` means the read has not finished. Until both reads
+    // have answered, no step has a status: a skip that is stored but not yet read must not show as "To do".
     const settingsLoaded = settingsQuery.data !== undefined;
-    const steps = devicesQuery.isSuccess ? deriveSetupSteps(devicesQuery.data, settingsQuery.data?.setupStepsSkipped) : undefined;
+    const steps = settingsLoaded && devicesQuery.isSuccess ? deriveSetupSteps(devicesQuery.data, settingsQuery.data?.setupStepsSkipped) : undefined;
 
     const copy: Record<SetupStepId, { action: string; description: string; title: string }> = {
         agent: {
@@ -81,7 +82,7 @@ const SetupChecklist: FC = () => {
         },
     };
     const statusLabel = { done: t`Done`, skipped: t`Skipped`, todo: t`To do` };
-    const pendingLabel = devicesQuery.isError ? t`Could not check` : t`Checking`;
+    const pendingLabel = devicesQuery.isError || settingsQuery.isError ? t`Could not check` : t`Checking`;
 
     return (
         <SettingsCard description={t`Three steps to use coding agents on your own machines. Skip any of them and come back later.`} title={t`Coding setup`}>
@@ -110,7 +111,7 @@ const SetupChecklist: FC = () => {
                                     </a>
                                     {status !== undefined && (
                                         <Button
-                                            disabled={!settingsLoaded || settingsQuery.isError}
+                                            disabled={settingsQuery.isError}
                                             onClick={() => {
                                                 setSkipped.mutate({ skipped: status === "todo", stepId: id });
                                             }}
