@@ -390,6 +390,43 @@ describe("the continuation's end", () => {
         expect(await runRow()).toMatchObject({ result: "Removed /tmp/old.txt.", status: "succeeded" });
     });
 
+    it("never answers with text from before the approval when the continuation saves only a tool result", async () => {
+        await run(
+            async (context) =>
+                await context.db.insert("messages", {
+                    message: { content: [{ text: "Earlier answer.", type: "text" }], role: "assistant" },
+                    order: 1,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId: childId,
+                    tool: false,
+                    userId: OWNER,
+                }),
+        );
+        // The earlier text is written before the continuation starts, so it is older than the resume stamp.
+        await new Promise((resolve) => {
+            setTimeout(resolve, 5);
+        });
+        await internalCall(resumeAwaitingRun, { runId });
+
+        const toolRowId = await run(
+            async (context) =>
+                await context.db.insert("messages", {
+                    message: { content: [{ output: { type: "text", value: "ok" }, toolCallId: "call-1", toolName: TOOL, type: "tool-result" }], role: "tool" },
+                    order: 3,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId: childId,
+                    tool: true,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(await internalCall(completeResumedRun, { lastMessageId: toolRowId, outcome: { kind: "succeeded" }, runId })).toBe(true);
+        expect(JSON.stringify(await runRow())).not.toContain("Earlier answer");
+        expect(await runStatus()).toBe("succeeded");
+    });
+
     it("waits again when the continuation stopped on another request", async () => {
         await internalCall(resumeAwaitingRun, { runId });
 

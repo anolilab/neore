@@ -1553,7 +1553,10 @@ export const completeResumedRun = internalMutation
                 .order("desc")
                 .take(ANSWER_WINDOW_ROWS);
 
-            text = recent.map((candidate) => assistantText(candidate)).find((candidate) => candidate !== "") ?? "";
+            // Only rows this continuation saved: its resume stamped the run's `updatedAt`, so an earlier turn's text is never the answer.
+            const continuation = recent.filter((candidate) => candidate._creationTime >= run.updatedAt);
+
+            text = continuation.map((candidate) => assistantText(candidate)).find((candidate) => candidate !== "") ?? "";
         }
 
         return await finishRunFromLoop(ctx, args.runId, { kind: "succeeded", result: text });
