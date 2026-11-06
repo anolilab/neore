@@ -205,7 +205,7 @@ describe("trigger routes", () => {
         const created = await request("/triggers", json("POST", { inputTemplate: template, model: "m", name: "Hook", type: "webhook" }));
         const updated = await request("/triggers/trg1", json("PATCH", { inputTemplate: template }));
 
-        expect([created.status, updated.status]).not.toContain(400);
+        expect([created.status, updated.status]).toEqual([201, 200]);
         expect(calls.find((entry) => entry.name === "triggers_functions:createTrigger")?.args).toMatchObject({ inputTemplate: template });
         expect(calls.find((entry) => entry.name === "triggers_functions:updateTrigger")?.args).toMatchObject({ inputTemplate: template });
     });

@@ -82,8 +82,12 @@ const MAX_DELIVERY_ID_LENGTH = 128;
 /** `X-Hub-Signature-256` is always `sha256=<64 hex>`; anything else is refused before any HMAC work. */
 const NATIVE_SIGNATURE = /^sha256=[\da-f]{64}$/iu;
 
-/** Lunora refuses a scheduled dispatch whose serialized arguments are over 1 MiB, after the delivery was acknowledged. */
-const MAX_SCHEDULED_ARGS_BYTES = 1024 * 1024;
+/**
+ * Lunora refuses a scheduled dispatch over 1 MiB, after the delivery was acknowledged. The limit here keeps a reserve for the
+ * dispatch envelope around the arguments, so a delivery that would fail there is refused now, with a 413. The envelope's
+ * size is not measured here.
+ */
+const MAX_SCHEDULED_ARGS_BYTES = 1024 * 1024 - 64 * 1024;
 
 /**
  * The trigger fields this handler reads.
@@ -108,7 +112,8 @@ type WebhookTrigger = Pick<
 
 /** The request's query parameters, the first value of each name (a credential-looking name is filtered when it is read). */
 const firstQueryValues = (url: string): Record<string, string> => {
-    const query: Record<string, string> = {};
+    // No prototype, so a name such as `__proto__` is stored as a key instead of invoking the inherited setter.
+    const query = Object.create(null) as Record<string, string>;
     const params = new URL(url).searchParams;
 
     for (const [name, value] of params) {
@@ -314,7 +319,12 @@ const handleTriggerWebhook = async (context: HttpActionCtx, request: Request, tr
             body || trigger.inputTemplate
                 ? renderWebhookPrompt(
                       trigger.inputTemplate,
-                      { body, headers: Object.fromEntries(request.headers), query: firstQueryValues(request.url) },
+                      {
+                          body,
+                          headers: Object.fromEntries(request.headers),
+                          jsonText: strictBody ?? "",
+                          query: firstQueryValues(request.url),
+                      },
                       randomFrameId(),
                   )
                 : undefined;

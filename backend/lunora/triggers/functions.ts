@@ -661,7 +661,8 @@ export const updateTrigger = authMutation
             patch.timezone = requestedZone;
         }
 
-        assertWebhookTemplateFits(trigger.type, args.inputTemplate);
+        // A template left as it is is not checked again: one saved before the limit can still be edited in other fields.
+        assertWebhookTemplateFits(trigger.type, args.inputTemplate === trigger.inputTemplate ? undefined : args.inputTemplate);
 
         if (args.inputTemplate !== undefined) patch.inputTemplate = cleanPromptField(args.inputTemplate, "The input");
 
@@ -697,6 +698,8 @@ export const updateTrigger = authMutation
             ...withoutUndefined(patch),
             // `null` removes the description.
             ...(args.description === null && { description: undefined }),
+            // An empty template removes the stored one; `undefined` leaves it as it is.
+            ...(args.inputTemplate !== undefined && args.inputTemplate.trim() === "" && { inputTemplate: undefined }),
             // `undefined` removes a stale time; enabling recomputes it (`firstRunOf`).
             // Also clears a time a non-schedule trigger stored before this check existed.
             // An event trigger's next check is its own and is never touched here.
@@ -953,11 +956,8 @@ export const testRunTrigger = authAction
         }
 
         const wasEnabled = trigger.enabled === true;
-        // A schedule's or a watcher's input is its template, so only a payload the user typed overrides it (`executeTrigger`).
-        // A webhook's template is its prompt, not a body: a test run without a typed payload renders it with an empty body.
-        const payload = ["event", "schedule", "webhook"].includes(trigger.type)
-            ? args.testPayload
-            : args.testPayload || trigger.inputTemplate || "Manual test run triggered.";
+        // Every trigger type takes only a payload the user typed: without one, `executeTrigger` builds the input from the template.
+        const payload = args.testPayload;
 
         // The run reads the trigger only when it starts, after this action has returned, so it is told to run a disabled one.
         // `manual`: a quiet routine posts a run the user asked for, whatever the workspace holds.

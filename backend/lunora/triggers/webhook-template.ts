@@ -29,21 +29,25 @@ export const MAX_PAYLOAD_LENGTH = 10_000;
  */
 export const MAX_WEBHOOK_TEMPLATE_LENGTH = MAX_RENDERED_PROMPT_LENGTH - MAX_PAYLOAD_LENGTH - 500;
 
-/** Credential words that are unambiguous inside a name (`access_token`, `Authorization`). */
-const CREDENTIAL_WORD = /authorization|assertion|bearer|cookie|credential|hmac|passphrase|password|passwd|secret|signature|token/u;
+/** Credential words that are unambiguous inside a name (`access_token`, `Authorization`), and joined forms (`sessionid`, `accesskey`). */
+const CREDENTIAL_WORD =
+    /accesskey|assertion|authkey|authorization|bearer|cookie|credential|hmac|passphrase|password|passwd|privatekey|secret|sessid|sessionid|signature|token/u;
 
 /** The separators between the segments of a header or query name. */
 const NAME_SEPARATOR = /[-_.]/u;
 
+/** A boundary between a lower-case letter or digit and a capital, so `accessKey` splits into two words. */
+const CAMEL_BOUNDARY = /(?<=[\da-z])(?=[A-Z])/gu;
+
 /** Credential words that are only a credential as a whole segment of a name (`x-api-key`, `sig`), since they occur inside ordinary words. */
-const CREDENTIAL_SEGMENT = new Set(["apikey", "auth", "csrf", "jwt", "key", "oauth", "otp", "pass", "pwd", "session", "sig", "xsrf"]);
+const CREDENTIAL_SEGMENT = new Set(["apikey", "auth", "code", "csrf", "jwt", "key", "oauth", "otp", "pass", "pwd", "session", "sid", "sig", "sign", "xsrf"]);
 
 /**
  * Whether a header or query name carries a credential. A false positive only blanks a value; a false negative leaks one.
  * Short words match only as a whole segment, so `author`, `assignee` and `bypass` are read.
  */
 const isCredentialName = (name: string): boolean => {
-    const lower = name.toLowerCase();
+    const lower = name.replaceAll(CAMEL_BOUNDARY, "-").toLowerCase();
 
     return CREDENTIAL_WORD.test(lower) || lower.split(NAME_SEPARATOR).some((segment) => CREDENTIAL_SEGMENT.has(segment));
 };
@@ -52,6 +56,8 @@ const isCredentialName = (name: string): boolean => {
 export interface WebhookInputs {
     readonly body: string;
     readonly headers: Readonly<Record<string, string>>;
+    /** The text body paths are read from, when it is not `body`: a body that is not valid UTF-8 passes `""`, so none resolves. */
+    readonly jsonText?: string;
     readonly query: Readonly<Record<string, string>>;
 }
 
@@ -64,9 +70,14 @@ const PLACEHOLDER = /\{\{([^{}]*)\}\}/gu;
 /** A frame tag for one delivery: six random bytes in hex, so the body cannot anticipate it. */
 export const randomFrameId = (): string => [...crypto.getRandomValues(new Uint8Array(6))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
+/**
+ * The body's JSON. An integer beyond the safe range keeps its source digits, as a string, so a large ID is not rounded.
+ */
 const parseJson = (body: string): unknown => {
     try {
-        return JSON.parse(body) as unknown;
+        return JSON.parse(body, (_key, value: unknown, context?: { source?: string }) =>
+            typeof value === "number" && Math.abs(value) > Number.MAX_SAFE_INTEGER && context?.source !== undefined ? context.source : value,
+        ) as unknown;
     } catch {
         return undefined;
     }
@@ -98,6 +109,16 @@ const lookupJson = (root: unknown, segments: ReadonlyArray<string>): unknown => 
     return current;
 };
 
+/** A high surrogate at the end of a string: the first half of a pair that a cut would split. */
+const TRAILING_HIGH_SURROGATE = /[\uD800-\uDBFF]$/u;
+
+/** The first `max` UTF-16 units, without a surrogate pair cut in two: a lone high surrogate at the end is dropped. */
+const sliceUnits = (text: string, max: number): string => {
+    const cut = text.slice(0, max);
+
+    return TRAILING_HIGH_SURROGATE.test(cut) ? cut.slice(0, -1) : cut;
+};
+
 /**
  * A value as the prompt reads it. A string is a quoted literal. `null`, a number, a boolean, an object or an array is
  * its JSON, and one whose JSON is over the limit is a quoted, cut copy of that JSON: a valid literal, never broken JSON.
@@ -109,7 +130,7 @@ const quoted = (value: unknown): string => {
     }
 
     if (typeof value === "string") {
-        return JSON.stringify(value.slice(0, MAX_RENDERED_VALUE_LENGTH));
+        return JSON.stringify(sliceUnits(value, MAX_RENDERED_VALUE_LENGTH));
     }
 
     const json = JSON.stringify(value);
@@ -137,14 +158,14 @@ const readNamed = (values: Readonly<Record<string, string>>, name: string): stri
  */
 export const renderWebhookPrompt = (template: string | undefined, input: WebhookInputs, frameId: string): string | undefined => {
     const tag = `webhook-data-${frameId}`;
-    const frame = `<${tag}>\n${input.body.slice(0, MAX_PAYLOAD_LENGTH)}\n</${tag}>`;
+    const frame = `<${tag}>\n${sliceUnits(input.body, MAX_PAYLOAD_LENGTH)}\n</${tag}>`;
 
     if (template === undefined || template.trim() === "") {
         return `${FRAME_LEAD}\n\n${frame}`;
     }
 
     try {
-        const json = parseJson(input.body);
+        const json = parseJson(input.jsonText ?? input.body);
         let framesBody = false;
         let prompt = "";
         let last = 0;
@@ -157,8 +178,14 @@ export const renderWebhookPrompt = (template: string | undefined, input: Webhook
             switch (root) {
                 case "body": {
                     if (segments.length > 0) {
-                        framesBody = true;
-                        expansion = quoted(lookupJson(json, segments));
+                        // A path that resolves places the body; a missing path, or a body that is not JSON, leaves the frame below.
+                        const value = lookupJson(json, segments);
+
+                        if (value !== undefined) {
+                            framesBody = true;
+                        }
+
+                        expansion = quoted(value);
                     }
 
                     break;

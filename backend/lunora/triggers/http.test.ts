@@ -191,8 +191,21 @@ describe("trigger webhook signing", () => {
         expect(args?.webhookPrompt.startsWith('Room "ops": "hi"')).toBe(true);
     });
 
+    it("renders a query parameter named __proto__ from the request URL", async () => {
+        const { post, scheduled } = await setup({ ...SIGNED_TRIGGER, inputTemplate: "Value {{query.__proto__}}" });
+        const body = "{}";
+
+        const response = await post(body, await signedHeaders(body), "?__proto__=ops");
+
+        expect(response.status).toBe(200);
+
+        const [args] = scheduled as { webhookPrompt: string }[];
+
+        expect(args?.webhookPrompt.startsWith('Value "ops"')).toBe(true);
+    });
+
     it("refuses a delivery that cannot be rendered, and its retry is refused the same way rather than taken as a duplicate", async () => {
-        // Three full-size frames are over the prompt limit whatever the body is, so the renderer refuses the delivery.
+        // Three frames of a full-size body are over the prompt limit, so the renderer refuses the delivery.
         const { post, scheduled } = await setup({ ...SIGNED_TRIGGER, inputTemplate: "{{payload}}".repeat(3) });
         const body = "y".repeat(10_000);
         const headers = await signedHeaders(body);
@@ -208,10 +221,13 @@ describe("trigger webhook signing", () => {
         const { post, scheduled } = await setup();
         // Every quote is escaped in the scheduled arguments, so this body is near 1.2 MiB there and under the 1 MiB body cap here.
         const body = '"'.repeat(600_000);
+        const headers = await signedHeaders(body);
 
-        const response = await post(body, await signedHeaders(body));
+        const response = await post(body, headers);
+        // The sender's retry is the same signed delivery: it must be refused again, not taken as a duplicate of the first.
+        const retry = await post(body, headers);
 
-        expect(response.status).toBe(413);
+        expect([response.status, retry.status]).toEqual([413, 413]);
         expect(scheduled).toHaveLength(0);
     });
 
