@@ -21722,12 +21722,12 @@ msgstr "開く"
 #: src/features/chat/thread/widgets/places-widget.tsx:165
 msgctxt "place opening hours"
 msgid "Open"
-msgstr ""
+msgstr "営業中"
 
 #: src/features/chat/thread/widgets/stock-widget.tsx:160
 msgctxt "stock opening price"
 msgid "Open"
-msgstr ""
+msgstr "始値"
 
 #: src/features/chat/thread/comparison-view.tsx:140
 msgid "Open {modelName} in full thread"
