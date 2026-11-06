@@ -60,10 +60,12 @@ const SetupChecklist: FC = () => {
         }
 
         try {
-            const stored = await (storedSettings.queryFn as (() => Promise<unknown>) | undefined)?.();
+            const stored = (await (storedSettings.queryFn as (() => Promise<unknown>) | undefined)?.()) as { setupStepsSkipped?: string[] } | null;
+            const cached = queryClient.getQueryData<{ setupStepsSkipped?: string[] } | null>(settingsKey);
 
             if (unsettledSaves.current === 0) {
-                queryClient.setQueryData(settingsKey, stored ?? null);
+                // Only the skip list is taken from the read: the cached row may hold other edits still on their way to the server.
+                queryClient.setQueryData(settingsKey, cached && stored ? { ...cached, setupStepsSkipped: stored.setupStepsSkipped } : (stored ?? null));
             }
         } catch {
             // Say so through the query's own error state, which has the retry.
