@@ -58,7 +58,7 @@ export const usePromptLinkDraft = ({
 
             if (otherDraftSource) {
                 applyLink = false;
-                showWarning(t`This chat already has a saved prompt. The prompt from the link was not added.`);
+                showWarning(t`This chat already has a prompt. The prompt from the link was not added.`);
             } else if (hasDraft) {
                 applyLink = false;
                 showWarning(t`Your draft is kept. The prompt from the link was not added.`);

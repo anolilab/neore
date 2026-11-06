@@ -117,7 +117,7 @@ describe("usePromptLinkDraft", () => {
         renderLink({ model: textModel?.id, otherDraftSource: true, prompt: "from the link" });
 
         expect(useChatUIStore.getState().composerText).toBe("");
-        expect(harness.showWarning).toHaveBeenCalledWith("This chat already has a saved prompt. The prompt from the link was not added.");
+        expect(harness.showWarning).toHaveBeenCalledWith("This chat already has a prompt. The prompt from the link was not added.");
         expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
         expect(harness.navigate).toHaveBeenCalledTimes(1);
     });

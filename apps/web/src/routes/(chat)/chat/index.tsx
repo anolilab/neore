@@ -21,6 +21,15 @@ import { useCRPC } from "@/lib/lunora/crpc";
 // that visit may resume: a later New chat (a new navigation) must open a blank chat.
 const resumeState: { consumed: boolean; firstKey: string | undefined } = { consumed: false, firstKey: undefined };
 
+/** Whether a landing message is waiting in the session. Read without consuming it; false where session storage is unavailable. */
+const landingMessageWaiting = (): boolean => {
+    try {
+        return Boolean(sessionStorage.getItem(LANDING_MESSAGE_KEY));
+    } catch {
+        return false;
+    }
+};
+
 const ChatPage = () => {
     const route = "/(chat)/chat/";
     const context = useRouteContext({ from: route });
@@ -54,7 +63,15 @@ const ChatPage = () => {
         linkModel === undefined &&
         resumeScopeReady;
 
-    usePromptLinkDraft({ model: linkModel, otherDraftSource: Boolean(promptId) || Boolean(hasInitialMessage), prompt: linkPrompt });
+    // The handoff owns the draft only when its message is really waiting. Read once, on mount, before the handoff effect below
+    // consumes it; a handoff URL with nothing in storage leaves a prompt link free to apply.
+    const [handoffWaiting] = useState(landingMessageWaiting);
+
+    usePromptLinkDraft({
+        model: linkModel,
+        otherDraftSource: Boolean(promptId) || (Boolean(hasInitialMessage) && handoffWaiting),
+        prompt: linkPrompt,
+    });
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.
         crpc.chat.resume.latestResumableThread.queryOptions(
