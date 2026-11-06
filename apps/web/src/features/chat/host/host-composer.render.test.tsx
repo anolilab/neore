@@ -409,6 +409,23 @@ describe("the options the agent offers", () => {
         expect(screen.queryByText(WAITING_STATUS)).toBeNull();
     });
 
+    it("reports a change the agent applied after the backend expired its call as answered late, not as refused", async () => {
+        const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+        await waitFor(() => expect(mutations()).toHaveLength(1));
+
+        client.setQueryData(["acp.functions.getHostSession", { threadId: "thread-1" }], {
+            _id: "session-1",
+            agentState: { configOptions: [{ ...MODEL, currentValue: "deep" }] },
+            optionResult: { callId: "call-1", optionId: "model", outcome: "refused", reason: "The host did not answer.", valueId: "deep" },
+            status: "idle",
+        });
+
+        expect(await screen.findByText("The agent answered late: Model is now Deep.")).toBeTruthy();
+    });
+
     it("names the option in its refusal, and while it waits, when the agent has removed the option since the change", async () => {
         const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;

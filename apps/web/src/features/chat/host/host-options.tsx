@@ -273,7 +273,9 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
         answered !== undefined &&
         changed !== undefined &&
         answered.outcome === "refused" &&
-        answered.reason === "the agent did not answer" &&
+        // A call the backend expired reads "The host did not answer."; the agent may still have applied the change after that.
+        // A call the backend expired reads "The host did not answer."; the agent may still have applied the change after that.
+        (answered.reason === "the agent did not answer" || answered.reason === "The host did not answer.") &&
         changed.current === answered.valueId
     ) {
         // The agent answered after the wait for it ended, and the option now shows the value it confirmed.
