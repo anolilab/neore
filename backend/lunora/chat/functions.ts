@@ -1723,15 +1723,30 @@ export const settleTitleWrite = async (
  * Releases a regenerate request's claim, retrying a failed release a few times. A release that still fails is logged and never thrown,
  * so it cannot replace the error of the run it follows: the claim then lapses after its TTL, and the log says so.
  */
-export const releaseRegenerateClaim = async (context: Pick<ActionContext, "log" | "runMutation">, threadId: string, claimedAt: number): Promise<void> => {
-    const released = await tryTimes(3, () =>
-        context.runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: threadId, scope: REGENERATE_TITLE_SCOPE }),
-    );
+export const releaseRegenerateClaim = async (
+    context: Pick<ActionContext, "log" | "runMutation" | "scheduler">,
+    threadId: string,
+    claimedAt: number,
+): Promise<void> => {
+    const release = { claimedAt, key: threadId, scope: REGENERATE_TITLE_SCOPE };
+    const released = await tryTimes(3, () => context.runMutation(internal.lib.claim_once.releaseKey, release));
 
-    if (!released) {
+    if (released) {
+        return;
+    }
+
+    // The immediate tries did not land, so the release runs again later, as a scheduled job rather than another call in this run. It does
+    // not wait for the claim's TTL, which is 15 minutes; if scheduling fails too, the claim does wait for its TTL, and the log says so.
+    try {
+        await context.scheduler.runAfter(REGENERATE_RELEASE_RETRY_MS, internal.lib.claim_once.releaseKey, release);
+        context.log.event("chat.regenerate_title", { skipped: "release-retry-scheduled" });
+    } catch {
         context.log.event("chat.regenerate_title", { skipped: "release-failed" });
     }
 };
+
+/** How long after a failed release the release runs again, as a scheduled job: far sooner than the claim's TTL. */
+const REGENERATE_RELEASE_RETRY_MS = 30 * 1000;
 
 /** How many times a title's post-answer eligibility read and write are tried before its charge is given back. */
 const TITLE_WRITE_ATTEMPTS = 3;

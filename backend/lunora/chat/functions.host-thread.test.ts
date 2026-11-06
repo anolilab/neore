@@ -662,6 +662,9 @@ describe("sending a title's prompt, and the errors around its give-back", () => 
 
                     return null;
                 },
+                scheduler: {
+                    runAfter: async () => null,
+                },
             } as never,
             events,
         };
@@ -691,12 +694,60 @@ describe("sending a title's prompt, and the errors around its give-back", () => 
         expect(events).toEqual([]);
     });
 
+    it("schedules a later release when the immediate ones never land, sooner than the claim's TTL", async () => {
+        const scheduled: { args: unknown; delay: number }[] = [];
+        const events: { fields: Record<string, unknown>; name: string }[] = [];
+        const context = {
+            log: {
+                event: (name: string, fields: Record<string, unknown>) => {
+                    events.push({ fields, name });
+                },
+            },
+            runMutation: async () => {
+                throw new Error("storage down");
+            },
+            scheduler: {
+                runAfter: async (delay: number, _reference: unknown, args: unknown) => {
+                    scheduled.push({ args, delay });
+                },
+            },
+        };
+
+        await releaseRegenerateClaim(context as never, "thread-s", 9);
+
+        expect(scheduled).toEqual([{ args: { claimedAt: 9, key: "thread-s", scope: "regenerate-title" }, delay: expect.any(Number) }]);
+        expect(scheduled[0]!.delay).toBeLessThan(15 * 60 * 1000);
+        expect(events).toEqual([expect.objectContaining({ fields: { skipped: "release-retry-scheduled" } })]);
+    });
+
+    it("logs a release that cannot be scheduled either, and does not throw", async () => {
+        const events: { fields: Record<string, unknown>; name: string }[] = [];
+        const context = {
+            log: {
+                event: (name: string, fields: Record<string, unknown>) => {
+                    events.push({ fields, name });
+                },
+            },
+            runMutation: async () => {
+                throw new Error("storage down");
+            },
+            scheduler: {
+                runAfter: async () => {
+                    throw new Error("scheduler down");
+                },
+            },
+        };
+
+        await expect(releaseRegenerateClaim(context as never, "thread-t", 9)).resolves.toBeUndefined();
+        expect(events).toEqual([expect.objectContaining({ fields: { skipped: "release-failed" } })]);
+    });
+
     it("retries a regenerate claim's release, and logs one that never lands without throwing", async () => {
         const failing = releasingContext(Infinity);
 
         await expect(releaseRegenerateClaim(failing.context as never, "thread-r", 5)).resolves.toBeUndefined();
         expect(failing.calls()).toBe(3);
-        expect(failing.events).toEqual([expect.objectContaining({ fields: { skipped: "release-failed" }, name: "chat.regenerate_title" })]);
+        expect(failing.events).toEqual([expect.objectContaining({ fields: { skipped: "release-retry-scheduled" }, name: "chat.regenerate_title" })]);
 
         const once = releasingContext(1);
 

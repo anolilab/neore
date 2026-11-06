@@ -56,14 +56,16 @@ describe("firstUserPromptText", () => {
 describe("reading a long structured prompt for a title", () => {
     it("stops reading its text parts once the title's limit is reached, instead of reading every part", () => {
         let reads = 0;
-        const parts = Array.from({ length: 10_000 }, () => {return {
-            get text() {
-                reads += 1;
+        const parts = Array.from({ length: 10_000 }, () => {
+            return {
+                get text() {
+                    reads += 1;
 
-                return "x".repeat(1000);
-            },
-            type: "text",
-        }});
+                    return "x".repeat(1000);
+                },
+                type: "text",
+            };
+        });
 
         const text = firstUserPromptText([{ message: { content: parts, role: "user" } }]);
 
