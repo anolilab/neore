@@ -14,6 +14,20 @@ export interface DerivedSections {
 
 type Candidate = Pick<BranchNode, "awaitingInput" | "isPinned" | "snoozedUntil" | "status">;
 
+type IdleCandidate = Pick<BranchNode, "awaitingInput" | "lastReplyAt" | "scheduled" | "snoozedUntil" | "status">;
+
+/**
+ * A finished thread that nothing will resume: its last turn replied and the run is over, nothing waits on the owner,
+ * no recurring task is bound to it, and it is not snoozed. Shown as a quiet marker, so nobody sends "continue" to find out.
+ * A failed last turn is not idle; the row shows it as failed.
+ */
+export const isIdleThread = (thread: IdleCandidate, now: number): boolean =>
+    thread.status === "active" &&
+    thread.lastReplyAt !== undefined &&
+    thread.awaitingInput === undefined &&
+    thread.scheduled !== true &&
+    !isSnoozed(thread.snoozedUntil, now);
+
 /**
  * Which derived section a thread belongs to, if any. A snooze beats everything (it is the owner's explicit
  * choice), then a pin keeps the thread where it is, then waiting for the owner beats running.

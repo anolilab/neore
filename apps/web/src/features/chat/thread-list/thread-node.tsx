@@ -301,6 +301,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const isFailed = node.status === "error" && needsYou === undefined;
     const isUnread = hasUnreadReply(node, { isOpen: isActive, isStreaming });
     const { snoozedUntil } = node;
+    // Finished and waiting on nothing (`isIdleThread`): a quiet marker, so nobody sends "continue" just to find out.
+    const isIdle = isRootThread && node.isIdle === true && !isStreaming && needsYou === undefined && !isFailed;
 
     // A thread that no longer waits forgets its blink window, so a later pause may blink again.
     useEffect(() => {
@@ -554,6 +556,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                     {linkedPullRequests}
                                 </span>
                             )}
+                            {isIdle && <span className="text-muted-foreground shrink-0 text-xs">{t`Idle`}</span>}
                         </span>
                     }
                 />

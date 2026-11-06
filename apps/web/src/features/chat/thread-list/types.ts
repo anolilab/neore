@@ -11,6 +11,8 @@ export interface BranchNode {
     createdAt: number;
     depth: number;
     expiresAt?: number; // Present if thread is temporary
+    /** Finished and waiting on nothing: shown with a quiet Idle marker, root threads only (`isIdleThread`). */
+    isIdle?: boolean;
     isPinned?: boolean;
     lastReplyAt?: number; // When the thread last got a reply (owned threads only)
     lastViewedAt?: number; // When its owner last opened it after a reply (owned threads only)
@@ -20,6 +22,8 @@ export interface BranchNode {
     projectId?: string; // Project ID if thread belongs to a project
     relevantMessages?: any[]; // Messages that matched the search query
     runner?: "host"; // Present on a chat that runs on a paired computer (its title is not generated in the cloud)
+    /** A recurring task is bound to this thread, so it is not idle. The list row does not carry it yet. */
+    scheduled?: boolean;
     snoozedUntil?: number; // Hidden from the main sections until then (owned threads only)
     source?: string; // "telegram" | "slack" | "discord" | undefined (web)
     statelessMode?: boolean; // Present if thread is in stateless mode
