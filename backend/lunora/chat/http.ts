@@ -843,7 +843,8 @@ const runChatStartOnShard = async (
     // (`chat/lib/start-title-jobs.ts`).
     const titleJobs: (() => Promise<unknown>)[] = [];
     const scheduleTitleJobs = (titleThreadId: string, isNewThread: boolean): void => {
-        const prompt = body.prompt ?? " ";
+        // A held note's title is read from the text that was saved (the note's own), not the prompt the client sent.
+        const prompt = guestNote ? stripHiddenText(guestNote.text).text : (body.prompt ?? " ");
 
         for (const job of startTitleJobs(contentType, isNewThread)) {
             const reference = job === "title" ? internal.chat.functions.createTitleChat : internal.chat.functions.createCategoryChat;

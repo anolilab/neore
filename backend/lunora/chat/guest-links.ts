@@ -31,7 +31,7 @@ import { authMutation, authQuery, publicAction, rateLimit } from "../lib/crpc";
 import { createRatelimit, getRateLimitKey, rateLimitGuard, shareLinkBucket } from "../lib/rate-limiter";
 import { noteShardActivity } from "../lib/shard-housekeeping";
 import { currentShard, ROOT_SHARD_KEY } from "../lib/shard-context";
-import { deleteShardRoute, setShardRoute, shardRouteOwner } from "../lib/shard-routes";
+import { setShardRoute, shardRouteOwner } from "../lib/shard-routes";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
@@ -76,7 +76,6 @@ const tooLong = (token: string): boolean => token.length === 0 || token.length >
 // The owner
 // ---------------------------------------------------------------------------
 
-/** Makes the thread's guest link (replacing any earlier one). The token comes back once; only its hash is kept. */
 /** Whether a note on any link of the thread is still waiting for the owner's review. */
 const hasWaitingNotes = async (context: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
     const links = await context.db
@@ -106,6 +105,7 @@ const hasWaitingNotes = async (context: MutationCtx, threadId: Id<"threads">): P
 /** The most links of a thread read when looking for waiting notes: a thread has one live link at a time. */
 const GUEST_LINK_SCAN = 10;
 
+/** Makes the thread's guest link (replacing any earlier one). The token comes back once; only its hash is kept. */
 export const createGuestLink = authMutation
     .use(rateLimit("sharing/create"))
     .input({ discardWaiting: v.optional(v.boolean()), threadId: v.id("threads") })
@@ -136,9 +136,8 @@ export const createGuestLink = authMutation
         await context.db.insert("threadGuestLinks", { createdAt: context.now, expiresAt, linkHash, threadId, userId });
         await setShardRoute(context, "guest-link", linkHash, userId);
 
-        for (const replacedHash of replacedHashes) {
-            await deleteShardRoute(context, "guest-link", replacedHash);
-        }
+        // Best-effort, as every other removal of a link: a failed route drop is logged, so the new link is not left half-made.
+        await dropGuestLinkRoutes(context, replacedHashes);
 
         // So housekeeping visits this shard after the link lapses, even when the owner is not seen again.
         await noteShardActivity(context, userId);
