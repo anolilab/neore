@@ -196,6 +196,20 @@ describe("a child that stopped on a request", () => {
         expect(row.completedAt).toBeUndefined();
     });
 
+    it("still waits when the run's request has expired by now: the reaper is scheduled at once, with no negative delay", async () => {
+        await run(async (context) => {
+            const [row] = await context.db.query("toolApprovalRuns").collect();
+
+            await context.db.patch("toolApprovalRuns", row._id, { createdAt: 1 });
+        });
+
+        expect(await run(async (context) => await markRunAwaiting(context, runId))).toBe(true);
+        expect(await runStatus()).toBe("awaiting");
+        const scheduled = await runRow();
+
+        expect(scheduled.reapAt).toBe(1 + PENDING_APPROVAL_TTL_MS);
+    });
+
     it("does not wait on an interactive request of the child's own chat, which is not the run's", async () => {
         await run(async (context) => {
             const [row] = await context.db.query("toolApprovalRuns").collect();

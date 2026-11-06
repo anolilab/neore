@@ -1442,7 +1442,8 @@ export const endApprovalWaitForMessage = internalMutation
 
 /** A reaper for `runId` that fires just past `reapAt`, the deadline it now owns. */
 const scheduleReaperAt = async (ctx: Pick<MutationCtx, "scheduler">, runId: Id<"subAgentRuns">, reapAt: number, now: number): Promise<void> => {
-    await ctx.scheduler.runAfter(reapAt - now + SUB_AGENT_REAP_SLACK_MS, internal.sub_agents.functions.reapRun, { runId });
+    // A deadline already past (an older request expired during a resumed turn) reaps at once: the scheduler takes no negative delay.
+    await ctx.scheduler.runAfter(Math.max(0, reapAt - now + SUB_AGENT_REAP_SLACK_MS), internal.sub_agents.functions.reapRun, { runId });
 };
 
 /**
