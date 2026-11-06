@@ -1295,7 +1295,8 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
         // paused on a request has no stream (its loop returned), and a stop here could end a reply sent meanwhile.
         const streaming = run.status === "running" && run.loopExitedAt === undefined;
 
-        if (outcome.kind === "cancelled" && !hostRun && streaming) {
+        // A run that ends without finishing (stopped, or failed by the reaper) must not keep its resumed stream running tools.
+        if (outcome.kind !== "succeeded" && !hostRun && streaming) {
             await ctx.scheduler.runAfter(0, internal.chat.streaming.persistent.library.stopActiveForThread, { threadId: run.childThreadId });
         }
     }
@@ -1457,7 +1458,9 @@ export const markRunAwaiting = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
         return false;
     }
 
-    const pending = await pendingApprovalRows(ctx, run.childThreadId);
+    // Only this run's own requests: an interactive request of the child's chat neither holds the run nor sets its deadline.
+    const open = await pendingApprovalRows(ctx, run.childThreadId);
+    const pending = open.filter((row) => row.config.subAgentRunId === run._id);
 
     if (pending.length === 0) {
         return false;

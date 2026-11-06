@@ -196,6 +196,33 @@ describe("a child that stopped on a request", () => {
         expect(row.completedAt).toBeUndefined();
     });
 
+    it("does not wait on an interactive request of the child's own chat, which is not the run's", async () => {
+        await run(async (context) => {
+            const [row] = await context.db.query("toolApprovalRuns").collect();
+
+            await context.db.patch("toolApprovalRuns", row._id, { resolvedAt: Date.now(), status: "approved" });
+            await context.db.insert("toolApprovalRuns", {
+                approvalId: "approval-chat",
+                config: {
+                    autoMediaEnrichment: false,
+                    mcpServerNames: [],
+                    model: "test-model",
+                    researchDepth: "balanced",
+                    searchMode: "web",
+                    shouldAutoContinue: true,
+                    toolNames: [],
+                },
+                createdAt: Date.now(),
+                status: "pending",
+                threadId: childId,
+                userId: OWNER,
+            });
+        });
+
+        expect(await run(async (context) => await markRunAwaiting(context, runId))).toBe(false);
+        expect(await runStatus()).toBe("running");
+    });
+
     it("does not wait once the request was answered from the child's own thread", async () => {
         await run(async (context) => {
             const [row] = await context.db.query("toolApprovalRuns").collect();
