@@ -9,6 +9,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 
+const REFS_PREFIX = /^refs:/u;
+
 // `lib/encryption` reads the key when it loads.
 const keyBytes = new Uint8Array(32);
 
@@ -377,5 +379,110 @@ describe("the Settings save and a stored header secret", () => {
             mcpServers: [{ enabled: true, headers: [{ key: "authorization", value: "typed-by-hand" }], name: "Files", protocol: "http", url: FILES_URL }],
         });
         expect(await secrets()).toHaveLength(0);
+    });
+});
+
+describe("answerSecretRequest on a card with several fields", () => {
+    const USERNAME = "svc-account-7731";
+    const SECOND_VALUE = "second-field-text";
+    const FIELDS = {
+        fields: [
+            { label: "Username", name: "username", use: { header: "X-User", kind: "mcp_header", server: "Files" } },
+            {
+                format: { minLength: 8, prefix: "second" },
+                label: "Password",
+                name: "password",
+                use: { header: "X-Pass", kind: "mcp_header", server: "Files" },
+            },
+        ],
+        label: "Files login",
+    };
+
+    const answerBoth = async (username: string, password: string) =>
+        await harness.withIdentity({ userId: OWNER } as never).mutation(
+            answerSecretRequest as never,
+            {
+                approvalId: "sec-2",
+                expectedUrl: FILES_URL,
+                more: [{ expectedUrl: FILES_URL, value: password }],
+                threadId,
+                value: username,
+            } as never,
+        );
+
+    beforeEach(async () => {
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("aiUserPreferences", {
+                    mcpServers: [{ enabled: true, name: "Files", protocol: "http", url: FILES_URL }],
+                    userId: OWNER,
+                }),
+        );
+        await insertRequest("sec-2", FIELDS, 2);
+    });
+
+    it("stores two secrets, each behind its own reference, and the transcript holds neither value", async () => {
+        await answerBoth(USERNAME, SECOND_VALUE);
+
+        const stored = (await rows("requestedSecrets")) as { encryptedValue: string; label: string; ref: string; use: { header: string } }[];
+
+        expect(stored).toHaveLength(2);
+        expect(stored.map((row) => row.label).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["Password", "Username"]);
+        expect(new Set(stored.map((row) => row.ref)).size).toBe(2);
+
+        const decrypted = await Promise.all(stored.map(async (row) => await decryptKey(row.encryptedValue, "provider-keys")));
+
+        expect(decrypted.toSorted((a, b) => a.localeCompare(b))).toStrictEqual([SECOND_VALUE, USERNAME].toSorted((a, b) => a.localeCompare(b)));
+
+        // The continuation gets the references, keyed by field name, and nothing else.
+        const refs = JSON.parse((queued[0]!.args as { answer: string }).answer.replace(REFS_PREFIX, "")) as Record<string, string>;
+
+        expect(Object.keys(refs).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["password", "username"]);
+        expect(new Set(Object.values(refs))).toStrictEqual(new Set(stored.map((row) => row.ref)));
+
+        for (const table of ["messages", "persistentChunks", "toolApprovalRuns", "threads"]) {
+            const text = JSON.stringify(await rows(table));
+
+            expect(text).not.toContain(USERNAME);
+            expect(text).not.toContain(SECOND_VALUE);
+        }
+
+        expect(JSON.stringify(queued)).not.toContain(USERNAME);
+        expect(JSON.stringify(queued)).not.toContain(SECOND_VALUE);
+    });
+
+    it("refuses a value that does not fit the declared format and stores nothing, not even the other field", async () => {
+        await expect(answerBoth(USERNAME, "other-field-text")).rejects.toMatchObject({
+            data: { code: "SECRET_FORMAT_INVALID", field: 1 },
+        });
+
+        expect(await rows("requestedSecrets")).toHaveLength(0);
+        expect(queued).toHaveLength(0);
+        expect(await runStatuses()).toContain("pending");
+    });
+
+    it("refuses an answer that leaves a field out", async () => {
+        await expect(
+            harness.withIdentity({ userId: OWNER } as never).mutation(
+                answerSecretRequest as never,
+                {
+                    approvalId: "sec-2",
+                    expectedUrl: FILES_URL,
+                    threadId,
+                    value: USERNAME,
+                } as never,
+            ),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        expect(await rows("requestedSecrets")).toHaveLength(0);
+    });
+
+    it("enforces a format declared on a single request too", async () => {
+        await insertRequest("sec-4", { format: { prefix: "sk-" }, label: "OpenAI API key", use: { kind: "provider_key", provider: "openai" } }, 4);
+
+        await expect(answer(OWNER, "not-a-key", "sec-4")).rejects.toMatchObject({ data: { code: "SECRET_FORMAT_INVALID", field: 0 } });
+        expect(await rows("requestedSecrets")).toHaveLength(0);
+
+        await answer(OWNER, "sk-fine", "sec-4");
+        expect(await rows("requestedSecrets")).toHaveLength(1);
     });
 });

@@ -1224,6 +1224,10 @@ msgstr "{providerName} · your own API key"
 msgid "{providerName} · your own Bedrock account ({region})"
 msgstr "{providerName} · your own Bedrock account ({region})"
 
+#: src/features/chat/thread/request-secret-prompt.tsx
+msgid "{refusedLabel} does not have the format this request asks for, so nothing was saved. Enter it again."
+msgstr "{refusedLabel} does not have the format this request asks for, so nothing was saved. Enter it again."
+
 #: src/features/settings/components/chat/usage-settings.tsx:391
 #: src/routes/admin/gateway/index.tsx:67
 msgid "{requestCount} req"
@@ -1786,6 +1790,10 @@ msgstr "A unique webhook URL and secret will be generated when you create this t
 msgid "A usage alert was triggered"
 msgstr "A usage alert was triggered"
 
+#: src/features/chat/thread/request-secret-prompt.tsx:301
+msgid "A value does not have the format this request asks for, so nothing was saved. Check it and enter it again."
+msgstr "A value does not have the format this request asks for, so nothing was saved. Check it and enter it again."
+
 #: src/features/develop/components/watched-repositories.tsx:38
 msgid "A webhook only tells Neore to look again sooner. Polling keeps working without one."
 msgstr "A webhook only tells Neore to look again sooner. Polling keeps working without one."
@@ -2035,7 +2043,7 @@ msgstr "Add a member from your organization to <0>{0}</0>"
 msgid "Add a model..."
 msgstr "Add a model..."
 
-#: src/features/chat/thread/ask-user-questions.tsx:58
+#: src/features/chat/thread/ask-user-questions.tsx:64
 msgid "Add a note (optional)…"
 msgstr "Add a note (optional)…"
 
@@ -3092,7 +3100,7 @@ msgstr "Allow for 1 hour"
 msgid "Allow for today"
 msgstr "Allow for today"
 
-#: src/features/chat/host/host-composer.tsx:64
+#: src/features/chat/host/host-composer.tsx:67
 msgid "Allow once"
 msgstr "Allow once"
 
@@ -3845,6 +3853,10 @@ msgstr "At {0}"
 #: src/features/settings/components/chat/event-trigger-fields.tsx:312
 msgid "At least {EVENT_MIN_INTERVAL_MINUTES} minutes between checks."
 msgstr "At least {EVENT_MIN_INTERVAL_MINUTES} minutes between checks."
+
+#: src/features/chat/thread/request-secret-prompt.tsx:214
+msgid "At least {minLength} characters"
+msgstr "At least {minLength} characters"
 
 #: src/features/chat/thread/composer-length-notice.tsx:45
 msgid "Attach as file"
@@ -6198,7 +6210,7 @@ msgstr "Close translation"
 msgid "Closed"
 msgstr "Closed"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:240
+#: src/features/chat/thread/request-secret-prompt.tsx:331
 msgid "Closed — the conversation moved on. Ask again in the chat."
 msgstr "Closed — the conversation moved on. Ask again in the chat."
 
@@ -7323,7 +7335,7 @@ msgid "Context-aware generation"
 msgstr "Context-aware generation"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
-#: src/features/chat/host/host-composer.tsx:186
+#: src/features/chat/host/host-composer.tsx:213
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "Continue"
@@ -7332,7 +7344,7 @@ msgstr "Continue"
 msgid "Continue interrupted replies"
 msgstr "Continue interrupted replies"
 
-#: src/features/chat/host/host-composer.tsx:180
+#: src/features/chat/host/host-composer.tsx:207
 msgid "Continue where you left off."
 msgstr "Continue where you left off."
 
@@ -7731,7 +7743,7 @@ msgstr "Could not add this to the thread. Try again."
 msgid "Could not answer the question. Try again."
 msgstr "Could not answer the question. Try again."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:215
+#: src/features/chat/thread/request-secret-prompt.tsx:306
 msgid "Could not answer. Please try again."
 msgstr "Could not answer. Please try again."
 
@@ -8027,7 +8039,7 @@ msgstr "Could not save this. Try again."
 msgid "Could not send the message."
 msgstr "Could not send the message."
 
-#: src/features/chat/host/host-composer.tsx:138
+#: src/features/chat/host/host-composer.tsx:165
 msgid "Could not send your answer."
 msgstr "Could not send your answer."
 
@@ -8875,12 +8887,12 @@ msgstr "Debates for {0} rounds."
 msgid "Debug an error or review my code..."
 msgstr "Debug an error or review my code..."
 
-#: src/features/chat/host/host-composer.tsx:69
-#: src/features/chat/thread/request-secret-prompt.tsx:335
+#: src/features/chat/host/host-composer.tsx:72
+#: src/features/chat/thread/request-secret-prompt.tsx:485
 msgid "Decline"
 msgstr "Decline"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:234
+#: src/features/chat/thread/request-secret-prompt.tsx:325
 msgid "Declined — continuing without it"
 msgstr "Declined — continuing without it"
 
@@ -15173,9 +15185,17 @@ msgstr "Help the AI understand you better by sharing some information about your
 msgid "Here they are: planning, budget and next steps."
 msgstr "Here they are: planning, budget and next steps."
 
+#: src/features/chat/host/host-composer.tsx:245
+msgid "Hidden characters were removed from your message."
+msgstr "Hidden characters were removed from your message."
+
 #: src/features/settings/components/chat/model-filter-settings.tsx:278
 msgid "Hidden in Model Picker"
 msgstr "Hidden in Model Picker"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:425
+msgid "Hide {fieldLabel}"
+msgstr "Hide {fieldLabel}"
 
 #: src/components/model-picker/model-picker.tsx:1163
 msgid "Hide {name} from model picker"
@@ -16071,7 +16091,7 @@ msgid "in {0, plural, one {# file} other {# files}}"
 msgstr "in {0, plural, one {# file} other {# files}}"
 
 #. placeholder {0}: request.folder
-#: src/features/chat/host/host-composer.tsx:55
+#: src/features/chat/host/host-composer.tsx:58
 msgid "In {0}"
 msgstr "In {0}"
 
@@ -16639,7 +16659,7 @@ msgstr "It may have expired, been revoked, or already been used. Ask for a new l
 msgid "It opened a different session than its own, so the conversation was handed over"
 msgstr "It opened a different session than its own, so the conversation was handed over"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:215
+#: src/features/chat/thread/request-secret-prompt.tsx:306
 msgid "It was not saved. Paste it again and save."
 msgstr "It was not saved. Paste it again and save."
 
@@ -17944,7 +17964,7 @@ msgstr "Loading..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:320
 #: src/features/chat/thread/memory-usage-action.tsx:46
-#: src/features/chat/thread/request-secret-prompt.tsx:314
+#: src/features/chat/thread/request-secret-prompt.tsx:469
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
@@ -18824,7 +18844,7 @@ msgstr "Message input"
 msgid "Message selection"
 msgstr "Message selection"
 
-#: src/features/chat/host/host-composer.tsx:198
+#: src/features/chat/host/host-composer.tsx:260
 msgid "Message the agent on your computer"
 msgstr "Message the agent on your computer"
 
@@ -18836,7 +18856,7 @@ msgstr "Message the worker"
 msgid "Message the worker..."
 msgstr "Message the worker..."
 
-#: src/features/chat/host/host-composer.tsx:192
+#: src/features/chat/host/host-composer.tsx:221
 msgid "Message to the coding agent"
 msgstr "Message to the coding agent"
 
@@ -19435,7 +19455,7 @@ msgstr "More steps = higher quality, longer generation"
 msgid "More than a proxy — an intelligent layer between your app and every LLM provider."
 msgstr "More than a proxy — an intelligent layer between your app and every LLM provider."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:149
+#: src/features/chat/thread/request-secret-prompt.tsx:185
 msgid "More than one of your MCP servers is named {serverName}. Rename one in Settings first, or decline."
 msgstr "More than one of your MCP servers is named {serverName}. Rename one in Settings first, or decline."
 
@@ -21198,7 +21218,7 @@ msgid "Note for the next run (optional)"
 msgstr "Note for the next run (optional)"
 
 #. placeholder {0}: entry.question
-#: src/features/chat/thread/ask-user-questions.tsx:54
+#: src/features/chat/thread/ask-user-questions.tsx:60
 msgid "Note for: {0}"
 msgstr "Note for: {0}"
 
@@ -22921,7 +22941,7 @@ msgstr "Paste image URL"
 msgid "Paste image URL..."
 msgstr "Paste image URL..."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:292
+#: src/features/chat/thread/request-secret-prompt.tsx:418
 msgid "Paste it here — it is not shown in the chat"
 msgstr "Paste it here — it is not shown in the chat"
 
@@ -23057,7 +23077,7 @@ msgstr "Permanently delete your account and all associated data"
 msgid "Permission Level"
 msgstr "Permission Level"
 
-#: src/features/chat/host/host-composer.tsx:151
+#: src/features/chat/host/host-composer.tsx:178
 msgid "Permission requests from the agent"
 msgstr "Permission requests from the agent"
 
@@ -23608,7 +23628,7 @@ msgstr "Premium-tier reasoning transparency"
 msgid "Preparing a question…"
 msgstr "Preparing a question…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:242
+#: src/features/chat/thread/request-secret-prompt.tsx:333
 msgid "Preparing a request…"
 msgstr "Preparing a request…"
 
@@ -26002,7 +26022,7 @@ msgid "retry"
 msgstr "retry"
 
 #: src/features/chat/thread/chat-error.tsx:56
-#: src/features/chat/thread/request-secret-prompt.tsx:311
+#: src/features/chat/thread/request-secret-prompt.tsx:466
 #: src/features/chat/translation/message-translation.tsx:88
 #: src/features/devices/components/devices-settings.tsx:140
 #: src/features/local-models/components/ollama-model-manager.tsx:188
@@ -26538,7 +26558,7 @@ msgstr "Saudi Arabia"
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:165
-#: src/features/chat/thread/request-secret-prompt.tsx:331
+#: src/features/chat/thread/request-secret-prompt.tsx:481
 #: src/features/develop/components/draft-comment-card.tsx:43
 #: src/features/knowledge/components/collection-dialog.tsx:100
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -26645,11 +26665,15 @@ msgstr "Save workflow"
 msgid "Saved"
 msgstr "Saved"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:238
+#: src/features/chat/thread/request-secret-prompt.tsx:329
 msgid "Saved — continuing"
 msgstr "Saved — continuing"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:236
+#: src/features/chat/thread/request-secret-prompt.tsx:327
+msgid "Saved — the assistant can use each once, in this reply"
+msgstr "Saved — the assistant can use each once, in this reply"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:327
 msgid "Saved — the assistant can use it once, in this reply"
 msgstr "Saved — the assistant can use it once, in this reply"
 
@@ -27070,7 +27094,8 @@ msgstr "seat/mo"
 msgid "secret"
 msgstr "secret"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:277
+#: src/features/chat/thread/request-secret-prompt.tsx:372
+#: src/features/chat/thread/request-secret-prompt.tsx:388
 #: src/features/develop/components/watched-repositories.tsx:33
 msgid "Secret"
 msgstr "Secret"
@@ -27363,7 +27388,7 @@ msgstr "Semi-realistic model with good prompt adherence"
 msgid "Semi-realistic visual style"
 msgstr "Semi-realistic visual style"
 
-#: src/features/chat/host/host-composer.tsx:214
+#: src/features/chat/host/host-composer.tsx:276
 #: src/features/sub-agents/components/worker-composer.tsx:104
 msgid "Send"
 msgstr "Send"
@@ -27584,12 +27609,11 @@ msgstr "Sessions Revoked"
 msgid "Set a password for your account"
 msgstr "Set a password for your account"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:154
-#: src/features/chat/thread/request-secret-prompt.tsx:171
+#: src/features/chat/thread/request-secret-prompt.tsx:196
 msgid "Set as the {header} header on your {serverName} MCP server"
 msgstr "Set as the {header} header on your {serverName} MCP server"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:161
+#: src/features/chat/thread/request-secret-prompt.tsx:190
 msgid "Set as the {header} header on your {serverName} MCP server ({address})"
 msgstr "Set as the {header} header on your {serverName} MCP server ({address})"
 
@@ -27785,6 +27809,10 @@ msgstr "Short text"
 #: src/features/settings/lib/settings-keywords.ts:45
 msgid "shortcut"
 msgstr "shortcut"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:425
+msgid "Show {fieldLabel}"
+msgstr "Show {fieldLabel}"
 
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:63
 msgid "Show {hidden} more lines"
@@ -29072,7 +29100,7 @@ msgstr "Starting import..."
 msgid "Starting test drive…"
 msgstr "Starting test drive…"
 
-#: src/features/chat/host/host-composer.tsx:166
+#: src/features/chat/host/host-composer.tsx:193
 msgid "Starting the agent on your computer. A message you send now goes out once it is up."
 msgstr "Starting the agent on your computer. A message you send now goes out once it is up."
 
@@ -29091,6 +29119,14 @@ msgstr "Starting…"
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:97
 msgid "starts with"
 msgstr "starts with"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:211
+msgid "Starts with {prefix}"
+msgstr "Starts with {prefix}"
+
+#: src/features/chat/thread/request-secret-prompt.tsx:207
+msgid "Starts with {prefix}, at least {minLength} characters"
+msgstr "Starts with {prefix}, at least {minLength} characters"
 
 #: src/features/marketing/data/models-data.ts:1114
 msgid "State-of-the-art code generation quality"
@@ -29184,7 +29220,7 @@ msgstr "Stocks"
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/chat/host/host-composer.tsx:203
+#: src/features/chat/host/host-composer.tsx:265
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:316
@@ -30624,7 +30660,7 @@ msgstr "That message is too long to send from here."
 msgid "That passcode is not right."
 msgstr "That passcode is not right."
 
-#: src/features/chat/host/host-composer.tsx:141
+#: src/features/chat/host/host-composer.tsx:168
 msgid "That request is no longer waiting."
 msgstr "That request is no longer waiting."
 
@@ -30709,7 +30745,7 @@ msgstr "The assistant has a question"
 msgid "The assistant is asking for a secret"
 msgstr "The assistant is asking for a secret"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:259
+#: src/features/chat/thread/request-secret-prompt.tsx:350
 msgid "The assistant needs a secret"
 msgstr "The assistant needs a secret"
 
@@ -30961,7 +30997,7 @@ msgstr "The last deletion request failed. You can request it again."
 msgid "the last time"
 msgstr "the last time"
 
-#: src/features/chat/host/host-composer.tsx:176
+#: src/features/chat/host/host-composer.tsx:203
 msgid "The last turn stopped before it finished."
 msgstr "The last turn stopped before it finished."
 
@@ -31504,6 +31540,10 @@ msgstr "This CSV file appears to be empty or invalid."
 msgid "This diff is cut short."
 msgstr "This diff is cut short."
 
+#: src/features/chat/thread/request-secret-prompt.tsx:221
+msgid "This does not look right: it must start with {prefix}."
+msgstr "This does not look right: it must start with {prefix}."
+
 #: src/features/local-models/components/ollama-model-manager.tsx:177
 msgid "This endpoint is not Ollama. Model management is available for Ollama only — in LM Studio, download models in the app."
 msgstr "This endpoint is not Ollama. Model management is available for Ollama only — in LM Studio, download models in the app."
@@ -31587,9 +31627,18 @@ msgstr "This is already in the thread."
 msgid "This is how your organization appears to members"
 msgstr "This is how your organization appears to members"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:325
+#. placeholder {0}: valueMaxOf(field)
+#: src/features/chat/thread/request-secret-prompt.tsx:395
+#~ msgid "This is too long: up to {0} characters."
+#~ msgstr "This is too long: up to {0} characters."
+
+#: src/features/chat/thread/request-secret-prompt.tsx:437
 msgid "This is too long: up to {valueMax} characters."
 msgstr "This is too long: up to {valueMax} characters."
+
+#: src/features/chat/thread/request-secret-prompt.tsx:227
+msgid "This is too short: at least {minLength} characters."
+msgstr "This is too short: at least {minLength} characters."
 
 #: src/features/auth/components/organization/organization-slug-card.tsx:109
 #: src/features/auth/components/organization/organization-slug-card.tsx:159
@@ -31723,7 +31772,7 @@ msgstr "This removes the model files from your computer. You can pull it again l
 msgid "This repository was not found."
 msgstr "This repository was not found."
 
-#: src/features/chat/host/host-composer.tsx:58
+#: src/features/chat/host/host-composer.tsx:61
 msgid "This request was too long to show whole. You can decline it here; to allow it, answer on your computer."
 msgstr "This request was too long to show whole. You can decline it here; to allow it, answer on your computer."
 
@@ -31747,7 +31796,7 @@ msgstr "This selection is too large to import at once. Import fewer files at a t
 msgid "This server requires sign-in. Save it, then choose Sign in."
 msgstr "This server requires sign-in. Save it, then choose Sign in."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:209
+#: src/features/chat/thread/request-secret-prompt.tsx:294
 msgid "This server's address changed. Check the address below and save again."
 msgstr "This server's address changed. Check the address below and save again."
 
@@ -31755,7 +31804,7 @@ msgstr "This server's address changed. Check the address below and save again."
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
 msgstr "This server's registry entry asks for the values below. They fill in the URL and headers."
 
-#: src/features/chat/host/host-composer.tsx:171
+#: src/features/chat/host/host-composer.tsx:198
 #: src/features/chat/host/host-send-errors.ts:19
 msgid "This session has ended. Start a new one from the desktop app."
 msgstr "This session has ended. Start a new one from the desktop app."
@@ -32754,7 +32803,7 @@ msgid "Type to search"
 msgstr "Type to search"
 
 #: src/features/chat/thread/ask-user-prompt.tsx:270
-#: src/features/chat/thread/ask-user-questions.tsx:58
+#: src/features/chat/thread/ask-user-questions.tsx:64
 msgid "Type your answer…"
 msgstr "Type your answer…"
 
@@ -34500,7 +34549,7 @@ msgstr "Waiting for output…"
 msgid "Waiting for the agent…"
 msgstr "Waiting for the agent…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:244
+#: src/features/chat/thread/request-secret-prompt.tsx:335
 msgid "Waiting for the owner"
 msgstr "Waiting for the owner"
 
@@ -34519,7 +34568,7 @@ msgstr "Waiting for the owner to approve"
 msgid "Waiting for uploads to complete…"
 msgstr "Waiting for uploads to complete…"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:244
+#: src/features/chat/thread/request-secret-prompt.tsx:335
 msgid "Waiting for you"
 msgstr "Waiting for you"
 
@@ -34956,7 +35005,7 @@ msgstr "Widely trusted for production workloads"
 msgid "Width"
 msgstr "Width"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:143
+#: src/features/chat/thread/request-secret-prompt.tsx:174
 msgid "Will be saved as your {provider} API key"
 msgstr "Will be saved as your {provider} API key"
 
@@ -35345,7 +35394,7 @@ msgstr "You have no indexed knowledge files yet."
 msgid "You have no projects yet."
 msgstr "You have no projects yet."
 
-#: src/features/chat/thread/request-secret-prompt.tsx:166
+#: src/features/chat/thread/request-secret-prompt.tsx:193
 msgid "You have no saved MCP server named {serverName}. Add it in Settings first, or decline."
 msgstr "You have no saved MCP server named {serverName}. Add it in Settings first, or decline."
 
@@ -35480,7 +35529,7 @@ msgid "Your answer in Neore has finished."
 msgstr "Your answer in Neore has finished."
 
 #: src/features/chat/thread/ask-user-prompt.tsx:223
-#: src/features/chat/thread/ask-user-questions.tsx:78
+#: src/features/chat/thread/ask-user-questions.tsx:85
 msgid "Your answer:"
 msgstr "Your answer:"
 
@@ -35678,7 +35727,7 @@ msgstr "Your review is kept."
 msgid "Your review was requested"
 msgstr "Your review was requested"
 
-#: src/features/chat/thread/request-secret-prompt.tsx:301
+#: src/features/chat/thread/request-secret-prompt.tsx:456
 msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."
 msgstr "Your saved MCP servers could not be loaded, so this cannot be saved yet."
 
