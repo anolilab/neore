@@ -533,6 +533,7 @@ for a schema table that is neither policed nor listed:
 | `projects_functions.moveThreadToProject` | mutation | authMutation + RL | projects, threads | row.userId == caller | ok |
 | `projects_functions.pinProject` | mutation | authMutation + RL | projects | row.userId == caller | ok |
 | `projects_functions.unpinProject` | mutation | authMutation + RL | projects | row.userId == caller | ok |
+| `projects_functions.setProjectRepositories` | mutation | authMutation + RL | projects | row.userId == caller (owner only; `getProject` hides other users' projects, so a stranger gets NOT_FOUND) | ok — new; at most 20 entries, URLs and branches checked by `parseRepoUrl`/`isValidBranchName` |
 | `projects_functions.updateProject` | mutation | authMutation + RL | projects | org membership/role; row.userId == caller | **fixed** (medium) — patch.organizationId must be the active org |
 | `projects_functions.updateProjectOrder` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `prompts_functions.applyThreadVariablesToPrompt` | query | authQuery | prompts, threads | row.userId == caller | **fixed** (medium) — only the caller's own variables row |

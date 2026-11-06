@@ -2005,6 +2005,18 @@ export const schema = defineSchema({
         pinnedAt: v.optional(v.number()),
         projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
         publicAccessToken: v.optional(v.string()),
+        // The repositories a coding-agent run in this project picks from (`projects/repositories.ts`);
+        // `url` in `parseRepoUrl` clone form, one entry `isDefault`.
+        repositories: v.optional(
+            v.array(
+                v.object({
+                    defaultBranch: v.optional(v.string()),
+                    id: v.string(),
+                    isDefault: v.optional(v.boolean()),
+                    url: v.string(),
+                }),
+            ),
+        ),
         title: v.string(),
         updatedAt: v.optional(v.number()),
         userId: v.optional(v.string()),

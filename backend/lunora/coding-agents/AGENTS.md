@@ -19,3 +19,9 @@
   `-p` executes the repo's `.claude/settings.json` hooks and `.mcp.json`
   servers. CLI flags are cited in `buildAgentCommand`; re-check them when
   bumping `npmVersion`. E2B itself is unit-tested against a fake only.
+- **Project repositories** — a project lists the repositories its runs pick
+  from (`projects.repositories`, normalised by `projects/repositories.ts`):
+  `url` is `parseRepoUrl(..).cloneUrl`, so it compares equal to a run's
+  `repoUrl`; one entry is `isDefault`. The task form's run picker
+  (`project-repo-picker.tsx`) offers them and preselects the default with its
+  `defaultBranch`. A run still targets one repository.

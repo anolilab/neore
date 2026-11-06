@@ -19962,6 +19962,44 @@
           "optional": true,
           "unique": false
         },
+        "repositories": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "defaultBranch": {
+                "kind": "string",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
+              "id": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "isDefault": {
+                "kind": "boolean",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
+              "url": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            }
+          }
+        },
         "title": {
           "kind": "string",
           "nullable": false,
