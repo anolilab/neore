@@ -1,6 +1,8 @@
 {
   "jurisdiction": "eu",
-  "migrationIds": [],
+  "migrationIds": [
+    "add-headless-approved"
+  ],
   "tables": {
     "account": {
       "commitOrdered": false,
@@ -26438,6 +26440,18 @@
                   "optional": false,
                   "unique": false
                 }
+              }
+            },
+            "headlessApproved": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
               }
             },
             "instructions": {
