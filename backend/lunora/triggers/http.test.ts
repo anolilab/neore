@@ -191,6 +191,19 @@ describe("trigger webhook signing", () => {
         expect(args?.webhookPrompt.startsWith('Room "ops": "hi"')).toBe(true);
     });
 
+    it("renders a query parameter named __proto__ from the request URL", async () => {
+        const { post, scheduled } = await setup({ ...SIGNED_TRIGGER, inputTemplate: "Value {{query.__proto__}}" });
+        const body = "{}";
+
+        const response = await post(body, await signedHeaders(body), "?__proto__=ops");
+
+        expect(response.status).toBe(200);
+
+        const [args] = scheduled as { webhookPrompt: string }[];
+
+        expect(args?.webhookPrompt.startsWith('Value "ops"')).toBe(true);
+    });
+
     it("refuses a delivery that cannot be rendered, and its retry is refused the same way rather than taken as a duplicate", async () => {
         // Three frames of a full-size body are over the prompt limit, so the renderer refuses the delivery.
         const { post, scheduled } = await setup({ ...SIGNED_TRIGGER, inputTemplate: "{{payload}}".repeat(3) });

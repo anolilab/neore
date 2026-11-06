@@ -951,11 +951,8 @@ export const testRunTrigger = authAction
         }
 
         const wasEnabled = trigger.enabled === true;
-        // A schedule's or a watcher's input is its template, so only a payload the user typed overrides it (`executeTrigger`).
-        // A webhook's template is its prompt, not a body: a test run without a typed payload renders it with an empty body.
-        const payload = ["event", "schedule", "webhook"].includes(trigger.type)
-            ? args.testPayload
-            : args.testPayload || trigger.inputTemplate || "Manual test run triggered.";
+        // Every trigger type takes only a payload the user typed: without one, `executeTrigger` builds the input from the template.
+        const payload = args.testPayload;
 
         // The run reads the trigger only when it starts, after this action has returned, so it is told to run a disabled one.
         // `manual`: a quiet routine posts a run the user asked for, whatever the workspace holds.

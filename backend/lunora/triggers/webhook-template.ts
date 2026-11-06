@@ -157,8 +157,14 @@ export const renderWebhookPrompt = (template: string | undefined, input: Webhook
             switch (root) {
                 case "body": {
                     if (segments.length > 0) {
-                        framesBody = true;
-                        expansion = quoted(lookupJson(json, segments));
+                        // A path that resolves places the body; a missing path, or a body that is not JSON, leaves the frame below.
+                        const value = lookupJson(json, segments);
+
+                        if (value !== undefined) {
+                            framesBody = true;
+                        }
+
+                        expansion = quoted(value);
                     }
 
                     break;

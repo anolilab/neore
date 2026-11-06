@@ -154,6 +154,15 @@ describe("renderWebhookPrompt", () => {
         expect(renderWebhookPrompt("{{body.a}}|{{payload}}", { body: "not json", headers: {}, query: {} }, FRAME)).toBe(`""|<${TAG}>\nnot json\n</${TAG}>`);
     });
 
+    it("appends the framed body when a body path does not resolve, so the delivery still reaches the agent", () => {
+        expect(renderWebhookPrompt("Summarise {{body.missing}}", { body: '{"x":1}', headers: {}, query: {} }, FRAME)).toBe(
+            `Summarise ""\n\n${LEAD}\n\n<${TAG}>\n{"x":1}\n</${TAG}>`,
+        );
+        expect(renderWebhookPrompt("Summarise {{body.a}}", { body: "not json", headers: {}, query: {} }, FRAME)).toBe(
+            `Summarise ""\n\n${LEAD}\n\n<${TAG}>\nnot json\n</${TAG}>`,
+        );
+    });
+
     it("appends the framed body when the template places neither the body nor a body value", () => {
         const body = '{"x":1}';
 
