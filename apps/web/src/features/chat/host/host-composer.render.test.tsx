@@ -4,7 +4,7 @@
  */
 
 import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => {
@@ -92,6 +92,9 @@ const { default: HostComposer } = await import("./host-composer");
 const ALWAYS = /always/iu;
 const CUT = /too long to show whole/u;
 const STILL_SHOWS_FAST = /The agent confirmed Deep, but Model still shows Fast/u;
+/** The page's catch-up wait for a confirmed value to show, in `host-options.tsx` (`CATCH_UP_MS`). */
+const CATCH_UP_MS = 15_000;
+const WAITING_FOR_CATCH_UP = /Waiting for Model to show Deep/u;
 
 const OPTIONS = [
     { kind: "allow_once", name: "Allow", optionId: "r1-allow" },
@@ -108,13 +111,34 @@ const mount = (data: Record<string, unknown>) => {
     );
 };
 
-// The text is on screen for the person: it is in the document, and no ancestor hides it with `hidden` or `aria-hidden`. jsdom does not
-// apply the stylesheet, so a class that hides it is not seen here.
+// The text is on screen for the person: it is in the document, no ancestor hides it with `hidden` or `aria-hidden`, and neither the text
+// nor an ancestor is hidden by a style (`display: none`, `visibility: hidden` or zero opacity) jsdom computes. A class from a stylesheet
+// the tests do not load is not seen here.
+/** Whether jsdom computes the element to be hidden: `display: none`, `visibility: hidden` or an opacity of zero. */
+const isHiddenByStyle = (element: HTMLElement): boolean => {
+    const style = globalThis.getComputedStyle(element);
+
+    return style.display === "none" || style.visibility === "hidden" || (style.opacity !== "" && Number(style.opacity) === 0);
+};
+
+/** The element and its ancestors, nearest first: the chain a hidden ancestor is found on. */
+const chainOf = (element: HTMLElement): HTMLElement[] => {
+    const chain: HTMLElement[] = [];
+
+    // eslint-disable-next-line testing-library/no-node-access -- walks the ancestor chain for the computed style, which no query does
+    for (let node: HTMLElement | null = element; node !== null; node = node.parentElement) {
+        chain.push(node);
+    }
+
+    return chain;
+};
+
 const expectShown = (element: HTMLElement) => {
     expect(element.isConnected).toBe(true);
     // The ancestor check needs the node itself: no query finds a hidden ancestor.
     // eslint-disable-next-line testing-library/no-node-access -- checks the hiding attributes of the ancestors, which no query does
     expect(element.closest("[hidden], [aria-hidden='true']")).toBeNull();
+    expect(chainOf(element).find((node) => isHiddenByStyle(node))).toBeUndefined();
 };
 
 const session = (fields: Record<string, unknown> = {}) => {
@@ -552,6 +576,41 @@ describe("the agent's slash commands", () => {
     });
 });
 
+describe("what counts as shown on screen", () => {
+    it.each([
+        ["an ancestor with display none", { display: "none" }],
+        ["an ancestor with visibility hidden", { visibility: "hidden" }],
+        ["an ancestor with zero opacity", { opacity: "0" }],
+    ])("does not count a message inside %s as shown", (_name, style) => {
+        const hidden = document.createElement("div");
+        const message = document.createElement("span");
+
+        Object.assign(hidden.style, style);
+        message.textContent = "The agent confirmed: Model is now Deep.";
+        hidden.appendChild(message);
+        document.body.appendChild(hidden);
+
+        try {
+            expect(() => expectShown(message)).toThrow();
+        } finally {
+            hidden.remove();
+        }
+    });
+
+    it("counts a message shown in the document as shown", () => {
+        const message = document.createElement("span");
+
+        message.textContent = "Shown";
+        document.body.appendChild(message);
+
+        try {
+            expect(() => expectShown(message)).not.toThrow();
+        } finally {
+            message.remove();
+        }
+    });
+});
+
 const WAITING_STATUS = /^Waiting/u;
 
 describe("the options the agent offers", () => {
@@ -848,21 +907,37 @@ describe("the options the agent offers", () => {
         fireEvent.change(model, { target: { value: "deep" } });
         await waitFor(() => expect(model.disabled).toBe(true));
 
-        // The agent confirmed the value, but the options it reports keep the old one past the page's wait.
-        harness.data = {
-            ...harness.data,
-            "acp.functions.getHostSession": {
-                agentState: { configOptions: [MODEL] },
-                optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
-                status: "idle",
-            },
-        };
-        await client.invalidateQueries();
+        // The page's wait for the value to show is a timer of CATCH_UP_MS: the clock is driven past it, not waited out.
+        vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ["setTimeout", "clearTimeout"] });
 
-        expectShown(await screen.findByText(STILL_SHOWS_FAST, undefined, { timeout: 25_000 }));
+        try {
+            // The agent confirmed the value, but the options it reports keep the old one past the page's wait.
+            harness.data = {
+                ...harness.data,
+                "acp.functions.getHostSession": {
+                    agentState: { configOptions: [MODEL] },
+                    optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+                    status: "idle",
+                },
+            };
+            await client.invalidateQueries();
+            expectShown(await screen.findByText(WAITING_FOR_CATCH_UP));
+
+            // Flush the effect that starts the wait, then drive the clock past it.
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(0);
+            });
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(CATCH_UP_MS);
+            });
+        } finally {
+            vi.useRealTimers();
+        }
+
+        expectShown(await screen.findByText(STILL_SHOWS_FAST));
         expect(screen.queryByText("The agent confirmed: Model is now Deep.")).toBeNull();
         expect(model.disabled).toBe(false);
-    }, 40_000);
+    });
 
     it("says why the agent refused, and leaves the value as it was", async () => {
         const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
