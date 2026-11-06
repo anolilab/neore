@@ -8,6 +8,8 @@ import { describe, expect, it, vi } from "vitest";
 import { buildAgentTools } from "./agent-tools";
 import getAgent from "./get-agent";
 import { resumeApprovedRun } from "./agent-run";
+import { createAnsweredAskUserTool } from "../tools/ask-user";
+import { createAnsweredRequestSecretTool } from "../tools/request-secret";
 
 // The rebuilt tools and the agent are not what this checks: the run stops at the approval lookup.
 vi.mock("./get-agent", () => {
@@ -17,6 +19,21 @@ vi.mock("./agent-tools", () => {
     return {
         buildAgentTools: vi.fn(async () => {
             return { mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
+        }),
+    };
+});
+
+vi.mock("../tools/ask-user", () => {
+    return {
+        createAnsweredAskUserTool: vi.fn(() => {
+            return {};
+        }),
+    };
+});
+vi.mock("../tools/request-secret", () => {
+    return {
+        createAnsweredRequestSecretTool: vi.fn(() => {
+            return {};
         }),
     };
 });
@@ -52,6 +69,45 @@ describe(resumeApprovedRun, () => {
         const [, args] = vi.mocked(buildAgentTools).mock.calls[0] as unknown as [unknown, Record<string, unknown>];
 
         expect(args).not.toHaveProperty("admittedRun");
+    });
+});
+
+describe("an answer whose tool left the rebuilt set", () => {
+    /** Resumes an approved `toolName` against an empty rebuilt set, which is what an `off` cap gives. */
+    const resumeAnswered = async (toolName: string, extra: Record<string, unknown>) => {
+        const resumeCtx = {
+            runQuery: vi.fn(async () => {
+                return { toolName };
+            }),
+        };
+
+        vi.mocked(getAgent).mockResolvedValue({ options: {} } as never);
+
+        await resumeApprovedRun(resumeCtx as never, {
+            approvalId: "approval-1",
+            approved: true,
+            config: CONFIG,
+            streamId: "stream-1",
+            threadId: "thread-1",
+            userId: "owner-1",
+            ...extra,
+        }).catch(() => undefined);
+    };
+
+    it("still takes the person's answer to a question, rather than recording a denial", async () => {
+        vi.mocked(createAnsweredAskUserTool).mockClear();
+
+        await resumeAnswered("askUser", { answer: "Blue" });
+
+        expect(createAnsweredAskUserTool).toHaveBeenCalledWith("Blue", [], []);
+    });
+
+    it("still takes the reference to a requested secret, rather than recording a denial", async () => {
+        vi.mocked(createAnsweredRequestSecretTool).mockClear();
+
+        await resumeAnswered("requestSecret", { answer: "secret-ref-1" });
+
+        expect(createAnsweredRequestSecretTool).toHaveBeenCalledWith("secret-ref-1");
     });
 });
 

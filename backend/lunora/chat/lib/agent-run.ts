@@ -1137,8 +1137,16 @@ export const resumeApprovedRun = async (
         }
 
         // A tool that left the rebuilt set after the pause (its organization's cap, or the member's own setting) is denied,
-        // not refused: the approval is already claimed, so a refusal here would leave the request unanswerable.
-        if (approved && pending.toolName !== null && !Object.hasOwn(toolResult.tools, pending.toolName)) {
+        // not refused: the approval is already claimed, so a refusal here would leave the request unanswerable. An answered
+        // question or secret request is not one: its handler below replaces the tool with one that only returns what the
+        // person submitted, so nothing runs that the cap took away.
+        if (
+            approved &&
+            pending.toolName !== null &&
+            pending.toolName !== ASK_USER_TOOL_NAME &&
+            pending.toolName !== REQUEST_SECRET_TOOL_NAME &&
+            !Object.hasOwn(toolResult.tools, pending.toolName)
+        ) {
             approved = false;
             denyReason = `Tool ${pending.toolName} is no longer available`;
         }
