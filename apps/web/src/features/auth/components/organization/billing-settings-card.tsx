@@ -126,7 +126,8 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
     }, []);
 
     const { isSubmitting } = form.state;
-    const isPending = isPermissionPending || isBillingPending;
+    // A non-owner's billing query is `skipToken`, which TanStack reports as pending forever: only an owner waits on it.
+    const isPending = isPermissionPending || (isOwner === true && isBillingPending);
 
     if (!isOwner && !isPending) {
         return (

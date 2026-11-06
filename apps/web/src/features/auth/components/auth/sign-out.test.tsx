@@ -56,4 +56,15 @@ describe("SignOut", () => {
         expect(localStorage).toHaveLength(1);
         expect(localStorage.getItem("neore-collapsed-groups")).toBe('["archived"]');
     });
+
+    it.each(["success", "error"] as const)("sends the visitor to sign-in with a full load when sign-out ends in %s", async (outcome) => {
+        auth.outcome = outcome;
+
+        render(<SignOut />);
+
+        await vi.waitFor(() => {
+            expect(globalThis.location.replace).toHaveBeenCalledWith("/auth/sign-in");
+        });
+        expect(globalThis.location.replace).toHaveBeenCalledTimes(1);
+    });
 });
