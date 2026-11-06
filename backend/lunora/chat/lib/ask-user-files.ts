@@ -115,13 +115,13 @@ const namesUnreadableFile = async (
         size = await storedObjectSize(ctx.storage, storageId);
     } catch (error) {
         streamLogger.error(`[AskUser] Answer file ${fileId} could not be checked in thread ${args.threadId}`, error);
-        skipped({ threadId: args.threadId }, fileId, "read-failed");
+        skipped(args, fileId, "read-failed");
 
         return false;
     }
 
     if (size === null || size > limit) {
-        skipped({ threadId: args.threadId }, fileId, size === null ? "missing" : "too-large");
+        skipped(args, fileId, size === null ? "missing" : "too-large");
 
         return false;
     }

@@ -244,6 +244,36 @@ const streamErrorMessage = (error: unknown): string => {
  * provider's headers and body, so a run can pause until `retryAt`
  * (`rate-limit-pause.ts`); it is only ever taken from that field, never inferred.
  */
+/**
+ * Workers AI takes no document input, so a PDF or other non-image file part fails the call. Such a part reaches the
+ * model as a line naming the file instead, so the reply can say it was not read. Chat attaches a document's extracted
+ * text when it has some; this covers one without (extraction pending or failed) and older rows.
+ */
+export const withoutUnreadableDocuments = (options: LanguageModelV3CallOptions, provider: string): LanguageModelV3CallOptions => {
+    if (provider !== "cloudflare") {
+        return options;
+    }
+
+    return {
+        ...options,
+        prompt: options.prompt.map((message) =>
+            message.role === "user"
+                ? {
+                      ...message,
+                      content: message.content.map((part) =>
+                          part.type === "file" && !part.mediaType.startsWith("image/")
+                              ? {
+                                    text: `[Attached file: ${part.filename ?? "document"} (${part.mediaType}) — this model cannot read it]`,
+                                    type: "text" as const,
+                                }
+                              : part,
+                      ),
+                  }
+                : message,
+        ),
+    };
+};
+
 export type GatewayError = Error & { fallbackReason?: string; rateLimit?: ProviderRateLimit; statusCode?: number };
 
 // ── GatewayLanguageModel ─────────────────────────────────────────────────────
@@ -280,7 +310,7 @@ export class GatewayLanguageModel implements LanguageModelV3 {
 
         const body = {
             action: "generate" as const,
-            callOptions: serializeForWire(options),
+            callOptions: serializeForWire(withoutUnreadableDocuments(options, this.config.provider)),
             modelApiId: this.config.modelApiId,
             modelId: this.config.modelId,
             orgId: this.config.orgId,
@@ -319,7 +349,7 @@ export class GatewayLanguageModel implements LanguageModelV3 {
 
         const body = {
             action: "stream" as const,
-            callOptions: serializeForWire(options),
+            callOptions: serializeForWire(withoutUnreadableDocuments(options, this.config.provider)),
             modelApiId: this.config.modelApiId,
             modelId: this.config.modelId,
             orgId: this.config.orgId,

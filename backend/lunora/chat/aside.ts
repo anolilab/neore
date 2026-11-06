@@ -34,6 +34,7 @@
  *   running, because a row landing after the run's pending row would split the
  *   reply across branches.
  */
+import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { isCustomModelId, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 import type { LanguageModel, ModelMessage } from "ai";
 import { generateText } from "ai";
@@ -58,6 +59,7 @@ import { isWorkerThread } from "../sub-agents/functions";
 import { DEFAULT_SKILL_KEY, usageDayOf } from "../usage/activity-logic";
 import { scheduleReplyUsage } from "../usage/schedule";
 import { isAgentRunError, loadUserProviderKeys, resolveRunModel } from "./lib/agent-run";
+import { defaultModelUnderRules, readsImagesAndCallsTools } from "../lib/utility-model";
 import {
     getUtilityModelForUser,
     loadSharedModelFilterRules,
@@ -228,7 +230,7 @@ export const readAsideSnapshot = internalQuery
 
         const newestFirst = await readPathRows(ctx, thread, unlockProof);
         const rows = fitAsideRows(newestFirst.slice(0, ASIDE_CONTEXT_ROWS).toReversed());
-        const live = await findLiveStream(ctx, threadId, Date.now());
+        const live = await findLiveStream(ctx, threadId, ctx.now);
         const liveReply = live ? await readLiveReply(ctx, live) : undefined;
 
         return { ...(liveReply !== undefined && { liveReply }), rows, running: live !== undefined };
@@ -357,7 +359,10 @@ export const askAside = authAction
                 }),
                 resolveRunModel(ctx, chosen.model, userId),
             ]);
-            const agent = await getAgent(chosen.model, {
+            // A thread on the Workers AI default under a region rule asks a default the rules allow.
+            const runModelId =
+                chosen.model === DEFAULT_CHAT_MODEL ? defaultModelUnderRules(chosen.model, modelFilterRules, readsImagesAndCallsTools) : chosen.model;
+            const agent = await getAgent(runModelId, {
                 customProvider: runModel.customProvider,
                 gateway,
                 language: prefs.language,

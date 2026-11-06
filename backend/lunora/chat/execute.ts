@@ -14,7 +14,8 @@
  * continuation into `persistentChunks` exactly like the original run. What the
  * two share lives in `lib/agent-run.ts`.
  */
-import { estimateTokensFromCharacters, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
+import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
+import { estimateTokensFromCharacters, hasActiveFilters, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -56,7 +57,8 @@ import { createToolRunMarker } from "./lib/mark-tool-runs";
 import { isRunReplaced } from "./lib/run-epoch";
 import { gatewayFetch } from "../lib/services";
 import getAgent from "./lib/get-agent";
-import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
+import { loadModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
+import { defaultModelUnderRules, readsImagesAndCallsTools } from "../lib/utility-model";
 import { injectsSkillText } from "./lib/low-risk-approval";
 import { closeMCPClientsThenSettle } from "./lib/mcp-tools";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
@@ -423,6 +425,18 @@ export const runStreamingAgent = internalAction
                 // An invoked skill's search mode is deliberate, so it beats the classifier.
                 if (invokedSkill?.config?.searchMode) {
                     effectiveSearchMode = invokedSkill.config.searchMode as SearchMode;
+                }
+
+                // The Workers AI default cannot keep to a region rule: a user with one runs on a default their rules allow, with
+                // the plan grant (`loadModelFilterRules`) so a paid user may land on a paid model. Recorded like an Auto route,
+                // so a resume continues on the same model even if the rules changed meanwhile.
+                if (resume === undefined && model === DEFAULT_CHAT_MODEL && hasActiveFilters(agentModulePrefs.modelFilterRules ?? undefined)) {
+                    const standIn = defaultModelUnderRules(model, await loadModelFilterRules(ctx, userId), readsImagesAndCallsTools);
+
+                    if (standIn !== model) {
+                        model = standIn;
+                        routedModel = standIn;
+                    }
                 }
 
                 // A custom endpoint gets no tools (built-in or MCP) unless the user

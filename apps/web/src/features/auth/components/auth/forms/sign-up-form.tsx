@@ -62,7 +62,6 @@ const SignUpForm = ({
         basePath,
         baseURL,
         credentials,
-        emailVerification,
         nameRequired,
         navigate,
         persistClient,
@@ -323,17 +322,11 @@ const SignUpForm = ({
                 if ("token" in data && data.token) {
                     await onSuccess();
                 } else {
-                    if (emailVerification) {
-                        toast({
-                            message: t`Email verification sent`,
-                            variant: "success",
-                        });
-                    } else {
-                        toast({
-                            message: t`Sign up successful`,
-                            variant: "success",
-                        });
-                    }
+                    // No session: the account waits for its address to be verified (`requireEmailVerification`).
+                    toast({
+                        message: t`Email verification sent`,
+                        variant: "success",
+                    });
 
                     navigate(`${basePath}/${viewPaths.SIGN_IN}${globalThis.location.search}`);
                 }

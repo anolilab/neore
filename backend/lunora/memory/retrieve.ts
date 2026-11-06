@@ -14,6 +14,7 @@ import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { searchVectors } from "../agent/vector/index";
 import { validateVectorDimension, type VectorDimension } from "../agent/vector/tables";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 import { getMemoryEmbeddingModel, MEMORY_EMBEDDING_MODEL_NAME } from "./extract";
 
@@ -158,46 +159,52 @@ export const retrieveRelevantMemories = internalAction
         const vectorScoreMap = new Map<string, number>(); // memoryId → cosine score
 
         try {
-            const embeddingModel = await getMemoryEmbeddingModel(gatewayFetch(ctx));
-            const { embedMany } = await import("../agent/client/search");
+            const rules = await loadModelFilterRules(ctx, args.userId);
+            const { embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
 
-            const { embeddings } = await embedMany(ctx, {
-                embeddingModel,
-                threadId: undefined,
-                userId: args.userId,
-                values: [args.searchText.slice(0, 2000)],
-            });
+            // Rules that refuse the embedding model leave keyword scoring alone: the gateway would refuse the call.
+            if (embeddingModelAllowed(rules)) {
+                const embeddingModel = await getMemoryEmbeddingModel(gatewayFetch(ctx), rules);
+                const { embedMany } = await import("../agent/client/search");
 
-            const queryVector = embeddings[0];
-
-            if (queryVector && queryVector.length > 0) {
-                const dimension = queryVector.length;
-
-                validateVectorDimension(dimension);
-
-                const vectorResults = await searchVectors(ctx, queryVector, {
-                    dimension: dimension as VectorDimension,
-                    limit: 30,
-                    model: MEMORY_EMBEDDING_MODEL_NAME,
-                    searchAllMessagesForUserId: args.userId,
-                    table: "memories",
+                const { embeddings } = await embedMany(ctx, {
+                    embeddingModel,
+                    threadId: undefined,
+                    userId: args.userId,
+                    values: [args.searchText.slice(0, 2000)],
                 });
 
-                if (vectorResults.length > 0) {
-                    // Bulk-lookup memory records for the vector hits
-                    const embeddingIds = vectorResults.map((r) => r._id as string);
-                    const matched = (await ctx.runQuery(internal.memory.functions.getMemoriesByEmbeddingIds, {
-                        embeddingIds,
-                        userId: args.userId,
-                    })) as { _id: string; embeddingId: string }[];
+                const queryVector = embeddings[0];
 
-                    // Build map: memoryId → cosine score
-                    const embeddingScores = new Map(vectorResults.map((r) => [r._id as string, r._score]));
+                if (queryVector && queryVector.length > 0) {
+                    const dimension = queryVector.length;
 
-                    for (const mem of matched) {
-                        const score = embeddingScores.get(mem.embeddingId) ?? 0;
+                    validateVectorDimension(dimension);
 
-                        vectorScoreMap.set(mem._id, score);
+                    const vectorResults = await searchVectors(ctx, queryVector, {
+                        dimension: dimension as VectorDimension,
+                        limit: 30,
+                        model: MEMORY_EMBEDDING_MODEL_NAME,
+                        searchAllMessagesForUserId: args.userId,
+                        table: "memories",
+                    });
+
+                    if (vectorResults.length > 0) {
+                        // Bulk-lookup memory records for the vector hits
+                        const embeddingIds = vectorResults.map((r) => r._id as string);
+                        const matched = (await ctx.runQuery(internal.memory.functions.getMemoriesByEmbeddingIds, {
+                            embeddingIds,
+                            userId: args.userId,
+                        })) as { _id: string; embeddingId: string }[];
+
+                        // Build map: memoryId → cosine score
+                        const embeddingScores = new Map(vectorResults.map((r) => [r._id as string, r._score]));
+
+                        for (const mem of matched) {
+                            const score = embeddingScores.get(mem.embeddingId) ?? 0;
+
+                            vectorScoreMap.set(mem._id, score);
+                        }
                     }
                 }
             }

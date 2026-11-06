@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
     adoptSessionToken,
+    adoptSessionTokenWhileShut,
     ALREADY_ANONYMOUS_CODE,
     ensureGuestSession,
     GuestSessionUnknownError,
@@ -188,6 +189,23 @@ describe("adoptSessionToken", () => {
         expect(state.token).toBe("jwt-1");
     });
 
+    it("writes nothing when the adoption was aborted while the token was on its way", async () => {
+        const { client, setAuthToken } = tokenClient(null);
+        const controller = new AbortController();
+
+        await adoptSessionToken(
+            client,
+            async () => {
+                controller.abort();
+
+                return "jwt-1";
+            },
+            controller.signal,
+        );
+
+        expect(setAuthToken).not.toHaveBeenCalled();
+    });
+
     it("throws when there is no token to adopt, and leaves the client alone", async () => {
         const { client, setAuthToken } = tokenClient("jwt-1");
 
@@ -206,5 +224,37 @@ describe("nextAdoptionDelay", () => {
 
         expect(delays).toStrictEqual([1000, 2000, 4000, 8000, 16_000, 30_000, 30_000]);
         expect(nextAdoptionDelay(1000 + 30_000 + 61_000)).toBe(1000);
+    });
+});
+
+describe("adoptSessionTokenWhileShut", () => {
+    afterEach(() => {
+        vi.useRealTimers();
+        resetAdoptionBackoff();
+    });
+
+    it("leaves no abort listener behind for a wait that ended normally", async () => {
+        vi.useFakeTimers();
+
+        const controller = new AbortController();
+        const added = vi.spyOn(controller.signal, "addEventListener");
+        const removed = vi.spyOn(controller.signal, "removeEventListener");
+        let attempts = 0;
+        const run = adoptSessionTokenWhileShut(
+            { getAuthToken: () => null, setAuthToken: () => undefined },
+            async () => {
+                attempts += 1;
+
+                // Fail twice, then succeed: three waits that each ended on their timer.
+                return attempts < 3 ? null : "jwt-1";
+            },
+            controller.signal,
+        );
+
+        await vi.runAllTimersAsync();
+        await run;
+
+        expect(added).toHaveBeenCalledTimes(3);
+        expect(removed).toHaveBeenCalledTimes(3);
     });
 });

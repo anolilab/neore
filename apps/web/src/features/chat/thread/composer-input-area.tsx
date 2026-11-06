@@ -122,6 +122,8 @@ interface ComposerInputAreaProps {
     placeholder?: string;
     /** Ghost-text autocomplete source; omit to turn it off. See `ComposerTiptapEditor`. */
     requestCompletion?: GhostRequest;
+    /** Slash commands, @ mentions and variable suggestions (they read the user's data). Default on. */
+    suggestions?: boolean;
     /** The over-the-cap draft would not fit even as a file, so the notice offers none. */
     tooLongForFile?: boolean;
     /** Text value */
@@ -168,6 +170,7 @@ const ComposerInputArea = ({
     placeholder,
     ref,
     requestCompletion,
+    suggestions = true,
     tooLongForFile = false,
     value,
 }: ComposerInputAreaProps & { ref?: React.RefObject<ComposerInputAreaRef | null> }) => {
@@ -308,6 +311,7 @@ const ComposerInputArea = ({
                         placeholder={placeholder}
                         ref={tiptapRef}
                         requestCompletion={requestCompletion}
+                        suggestions={suggestions}
                         value={value}
                     />
                 </div>

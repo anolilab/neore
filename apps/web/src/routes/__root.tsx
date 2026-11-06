@@ -27,6 +27,7 @@ import ImpersonationBanner from "@/features/admin/components/impersonation-banne
 import AppearanceSync from "@/features/appearance/components/appearance-sync";
 import { ACCENT_BOOT_SCRIPT } from "@/features/appearance/lib/accent-boot-script";
 import { CHAT_TEXT_SIZE_BOOT_SCRIPT } from "@/features/appearance/lib/chat-text-size";
+import LoginPromptHost from "@/features/auth/components/auth/login-prompt-host";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
@@ -468,6 +469,8 @@ const RootComponent = () => {
                                                     <Suspense fallback={null}>
                                                         <SettingsModal />
                                                     </Suspense>
+                                                    {/* Sending while signed out or as a guest under invite-only opens this (`openLoginPrompt`). */}
+                                                    <LoginPromptHost />
                                                     <Suspense fallback={null}>
                                                         <SwUpdatePrompt />
                                                     </Suspense>

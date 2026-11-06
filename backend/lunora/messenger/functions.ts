@@ -679,18 +679,16 @@ export const saveMessengerNotice = internalMutation
 /** Messages scanned for media, newest first — well past what a reply's context window holds. */
 const RECENT_MEDIA_SCAN = 40;
 
-const hasMediaPart = (content: unknown): boolean =>
-    Array.isArray(content) &&
-    content.some((part) => (part as { type?: unknown } | null)?.type === "image" || (part as { type?: unknown } | null)?.type === "file");
+const partTypesOf = (content: unknown): unknown[] => (Array.isArray(content) ? content.map((part) => (part as { type?: unknown } | null)?.type) : []);
 
 /**
- * Whether the thread's recent messages carry images or files. A reply to such
- * a thread needs a model that reads them — the older ones are still in its
+ * What the thread's recent messages carry for the model to read: `files` when any holds a file part, else `images`
+ * when any holds an image. A reply to such a thread needs a model that reads them — the older ones are still in its
  * context after the sender goes back to plain text.
  */
-export const threadHasRecentMedia = internalQuery
+export const threadRecentMedia = internalQuery
     .input({ threadId: v.id("threads") })
-    .output(v.boolean())
+    .output(v.union(v.literal("files"), v.literal("images"), v.literal("none")))
     .query(async ({ args: { threadId }, ctx }) => {
         const recent = await ctx.db
             .query("messages")
@@ -698,7 +696,13 @@ export const threadHasRecentMedia = internalQuery
             .order("desc")
             .take(RECENT_MEDIA_SCAN);
 
-        return recent.some((row) => hasMediaPart((row.message as { content?: unknown } | undefined)?.content));
+        const types = new Set(recent.flatMap((row) => partTypesOf((row.message as { content?: unknown } | undefined)?.content)));
+
+        if (types.has("file")) {
+            return "files";
+        }
+
+        return types.has("image") ? "images" : "none";
     });
 
 /**

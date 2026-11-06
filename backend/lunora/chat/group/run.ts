@@ -25,6 +25,7 @@
  * the same branch, not a sibling of the first reply (which would read as a
  * regenerate).
  */
+import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import type { MCPClient } from "@ai-sdk/mcp";
 import { MODEL_LOOKUP, type ModelFilterRules } from "@neore/ai/models";
 import type { ModelMessage } from "ai";
@@ -37,7 +38,7 @@ import type { ActionCtx } from "../../_generated/server";
 import type { ResearchDepth } from "../../agent/client/create-tool";
 import { streamLogger } from "../../lib/logger";
 import { gatewayFetch, type ServiceFetch } from "../../lib/services";
-import { getUtilityModel } from "../../lib/utility-model";
+import { defaultModelUnderRules, getUtilityModel, readsImagesAndCallsTools } from "../../lib/utility-model";
 import { resolveReasoningEffort, resolveSkillModel } from "../../skills/slash-command";
 import type { AwaitingInput, RunContext } from "../lib/agent-run";
 import {
@@ -252,7 +253,10 @@ const runSpeaker = async (
     let mcpClients: MCPClient[] = [];
 
     try {
-        const model = resolveSkillModel(turn.baseModel, speaker.config?.preferredModel, (id) => MODEL_LOOKUP.get(id), turn.isAnonymous);
+        const modelFilterRules = await loadModelFilterRules(ctx, turn.userId);
+        const skillModel = resolveSkillModel(turn.baseModel, speaker.config?.preferredModel, (id) => MODEL_LOOKUP.get(id), turn.isAnonymous);
+        // The Workers AI default cannot keep to a region rule: a user with one runs on a default their rules allow.
+        const model = skillModel === DEFAULT_CHAT_MODEL ? defaultModelUnderRules(skillModel, modelFilterRules, readsImagesAndCallsTools) : skillModel;
         const searchMode = (speaker.config?.searchMode ?? turn.searchMode) as SearchMode;
         const { allowTools, customProvider } = await resolveRunModel(ctx, model, turn.userId);
 
@@ -277,7 +281,6 @@ const runSpeaker = async (
         setDispatchOrigin(ctx, turn.origin);
         setRunStartedBy(ctx, turn.startedBy);
 
-        const modelFilterRules = await loadModelFilterRules(ctx, turn.userId);
         const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model, modelFilterRules);
         const agent = await getAgent(model, {
             backupModelId,

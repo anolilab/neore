@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { isInviteOnly } from "./chat-helpers";
 import { AUTH_PATHS, TEST_USER } from "./fixtures";
 
 const TRAILING_QUERY_RE = /\?$/;
@@ -17,9 +18,16 @@ test.describe("Sign-in page", () => {
         await expect(page.getByPlaceholder("Enter your password")).toBeVisible();
         await expect(page.getByRole("button", { exact: true, name: "Sign in" })).toBeVisible();
         // Cross-navigation out of the card is anchors, not buttons — the submit
-        // control is the only button on it.
-        await expect(page.getByRole("link", { exact: true, name: "Sign up" })).toBeVisible();
+        // control is the only button on it. Under invite-only no sign-up is
+        // offered without an invitation; with registration open, one is.
         await expect(page.getByRole("link", { name: "Forgot password?" })).toBeVisible();
+        await expect(page.getByRole("link", { exact: true, name: "Sign up" })).toHaveCount((await isInviteOnly()) ? 0 : 1);
+    });
+
+    test("offers sign-up on an invitation link", async ({ page }) => {
+        await page.goto(`${AUTH_PATHS.signIn}?invite=e2e-sign-in`);
+
+        await expect(page.getByRole("link", { exact: true, name: "Sign up" })).toBeVisible();
     });
 
     test("accepts typing into both credential fields", async ({ page }) => {
@@ -57,8 +65,9 @@ test.describe("Sign-in page", () => {
 });
 
 test.describe("Sign-up page", () => {
+    // The token is checked only on submit, so any value shows the form.
     test.beforeEach(async ({ page }) => {
-        await page.goto(AUTH_PATHS.signUp);
+        await page.goto(`${AUTH_PATHS.signUp}?invite=e2e-sign-up`);
     });
 
     test("renders the registration form", async ({ page }) => {
@@ -70,6 +79,21 @@ test.describe("Sign-up page", () => {
 
     test("asks for a name as well as credentials", async ({ page }) => {
         await expect(page.getByPlaceholder(NAME_FIELD_RE).first()).toBeVisible();
+    });
+});
+
+test.describe("Sign-up page without an invitation, invite-only", () => {
+    test.beforeEach(async () => {
+        // Conditional, not a disabled test: with registration open the page offers the form.
+        test.skip(!(await isInviteOnly()), "registration is open on this backend");
+    });
+
+    test("says registration is by invitation, with a way to sign in", async ({ page }) => {
+        await page.goto(AUTH_PATHS.signUp);
+
+        await expect(page.getByText("Sign-up needs an invitation")).toBeVisible();
+        await expect(page.getByPlaceholder("Enter your password")).toHaveCount(0);
+        await expect(page.getByRole("link", { exact: true, name: "Sign in" })).toBeVisible();
     });
 });
 

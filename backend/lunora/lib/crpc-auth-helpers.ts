@@ -146,7 +146,7 @@ export const getSessionUserForQuery = async (context: QueryContext, options?: { 
     const [session, userDocument] = await Promise.all([
         getSession(context, identity.sessionId),
         // `findFirst` on `_id`, not `get`: a `get` of a `.global()` id probes
-        // every global table (root AGENTS.md, "Database access").
+        // every global table (`backend/AGENTS.md`, "Database access").
         context.db.user.findFirst({ where: { _id: identity.userId as Id<"user"> } }),
     ]);
 

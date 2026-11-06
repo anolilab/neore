@@ -186,7 +186,7 @@ describe("SignUpForm", () => {
             expect(harness.navigate).toHaveBeenCalledWith("/auth/sign-in?invite=tok-123");
         });
 
-        expect(harness.toast).toHaveBeenCalledWith({ message: "Sign up successful", variant: "success" });
+        expect(harness.toast).toHaveBeenCalledWith({ message: "Email verification sent", variant: "success" });
         expect(harness.onSuccess).not.toHaveBeenCalled();
     });
 

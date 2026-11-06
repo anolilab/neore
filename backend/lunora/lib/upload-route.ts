@@ -61,15 +61,6 @@ import { PURPOSE_METADATA_KEY, purposeOfStagingKey, STAGING_PREFIX, STAGING_TTL_
 import { inShard } from "./http-shard";
 import { MAX_REFERENCE_MEDIA_BYTES, REFERENCE_MEDIA_MIME_TYPES, referenceMediaLimitFor } from "./document-limits";
 
-/** Where browsers upload. The TUS upload URL of each file is `<UPLOAD_PATH>/<uploadId>`. */
-export const UPLOAD_PATH = "/uploads";
-
-/** Request headers the TUS client sends, for the CORS preflight. */
-export const TUS_REQUEST_HEADERS = ["Tus-Resumable", "Upload-Length", "Upload-Metadata", "Upload-Offset"];
-
-/** Response headers the TUS client reads, for CORS. */
-export const TUS_RESPONSE_HEADERS = ["Location", "Tus-Resumable", "Upload-Length", "Upload-Offset", "Upload-Metadata"];
-
 const UPLOAD_PURPOSES: ReadonlySet<string> = new Set(["chat", "reference-media"]);
 
 /** The purpose a create declares in `?purpose=` (absent means chat), or `undefined` for a value that names none. */
