@@ -58,7 +58,7 @@ import {
 } from "./source-control/validators";
 import { vSkillConfig } from "./skills/validators";
 import { vDispatchSource, vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus, vWorkerPolicy } from "./sub-agents/validators";
-import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskStatus, vVerdict } from "./tasks/validators";
+import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskSkipReason, vTaskStatus, vVerdict } from "./tasks/validators";
 import { vEventSource, vEventState, vWebhookSignatureScheme } from "./triggers/validators";
 
 /** Hoisted so `streamDeltasFields` is readable as a value, not just a type. */
@@ -2678,6 +2678,9 @@ export const schema = defineSchema({
         instructions: v.string(),
         lastError: v.optional(v.string()),
         lastRunThreadId: v.optional(v.string()),
+        // The last recurrence slot the sweep let pass without a run, and why (`tasks/AGENTS.md`).
+        lastSkippedAt: v.optional(v.number()),
+        lastSkipReason: v.optional(vTaskSkipReason),
         maxRepairRounds: v.number(),
         model: v.optional(v.string()),
         nextRunAt: v.optional(v.number()),

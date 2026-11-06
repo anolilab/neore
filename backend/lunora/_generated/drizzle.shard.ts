@@ -1435,6 +1435,8 @@ export const tasks = sqliteTable("tasks", {
     instructions: text("instructions").notNull(),
     lastError: text("lastError"),
     lastRunThreadId: text("lastRunThreadId"),
+    lastSkippedAt: real("lastSkippedAt"),
+    lastSkipReason: text("lastSkipReason", { mode: "json" }).$type<"still_running" | "awaiting_review" | "blocked">(),
     maxRepairRounds: real("maxRepairRounds").notNull(),
     model: text("model"),
     nextRunAt: real("nextRunAt"),
