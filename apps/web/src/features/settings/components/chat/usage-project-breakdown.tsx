@@ -78,6 +78,9 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
         staleTime: 2 * 60_000,
     });
 
+    // Not polled while the walk runs (each read asks every member's shard), but read again once it is done.
+    useRefetchAfterBackfill(backfilling, organization.refetch);
+
     const active = showing === "mine" ? mine : organization;
     let rows: ProjectRow[] = [];
 

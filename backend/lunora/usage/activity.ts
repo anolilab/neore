@@ -28,7 +28,7 @@ import { internalMutation } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authQuery } from "../lib/crpc";
 import { readableProject } from "../projects/functions";
-import type { ProjectIncrement, RollupIncrement } from "./activity-logic";
+import type { ProjectIncrement, ProjectTotal, RollupIncrement } from "./activity-logic";
 import {
     addDays,
     BREAKDOWN_ROW_LIMIT,
@@ -265,6 +265,9 @@ export const getSkillBreakdown = authQuery
 
 const vTotals = { costMicrodollars: v.number(), replies: v.number(), tokens: v.number() };
 
+/** Project title lookups one breakdown runs at once. */
+const TITLE_LOOKUPS_AT_ONCE = 16;
+
 /** Total rows from `fromDate` on, summed: one per day, so a year is a bounded read. */
 const totalSince = async (ctx: Pick<QueryCtx, "db">, userId: string, fromDate: string) => {
     const { page } = await ctx.db.usageDaily.findMany({
@@ -303,13 +306,20 @@ export const getProjectBreakdown = authQuery
             }),
         ]);
         const projects = foldProjectTotals(rows.page);
-        const titled = await Promise.all(
-            projects.map(async (project) => {
-                const found = await readableProject(ctx, project.projectKey as Id<"projects">, userId).catch(() => null);
+        const titled: (ProjectTotal & { title?: string })[] = [];
 
-                return { ...project, ...(found && { title: found.title }) };
-            }),
-        );
+        // A few lookups at a time: each is up to three reads, and a long history holds many projects.
+        for (let index = 0; index < projects.length; index += TITLE_LOOKUPS_AT_ONCE) {
+            const batch = await Promise.all(
+                projects.slice(index, index + TITLE_LOOKUPS_AT_ONCE).map(async (project) => {
+                    const found = await readableProject(ctx, project.projectKey as Id<"projects">, userId).catch(() => null);
+
+                    return { ...project, ...(found && { title: found.title }) };
+                }),
+            );
+
+            titled.push(...batch);
+        }
 
         return {
             noProject: remainderOf(totals.total, projects),

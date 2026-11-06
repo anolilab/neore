@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import { getActivityHeatmap, getProjectBreakdown, getProjectUsage, getSkillBreakdown, recordReplyUsage } from "./activity";
 import { DEFAULT_SKILL_KEY } from "./activity-logic";
-import { memberProjectUsage } from "./organization";
+import { isOrganizationAdminRole, memberProjectUsage } from "./organization";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -244,5 +244,13 @@ describe("usage by project", () => {
         );
 
         expect(result).toStrictEqual({ projects: [{ costMicrodollars: 300, projectKey: alpha.projectId, replies: 1, tokens: 10 }], truncated: false });
+    });
+});
+
+describe("isOrganizationAdminRole", () => {
+    it("reads each of a member's comma-separated roles", () => {
+        expect(isOrganizationAdminRole("admin,member")).toBe(true);
+        expect(isOrganizationAdminRole("member, owner")).toBe(true);
+        expect(isOrganizationAdminRole("member")).toBe(false);
     });
 });

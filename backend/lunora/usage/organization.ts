@@ -34,6 +34,9 @@ const SHARD_CONCURRENCY = 8;
 
 const ADMIN_ROLES = new Set(["admin", "owner"]);
 
+/** Whether a member's role grants the view; better-auth keeps several roles in one comma-separated string. */
+export const isOrganizationAdminRole = (role: string): boolean => role.split(",").some((part) => ADMIN_ROLES.has(part.trim()));
+
 const vTotals = { costMicrodollars: v.number(), replies: v.number(), tokens: v.number() };
 
 /** The organization's projects and members, or `null` when `userId` is not one of its admins. */
@@ -57,7 +60,7 @@ export const organizationUsageScope = internalQuery
     .query(async ({ args: { afterUserId, organizationId, userId }, ctx }) => {
         const member = await getMemberByOrganizationAndUser(ctx, organizationId, userId);
 
-        if (!member || !ADMIN_ROLES.has(member.role)) {
+        if (!member || !isOrganizationAdminRole(member.role)) {
             return null;
         }
 

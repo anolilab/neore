@@ -25,8 +25,9 @@
  * walk's window and grouping, keeps its own position on the same row, and
  * counts a reply once against the live path: the live record marks its key
  * `projectFiled`, the walk marks `project:<key>`, and each skips what the other
- * marked. A reply from after the first walk's cutoff is filed only while its
- * key is still held, so the projects never add up to more than the total.
+ * marked. A reply from after the first walk's cutoff and inside the
+ * key-keeping window is filed only when its key is held: a missing key there
+ * means its live record never landed, and so no total.
  * Keys are pruned only once both walks are done.
  *
  * Threads are paged through `by_userId`, whose key no thread edit changes, so
@@ -440,9 +441,13 @@ export const runUsageProjectBackfillStep = internalMutation
                     }
 
                     // Before the first walk's cutoff, that walk counts every reply this one takes. After it only the live
-                    // record does, and a record that never landed left no total: file only a reply whose key the rollup
-                    // still holds, so the projects never add up to more than the total.
-                    if (group.rows[0]!._creationTime >= state.startedAt && !(await anyRecorded(ctx, userId, group.rows))) {
+                    // record does, and a record that never landed left no total. Inside the key-keeping window a missing
+                    // key means exactly that, so such a reply is left out; an older one's key was pruned on schedule, so
+                    // its absence proves nothing and the reply is filed.
+                    const createdAt = group.rows[0]!._creationTime;
+                    const keysKept = createdAt >= position.startedAt - REPLY_KEY_KEEP_MS;
+
+                    if (createdAt >= state.startedAt && keysKept && !(await anyRecorded(ctx, userId, group.rows))) {
                         return undefined;
                     }
 

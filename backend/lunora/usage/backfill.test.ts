@@ -539,6 +539,16 @@ describe("project backfill", () => {
                 }),
         );
 
+    /** The state as it was before the project walk existed: the first walk's alone. */
+    const forgetProjectWalk = async () =>
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.usageBackfill.findFirst({ where: { userId: USER } });
+            const before = Object.fromEntries(Object.entries(row).filter(([key]) => !["_creationTime", "_id", "projects"].includes(key)));
+
+            await ctx.db.delete("usageBackfill", row._id);
+            await ctx.db.insert("usageBackfill", before);
+        });
+
     /** Two projects of one reply each, and a reply in no project: 100 + 40 + 7 µ$. */
     const insertProjectFixture = async () => {
         const alpha = await insertProject("Alpha");
@@ -598,14 +608,7 @@ describe("project backfill", () => {
             await step(current.runId);
         }
 
-        await harness.run(async (ctx: any) => {
-            const row = await ctx.db.usageBackfill.findFirst({ where: { userId: USER } });
-
-            const before = Object.fromEntries(Object.entries(row).filter(([key]) => !["_creationTime", "_id", "projects"].includes(key)));
-
-            await ctx.db.delete("usageBackfill", row._id);
-            await ctx.db.insert("usageBackfill", before);
-        });
+        await forgetProjectWalk();
 
         expect(await status()).toBe("idle");
         expect(await start()).toBe("running");
@@ -679,5 +682,27 @@ describe("project backfill", () => {
         await drain();
 
         expect(await projectRows()).toStrictEqual([]);
+    });
+
+    it("files a reply after the first walk's cutoff whose key was pruned on schedule", async () => {
+        vi.setSystemTime(DAY_1);
+        await start();
+
+        for (let current = await state(); current.status !== "done"; current = await state()) {
+            await step(current.runId);
+        }
+
+        const alpha = await insertProject("Alpha");
+
+        // Recorded live with its total, and its key pruned two days later, before the project walk existed.
+        await insertThread(DAY_1 + 1000, [[prompt(), reply(10, 100)]], "active", alpha);
+        await forgetProjectWalk();
+        vi.setSystemTime(DAY_1 + 5 * DAY_MS);
+        await start();
+        await drain();
+
+        const rows = await projectRows();
+
+        expect(rows).toMatchObject([{ costMicrodollars: 100, projectKey: alpha }]);
     });
 });

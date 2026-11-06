@@ -5,6 +5,7 @@ import { Skeleton } from "@neore/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill, useUsageBackfill } from "@/features/settings/hooks/use-usage-backfill";
 import { formatUsd, localDayKey, periodStart } from "@/features/settings/lib/usage-activity";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -21,13 +22,18 @@ const ProjectUsageSummary = ({ projectId }: ProjectUsageSummaryProps) => {
     const crpc = useCRPC();
     const [today] = useState(() => localDayKey(new Date()));
     const locale = i18n.locale || "en";
-    const { data, isError, isPending } = useQuery(
-        crpc.usage.activity.getProjectUsage.queryOptions(
+    // Earlier replies are filed under their projects by the usage backfill: start it if it has not run, and read again as it goes.
+    const { backfilling } = useUsageBackfill();
+    const { data, isError, isPending, refetch } = useQuery({
+        ...crpc.usage.activity.getProjectUsage.queryOptions(
             // The dialog receives `_id` as a plain `string`; it is always an id the backend returned for a `projects` row.
             { fromDate: periodStart(today, WINDOW_DAYS), projectId: projectId as Id<"projects"> },
             { live: false },
         ),
-    );
+        refetchInterval: backfilling ? BACKFILL_REFETCH_MS : false,
+    });
+
+    useRefetchAfterBackfill(backfilling, refetch);
 
     const stats = [
         { label: t`Replies`, value: data ? data.replies.toLocaleString(locale) : undefined },
