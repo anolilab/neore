@@ -474,6 +474,16 @@ describe("reordering queued prompts", () => {
         expect(moveQueuedPrompt(state, "c", 1)).toBe(state);
     });
 
+    it("keeps an accepted steer in its place too, since the reply reads steers in the order they were sent", () => {
+        const state: PromptQueueState<never> = {
+            items: [item("a"), { ...item("s"), steer: { id: "s1", streamId: "x" } }, item("c")],
+            paused: false,
+        };
+
+        expect(moveQueuedPrompt(state, "s", 2)).toBe(state);
+        expect(moveQueuedPrompt(state, "c", 0)).toBe(state);
+    });
+
     it("refuses a move that passes over a pending steer, even when neither end is the steer", () => {
         const state: PromptQueueState<never> = {
             items: [item("a"), { ...item("s"), steer: { id: "s1", pending: true, streamId: "x" } }, item("c")],

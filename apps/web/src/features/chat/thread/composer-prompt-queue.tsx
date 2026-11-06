@@ -266,7 +266,9 @@ const QueueChip: FC<{
 }> = ({ blockedDown, blockedUp, count, onMove, onRemove, position, prompt }) => {
     const { t } = useLingui();
     const pending = Boolean(prompt.steer?.pending);
-    const { isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ disabled: pending, id: prompt.id });
+    // A steered message keeps its place in the order the reply reads it, so it cannot be dragged or moved.
+    const fixed = Boolean(prompt.steer);
+    const { isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ disabled: fixed, id: prompt.id });
     // Reduced motion: the chip still moves, without the sliding transition.
     const reduceMotion = useReducedMotion();
     const preview = prompt.text.trim() || t`(attachments only)`;
@@ -284,7 +286,7 @@ const QueueChip: FC<{
                 {position}.
             </span>
             {/* The only drag surface: `touch-none` keeps a touch drag from scrolling the page, and the buttons stay free for taps. */}
-            {!pending && (
+            {!fixed && (
                 <span aria-hidden="true" className="text-muted-foreground flex cursor-grab touch-none items-center" ref={setActivatorNodeRef} {...listeners}>
                     <GripVerticalIcon className="size-3" />
                 </span>
@@ -314,7 +316,7 @@ const QueueChip: FC<{
                 aria-label={t`Move queued message ${position} up`}
                 className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
                 data-move-up=""
-                disabled={pending || position === 1 || blockedUp}
+                disabled={fixed || position === 1 || blockedUp}
                 onClick={() => onMove(prompt.id, -1)}
                 type="button"
             >
@@ -324,7 +326,7 @@ const QueueChip: FC<{
                 aria-label={t`Move queued message ${position} down`}
                 className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
                 data-move-down=""
-                disabled={pending || position === count || blockedDown}
+                disabled={fixed || position === count || blockedDown}
                 onClick={() => onMove(prompt.id, 1)}
                 type="button"
             >
@@ -513,8 +515,11 @@ const ComposerPromptQueue: FC = () => {
 
                 usePromptQueueStore.getState().move(threadId, String(active.id), toIndex);
 
-                if (from !== -1 && toIndex !== from) {
-                    setAnnouncement(t`Moved to position ${toIndex + 1}`);
+                // The store may refuse the move (a steer on the way): announce the position it actually has.
+                const to = (usePromptQueueStore.getState().queues[threadId]?.items ?? []).findIndex((item) => item.id === active.id);
+
+                if (from !== -1 && to !== from) {
+                    setAnnouncement(t`Moved to position ${to + 1}`);
                 }
             }
         },
@@ -557,8 +562,8 @@ const ComposerPromptQueue: FC = () => {
                     <ol aria-label={t`Queued messages`} className="flex min-w-0 flex-wrap gap-1.5">
                         {queue.items.map((prompt, index) => (
                             <QueueChip
-                                blockedDown={queue.items[index + 1]?.steer?.pending === true}
-                                blockedUp={index > 0 && queue.items[index - 1]?.steer?.pending === true}
+                                blockedDown={queue.items[index + 1]?.steer !== undefined}
+                                blockedUp={index > 0 && queue.items[index - 1]?.steer !== undefined}
                                 count={count}
                                 key={prompt.id}
                                 onMove={handleMove}

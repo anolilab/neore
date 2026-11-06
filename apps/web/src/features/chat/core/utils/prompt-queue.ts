@@ -109,7 +109,8 @@ export const moveQueuedPrompt = <A>(state: PromptQueueState<A>, id: string, toIn
 
     const [low, high] = from < target ? [from, target] : [target, from];
 
-    if (state.items.slice(low, high + 1).some((item) => item.steer?.pending)) {
+    // A steer is fixed in the order the running reply reads it, so a move that starts, ends, or passes over one is refused.
+    if (state.items.slice(low, high + 1).some((item) => item.steer)) {
         return state;
     }
 
