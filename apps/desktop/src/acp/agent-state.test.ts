@@ -148,12 +148,25 @@ describe("availableCommandsOf", () => {
             return { description: euros, name: `c${index}` };
         });
         const commands = availableCommandsOf({ availableCommands: many }, plain) ?? [];
+        // The size of the first `count` entries as the post sends them: a prefix fits when its JSON does.
+        const fits = (count: number): boolean => new TextEncoder().encode(JSON.stringify(many.slice(0, count))).length <= 64 * 1024;
 
-        expect(commands.length).toBeGreaterThan(0);
+        expect(commands.length).toBeGreaterThan(1);
         expect(commands.length).toBeLessThan(100);
-        expect(new TextEncoder().encode(JSON.stringify(commands)).length).toBeLessThanOrEqual(64 * 1024);
+        // The JSON grows with each entry, so this is the longest prefix that fits: one more would be over the budget.
+        expect(fits(commands.length)).toBe(true);
+        expect(fits(commands.length + 1)).toBe(false);
         // The prefix is kept in the agent's order.
         expect(commands.map((command) => command.name)).toEqual(many.slice(0, commands.length).map((command) => command.name));
+    });
+
+    it("keeps every command of a list that fits the 64 KiB budget", () => {
+        // 50 entries of 300 euro signs are about 47 KiB of JSON: all of them fit, so none is cut.
+        const many = Array.from({ length: 50 }, (_, index) => {
+            return { description: "€".repeat(300), name: `c${index}` };
+        });
+
+        expect(availableCommandsOf({ availableCommands: many }, plain)?.map((command) => command.name)).toEqual(many.map((command) => command.name));
     });
 
     it("scrubs every description and hint, and drops a command whose name the scrub would change", () => {
