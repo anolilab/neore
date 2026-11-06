@@ -14,9 +14,10 @@ const withoutLinkParameters = (search: Record<string, unknown>): Record<string, 
     Object.fromEntries(Object.entries(search).filter(([key]) => key !== "model" && key !== "prompt"));
 
 /**
- * Applies a prompt link once: its prompt becomes the draft (a draft the composer already holds is kept, with a notice),
- * and its model is chosen when the model is enabled and not external. The link's parameters are then removed from the
- * address. It never sends.
+ * Applies a prompt link once: its prompt becomes the draft, and its model is chosen when the link can name it
+ * (`carriableLinkModel`). A draft or a saved prompt already in place is kept with a notice, and so is the model the person
+ * chose. A model the link cannot name is left alone, with a notice. The link's parameters are then removed from the address.
+ * It never sends.
  */
 export const usePromptLinkDraft = ({
     model,
