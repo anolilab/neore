@@ -12,6 +12,8 @@ const harness = vi.hoisted(() => {
         calls: [] as [string, unknown][],
         /** What the next sends answer, in order; an empty list answers ok. */
         sendResults: [] as ({ error: string; ok: false } | { ok: true })[],
+        /** When set, a send waits for it before it answers. */
+        gate: undefined as Promise<void> | undefined,
         data: {} as Record<string, unknown>,
     };
 });
@@ -34,6 +36,10 @@ vi.mock("./host-send", () => {
         MAX_HOST_PROMPT_CHARS: 30_000,
         sendHostMessage: vi.fn(async (input: unknown) => {
             harness.calls.push(["send", input]);
+
+            if (harness.gate) {
+                await harness.gate;
+            }
 
             return harness.sendResults.shift() ?? { ok: true };
         }),
@@ -174,6 +180,34 @@ describe("the coding-agent composer", () => {
         expect((harness.calls[0]?.[1] as { text: string }).text).toBe(`${"a".repeat(29_998)}\u{1F600}`);
         // The sent text clears from the box, joiner and all.
         await waitFor(() => expect(box.value).toBe(""));
+    });
+
+    it("keeps the refusal of a paste made while a send is in flight, and keeps Send off for the draft", async () => {
+        let open: () => void = () => undefined;
+
+        harness.gate = new Promise<void>((resolve) => {
+            open = () => {
+                resolve();
+            };
+        });
+
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "a valid draft" } });
+        fireEvent.click(screen.getByRole("button", { name: "Send" }));
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+
+        // A paste is refused while the first send is still pending.
+        fireEvent.change(box, { target: { value: "x".repeat(120_001) } });
+        open();
+        harness.gate = undefined;
+
+        await waitFor(() => expect(box.value).toBe(""));
+        // The refusal made during the send is still shown, and the field cannot send.
+        expect(screen.queryAllByRole("status").length).toBeGreaterThan(0);
+        expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
     });
 
     it("does not send the draft a refused paste would have left, and shows the refusal", async () => {

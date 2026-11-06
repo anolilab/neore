@@ -85,6 +85,8 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const [sending, setSending] = useState(false);
     // Set when a paste was refused, so the field keeps saying why until the next accepted edit (the toast fades).
     const [refusedPaste, setRefusedPaste] = useState(false);
+    // Counts the refusals, so a send clears only those that came before it, not one made while it was in flight.
+    const refusals = useRef(0);
     const attempt = useRef<{ id: string; text: string } | undefined>(undefined);
     const { data: session } = useQuery(crpc.acp.functions.getHostSession.queryOptions({ threadId }));
     const { data: live } = useQuery(crpc.chat.streaming.getActiveStreamForThread.queryOptions({ threadId: id }));
@@ -104,6 +106,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
         }
 
         setSending(true);
+        const refusalsBefore = refusals.current;
 
         const result = await sendHostMessage({ requestId: attempt.current.id, text: prompt, threadId });
 
@@ -111,7 +114,11 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
 
         if (result.ok) {
             attempt.current = undefined;
-            setRefusedPaste(false);
+
+            if (refusals.current === refusalsBefore) {
+                setRefusedPaste(false);
+            }
+
             // Continue sends a fixed prompt: a draft being typed beside it stays.
             // Compared as the server cleaned it, so a draft whose only extra text is a removed joiner still clears.
             setText((current) => (stripHiddenText(current).text.trim() === prompt ? "" : current));
@@ -214,6 +221,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
 
                         // Refused before any scan: the controlled value stays as it was.
                         if (exceedsRawInputLimit(value, MAX_HOST_PROMPT_CHARS)) {
+                            refusals.current += 1;
                             setRefusedPaste(true);
                             toast.error(messages.too_large);
 
