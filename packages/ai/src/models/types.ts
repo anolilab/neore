@@ -2,7 +2,20 @@ import type { Experimental_VideoModelV4, ImageModelV4, SpeechModelV4, Transcript
 import type { EmbeddingModel, LanguageModel, LanguageModelRequestMetadata, LanguageModelResponseMetadata, LanguageModelUsage, ToolSet } from "ai";
 
 export type ProviderKind =
-    "groq" | "openai" | "xai" | "openrouter" | "requesty" | "fal" | "google" | "klingai" | "luma" | "replicate" | "fireworks" | "bfl" | "external";
+    | "groq"
+    | "openai"
+    | "xai"
+    | "openrouter"
+    | "requesty"
+    | "fal"
+    | "google"
+    | "klingai"
+    | "luma"
+    | "replicate"
+    | "fireworks"
+    | "bfl"
+    | "cloudflare"
+    | "external";
 
 /**
  * Options to determine what messages are included as context in message generation.

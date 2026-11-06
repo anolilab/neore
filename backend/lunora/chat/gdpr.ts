@@ -8,12 +8,11 @@ import type { MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, deleteParentsWithChildren } from "../gdpr/batch";
 
 /**
- * The user's pins, tags and thread passcodes (relationships and grants are `agent/gdpr.ts`; goals go in batches
+ * The user's pins and tags (relationships, grants and passcodes are `agent/gdpr.ts`; goals go in batches
  * with the run state, {@link erasePersistentStreamsForUser}).
- * A passcode row is the hash of a lock on one of their threads: it goes with them.
  */
 export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: string): Promise<void> => {
-    const [pins, threadTags, passcodes] = await Promise.all([
+    const [pins, threadTags] = await Promise.all([
         ctx.db
             .query("threadPins")
             .withIndex("by_user_and_thread", (q) => q.eq("userId", userId))
@@ -22,17 +21,9 @@ export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: st
             .query("threadTags")
             .withIndex("by_user_and_order", (q) => q.eq("userId", userId))
             .collect(),
-        ctx.db
-            .query("threadPasscodes")
-            .withIndex("by_userId", (q) => q.eq("userId", userId))
-            .collect(),
     ]);
 
-    await Promise.all([
-        ...pins.map((p) => ctx.db.delete("threadPins", p._id)),
-        ...threadTags.map((tag) => ctx.db.delete("threadTags", tag._id)),
-        ...passcodes.map((row) => ctx.db.delete("threadPasscodes", row._id)),
-    ]);
+    await Promise.all([...pins.map((p) => ctx.db.delete("threadPins", p._id)), ...threadTags.map((tag) => ctx.db.delete("threadTags", tag._id))]);
 };
 
 /**
@@ -69,14 +60,16 @@ export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: st
     ]);
 
     const streamsLeft = await deleteParentsWithChildren(
-        ctx,
-        { child: "persistentChunks", parent: "persistentStreams" },
         streams,
         async (stream) =>
             await ctx.db
                 .query("persistentChunks")
                 .withIndex("by_streamId_seq", (q) => q.eq("streamId", stream._id))
                 .take(BATCH),
+        {
+            child: (chunk) => ctx.db.delete("persistentChunks", chunk._id),
+            parent: (stream) => ctx.db.delete("persistentStreams", stream._id),
+        },
     );
 
     return { hasMore: streamsLeft || approvalRuns.length >= BATCH || secrets.length >= BATCH || goals.length >= BATCH };
@@ -90,14 +83,16 @@ export const erasePresentationsForUser = async (ctx: MutationCtx, userId: string
         .take(BATCH);
 
     const hasMore = await deleteParentsWithChildren(
-        ctx,
-        { child: "presentationSlides", parent: "presentations" },
         presentations,
         async (presentation) =>
             await ctx.db
                 .query("presentationSlides")
                 .withIndex("by_presentation_and_number", (q) => q.eq("presentationId", presentation._id))
                 .take(BATCH),
+        {
+            child: (slide) => ctx.db.delete("presentationSlides", slide._id),
+            parent: (presentation) => ctx.db.delete("presentations", presentation._id),
+        },
     );
 
     return { hasMore };

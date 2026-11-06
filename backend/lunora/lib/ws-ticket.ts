@@ -23,7 +23,7 @@ type TicketDatabase = Pick<D1DatabaseLike, "prepare">;
  *   delete-returning, and `findFirst` + `delete` on a `.global()` table is two
  *   D1 round trips with no Durable Object input gate between them — two
  *   upgrades racing on one ticket could both win (the same reason `rateLimits`
- *   is not `.global()`, see AGENTS.md).
+ *   is not `.global()`, see `backend/AGENTS.md`).
  *
  * The table is created LAZILY by the statement below, once per isolate, before
  * the first mint, redeem or purge touches it — the same model as Lunora's own

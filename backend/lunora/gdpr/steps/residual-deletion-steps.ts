@@ -271,8 +271,8 @@ export const deleteUserIntegrations = internalMutation
         ]);
 
         // `gdprConsent` is audited: one delete at a time (`gdpr/batch.ts`).
-        await deleteOneByOne(context, "idempotencyClaims", claims);
-        await deleteOneByOne(context, "gdprConsent", consents);
+        await deleteOneByOne(claims, (row) => context.db.delete("idempotencyClaims", row._id));
+        await deleteOneByOne(consents, (row) => context.db.delete("gdprConsent", row._id));
 
         // The user's system-prompt presets (`system-prompts/gdpr.ts`).
         const presets = await eraseSystemPromptPresetsForUser(context, userId);

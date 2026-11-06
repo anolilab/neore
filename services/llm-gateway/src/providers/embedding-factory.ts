@@ -6,6 +6,7 @@
 import type { EmbeddingModelV4 } from "@ai-sdk/provider";
 
 import { GatewayError } from "../lib/errors.js";
+import type { CloudflareProviderOptions } from "./factory.js";
 
 /** Supported embedding models and their provider mapping */
 export interface EmbeddingModelInfo {
@@ -13,11 +14,17 @@ export interface EmbeddingModelInfo {
     costPer1MTokensMicrodollars: number;
     /** Dimensions in the output embedding vector */
     dimensions: number;
+    /** The longest input string the model takes, where it is shorter than the route's own cap. */
+    maxInputChars?: number;
     modelApiId: string;
     provider: string;
 }
 
 export const EMBEDDING_MODELS: Record<string, EmbeddingModelInfo> = {
+    // Cloudflare Workers AI ($0.012 per 1M tokens). The default for memory and
+    // knowledge: no provider key, and multilingual, where bge-base-en is English only.
+    // 8,192 input tokens; a character is at most about one token in its tokenizer.
+    "bge-m3": { costPer1MTokensMicrodollars: 12_000, dimensions: 1024, maxInputChars: 8000, modelApiId: "@cf/baai/bge-m3", provider: "cloudflare" },
     "embedding-001": { costPer1MTokensMicrodollars: 0, dimensions: 768, modelApiId: "embedding-001", provider: "google" },
     // Groq (via OpenAI-compatible API)
     "nomic-embed-text-v1.5": { costPer1MTokensMicrodollars: 0, dimensions: 768, modelApiId: "nomic-embed-text-v1.5", provider: "groq" },
@@ -29,11 +36,33 @@ export const EMBEDDING_MODELS: Record<string, EmbeddingModelInfo> = {
     "text-embedding-ada-002": { costPer1MTokensMicrodollars: 100_000, dimensions: 1536, modelApiId: "text-embedding-ada-002", provider: "openai" },
 };
 
+/** Whether an input is longer than `model` takes, so the request is refused before the provider is paid for it. */
+export const isTooLongForModel = (model: EmbeddingModelInfo, inputs: ReadonlyArray<string>): boolean =>
+    model.maxInputChars !== undefined && inputs.some((input) => input.length > model.maxInputChars!);
+
 /**
  * Create an AI SDK embedding model instance for the given provider and model.
  */
-export const createEmbeddingModel = async (provider: string, modelApiId: string, apiKey: string): Promise<EmbeddingModelV4> => {
+export const createEmbeddingModel = async (
+    provider: string,
+    modelApiId: string,
+    apiKey: string,
+    cloudflare?: CloudflareProviderOptions,
+): Promise<EmbeddingModelV4> => {
     switch (provider) {
+        case "cloudflare": {
+            const { createWorkersAI } = await import("workers-ai-provider");
+
+            if (cloudflare?.aiBinding) {
+                return createWorkersAI({ binding: cloudflare.aiBinding }).textEmbedding(modelApiId);
+            }
+
+            if (apiKey && cloudflare?.accountId) {
+                return createWorkersAI({ accountId: cloudflare.accountId, apiKey }).textEmbedding(modelApiId);
+            }
+
+            throw new GatewayError("PROVIDER_NOT_CONFIGURED", "Cloudflare embeddings need either an AI binding or accountId + apiKey");
+        }
         case "google": {
             const { createGoogleGenerativeAI } = await import("@ai-sdk/google");
 

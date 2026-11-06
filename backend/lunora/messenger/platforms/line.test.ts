@@ -58,7 +58,7 @@ describe("parseLineWebhook", () => {
                 chatId: "U4af4980629",
                 eventId: "01FZ74A0TDDPYRVKNK77XKC3ZR",
                 kind: "text",
-                replyToken: "38ef843bde154d9b91c21320ffd17a0f",
+                replyToken: "38ef843bde154d9b91c21320ffd17a0f", // secret-scanner:allow LINE sample reply token
                 senderId: "U4af4980629",
                 text: "Hello",
                 timestampMs: NOW,

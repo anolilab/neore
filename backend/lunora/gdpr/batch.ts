@@ -3,8 +3,6 @@
  * `gdpr.ts`: at most {@link BATCH} rows per table per call, `{ hasMore }` back,
  * idempotent on retry. See `steps/residual-deletion-steps.ts`.
  */
-import type { TableName } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
 
 /** Rows per table per round. */
 export const BATCH = 100;
@@ -17,31 +15,31 @@ export const full = (rows: ReadonlyArray<unknown>): boolean => rows.length >= BA
 type Row = { _id: string };
 
 /**
- * Deletes a batch of parent rows with their children: up to {@link BATCH}
- * children per parent, and a parent only once none of its children are left.
- * `true` while anything may remain.
+ * Deletes rows one at a time through `remove`. Use this, not a `Promise.all`, for rows
+ * on an audited table (`lib/audit-triggers.ts`): each delete fires a trigger, and a batch
+ * of them in parallel nests the triggers past the runtime's 50-level limit.
  *
- * One delete at a time, deliberately: on an audited table
- * (`lib/audit-triggers.ts`) every delete fires a trigger, and a `Promise.all`
- * over a batch nests them past the runtime's 50-level trigger-recursion limit.
- * The rows are local to the shard, so sequential costs little.
+ * The caller passes the delete (`(row) => ctx.db.delete("table", row._id)`) so the
+ * write names its table at the call site, in the module that owns it: a `TableName`
+ * parameter here reads to the advisor as a write to every table.
  */
-/**
- * Deletes rows one at a time. Use this, not a `Promise.all`, for rows on an audited
- * table (`lib/audit-triggers.ts`): each delete fires a trigger, and a batch of them
- * in parallel nests the triggers past the runtime's 50-level limit.
- */
-export const deleteOneByOne = async (context: MutationCtx, table: TableName, rows: ReadonlyArray<Row>): Promise<void> => {
+export const deleteOneByOne = async <R extends Row>(rows: ReadonlyArray<R>, remove: (row: R) => Promise<unknown>): Promise<void> => {
     for (const row of rows) {
-        await context.db.delete(table, row._id as never);
+        await remove(row);
     }
 };
 
-export const deleteParentsWithChildren = async <P extends Row>(
-    context: MutationCtx,
-    tables: { child: TableName; parent: TableName },
+/**
+ * Deletes a batch of parent rows with their children: up to {@link BATCH}
+ * children per parent, and a parent only once none of its children are left.
+ * `true` while anything may remain. Sequential for the same trigger-recursion
+ * reason as {@link deleteOneByOne}, and the deletes come from the caller for the
+ * same advisor reason.
+ */
+export const deleteParentsWithChildren = async <P extends Row, C extends Row>(
     parents: ReadonlyArray<P>,
-    childrenOf: (parent: P) => Promise<Row[]>,
+    childrenOf: (parent: P) => Promise<C[]>,
+    remove: { child: (child: C) => Promise<unknown>; parent: (parent: P) => Promise<unknown> },
 ): Promise<boolean> => {
     let hasMore = parents.length >= BATCH;
 
@@ -49,7 +47,7 @@ export const deleteParentsWithChildren = async <P extends Row>(
         const children = await childrenOf(parent);
 
         for (const child of children) {
-            await context.db.delete(tables.child, child._id as never);
+            await remove.child(child);
         }
 
         if (children.length >= BATCH) {
@@ -57,7 +55,7 @@ export const deleteParentsWithChildren = async <P extends Row>(
             continue;
         }
 
-        await context.db.delete(tables.parent, parent._id as never);
+        await remove.parent(parent);
     }
 
     return hasMore;

@@ -27,6 +27,7 @@ import { AlertTriangleIcon, EditIcon, InfoIcon, XIcon } from "lucide-react";
 import type { ChangeEvent, DragEvent, FC } from "react";
 import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
+import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import ReferenceStrip from "@/features/chat/components/reference-picker/reference-strip";
 import type { AttachmentAdapter } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import {
@@ -40,6 +41,7 @@ import {
 } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import { useChatActions, useChatIsStreaming, useChatLunora, useChatThread } from "@/features/chat/core/context/chat-context";
 import useComparisonChat from "@/features/chat/core/hooks/use-comparison-chat";
+import usePendingSend, { holdForSignIn } from "@/features/chat/core/hooks/use-pending-send";
 import useRunnerCapabilities from "@/features/chat/core/hooks/use-runner-capabilities";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
 import { selectAttachedReferences, selectRemoveAttachedReference, useChatUIStore, useComposerState } from "@/features/chat/core/stores/chat-ui-store";
@@ -478,6 +480,8 @@ const ComposerInput = ({
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     const { isNewThread, threadId } = useChatThread();
+    // Invite-only: a guest's comparison send is held for sign-in (a plain send is held in `ChatProvider`).
+    const { mustSignIn } = useInviteOnly();
     const { getChatKey, isMounted, trackToast } = usePasteGuard(threadId);
 
     // Opt-in ghost text; `undefined` (off) unless the user enabled it in settings.
@@ -1022,6 +1026,14 @@ const ComposerInput = ({
             return;
         }
 
+        // A comparison send does not go through `sendMessage`, where a guest's send is held under invite-only, so hold
+        // it here: the draft stays and sign-in opens.
+        if (mustSignIn && (onSubmitOverride || isComparisonValid)) {
+            holdForSignIn(draftText);
+
+            return;
+        }
+
         // Set submitting flag briefly (guards against double-send, cleared inside sendMessage)
         useChatUIStore.getState().setIsSubmitting(true);
 
@@ -1048,6 +1060,7 @@ const ComposerInput = ({
         onSubmitProp?.();
     }, [
         disabled,
+        mustSignIn,
         sendMessage,
         onSubmitProp,
         contextStats,
@@ -1067,6 +1080,8 @@ const ComposerInput = ({
     // composer takes it; it fills the text, and the effect below submits once
     // that text has rendered and the composer can send.
     const autoSubmitTextRef = useRef<string | null>(null);
+    // Bumped with each request, so a requested text that is already the draft still submits.
+    const [autoSubmitRequest, setAutoSubmitRequest] = useState(0);
     const isAutoSubmitTarget = !onSubmitOverride && !compact && isNewThread;
 
     useEffect(() => {
@@ -1077,8 +1092,17 @@ const ComposerInput = ({
         return onComposerSubmitRequest(({ text: requested }) => {
             autoSubmitTextRef.current = requested;
             setText(requested);
+            setAutoSubmitRequest((count) => count + 1);
         });
     }, [isAutoSubmitTarget, setText]);
+
+    // The message a visitor sent before signing in (invite-only), sent once a real account's token is on the client.
+    // The new-chat composer and a thread's composer both take it: sign-in returns to the URL it started from.
+    usePendingSend(!onSubmitOverride && !compact, (pending) => {
+        autoSubmitTextRef.current = pending;
+        setText(pending);
+        setAutoSubmitRequest((count) => count + 1);
+    });
 
     // Files dropped on the dock icon (`core/utils/composer-submit.ts`) are attached the same way as a drop: uploaded, never sent.
     useEffect(() => {
@@ -1100,7 +1124,7 @@ const ComposerInput = ({
         // the composer for the user to send.
         autoSubmitTextRef.current = null;
         handleSubmit();
-    }, [disabled, handleSubmit, isStreaming, text]);
+    }, [autoSubmitRequest, disabled, handleSubmit, isStreaming, text]);
 
     // Handle cancel/stop
     // A manual stop pauses the queue: the chips stay, nothing auto-sends.

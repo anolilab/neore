@@ -218,15 +218,6 @@ export const documentHistory = sqliteTable("documentHistory", {
     by_ts: index("by_ts").on(t.ts),
 }));
 
-export const emails = sqliteTable("emails", {
-    _id: text("_id").primaryKey(),
-    _creationTime: integer("_creationTime").notNull(),
-    email: text("email").notNull(),
-    expectation: text("expectation", { mode: "json" }).$type<"delivered" | "bounced" | "complained">().notNull(),
-}, (t) => ({
-    by_email: index("by_email").on(t.email),
-}));
-
 export const invitation = sqliteTable("invitation", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

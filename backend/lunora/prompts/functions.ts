@@ -14,7 +14,7 @@ import { isLockedWithoutProof } from "../agent/thread-passcode";
 import { throwThreadLocked } from "../lib/thread-lock";
 import { assertOwnOrganizationId } from "../auth/lib/organization-helpers";
 import getAgent from "../chat/lib/get-agent";
-import { loadOptimizerModelRules } from "../chat/lib/optimizer-model-rules";
+import { loadOptimizerModel } from "../chat/lib/optimizer-model-rules";
 import { gatewayFetch } from "../lib/services";
 import { ActionCache, cacheKeyFor } from "../lib/action-cache";
 import { compareStrings } from "../lib/collections";
@@ -1526,9 +1526,7 @@ export const optimizePrompt = internalAction
             });
         }
 
-        const model = DEFAULT_PROMPT_IMPROVEMENT_MODEL;
-
-        const modelFilterRules = await loadOptimizerModelRules(context, userId, model);
+        const { model, modelFilterRules } = await loadOptimizerModel(context, userId, DEFAULT_PROMPT_IMPROVEMENT_MODEL);
         const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules });
 
         // Create a temporary thread for optimization

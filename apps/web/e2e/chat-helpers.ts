@@ -117,6 +117,8 @@ export const sendMessage = async (page: Page, text: string): Promise<void> => {
 export const assistantMessages = (page: Page): Locator =>
     page.locator('.message-item[data-message-role="assistant"]:not([data-streaming-placeholder]):not([data-thinking-placeholder])');
 
+export const userMessages = (page: Page): Locator => page.locator('.message-item[data-message-role="user"]');
+
 /** Wait until an assistant message carrying `text` is on the page, and return it. */
 export const expectAssistantReply = async (page: Page, text: string | RegExp): Promise<Locator> => {
     const message = assistantMessages(page).filter({ hasText: text }).last();
@@ -133,7 +135,7 @@ export const expectAssistantReply = async (page: Page, text: string | RegExp): P
  * Closing a page while the backend still owes it a response is what kills the
  * local backend: the response is later written to a closed socket, miniflare
  * reports "Network connection lost." and wrangler 4.124 treats that as fatal
- * (CLAUDE.md → Local dev; reproduced by closing a context mid-load — 2 of 6
+ * (`docs/agents/local-dev.md`; reproduced by closing a context mid-load — 2 of 6
  * closes took the backend down). A first paint's `/_lunora/rpc-batch` can take
  * 5-10s locally, so a spec's teardown lands inside that window routinely.
  */
@@ -185,7 +187,24 @@ export const trackBackendRequests = (page: Page): ((timeoutMs?: number) => Promi
     return drain;
 };
 
-/** Open `/chat` as whoever the page is (a guest, unless signed in first). */
+/**
+ * Whether the backend runs invite-only (`SIGNUP_INVITE_ONLY`, on unless "false"/"0"). Under it nobody can be a
+ * guest: `/chat` is shown signed out and sending asks for a sign-in.
+ */
+export const isInviteOnly = async (): Promise<boolean> => {
+    const response = await fetch(`${APP_BASE_URL}/api/auth/sign-in-methods`, { headers: { accept: "application/json" } });
+    const body: unknown = response.ok ? await response.json() : await response.text();
+    const inviteOnly = (body as { inviteOnly?: unknown } | null)?.inviteOnly;
+
+    // A refused or malformed answer (a 429, an error body) must not pick the suite's mode: fail loudly instead.
+    if (!response.ok || typeof inviteOnly !== "boolean") {
+        throw new Error(`[e2e] sign-in-methods answered ${String(response.status)} without an inviteOnly flag: ${JSON.stringify(body).slice(0, 200)}`);
+    }
+
+    return inviteOnly;
+};
+
+/** Open `/chat` as whoever the page is (signed out, or a guest when registration is open, unless signed in first). */
 export const openChat = async (page: Page): Promise<void> => {
     await settle(page);
     await page.goto("/chat");
@@ -267,7 +286,7 @@ const functionPathsIn = (payload: unknown): string[] => {
  * Record every backend function execution a page triggers, over HTTP and over
  * the live-query socket. Used to hold first paint to a budget: each execution
  * on first paint queues on the `__root__` shard, and a burst of them is what
- * makes the local backend slow enough to crash (CLAUDE.md → Local dev).
+ * makes the local backend slow enough to crash (`docs/agents/local-dev.md`).
  */
 export const recordBackendCalls = (page: Page): BackendCalls => {
     const record: BackendCalls = { calls: [], unauthorized: [] };

@@ -779,6 +779,8 @@ export const schema = defineSchema({
         .index("by_messageId", ["messageId"])
         .index("by_userId", ["userId"])
         .index("by_threadId_and_kind", ["threadId", "kind"])
+        // The image library across all of one user's threads (`media/functions.ts`).
+        .index("by_userId_and_kind", ["userId", "kind"])
         .relations((r) => {
             return {
                 thread: r.one("threads", { field: "threadId" }),
@@ -802,13 +804,6 @@ export const schema = defineSchema({
                 document: r.one("documents", { field: "documentId" }),
             };
         }),
-
-    emails: defineTable({
-        email: v.string(),
-        expectation: v.union(v.literal("delivered"), v.literal("bounced"), v.literal("complained")),
-    })
-        .global()
-        .index("by_email", ["email"]),
 
     embeddings_128: defineTable({
         model: v.string(),

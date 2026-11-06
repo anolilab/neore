@@ -14,7 +14,11 @@
  * 2. only once EVERYTHING is copied are the guest's rows deleted
  *    ({@link deleteShardRows}) — a relation's `onDelete` cascade could
  *    otherwise remove a row before it was copied;
- * 3. `.global()` rows naming the guest are re-pointed ({@link reassignGlobalRows}).
+ * 3. `.global()` rows naming the guest are re-pointed ({@link reassignGlobalRows});
+ * 4. once the guest's shard is empty, the guest itself is deleted
+ *    (`auth/hooks.ts#deleteMergedGuest`), as the anonymous plugin does when a
+ *    conversion completes in the guest's own browser. A cross-browser
+ *    conversion (`auth/guest-conversion.ts`) would otherwise leave it alive.
  *
  * The new account's own seeded `userSettings`/`aiUserPreferences` win over the
  * guest's. Re-running after a partial failure is safe: an id already on the new
@@ -228,19 +232,32 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
     }
 
     // Then clear the guest's shard.
+    let drained = true;
+
     for (const table of tables) {
+        let emptied = false;
+
         for (let round = 0; round < MAX_ROUNDS_PER_TABLE; round += 1) {
             const ids: string[] = await call(references.listIds, { table }, from);
 
             if (ids.length === 0) {
+                emptied = true;
+
                 break;
             }
 
             await call(references.deleteRows, { ids, table }, from);
         }
+
+        drained &&= emptied;
     }
 
     await call(references.reassignGlobal, { from, to }, to);
+
+    // Only once nothing of the guest's is left to move: a later run still needs to find it otherwise.
+    if (drained) {
+        await call(references.deleteGuest, { userId: from }, from);
+    }
 
     return { moved };
 };
@@ -250,6 +267,7 @@ const MAX_ROUNDS_PER_TABLE = 1000;
 
 /** The generated references `mergeGuestInto` calls (passed in, so this module does not import `_generated/api`). */
 export interface MergeReferences {
+    deleteGuest: { __lunoraRef: string };
     deleteRows: { __lunoraRef: string };
     importRows: { __lunoraRef: string };
     list: { __lunoraRef: string };
@@ -270,6 +288,7 @@ export const runGuestMerge = internalAction
         const result = await mergeGuestInto(
             async (reference, callArgs, shardKey) => (await callOnShard(reference as never, callArgs as never, { shardKey })) as never,
             {
+                deleteGuest: internal.auth.hooks.deleteMergedGuest,
                 deleteRows: internal.lib.account_merge.deleteShardRows,
                 importRows: internal.lib.account_merge.importShardRows,
                 list: internal.lib.account_merge.listShardRowsPage,

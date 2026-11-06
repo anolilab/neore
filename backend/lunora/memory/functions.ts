@@ -142,7 +142,7 @@ type OrphanedVector = { embeddingId: string; memoryId: string; userId: string };
 
 /**
  * Delete the embedding of a memory whose row is already gone. The vector's table is
- * resolved from its id (a memory's embedding is normally `embeddings_768`) and the
+ * resolved from its id (a memory's embedding is normally `embeddings_1024`) and the
  * embedding carries no memory text, only the vector plus model/table/thread/user ids.
  *
  * This covers the vector ROW in the database. The sync of that delete to the vector

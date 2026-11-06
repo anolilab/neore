@@ -9,11 +9,14 @@ import { useCallback, useState } from "react";
 
 import Neore from "@/assets/logo/neore.svg?react";
 import { LinkButton } from "@/components/link-button";
+import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 
 export type NavTheme = "dark" | "light";
 
 const GatewayNavbar: FC<{ theme?: NavTheme }> = ({ theme = "dark" }) => {
     const { t } = useLingui();
+    // Registration is invite-only unless the backend says otherwise: "Get API key" then leads to sign-in.
+    const { signUpHref } = useInviteOnly();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const isDark = theme === "dark";
 
@@ -86,7 +89,7 @@ const GatewayNavbar: FC<{ theme?: NavTheme }> = ({ theme = "dark" }) => {
                     <LinkButton size="marketing" to="/auth/sign-in" variant="marketing-ghost">
                         {t`Login`}
                     </LinkButton>
-                    <LinkButton size="marketing" to="/auth/sign-up" variant="marketing">
+                    <LinkButton size="marketing" to={signUpHref} variant="marketing">
                         {t`Get API key`}
                     </LinkButton>
                 </div>
@@ -180,7 +183,7 @@ const GatewayNavbar: FC<{ theme?: NavTheme }> = ({ theme = "dark" }) => {
                                 >
                                     {t`Login`}
                                 </LinkButton>
-                                <LinkButton className="w-full" size="marketing" to="/auth/sign-up" variant="marketing">
+                                <LinkButton className="w-full" size="marketing" to={signUpHref} variant="marketing">
                                     {t`Get API key`}
                                     <ArrowRight className="ml-1.5 size-3.5" />
                                 </LinkButton>

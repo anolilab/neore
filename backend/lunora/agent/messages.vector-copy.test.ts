@@ -25,11 +25,11 @@ describe("cloneMessageBatch vector copy", () => {
         expect.assertions(2);
 
         const { copies, reads } = await harness.run(async (ctx) => {
-            const embeddingId = await ctx.db.insert("embeddings_768", {
+            const embeddingId = await ctx.db.insert("embeddings_1024", {
                 model: "m",
                 table: "messages",
                 userId: OWNER,
-                vector: Array.from({ length: 768 }, (_, index) => index / 768),
+                vector: Array.from({ length: 1024 }, (_, index) => index / 1024),
             });
             const source = await ctx.db.insert("threads", { status: "active", title: "S", userId: OWNER });
             const target = await ctx.db.insert("threads", { status: "active", title: "T", userId: OWNER });
@@ -54,7 +54,7 @@ describe("cloneMessageBatch vector copy", () => {
                 targetThreadId: target,
             });
 
-            const rows = await ctx.db.query("embeddings_768").collect();
+            const rows = await ctx.db.query("embeddings_1024").collect();
 
             return {
                 copies: rows.length,

@@ -28,6 +28,7 @@ import {
     getModelMode,
     getModelModeName,
     groupModelsByCreator,
+    initialCreatorSlug,
     stripProviderPrefix,
 } from "./utils";
 
@@ -86,7 +87,7 @@ const ProviderSidebarButton = memo<{
             "relative flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors duration-150",
             showBorder && "mb-0.5 border-b pb-2",
             isSelected
-                ? "text-foreground before:bg-primary before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full"
+                ? "text-foreground before:bg-primary-text before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full"
                 : "text-muted-foreground/70 hover:text-foreground",
         )}
         onClick={onClick}
@@ -181,7 +182,7 @@ const ModelItemContent = memo<{
                 ) : null}
                 {showCheckmark ? (
                     <span className="ml-0.5 flex size-3.5 shrink-0 items-center justify-center">
-                        {isSelected ? <CheckIcon aria-hidden="true" className="text-primary size-3.5" /> : null}
+                        {isSelected ? <CheckIcon aria-hidden="true" className="text-primary-text size-3.5" /> : null}
                     </span>
                 ) : null}
             </div>
@@ -256,7 +257,7 @@ const ModelGroupRenderer = memo<{
                         if (isTypeMismatch) {
                             parallelCheckbox = <Lock className="text-muted-foreground/30 size-4" />;
                         } else if (isParallelSelected) {
-                            parallelCheckbox = <CheckSquare2 className="text-primary size-4" />;
+                            parallelCheckbox = <CheckSquare2 className="text-primary-text size-4" />;
                         }
 
                         return (
@@ -345,17 +346,10 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     const [activeTab, setActiveTab] = useState<ModelPickerTab>(defaultTab);
     const [selectionMode, setSelectionMode] = useState<"parallel" | "single">(() => ((initialModelIds?.length ?? 0) > 0 ? "parallel" : "single"));
     const [modeFilter, setModeFilter] = useState<ModelModeFilter>(defaultModeFilter);
-    const [selectedProvider, setSelectedProvider] = useState<string | null>(() => {
-        if (initialModelId) {
-            const slug = initialModelId.split("/", 1)[0];
-
-            if (slug) {
-                return slug;
-            }
-        }
-
-        return null;
-    });
+    // `undefined` until the user picks a creator or "All": the scope then follows the selected model's creator, so it
+    // waits for the model to arrive in the list and clears itself when that creator is hidden.
+    const [chosenProvider, setChosenProvider] = useState<string | null | undefined>(undefined);
+    const selectedProvider = chosenProvider === undefined ? initialCreatorSlug(models, initialModelId) : chosenProvider;
 
     const onSelectRef = useRef(onSelect);
     const onSelectMultipleRef = useRef(onSelectMultiple);
@@ -405,7 +399,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     );
 
     const handleProviderSelect = useCallback((slug: string | null) => {
-        setSelectedProvider(slug);
+        setChosenProvider(slug);
         setSearchQuery("");
     }, []);
 
@@ -413,7 +407,8 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
     const handleTabChange = useCallback((tab: ModelPickerTab) => {
         setActiveTab(tab);
-        setSelectedProvider(null);
+        // Starred shows no scope, so leaving it keeps the opening scope; a creator the user picked is cleared.
+        setChosenProvider((current) => (current === undefined ? undefined : null));
         setSearchQuery("");
     }, []);
 
@@ -609,7 +604,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                             aria-pressed={modeFilter === null}
                             className={cn(
                                 "rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                modeFilter === null ? "bg-primary/10 text-primary" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                modeFilter === null ? "bg-primary/10 text-primary-text" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                             )}
                             onClick={() => setModeFilter(null)}
                             type="button"
@@ -620,7 +615,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                             aria-pressed={modeFilter === "text"}
                             className={cn(
                                 "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                modeFilter === "text" ? "bg-primary/10 text-primary" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                modeFilter === "text" ? "bg-primary/10 text-primary-text" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                             )}
                             onClick={() => setModeFilter("text")}
                             type="button"
@@ -632,7 +627,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                             aria-pressed={modeFilter === "image"}
                             className={cn(
                                 "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                modeFilter === "image" ? "bg-primary/10 text-primary" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                modeFilter === "image" ? "bg-primary/10 text-primary-text" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                             )}
                             onClick={() => setModeFilter("image")}
                             type="button"
@@ -644,7 +639,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                             aria-pressed={modeFilter === "video"}
                             className={cn(
                                 "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                modeFilter === "video" ? "bg-primary/10 text-primary" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                modeFilter === "video" ? "bg-primary/10 text-primary-text" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                             )}
                             onClick={() => setModeFilter("video")}
                             type="button"
@@ -657,7 +652,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                             className={cn(
                                 "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                 modeFilter === "speech-to-text"
-                                    ? "bg-primary/10 text-primary"
+                                    ? "bg-primary/10 text-primary-text"
                                     : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                             )}
                             onClick={() => setModeFilter("speech-to-text")}

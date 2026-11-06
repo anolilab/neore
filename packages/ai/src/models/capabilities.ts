@@ -23,10 +23,12 @@ export const DEFAULT_FILE_PART_MIME_SET = new Set(DEFAULT_FILE_PART_MIME_TYPES);
 export const INGEST_SUPPORTED_MIME = new Set(["application/csv", "text/csv"]);
 
 /**
- * Pre-computed set of model API IDs that do not support tool calling.
- * Derived from MODEL_REGISTRY — no side-effect registration needed.
+ * Pre-computed set of the models that do not support tool calling, by registry id and by API id: chat names a model
+ * by its registry id, a provider by its API id. Derived from MODEL_REGISTRY — no side-effect registration needed.
  */
-export const staticUnsupportedModels: ReadonlySet<string> = new Set(MODEL_REGISTRY.filter((m) => m.supportsToolCalling === false).map((m) => m.modelApiId));
+export const staticUnsupportedModels: ReadonlySet<string> = new Set(
+    MODEL_REGISTRY.flatMap((m) => (m.supportsToolCalling === false ? [m.id, m.modelApiId] : [])),
+);
 
 const findDefinition = (model: LanguageModel) => {
     const modelId: string = (model as any).modelId ?? "";

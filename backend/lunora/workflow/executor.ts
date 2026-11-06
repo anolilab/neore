@@ -6,7 +6,8 @@ import type { AgentConfig } from "@neore/ai/providers";
  * Executes workflow nodes in topological order, passing data between nodes
  * via a shared execution context.
  */
-import { resolveWorkflowModel } from "@neore/ai/models";
+import { DEFAULT_TEXT_TO_TEXT_MODEL } from "@neore/ai/constants";
+import { hasActiveFilters, MODEL_LOOKUP, type ModelFilterRules, resolveWorkflowModel } from "@neore/ai/models";
 import { generateText, type LanguageModel } from "ai";
 import { LunoraError, v } from "lunorash/server";
 
@@ -14,7 +15,12 @@ import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx as ActionContext } from "../_generated/server";
-import { authAction, rateLimit } from "../lib/crpc";
+import { backupFilterRejection } from "../chat/lib/backup-model";
+import { GatewayLanguageModel } from "../chat/lib/gateway-language-model";
+import { loadModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE, ModelFilterRulesUnavailableError } from "../chat/lib/model-filter-rules";
+import { authAction, internalAction, rateLimit } from "../lib/crpc";
+import { gatewayFetch, type ServiceFetch } from "../lib/services";
+import { defaultModelUnderRules } from "../lib/utility-model";
 import {
     accumulateUsage,
     createEmptyUsage,
@@ -55,9 +61,158 @@ const getAgents = (): Promise<Record<string, AgentConfig>> => {
 };
 
 /**
+ * Whether `modelId` runs only behind the LLM gateway (Workers AI, on the gateway's `AI` binding). Such a model has
+ * no provider SDK the backend could call, so a node reaches it through the gateway binding: directly from an
+ * action, through {@link generateWorkflowText} from the streaming HTTP route, which has no binding.
+ */
+export const runsOnGatewayOnly = (modelId: string): boolean => MODEL_LOOKUP.get(modelId)?.provider === "cloudflare";
+
+interface GatewayTextRequest {
+    maxTokens?: number;
+    modelId: string;
+    /** The run account's organization, charged for the call like every other node (`resolveRunAccount`). */
+    orgId?: string;
+    prompt: string;
+    system?: string;
+    temperature?: number;
+    userId: string;
+}
+
+/** How long one node's generation may take on the gateway before the node fails. */
+const GATEWAY_NODE_TIMEOUT_MS = 5 * 60_000;
+
+/**
+ * Generates a node's text on a gateway-only model, metered to the user who runs the workflow. The runner's model
+ * filters go with the call, read fail-closed (`loadModelFilterRules`), so the gateway refuses a model they exclude:
+ * the node named this model, so nothing stands in for it.
+ */
+const generateOnGateway = async (ctx: Pick<ActionContext, "runQuery">, gateway: ServiceFetch, request: GatewayTextRequest) => {
+    if (request.prompt.length > MAX_LENGTH.document || (request.system?.length ?? 0) > MAX_LENGTH.document) {
+        throw new LunoraError("BAD_REQUEST", "This node's prompt is too long to send to the model.");
+    }
+
+    const definition = MODEL_LOOKUP.get(request.modelId)!;
+    const rules = await loadModelFilterRules(ctx, request.userId);
+
+    return await generateText({
+        abortSignal: AbortSignal.timeout(GATEWAY_NODE_TIMEOUT_MS),
+        maxOutputTokens: request.maxTokens,
+        model: new GatewayLanguageModel({
+            gateway,
+            modelApiId: definition.modelApiId,
+            modelFilterRules: hasActiveFilters(rules) ? rules : undefined,
+            modelId: definition.id,
+            orgId: request.orgId,
+            provider: definition.provider,
+            userId: request.userId,
+        }),
+        prompt: request.prompt,
+        system: request.system,
+        temperature: request.temperature,
+    });
+};
+
+/**
+ * Why the runner's model filters exclude the model a node names, or `undefined` when they allow it. A node on a
+ * provider's own SDK never passes the gateway, which is where the filters are otherwise enforced, so it is checked
+ * here before the call. Read fail-closed (`loadModelFilterRules`).
+ */
+export const directModelRefusal = async (ctx: Pick<ActionContext, "runQuery">, userId: string, modelId: string): Promise<string | undefined> =>
+    refusalUnder(await loadModelFilterRules(ctx, userId), modelId);
+
+/** Why `rules` exclude `modelId`, or `undefined` when they allow it. An id the registry does not know cannot be checked, so it is refused while any rule is active. */
+const refusalUnder = (rules: ModelFilterRules, modelId: string): string | undefined => {
+    const definition = MODEL_LOOKUP.get(modelId);
+
+    if (!definition && hasActiveFilters(rules)) {
+        return `Your model settings cannot be checked against this node's model ("${modelId}"). Pick a listed model.`;
+    }
+
+    const refusal = definition ? backupFilterRejection(definition, rules) : null;
+
+    return refusal === null ? undefined : `Your model settings exclude this node's model. ${refusal}`;
+};
+
+/** The model an AI node runs on when it names none, unless the runner's rules exclude it ({@link aiNodeModel}). */
+export const AI_NODE_DEFAULT_MODEL = DEFAULT_TEXT_TO_TEXT_MODEL;
+
+/**
+ * The model an AI node runs on: the one it names, else the default, moved to the first fallback the runner's rules
+ * allow when they exclude it (`defaultModelUnderRules`), as a chat on the default model would be. Read fail-closed.
+ */
+export const aiNodeModel = async (ctx: Pick<ActionContext, "runQuery">, userId: string, model: string | undefined): Promise<string> =>
+    model ?? defaultModelUnderRules(AI_NODE_DEFAULT_MODEL, await loadModelFilterRules(ctx, userId));
+
+/** The most output tokens a node may ask for. */
+export const MAX_NODE_OUTPUT_TOKENS = 32_768;
+
+/** A node's `maxTokens` as a model call takes it: a positive integer, capped; anything else leaves the model's own limit. */
+export const nodeMaxTokens = (maxTokens: number | undefined): number | undefined =>
+    maxTokens !== undefined && Number.isSafeInteger(maxTokens) && maxTokens > 0 ? Math.min(maxTokens, MAX_NODE_OUTPUT_TOKENS) : undefined;
+
+/**
+ * Why the runner's model filters exclude the model of any AI node in the graph, one line per refused model. Checked
+ * before the first node runs, with the media checks (`workflowRunErrors`), so a run that cannot finish never bills
+ * an earlier clip or image. Read fail-closed (`loadModelFilterRules`). The per-node checks stay: the rules may change
+ * while a long run is in flight.
+ */
+export const workflowModelRefusals = async (ctx: Pick<ActionContext, "runQuery">, userId: string, nodes: ReadonlyArray<WorkflowNode>): Promise<string[]> => {
+    const aiNodes = nodes.filter((node) => node.type === "ai");
+
+    if (aiNodes.length === 0) {
+        return [];
+    }
+
+    let rules: ModelFilterRules;
+
+    try {
+        rules = await loadModelFilterRules(ctx, userId);
+    } catch (error) {
+        if (error instanceof ModelFilterRulesUnavailableError) {
+            return [MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE];
+        }
+
+        throw error;
+    }
+
+    const models = new Set(aiNodes.map((node) => (node.data as { model?: string }).model ?? defaultModelUnderRules(AI_NODE_DEFAULT_MODEL, rules)));
+
+    return [...models].flatMap((model) => {
+        const refusal = refusalUnder(rules, model);
+
+        return refusal === undefined ? [] : [refusal];
+    });
+};
+
+/** {@link generateOnGateway} for the streaming workflow route: an HTTP action, which cannot reach the gateway itself. */
+export const generateWorkflowText = internalAction
+    .input({
+        maxTokens: v.optional(
+            v.number().check((value) => Number.isSafeInteger(value) && value > 0 && value <= MAX_NODE_OUTPUT_TOKENS, { message: "Invalid output token limit" }),
+        ),
+        modelId: v.string().max(MAX_LENGTH.short),
+        orgId: v.optional(v.string().max(MAX_LENGTH.short)),
+        prompt: v.string().max(MAX_LENGTH.document),
+        system: v.optional(v.string().max(MAX_LENGTH.document)),
+        temperature: v.optional(v.number()),
+        userId: v.string().max(MAX_LENGTH.short),
+    })
+    .output(v.object({ inputTokens: v.number(), outputTokens: v.number(), text: v.string() }))
+    .action(async ({ args, ctx }) => {
+        const result = await generateOnGateway(ctx, gatewayFetch(ctx), args);
+
+        return { inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0, text: result.text };
+    });
+
+/**
  * Execute an AI node using the agent system.
  */
-const executeAINode = async (node: WorkflowNode, context: ExecutionContext, userProviderKeys?: Record<string, string>): Promise<NodeExecutionResult> => {
+const executeAINode = async (
+    node: WorkflowNode,
+    context: ExecutionContext,
+    run: { ctx: Pick<ActionContext, "runQuery">; gateway: ServiceFetch; orgId?: string; userId: string },
+    userProviderKeys?: Record<string, string>,
+): Promise<NodeExecutionResult> => {
     const data = node.data as {
         maxTokens?: number;
         model?: string;
@@ -71,18 +226,36 @@ const executeAINode = async (node: WorkflowNode, context: ExecutionContext, user
         return { error: "No input provided to AI node", success: false };
     }
 
-    const modelId = (data.model ?? "claude-sonnet-4-20250514") as string;
-
     try {
+        const modelId = await aiNodeModel(run.ctx, run.userId, data.model);
+
+        if (runsOnGatewayOnly(modelId)) {
+            const result = await generateOnGateway(run.ctx, run.gateway, {
+                maxTokens: nodeMaxTokens(data.maxTokens),
+                modelId,
+                orgId: run.orgId,
+                prompt,
+                system: systemPromptFor(node, context),
+                temperature: data.temperature,
+                userId: run.userId,
+            });
+            const promptTokens = result.usage.inputTokens ?? 0;
+            const completionTokens = result.usage.outputTokens ?? 0;
+
+            return { output: result.text, success: true, usage: { completionTokens, promptTokens, totalTokens: promptTokens + completionTokens } };
+        }
+
+        const refusal = await directModelRefusal(run.ctx, run.userId, modelId);
+
+        if (refusal) {
+            return { error: refusal, success: false };
+        }
+
         const agents = await getAgents();
-        let agent = agents[modelId];
+        const agent = agents[modelId];
 
         if (!agent) {
-            agent = agents["claude-sonnet-4-20250514" as string];
-
-            if (!agent) {
-                return { error: `Unknown model: ${modelId}`, success: false };
-            }
+            return { error: `Unknown model: ${modelId}`, success: false };
         }
 
         let languageModel = agent.chat;
@@ -102,7 +275,7 @@ const executeAINode = async (node: WorkflowNode, context: ExecutionContext, user
         }
 
         const result = await generateText({
-            maxOutputTokens: data.maxTokens,
+            maxOutputTokens: nodeMaxTokens(data.maxTokens),
             model: languageModel,
             prompt,
             system: systemPromptFor(node, context),
@@ -911,7 +1084,7 @@ export const executeWorkflow = authAction
         const account = await resolveRunAccount(context, userId);
 
         // Checked before any node runs, so a run that cannot finish never bills an earlier clip.
-        const inputErrors = workflowRunErrors(account, workflowContent);
+        const inputErrors = [...workflowRunErrors(account, workflowContent), ...(await workflowModelRefusals(context, userId, workflowContent.nodes))];
 
         if (inputErrors.length > 0) {
             throw new LunoraError("BAD_REQUEST", inputErrors.join("; "));
@@ -965,7 +1138,12 @@ export const executeWorkflow = authAction
                             break;
                         }
                         case "ai": {
-                            result = await executeAINode(node, executionContext, userProviderKeys ?? undefined);
+                            result = await executeAINode(
+                                node,
+                                executionContext,
+                                { ctx: context, gateway: gatewayFetch(context), orgId: account.orgId, userId },
+                                userProviderKeys ?? undefined,
+                            );
                             break;
                         }
                         case "audio": {

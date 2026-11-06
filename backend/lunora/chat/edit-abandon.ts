@@ -19,6 +19,7 @@ import { isThreadLocked } from "../lib/thread-lock";
 
 export const ABANDONED_REPLY_TEXT = "*The reply did not finish. Please try again.*";
 const ABANDONED_REPLY_ERROR = "The reply stopped before it finished.";
+const PENDING_REPLY_PAGE = 100;
 
 export const failAbandonedEditReply = internalMutation
     .input({
@@ -43,26 +44,41 @@ export const failAbandonedEditReply = internalMutation
             return { added: false, failed: 0 };
         }
 
-        // Replies to the prompt share or follow its `order`, and were written after it.
-        const pendingRows = await ctx.db
-            .query("messages")
-            .withIndex("threadId_status_tool_order_stepOrder", (q) =>
-                q.eq("threadId", threadId).eq("status", "pending").eq("tool", false).gte("order", prompt.order),
-            )
-            .collect();
-        const pending = pendingRows.filter((row) => row._creationTime >= prompt._creationTime);
+        // Replies to the prompt share or follow its `order`, and were written after it. The range is walked a page at a
+        // time with a cursor: rows written before the prompt also match it and are never patched, so re-reading the
+        // first page would never end.
+        let failed = 0;
+        let cursor: string | null = null;
+        let isDone = false;
 
-        for (const row of pending) {
-            await patchRow(ctx.db, "messages", row, {
-                error: ABANDONED_REPLY_ERROR,
-                message: { content: [{ text: ABANDONED_REPLY_TEXT, type: "text" }], role: "assistant" },
-                status: "failed",
-                text: ABANDONED_REPLY_TEXT,
-            });
+        while (!isDone) {
+            const page = await ctx.db
+                .query("messages")
+                .withIndex("threadId_status_tool_order_stepOrder", (q) =>
+                    q.eq("threadId", threadId).eq("status", "pending").eq("tool", false).gte("order", prompt.order),
+                )
+                .paginate({ cursor, numItems: PENDING_REPLY_PAGE });
+
+            for (const row of page.page) {
+                // A row from before the prompt shares the range but belongs to an earlier reply.
+                if (row._creationTime < prompt._creationTime) {
+                    continue;
+                }
+
+                await patchRow(ctx.db, "messages", row, {
+                    error: ABANDONED_REPLY_ERROR,
+                    message: { content: [{ text: ABANDONED_REPLY_TEXT, type: "text" }], role: "assistant" },
+                    status: "failed",
+                    text: ABANDONED_REPLY_TEXT,
+                });
+                failed += 1;
+            }
+
+            ({ continueCursor: cursor, isDone } = page);
         }
 
-        if (pending.length > 0) {
-            return { added: false, failed: pending.length };
+        if (failed > 0) {
+            return { added: false, failed };
         }
 
         // Nothing was written: answer the prompt with the error. A reply that

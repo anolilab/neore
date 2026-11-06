@@ -196,9 +196,8 @@ export const listUserImages = authQuery
                       .collect()
                 : await context.db
                       .query("documents")
-                      .withIndex("by_userId", (q) => q.eq("userId", userId))
+                      .withIndex("by_userId_and_kind", (q) => q.eq("userId", userId).eq("kind", "image"))
                       .order("desc")
-                      .filter((document) => document.kind === "image")
                       .take(MAX_DOCUMENT_SCAN);
 
         // Resolve thread titles in a single batch. Both sources may reference

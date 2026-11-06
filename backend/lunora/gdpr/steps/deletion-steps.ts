@@ -5,7 +5,13 @@ import { endHostThread } from "../../acp/lib/thread-removed";
 import { deleteAccountsOf, deleteSessionsOf, deleteUserSettingRows } from "../../auth/gdpr";
 import { deleteShardRoutesOf } from "../../lib/shard-routes";
 import { eraseConnectorsForUser } from "../../connectors/gdpr";
-import { eraseProjectsForUser, eraseThreadMetadataForUser, eraseThreadSuggestionsAndInvites } from "../../agent/gdpr";
+import {
+    eraseDocumentsForUser,
+    eraseProjectsForUser,
+    eraseThreadMetadataForUser,
+    eraseThreadPasscodesForUser,
+    eraseThreadSuggestionsAndInvites,
+} from "../../agent/gdpr";
 import { eraseThreadPinsAndTagsForUser, erasePersistentStreamsForUser, erasePresentationsForUser } from "../../chat/gdpr";
 import { eraseVaultForUser } from "../../vault/gdpr";
 import { erasePromptsForUser } from "../../prompts/gdpr";
@@ -13,7 +19,7 @@ import { eraseMemoriesForUser } from "../../memory/gdpr";
 import { eraseImportJobsForUser } from "../../chat-import/gdpr";
 import { eraseSkillsForUser } from "../../skills/gdpr";
 import { eraseBrowserDataForUser } from "../../browser/gdpr";
-import { BATCH, deleteParentsWithChildren } from "../batch";
+import { BATCH } from "../batch";
 
 /**
  * Steps that return `{ hasMore }` follow the residual steps' contract
@@ -77,8 +83,9 @@ export const deleteUserThreadMetadata = internalMutation
         // Relationships, temporary threads and thread grants are the agent module's (`agent/gdpr.ts`).
         await eraseThreadMetadataForUser(context, userId);
 
-        // Pins and tags are the chat module's (`chat/gdpr.ts`).
+        // Pins and tags are the chat module's (`chat/gdpr.ts`), passcodes the agent module's.
         await eraseThreadPinsAndTagsForUser(context, userId);
+        await eraseThreadPasscodesForUser(context, userId);
 
         return null;
     });
@@ -109,7 +116,7 @@ export const deleteUserThreadCascade = internalMutation
         });
         let revisit = false;
 
-        const now = Date.now();
+        const { now } = context;
 
         for (const thread of threads.page) {
             await endHostThread(context, thread, now);
@@ -129,25 +136,7 @@ export const deleteUserThreadCascade = internalMutation
 export const deleteUserDocuments = internalMutation
     .input({ userId: v.string() })
     .output(vBatchResult)
-    .mutation(async ({ args: { userId }, ctx: context }) => {
-        const documents = await context.db
-            .query("documents")
-            .withIndex("by_userId", (q) => q.eq("userId", userId))
-            .take(BATCH);
-
-        const hasMore = await deleteParentsWithChildren(
-            context,
-            { child: "documentVersions", parent: "documents" },
-            documents,
-            async (documentRow) =>
-                await context.db
-                    .query("documentVersions")
-                    .withIndex("by_documentId_version", (q) => q.eq("documentId", documentRow._id))
-                    .take(BATCH),
-        );
-
-        return { hasMore };
-    });
+    .mutation(async ({ args: { userId }, ctx: context }) => await eraseDocumentsForUser(context, userId));
 
 /** The user's presentations and their slides (`chat/gdpr.ts`). */
 export const deleteUserPresentations = internalMutation

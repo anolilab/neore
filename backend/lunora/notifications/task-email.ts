@@ -84,7 +84,7 @@ export const listPendingOutcomeEmails = internalQuery
     .input({})
     .output(v.array(v.object({ id: v.id("outcomeEmails"), link: v.string(), title: v.string(), userId: v.string() })))
     .query(async ({ ctx }) => {
-        const cutoff = Date.now() - OUTCOME_CLAIM_RECOVERY_MS;
+        const cutoff = ctx.now - OUTCOME_CLAIM_RECOVERY_MS;
         const { page: pending } = await ctx.db.outcomeEmails.findMany({ limit: SEND_BATCH, orderBy: [{ createdAt: "asc" }], where: { status: "pending" } });
         const { page: abandoned } = await ctx.db.outcomeEmails.findMany({
             limit: SEND_BATCH,
@@ -111,14 +111,14 @@ export const claimOutcomeEmail = internalMutation
     .output(v.union(v.number(), v.null()))
     .mutation(async ({ args: { id }, ctx }) => {
         const row = await ctx.db.get("outcomeEmails", id);
-        const abandoned = row?.status === "sending" && (row.claimedAt ?? 0) < Date.now() - OUTCOME_CLAIM_RECOVERY_MS;
+        const abandoned = row?.status === "sending" && (row.claimedAt ?? 0) < ctx.now - OUTCOME_CLAIM_RECOVERY_MS;
 
         if (!row || (row.status !== "pending" && !abandoned)) {
             return null;
         }
 
         // The claim time is the token: only the run that holds this claim may settle the row.
-        const claimedAt = Date.now();
+        const claimedAt = ctx.now;
 
         await ctx.db.patch("outcomeEmails", id, { claimedAt, status: "sending" });
 
@@ -178,7 +178,7 @@ export const settleOutcomeEmail = internalMutation
             }
 
             case "sent": {
-                await patchById(ctx.db, "outcomeEmails", id, { claimedAt: undefined, sentAt: Date.now(), status: "sent" });
+                await patchById(ctx.db, "outcomeEmails", id, { claimedAt: undefined, sentAt: ctx.now, status: "sent" });
                 break;
             }
 

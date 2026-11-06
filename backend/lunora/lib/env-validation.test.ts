@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const CORE_ENV = {
     ADMIN: "admin@test.com",
     BETTER_AUTH_SECRET: "test-secret-that-is-long-enough",
-    ENCRYPTION_KEY: "a]V2x!9Kp#mN7Qw$rF4hJ8dL0sY6bE3c", // 32+ chars
+    ENCRYPTION_KEY: btoa("k".repeat(32)),
     ENVIRONMENT: "development",
     JWKS: '{"keys":[]}',
     SITE_URL: "http://localhost:5173",
@@ -22,8 +22,6 @@ const SERVICE_ENV = {
     R2_ENDPOINT: "https://test.r2.cloudflarestorage.com",
     R2_SECRET_ACCESS_KEY: "test-secret",
     R2_TOKEN: "test-token",
-    RESEND_API_KEY: "re_test_key",
-    RESEND_WEBHOOK_SECRET: "whsec_test",
     STORAGE_SIGNING_SECRET: "storage-signing-secret-at-least-32-chars",
 };
 
@@ -109,6 +107,30 @@ describe("envValidation — tiered validation", () => {
         expect(() => assertEnv()).toThrow("Environment validation failed");
     });
 
+    it("assertEnv should refuse an ENCRYPTION_KEY of 32 characters that decodes to fewer than 32 bytes", async () => {
+        const environment = Object.entries({ ...ALL_ENV, ENCRYPTION_KEY: btoa("k".repeat(24)), ENVIRONMENT: "production" });
+
+        for (const [key, value] of environment) {
+            vi.stubEnv(key, value);
+        }
+
+        const { assertEnv } = await import("./env-validation");
+
+        expect(() => assertEnv()).toThrow("ENCRYPTION_KEY must decode to at least 32 bytes (got 24)");
+    });
+
+    it("assertEnv should refuse an ENCRYPTION_KEY that is not Base64", async () => {
+        const environment = Object.entries({ ...ALL_ENV, ENCRYPTION_KEY: "not-base64!", ENVIRONMENT: "production" });
+
+        for (const [key, value] of environment) {
+            vi.stubEnv(key, value);
+        }
+
+        const { assertEnv } = await import("./env-validation");
+
+        expect(() => assertEnv()).toThrow("ENCRYPTION_KEY is not valid Base64");
+    });
+
     it("assertEnv should memoize a successful validation across calls", async () => {
         const productionEnvironment = Object.entries({ ...ALL_ENV, ENVIRONMENT: "production" });
 
@@ -137,7 +159,7 @@ describe("envValidation — tiered validation", () => {
         expect(result.ENVIRONMENT).toBe("development");
 
         // Service, AI, and tool vars default to ""
-        expect(result.RESEND_API_KEY).toBe("");
+        expect(result.MAIL_FROM).toBe("");
         expect(result.OPENROUTER_API_KEY).toBe("");
         expect(result.TAVILY_API_KEY).toBe("");
         expect(result.GOOGLE_CLIENT_ID).toBe("");

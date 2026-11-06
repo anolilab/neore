@@ -24,6 +24,7 @@ import type { FC, ReactNode } from "react";
 import React, { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import useModelNicknames from "@/features/chat/core/hooks/use-model-nicknames";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
@@ -45,6 +46,7 @@ import {
     getModelModeName,
     getModelSearchText,
     groupModelsByCreator,
+    initialCreatorSlug,
     sortModels,
 } from "./utilities";
 
@@ -254,7 +256,7 @@ const ProviderSidebarButton = memo<{
             "relative flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors duration-150",
             showBorder && "mb-0.5 border-b pb-2",
             isSelected
-                ? "text-foreground before:bg-primary before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full"
+                ? "text-foreground before:bg-primary-text before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full"
                 : "text-muted-foreground/70 hover:text-foreground",
         )}
         onClick={onClick}
@@ -406,7 +408,7 @@ const ModelItemContent = memo<{
                 </button>
                 {selectionMode === "single" ? (
                     <span className="ml-0.5 flex size-3.5 shrink-0 items-center justify-center">
-                        {isSelected ? <CheckIcon className="text-primary size-3.5" /> : null}
+                        {isSelected ? <CheckIcon className="text-primary-text size-3.5" /> : null}
                     </span>
                 ) : null}
             </div>
@@ -418,6 +420,8 @@ const ModelItemContent = memo<{
 
 const ModelGroupRenderer = memo<{
     anchorMode: string | null;
+    /** Whether a guest may be offered sign-up (registration open, or an invitation in the URL). */
+    canSignUp?: boolean;
     group: ModelGroup;
     infoModelId?: string;
     isAnonymous?: boolean;
@@ -436,6 +440,7 @@ const ModelGroupRenderer = memo<{
 }>(
     ({
         anchorMode,
+        canSignUp = true,
         group,
         infoModelId,
         isAnonymous = false,
@@ -477,7 +482,7 @@ const ModelGroupRenderer = memo<{
 
                         if (isLockedForAnonymous) {
                             stateClassName = "cursor-not-allowed opacity-40";
-                            lockedTitle = t`Sign up to unlock all models`;
+                            lockedTitle = canSignUp ? t`Sign up to unlock all models` : t`Sign in to unlock all models`;
                         } else if (isTypeMismatch) {
                             stateClassName = "cursor-not-allowed opacity-25";
                             lockedTitle = t`Only ${getModelModeName(anchorMode!)} models can be compared. Clear selection to switch types.`;
@@ -490,7 +495,7 @@ const ModelGroupRenderer = memo<{
                         if (isTypeMismatch) {
                             parallelIndicator = <Lock className="text-muted-foreground/30 size-4" />;
                         } else if (isParallelSelected) {
-                            parallelIndicator = <CheckSquare2 className="text-primary size-4" />;
+                            parallelIndicator = <CheckSquare2 className="text-primary-text size-4" />;
                         } else {
                             parallelIndicator = <Square className={cn("size-4", isDisabled ? "text-muted-foreground/20" : "text-muted-foreground/30")} />;
                         }
@@ -590,6 +595,8 @@ const ModelPicker: FC<ModelPickerProps> = ({
     panelClassName,
 }) => {
     const { i18n, t } = useLingui();
+    // Under invite-only a guest is pointed at sign-in, not sign-up, unless the URL carries an invitation.
+    const { canSignUp, signUpHref } = useInviteOnly();
 
     // Use provided models list or fall back to the feature-flagged gateway models
     const featureFlaggedModels = useFeatureFlaggedModels({ applyUserOverrides: true });
@@ -648,17 +655,10 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const isFavorite = useCallback((id: string) => favorites.includes(id), [favorites]);
     const toggleFavorite = useCallback((id: string, setFavorite: boolean) => onToggleFavorite?.(id, setFavorite), [onToggleFavorite]);
 
-    const [selectedProvider, setSelectedProvider] = useState<string | null>(() => {
-        if (initialModelId) {
-            const slug = initialModelId.split("/", 1)[0];
-
-            if (slug) {
-                return slug;
-            }
-        }
-
-        return null;
-    });
+    // `undefined` until the user picks a creator or "All": the scope then follows the selected model's creator, so it
+    // waits for the model to arrive in the list and clears itself when that creator is hidden.
+    const [chosenProvider, setChosenProvider] = useState<string | null | undefined>(undefined);
+    const selectedProvider = chosenProvider === undefined ? initialCreatorSlug(sourceModels, initialModelId) : chosenProvider;
 
     const handleModelSelect = useCallback(
         (modelId: string) => {
@@ -707,7 +707,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
     );
 
     const handleProviderSelect = useCallback((slug: string | null) => {
-        setSelectedProvider(slug);
+        setChosenProvider(slug);
         setSearchQuery("");
     }, []);
 
@@ -746,7 +746,8 @@ const ModelPicker: FC<ModelPickerProps> = ({
 
     const handleTabChange = useCallback((tab: ModelPickerTab) => {
         setActiveTab(tab);
-        setSelectedProvider(null);
+        // Starred shows no scope, so leaving it keeps the opening scope; a creator the user picked is cleared.
+        setChosenProvider((current) => (current === undefined ? undefined : null));
         setSearchQuery("");
         setInfoModelId(undefined);
     }, []);
@@ -979,9 +980,15 @@ const ModelPicker: FC<ModelPickerProps> = ({
                             <Lock className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
                             <p className="text-[12px] leading-snug text-amber-700 dark:text-amber-300">
                                 {t`Guest accounts use free models only.`}{" "}
-                                <a className="font-semibold underline underline-offset-2" href="/auth/sign-up">
-                                    {t`Subscribe for $8/mo to unlock all models.`}
-                                </a>
+                                {canSignUp ? (
+                                    <a className="font-semibold underline underline-offset-2" href={signUpHref}>
+                                        {t`Subscribe for $8/mo to unlock all models.`}
+                                    </a>
+                                ) : (
+                                    <a className="font-semibold underline underline-offset-2" href="/auth/sign-in">
+                                        {t`Sign in to unlock all models.`}
+                                    </a>
+                                )}
                             </p>
                         </div>
                     )}
@@ -1059,7 +1066,9 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                 <button
                                     className={cn(
                                         "rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                        modeFilter === null ? "bg-primary/10 text-primary" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                        modeFilter === null
+                                            ? "bg-primary/10 text-primary-text"
+                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter(null)}
                                     type="button"
@@ -1070,7 +1079,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                     className={cn(
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "text"
-                                            ? "bg-primary/10 text-primary"
+                                            ? "bg-primary/10 text-primary-text"
                                             : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("text")}
@@ -1083,7 +1092,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                     className={cn(
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "image"
-                                            ? "bg-primary/10 text-primary"
+                                            ? "bg-primary/10 text-primary-text"
                                             : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("image")}
@@ -1096,7 +1105,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                     className={cn(
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "video"
-                                            ? "bg-primary/10 text-primary"
+                                            ? "bg-primary/10 text-primary-text"
                                             : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("video")}
@@ -1109,7 +1118,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                     className={cn(
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "speech-to-text"
-                                            ? "bg-primary/10 text-primary"
+                                            ? "bg-primary/10 text-primary-text"
                                             : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("speech-to-text")}
@@ -1185,6 +1194,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         {filteredGroupedItems.map((group) => (
                                             <ModelGroupRenderer
                                                 anchorMode={selectionMode === "parallel" ? anchorMode : null}
+                                                canSignUp={canSignUp}
                                                 group={group}
                                                 infoModelId={infoModelId}
                                                 isAnonymous={isAnonymous}

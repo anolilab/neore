@@ -29,6 +29,7 @@ import type { Id } from "./_generated/dataModel";
 import { clientGrantCookie } from "./auth/client-grant-cookie";
 import type { HostPairingOptions } from "./auth/cli-device-auth";
 import { cliDeviceAuth } from "./auth/cli-device-auth";
+import { guestConversion } from "./auth/guest-conversion";
 import { deletedOrganizationOf, queueOrganizationBillingCancel } from "./billing/gdpr";
 import { queueOrganizationPolicyErase } from "./auth/organization-policy-erase";
 import { organizationOfMemberChange, queueSeatSync } from "./billing/seats";
@@ -38,6 +39,7 @@ import { ac, roles } from "./auth/permissions";
 import type { SignInMethods } from "./auth/sign-in-methods";
 import { signInMethods } from "./auth/sign-in-methods";
 import { sendEmailVerification, sendMagicLink, sendOrganizationInvite, sendOTPVerification, sendResetPassword } from "./email/functions";
+import { deliversMail } from "./email/mailer";
 import {
     AUTH_GITHUB_CLIENT_ID,
     AUTH_GITHUB_CLIENT_SECRET,
@@ -277,8 +279,11 @@ export const API_KEY_OPTIONS = {
  *   a code bound to it, so they only bound a signed-in account's retries.
  * Per address means per client address only where the app names a trusted
  * address header; without one better-auth keys every request of a path on one
- * shared bucket. `auth.rate-limit.test.ts` drives better-auth's real limiter to
- * pin these rules.
+ * shared bucket.
+ *
+ * `sign-in-methods` is exempt too: it answers the same static JSON to everyone.
+ *
+ * `auth.rate-limit.test.ts` drives better-auth's real limiter to pin both halves.
  */
 // Key order is meaningful, not alphabetical: `/get-session` must stay first so it matches before the catch-all.
 /* eslint-disable perfectionist/sort-objects */
@@ -299,6 +304,9 @@ export const AUTH_RATE_LIMIT_CUSTOM_RULES: Record<string, false | { max: number;
     // account's retries.
     "/device/approve": { max: 10, window: 10 },
     "/device/deny": { max: 10, window: 10 },
+    // Static configuration, read on every chat page load to choose between guest chat and the signed-out chat. The
+    // `/sign-in` prefix rule held it to 3 per 10 s, and a 429 reads as invite-only in the app.
+    "/sign-in-methods": false,
 };
 /* eslint-enable perfectionist/sort-objects */
 
@@ -320,7 +328,10 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
         // Database adapter is set by the defineAuth runtime
         emailAndPassword: {
             enabled: true,
-            requireEmailVerification: false,
+            // An invitation link is a bearer credential: whoever it reaches could sign up as that address. Where mail
+            // reaches an inbox, a password sign-up gets no session until the address is verified. A stage that cannot
+            // deliver mail (dev capture, no transport) would lock every sign-up out, so it keeps the link as the check.
+            requireEmailVerification: deliversMail(),
             sendResetPassword: async ({ url, user }) => {
                 await sendResetPassword({
                     to: user.email,
@@ -329,6 +340,11 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
             },
         },
         emailVerification: {
+            autoSignInAfterVerification: true,
+            // An account created before verification was required meets the requirement at its next password sign-in;
+            // the mail goes out then, so it is not locked out with no way to verify.
+            sendOnSignIn: deliversMail(),
+            sendOnSignUp: deliversMail(),
             sendVerificationEmail: async ({ url, user }) => {
                 await sendEmailVerification({
                     to: user.email,
@@ -377,16 +393,21 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
                 // guest's shard: move them to the new user's (`lib/account-merge.ts`).
                 ...(hooks.onGuestConverted && {
                     onLinkAccount: async ({ anonymousUser, newUser }) => {
-                        await hooks.onGuestConverted?.(String(anonymousUser.user.id), String(newUser.user.id));
+                        try {
+                            await hooks.onGuestConverted?.(String(anonymousUser.user.id), String(newUser.user.id));
+                        } catch (error) {
+                            // The account itself is created; losing the guest's history must not fail the sign-up.
+                            authLogger.error(`[auth] queueing the move of guest ${String(anonymousUser.user.id)} failed:`, error);
+                        }
                     },
                 }),
             }),
             /**
              * Invite-only registration. Gates email sign-up (including an anonymous
              * user converting to a real account, which creates a new user) and
-             * social first-sign-in. Anonymous sign-in stays open: `inviteOnly()`
-             * exempts rows carrying `isAnonymous` as of `@lunora/auth@127`, so
-             * the wrapper this used to need is gone.
+             * social first-sign-in. Anonymous (guest) sign-in is refused under
+             * the gate by `signInMethods` below (`GUEST_SIGN_IN_DISABLED`);
+             * `inviteOnly()` itself still exempts `isAnonymous` rows.
              *
              * `allowFirstUser` is deliberately left off: it races two concurrent
              * sign-ups and opens a window between deploy and the owner signing up.
@@ -394,8 +415,10 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
              * `auth/invitations.ts` exposes that to admins.
              */
             ...(SIGNUP_INVITE_ONLY ? [inviteOnly()] : []),
+            // A guest that converts and verifies in another browser keeps its data (`auth/guest-conversion.ts`).
+            ...(hooks.onGuestConverted ? [guestConversion(hooks.onGuestConverted)] : []),
             // `GET /sign-in-methods`, the verified-email rule for OAuth first
-            // sign-in under the invite gate, and no passkeys for guests.
+            // sign-in and the guest refusal under the invite gate, and no passkeys for guests.
             signInMethods(resolveSignInMethods(), { inviteOnly: SIGNUP_INVITE_ONLY }),
             /**
              * Passkeys. Registration needs a signed-in, non-guest session
@@ -668,15 +691,10 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
             },
             // Queued, not run here: moving a guest's rows takes a round trip per
             // table and page, too long to hold the sign-up request. The job runs
-            // on the NEW user's shard (`lib/account-merge.ts#runGuestMerge`).
+            // on the NEW user's shard (`lib/account-merge.ts#runGuestMerge`). A
+            // failure is the caller's to handle: each one keeps the request alive.
             onGuestConverted: async (guestId, userId) => {
-                try {
-                    await enqueueJob(internal.lib.account_merge.runGuestMerge, { from: guestId, to: userId }, { shardKey: userId });
-                } catch (error) {
-                    // The account itself is created; losing the guest's history
-                    // must not fail the sign-up.
-                    authLogger.error(`[auth] queueing the move of guest ${guestId} to ${userId} failed:`, error);
-                }
+                await enqueueJob(internal.lib.account_merge.runGuestMerge, { from: guestId, to: userId }, { shardKey: userId });
             },
         }),
         database: lunoraD1Adapter(env.DB),
@@ -695,7 +713,7 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
                      * Gated on BOTH the `ADMIN` allowlist AND `emailVerified`.
                      * Without the second condition an attacker who learns an
                      * admin's address could pre-claim the role through the
-                     * email/password path (`requireEmailVerification` is false).
+                     * email/password path where `requireEmailVerification` is off.
                      * OAuth signups arrive verified, so real admin onboarding is
                      * unaffected; anyone else is promoted later by
                      * `promoteVerifiedAdmin`.
