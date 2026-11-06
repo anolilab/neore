@@ -167,10 +167,6 @@ export const withBranchInfo = <M extends { branch?: MessageBranch; id: string }>
 export const TITLE_PATH_LIMIT = 1000;
 
 /**
- * The ids of the active path ending at `leafMessageId`, top first, read at most `TITLE_PATH_LIMIT` rows deep. `"too-long"`
- * when the path is longer; `null` when the leaf is not a message of the thread.
- */
-/**
  * The ids on the active path that ends at `leafMessageId`, root first: `null` when the thread has no rows, `"too-long"` past the
  * title limit. A stored leaf whose row is gone reads the thread's own active path, as the thread view shows it (`resolveLeafRow`).
  * Plain, so a write can check the path inside its own transaction.

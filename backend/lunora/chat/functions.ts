@@ -1833,7 +1833,6 @@ export const createTitleChat = internalAction.input({ prompt: v.string(), thread
     });
 });
 
-/** The most rows read, oldest first, while looking for a title's prompt, and the page they are read in. */
 /** The first user prompt a title is read from, and the id of the message it came from (`undefined` when the row has none). */
 type TitlePrompt = { id: string | undefined; text: string };
 const TITLE_PROMPT_PAGE = 50;
