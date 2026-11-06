@@ -135,6 +135,21 @@ describe("availableCommandsOf", () => {
         expect(long?.hint).toHaveLength(200);
     });
 
+    it("cuts the list to the longest prefix whose JSON fits 64 KiB, so a post with the options stays under the ingest cap", () => {
+        // Each description is 300 euro signs: 900 bytes of JSON apiece, so 100 of them are about 90 KiB, over the budget.
+        const euros = "€".repeat(300);
+        const many = Array.from({ length: 100 }, (_, index) => {
+            return { description: euros, name: `c${index}` };
+        });
+        const commands = availableCommandsOf({ availableCommands: many }, plain) ?? [];
+
+        expect(commands.length).toBeGreaterThan(0);
+        expect(commands.length).toBeLessThan(100);
+        expect(new TextEncoder().encode(JSON.stringify(commands)).length).toBeLessThanOrEqual(64 * 1024);
+        // The prefix is kept in the agent's order.
+        expect(commands.map((command) => command.name)).toEqual(many.slice(0, commands.length).map((command) => command.name));
+    });
+
     it("scrubs every description and hint, and drops a command whose name the scrub would change", () => {
         const scrub = (text: string) => text.replaceAll("SECRET", "***");
 

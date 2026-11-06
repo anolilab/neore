@@ -3,6 +3,7 @@
  * output). Pure: each reader returns `undefined` for anything malformed, so a bad update is dropped, never sent.
  * Every text value is scrubbed by the caller's `scrub` (the agent's environment values are removed there).
  */
+import { fitPrefix } from "./agent-options";
 import { isRecord } from "./child-updates";
 import type { AgentCommand, AgentUsage } from "./host-events";
 
@@ -42,6 +43,12 @@ const MAX_COMMANDS = 100;
 const MAX_COMMAND_NAME_CHARS = 64;
 const MAX_COMMAND_DESCRIPTION_CHARS = 300;
 const MAX_COMMAND_HINT_CHARS = 200;
+
+/**
+ * The most JSON the list may take. Escaped or non-ASCII text makes 100 entries far larger than their character bounds: the options
+ * take up to 64 KiB of the same post and the backend refuses a post over 256 KiB, dropping the usage with it.
+ */
+const COMMANDS_BYTE_BUDGET = 64 * 1024;
 /** A raw text longer than this is not read: scrubbing a near-limit string on every update costs more than the entry is worth. */
 const MAX_RAW_TEXT_CHARS = 4096;
 /** Entries looked at per list, valid or not, so a long list of malformed entries cannot make a parse unbounded. */
@@ -74,7 +81,7 @@ const commandOf = (value: unknown, scrub: (text: string) => string): AgentComman
 
 /**
  * `available_commands_update`: the agent's whole list of slash commands. Undefined when `availableCommands` is not an array;
- * an entry without a usable name is skipped, and the list is cut at 100.
+ * an entry without a usable name is skipped, and the list is cut at 100 entries and to the longest prefix that fits its JSON budget.
  */
 export const availableCommandsOf = (update: Record<string, unknown>, scrub: (text: string) => string): AgentCommand[] | undefined => {
     if (!Array.isArray(update.availableCommands)) {
@@ -95,5 +102,5 @@ export const availableCommandsOf = (update: Record<string, unknown>, scrub: (tex
         }
     }
 
-    return commands;
+    return fitPrefix(commands, COMMANDS_BYTE_BUDGET);
 };
