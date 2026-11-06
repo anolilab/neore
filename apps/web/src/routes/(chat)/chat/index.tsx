@@ -2,7 +2,7 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useLocation, useNavigate, useRouteContext } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
@@ -14,6 +14,8 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
+import { useComposerModels } from "@/hooks/use-composer-models";
+import { useGatewayModelsSettled } from "@/hooks/use-gateway-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 // Module scope, so it outlives this component's mounts: a page load resumes once.
@@ -69,13 +71,20 @@ const ChatPage = () => {
     // `initialMessage`. A handoff URL with nothing in storage never owned the draft.
     const [handoffWaiting, setHandoffWaiting] = useState(landingMessageWaiting);
 
+    // A link may select only a model the composer's picker offers this user. The list is empty until the catalog answers, so the
+    // link waits for it, and a catalog that fails leaves the list empty: the link's model is then refused, its prompt still applies.
+    const composerModels = useComposerModels();
+    const catalogSettled = useGatewayModelsSettled();
+    const allowedModelIds = useMemo(() => new Set(composerModels.map((entry) => entry.id)), [composerModels]);
+
     usePromptLinkDraft({
+        allowedModelIds,
         // The composer sends the free model to an anonymous visitor's text chat, so the link's model waits for the session.
         isAnonymous: sessionData?.user?.isAnonymous === true,
         model: linkModel,
         otherDraftSource: Boolean(promptId) || (Boolean(hasInitialMessage) && handoffWaiting),
         prompt: linkPrompt,
-        ready: !isSessionPending,
+        ready: !isSessionPending && catalogSettled,
     });
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.

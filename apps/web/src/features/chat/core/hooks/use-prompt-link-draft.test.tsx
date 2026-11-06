@@ -49,7 +49,18 @@ const disabledModel = "fal-ai/flux-schnell";
 const externalModel = "ext/mimo-v2-flash";
 const MODEL_NOTICE = "This link's model is not available in this chat. The chat keeps its model.";
 
+/** Every text model the composer's picker offers, by default: the link may select any of them, as a user with no gate would. */
+const OFFERED_TEXT_MODEL_IDS: ReadonlySet<string> = new Set(
+    MODEL_REGISTRY.filter((model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external").map((model) => model.id),
+);
+
+/** A text model other than the default: a model a link can name, which the picker does not offer in the test that gates it. */
+const gatedTextModel = MODEL_REGISTRY.find(
+    (model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external" && model.id !== DEFAULT_CHAT_MODEL,
+);
+
 interface LinkProps {
+    allowedModelIds?: ReadonlySet<string>;
     isAnonymous?: boolean;
     model?: string;
     otherDraftSource?: boolean;
@@ -57,7 +68,8 @@ interface LinkProps {
     ready?: boolean;
 }
 
-const renderLink = (initial: LinkProps) => renderHook((props: LinkProps) => usePromptLinkDraft(props), { initialProps: initial });
+const renderLink = (initial: LinkProps) =>
+    renderHook((props: LinkProps) => usePromptLinkDraft({ allowedModelIds: OFFERED_TEXT_MODEL_IDS, ...props }), { initialProps: initial });
 
 const selectedModel = (): string => useModelStore.getState().selectedModel;
 
@@ -217,6 +229,16 @@ describe("usePromptLinkDraft", () => {
         expect(useModelStore.getState().selectedModelsForComparison).toEqual([]);
         expect(selectedModel()).toBe(textModel?.id);
         expect(useChatUIStore.getState().composerText).toBe("hi");
+    });
+
+    it("does not select a model the composer's picker does not offer, keeps the chat's model, and still drafts the prompt", () => {
+        expect(gatedTextModel).toBeDefined();
+
+        renderLink({ allowedModelIds: new Set([DEFAULT_CHAT_MODEL]), model: gatedTextModel?.id, prompt: "hi" });
+
+        expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+        expect(useChatUIStore.getState().composerText).toBe("hi");
+        expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
     });
 
     it("does not change the chat's model for a link with no prompt, even when it names a model", () => {

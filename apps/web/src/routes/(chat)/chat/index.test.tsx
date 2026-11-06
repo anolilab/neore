@@ -21,6 +21,7 @@ import { Route } from "./index";
 const harness = vi.hoisted(() => {
     return {
         assistantProps: undefined as { initialMessage?: string } | undefined,
+        composerModels: [] as { id: string }[],
         latestThread: undefined as string | undefined,
         locationSearch: "",
         navigate: vi.fn(),
@@ -72,6 +73,19 @@ vi.mock("@/features/chat/assistant", () => {
 vi.mock("@/components/error-boundaries/route-error-boundary", () => {
     return {
         default: ({ children }: { children: ReactNode }) => children,
+    };
+});
+
+// The picker's list for this user: by default every text model, so the link may select any of them; a test narrows it.
+vi.mock("@/hooks/use-composer-models", () => {
+    return {
+        useComposerModels: () => harness.composerModels,
+    };
+});
+
+vi.mock("@/hooks/use-gateway-models", () => {
+    return {
+        useGatewayModelsSettled: () => true,
     };
 });
 
@@ -178,6 +192,11 @@ describe("chat index route", () => {
     beforeEach(() => {
         harness.assistantProps = undefined;
         harness.latestThread = undefined;
+        harness.composerModels = MODEL_REGISTRY.filter(
+            (model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external",
+        ).map((model) => {
+            return { id: model.id };
+        });
         harness.settings = undefined;
         harness.navigate.mockReset();
         harness.showWarning.mockReset();
@@ -336,6 +355,24 @@ describe("chat index route", () => {
 
             await waitFor(() => expect(fresh.chatUI.getState().composerText).toBe("from the link"));
             expect(resumes()).toBe(false);
+        });
+    });
+
+    describe("a link that names a model the picker does not offer", () => {
+        it("does not select the gated model: the chat keeps its model, the prompt is drafted, and the person is told", async () => {
+            const gated = MODEL_REGISTRY.find(
+                (model) => (model.mode ?? "text") === "text" && model.enabled !== false && model.provider !== "external" && model.id !== DEFAULT_CHAT_MODEL,
+            );
+
+            expect(gated).toBeDefined();
+            harness.composerModels = [{ id: DEFAULT_CHAT_MODEL }];
+            openUrl(buildPromptLink("https://app.example.com", { model: gated?.id, prompt: "from the link" }));
+
+            mountPage();
+
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("from the link"));
+            expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+            expect(harness.showWarning).toHaveBeenCalledWith("This link's model is not available in this chat. The chat keeps its model.");
         });
     });
 

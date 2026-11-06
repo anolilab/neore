@@ -23,12 +23,18 @@ const withoutLinkParameters = (search: Record<string, unknown>): Record<string, 
  * address. It never sends. Nothing is decided until `ready`: the anonymity it reads comes from the session.
  */
 export const usePromptLinkDraft = ({
+    allowedModelIds,
     isAnonymous = false,
     model,
     otherDraftSource = false,
     prompt,
     ready = true,
 }: {
+    /**
+     * The models the composer's picker offers this user (`useComposerModels`). A link selects a model only from this set, so a
+     * model the person is not entitled to, or has blocked, is not selected by a link.
+     */
+    allowedModelIds: ReadonlySet<string>;
     /** The signed-in person is an anonymous guest: the composer sends the free model for them in a text chat. */
     isAnonymous?: boolean;
     model?: string;
@@ -88,6 +94,7 @@ export const usePromptLinkDraft = ({
             // (an anonymous visitor's text chat shows the free model instead). Anything else would send a different model.
             const sendsLinkModel =
                 definition !== undefined &&
+                allowedModelIds.has(definition.id) &&
                 state.newThreadMode === "text" &&
                 composerModelOf({ isAnonymous, mode: "text", threadModel: definition.id }) === definition.id;
 
@@ -109,5 +116,5 @@ export const usePromptLinkDraft = ({
         }
 
         void navigate({ replace: true, search: (previous: Record<string, unknown>) => withoutLinkParameters(previous), to: "/chat" });
-    }, [isAnonymous, model, navigate, otherDraftSource, prompt, ready, t]);
+    }, [allowedModelIds, isAnonymous, model, navigate, otherDraftSource, prompt, ready, t]);
 };
