@@ -14,6 +14,9 @@
  * picks up. Afterwards it shows the answer read-only, with the names of the
  * files it carried.
  *
+ * A call may carry up to four questions instead (`questions`): each shows its choices (checkboxes when several may be
+ * picked, radios otherwise) and a note field, and one send answers the whole card (`answers`, one entry per question).
+ *
  * Only the thread owner can answer: the run resumes with the owner's tools and
  * keys. Anyone else sees the question read-only.
  */
@@ -34,19 +37,26 @@ import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
-import { normalizeAskUserChoices } from "./ask-user-choices";
+import type { AskUserQuestionDraft } from "./ask-user-choices";
+import { isAskUserQuestionAnswered, normalizeAskUserChoices, normalizeAskUserQuestions } from "./ask-user-choices";
+import type { AskUserAnswerEntry } from "./ask-user-questions";
+import { AskUserAnswerList, AskUserQuestionFields } from "./ask-user-questions";
 import { useAskUserAttachments } from "./use-ask-user-attachments";
 
 interface AskUserInput {
     choices?: string[];
     question?: string;
+    questions?: unknown;
 }
 
 type AskUserOutput =
     | { answer: string; answered: true; attachedFiles?: { filename: string; mediaType: string }[]; unreadFiles?: string[] }
+    | { answered: true; answers: AskUserAnswerEntry[]; attachedFiles?: { filename: string; mediaType: string }[]; unreadFiles?: string[] }
     | { answered: false; message: string };
 
-type Submitted = { answer: string; kind: "answer" } | { kind: "dismiss" };
+type Submitted = { answer: string; kind: "answer" } | { answers: AskUserAnswerEntry[]; kind: "answers" } | { kind: "dismiss" };
+
+const EMPTY_DRAFT: AskUserQuestionDraft = { note: "", selected: [] };
 
 const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const { t } = useLingui();
@@ -58,6 +68,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const answerId = useId();
     const hintId = useId();
     const [draft, setDraft] = useState("");
+    const [drafts, setDrafts] = useState<AskUserQuestionDraft[]>([]);
     const [submitted, setSubmitted] = useState<Submitted | null>(null);
     // Focus lands here after a send: the form (and the focused control) goes away.
     const groupRef = useRef<HTMLDivElement>(null);
@@ -65,7 +76,8 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const { isPending, mutate } = useMutation(crpc.chat.ask_user.answerAskUser.mutationOptions());
 
     const input = (typeof part.input === "object" && part.input !== null ? part.input : {}) as AskUserInput;
-    const question = input.question ?? "";
+    const questions = normalizeAskUserQuestions(input.questions);
+    const question = questions ? "" : (input.question ?? "");
     const choices = normalizeAskUserChoices(input.choices);
     const approvalId = part.approval?.id;
     // A public viewer's thread copy has no `userId`, so it never matches.
@@ -85,10 +97,17 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         groupRef.current?.focus();
         mutate(
             {
-                answer: reply.kind === "answer" ? reply.answer : null,
+                // A multi-question card answers with `answers`; dismissing sends `answer: null` for either form.
+                ...(reply.kind === "answers"
+                    ? {
+                          answers: reply.answers.map(({ note, selected }) => {
+                              return { ...(note && { note }), selected };
+                          }),
+                      }
+                    : { answer: reply.kind === "answer" ? reply.answer : null }),
                 approvalId,
                 // Dismissing carries no files: the question closes without an answer.
-                ...(reply.kind === "answer" && files.length > 0 && { fileIds: files.map((file) => file.fileId) }),
+                ...(reply.kind !== "dismiss" && files.length > 0 && { fileIds: files.map((file) => file.fileId) }),
                 threadId: threadId as Id<"threads">,
             },
             {
@@ -108,9 +127,37 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         }
     };
 
+    const updateDraft = (index: number, patch: Partial<AskUserQuestionDraft>) =>
+        setDrafts((current) =>
+            (questions ?? []).map((_, position) => {
+                const base = current[position] ?? EMPTY_DRAFT;
+
+                return position === index ? { ...base, ...patch } : base;
+            }),
+        );
+    const allAnswered = !!questions && questions.every((_, index) => isAskUserQuestionAnswered(drafts[index] ?? EMPTY_DRAFT));
+
+    const sendQuestions = () => {
+        if (questions && allAnswered && canAnswer && !uploading) {
+            send({
+                answers: questions.map((entry, index) => {
+                    const { note, selected } = drafts[index] ?? EMPTY_DRAFT;
+
+                    return { question: entry.question, selected, ...(note.trim() && { note: note.trim() }) };
+                }),
+                kind: "answers",
+            });
+        }
+    };
+
     const onSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        sendDraft();
+
+        if (questions) {
+            sendQuestions();
+        } else {
+            sendDraft();
+        }
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -141,9 +188,17 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     let answerText: string | undefined;
 
     if (output?.answered) {
-        answerText = output.answer;
+        answerText = "answer" in output ? output.answer : undefined;
     } else if (submitted?.kind === "answer") {
         answerText = submitted.answer;
+    }
+
+    let answerEntries: AskUserAnswerEntry[] | undefined;
+
+    if (output?.answered && "answers" in output) {
+        answerEntries = output.answers;
+    } else if (submitted?.kind === "answers") {
+        answerEntries = submitted.answers;
     }
 
     const answeredFiles = output?.answered ? (output.attachedFiles ?? []) : [];
@@ -155,7 +210,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                 <MessageCircleQuestion aria-hidden="true" className="text-primary mt-0.5 size-4 shrink-0" />
                 <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium whitespace-pre-wrap" id={headingId}>
-                        {question || t`The assistant has a question`}
+                        {question || (questions ? t`The assistant has a few questions` : t`The assistant has a question`)}
                     </p>
                     <p aria-live="polite" className="text-muted-foreground text-xs" role="status">
                         {statusText}
@@ -170,6 +225,8 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                 </p>
             )}
 
+            {answerEntries && <AskUserAnswerList entries={answerEntries} />}
+
             {answeredFiles.length > 0 && (
                 <p className="text-muted-foreground mt-2 text-xs">
                     {t`Attached:`} {answeredFiles.map((file) => file.filename).join(", ")}
@@ -180,7 +237,10 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
 
             {canAnswer && (
                 <form className="mt-3 flex flex-col gap-2" onSubmit={onSubmit}>
-                    {choices.length > 0 && (
+                    {questions && (
+                        <AskUserQuestionFields disabled={uploading} drafts={drafts} idPrefix={answerId} onChange={updateDraft} questions={questions} />
+                    )}
+                    {!questions && choices.length > 0 && (
                         <div aria-label={t`Suggested answers`} className="flex flex-wrap gap-2" role="group">
                             {choices.map((choice) => (
                                 <Button
@@ -196,20 +256,24 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                             ))}
                         </div>
                     )}
-                    <label className="sr-only" htmlFor={answerId}>
-                        {t`Your answer`}
-                    </label>
-                    <Textarea
-                        aria-describedby={hintId}
-                        id={answerId}
-                        maxLength={ASK_USER_ANSWER_MAX}
-                        onChange={(event) => setDraft(event.target.value)}
-                        onKeyDown={onKeyDown}
-                        placeholder={choices.length > 0 ? t`Or type your own answer…` : t`Type your answer…`}
-                        rows={2}
-                        size="sm"
-                        value={draft}
-                    />
+                    {!questions && (
+                        <>
+                            <label className="sr-only" htmlFor={answerId}>
+                                {t`Your answer`}
+                            </label>
+                            <Textarea
+                                aria-describedby={hintId}
+                                id={answerId}
+                                maxLength={ASK_USER_ANSWER_MAX}
+                                onChange={(event) => setDraft(event.target.value)}
+                                onKeyDown={onKeyDown}
+                                placeholder={choices.length > 0 ? t`Or type your own answer…` : t`Type your answer…`}
+                                rows={2}
+                                size="sm"
+                                value={draft}
+                            />
+                        </>
+                    )}
                     {attachNotice && (
                         <p className="text-destructive text-xs" role="alert">
                             {attachNotice}
@@ -232,9 +296,11 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                             ))}
                         </ul>
                     )}
-                    <p className="text-muted-foreground text-xs" id={hintId}>
-                        {t`Enter to send, Shift+Enter for a new line.`}
-                    </p>
+                    {!questions && (
+                        <p className="text-muted-foreground text-xs" id={hintId}>
+                            {t`Enter to send, Shift+Enter for a new line.`}
+                        </p>
+                    )}
                     <input
                         accept={ASK_USER_FILE_TYPES.join(",")}
                         aria-hidden="true"
@@ -261,7 +327,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                             <Paperclip aria-hidden="true" />
                             {uploading ? t`Attaching…` : t`Attach file`}
                         </Button>
-                        <Button disabled={uploading || draft.trim().length === 0} size="sm" type="submit">
+                        <Button disabled={uploading || (questions ? !allAnswered : draft.trim().length === 0)} size="sm" type="submit">
                             <Send aria-hidden="true" />
                             {t`Send answer`}
                         </Button>

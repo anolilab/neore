@@ -66,6 +66,7 @@ import { closeMCPClients } from "../lib/mcp-tools";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "../lib/persist-stream";
 import type { SearchMode } from "../lib/tool-builder";
 import type { ToolRunConfig } from "../lib/tool-run-config";
+import type { AskUserQuestionAnswer } from "../tools/ask-user-constants";
 import type { GroupHistoryRow, GroupParticipantInfo } from "./logic";
 import {
     buildGroupSystemContext,
@@ -770,6 +771,7 @@ export const continueGroupAfterToolApproval = async (
         answer?: string;
         /** The files an `askUser` answer carries (`lib/ask-user-files.ts`). */
         answerFileIds?: string[];
+        answers?: AskUserQuestionAnswer[];
         approvalId: string;
         approved: boolean;
         config: ToolRunConfig & { group: GroupRunSnapshot };
@@ -779,7 +781,7 @@ export const continueGroupAfterToolApproval = async (
         userId: string;
     },
 ): Promise<void> => {
-    const { answer, answerFileIds, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
+    const { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { group } = config;
 
     // Participants are re-checked: one that lost access since the pause does
@@ -797,7 +799,7 @@ export const continueGroupAfterToolApproval = async (
 
     const resumed = await resumeApprovedRun(
         ctx,
-        { answer, answerFileIds, approvalId, approved, config, denyReason, streamId, threadId, userId },
+        { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId },
         {
             // Reached only through `continueAfterToolApproval`, after its stream gate.
             admittedRun: true,

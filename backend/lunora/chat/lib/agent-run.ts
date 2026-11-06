@@ -53,6 +53,7 @@ import {
 } from "./persist-stream";
 import { buildReasoningProviderOptions } from "./reasoning-options";
 import { ASK_USER_TOOL_NAME } from "../tools/ask-user-constants";
+import type { AskUserQuestionAnswer } from "../tools/ask-user-constants";
 import { REQUEST_SECRET_TOOL_NAME } from "../tools/request-secret-constants";
 import { collectApprovalRequestIds, collectAskUserApprovalIds } from "./tool-approval-claim";
 import type { SearchMode } from "./tool-builder";
@@ -1054,6 +1055,8 @@ export const resumeApprovedRun = async (
         answer?: string;
         /** Files an `askUser` answer carries, read as the owner for this one call (`lib/ask-user-files.ts`). */
         answerFileIds?: string[];
+        /** The answers to a multi-question `askUser` call, one per question: the resumed tool returns them as its result. */
+        answers?: AskUserQuestionAnswer[];
         approvalId: string;
         approved: boolean;
         config: ToolRunConfig;
@@ -1077,7 +1080,7 @@ export const resumeApprovedRun = async (
         steerable?: boolean;
     } = {},
 ): Promise<{ awaitingInput?: AwaitingInput; lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
-    const { answer, answerFileIds, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
+    const { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { customProvider } = await resolveRunModel(ctx, config.model, userId);
     const [toolResult, userProviderKeys, preferences] = await Promise.all([
         buildAgentTools(ctx, {
@@ -1122,7 +1125,7 @@ export const resumeApprovedRun = async (
         // An answered question: the approved call executes a copy of the tool
         // that returns the answer, so the answer is the call's tool result.
         if (approved && pending.toolName === ASK_USER_TOOL_NAME) {
-            if (answer === undefined) {
+            if (answer === undefined && answers === undefined) {
                 throw new AgentRunError("stale-approval", "A question can only be resumed with an answer");
             }
 
@@ -1136,7 +1139,11 @@ export const resumeApprovedRun = async (
                 : [];
             const readableFiles = filesTheModelReads(loaded, capabilities);
 
-            toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer, loaded, readableFiles) as (typeof toolResult.tools)[string];
+            toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(
+                answers ?? (answer as string),
+                loaded,
+                readableFiles,
+            ) as (typeof toolResult.tools)[string];
             answerFiles = answerFilesMessage(readableFiles);
         }
 
