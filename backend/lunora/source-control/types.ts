@@ -162,6 +162,17 @@ export interface MergedPullRequest {
     sha: string | null;
 }
 
+/** The fields a person may change on a pull request; an omitted field is left as it is. */
+export interface PullRequestEdit {
+    body?: string;
+    title?: string;
+}
+
+/** A pull request the host just opened (a revert), in the repository it was opened in. */
+export interface RevertPullRequestResult extends PullRequestRef {
+    url: string;
+}
+
 // ─── Review ─────────────────────────────────────────────────────────────────
 
 /** Which side of the diff a line number counts: the file before the change, or after it. */
@@ -237,7 +248,7 @@ export interface HostView {
     connectorSlug: string;
     label: string;
     /** The ceilings the host puts on a list; past them a count of what was left out is shown instead. */
-    limits: { commits: number; files: number };
+    limits: { commits: number; files: number; reviewers: number };
     /** The host's word for the change: "pull request", "merge request". */
     requestNoun: "merge request" | "pull request";
 }

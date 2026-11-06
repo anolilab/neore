@@ -701,7 +701,7 @@ export interface ApiTypes {
             watchRepo: FunctionReference<"mutation", { repository: string }, { status: "invalid" | "limit" | "ok" }>;
         };
         functions: {
-            getDevelopHost: FunctionReference<"action", {}, { connected: boolean; host: { capabilities: { groups: Record<string, Record<string, { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }>>; reportedAt: number; version: 1 }; connectorSlug: string; label: string; limits: { commits: number; files: number }; requestNoun: "merge request" | "pull request" } }>;
+            getDevelopHost: FunctionReference<"action", {}, { connected: boolean; host: { capabilities: { groups: Record<string, Record<string, { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }>>; reportedAt: number; version: 1 }; connectorSlug: string; label: string; limits: { commits: number; files: number; reviewers: number }; requestNoun: "merge request" | "pull request" } }>;
             getInbox: FunctionReference<"action", { page?: number; section: "needsMyReview" | "mine" | "readyToMerge" | "drafts" }, { hasMore: boolean; items: Array<{ authorLogin: string; commentCount: number; createdAt: number; draft: boolean; labels: Array<string>; number: number; repository: string; title: string; updatedAt: number; url: string }>; page: number; status: "ok"; total: number } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
             getPullRequest: FunctionReference<"action", { number: number; repository: string }, { detail: { additions: number; authorLogin: string; baseBranch: string; body: string; bodyTruncated: boolean; changedFiles: number; commitCount: number; createdAt: number; deletions: number; draft: boolean; headBranch: string; headSha: string; number: number; repository: string; state: "closed" | "merged" | "open"; title: string; updatedAt: number; url: string }; leftOut: { commits: number; files: number }; status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
             getPullRequestChecks: FunctionReference<"action", { number: number; repository: string; headSha: string }, { checks: Array<{ id: string | null; name: string; required: boolean | null; state: "cancelled" | "failure" | "neutral" | "pending" | "skipped" | "success"; url: string | null }>; rollup: { complete: boolean; failing: number; optionalFailing: number; pending: number; state: "failing" | "none" | "passing" | "pending"; waiting: Array<string> }; status: "ok"; total: number } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" }>;
@@ -727,6 +727,11 @@ export interface ApiTypes {
             getForThread: FunctionReference<"query", { threadId: string }, { baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "opened"; number: number; repository: string; threadId: string; title: string; url: string } | null>;
             listForPullRequest: FunctionReference<"query", { number: number; repository: string }, Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }>>;
             startWorkOnPullRequest: FunctionReference<"mutation", { baseBranch?: string; headBranch?: string; number: number; repository: string }, { created: boolean; threadId: string }>;
+        };
+        pull_request_actions: {
+            editPullRequest: FunctionReference<"action", { number: number; repository: string; body?: string; title?: string }, { status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
+            requestReviewers: FunctionReference<"action", { number: number; repository: string; logins: Array<string> }, { status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
+            revertPullRequest: FunctionReference<"action", { number: number; repository: string; body?: string; title?: string }, { number: number; repository: string; status: "ok"; url: string } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
         };
         review_drafts: {
             deleteDraftComment: FunctionReference<"mutation", { commentId: string; number: number; repository: string }, ({} & { commentId: string | null; revision: number; status: "ok"; }) | ({} & { status: "not_found" | "head_moved" | "submitting" | "too_many"; })>;
@@ -1590,6 +1595,11 @@ export const api: ApiTypes = {
             getForThread: { __lunoraRef: "source_control_pr_threads:getForThread" },
             listForPullRequest: { __lunoraRef: "source_control_pr_threads:listForPullRequest" },
             startWorkOnPullRequest: { __lunoraRef: "source_control_pr_threads:startWorkOnPullRequest" },
+        },
+        pull_request_actions: {
+            editPullRequest: { __lunoraRef: "source_control_pull_request_actions:editPullRequest" },
+            requestReviewers: { __lunoraRef: "source_control_pull_request_actions:requestReviewers" },
+            revertPullRequest: { __lunoraRef: "source_control_pull_request_actions:revertPullRequest" },
         },
         review_drafts: {
             deleteDraftComment: { __lunoraRef: "source_control_review_drafts:deleteDraftComment" },

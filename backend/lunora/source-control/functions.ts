@@ -119,7 +119,7 @@ export const getDevelopHost = authAction
                 capabilities: v.object({ groups: v.record(v.string(), v.record(v.string(), vCapability)), reportedAt: v.number(), version: v.literal(1) }),
                 connectorSlug: v.string(),
                 label: v.string(),
-                limits: v.object({ commits: v.number(), files: v.number() }),
+                limits: v.object({ commits: v.number(), files: v.number(), reviewers: v.number() }),
                 requestNoun: v.union(v.literal("merge request"), v.literal("pull request")),
             }),
         }),
