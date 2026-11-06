@@ -35,10 +35,16 @@ describe("usageOf", () => {
         }
     });
 
-    it("scrubs and cuts the currency code", () => {
-        const scrub = (text: string) => text.replaceAll("SECRET", "");
-        const usage = usageOf({ cost: { amount: 1, currency: "SECRETUSDTOOLONG" }, size: 1, used: 0 }, scrub);
+    it("cuts a currency code longer than the backend takes", () => {
+        const usage = usageOf({ cost: { amount: 1, currency: "USDTOOLONGCODE" }, size: 1, used: 0 }, plain);
 
         expect(usage?.cost?.currency).toBe("USDTOOLO");
+    });
+
+    it("leaves the cost out, rather than relabel it, when the scrub changes the currency code", () => {
+        // A four-letter code that matches a configured secret is scrubbed to a marker: the amount would then carry a false currency.
+        const scrub = (text: string) => text.replaceAll("USDC", "***");
+
+        expect(usageOf({ cost: { amount: 2, currency: "USDC" }, size: 10, used: 1 }, scrub)).toEqual({ size: 10, used: 1 });
     });
 });
