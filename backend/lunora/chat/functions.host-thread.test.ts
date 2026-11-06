@@ -57,6 +57,7 @@ let threadId: string;
 beforeAll(async () => {
     registerModule(registry, "chat_functions", await import("./functions"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "lib_claim_once", await import("../lib/claim-once"));
 }, 30_000);
 
 beforeEach(async () => {
@@ -112,6 +113,16 @@ describe("regenerating the title of a cloud thread", () => {
             async (context: any) => await context.db.insert("threads", { model: "gpt-4o", status: "active", title: "Shared", userId: OWNER, ...fields }),
         )) as string;
 
+    /** The thread ids that hold a regenerate claim. */
+    const regenerateClaimKeys = async (): Promise<string[]> => {
+        const claims = (await harness.run(async (context: any) => await context.db.query("idempotencyClaims").collect())) as {
+            key: string;
+            scope: string;
+        }[];
+
+        return claims.filter((claim) => claim.scope === "regenerate-title").map((claim) => claim.key);
+    };
+
     const grant = async (grantedThreadId: string, permission: "read" | "write") => {
         await harness.run(async (context: any) => {
             await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission, threadId: grantedThreadId, userId: GRANTEE });
@@ -124,6 +135,29 @@ describe("regenerating the title of a cloud thread", () => {
         await expect(harness.withIdentity({ userId: OWNER }).action(regenerateThreadTitle as never, { threadId: cloud } as never)).resolves.toEqual({
             success: true,
         });
+    });
+
+    it("coalesces a request made while one is in flight: it succeeds, and holds no second claim", async () => {
+        const cloud = await cloudThread();
+        const owner = harness.withIdentity({ userId: OWNER });
+
+        await expect(owner.action(regenerateThreadTitle as never, { threadId: cloud } as never)).resolves.toEqual({ success: true });
+        await expect(owner.action(regenerateThreadTitle as never, { threadId: cloud } as never)).resolves.toEqual({ success: true });
+
+        const claims = await regenerateClaimKeys();
+
+        expect(claims.filter((key) => key === cloud)).toHaveLength(1);
+    });
+
+    it("does not coalesce requests for different threads", async () => {
+        const first = await cloudThread();
+        const second = await cloudThread();
+        const owner = harness.withIdentity({ userId: OWNER });
+
+        await owner.action(regenerateThreadTitle as never, { threadId: first } as never);
+        await owner.action(regenerateThreadTitle as never, { threadId: second } as never);
+
+        expect(await regenerateClaimKeys()).toEqual(expect.arrayContaining([first, second]));
     });
 
     it("refuses a locked chat, whose title is its content", async () => {

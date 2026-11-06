@@ -1784,6 +1784,13 @@ const REGENERATE_TITLE_WINDOW = 500;
 const TITLE_PROMPT_PAGE = 50;
 
 /**
+ * One regenerate in flight per thread (`idempotencyClaims`, released by its job). The TTL only matters when the job never
+ * runs or never ends: then the claim lapses and the owner can ask again.
+ */
+const REGENERATE_TITLE_SCOPE = "regenerate-title";
+const REGENERATE_TITLE_CLAIM_TTL_MS = 5 * 60 * 1000;
+
+/**
  * The earliest user prompt on the thread's active branch. A branched thread's path is read by id, so its sibling replies
  * cannot push the prompt out of the read; an unbranched thread's rows are its path. The read stops at the first prompt,
  * and only a message that succeeded can supply a title. `"too-long"` when the path is past the read's limit.
@@ -1855,50 +1862,70 @@ const activeBranchPrompt = async (
  * from its first 500 rows, so a thread longer than that is titled from a later prompt. It is left as it is only when no
  * user text is found.
  */
+const runRegenerateTitle = async (context: ActionContext, arguments_: { expectedTitle?: string; threadId: string; userId: string }): Promise<void> => {
+    // Before any message is read: a locked, host-run or deleted thread, or a requester who lost access since, never reaches the model.
+    const beforeRead = await titleIneligibility(context, { requestedBy: arguments_.userId, threadId: arguments_.threadId });
+
+    if (beforeRead) {
+        context.log.event("chat.thread_title", { skipped: `${beforeRead}-at-start` });
+
+        return;
+    }
+
+    const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: arguments_.threadId as Id<"threads"> });
+
+    if (!thread) {
+        return;
+    }
+
+    // The active branch's history only: an edited prompt on another branch must not supply the title.
+    const branch = await activeBranchPrompt(context, arguments_.threadId, thread.activeLeafMessageId);
+
+    if (branch.kind === "too-long") {
+        context.log.event("chat.thread_title", { skipped: "path-too-long" });
+
+        return;
+    }
+
+    const prompt = branch.text;
+
+    if (!prompt) {
+        context.log.event("chat.thread_title", { skipped: "no-user-prompt" });
+
+        return;
+    }
+
+    await writeGeneratedTitle(context, {
+        expectedLeaf: thread.activeLeafMessageId ?? null,
+        expectedTitle: arguments_.expectedTitle,
+        force: true,
+        prompt,
+        requestedBy: arguments_.userId,
+        stateless: true,
+        threadId: arguments_.threadId,
+    });
+};
+
 export const regenerateTitleChat = internalAction
-    .input({ expectedTitle: v.optional(v.string().max(MAX_LENGTH.long)), threadId: v.string(), userId: v.string() })
+    .input({
+        claimedAt: v.optional(v.number()),
+        expectedTitle: v.optional(v.string().max(MAX_LENGTH.long)),
+        threadId: v.string(),
+        userId: v.string(),
+    })
     .action(async ({ args: arguments_, ctx: context }) => {
-        // Before any message is read: a locked, host-run or deleted thread, or a requester who lost access since, never reaches the model.
-        const beforeRead = await titleIneligibility(context, { requestedBy: arguments_.userId, threadId: arguments_.threadId });
-
-        if (beforeRead) {
-            context.log.event("chat.thread_title", { skipped: `${beforeRead}-at-start` });
-
-            return;
+        try {
+            await runRegenerateTitle(context, arguments_);
+        } finally {
+            // The request is over however it ended, so a later regenerate may ask again. A fence of a claim that has lapsed releases nothing.
+            if (arguments_.claimedAt !== undefined) {
+                await context.runMutation(internal.lib.claim_once.releaseKey, {
+                    claimedAt: arguments_.claimedAt,
+                    key: arguments_.threadId,
+                    scope: REGENERATE_TITLE_SCOPE,
+                });
+            }
         }
-
-        const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: arguments_.threadId as Id<"threads"> });
-
-        if (!thread) {
-            return;
-        }
-
-        // The active branch's history only: an edited prompt on another branch must not supply the title.
-        const branch = await activeBranchPrompt(context, arguments_.threadId, thread.activeLeafMessageId);
-
-        if (branch.kind === "too-long") {
-            context.log.event("chat.thread_title", { skipped: "path-too-long" });
-
-            return;
-        }
-
-        const prompt = branch.text;
-
-        if (!prompt) {
-            context.log.event("chat.thread_title", { skipped: "no-user-prompt" });
-
-            return;
-        }
-
-        await writeGeneratedTitle(context, {
-            expectedLeaf: thread.activeLeafMessageId ?? null,
-            expectedTitle: arguments_.expectedTitle,
-            force: true,
-            prompt,
-            requestedBy: arguments_.userId,
-            stateless: true,
-            threadId: arguments_.threadId,
-        });
     });
 
 /**
@@ -1947,8 +1974,35 @@ export const regenerateThreadTitle = authAction
             throw new LunoraError("CONFLICT", "This chat is too long to retitle from its first prompt.");
         }
 
+        // One regenerate in flight per thread: a request that finds one running reads the same first prompt, so it is not a second model
+        // call. The claim is fenced by its time, so the job releases only its own claim.
+        const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, {
+            key: threadId,
+            scope: REGENERATE_TITLE_SCOPE,
+            ttlMs: REGENERATE_TITLE_CLAIM_TTL_MS,
+            userId,
+        });
+
+        if (claimedAt === null) {
+            context.log.event("chat.regenerate_title", { coalesced: true });
+
+            return { success: true };
+        }
+
         // The title the owner saw when asking: a rename made while the model works is kept (`writeGeneratedTitle`).
-        await context.scheduler.runAfter(0, internal.chat.functions.regenerateTitleChat, { expectedTitle: thread.title ?? "", threadId, userId });
+        try {
+            await context.scheduler.runAfter(0, internal.chat.functions.regenerateTitleChat, {
+                claimedAt,
+                expectedTitle: thread.title ?? "",
+                threadId,
+                userId,
+            });
+        } catch (error) {
+            // The job did not start, so nothing will release the claim: give it back for the next request.
+            await context.runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: threadId, scope: REGENERATE_TITLE_SCOPE });
+
+            throw error;
+        }
 
         context.log.event("chat.regenerate_title", { scheduled: true });
 

@@ -28,6 +28,7 @@
  * | `aside-add`        | `<userId>:<threadId>:<entryId>` | {@link ASIDE_ADD_CLAIM_TTL_MS} | `chat/aside.ts` ("Add to thread", one click, retried or doubled) |
  * | `thread-cut`        | `<threadId>:<covered row id>` | 30 min | `agent/thread-summaries.ts` (idle summary) and `agent/thread-compaction.ts` (compaction): one scope, so a cut is paid for once |
  * | `thread-fold`       | `<threadId>`             | 3 min, released when the call ends | `agent/thread-summaries.ts` (`claimCut`): one paid summarising call in flight per thread, so two runs planning different cuts of the same rows do not both pay |
+ * | `regenerate-title`  | `<threadId>`             | 5 min (released when the job ends) | `chat/functions.ts` (`regenerateThreadTitle`: one regenerate in flight per thread) |
  * | `organization-policy-create` | `<organizationId>` | {@link ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS} | `auth/organization-policy.ts` (`setOrganizationPolicy`: one writer creates an organization's first policy row) |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |

@@ -9527,7 +9527,7 @@
     },
     {
       "callsMail": false,
-      "emitsEvent": true,
+      "emitsEvent": false,
       "fanOut": false,
       "handlesErrors": false,
       "reachesOutbound": false,
