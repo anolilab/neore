@@ -49,9 +49,11 @@ const NOT_FOUND_ERROR = /not found/u;
 const REQUIRES_AN_ACCOUNT_ERROR = /requires an account/u;
 const SIGNATURE_ERROR = /signature/u;
 /** The app version the listing reports for one device, or undefined. */
-const appVersionOf = async (userId: string, deviceId: string): Promise<string | undefined> =>
-    ((await as(userId).query(functions.listDevices as never, {} as never)) as { _id: string; appVersion?: string }[]).find((device) => device._id === deviceId)
-        ?.appVersion;
+const appVersionOf = async (userId: string, deviceId: string): Promise<string | undefined> => {
+    const devices = (await as(userId).query(functions.listDevices as never, {} as never)) as { _id: string; appVersion?: string }[];
+
+    return devices.find((device) => device._id === deviceId)?.appVersion;
+};
 
 const STALE_ERROR = /stale/u;
 const MALFORMED_ERROR = /malformed/u;
