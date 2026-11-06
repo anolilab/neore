@@ -265,6 +265,15 @@ describe("checkDueTasks missed and overlapping slots", () => {
     const HOUR = 60 * 60_000;
     const HOURLY = "0 * * * *";
 
+    // Half past an hour, so no test here sees the clock cross an hourly slot between its setup and its sweep.
+    beforeEach(() => {
+        vi.useFakeTimers({ now: Date.UTC(2026, 10, 6, 12, 30), toFake: ["Date"] });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it("starts exactly one catch-up run after a three-slot outage, then waits for the next future slot", async () => {
         const taskId = await insertTask({ cronExpression: HOURLY, nextRunAt: Date.now() - 3 * HOUR, recurring: true, status: "done" });
 
