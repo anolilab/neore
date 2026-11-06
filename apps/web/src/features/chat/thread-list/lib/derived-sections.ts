@@ -64,6 +64,11 @@ export type ThreadState = "idle" | "needsYou" | "other" | "snoozed" | "working";
  * for the owner, then idle. Pins do not change it, so a pinned running thread is still working.
  */
 export const threadStateOf = (thread: IdleCandidate, now: number): ThreadState => {
+    // Archived threads leave every active section, whatever their run or snooze fields still say, so they carry no state tag.
+    if (thread.status === "archived") {
+        return "other";
+    }
+
     if (isSnoozed(thread.snoozedUntil, now)) {
         return "snoozed";
     }

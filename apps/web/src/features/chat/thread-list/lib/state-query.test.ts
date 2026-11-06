@@ -62,6 +62,10 @@ describe("threadStateOf", () => {
         expect(threadStateOf(row("a", { snoozedUntil: NOW + 1, status: "running" }), NOW)).toBe("snoozed");
     });
 
+    it("classifies an archived thread as other, even while it still waits or is snoozed", () => {
+        expect(threadStateOf(row("a", { awaitingInput: "approval", snoozedUntil: NOW + 1, status: "archived" }), NOW)).toBe("other");
+    });
+
     it("classifies a thread that never replied as other, so no state tag lists it", () => {
         expect(threadStateOf(row("a", { lastReplyAt: undefined }), NOW)).toBe("other");
     });

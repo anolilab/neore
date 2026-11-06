@@ -143,6 +143,20 @@ describe("KeyboardShortcutsSettings", () => {
         expect(screen.getAllByRole("alert")).toHaveLength(2);
     });
 
+    it("refuses Save when an archive chord is the audio-recording chord, which would fire both", async () => {
+        act(() => {
+            useUIStateStore.setState({ keyboardShortcuts: { ...defaultKeyboardShortcuts, audioRecord: "ctrl+j" } });
+        });
+        renderSettings();
+
+        recordShortcut("Archive Open Thread", "j");
+
+        await waitFor(() => {
+            expect((screen.getByRole("button", { name: "Save Shortcuts" }) as HTMLButtonElement).disabled).toBe(true);
+        });
+        expect(screen.getAllByRole("alert")).toHaveLength(1);
+    });
+
     it("saves the defaults to the server on reset", async () => {
         act(() => {
             useUIStateStore.setState({ keyboardShortcuts: { ...defaultKeyboardShortcuts, newChat: "ctrl+j" } });

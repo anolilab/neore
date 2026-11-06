@@ -50,7 +50,7 @@ import { useCurrentThreadId, useThreadMetadata } from "@/features/chat/core/stor
 import { scrollToMessage } from "@/features/chat/thread/message-list";
 import useThreadHandlers from "@/features/chat/thread-list/hooks/use-thread-handlers";
 import type { ThreadState } from "@/features/chat/thread-list/lib/derived-sections";
-import { threadStateOf } from "@/features/chat/thread-list/lib/derived-sections";
+import { nextSnoozeWake, threadStateOf } from "@/features/chat/thread-list/lib/derived-sections";
 import { compareByStateRank, parseStateQuery } from "@/features/chat/thread-list/lib/state-query";
 import { buildMatchSnippet } from "@/features/chat/thread-list/utilities";
 import convertShortcutToHotkeysHook from "@/features/keyboard/lib/shortcut-converter";
@@ -65,6 +65,8 @@ import { useCommandDialogActions, useCommandDialogState, useCommandDialogStore }
 const MESSAGE_SEARCH_MIN_CHARS = 2;
 const MESSAGE_SEARCH_DEBOUNCE_MS = 250;
 const MAX_MESSAGE_HITS = 8;
+/** The longest delay setTimeout accepts; a later wake re-arms when this one fires. */
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
     const [debounced, setDebounced] = useState(value);
@@ -199,14 +201,30 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             .filter((id): id is string => typeof id === "string") || [],
     );
 
-    // The clock the states are read against, re-read each time the palette opens so a snooze that ended meanwhile shows.
+    // The clock the states are read against: re-read when the palette opens, and again at each snooze expiry while it stays open.
     const [now, setNow] = useState(() => Date.now());
+    const snoozeWake = nextSnoozeWake((allThreadsData.lunora ?? []) as { snoozedUntil?: number }[], now);
 
     useEffect(() => {
         if (isOpen) {
             setNow(Date.now());
         }
     }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen || snoozeWake === undefined) {
+            return undefined;
+        }
+
+        const delay = Math.min(Math.max(snoozeWake - Date.now(), 0) + 25, MAX_TIMEOUT_MS);
+        const timer = setTimeout(() => {
+            setNow(Date.now());
+        }, delay);
+
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [isOpen, snoozeWake]);
 
     const allThreads: ThreadItem[] = ((): ThreadItem[] => {
         const threads: ThreadItem[] = [];
@@ -242,7 +260,8 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                             lastUserMessageAt: row.lastUserMessageAt,
                             scheduled: row.scheduled,
                             snoozedUntil: row.snoozedUntil,
-                            status: row.status ?? "active",
+                            // An archived thread counts as archived when its metadata says so, even if the row does not yet.
+                            status: metadata?.status === "archived" || row.status === "archived" ? "archived" : (row.status ?? "active"),
                         },
                         now,
                     ),

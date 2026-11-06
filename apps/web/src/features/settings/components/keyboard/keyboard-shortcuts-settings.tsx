@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import * as z from "zod";
 
 import { findEffortConflicts } from "@/features/keyboard/lib/recorded-shortcut-converter";
+import { SHORTCUT_ENTRIES } from "@/features/keyboard/lib/shortcut-sheet";
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 import { defaultKeyboardShortcuts, useUIStateStore } from "@/features/layout/stores/ui-state-store";
@@ -36,6 +37,10 @@ const shortcutIdentity = (value: string): string => {
 
     return [...[...modifiers].toSorted((a, b) => a.localeCompare(b)), key].join("+");
 };
+
+// The thread actions also run on a chord a fixed binding already answers to (audio recording, list navigation), so both would fire.
+// Only these two are checked: other defaults share a chord with a fixed binding (Escape) by design.
+const THREAD_ACTION_KEYS = ["archiveThread", "deleteThread"] as const;
 
 const keyboardShortcutSchema = z
     .strictObject({
@@ -76,6 +81,19 @@ const keyboardShortcutSchema = z
 
         for (const key of conflicting) {
             context.issues.push({ code: "custom", input: context.value, message: DUPLICATE_SHORTCUT_MESSAGE, path: [key] });
+        }
+
+        const fixedChords = new Set<string>([
+            shortcutIdentity(useUIStateStore.getState().keyboardShortcuts.audioRecord),
+            ...SHORTCUT_ENTRIES.flatMap((entry) => ("fixed" in entry ? [shortcutIdentity(entry.fixed)] : [])),
+        ]);
+
+        for (const key of THREAD_ACTION_KEYS) {
+            const value = context.value[key];
+
+            if (value && isValidShortcut(value) && fixedChords.has(shortcutIdentity(value))) {
+                context.issues.push({ code: "custom", input: context.value, message: DUPLICATE_SHORTCUT_MESSAGE, path: [key] });
+            }
         }
     });
 
