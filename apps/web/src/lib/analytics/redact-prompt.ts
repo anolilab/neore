@@ -3,98 +3,31 @@
  * or error reports, so every event is passed through `redactPromptFromEvent` before PostHog sends it (`before_send` in
  * `providers/analytics-provider.tsx`). Every route is covered by that one hook. The page URL (`$current_url`), the referrer, the
  * URL an error report names, and any URL inside a session-replay snapshot are all strings in the event, so they are cleaned the
- * same way, wherever they sit. A sign-in page's return URL nests the link inside its own `redirectTo` parameter, encoded, so a
- * nested link is cut as well as a top-level one.
+ * same way, wherever they sit. A sign-in page's return URL nests the link inside its own `redirectTo` parameter, encoded.
+ *
+ * Only a prompt parameter is removed, and a nested link's own prompt: every other query parameter and the fragment are kept byte
+ * for byte. An event that names no prompt is returned as the same object, so nothing is copied for it.
  */
 
-const PROMPT_PARAMETER = "prompt";
+/** A prompt parameter's text, in decoded text: a `prompt=` that starts a query, after `?` or `&`. */
+const PROMPT_PARAMETER = /(?:^|[?&])prompt=/i;
 
-/**
- * The name of a `prompt` parameter followed by its value: plain (`prompt=`), or percent-encoded once or more (`prompt%3D`,
- * `prompt%253D`), which is how a link sits inside another URL's query. The text of a prompt always follows its name.
- */
-const PROMPT_MARKER = /prompt(?:=|%(?:25)*3D)/i;
+/** A link nested as the value of another parameter starts its own query with `?` or `&`. A value that merely begins `prompt=` is text. */
+const NESTED_PROMPT = /[?&]prompt=/i;
 
-/** A separator left at the end of a value once it is cut before its prompt: a plain or encoded `?` or `&`. */
-const TRAILING_SEPARATOR = /(?:\?|&|%3F|%26)$/i;
+/** A segment that is the prompt parameter itself, once decoded. */
+const PROMPT_SEGMENT = /^prompt=/i;
 
-/** The word a prompt link's parameter is named with; a value without it cannot carry a prompt. */
+/** Any `prompt=` at all, in decoded text. A snapshot that holds one is not sent. */
+const PROMPT_ASSIGNMENT = /prompt=/i;
+
+/** The word a prompt is named by: checked before any decoding, since most strings never contain it. */
 const PROMPT_WORD = /prompt/i;
 
-/** The value without any separators left at its end. */
-const withoutTrailingSeparators = (value: string): string => {
-    let trimmed = value;
+/** A run of percent-encoded bytes, decoded run by run so a malformed run does not stop the others. */
+const ENCODED_RUN = /(?:%[\da-f]{2})+/gi;
 
-    for (let found = TRAILING_SEPARATOR.exec(trimmed); found; found = TRAILING_SEPARATOR.exec(trimmed)) {
-        trimmed = trimmed.slice(0, found.index);
-    }
-
-    return trimmed;
-};
-
-const RELATIVE_BASE = "https://relative.invalid";
-
-/** The URL as it was written, with its top-level `prompt` parameter removed. A value that is not a URL, or has no such parameter, is returned unchanged. */
-const withoutTopLevelPrompt = (value: string): string => {
-    let absolute = true;
-    let url: URL;
-
-    try {
-        url = new URL(value);
-    } catch {
-        absolute = false;
-
-        try {
-            url = new URL(value, RELATIVE_BASE);
-        } catch {
-            return value;
-        }
-    }
-
-    if (!url.searchParams.has(PROMPT_PARAMETER)) {
-        return value;
-    }
-
-    url.searchParams.delete(PROMPT_PARAMETER);
-
-    return absolute ? url.href : `${url.pathname}${url.search}${url.hash}`;
-};
-
-/**
- * A URL, or any string that may hold one, with no prompt text left in it. A top-level `prompt` parameter is removed exactly. A
- * prompt still named further in (inside a nested link, plain or encoded) is cut from its name on, so nothing after it is kept.
- */
-export const redactPromptFromUrl = (value: string): string => {
-    if (!PROMPT_WORD.test(value)) {
-        return value;
-    }
-
-    const withoutPrompt = withoutTopLevelPrompt(value);
-    const marker = PROMPT_MARKER.exec(withoutPrompt);
-
-    if (!marker) {
-        return withoutPrompt;
-    }
-
-    return withoutTrailingSeparators(withoutPrompt.slice(0, marker.index));
-};
-
-/** Every string in `value`, at any depth, cleaned by `redactPromptFromUrl`. Copies what it walks; the input is not changed. */
-const redactDeep = (value: unknown): unknown => {
-    if (typeof value === "string") {
-        return redactPromptFromUrl(value);
-    }
-
-    if (Array.isArray(value)) {
-        return value.map((item) => redactDeep(item));
-    }
-
-    if (value !== null && typeof value === "object") {
-        return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, redactDeep(item)]));
-    }
-
-    return value;
-};
+const MAX_DECODE_PASSES = 5;
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> => {
     if (value === null || typeof value !== "object") {
@@ -106,17 +39,136 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> => {
     return prototype === Object.prototype || prototype === null;
 };
 
-/** Whether any string in `value`, at any depth, names a prompt. */
-const namesPrompt = (value: unknown): boolean => {
+/** The text with its percent-encoding removed, repeated while a pass still changes it: a nested link is encoded twice. */
+const decodeFully = (text: string): string => {
+    let current = text;
+
+    for (let pass = 0; pass < MAX_DECODE_PASSES; pass += 1) {
+        const next = current.replaceAll(ENCODED_RUN, (run) => {
+            try {
+                return decodeURIComponent(run);
+            } catch {
+                return run;
+            }
+        });
+
+        if (next === current) {
+            return current;
+        }
+
+        current = next;
+    }
+
+    return current;
+};
+
+/** One `&`-separated segment, or `undefined` when it is the prompt parameter and is removed. `redact` cleans a nested link. */
+const redactSegment = (segment: string, redact: (text: string) => string): string | undefined => {
+    if (PROMPT_SEGMENT.test(decodeFully(segment))) {
+        return undefined;
+    }
+
+    const equals = segment.indexOf("=");
+
+    if (equals === -1) {
+        return segment;
+    }
+
+    const decodedValue = decodeFully(segment.slice(equals + 1));
+
+    if (!NESTED_PROMPT.test(decodedValue)) {
+        return segment;
+    }
+
+    return `${segment.slice(0, equals)}=${encodeURIComponent(redact(decodedValue))}`;
+};
+
+/** A query with its prompt parameters removed. Every other segment is kept as it was written. */
+const redactQuery = (query: string, redact: (text: string) => string): string =>
+    query
+        .split("&")
+        .map((segment) => redactSegment(segment, redact))
+        .filter((segment): segment is string => segment !== undefined)
+        .join("&");
+
+/**
+ * A URL, or any string that may hold one, with no prompt text left in it. The prompt parameter and a nested link's prompt are
+ * removed; every other query parameter and the fragment are kept as written. A string that names no prompt is returned as it is.
+ */
+export const redactPromptFromUrl = (value: string): string => {
+    if (!PROMPT_WORD.test(value) || !PROMPT_PARAMETER.test(decodeFully(value))) {
+        return value;
+    }
+
+    const hashAt = value.indexOf("#");
+    const body = hashAt === -1 ? value : value.slice(0, hashAt);
+    const fragment = hashAt === -1 ? undefined : value.slice(hashAt + 1);
+    const cleanedFragment = fragment === undefined ? undefined : redactPromptFromUrl(fragment);
+    // A fragment that held only the prompt leaves no `#` behind.
+    const tail = cleanedFragment === undefined || (cleanedFragment === "" && fragment !== "") ? "" : `#${cleanedFragment}`;
+
+    const queryAt = body.indexOf("?");
+
+    if (queryAt === -1) {
+        return `${redactQuery(body, redactPromptFromUrl)}${tail}`;
+    }
+
+    const path = redactQuery(body.slice(0, queryAt), redactPromptFromUrl);
+    const rawQuery = body.slice(queryAt + 1);
+    const query = redactQuery(rawQuery, redactPromptFromUrl);
+    const head = query === "" && rawQuery !== "" ? path : `${path}?${query}`;
+
+    return `${head}${tail}`;
+};
+
+const containsPrompt = (value: unknown): boolean => {
     if (typeof value === "string") {
-        return PROMPT_MARKER.test(value);
+        return PROMPT_WORD.test(value) && PROMPT_ASSIGNMENT.test(decodeFully(value));
     }
 
     if (Array.isArray(value)) {
-        return value.some((item) => namesPrompt(item));
+        return value.some((item) => containsPrompt(item));
     }
 
-    return isPlainObject(value) && Object.values(value).some((item) => namesPrompt(item));
+    return isPlainObject(value) && Object.values(value).some((item) => containsPrompt(item));
+};
+
+/**
+ * Every string in `value`, at any depth, cleaned by `redactPromptFromUrl`. Only a plain array or object is walked; anything else
+ * (a `Date`, a class instance) is kept as it is. A container with nothing to change is returned as the same object.
+ */
+const redactDeep = (value: unknown): unknown => {
+    if (typeof value === "string") {
+        return redactPromptFromUrl(value);
+    }
+
+    if (Array.isArray(value)) {
+        let changed = false;
+        const items = value.map((item) => {
+            const next = redactDeep(item);
+
+            changed ||= next !== item;
+
+            return next;
+        });
+
+        return changed ? items : value;
+    }
+
+    if (isPlainObject(value)) {
+        let changed = false;
+        const entries = Object.entries(value).map(([key, item]) => {
+            const next = redactDeep(item);
+
+            changed ||= next !== item;
+
+            return [key, next] as const;
+        });
+
+        return changed ? Object.fromEntries(entries) : value;
+    }
+
+    return value;
 };
 
 /**
@@ -131,7 +183,7 @@ const isPromptSnapshot = (event: unknown): boolean => {
 
     const properties = isPlainObject(event.properties) ? event.properties : {};
 
-    return namesPrompt(properties.$current_url) || namesPrompt(properties.$snapshot_data);
+    return containsPrompt(properties.$current_url) || containsPrompt(properties.$snapshot_data);
 };
 
 /**

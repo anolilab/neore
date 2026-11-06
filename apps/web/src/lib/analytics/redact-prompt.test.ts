@@ -111,7 +111,7 @@ describe("a prompt link on a sign-in route", () => {
 
         expect(cleaned).not.toContain("Summarise");
         expect(cleaned).not.toContain("merger");
-        expect(cleaned).toBe("https://app.example.com/auth/sign-in?redirectTo=%2Fchat");
+        expect(cleaned).toBe("https://app.example.com/auth/sign-in?redirectTo=%2Fchat%3Fmodel%3Dgpt-4o");
     });
 
     it("keeps the prompt text out when the return link is encoded twice", () => {
@@ -144,7 +144,11 @@ describe("the exact sign-in inputs from the review", () => {
             "https://app.example.com/auth/sign-in?redirectTo=%2Fchat%3Fprompt%3D%2522hi%2522",
             "https://app.example.com/auth/sign-in?redirectTo=%2Fchat",
         ],
-        ["email code, with the model after", "/auth/email-otp?redirectTo=%2Fchat%3Fprompt%3D%2522hi%2522&model=x", "/auth/email-otp?redirectTo=%2Fchat"],
+        [
+            "email code, with the model after",
+            "/auth/email-otp?redirectTo=%2Fchat%3Fprompt%3D%2522hi%2522&model=x",
+            "/auth/email-otp?redirectTo=%2Fchat&model=x",
+        ],
     ])("removes the nested prompt from a %s sign-in URL", (_name, input, expected) => {
         expect(redactPromptFromUrl(input)).toBe(expected);
     });
@@ -186,5 +190,38 @@ describe("a session recording snapshot of a prompt link", () => {
         };
 
         expect(redactPromptFromEvent(snapshot)).toEqual(snapshot);
+    });
+});
+
+describe("what the scrubber keeps", () => {
+    it("keeps every other query parameter and the fragment, byte for byte", () => {
+        expect(redactPromptFromUrl("/chat?prompt=hi&model=gpt-4o&q=a%20b+c#notes")).toBe("/chat?model=gpt-4o&q=a%20b+c#notes");
+        expect(redactPromptFromUrl("/auth/sign-in?lang=en%20US&redirectTo=%2Fchat%3Fprompt%3Dhi&theme=dark#section?x")).toBe(
+            "/auth/sign-in?lang=en%20US&redirectTo=%2Fchat&theme=dark#section?x",
+        );
+    });
+
+    it("keeps a value that merely contains prompt=, as a note does (the review's example)", () => {
+        expect(redactPromptFromUrl("/chat?note=prompt=keep&model=gpt-4o")).toBe("/chat?note=prompt=keep&model=gpt-4o");
+    });
+
+    it("drops the fragment only when the fragment held nothing else", () => {
+        expect(redactPromptFromUrl("/chat?prompt=hi#prompt=hi")).toBe("/chat");
+    });
+});
+
+describe("the event's own fields", () => {
+    it("keeps a Date timestamp as a Date, with its time", () => {
+        const timestamp = new Date("2026-11-06T10:00:00.000Z");
+        const redacted = redactPromptFromEvent({ event: "$pageview", properties: { $current_url: linkOpened }, timestamp });
+
+        expect(redacted?.timestamp).toBeInstanceOf(Date);
+        expect(redacted?.timestamp.getTime()).toBe(timestamp.getTime());
+    });
+
+    it("returns the same event object when it names no prompt, so nothing is copied", () => {
+        const event = { event: "$pageview", properties: { $current_url: "https://app.example.com/chat?model=gpt-4o" }, timestamp: new Date() };
+
+        expect(redactPromptFromEvent(event)).toBe(event);
     });
 });
