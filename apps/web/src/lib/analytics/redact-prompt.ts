@@ -155,7 +155,14 @@ const containsPrompt = (value: unknown): boolean => {
  * Every string in `value`, at any depth, cleaned by `redactPromptFromUrl`. Only a plain array or object is walked; anything else
  * (a `Date`, a class instance) is kept as it is. A container with nothing to change is returned as the same object.
  */
-const redactDeep = (value: unknown): unknown => {
+/** How deep the walk goes into an event. An event is shallow; past this depth a value is dropped rather than sent unchecked. */
+const MAX_EVENT_DEPTH = 64;
+
+const redactDeep = (value: unknown, depth = 0): unknown => {
+    if (depth > MAX_EVENT_DEPTH) {
+        return undefined;
+    }
+
     if (typeof value === "string") {
         return redactPromptFromUrl(value);
     }
@@ -163,7 +170,7 @@ const redactDeep = (value: unknown): unknown => {
     if (Array.isArray(value)) {
         let changed = false;
         const items = value.map((item) => {
-            const next = redactDeep(item);
+            const next = redactDeep(item, depth + 1);
 
             changed ||= next !== item;
 
@@ -174,13 +181,15 @@ const redactDeep = (value: unknown): unknown => {
     }
 
     if (isPlainObject(value)) {
+        // A key is text too: a property named from a link carries its prompt, so the key is cleaned as a string value is.
         let changed = false;
         const entries = Object.entries(value).map(([key, item]) => {
-            const next = redactDeep(item);
+            const cleanKey = redactPromptFromUrl(key);
+            const next = redactDeep(item, depth + 1);
 
-            changed ||= next !== item;
+            changed ||= next !== item || cleanKey !== key;
 
-            return [key, next] as const;
+            return [cleanKey, next] as const;
         });
 
         return changed ? Object.fromEntries(entries) : value;

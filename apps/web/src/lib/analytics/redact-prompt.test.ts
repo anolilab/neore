@@ -326,3 +326,33 @@ describe("a prompt inside an encoded or nested fragment", () => {
         expect(redactPromptFromUrl(url)).toBe(expected);
     });
 });
+
+describe("a prompt in an event's property name", () => {
+    it("removes the prompt from a key built from a link, and keeps the value of the property", () => {
+        const event = {
+            event: "$pageview",
+            properties: {
+                "/chat?prompt=Summarise%20the%20merger%20plan&model=gpt-4o": "kept",
+                [`/chat?prompt=${encodeURIComponent("Summarise the merger plan")}`]: 1,
+                plain: "value",
+            },
+        };
+
+        const payload = JSON.stringify(redactPromptFromEvent(event));
+
+        expect(payload).not.toContain("merger");
+        // The key keeps its other parameter, and its value is kept with it.
+        expect(redactPromptFromEvent(event)?.properties).toHaveProperty("/chat?model=gpt-4o", "kept");
+        expect(redactPromptFromEvent(event)?.properties).toEqual(expect.objectContaining({ plain: "value" }));
+    });
+
+    it("bounds the walk: a value nested past the event depth is dropped, not sent", () => {
+        let nested: Record<string, unknown> = { leaf: "prompt=secret" };
+
+        for (let level = 0; level < 80; level += 1) {
+            nested = { next: nested };
+        }
+
+        expect(JSON.stringify(redactPromptFromEvent({ event: "$pageview", properties: nested }))).not.toContain("secret");
+    });
+});
