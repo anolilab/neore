@@ -261,6 +261,214 @@ describe("checkDueTasks", () => {
     });
 });
 
+describe("checkDueTasks missed and overlapping slots", () => {
+    const HOUR = 60 * 60_000;
+    const HOURLY = "0 * * * *";
+
+    // Half past an hour, so no test here sees the clock cross an hourly slot between its setup and its sweep.
+    beforeEach(() => {
+        vi.useFakeTimers({ now: Date.UTC(2026, 10, 6, 12, 30), toFake: ["Date"] });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it("starts exactly one catch-up run after a three-slot outage, then waits for the next future slot", async () => {
+        const taskId = await insertTask({ cronExpression: HOURLY, nextRunAt: Date.now() - 3 * HOUR, recurring: true, status: "done" });
+
+        await runInternal(checkDueTasks, {});
+
+        expect(roundJobs()).toHaveLength(1);
+        const task = await getTask(taskId);
+
+        expect(task.status).toBe("queued");
+        expect(task.nextRunAt).toBeGreaterThan(Date.now());
+        expect(task.lastSkippedAt).toBeUndefined();
+
+        // The catch-up finished at once; the next sweeps start nothing until the next slot.
+        await harness.run(async (ctx: any) => await patchById(ctx.db, "tasks", taskId as never, { activeCycle: undefined, status: "done" }));
+        await runInternal(checkDueTasks, {});
+        await runInternal(checkDueTasks, {});
+
+        expect(roundJobs()).toHaveLength(1);
+    });
+
+    it("fails a round that went silent during the outage before the slot, so the slot starts the catch-up", async () => {
+        const taskId = await insertTask({
+            activeCycle: "stuck",
+            cronExpression: HOURLY,
+            nextRunAt: Date.now() - 3 * HOUR,
+            recurring: true,
+            status: "running",
+            updatedAt: Date.now() - 4 * HOUR,
+        });
+
+        await runInternal(checkDueTasks, {});
+
+        const task = await getTask(taskId);
+
+        expect(task.status).toBe("queued");
+        expect(task.lastSkipReason).toBeUndefined();
+        expect(roundJobs()).toHaveLength(1);
+    });
+
+    it("fails a dead round past the stale batch when its slot comes up, and starts the catch-up", async () => {
+        const fourHoursAgo = Date.now() - 4 * HOUR;
+
+        // More dead rounds than one stale batch fails, all older than the recurring one.
+        for (let index = 0; index < 30; index += 1) {
+            await insertTask({ activeCycle: `old-${String(index)}`, status: "running", title: `Old ${String(index)}`, updatedAt: fourHoursAgo - 1000 + index });
+        }
+
+        const taskId = await insertTask({
+            activeCycle: "stuck",
+            cronExpression: HOURLY,
+            nextRunAt: Date.now() - 3 * HOUR,
+            recurring: true,
+            status: "running",
+            updatedAt: fourHoursAgo,
+        });
+
+        await runInternal(checkDueTasks, {});
+
+        const task = await getTask(taskId);
+
+        expect(task.status).toBe("queued");
+        expect(task.lastSkipReason).toBeUndefined();
+        expect(roundJobs().map((job) => job.args.taskId)).toStrictEqual([taskId]);
+    });
+
+    it("keeps a trace of a round that never started, though the catch-up re-queues the task at once", async () => {
+        const taskId = await insertTask({
+            activeCycle: "lost",
+            cronExpression: HOURLY,
+            nextRunAt: Date.now() - HOUR,
+            recurring: true,
+            status: "queued",
+            updatedAt: Date.now() - 2 * HOUR,
+        });
+
+        await runInternal(checkDueTasks, {});
+
+        expect(await statusOf(taskId)).toBe("queued");
+        expect(await inbox()).toStrictEqual([{ outcome: "failure", title: "Summary", type: "task" }]);
+    });
+
+    it("never lets a skipped task hold up the next due task in the batch", async () => {
+        // A schedule that matches no date (30 February), skipped while it runs.
+        const impossible = await insertTask({
+            activeCycle: "c1",
+            createdAt: Date.now() - 400 * 24 * HOUR,
+            cronExpression: "0 0 30 2 *",
+            nextRunAt: Date.now() - 300 * 24 * HOUR,
+            recurring: true,
+            status: "running",
+            title: "Impossible",
+            updatedAt: Date.now() - 60_000,
+        });
+        const next = await insertTask({ cronExpression: HOURLY, nextRunAt: Date.now() - HOUR, recurring: true, status: "done", title: "Next" });
+        const started = performance.now();
+
+        await runInternal(checkDueTasks, {});
+
+        expect(performance.now() - started).toBeLessThan(5000);
+        expect(roundJobs().map((job) => job.args.taskId)).toStrictEqual([next]);
+
+        const skipped = await getTask(impossible);
+
+        expect(skipped.status).toBe("running");
+        expect(skipped.nextRunAt).toBeGreaterThan(Date.now());
+        expect(skipped.lastSkippedAt).toBeUndefined();
+    });
+
+    it("records the first slot of a task found blocked like any later skipped slot", async () => {
+        const slot = Math.floor(Date.now() / HOUR) * HOUR;
+        const dependency = await insertTask({ title: "Dependency" });
+        const taskId = await insertTask({ cronExpression: HOURLY, dependsOn: [dependency], nextRunAt: slot, recurring: true, status: "todo" });
+
+        await runInternal(checkDueTasks, {});
+
+        expect(await getTask(taskId)).toMatchObject({ lastSkippedAt: slot, lastSkipReason: "blocked", status: "blocked" });
+        expect(roundJobs()).toHaveLength(0);
+    });
+
+    it("records no slot from before the task was created", async () => {
+        const latest = Math.floor(Date.now() / HOUR) * HOUR;
+        const taskId = await insertTask({
+            createdAt: latest - 90 * 60_000,
+            cronExpression: HOURLY,
+            nextRunAt: latest - 5 * HOUR,
+            recurring: true,
+            status: "needs_review",
+        });
+
+        await runInternal(checkDueTasks, {});
+
+        const task = await getTask(taskId);
+
+        expect(task.lastSkippedAt).toBe(latest);
+        expect(task.lastSkippedAt).toBeGreaterThanOrEqual(task.createdAt);
+    });
+
+    it("records a slot that falls while the previous run is still going, without touching updatedAt", async () => {
+        const slot = Math.floor(Date.now() / HOUR) * HOUR;
+        const lastSignOfLife = Date.now() - 5 * 60_000;
+        const taskId = await insertTask({
+            activeCycle: "c1",
+            cronExpression: HOURLY,
+            nextRunAt: slot,
+            recurring: true,
+            status: "running",
+            updatedAt: lastSignOfLife,
+        });
+
+        await runInternal(checkDueTasks, {});
+
+        const task = await getTask(taskId);
+
+        expect(task).toMatchObject({ activeCycle: "c1", lastSkippedAt: slot, lastSkipReason: "still_running", status: "running", updatedAt: lastSignOfLife });
+        expect(task.nextRunAt).toBeGreaterThan(Date.now());
+        expect(roundJobs()).toHaveLength(0);
+    });
+
+    it("records the latest of the slots missed while the last result waits on a review", async () => {
+        const latest = Math.floor(Date.now() / HOUR) * HOUR;
+        const taskId = await insertTask({ cronExpression: HOURLY, nextRunAt: latest - 3 * HOUR, recurring: true, status: "needs_review" });
+
+        await runInternal(checkDueTasks, {});
+
+        expect(await getTask(taskId)).toMatchObject({ lastSkippedAt: latest, lastSkipReason: "awaiting_review", status: "needs_review" });
+    });
+});
+
+describe("a failed run", () => {
+    it("shows failed, keeps no earlier result as its own, and notifies a failure", async () => {
+        const taskId = await insertTask({ activeCycle: "c1", resultSummary: "Yesterday's summary", status: "queued" });
+        const claimed = await claim(taskId, 0);
+
+        expect(await complete({ outcome: { error: "The provider is down.", kind: "error" }, runId: claimed.runId, threadId: "thread-2" })).toBe("failed");
+
+        const task = await getTask(taskId);
+
+        expect(task).toMatchObject({ lastError: "The provider is down.", lastRunThreadId: "thread-2", status: "failed" });
+        expect(task.resultSummary).toBeUndefined();
+        expect(await statusOf(claimed.runId)).toBe("error");
+        expect(await inbox()).toStrictEqual([expect.objectContaining({ outcome: "failure", type: "task" })]);
+    });
+
+    it("drops an earlier result when a stale round is failed", async () => {
+        const taskId = await insertTask({ activeCycle: "c1", resultSummary: "Yesterday's summary", status: "queued", updatedAt: 1 });
+
+        await runInternal(checkDueTasks, {});
+
+        const task = await getTask(taskId);
+
+        expect(task.status).toBe("failed");
+        expect(task.resultSummary).toBeUndefined();
+    });
+});
+
 describe("claim refusals", () => {
     const runCount = async (): Promise<number> => {
         const runs: unknown[] = await harness.run(async (ctx: any) => await ctx.db.query("taskRuns").collect());

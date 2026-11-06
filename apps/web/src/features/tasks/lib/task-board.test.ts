@@ -27,6 +27,8 @@ const task = (id: string, overrides: Partial<BoardTask> = {}): BoardTask => {
         instructions: "Do it",
         lastError: null,
         lastRunThreadId: null,
+        lastSkipReason: null,
+        lastSkippedAt: null,
         maxRepairRounds: 2,
         model: null,
         nextRunAt: null,
