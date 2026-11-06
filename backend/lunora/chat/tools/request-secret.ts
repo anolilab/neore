@@ -35,6 +35,7 @@ import {
     SECRET_HEADER_NAME_RE,
     SECRET_HEADER_VALUE_MAX,
     SECRET_LABEL_MAX,
+    SECRET_HEADER_VALUE_FORBIDDEN_RE,
     SECRET_PROVIDER_KEY_MAX,
     SECRET_PROVIDERS,
     SECRET_PURPOSE_MAX,
@@ -68,7 +69,14 @@ const useSchema = z
 const formatSchema = z
     .object({
         minLength: z.int().min(1).max(SECRET_HEADER_VALUE_MAX).optional().meta({ description: "The fewest characters the value may have" }),
-        prefix: z.string().min(1).max(SECRET_FORMAT_PREFIX_MAX).optional().meta({ description: 'What the value must start with, e.g. "sk-"' }),
+        // The value is trimmed before it is checked, so a prefix that starts with whitespace could never match.
+        prefix: z
+            .string()
+            .min(1)
+            .max(SECRET_FORMAT_PREFIX_MAX)
+            .refine((prefix) => prefix === prefix.trimStart(), { error: "A prefix cannot start with whitespace" })
+            .optional()
+            .meta({ description: 'What the value must start with, e.g. "sk-"' }),
     })
     .strict()
     .meta({ description: "Optional shape the value must have; a value that does not fit is refused and nothing is stored." });
@@ -101,6 +109,14 @@ const inputSchema = z
     .refine((input) => input.fields === undefined || new Set(input.fields.map((field) => field.name)).size === input.fields.length, {
         error: "Field names must be unique",
     })
+    // A header prefix with a character no header value may hold could never be matched, so the card would be unanswerable.
+    .refine(
+        (input) =>
+            (input.fields ?? (input.use === undefined ? [] : [{ format: input.format, use: input.use }])).every(
+                ({ format, use }) => use.kind !== "mcp_header" || format?.prefix === undefined || !SECRET_HEADER_VALUE_FORBIDDEN_RE.test(format.prefix),
+            ),
+        { error: "A header prefix cannot hold a control character, a line break or a character above U+00FF" },
+    )
     // A provider key is stored up to SECRET_PROVIDER_KEY_MAX characters, so a card that requires more could never be answered.
     .refine(
         (input) =>

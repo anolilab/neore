@@ -226,6 +226,10 @@ describe("the pause", () => {
         expect(inputSchema.safeParse(SECRET_INPUT).success).toBe(true);
         expect(inputSchema.safeParse({ label: "Token", use: HEADER_USE }).success).toBe(true);
         expect(inputSchema.safeParse({ label: "Token", use: { kind: "provider_key", provider: "nope" } }).success).toBe(false);
+        // A prefix the trimmed value can never start with, or a header prefix no header value may hold, is refused before the card shows.
+        expect(inputSchema.safeParse({ format: { prefix: " sk-" }, label: "Key", use: { kind: "provider_key", provider: "openai" } }).success).toBe(false);
+        expect(inputSchema.safeParse({ format: { prefix: "sk-" }, label: "Key", use: { kind: "provider_key", provider: "openai" } }).success).toBe(true);
+        expect(inputSchema.safeParse({ format: { prefix: "a\nb" }, label: "Token", use: HEADER_USE }).success).toBe(false);
         expect(inputSchema.safeParse({ label: "Token", use: PROVIDER_USE, value: "sk-oops" }).success).toBe(false);
         expect(inputSchema.safeParse({ label: "", use: PROVIDER_USE }).success).toBe(false);
     });

@@ -42,6 +42,18 @@ msgstr "，未读"
 msgid "...and {0} more"
 msgstr "……还有 {0} 个"
 
+#: src/features/chat/thread/request-secret-prompt.tsx
+msgid "At least {minLength} characters"
+msgstr "至少 {minLength} 个字符"
+
+#: src/features/chat/thread/request-secret-prompt.tsx
+msgid "Starts with {prefix}"
+msgstr "以 {prefix} 开头"
+
+#: src/features/chat/thread/request-secret-prompt.tsx
+msgid "Starts with {prefix}, at least {minLength} characters"
+msgstr "以 {prefix} 开头，至少 {minLength} 个字符"
+
 #. placeholder {0}: prompt.name
 #: src/features/prompts/components/variable-fill-dialog.tsx:128
 msgid "\"{0}\" has variables that need values."

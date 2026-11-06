@@ -198,6 +198,22 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         }
     };
 
+    // The rule a value must meet, shown as help text before anything is typed, so a disabled Save has a visible reason.
+    const ruleOf = (format: SecretFormat | undefined): string | undefined => {
+        const prefix = format?.prefix;
+        const minLength = format?.minLength;
+
+        if (prefix !== undefined && minLength !== undefined) {
+            return t`Starts with ${prefix}, at least ${minLength} characters`;
+        }
+
+        if (prefix !== undefined) {
+            return t`Starts with ${prefix}`;
+        }
+
+        return minLength === undefined ? undefined : t`At least ${minLength} characters`;
+    };
+
     const formatMessageOf = (field: RequestedField, problem: "min_length" | "prefix" | undefined): string => {
         if (problem === "prefix") {
             const prefix = field.format?.prefix ?? "";
@@ -254,6 +270,8 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
         // Cleared before the call returns: the values live in this component for no longer than the keystrokes.
         setDrafts([]);
         setRevealed(new Set());
+        // A retyped value is named again only once the person leaves its field, as the first one was.
+        setTouched(new Set());
         setSaveError(null);
         setSubmitted(reply);
         groupRef.current?.focus();
@@ -365,12 +383,14 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                         const inputId = `${fieldId}-${index}`;
                         const destination = destinationOf(field, servers[index]);
                         const formatMessage = touched.has(index) ? formatMessageOf(field, formatProblems[index]) : undefined;
+                        const rule = ruleOf(field.format);
                         const valueMax = valueMaxOf(field);
                         const fieldLabel = field.label || label || t`Secret`;
                         const shown = revealed.has(index);
                         const describedBy = [
                             destination ? `${inputId}-destination` : "",
                             tooLong[index] === true ? `${inputId}-too-long` : "",
+                            rule ? `${inputId}-rule` : "",
                             formatMessage ? `${inputId}-format` : "",
                             saveError ? saveErrorId : "",
                             loadFailureShown ? loadErrorId : "",
@@ -415,6 +435,11 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                                 {tooLong[index] && (
                                     <p className="text-destructive text-xs" id={`${inputId}-too-long`} role="alert">
                                         {t`This is too long: up to ${valueMax} characters.`}
+                                    </p>
+                                )}
+                                {rule && (
+                                    <p className="text-muted-foreground text-xs" id={`${inputId}-rule`}>
+                                        {rule}
                                     </p>
                                 )}
                                 {formatMessage && (

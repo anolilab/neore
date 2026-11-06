@@ -42,6 +42,18 @@ msgstr ", ungelesen"
 msgid "...and {0} more"
 msgstr "...und {0} weitere"
 
+#: src/features/chat/thread/request-secret-prompt.tsx
+msgid "At least {minLength} characters"
+msgstr "Mindestens {minLength} Zeichen"
+
+#: src/features/chat/thread/request-secret-prompt.tsx
+msgid "Starts with {prefix}"
+msgstr "Beginnt mit {prefix}"
+
+#: src/features/chat/thread/request-secret-prompt.tsx
+msgid "Starts with {prefix}, at least {minLength} characters"
+msgstr "Beginnt mit {prefix}, mindestens {minLength} Zeichen"
+
 #. placeholder {0}: prompt.name
 #: src/features/prompts/components/variable-fill-dialog.tsx:128
 msgid "\"{0}\" has variables that need values."

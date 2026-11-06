@@ -336,6 +336,13 @@ describe("the secret request card", () => {
         expect(field.getAttribute("type")).toBe("password");
     });
 
+    it("shows the rule a value must meet before anything is typed, so a disabled Save has a visible reason", () => {
+        mountCard({ kind: "provider_key", provider: "openai" }, undefined, { format: { prefix: "sk-" } });
+
+        expect(screen.getByText("Starts with sk-")).toBeTruthy();
+        expect(screen.queryByText("This does not look right: it must start with sk-.")).toBeNull();
+    });
+
     it("refuses a value that misses the declared prefix before sending, and accepts one that fits", () => {
         mountCard({ kind: "provider_key", provider: "openai" }, undefined, { format: { prefix: "sk-" } });
 
