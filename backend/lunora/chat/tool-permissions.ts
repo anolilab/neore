@@ -205,10 +205,6 @@ const modeFor = (thread: Doc<"threads"> | null, userId: string): ThreadPermissio
 /** Relationship rows read for one thread when its mode is resolved. */
 const MAX_LINKS_CHECKED = 50;
 
-/**
- * A comparison column is a thread of its own, but the mode is chosen once, on the comparison it belongs to: a column always takes its
- * comparison parent's mode, whatever mode it holds. The parent's choice therefore reaches the first send and every follow-up alike.
- */
 /** The relationship rows where `threadId` is the child, read up to the bound (`MAX_LINKS_CHECKED`). */
 const linksOf = async (ctx: QueryCtx, threadId: Id<"threads">) =>
     await ctx.db
@@ -236,6 +232,10 @@ export const isComparisonColumn = async (ctx: QueryCtx, threadId: Id<"threads">)
     return parents.some((parent) => parent !== null);
 };
 
+/**
+ * A comparison column is a thread of its own, but the mode is chosen once, on the comparison it belongs to: a column always takes its
+ * comparison parent's mode, whatever mode it holds. The parent's choice therefore reaches the first send and every follow-up alike.
+ */
 export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null, userId: string): Promise<ThreadPermissionMode | null> => {
     // A host thread has no mode, and a comparison link must not give it one.
     if (!thread || thread.runner === "host") {
