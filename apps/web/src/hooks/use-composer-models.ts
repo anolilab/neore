@@ -16,10 +16,10 @@ import { useGatewayModels, useGatewayModelsSettled } from "./use-gateway-models"
 import { useBlockedCreators } from "./use-model-filter-rules";
 
 /**
- * How long a link waits for PostHog's feature flags before it decides without them. A model behind a flag is hidden until the flags
- * arrive, as the picker hides it, so after this wait the link refuses such a model rather than wait for flags that may never come.
+ * How long a prompt link waits for anything that decides its model (the session, the catalog, the account's rules, the feature flags) before
+ * it applies without them. Past this the link applies its prompt, selects no model it could not check, and says so; it never stays pending.
  */
-export const FLAG_WAIT_MS = 1500;
+export const LINK_WAIT_MS = 5000;
 
 /** The list while the user's rules are not known: a failed read. A link then selects no model, so it cannot select one the user blocked. */
 const NO_MODELS: GatewayModel[] = [];
@@ -77,7 +77,6 @@ const useFeatureFlagsKnown = (): boolean => {
     const posthog = usePostHog();
     const gated = useGatewayModels().some((model) => model.featureFlag);
     const [, setFlagsVersion] = useState(0);
-    const [waitOver, setWaitOver] = useState(false);
     const [flagsFailed, setFlagsFailed] = useState(false);
 
     useEffect(() => {
@@ -95,22 +94,9 @@ const useFeatureFlagsKnown = (): boolean => {
         });
     }, [posthog]);
 
-    useEffect(() => {
-        if (!gated) {
-            return undefined;
-        }
-
-        const timer = setTimeout(() => {
-            setWaitOver(true);
-        }, FLAG_WAIT_MS);
-
-        return () => {
-            clearTimeout(timer);
-        };
-    }, [gated]);
-
     // Without a PostHog project there are no flags to wait for.
-    return !gated || !env.VITE_POSTHOG_API_KEY || posthog?.flagsEndpointWasHit === true || flagsFailed || waitOver;
+    // A bounded wait for flags that never load is the link's own (`useLinkWaitOver`), not this hook's.
+    return !gated || !env.VITE_POSTHOG_API_KEY || posthog?.flagsEndpointWasHit === true || flagsFailed;
 };
 
 /**
@@ -150,4 +136,24 @@ export const useComposerModelEntries = (): ReadonlyMap<string, LinkableModel> | 
     const signature = settled ? models.map((model) => [model.id, model.mode ?? "", model.provider ?? ""].join(FIELD)).join(ROW) : undefined;
 
     return useMemo(() => (signature === undefined ? undefined : entriesOf(signature)), [signature]);
+};
+
+/**
+ * Whether a prompt link has waited `LINK_WAIT_MS` for its model decision. Once it has, the link stops waiting and applies, so no wait on the
+ * session, the catalog, the rules or the flags can hold a link pending indefinitely.
+ */
+export const useLinkWaitOver = (): boolean => {
+    const [over, setOver] = useState(false);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setOver(true);
+        }, LINK_WAIT_MS);
+
+        return () => {
+            clearTimeout(timer);
+        };
+    }, []);
+
+    return over;
 };

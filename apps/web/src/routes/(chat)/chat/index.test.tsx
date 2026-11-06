@@ -85,6 +85,7 @@ vi.mock("@/components/error-boundaries/route-error-boundary", () => {
 vi.mock("@/hooks/use-composer-models", () => {
     return {
         useComposerModelEntries: () => new Map(harness.composerModels.map((model) => [model.id, { id: model.id }])),
+        useLinkWaitOver: () => false,
     };
 });
 

@@ -16,7 +16,7 @@ import type { ModelId } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import { buildPromptLink, readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 
-import { FLAG_WAIT_MS, useComposerModelEntries } from "./use-composer-models";
+import { LINK_WAIT_MS, useComposerModelEntries, useLinkWaitOver } from "./use-composer-models";
 
 const harness = vi.hoisted(() => {
     return {
@@ -142,8 +142,9 @@ const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider 
 /** The composer's entries and the link hook, as the route wires them: the link waits until the list is final. */
 const useLinkWithComposerList = (model: string | undefined) => {
     const entries = useComposerModelEntries();
+    const linkWaitOver = useLinkWaitOver();
 
-    usePromptLinkDraft({ linkableModels: entries ?? new Map(), model, prompt: "hi", ready: entries !== undefined });
+    usePromptLinkDraft({ linkableModels: entries ?? new Map(), model, prompt: "hi", ready: entries !== undefined || linkWaitOver });
 
     return { ids: entries ? [...entries.keys()] : [], settled: entries !== undefined };
 };
@@ -286,6 +287,28 @@ describe("a prompt link and the user's blocked models", () => {
             expect(harness.showWarning).not.toHaveBeenCalled();
         });
 
+        it("a wait that never resolves: the link applies its prompt within the bound, and says the model is unavailable", async () => {
+            // The account's rules never load: nothing decides the model, so the link waits, and is not applied before the bound.
+            harness.gate = new Promise<void>(() => {
+                // Never resolves: the account's rules never load.
+            });
+
+            const { result } = renderHook(() => useLinkWithComposerList(flagged.id), { wrapper });
+
+            await settle();
+            expect(result.current.settled).toBe(false);
+            expect(useChatUIStore.getState().composerText).toBe("");
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(LINK_WAIT_MS);
+            });
+
+            // Past the bound the link has applied: the prompt is drafted, the model is refused with its notice, and the chat keeps its model.
+            expect(useChatUIStore.getState().composerText).toBe("hi");
+            expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
+            expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+        }, 15_000);
+
         it("a flag request that fails decides the link at once, without the wait", async () => {
             const { result } = renderHook(() => useLinkWithComposerList(flagged.id), { wrapper });
 
@@ -310,10 +333,11 @@ describe("a prompt link and the user's blocked models", () => {
 
             // The clock, not the wall clock, moves past the wait.
             await act(async () => {
-                await vi.advanceTimersByTimeAsync(FLAG_WAIT_MS);
+                await vi.advanceTimersByTimeAsync(LINK_WAIT_MS);
             });
 
-            expect(result.current.settled).toBe(true);
+            // The flags never came, so the list stayed unfinished; the link applied at the bound, with the flagged model refused.
+            expect(result.current.settled).toBe(false);
             expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
             expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
             expect(useChatUIStore.getState().composerText).toBe("hi");

@@ -17,7 +17,7 @@ import type { LinkableModel } from "@/features/chat/core/utils/prompt-link-model
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
 import validatePromptSettings from "@/features/prompts/lib/prompt-validation";
-import { useComposerModelEntries } from "@/hooks/use-composer-models";
+import { useComposerModelEntries, useLinkWaitOver } from "@/hooks/use-composer-models";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -113,7 +113,9 @@ const ChatPage = () => {
     // A missing or invalid one applies nothing, so the link keeps the draft, and the link waits until the prompt has answered.
     const pickerModels = useFeatureFlaggedModels();
     const savedPrompt = useQuery(crpc.prompts.functions.getPrompt.queryOptions(promptId ? { promptId: promptId as Id<"prompts"> } : skipToken));
-    const savedPromptPending = Boolean(promptId) && savedPrompt.isPending;
+    // The link waits for the saved prompt, the session and the model decision, each bounded: past `LINK_WAIT_MS` it applies (`useLinkWaitOver`).
+    const linkWaitOver = useLinkWaitOver();
+    const savedPromptPending = Boolean(promptId) && savedPrompt.isPending && !linkWaitOver;
     const savedPromptApplies =
         Boolean(promptId) &&
         savedPrompt.data !== undefined &&
@@ -130,7 +132,7 @@ const ChatPage = () => {
         otherDraftSource: savedPromptApplies || (Boolean(hasInitialMessage) && (handoffWaiting || landingMessageWaiting())),
         prompt: linkPrompt,
         onDecided: endHandoffOwnership,
-        ready: !isSessionPending && linkableModels !== undefined && !savedPromptPending,
+        ready: (!isSessionPending || linkWaitOver) && (linkableModels !== undefined || linkWaitOver) && !savedPromptPending,
     });
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.

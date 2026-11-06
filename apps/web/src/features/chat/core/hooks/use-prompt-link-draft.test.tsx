@@ -298,7 +298,14 @@ describe("usePromptLinkDraft", () => {
     });
 
     it("a link whose default is disabled opens on another text model the picker offers, not the disabled default", () => {
-        const enabledText = OFFERED_TEXT_MODELS.values().find((entry) => entry.id !== DEFAULT_CHAT_MODEL);
+        let enabledText: LinkableModel | undefined;
+
+        for (const entry of OFFERED_TEXT_MODELS.values()) {
+            if (entry.id !== DEFAULT_CHAT_MODEL) {
+                enabledText = entry;
+                break;
+            }
+        }
 
         expect(enabledText).toBeDefined();
         // The owner has switched the default off: the picker does not offer it, only other text models.
