@@ -6,7 +6,6 @@ import type { ReactNode } from "react";
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
-// eslint-disable-next-line import/no-extraneous-dependencies -- vitest is this package's devDependency; the app's config does not read it
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PDF_LOAD_TIMEOUT_MS } from "./pdf-limits";
@@ -81,7 +80,6 @@ describe("the thumbnail's load deadline", () => {
     let root: Root;
 
     const mountThumbnail = async () => {
-        // eslint-disable-next-line testing-library/no-unnecessary-act -- a plain react-dom root, not a Testing Library render: act is what flushes it
         await act(async () => {
             root.render(
                 <FetchableOriginsProvider origins={originsOf(ORIGIN)}>
