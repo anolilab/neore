@@ -162,6 +162,12 @@ export const configOptionsOf = (value: unknown, scrub: Scrub): AgentOption[] | u
         }
     }
 
+    // A nonempty list with no usable entry is malformed, not a list that clears the choices: it is ignored, and the choices offered
+    // before stay. Only an explicitly empty list means the agent offers none.
+    if (options.length === 0 && value.length > 0) {
+        return undefined;
+    }
+
     return options;
 };
 

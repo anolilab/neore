@@ -20,6 +20,11 @@ const select = (id: string, extra: Record<string, unknown> = {}) => {
 };
 
 describe("configOptionsOf", () => {
+    it("ignores a nonempty list that holds no usable option, and clears the choices only for an empty list", () => {
+        expect(configOptionsOf([null, 3, { id: "x", type: "boolean" }], plain)).toBeUndefined();
+        expect(configOptionsOf([], plain)).toEqual([]);
+    });
+
     it("reads a list option with its category, current value and choices", () => {
         expect(configOptionsOf([select("m")], plain)).toEqual([
             {
@@ -52,7 +57,7 @@ describe("configOptionsOf", () => {
     it("leaves out a boolean option and one without a usable id or value", () => {
         expect(
             configOptionsOf([select("b", { currentValue: true, type: "boolean" }), select("", {}), select("x", { currentValue: "" }), "junk", null], plain),
-        ).toEqual([]);
+        ).toBeUndefined();
     });
 
     it("keeps at most 20 options and 100 choices, and one of each id", () => {
@@ -85,7 +90,7 @@ describe("configOptionsOf", () => {
         const offered = (id: string) => configOptionsOf([select(id)], plain);
 
         expect(offered("é".repeat(64))).toHaveLength(1);
-        expect(offered("é".repeat(65))).toEqual([]);
+        expect(offered("é".repeat(65))).toBeUndefined();
     });
 
     it("cuts the options by bytes as well as by count, so the post stays under the ingest cap", () => {
@@ -134,10 +139,10 @@ describe("configOptionsOf", () => {
         expect(option?.name).toHaveLength(200);
         expect(option?.name.startsWith("ab")).toBe(true);
         expect(option?.choices).toEqual([{ name: "x ", value: "v" }]);
-        expect(configOptionsOf([select("SECRET-id")], scrub)).toEqual([]);
+        expect(configOptionsOf([select("SECRET-id")], scrub)).toBeUndefined();
         const tooLong = select("m", { id: "x".repeat(129) });
 
-        expect(configOptionsOf([tooLong], plain)).toEqual([]);
+        expect(configOptionsOf([tooLong], plain)).toBeUndefined();
     });
 
     it("is undefined for anything that is not a list", () => {
