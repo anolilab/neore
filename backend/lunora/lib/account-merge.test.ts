@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { deleteMergedGuest } from "../auth/hooks";
 import { requireOwnCollectionId } from "../knowledge/documents-shared";
 import type { MergeReferences, ShardCall } from "./account-merge";
-import { importShardRows } from "./account-merge";
+import { importShardRows, MERGE_PAGE_SIZE } from "./account-merge";
 import { GLOBAL_USER_COLUMNS, GLOBAL_USER_TABLES_NOT_REASSIGNED, mergeGuestInto, reassignGlobalRows, rewriteOwner, shardLocalTables } from "./account-merge";
 import { schemaWithShardedTables } from "./test-schema";
 
@@ -312,18 +312,22 @@ describe("deleteMergedGuest", () => {
 });
 
 describe("importShardRows for userSettings", () => {
-    const run = async (guestRows: Record<string, unknown>[], seed?: Record<string, unknown>) => {
+    const run = async (guestRows: Record<string, unknown>[], seed?: Record<string, unknown>, crowd: Record<string, unknown>[] = []) => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
 
         try {
             return await harness.run(async (context: any) => {
+                for (const other of crowd) {
+                    await context.db.insert("userSettings", other);
+                }
+
                 if (seed) {
                     await context.db.insert("userSettings", seed);
                 }
 
                 await context.runMutation(importShardRows, { from: "guest", rows: guestRows, table: "userSettings", to: "user" });
 
-                const stored = await context.db.query("userSettings").take(10);
+                const stored = await context.db.query("userSettings").take(MERGE_PAGE_SIZE + 50);
 
                 return stored.filter((row: Record<string, unknown>) => row.userId === "user");
             });
@@ -341,6 +345,27 @@ describe("importShardRows for userSettings", () => {
 
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({ language: "de-DE", setupStepsSkipped: ["pair", "ssh", "agent"] });
+    });
+
+    it("takes only the converting guest's own row from a page that holds another user's too", async () => {
+        const rows = await run(
+            [
+                { _id: "o1", setupStepsSkipped: ["pair"], userId: "someone-else" },
+                { _id: "g1", setupStepsSkipped: ["ssh"], userId: "guest" },
+            ],
+            { userId: "user" },
+        );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]?.setupStepsSkipped).toEqual(["ssh"]);
+    });
+
+    it("finds the new account's row among more settings rows than a merge page holds, and adds no second one", async () => {
+        const others = Array.from({ length: MERGE_PAGE_SIZE + 20 }, (_, index) => {return { userId: `other-${index}` }});
+        const rows = await run([{ _id: "g1", setupStepsSkipped: ["agent"], userId: "guest" }], { language: "de-DE", userId: "user" }, others);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ language: "de-DE", setupStepsSkipped: ["agent"] });
     });
 
     it("leaves the new account's settings alone when the guest skipped nothing", async () => {

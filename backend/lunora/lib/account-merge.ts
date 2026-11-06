@@ -130,15 +130,19 @@ export const listShardRowIds = internalQuery
  * The new account keeps its own `userSettings` row, but the guest's skipped first-run steps are a choice the guest made
  * and would otherwise vanish on sign-up: they are added to the new row's list and nothing else of it changes.
  */
-const carrySetupSteps = async (db: RawDb, guestRows: Record<string, unknown>[], to: string): Promise<void> => {
-    const skipped = guestRows.flatMap((row) => (Array.isArray(row.setupStepsSkipped) ? (row.setupStepsSkipped as string[]) : []));
+const carrySetupSteps = async (ctx: { db: unknown }, guestRows: Record<string, unknown>[], from: string, to: string): Promise<void> => {
+    // Only the converting guest's own row: a page may hold other rows, and their choices are not this account's.
+    const skipped = guestRows.flatMap((row) => (row.userId === from && Array.isArray(row.setupStepsSkipped) ? (row.setupStepsSkipped as string[]) : []));
 
     if (skipped.length === 0) {
         return;
     }
 
-    const rows = await db.query("userSettings").take(MERGE_PAGE_SIZE);
-    const existing = rows.find((row) => row.userId === to);
+    // By userId, through the table's index: the new account's row is found wherever it sits, never by scanning a page of rows.
+    const settings = (ctx.db as { userSettings: { findFirst: (options: { where: { userId: string } }) => Promise<Record<string, unknown> | null> } })
+        .userSettings;
+    const existing = await settings.findFirst({ where: { userId: to } });
+    const db = rawDb(ctx);
 
     if (existing) {
         await db.patch("userSettings", existing._id as string, {
@@ -157,7 +161,7 @@ export const importShardRows = internalMutation
         const db = rawDb(ctx);
 
         if (args.table === "userSettings") {
-            await carrySetupSteps(db, args.rows as Record<string, unknown>[], args.to);
+            await carrySetupSteps(ctx, args.rows as Record<string, unknown>[], args.from, args.to);
 
             return { imported: 0 };
         }
