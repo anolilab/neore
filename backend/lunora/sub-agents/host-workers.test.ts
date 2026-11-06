@@ -73,6 +73,7 @@ const NOT_ONLINE = /not online/iu;
 const OUT_OF_DATE = /out of date/iu;
 const NOT_ANSWERED = /host did not answer/iu;
 const NEEDS_A_PERSON = /needs a person/iu;
+const NOT_ALLOWED_BY_CAP = /does not allow agents on your computer/iu;
 const SESSION_ENDED = /session has ended/iu;
 const REFUSED_THREAD = /alone|own|computer/iu;
 const KEEPS_RUNNER = /keeps the runner/iu;
@@ -298,6 +299,28 @@ describe("creating a worker on a computer", () => {
         await expect(createHostWorker(device)).rejects.toMatchObject({ message: expect.stringMatching(HOST_OUT_OF_SCOPE) });
         expect(await table("subAgentRuns")).toHaveLength(0);
         expect(await table("deviceCalls")).toHaveLength(0);
+    });
+
+    it("refuses a worker on a computer when the organization's cap is below auto, creating nothing", async () => {
+        const device = await pairedDevice();
+        const lead = await newThread({ organizationId: "org-capped" });
+
+        await run(
+            async (context) =>
+                await context.db.insert("organizationPolicies", {
+                    document: JSON.stringify({ permissionCap: "ask", schemaVersion: 1 }),
+                    organizationId: "org-capped",
+                    revision: 1,
+                    schemaVersion: 1,
+                    updatedAt: Date.now(),
+                }),
+        );
+
+        await expect(createHostWorker(device, { leadThreadId: lead })).rejects.toMatchObject({
+            message: expect.stringMatching(NOT_ALLOWED_BY_CAP),
+        });
+        expect(await table("subAgentRuns")).toHaveLength(0);
+        expect(await table("acpSessions")).toHaveLength(0);
     });
 
     it("refuses a pair the computer did not offer, creating nothing", async () => {

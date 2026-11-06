@@ -59,6 +59,7 @@ import { notifyQuietly } from "../notifications/notify";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
 import { threadGateOutcome, throwUnlessGranted } from "../chat/lib/thread-gate";
+import { permissionCapOf, readPolicyState } from "../auth/lib/organization-policy";
 import { MAX_LENGTH } from "../lib/validators";
 import { RUN_STALE_MS, RUN_WATCH_RETRY } from "../chat/lib/interrupted-run";
 import { HOST_SESSION_BUSY_RETRY_MS, HOST_START_MAX_ATTEMPTS, hostRunActivity, hostStartRetryDelayMs, sendHostRunTurn } from "./host-runs";
@@ -530,6 +531,9 @@ const findDispatchedRun = async (ctx: Pick<MutationCtx, "db">, args: WorkerRunAr
 
 const HOST_NEEDS_A_PERSON = "Messaging a worker on a computer needs a person in the conversation to approve it, so a background run cannot do it.";
 
+// A computer agent approves its own tools, out of the backend's reach, so an organization capped below `auto` allows none (as device tools are removed).
+const HOST_NOT_UNDER_AUTO = "Your organization does not allow agents on your computer.";
+
 const HOST_NEEDS_OWN_CONVERSATION =
     "A worker on a computer can only be used from a conversation that is yours alone: not shared, public, a group chat or a messenger conversation.";
 
@@ -671,6 +675,17 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
     // be in the lead's context. The grant lookup decides past RLS: a hidden grant row must not read as "not shared".
     if (runnerKind === "host" && !(await loadEligibleThread({ db: systemDb(ctx) }, parent._id, args.userId))) {
         return await refuse({ error: HOST_NEEDS_OWN_CONVERSATION, kind: "forbidden" });
+    }
+
+    // The organization's cap must allow `auto`: a computer agent's tools are approved there, out of the backend's reach.
+    // A new worker takes the organization its thread is stamped with; an existing one keeps its own.
+    if (runnerKind === "host") {
+        const organizationId = child?.organizationId ?? parent.organizationId ?? args.organizationId;
+        const policy = organizationId ? await ctx.db.organizationPolicies.findFirst({ where: { organizationId } }) : null;
+
+        if (permissionCapOf(readPolicyState(policy?.document)) !== "auto") {
+            return await refuse({ error: HOST_NOT_UNDER_AUTO, kind: "forbidden" });
+        }
     }
 
     // Only the task text reaches a coding agent on a computer: a tool list or skill the caller asks for would read as a
