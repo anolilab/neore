@@ -91,7 +91,7 @@ const CodeForm = () => {
     );
 };
 
-const ProblemMessage = ({ problem }: { problem: Problem }) => {
+const ProblemMessage = ({ onRetry, problem }: { onRetry?: () => void; problem: Problem }) => {
     const { i18n, t } = useLingui();
 
     return (
@@ -99,6 +99,11 @@ const ProblemMessage = ({ problem }: { problem: Problem }) => {
             <p className="text-sm text-red-600" role="alert">
                 {i18n._(DEVICE_PROBLEM_MESSAGES[problem])}
             </p>
+            {problem === "unavailable" && onRetry && (
+                <Button onClick={onRetry} type="button">
+                    {t`Try again`}
+                </Button>
+            )}
             <a className="text-sm font-medium underline underline-offset-4" href="/auth/device">
                 {t`Enter a different code`}
             </a>
@@ -293,7 +298,7 @@ const DeviceApproval = () => {
     const userId = data?.user?.id;
 
     // Opening the code while signed in claims it for this account, so it runs once per code and account.
-    const { data: lookup, error: lookupError } = useQuery({
+    const { data: lookup, error: lookupError, refetch: retryLookup } = useQuery({
         enabled: Boolean(userCode && userId && !isAnonymous),
         gcTime: 0,
         queryFn: async (): Promise<Lookup> => {
@@ -372,7 +377,15 @@ const DeviceApproval = () => {
     }
 
     if (lookupError) {
-        return <ProblemMessage problem={lookupError instanceof ProblemError ? lookupError.problem : "unavailable"} />;
+        // A lookup that could not be answered (an outage) is retried from here with the same code.
+        return (
+            <ProblemMessage
+                onRetry={() => {
+                    retryLookup().catch(() => undefined);
+                }}
+                problem={lookupError instanceof ProblemError ? lookupError.problem : "unavailable"}
+            />
+        );
     }
 
     if (!lookup) {

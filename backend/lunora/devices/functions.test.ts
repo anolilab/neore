@@ -1264,6 +1264,19 @@ describe("a headless machine paired by code", () => {
         expect(other.secret).not.toBe(first.secret);
     });
 
+    it("never exceeds the device cap when two pairings register at once", async () => {
+        for (let index = 0; index < 9; index += 1) {
+            await pairHeadless(ownerId, `filler-${String(index)}`);
+        }
+
+        // The cap check and the insert are one mutation on the owner's shard, and a shard runs one mutation at a time.
+        const settled = await Promise.allSettled([pairHeadless(ownerId, "a"), pairHeadless(ownerId, "b"), pairHeadless(ownerId, "c")]);
+        const list = (await as(ownerId).query(functions.listDevices as never, {} as never)) as { _id: string }[];
+
+        expect(settled.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
+        expect(list).toHaveLength(10);
+    });
+
     it("hands the retry its device even when the account has since filled up", async () => {
         const first = await pairHeadless(ownerId, "build-box", "code-full");
 
