@@ -68,7 +68,7 @@ describe("buildCloudGuidePrompt", () => {
         // The patch is quoted as JSON in the prompt: its regex backslash and its escape each show doubled there.
         expect(prompt).toContain(String.raw`/\\d+/`);
         expect(prompt).toContain(String.raw`x\\u200B`);
-        expect(prompt).not.toContain("\u200B");
+        expect(prompt).not.toContain("\u{200B}");
     });
 
     it("shows a hidden character in a diff as an escape, and keeps the diff's line breaks", () => {
