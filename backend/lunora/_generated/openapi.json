@@ -18549,17 +18549,11 @@
                 "schema": {
                   "items": {
                     "properties": {
-                      "_creationTime": {
-                        "type": "number"
+                      "autoModel": {
+                        "type": "boolean"
                       },
-                      "_id": {
+                      "category": {
                         "type": "string"
-                      },
-                      "botId": {
-                        "type": "string"
-                      },
-                      "createdAt": {
-                        "type": "number"
                       },
                       "createdBy": {
                         "type": "string"
@@ -18573,26 +18567,63 @@
                       "deletedAt": {
                         "type": "number"
                       },
+                      "dictationLanguage": {
+                        "type": "string"
+                      },
                       "enabledFeatures": {
                         "items": {
                           "type": "string"
                         },
                         "type": "array"
                       },
+                      "externalThreadId": {
+                        "type": "string"
+                      },
                       "isPublic": {
                         "type": "boolean"
                       },
-                      "lastUserMessageAt": {
+                      "isTemporary": {
+                        "type": "boolean"
+                      },
+                      "language": {
+                        "type": "string"
+                      },
+                      "lastCompressionStartedAt": {
                         "type": "number"
                       },
-                      "lockedAt": {
-                        "type": "number"
+                      "messengerConnectionId": {
+                        "type": "string"
+                      },
+                      "mode": {
+                        "anyOf": [
+                          {
+                            "const": "text",
+                            "type": "string"
+                          },
+                          {
+                            "const": "image",
+                            "type": "string"
+                          },
+                          {
+                            "const": "video",
+                            "type": "string"
+                          }
+                        ]
                       },
                       "model": {
                         "type": "string"
                       },
-                      "order": {
-                        "type": "number"
+                      "multiChat": {
+                        "type": "boolean"
+                      },
+                      "organizationId": {
+                        "type": "string"
+                      },
+                      "parentThreadIds": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
                       },
                       "pinnedAt": {
                         "type": "number"
@@ -18606,11 +18637,11 @@
                       "reasoningEffort": {
                         "type": "number"
                       },
+                      "source": {
+                        "type": "string"
+                      },
                       "statelessMode": {
                         "type": "boolean"
-                      },
-                      "status": {
-                        "type": "string"
                       },
                       "summary": {
                         "type": "string"
@@ -18621,6 +18652,9 @@
                         },
                         "type": "array"
                       },
+                      "teamId": {
+                        "type": "string"
+                      },
                       "title": {
                         "type": "string"
                       },
@@ -18629,6 +18663,237 @@
                       },
                       "userId": {
                         "type": "string"
+                      },
+                      "_creationTime": {
+                        "type": "number"
+                      },
+                      "_id": {
+                        "type": "string"
+                      },
+                      "activeAgent": {
+                        "properties": {
+                          "kind": {
+                            "const": "model",
+                            "type": "string"
+                          },
+                          "model": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "model"
+                        ],
+                        "type": "object"
+                      },
+                      "activeLeafMessageId": {
+                        "type": "string"
+                      },
+                      "awaitingInput": {
+                        "anyOf": [
+                          {
+                            "const": "approval",
+                            "type": "string"
+                          },
+                          {
+                            "const": "question",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "botId": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "number"
+                      },
+                      "groupChat": {
+                        "properties": {
+                          "debateRounds": {
+                            "type": "number"
+                          },
+                          "mode": {
+                            "anyOf": [
+                              {
+                                "const": "supervisor",
+                                "type": "string"
+                              },
+                              {
+                                "const": "round-robin",
+                                "type": "string"
+                              },
+                              {
+                                "const": "mention-only",
+                                "type": "string"
+                              },
+                              {
+                                "const": "parallel",
+                                "type": "string"
+                              },
+                              {
+                                "const": "debate",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "participants": {
+                            "items": {
+                              "properties": {
+                                "addedAt": {
+                                  "type": "number"
+                                },
+                                "skillId": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "addedAt",
+                                "skillId"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "stopRequestedAt": {
+                            "type": "number"
+                          },
+                          "synthesizerSkillId": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "participants"
+                        ],
+                        "type": "object"
+                      },
+                      "hasHandoff": {
+                        "type": "boolean"
+                      },
+                      "lastReplyAt": {
+                        "type": "number"
+                      },
+                      "lastUserMessageAt": {
+                        "type": "number"
+                      },
+                      "lastViewedAt": {
+                        "type": "number"
+                      },
+                      "lockedAt": {
+                        "type": "number"
+                      },
+                      "order": {
+                        "type": "number"
+                      },
+                      "permissionMode": {
+                        "anyOf": [
+                          {
+                            "const": "supervised",
+                            "type": "string"
+                          },
+                          {
+                            "const": "auto-edit",
+                            "type": "string"
+                          },
+                          {
+                            "const": "auto",
+                            "type": "string"
+                          },
+                          {
+                            "const": "full",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "runner": {
+                        "const": "host",
+                        "type": "string"
+                      },
+                      "snoozedUntil": {
+                        "type": "number"
+                      },
+                      "status": {
+                        "anyOf": [
+                          {
+                            "const": "active",
+                            "type": "string"
+                          },
+                          {
+                            "const": "archived",
+                            "type": "string"
+                          },
+                          {
+                            "const": "running",
+                            "type": "string"
+                          },
+                          {
+                            "const": "abort",
+                            "type": "string"
+                          },
+                          {
+                            "const": "error",
+                            "type": "string"
+                          },
+                          {
+                            "const": "finish",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "summaryEpoch": {
+                        "type": "number"
+                      },
+                      "summaryPathTooLongAt": {
+                        "type": "number"
+                      },
+                      "tagIds": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "workerPolicy": {
+                        "properties": {
+                          "allowedSources": {
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "const": "lead",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "user",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "trigger",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "messenger",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "outside_agent",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "type": "array"
+                          },
+                          "hostDispatch": {
+                            "const": "ask",
+                            "type": "string"
+                          },
+                          "maxDispatchesPerHour": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "allowedSources",
+                          "hostDispatch"
+                        ],
+                        "type": "object"
                       }
                     },
                     "required": [
