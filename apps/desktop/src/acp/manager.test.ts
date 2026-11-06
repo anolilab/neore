@@ -525,4 +525,37 @@ describe("starts that wait for their plan", () => {
         await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow(MISSING_COMMAND);
         expect(calls).toHaveLength(1);
     });
+
+    it("still sees a start in flight after another start of the same agent has finished", async () => {
+        const bad = { args: [], command: "neore-no-such-agent", cwd: scratch.dir, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
+        let released = false;
+        let calls = 0;
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    calls += 1;
+
+                    // The first start answers at once; the second waits.
+                    if (calls === 2) {
+                        await vi.waitFor(() => expect(released).toBe(true));
+                    }
+
+                    return bad;
+                },
+            },
+        );
+
+        const first = messageOf(target.startSession("fake", "Fake", scratch.work));
+        const second = messageOf(target.startSession("fake", "Fake", scratch.work));
+
+        await first;
+        // The agent is removed while the second start still waits for its plan.
+        await target.closeUnapproved({ agents: [], consents: [] });
+        released = true;
+
+        // Its plan is made again (a third call) rather than used as it came.
+        await second;
+        expect(calls).toBeGreaterThanOrEqual(3);
+    });
 });

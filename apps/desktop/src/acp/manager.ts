@@ -82,7 +82,7 @@ export class AcpManager {
     private readonly revocations = new Map<string, number>();
 
     /** Agents with a plan being made now; an agent not seen before counts as changed for them. */
-    private readonly planning = new Set<string>();
+    private readonly planning = new Map<string, number>();
 
     /** The hook runner of each session that has one; it lives and dies with the session. */
     private readonly runners = new Map<string, HookRunner>();
@@ -372,12 +372,18 @@ export class AcpManager {
      * check and the spawn that follows.
      */
     private async planCurrent(agentKey: string, folder: string | null): Promise<SpawnPlan> {
-        this.planning.add(agentKey);
+        this.planning.set(agentKey, (this.planning.get(agentKey) ?? 0) + 1);
 
         try {
             return await this.planUntilCurrent(agentKey, folder);
         } finally {
-            this.planning.delete(agentKey);
+            const left = (this.planning.get(agentKey) ?? 1) - 1;
+
+            if (left > 0) {
+                this.planning.set(agentKey, left);
+            } else {
+                this.planning.delete(agentKey);
+            }
         }
     }
 
@@ -420,12 +426,12 @@ export class AcpManager {
             next.set(agent.key, JSON.stringify([agent.command, agent.args, agent.install?.version ?? null, agent.install?.sha256 ?? null, agent.install?.treeSha256 ?? null, folders]));
         }
 
-        const keys = new Set([...this.approvalState.keys(), ...this.planning, ...next.keys()]);
+        const keys = new Set([...this.approvalState.keys(), ...this.planning.keys(), ...next.keys()]);
 
         for (const key of keys) {
             const prior = this.approvalState.get(key);
 
-            if (prior !== next.get(key) || (prior === undefined && this.planning.has(key))) {
+            if (prior !== next.get(key) || (prior === undefined && (this.planning.get(key) ?? 0) > 0)) {
                 this.revocations.set(key, (this.revocations.get(key) ?? 0) + 1);
             }
         }

@@ -1180,3 +1180,35 @@ fn a_multi_call_node_shim_is_recorded_by_the_name_it_runs_under() {
     assert!(output.status.success(), "the recorded command runs as node");
     assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "node-ok");
 }
+
+#[test]
+fn a_node_modules_folder_planted_next_to_the_install_refuses_the_start() {
+    let (state, guard) = state("planted");
+    let dir = guard.path().to_path_buf();
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+
+    state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap();
+    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+
+    for planted in [
+        dir.join("acp-agents/fixture/node_modules"),
+        dir.join("acp-agents/node_modules"),
+    ] {
+        fs::create_dir_all(&planted).unwrap();
+
+        let error = state.acp_spawn_plan("fixture", None).unwrap_err();
+
+        assert!(
+            error.contains("node_modules folder next to its install"),
+            "{error}"
+        );
+        fs::remove_dir_all(&planted).unwrap();
+        assert!(
+            state.acp_spawn_plan("fixture", None).is_ok(),
+            "removing it allows the start"
+        );
+    }
+}

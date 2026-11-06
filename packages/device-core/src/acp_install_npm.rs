@@ -729,6 +729,28 @@ impl DeviceState {
             ));
         }
 
+        // Node looks for modules in every `node_modules` above the program too. The two such folders inside our
+        // own install root are never made by an install, so one that exists is planted: refuse. Folders above the
+        // app's data folder (the person's home, their projects) are theirs and are not checked; see the consent text.
+        for outside in [
+            self.install_root().join(&agent.key).join("node_modules"),
+            self.install_root().join("node_modules"),
+        ] {
+            if fs::symlink_metadata(&outside).is_ok() {
+                self.audit(json!({
+                    "at": now_ms(), "decision": "refused", "detail": format!("{} {}: unexpected node_modules next to the install", agent.label, pin.version),
+                    "status": "refused", "tool": "acp_start",
+                }));
+
+                return Err(format!(
+                    "{} {} has a node_modules folder next to its install that Neore did not put there ({}). Neore will not start it. Remove that folder, or reinstall the agent.",
+                    agent.label,
+                    pin.version,
+                    outside.display()
+                ));
+            }
+        }
+
         let actual = if fs::symlink_metadata(&dir).is_ok_and(|meta| meta.is_dir()) {
             tree_hash(&dir).ok()
         } else {

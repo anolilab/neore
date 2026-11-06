@@ -39,7 +39,9 @@
   (`verify_installed_tree`, in `acp_spawn_plan`) and refuses on a mismatch. Binary installs are not re-hashed. `uvx`
   entries stay listed as not installable, as does a `binary` entry without a checksum. Deleting an install (remove,
   prune, replaced version) renames it into `acp-agents/.trash` under the install lock and deletes it on a thread, so
-  neither the lock nor the main thread waits on a `node_modules` tree.
+  neither the lock nor the main thread waits on a `node_modules` tree. The start check also refuses when a
+  `node_modules` exists in `acp-agents/<key>/` or `acp-agents/`; folders above the app's data folder (home, projects)
+  are NOT checked, a stated limit that the consent text repeats.
 
 - **Desktop dictation** (`apps/desktop/src/dictation/`, desktop-dictation.md S2) is off until the settings
   switch turns it on (`DEFAULT_SETTINGS.enabled: false`); off, no shortcut is registered.

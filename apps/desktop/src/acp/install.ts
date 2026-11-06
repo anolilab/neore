@@ -73,7 +73,7 @@ export const npmConsentText = ({ agent, args, env, name, version }: ResolvedNpmI
             "",
             "The registry publishes no hash for this agent. This hash came from the npm package index just now, not from the publisher: you are trusting the index as it is today (trust on first use). Neore downloads the package, checks it against this hash and refuses to install it if it differs.",
             "",
-            "npm installs it into Neore's own app data without running any install script. The files it installs, its dependencies included, are hashed after the install and checked before every start: if one changes, Neore will not start the agent.",
+            "npm installs it into Neore's own app data without running any install script. The files it installs, its dependencies included, are hashed after the install and checked before every start: if one changes, Neore will not start the agent. Node also loads modules from node_modules folders above the install (in your home or project folders); Neore checks the ones inside its own app data folder, not those, so a module placed there by another program is not detected.",
             "",
             "The agent runs on this computer with your rights, outside the shell sandbox. Installing approves no folder for it, and Neore never updates it on its own: a newer version is a new install you confirm.",
         ]
