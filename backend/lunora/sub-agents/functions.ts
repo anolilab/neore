@@ -531,7 +531,6 @@ const findDispatchedRun = async (ctx: Pick<MutationCtx, "db">, args: WorkerRunAr
 
 const HOST_NEEDS_A_PERSON = "Messaging a worker on a computer needs a person in the conversation to approve it, so a background run cannot do it.";
 
-// A computer agent approves its own tools, out of the backend's reach, so an organization capped below `auto` allows none (as device tools are removed).
 const HOST_NOT_UNDER_AUTO = "Your organization does not allow agents on your computer.";
 
 const HOST_NEEDS_OWN_CONVERSATION =
