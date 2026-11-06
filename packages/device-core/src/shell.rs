@@ -146,8 +146,10 @@ fn store_tail(buffer: &Mutex<(Vec<u8>, bool)>, chunk: &[u8], cap: usize) {
     }
 }
 
-/// A kept tail as text: a character the cut split at the front is dropped, not shown as a replacement.
-fn tail_text(bytes: &[u8], truncated: bool) -> String {
+/// A kept tail as text, at most `cap` bytes long: a character the cut split at the front is dropped, not shown as a
+/// replacement. Invalid bytes decode to U+FFFD, three bytes each, so the decoded text can outgrow `cap`; then its front
+/// is cut at a character boundary. Returns whether anything was cut, beyond the bytes already dropped.
+fn tail_text(bytes: &[u8], truncated: bool, cap: usize) -> (String, bool) {
     let start = if truncated {
         bytes
             .iter()
@@ -156,8 +158,19 @@ fn tail_text(bytes: &[u8], truncated: bool) -> String {
     } else {
         0
     };
+    let text = String::from_utf8_lossy(&bytes[start..]).into_owned();
 
-    String::from_utf8_lossy(&bytes[start..]).into_owned()
+    if text.len() <= cap {
+        return (text, false);
+    }
+
+    let mut cut = text.len() - cap;
+
+    while !text.is_char_boundary(cut) {
+        cut += 1;
+    }
+
+    (text[cut..].to_owned(), true)
 }
 
 /// The run's private temp folder (owner-only), removed when the run ends. A
@@ -563,17 +576,27 @@ fn spawn(
 fn finish_readers(readers: [thread::JoinHandle<()>; 2], stop: &AtomicBool) {
     let deadline = Instant::now() + READER_GRACE;
 
-    for reader in readers {
+    for reader in &readers {
         while !reader.is_finished() && Instant::now() < deadline {
             thread::sleep(Duration::from_millis(10));
-        }
-
-        if reader.is_finished() {
-            let _ = reader.join();
         }
     }
 
     stop.store(true, Ordering::Relaxed);
+
+    // A unix reader leaves within one poll slice of `stop`, so joining it cannot wait on a child that holds the pipe. A reader
+    // left running here would append output after the caller had published the command's end.
+    #[cfg(unix)]
+    for reader in readers {
+        let _ = reader.join();
+    }
+
+    #[cfg(not(unix))]
+    for reader in readers {
+        if reader.is_finished() {
+            let _ = reader.join();
+        }
+    }
 }
 
 /// Runs `line` in `cwd`. With a `sandbox` policy it runs confined or not at
@@ -626,7 +649,7 @@ pub fn run(
     #[cfg(unix)]
     drop(spawned.tracked.take());
 
-    // Unfinished readers are left to end on their own; they write only into the capped buffer.
+    // The readers are joined: once stopped they leave within a poll slice, so nothing is written after the output is read.
     finish_readers(readers, &stop);
 
     let (bytes, truncated) = std::mem::take(&mut *buffer.lock().unwrap());
@@ -680,6 +703,7 @@ struct TerminalShared {
 /// (background children die with it, as for `shell_run`). One watcher thread owns the process.
 pub struct Terminal {
     shared: Arc<TerminalShared>,
+    cap: usize,
 }
 
 #[cfg(unix)]
@@ -788,7 +812,7 @@ impl Terminal {
             watched.changed.notify_all();
         });
 
-        Ok(Terminal { shared })
+        Ok(Terminal { shared, cap })
     }
 
     /// The tail of the output so far and, once the command has ended, how it ended.
@@ -796,11 +820,12 @@ impl Terminal {
         // Read before the exit, so an ended terminal's output is whole: the watcher sets the exit after its readers.
         let exit_status = self.shared.state.lock().unwrap().exit.clone();
         let (bytes, truncated) = self.shared.buffer.lock().unwrap().clone();
+        let (output, cut) = tail_text(&bytes, truncated, self.cap);
 
         TerminalOutput {
             exit_status,
-            output: tail_text(&bytes, truncated),
-            truncated,
+            output,
+            truncated: truncated || cut,
         }
     }
 
@@ -1358,7 +1383,18 @@ mod tests {
 
         assert!(truncated);
         // "é" is two bytes; the cut left only its second, which is not shown.
-        assert_eq!(tail_text(&bytes, truncated), "xy");
+        assert_eq!(tail_text(&bytes, truncated, 3), ("xy".to_owned(), false));
+    }
+
+    #[test]
+    fn a_tail_of_invalid_bytes_stays_within_its_cap() {
+        // Each 0xFF decodes to a three-byte replacement, so a 6-byte cap is exceeded by the decoded text unless it is cut.
+        let bytes = [0xFF_u8; 6];
+        let (text, cut) = tail_text(&bytes, false, 6);
+
+        assert!(text.len() <= 6, "{text:?} is {} bytes", text.len());
+        assert!(cut);
+        assert_eq!(text, "\u{FFFD}\u{FFFD}");
     }
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -1374,6 +1410,33 @@ mod tests {
             shared,
             outside,
         ))
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn a_terminal_output_does_not_change_once_its_end_is_reported() {
+        let Some((policy, shared, _)) = terminal_policy("sealed") else {
+            return;
+        };
+        // A background child keeps the pipe open past the shell's exit and writes once more later. Guard, not a repro: the
+        // group is killed with the shell, so the late line should never be written at all.
+        let terminal = Terminal::start(
+            "echo first; (sleep 1; echo late) & exit 0",
+            &shared,
+            &policy,
+            &[],
+            64 * 1024,
+            Duration::from_secs(20),
+        )
+        .unwrap();
+
+        terminal.wait(Duration::from_secs(20)).expect("ended");
+        let at_end = terminal.output().output;
+
+        std::thread::sleep(Duration::from_millis(1500));
+
+        assert!(at_end.contains("first"));
+        assert_eq!(terminal.output().output, at_end);
     }
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
