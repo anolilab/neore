@@ -3541,7 +3541,7 @@ msgstr ""
 #: src/features/chat/thread/tool-approval.tsx:121
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:102
-#: src/routes/auth/device.tsx:205
+#: src/routes/auth/device.tsx:189
 msgid "Approve"
 msgstr "Aprovar"
 
@@ -3561,11 +3561,11 @@ msgstr ""
 msgid "Approved automatically — low risk"
 msgstr ""
 
-#: src/routes/auth/device.tsx:123
+#: src/routes/auth/device.tsx:107
 msgid "Approved. Return to your terminal: the command line is signed in. You can close this tab."
 msgstr ""
 
-#: src/routes/auth/device.tsx:110
+#: src/routes/auth/device.tsx:94
 msgid "Approving…"
 msgstr ""
 
@@ -5682,7 +5682,7 @@ msgstr ""
 msgid "Checking image safety..."
 msgstr "Verificando a segurança da imagem..."
 
-#: src/routes/auth/device.tsx:293
+#: src/routes/auth/device.tsx:277
 msgid "Checking the code…"
 msgstr ""
 
@@ -6202,8 +6202,8 @@ msgid "Cloudflare Workers AI models run wherever Cloudflare has capacity, so any
 msgstr "Os modelos do Cloudflare Workers AI são executados onde a Cloudflare tiver capacidade, por isso qualquer regra de região os oculta."
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:40
-#: src/features/auth/components/device-code-parts.tsx:18
-#: src/features/auth/components/device-code-parts.tsx:50
+#: src/features/auth/components/device-code-parts.tsx:23
+#: src/features/auth/components/device-code-parts.tsx:56
 #: src/features/canvas/canvas-panel.tsx:754
 #: src/features/chat/thread/composer-search-mode.tsx:56
 #: src/features/code/components/code-workspace.tsx:219
@@ -6812,7 +6812,7 @@ msgstr "Perspectiva comprimida"
 msgid "Compressing context..."
 msgstr "Comprimindo o contexto..."
 
-#: src/features/auth/components/device-code-parts.tsx:46
+#: src/features/auth/components/device-code-parts.tsx:52
 #: src/features/settings/components/chat/bots-settings.tsx:140
 msgid "Computer"
 msgstr ""
@@ -7312,9 +7312,9 @@ msgid "Context-aware generation"
 msgstr "Geração com reconhecimento de contexto"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
+#: src/features/auth/components/device-code-parts.tsx:107
 #: src/features/chat/host/host-composer.tsx:186
 #: src/features/skills/components/skill-builder-dialog.tsx:328
-#: src/routes/auth/device.tsx:80
 msgid "Continue"
 msgstr "Continuar"
 
@@ -9428,7 +9428,7 @@ msgstr "Negado — continuando sem ela"
 msgid "Denied on {device}"
 msgstr "Negado em {device}"
 
-#: src/routes/auth/device.tsx:124
+#: src/routes/auth/device.tsx:108
 msgid "Denied. The command line was not signed in. You can close this tab."
 msgstr ""
 
@@ -9445,7 +9445,7 @@ msgid "Density updated"
 msgstr ""
 
 #: src/features/chat/thread/tool-approval.tsx:125
-#: src/routes/auth/device.tsx:196
+#: src/routes/auth/device.tsx:180
 msgid "Deny"
 msgstr "Negar"
 
@@ -9458,7 +9458,7 @@ msgstr "Negar {tool}"
 msgid "Deny Data Collection"
 msgstr "Negar coleta de dados"
 
-#: src/routes/auth/device.tsx:110
+#: src/routes/auth/device.tsx:94
 msgid "Denying…"
 msgstr ""
 
@@ -11128,7 +11128,7 @@ msgstr ""
 msgid "enter"
 msgstr ""
 
-#: src/routes/auth/device.tsx:100
+#: src/routes/auth/device.tsx:84
 msgid "Enter a different code"
 msgstr ""
 
@@ -11218,7 +11218,7 @@ msgstr "Digite um texto..."
 msgid "Enter the API key"
 msgstr "Informe a chave de API"
 
-#: src/features/auth/components/device-code-parts.tsx:16
+#: src/features/auth/components/device-code-parts.tsx:21
 msgid "Enter the code that `neore login --device` shows in your terminal, then choose Continue."
 msgstr ""
 
@@ -17941,7 +17941,7 @@ msgstr "Carregando..."
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
-#: src/routes/auth/device.tsx:264
+#: src/routes/auth/device.tsx:248
 #: src/routes/auth/extension.tsx:66
 msgid "Loading…"
 msgstr "Carregando…"
@@ -21559,7 +21559,7 @@ msgstr "Só é possível comparar modelos de {0}. Limpe a seleção para trocar 
 msgid "Only 3B activated per token for efficiency"
 msgstr "Apenas 3B ativados por token, para mais eficiência"
 
-#: src/features/auth/components/device-code-parts.tsx:55
+#: src/features/auth/components/device-code-parts.tsx:61
 msgid "Only continue if you started this just now by running `neore login --device`, and the code above matches the one in your terminal."
 msgstr ""
 
@@ -27959,7 +27959,7 @@ msgstr "Barra lateral à direita"
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/marketing/components/landing-page.tsx:1058
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
-#: src/routes/auth/device.tsx:276
+#: src/routes/auth/device.tsx:260
 #: src/routes/auth/extension.tsx:78
 msgid "Sign in"
 msgstr "Entrar"
@@ -27983,12 +27983,12 @@ msgstr ""
 msgid "Sign in on another site?"
 msgstr "Entrar em outro site?"
 
-#: src/routes/auth/device.tsx:78
-#: src/routes/auth/device.tsx:308
+#: src/features/auth/components/device-code-parts.tsx:93
+#: src/routes/auth/device.tsx:292
 msgid "Sign in the command line"
 msgstr ""
 
-#: src/routes/auth/device.tsx:174
+#: src/routes/auth/device.tsx:158
 msgid "Sign in the command line?"
 msgstr ""
 
@@ -28095,7 +28095,7 @@ msgstr "Cadastre-se para desbloquear todos os modelos"
 msgid "Sign-in expired"
 msgstr "Login expirado"
 
-#: src/features/auth/components/device-code-parts.tsx:44
+#: src/features/auth/components/device-code-parts.tsx:50
 msgid "Sign-in request"
 msgstr ""
 
@@ -30589,7 +30589,7 @@ msgstr ""
 msgid "That computer is not online."
 msgstr ""
 
-#: src/routes/auth/device.tsx:164
+#: src/routes/auth/device.tsx:148
 msgid "That did not go through. Try again."
 msgstr ""
 
@@ -30746,15 +30746,19 @@ msgstr "A alteração é grande demais para ser exibida por completo."
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "O agente de chat executa a tarefa com suas ferramentas, seguindo opcionalmente uma habilidade."
 
-#: src/routes/auth/device.tsx:91
+#: src/routes/auth/device.tsx:75
 msgid "The code could not be checked right now. Try again in a moment."
+msgstr ""
+
+#: src/features/auth/components/device-code-parts.tsx:104
+msgid "The code must contain the letters and digits shown in your terminal."
 msgstr ""
 
 #: src/features/coding-agents/components/coding-agent-tool-view.tsx:41
 msgid "The coding agent could not start."
 msgstr "Não foi possível iniciar o agente de código."
 
-#: src/routes/auth/device.tsx:176
+#: src/routes/auth/device.tsx:160
 msgid "The command line on the computer below will be signed in as {email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings."
 msgstr ""
 
@@ -31427,19 +31431,19 @@ msgstr ""
 #~ msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
 #~ msgstr ""
 
-#: src/routes/auth/device.tsx:140
+#: src/routes/auth/device.tsx:124
 msgid "This code has already been answered."
 msgstr ""
 
-#: src/routes/auth/device.tsx:88
+#: src/routes/auth/device.tsx:72
 msgid "This code has expired. Run `neore login --device` again to get a new one."
 msgstr ""
 
-#: src/routes/auth/device.tsx:89
+#: src/routes/auth/device.tsx:73
 msgid "This code is not valid, or it was already used. Run `neore login --device` again to get a new one."
 msgstr ""
 
-#: src/routes/auth/device.tsx:132
+#: src/routes/auth/device.tsx:116
 msgid "This code was opened with a different account. Sign in with that account, or run `neore login --device` again."
 msgstr ""
 
@@ -32594,7 +32598,7 @@ msgstr "Tente ajustar os termos da pesquisa."
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/home/components/home-page.tsx:144
-#: src/routes/auth/device.tsx:255
+#: src/routes/auth/device.tsx:239
 msgid "Try again"
 msgstr "Tentar novamente"
 
@@ -32999,7 +33003,7 @@ msgstr "Abordagem única para modelagem de linguagem"
 msgid "United States"
 msgstr "Estados Unidos"
 
-#: src/features/auth/components/device-code-parts.tsx:47
+#: src/features/auth/components/device-code-parts.tsx:53
 msgid "unknown"
 msgstr ""
 
@@ -34582,7 +34586,7 @@ msgstr ""
 msgid "Watched repositories"
 msgstr ""
 
-#: src/routes/auth/device.tsx:246
+#: src/routes/auth/device.tsx:230
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr ""
 
@@ -35073,7 +35077,7 @@ msgstr ""
 #: src/features/chat/thread/streaming-placeholder.tsx:631
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
-#: src/routes/auth/device.tsx:205
+#: src/routes/auth/device.tsx:189
 msgid "Working…"
 msgstr "Trabalhando…"
 
@@ -35289,7 +35293,7 @@ msgstr "Você está adicionando documentos rápido demais. Aguarde um momento e 
 msgid "You are browsing as a guest. Sign in with your account to connect the extension."
 msgstr "Você está navegando como visitante. Entre com sua conta para conectar a extensão."
 
-#: src/routes/auth/device.tsx:274
+#: src/routes/auth/device.tsx:258
 msgid "You are browsing as a guest. Sign in with your account to sign in the command line."
 msgstr ""
 
@@ -35492,7 +35496,7 @@ msgstr ""
 msgid "Your {label} sign-in has expired. Connect it again."
 msgstr ""
 
-#: src/routes/auth/device.tsx:90
+#: src/routes/auth/device.tsx:74
 msgid "Your account already has the maximum number of API keys, so the command line was not signed in. Revoke one in Settings, then run `neore login --device` again."
 msgstr ""
 

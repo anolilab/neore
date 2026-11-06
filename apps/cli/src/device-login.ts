@@ -75,6 +75,9 @@ const readJson = async (response: Response): Promise<OAuthBody & Record<string, 
     }
 };
 
+/** ESC, the other C0 controls and the C1 controls, tab and newline aside: what an escape sequence is made of. */
+const TERMINAL_CONTROL = /(?![\t\n])\p{Cc}/u;
+
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "[::1]", "localhost"]);
 
 /** The same switch the paired-host pairing reads (`packages/device-core`): http to a loopback server, for local development only. */
@@ -157,6 +160,7 @@ export const requestDeviceCode = async (dependencies: DeviceFlowDependencies, ba
         typeof deviceCode !== "string" ||
         typeof userCode !== "string" ||
         typeof uri !== "string" ||
+        [userCode, uri, complete].some((value) => typeof value === "string" && TERMINAL_CONTROL.test(value)) ||
         !isTiming(expiresIn) ||
         (interval !== undefined && !isTiming(interval))
     ) {

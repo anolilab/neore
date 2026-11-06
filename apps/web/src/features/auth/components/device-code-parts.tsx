@@ -1,13 +1,18 @@
 import { useLingui } from "@lingui/react/macro";
+import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import { useState } from "react";
+
+/** The server ignores case, spaces and dashes; so does the form. */
+export const normalizeCode = (value: string): string => value.replaceAll(/[^a-z0-9]/giu, "").toUpperCase();
 
 /**
  * The code field of the CLI approval page: required (so Continue stays usable and native validation names the
  * field) and described by the instruction that says what to type and where it comes from.
  */
-export const DeviceCodeField = ({ onChange, value }: { onChange: (value: string) => void; value: string }) => {
+export const DeviceCodeField = ({ isInvalid = false, onChange, value }: { isInvalid?: boolean; onChange: (value: string) => void; value: string }) => {
     const { t } = useLingui();
 
     return (
@@ -18,6 +23,7 @@ export const DeviceCodeField = ({ onChange, value }: { onChange: (value: string)
             <Label htmlFor="device-code">{t`Code`}</Label>
             <Input
                 aria-describedby="device-code-hint"
+                aria-invalid={isInvalid}
                 autoCapitalize="characters"
                 autoComplete="off"
                 autoCorrect="off"
@@ -55,5 +61,50 @@ export const DeviceCodeDetails = ({ code, hostname }: { code: string; hostname: 
                 {t`Only continue if you started this just now by running \`neore login --device\`, and the code above matches the one in your terminal.`}
             </p>
         </>
+    );
+};
+
+/**
+ * The code form: normalises what was typed and hands the code on. A value with no letters or digits in it is
+ * not sent anywhere; it gets an inline alert instead of a silent no-op.
+ */
+export const DeviceCodeForm = ({ onCode }: { onCode: (code: string) => void }) => {
+    const { t } = useLingui();
+    const [typed, setTyped] = useState("");
+    const [hasError, setHasError] = useState(false);
+
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+
+        const code = normalizeCode(typed);
+
+        if (code.length === 0) {
+            setHasError(true);
+
+            return;
+        }
+
+        setHasError(false);
+        onCode(code);
+    };
+
+    return (
+        <form className="flex flex-col gap-4" noValidate onSubmit={submit}>
+            <h1 className="text-center text-xl font-semibold">{t`Sign in the command line`}</h1>
+            <DeviceCodeField
+                isInvalid={hasError}
+                onChange={(value) => {
+                    setTyped(value);
+                    setHasError(false);
+                }}
+                value={typed}
+            />
+            {hasError && (
+                <p className="text-center text-sm text-red-600" role="alert">
+                    {t`The code must contain the letters and digits shown in your terminal.`}
+                </p>
+            )}
+            <Button type="submit">{t`Continue`}</Button>
+        </form>
     );
 };

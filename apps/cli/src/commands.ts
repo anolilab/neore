@@ -249,13 +249,14 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
     }
 
     const existing = await readConfig(context.configFile);
-    const apiUrl = (
-        flags["api-url"] ??
-        context.io.env["NEORE_API_URL"] ??
-        existing.apiUrl ??
-        (await context.readLine("API URL (e.g. https://api.example.com): ")) ??
-        ""
-    ).trim();
+    const knownUrl = flags["api-url"] ?? context.io.env["NEORE_API_URL"] ?? existing.apiUrl;
+
+    // A device sign-in without a terminal (a script, CI, a pipe) has nobody to answer a prompt: say what to set.
+    if (!knownUrl && flags.device && !context.stdinIsTTY) {
+        throw new UsageError("--device needs the API URL and there is no terminal to ask for it: pass --api-url or set NEORE_API_URL.");
+    }
+
+    const apiUrl = (knownUrl ?? (await context.readLine("API URL (e.g. https://api.example.com): ")) ?? "").trim();
 
     if (!apiUrl || !URL.canParse(apiUrl)) {
         throw new UsageError("An absolute API URL is required (--api-url).");

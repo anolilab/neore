@@ -95,6 +95,21 @@ describe("requestDeviceCode", () => {
         expect(log).toHaveLength(1);
     });
 
+    it.each([
+        ["verification_uri", "https://a.test/x\u{1B}[2J"],
+        ["verification_uri_complete", "https://a.test/x?c=1\u{1B}]8;;https://evil.test\u{7}"],
+        ["user_code", "AB\u{1B}[31mCD"],
+        ["user_code", "AB\u{9B}CD"],
+        ["verification_uri", "https://a.test/x\u{0}"],
+    ])("refuses a %s that carries a terminal control sequence, and prints nothing", async (field, value) => {
+        const reply = { ...CODE_RESPONSE, [field]: value };
+        const { deps } = harness([() => Response.json(reply)]);
+
+        const error = await requestDeviceCode(deps, BASE, "devbox").catch((error_: unknown) => error_);
+
+        expect(error).toMatchObject({ code: "invalid_response" });
+    });
+
     it("defaults the interval when the server sends none", async () => {
         const { deps } = harness([() => Response.json({ ...CODE_RESPONSE, interval: undefined })]);
 
@@ -486,6 +501,22 @@ describe("neore login --device", () => {
         await expect(requestDeviceCode(deps, "http://api.example.com", "devbox")).rejects.toMatchObject({ name: "UsageError" });
         await expect(pollForKey(deps, "ftp://api.example.com", code())).rejects.toMatchObject({ name: "UsageError" });
         expect(log).toHaveLength(0);
+    });
+
+    it("does not prompt for the API URL without a terminal, and names how to give it", async () => {
+        const context = contextFor([]);
+        let wasAsked = false;
+
+        context.readLine = async () => {
+            wasAsked = true;
+
+            return null;
+        };
+
+        expect(await run(["login", "--device"], context)).toBe(EXIT.usage);
+        expect(wasAsked).toBe(false);
+        expect(context.io.stderr.text()).toContain("--api-url");
+        expect(context.io.stderr.text()).toContain("NEORE_API_URL");
     });
 
     describe("host confirmation", () => {

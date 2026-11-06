@@ -3,10 +3,9 @@ import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import type { FormEvent } from "react";
 import { useState } from "react";
 
-import { DeviceCodeDetails, DeviceCodeField } from "@/features/auth/components/device-code-parts";
+import { DeviceCodeDetails, DeviceCodeForm, normalizeCode } from "@/features/auth/components/device-code-parts";
 import useAuthenticate from "@/features/auth/hooks/use-authenticate";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { authClient } from "@/lib/auth/client";
@@ -42,9 +41,6 @@ interface Lookup {
 
 const CODE_LENGTH = 8;
 
-/** The server ignores case, spaces and dashes; so does the form. */
-const normalizeCode = (value: string): string => value.replaceAll(/[^a-z0-9]/giu, "").toUpperCase();
-
 const formatCode = (code: string): string => (code.length === CODE_LENGTH ? `${code.slice(0, 4)}-${code.slice(4)}` : code);
 
 const asString = (value: unknown): string | undefined => (typeof value === "string" && value.length > 0 ? value : undefined);
@@ -59,26 +55,14 @@ class ProblemError extends Error {
 }
 
 const CodeForm = () => {
-    const { t } = useLingui();
     const navigate = Route.useNavigate();
-    const [typed, setTyped] = useState("");
-
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-
-        const code = normalizeCode(typed);
-
-        if (code.length > 0) {
-            navigate({ search: { user_code: code } }).catch(() => undefined);
-        }
-    };
 
     return (
-        <form className="flex flex-col gap-4" onSubmit={submit}>
-            <h1 className="text-center text-xl font-semibold">{t`Sign in the command line`}</h1>
-            <DeviceCodeField onChange={setTyped} value={typed} />
-            <Button type="submit">{t`Continue`}</Button>
-        </form>
+        <DeviceCodeForm
+            onCode={(code) => {
+                navigate({ search: { user_code: code } }).catch(() => undefined);
+            }}
+        />
     );
 };
 
