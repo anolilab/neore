@@ -118,7 +118,7 @@ describe("a session's terminals", () => {
 
     it("asks once, in this window only, with the exact line and only allow-once or decline, then runs it through the core", async () => {
         const asked: PermissionRequest[] = [];
-        const { host } = fakeHost();
+        const { finish, host } = fakeHost();
         const { agent, session } = await open({ gate: allow(asked), host });
 
         await busy(agent, session);
@@ -163,6 +163,10 @@ describe("a session's terminals", () => {
 
         agent.say({ id: 9, method: "terminal/release", params: { sessionId: "sess_1", terminalId } });
         await answerTo(agent, 9);
+
+        // The released command exits, and only then is its core handle freed (after its output was read).
+        finish({ exitCode: null, signal: "SIGKILL" });
+        await expect.poll(() => host.release.mock.calls.length).toBe(1);
         expect(host.release).toHaveBeenCalledWith(41);
     });
 
@@ -224,7 +228,7 @@ describe("a session's terminals", () => {
         expect(await answerTo(agent, 6)).toMatchObject({ result: { exitCode: 0, signal: null } });
     });
 
-    it("releases a command that finishes starting after its turn was cancelled and a queued turn began", async () => {
+    it("ends a command that finishes starting after its turn was cancelled and a queued turn began", async () => {
         let startedWith: (id: number) => void = () => {};
         // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` is not in this package's TypeScript lib
         const starting = new Promise<number>((resolve) => {
@@ -256,7 +260,7 @@ describe("a session's terminals", () => {
         startedWith(41);
 
         expect(await answerTo(agent, 5)).toMatchObject({ error: {} });
-        expect(host.release).toHaveBeenCalledWith(41);
+        expect(host.kill).toHaveBeenCalledWith(41);
     });
 
     it("are killed when the turn is cancelled and released when the session ends", async () => {

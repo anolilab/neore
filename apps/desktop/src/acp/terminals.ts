@@ -201,6 +201,8 @@ interface OpenTerminal {
     ended?: { exit: TerminalExitStatus; output: string; truncated: boolean };
     /** How the command ended. The one core wait for this terminal: every `terminal/wait_for_exit` shares it. */
     exited: Promise<TerminalExitStatus>;
+    /** The core's handle is released: the core forgets it, so its output can no longer be read. */
+    freed: boolean;
     handle: number;
     released: boolean;
     /** Settles once the command's result is recorded and its tool rows are told; set when the terminal is opened. */
@@ -270,7 +272,7 @@ export class SessionTerminals {
         }
 
         const terminalId = `term_${randomUUID()}`;
-        const terminal: OpenTerminal = { exited: this.host.wait(handle), handle, released: false, turnId };
+        const terminal: OpenTerminal = { exited: this.host.wait(handle), freed: false, handle, released: false, turnId };
 
         this.open.set(terminalId, terminal);
         terminal.reported = this.watch(terminalId, terminal);
@@ -302,13 +304,25 @@ export class SessionTerminals {
         }
     }
 
-    /** Kills the command if it still runs and frees the terminal. Its result stays for the tool row. */
+    /**
+     * Kills the command if it still runs and frees the terminal. Its result stays for the tool row. A command that is still
+     * running keeps its core handle until it has exited and its output is read, so what it printed is not lost.
+     */
     public release(terminalId: string): void {
         const terminal = this.require(terminalId);
 
         if (!terminal.released) {
             terminal.released = true;
-            this.host.release(terminal.handle);
+
+            if (terminal.ended === undefined) {
+                try {
+                    this.host.kill(terminal.handle);
+                } catch {
+                    // The core forgot it already (it was stopped); its watcher is gone with it, and nothing is left to end.
+                }
+            } else {
+                this.freeHandle(terminal);
+            }
         }
 
         this.prune();
@@ -367,20 +381,27 @@ export class SessionTerminals {
         this.closed = true;
 
         for (const terminal of this.open.values()) {
-            if (terminal.released) {
-                continue;
-            }
-
             terminal.released = true;
-
-            try {
-                this.host.release(terminal.handle);
-            } catch {
-                // The core forgot it already (it was stopped); there is nothing left to free.
-            }
+            this.freeHandle(terminal);
         }
 
         this.open.clear();
+    }
+
+    /** Releases the core's handle once, ending the command if it still runs. */
+    private freeHandle(terminal: OpenTerminal): void {
+        if (terminal.freed) {
+            return;
+        }
+
+        // eslint-disable-next-line no-param-reassign -- the terminal is this session's own record, and freeing it is what changes it
+        terminal.freed = true;
+
+        try {
+            this.host.release(terminal.handle);
+        } catch {
+            // The core forgot it already (it was stopped); there is nothing left to free.
+        }
     }
 
     /** Forgets the oldest results of terminals that ended and were released, past the last {@link KEPT_RESULTS}. */
@@ -424,6 +445,11 @@ export class SessionTerminals {
 
                 // The rows are told first: releasing prunes, and a cancelled command's result must still be there to show.
                 this.ended(terminalId);
+
+                // A command released while it ran keeps its handle until now, after its output was read.
+                if (current.released) {
+                    this.freeHandle(current);
+                }
 
                 // A cancelled turn may never release what it started: its result is kept for the row, and its slot is freed here.
                 if (current.cancelled) {

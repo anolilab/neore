@@ -281,6 +281,51 @@ describe(SessionTerminals, () => {
         expect(reported).toEqual(["partial"]);
     });
 
+    it("records what a command printed when the agent releases it while it runs and it exits after", async () => {
+        const finishes: ((exit: { exitCode: number | null; signal: string | null }) => void)[] = [];
+        let alive = true;
+        const host = {
+            kill: vi.fn(),
+            output: vi.fn(() => {
+                // The core forgets a released handle: reading its output then fails, as it does there.
+                if (!alive) {
+                    throw new Error("that terminal is gone");
+                }
+
+                return { output: "building...\n", truncated: false };
+            }),
+            release: vi.fn(() => {
+                alive = false;
+            }),
+            start: vi.fn(async () => 12),
+            wait: vi.fn(
+                async () =>
+                    await new Promise<{ exitCode: number | null; signal: string | null }>((resolve) => {
+                        finishes.push(resolve);
+                    }),
+            ),
+        };
+        const reported: (string | undefined)[] = [];
+        const terminals: SessionTerminals = new SessionTerminals(host as never, (terminalId) => {
+            reported.push(terminals.result(terminalId)?.output);
+        });
+        const id = await terminals.create(request);
+
+        // The agent gives up on a command that is still running: it is killed, and its handle is kept until its output is read.
+        terminals.release(id);
+        expect(host.kill).toHaveBeenCalledWith(12);
+
+        finishes[0]?.({ exitCode: null, signal: "SIGKILL" });
+        await new Promise((resolve) => {
+            setTimeout(() => {
+                resolve(undefined);
+            }, 0);
+        });
+
+        expect(reported).toEqual(["building...\n"]);
+        expect(host.release).toHaveBeenCalledTimes(1);
+    });
+
     it("holds a turn for a killed command's result, but no longer than the limit", async () => {
         const finishes: ((exit: { exitCode: number | null; signal: string | null }) => void)[] = [];
         const host = {
