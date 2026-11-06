@@ -1,6 +1,7 @@
 import { ANONYMOUS_FREE_MODEL } from "@neore/ai/constants";
 
 import type { ComposerMode } from "../stores/model-store";
+import { MIN_COMPARISON_MODELS } from "../stores/model-store";
 
 /**
  * The model the composer shows, and so the model a send is meant to run on. A bot chat shows the bot's current model (its
@@ -32,3 +33,15 @@ export const composerModeOf = ({
     /** The thread's stored mode, read from the model store's per-thread map. */
     threadMode: ComposerMode | undefined;
 }): ComposerMode => (threadId ? (threadMode ?? "text") : newThreadMode);
+
+/**
+ * Whether a send fans out to several models: the composer's comparison is on with the minimum number of models. The composer
+ * sends that way and a prompt link cannot name it, so both read this one rule.
+ */
+export const sendsToComparison = ({
+    comparisonMode,
+    selectedModelsForComparison,
+}: {
+    comparisonMode: boolean;
+    selectedModelsForComparison: ReadonlyArray<string>;
+}): boolean => comparisonMode && selectedModelsForComparison.length >= MIN_COMPARISON_MODELS;

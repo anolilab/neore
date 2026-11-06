@@ -45,9 +45,10 @@ import usePendingSend, { holdForSignIn } from "@/features/chat/core/hooks/use-pe
 import useRunnerCapabilities from "@/features/chat/core/hooks/use-runner-capabilities";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
 import { selectAttachedReferences, selectRemoveAttachedReference, useChatUIStore, useComposerState } from "@/features/chat/core/stores/chat-ui-store";
-import { MIN_COMPARISON_MODELS, useModelStore } from "@/features/chat/core/stores/model-store";
+import { useModelStore } from "@/features/chat/core/stores/model-store";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { captureScreenFrame, isScreenCaptureSupported } from "@/features/chat/core/utils/capture-screen";
+import { sendsToComparison } from "@/features/chat/core/utils/composer-model";
 import type { ComposerRestoreFile } from "@/features/chat/core/utils/composer-restore";
 import { loadRestoreFile, onComposerRestore, textAfterRestore } from "@/features/chat/core/utils/composer-restore";
 import { onComposerAttachRequest, onComposerSubmitRequest } from "@/features/chat/core/utils/composer-submit";
@@ -491,7 +492,7 @@ const ComposerInput = ({
     const comparisonMode = useModelStore((state) => state.comparisonMode);
     const selectedModelsForComparison = useModelStore((state) => state.selectedModelsForComparison);
     const { isLoading: isComparisonLoading, sendComparisonMessage } = useComparisonChat({ jwtToken });
-    const isComparisonValid = comparisonMode && selectedModelsForComparison.length >= MIN_COMPARISON_MODELS;
+    const isComparisonValid = sendsToComparison({ comparisonMode, selectedModelsForComparison });
 
     // SSE streaming in progress
     const isSSEStreaming = !!sseStreamState;

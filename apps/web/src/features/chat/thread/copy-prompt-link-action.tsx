@@ -14,7 +14,7 @@ import type { FC } from "react";
 
 import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
-import { composerModelOf, composerModeOf } from "@/features/chat/core/utils/composer-model";
+import { composerModelOf, composerModeOf, sendsToComparison } from "@/features/chat/core/utils/composer-model";
 import { buildPromptLink, isPromptLinkTooLong } from "@/features/chat/core/utils/prompt-link";
 import { carriableLinkModel } from "@/features/chat/core/utils/prompt-link-model";
 import type { UIMessage } from "@/lib/agent";
@@ -51,6 +51,7 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
     // The same sentence is the warning when the chat's own model is known now, and the error when a bot's model is read on the click.
     const modelRefused = t`A prompt link cannot name this chat's model, so no link was copied.`;
     const tooLong = t`This message is too long to copy as a prompt link.`;
+    const comparisonRefused = t`This chat sends to several models, and a prompt link names one, so no link was copied.`;
     const botUnreadable = t`Could not read this chat's bot, so no link was copied.`;
 
     // A bot chat runs on the bot's current model, which the composer shows; the thread may still store an older one. The bot
@@ -114,6 +115,16 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
 
         if (!prompt.trim()) {
             showWarning(t`This message has no text to copy as a prompt link.`);
+
+            return;
+        }
+
+        // A comparison sends to several models at once, and a link names one. Naming the first would open a different prompt from the
+        // one the comparison runs, so the copy is refused, as a model a link cannot name is.
+        const comparison = useModelStore.getState();
+
+        if (sendsToComparison({ comparisonMode: comparison.comparisonMode, selectedModelsForComparison: comparison.selectedModelsForComparison })) {
+            showWarning(comparisonRefused);
 
             return;
         }

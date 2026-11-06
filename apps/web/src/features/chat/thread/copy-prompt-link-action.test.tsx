@@ -142,7 +142,12 @@ describe("CopyPromptLinkAction", () => {
         harness.isAnonymous = false;
         harness.thread = { botId: null };
         harness.threadModel = DEFAULT_CHAT_MODEL;
-        useModelStore.setState({ newThreadMode: "text", threadModes: new Map() });
+        useModelStore.setState({
+            comparisonMode: false,
+            newThreadMode: "text",
+            selectedModelsForComparison: [],
+            threadModes: new Map(),
+        });
     });
 
     afterEach(() => {
@@ -354,6 +359,34 @@ describe("CopyPromptLinkAction", () => {
         await waitFor(() => expect(harness.showError).toHaveBeenCalledWith("A prompt link cannot name this chat's model, so no link was copied."));
         expect(harness.showError).not.toHaveBeenCalledWith("Could not copy the link");
         expect(writeText).not.toHaveBeenCalled();
+    });
+
+    it("refuses to copy in comparison mode, where the composer sends to several models, and copies nothing", async () => {
+        expect(textModel).toBeDefined();
+        expect(otherTextModel).toBeDefined();
+
+        useModelStore.setState({ comparisonMode: true, selectedModelsForComparison: [textModel?.id ?? "", otherTextModel?.id ?? ""] as never });
+
+        renderAction();
+
+        clickCopy();
+
+        await waitFor(() =>
+            expect(harness.showWarning).toHaveBeenCalledWith("This chat sends to several models, and a prompt link names one, so no link was copied."),
+        );
+        expect(writeText).not.toHaveBeenCalled();
+        expect(harness.showSuccess).not.toHaveBeenCalled();
+    });
+
+    it("copies normally with comparison mode on but only one model selected, as the composer sends that as a single send", async () => {
+        useModelStore.setState({ comparisonMode: true, selectedModelsForComparison: [textModel?.id ?? ""] as never });
+
+        renderAction();
+
+        clickCopy();
+
+        await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+        expect(copiedLink().searchParams.get("model")).toBe(DEFAULT_CHAT_MODEL);
     });
 
     it("reports a refused clipboard write", async () => {
