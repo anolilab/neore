@@ -28,6 +28,7 @@ import {
 import { MAX_ACTIVE_EVENT_WATCHERS } from "./event-sources/types";
 import { compileWebhookPreset } from "./presets";
 import { findNextCronTime } from "./schedule";
+import { MAX_WEBHOOK_TEMPLATE_LENGTH } from "./webhook-template";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write, so the
 // session is read straight off the harness identity.
@@ -287,6 +288,31 @@ describe("trigger schedules", () => {
         const cleared = await readTrigger(triggerId);
 
         expect(cleared.inputTemplate).toBeUndefined();
+    });
+
+    it("refuses a webhook template one character over the limit, on create and on update", async () => {
+        const over = "x".repeat(MAX_WEBHOOK_TEMPLATE_LENGTH + 1);
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+
+        await expect(as().mutation(createTrigger as never, { inputTemplate: over, model: "m", name: "Hook", type: "webhook" } as never)).rejects.toThrow(
+            "at most",
+        );
+        await expect(as().mutation(updateTrigger as never, { inputTemplate: over, triggerId } as never)).rejects.toThrow("at most");
+    });
+
+    it("lets an edit to another field through when the stored template is over the limit", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { inputTemplate: "Hi", model: "m", name: "Hook", type: "webhook" } as never)) as {
+            triggerId: string;
+        };
+        const longTemplate = "x".repeat(MAX_WEBHOOK_TEMPLATE_LENGTH + 1);
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId as never, { inputTemplate: longTemplate }));
+        await as().mutation(updateTrigger as never, { inputTemplate: longTemplate, name: "Renamed", triggerId } as never);
+
+        const stored = await readTrigger(triggerId);
+
+        expect(stored.name).toBe("Renamed");
+        expect(stored.inputTemplate).toBe(longTemplate);
     });
 
     it("refuses an unknown time zone on create and on update, storing nothing", async () => {

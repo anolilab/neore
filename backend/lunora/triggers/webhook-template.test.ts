@@ -133,6 +133,22 @@ describe("renderWebhookPrompt", () => {
         );
     });
 
+    it("never reads a camel-cased, joined or short signing name", () => {
+        const secrets = inputs({
+            body: "",
+            headers: { sessionid: "a", sign: "b" },
+            query: { accessKey: "c", phpsessid: "d", privateKey: "e", sessionId: "f", xApiKey: "g" },
+        });
+
+        expect(
+            renderWebhookPrompt(
+                "{{header.sessionid}}|{{header.sign}}|{{query.accessKey}}|{{query.phpsessid}}|{{query.privateKey}}|{{query.sessionId}}|{{query.xApiKey}}",
+                secrets,
+                FRAME,
+            ),
+        ).toBe('""|""|""|""|""|""|""');
+    });
+
     it("reads ordinary names that contain a short credential word", () => {
         const ordinary = inputs({ body: "", headers: { assignee: "a", author: "b", bypass: "c", design: "d", keyword: "e" }, query: {} });
 

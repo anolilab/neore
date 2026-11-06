@@ -661,7 +661,8 @@ export const updateTrigger = authMutation
             patch.timezone = requestedZone;
         }
 
-        assertWebhookTemplateFits(trigger.type, args.inputTemplate);
+        // A template left as it is is not checked again: one saved before the limit can still be edited in other fields.
+        assertWebhookTemplateFits(trigger.type, args.inputTemplate === trigger.inputTemplate ? undefined : args.inputTemplate);
 
         if (args.inputTemplate !== undefined) patch.inputTemplate = cleanPromptField(args.inputTemplate, "The input");
 

@@ -29,21 +29,25 @@ export const MAX_PAYLOAD_LENGTH = 10_000;
  */
 export const MAX_WEBHOOK_TEMPLATE_LENGTH = MAX_RENDERED_PROMPT_LENGTH - MAX_PAYLOAD_LENGTH - 500;
 
-/** Credential words that are unambiguous inside a name (`access_token`, `Authorization`). */
-const CREDENTIAL_WORD = /authorization|assertion|bearer|cookie|credential|hmac|passphrase|password|passwd|secret|signature|token/u;
+/** Credential words that are unambiguous inside a name (`access_token`, `Authorization`), and joined forms (`sessionid`, `accesskey`). */
+const CREDENTIAL_WORD =
+    /accesskey|assertion|authkey|authorization|bearer|cookie|credential|hmac|passphrase|password|passwd|privatekey|secret|sessid|sessionid|signature|token/u;
 
 /** The separators between the segments of a header or query name. */
 const NAME_SEPARATOR = /[-_.]/u;
 
+/** A boundary between a lower-case letter or digit and a capital, so `accessKey` splits into two words. */
+const CAMEL_BOUNDARY = /(?<=[\da-z])(?=[A-Z])/gu;
+
 /** Credential words that are only a credential as a whole segment of a name (`x-api-key`, `sig`), since they occur inside ordinary words. */
-const CREDENTIAL_SEGMENT = new Set(["apikey", "auth", "code", "csrf", "jwt", "key", "oauth", "otp", "pass", "pwd", "session", "sid", "sig", "xsrf"]);
+const CREDENTIAL_SEGMENT = new Set(["apikey", "auth", "code", "csrf", "jwt", "key", "oauth", "otp", "pass", "pwd", "session", "sid", "sig", "sign", "xsrf"]);
 
 /**
  * Whether a header or query name carries a credential. A false positive only blanks a value; a false negative leaks one.
  * Short words match only as a whole segment, so `author`, `assignee` and `bypass` are read.
  */
 const isCredentialName = (name: string): boolean => {
-    const lower = name.toLowerCase();
+    const lower = name.replaceAll(CAMEL_BOUNDARY, "-").toLowerCase();
 
     return CREDENTIAL_WORD.test(lower) || lower.split(NAME_SEPARATOR).some((segment) => CREDENTIAL_SEGMENT.has(segment));
 };
