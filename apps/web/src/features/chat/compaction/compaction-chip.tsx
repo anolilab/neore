@@ -32,7 +32,8 @@ const CompactionChip: FC = () => {
     const validThreadId = getValidThreadId(threadId);
     // Only the owner can compact, and a visitor who is not signed in has no status to read: the request would be refused.
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
-    const { isStreaming } = useChatIsStreaming();
+    // Only a reply in this thread: a local reply still running in another chat says nothing about this one.
+    const { isThreadStreaming } = useChatIsStreaming();
     const afterFirstPaint = useAfterFirstPaint();
     const { compact, isCompacting } = useCompactThread(validThreadId);
     // The idle time is judged when the thread opens; a reply in this view makes it stale.
@@ -47,10 +48,10 @@ const CompactionChip: FC = () => {
     });
 
     useEffect(() => {
-        if (isStreaming) {
+        if (isThreadStreaming) {
             setReplied(true);
         }
-    }, [isStreaming]);
+    }, [isThreadStreaming]);
 
     if (replied || !shouldOfferCompaction(status, openedAt)) {
         return null;

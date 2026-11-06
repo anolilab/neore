@@ -45,6 +45,8 @@ export interface LocalModelTurn {
     send: (options: LocalTurnSendOptions) => Promise<void>;
     /** The assistant reply while it streams (and until its saved row replaces it). */
     streamingMessage: UIMessage | null;
+    /** The thread the running turn was sent in; unset when none runs or the turn creates its thread. */
+    streamingThreadId: string | undefined;
     /** Set when `model` runs on a `local-browser` endpoint; `undefined` for the gateway path. */
     target: LocalModelTarget | undefined;
 }
@@ -54,6 +56,8 @@ interface LiveReply {
     reasoning: string;
     startedAt: number;
     text: string;
+    /** The thread the turn was sent in; unset for a turn that creates its thread. */
+    threadId?: string;
 }
 
 /**
@@ -104,7 +108,7 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
             const controller = new AbortController();
 
             abortRef.current = controller;
-            setLive({ reasoning: "", startedAt: Date.now(), text: "" });
+            setLive({ reasoning: "", startedAt: Date.now(), text: "", ...(threadId && { threadId }) });
 
             let assistantMessageId: string | undefined;
 
@@ -192,7 +196,7 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
 
     const isStreaming = live !== null && !live.persistedId;
 
-    return { cancel, isStreaming, send, streamingMessage, target };
+    return { cancel, isStreaming, send, streamingMessage, streamingThreadId: isStreaming ? live.threadId : undefined, target };
 };
 
 export default useLocalModelTurn;

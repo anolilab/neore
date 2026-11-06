@@ -46,6 +46,7 @@ const STREAMING_VALUE: ChatStreamingContextValue = {
     isLocalModel: false,
     isLocalStreaming: false,
     isStreaming: false,
+    isThreadStreaming: false,
     streamingMessageId: null,
     streamToken: null,
 };
