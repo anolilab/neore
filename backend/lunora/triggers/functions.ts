@@ -35,6 +35,7 @@ import type { PayloadFilter } from "./filters";
 import { assertValidFilters, evaluateFilters, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH, MAX_WEBHOOK_BODY_BYTES } from "./filters";
 import type { WebhookPreset } from "./presets";
 import { compileWebhookPreset } from "./presets";
+import { MAX_WEBHOOK_TEMPLATE_LENGTH } from "./webhook-template";
 import { canBeQuiet } from "./quiet";
 import { resolveTimeZone } from "../memory/reflection-logic";
 import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
@@ -382,6 +383,16 @@ const cleanPromptField = <T extends string | undefined>(value: T, label: string)
     return text as T;
 };
 
+/**
+ * A webhook's Input Template is its prompt. A template longer than the room left beside a delivery's body would refuse
+ * every delivery, so it is refused when it is saved (`webhook-template.ts`).
+ */
+const assertWebhookTemplateFits = (type: string, template: string | undefined): void => {
+    if (type === "webhook" && template !== undefined && template.length > MAX_WEBHOOK_TEMPLATE_LENGTH) {
+        throw new LunoraError("BAD_REQUEST", `A webhook's Input Template is at most ${String(MAX_WEBHOOK_TEMPLATE_LENGTH)} characters.`);
+    }
+};
+
 export const createTrigger = authMutation
     .use(rateLimit("triggers/create"))
     .input({
@@ -464,6 +475,8 @@ export const createTrigger = authMutation
 
         const { filters, webhookSignatureScheme } = webhookSetup(args, triggerType);
         const eventSource = await checkedEventSource(context, args.eventSource, triggerType, userId, now);
+
+        assertWebhookTemplateFits(triggerType, args.inputTemplate);
 
         const inserted = await context.db.insert("triggers", {
             botComputer: args.botComputer === true ? true : undefined,
@@ -647,6 +660,8 @@ export const updateTrigger = authMutation
         if (zoneChanged) {
             patch.timezone = requestedZone;
         }
+
+        assertWebhookTemplateFits(trigger.type, args.inputTemplate);
 
         if (args.inputTemplate !== undefined) patch.inputTemplate = cleanPromptField(args.inputTemplate, "The input");
 

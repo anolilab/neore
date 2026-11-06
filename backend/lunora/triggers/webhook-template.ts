@@ -23,9 +23,30 @@ export const MAX_RENDERED_PROMPT_LENGTH = 20_000;
 /** Longest body the frame carries; a longer body is cut before it is framed. */
 export const MAX_PAYLOAD_LENGTH = 10_000;
 
-/** Header and query names that carry credentials. A false positive only blanks a value; a false negative leaks one. */
-const CREDENTIAL_NAME =
-    /authorization|proxy-authorization|cookie|set-cookie|token|secret|signature|sig|key|password|passwd|pass|auth|credential|hmac|jwt|assertion|session|csrf|xsrf|bearer/iu;
+/**
+ * Longest Input Template a webhook trigger may be saved with. A template plus the framed body it can add (about 10,200
+ * characters) stays inside the prompt limit, so a saved template cannot make every delivery fail.
+ */
+export const MAX_WEBHOOK_TEMPLATE_LENGTH = MAX_RENDERED_PROMPT_LENGTH - MAX_PAYLOAD_LENGTH - 500;
+
+/** Credential words that are unambiguous inside a name (`access_token`, `Authorization`). */
+const CREDENTIAL_WORD = /authorization|assertion|bearer|cookie|credential|hmac|passphrase|password|passwd|secret|signature|token/u;
+
+/** The separators between the segments of a header or query name. */
+const NAME_SEPARATOR = /[-_.]/u;
+
+/** Credential words that are only a credential as a whole segment of a name (`x-api-key`, `sig`), since they occur inside ordinary words. */
+const CREDENTIAL_SEGMENT = new Set(["apikey", "auth", "csrf", "jwt", "key", "oauth", "otp", "pass", "pwd", "session", "sig", "xsrf"]);
+
+/**
+ * Whether a header or query name carries a credential. A false positive only blanks a value; a false negative leaks one.
+ * Short words match only as a whole segment, so `author`, `assignee` and `bypass` are read.
+ */
+const isCredentialName = (name: string): boolean => {
+    const lower = name.toLowerCase();
+
+    return CREDENTIAL_WORD.test(lower) || lower.split(NAME_SEPARATOR).some((segment) => CREDENTIAL_SEGMENT.has(segment));
+};
 
 /** What a delivery presented, the bytes of the body included. Header names are lowercase. */
 export interface WebhookInputs {
@@ -51,16 +72,27 @@ const parseJson = (body: string): unknown => {
     }
 };
 
-/** Walks dotted `segments` into a JSON value. Anything that is not an object or an array on the way is missing. */
+const ARRAY_INDEX = /^(?:0|[1-9]\d*)$/u;
+
+/**
+ * Walks dotted `segments` into a JSON value. An object is read by its own keys; an array only by a numeric index, so an
+ * array's `length` is not body data. Anything else on the way is missing.
+ */
 const lookupJson = (root: unknown, segments: ReadonlyArray<string>): unknown => {
     let current = root;
 
     for (const segment of segments) {
-        if (current === null || typeof current !== "object" || !Object.hasOwn(current, segment)) {
+        if (Array.isArray(current)) {
+            if (!ARRAY_INDEX.test(segment) || Number(segment) >= current.length) {
+                return undefined;
+            }
+
+            current = current[Number(segment)];
+        } else if (current !== null && typeof current === "object" && Object.hasOwn(current, segment)) {
+            current = (current as Record<string, unknown>)[segment];
+        } else {
             return undefined;
         }
-
-        current = (current as Record<string, unknown>)[segment];
     }
 
     return current;
@@ -91,7 +123,7 @@ const quoted = (value: unknown): string => {
 
 /** The first value of a header or query name, unless the name is a credential. */
 const readNamed = (values: Readonly<Record<string, string>>, name: string): string => {
-    if (CREDENTIAL_NAME.test(name)) {
+    if (isCredentialName(name)) {
         return "";
     }
 

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { MAX_RENDERED_PROMPT_LENGTH, MAX_RENDERED_VALUE_LENGTH, randomFrameId, renderWebhookPrompt, type WebhookInputs } from "./webhook-template";
+import {
+    MAX_PAYLOAD_LENGTH,
+    MAX_RENDERED_PROMPT_LENGTH,
+    MAX_RENDERED_VALUE_LENGTH,
+    MAX_WEBHOOK_TEMPLATE_LENGTH,
+    randomFrameId,
+    renderWebhookPrompt,
+    type WebhookInputs,
+} from "./webhook-template";
 
 const FRAME = "abc123";
 const FRAME_ID = /^[\da-f]{12}$/u;
@@ -110,6 +118,30 @@ describe("renderWebhookPrompt", () => {
         expect(renderWebhookPrompt("{{payload}}", { body, headers: {}, query: {} }, FRAME)).toContain(body);
     });
 
+    it("never reads a name that carries a passphrase, whatever its separators", () => {
+        const secrets = inputs({ body: "", headers: { "x-hub-passphrase": "b", "x-passphrase": "a" }, query: { passphrase: "c" } });
+
+        expect(renderWebhookPrompt("{{header.x-passphrase}}|{{header.x-hub-passphrase}}|{{query.passphrase}}", secrets, FRAME)).toBe('""|""|""');
+    });
+
+    it("reads ordinary names that contain a short credential word", () => {
+        const ordinary = inputs({ body: "", headers: { assignee: "a", author: "b", bypass: "c", design: "d", keyword: "e" }, query: {} });
+
+        expect(renderWebhookPrompt("{{header.author}} {{header.assignee}} {{header.bypass}} {{header.design}} {{header.keyword}}", ordinary, FRAME)).toBe(
+            '"b" "a" "c" "d" "e"',
+        );
+    });
+
+    it("never reads an array's length as body data, only its items by index", () => {
+        const body = '{"list":[1,2,3]}';
+
+        expect(renderWebhookPrompt("{{body.list.length}}|{{body.list.1}}", { body, headers: {}, query: {} }, FRAME)).toBe('""|2');
+    });
+
+    it("leaves room for the framed body inside the prompt limit", () => {
+        expect(MAX_WEBHOOK_TEMPLATE_LENGTH + MAX_PAYLOAD_LENGTH).toBeLessThan(MAX_RENDERED_PROMPT_LENGTH);
+    });
+
     it("reads no body path from a body that is not JSON", () => {
         expect(renderWebhookPrompt("{{body.a}}|{{payload}}", { body: "not json", headers: {}, query: {} }, FRAME)).toBe(`""|<${TAG}>\nnot json\n</${TAG}>`);
     });
@@ -127,11 +159,15 @@ describe("renderWebhookPrompt", () => {
         expect(renderWebhookPrompt("Summarise this webhook", { body: "", headers: {}, query: {} }, FRAME)).toBe("Summarise this webhook");
     });
 
-    it("refuses a field nested too deep to serialise, instead of throwing", () => {
-        const depth = 100_000;
+    it("renders a field nested deeply as a valid string literal, cut to the value limit, instead of throwing", () => {
+        // Deep enough that its JSON is over the value limit, shallow enough that no engine's stack limit decides the outcome.
+        const depth = 5000;
         const body = `{"deep":${"[".repeat(depth)}${"]".repeat(depth)}}`;
+        const rendered = renderWebhookPrompt("{{body.deep}}", { body, headers: {}, query: {} }, FRAME);
 
-        expect(renderWebhookPrompt("{{body.deep}}", { body, headers: {}, query: {} }, FRAME)).toBeUndefined();
+        expect(rendered).toBeDefined();
+        expect(typeof JSON.parse(rendered ?? "")).toBe("string");
+        expect((rendered ?? "").length).toBeLessThanOrEqual(MAX_RENDERED_VALUE_LENGTH + 2);
     });
 
     it("uses the default instruction with the framed body when there is no template", () => {

@@ -374,7 +374,7 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                     />
                     {formData.type === "webhook" && (
                         <p className="text-muted-foreground text-xs" id="trigger-input-hint">
-                            {t`Placeholders: ${PAYLOAD_TOKEN} is the body, ${WEBHOOK_BODY_TOKEN} a JSON field, ${WEBHOOK_HEADER_TOKEN} a header and ${WEBHOOK_QUERY_TOKEN} a query parameter. Each is inserted as quoted data. Headers and the query are not signed, and a credential-looking name is never read.`}
+                            {t`Placeholders: ${PAYLOAD_TOKEN} inserts the whole body, framed as raw text. ${WEBHOOK_BODY_TOKEN} inserts a JSON field, ${WEBHOOK_HEADER_TOKEN} a header and ${WEBHOOK_QUERY_TOKEN} a query parameter, each as quoted data. Headers and the query are not signed, and a credential-looking name is never read. A template is at most 9,500 characters.`}
                         </p>
                     )}
                 </div>

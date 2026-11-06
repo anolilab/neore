@@ -192,9 +192,9 @@ describe("trigger webhook signing", () => {
     });
 
     it("refuses a delivery that cannot be rendered, and its retry is refused the same way rather than taken as a duplicate", async () => {
-        const { post, scheduled } = await setup({ ...SIGNED_TRIGGER, inputTemplate: "{{body.deep}}" });
-        const depth = 100_000;
-        const body = `{"deep":${"[".repeat(depth)}${"]".repeat(depth)}}`;
+        // Three full-size frames are over the prompt limit whatever the body is, so the renderer refuses the delivery.
+        const { post, scheduled } = await setup({ ...SIGNED_TRIGGER, inputTemplate: "{{payload}}".repeat(3) });
+        const body = "y".repeat(10_000);
         const headers = await signedHeaders(body);
 
         const first = await post(body, headers);
