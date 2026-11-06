@@ -460,12 +460,13 @@ const ComposerPromptQueue: FC = () => {
 
     // The chip a keyboard move was made from, so its button can take focus again once React has moved the chip.
     const pendingFocus = useRef<{ id: string; step: -1 | 1 } | null>(null);
-    const [announcement, setAnnouncement] = useState("");
+    // The announcement names the thread it was made in, so a move in one chat is never read out in another.
+    const [announcement, setAnnouncement] = useState<{ text: string; threadId: string | undefined }>({ text: "", threadId: undefined });
 
     // Cleared first and set on the next frame, so the same text said twice in a row is announced again.
-    const announce = useCallback((text: string) => {
-        setAnnouncement("");
-        globalThis.requestAnimationFrame(() => setAnnouncement(text));
+    const announce = useCallback((text: string, announcedThreadId: string | undefined) => {
+        setAnnouncement({ text: "", threadId: announcedThreadId });
+        globalThis.requestAnimationFrame(() => setAnnouncement({ text, threadId: announcedThreadId }));
     }, []);
 
     useEffect(() => {
@@ -502,7 +503,7 @@ const ComposerPromptQueue: FC = () => {
             const to = (usePromptQueueStore.getState().queues[threadId]?.items ?? []).findIndex((item) => item.id === id);
 
             if (from !== -1 && to !== from) {
-                announce(t`Moved to position ${to + 1}`);
+                announce(t`Moved to position ${to + 1}`, threadId);
             }
 
             if (document.activeElement?.closest("[data-queue-chip-id]")) {
@@ -529,7 +530,7 @@ const ComposerPromptQueue: FC = () => {
                 const to = (usePromptQueueStore.getState().queues[threadId]?.items ?? []).findIndex((item) => item.id === active.id);
 
                 if (from !== -1 && to !== from) {
-                    announce(t`Moved to position ${to + 1}`);
+                    announce(t`Moved to position ${to + 1}`, threadId);
                 }
             }
         },
@@ -565,7 +566,7 @@ const ComposerPromptQueue: FC = () => {
                 {statusText}
             </span>
             <span aria-live="polite" className="sr-only" role="status">
-                {announcement}
+                {announcement.threadId === threadId ? announcement.text : ""}
             </span>
             <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd} sensors={sensors}>
                 <SortableContext items={queue.items.map((prompt) => prompt.id)} strategy={rectSortingStrategy}>
