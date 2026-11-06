@@ -72,7 +72,7 @@ export const HostPlan: FC<{ entries: HostPlanEntry[] }> = memo(({ entries }) => 
             <h3 className="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">{t`Plan`}</h3>
             {/* Only the progress is spoken, so a change is announced without reading the whole list again. */}
             <span className="sr-only" role="status">
-                {t`${done} of ${total} tasks done`}
+                {total === 1 ? t`${done} of ${total} task done` : t`${done} of ${total} tasks done`}
                 {current === undefined ? "" : `. ${t`In progress`}: ${current.content}`}
             </span>
             {/* A styled list loses its list semantics in some browsers, so the role is said out loud. */}
