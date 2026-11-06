@@ -56,6 +56,7 @@ import {
     resumeApprovedRun,
     discardRunSecrets,
     setDispatchOrigin,
+    setRunOrganizationId,
     setRunStartedBy,
     setResearchDepth,
     setThreadStatus,
@@ -287,6 +288,7 @@ const runSpeaker = async (
         setResearchDepth(ctx, turn.researchDepth);
         setDispatchOrigin(ctx, turn.origin);
         setRunStartedBy(ctx, turn.startedBy);
+        setRunOrganizationId(ctx, turn.permissionOrganizationId);
 
         const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model, modelFilterRules);
         const agent = await getAgent(model, {

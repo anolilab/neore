@@ -110,6 +110,8 @@ type RunDoc = Doc<"subAgentRuns">;
 export interface CreateSubAgentRunArgs {
     /** Who sent the dispatch; a lead's own call when unset. */
     dispatchedBy?: DispatchSource;
+    /** The organization that capped the dispatching run; used when the parent thread has no stored organization. */
+    organizationId?: string;
     parentModel?: string;
     parentThreadId: string;
     skillSlug?: string;
@@ -256,7 +258,7 @@ export const admitSubAgentRun = async (
             createdAt: now,
             depth,
             dispatchedBy: args.dispatchedBy ?? "lead",
-            organizationId: parent.organizationId,
+            organizationId: parent.organizationId ?? args.organizationId,
             parentModel: args.parentModel,
             parentThreadId: parent._id,
             skillSlug,
@@ -785,7 +787,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
             createdAt: now,
             // A host worker runs on its agent, not on a cloud model.
             model: host ? host.offer.agentKey : model,
-            organizationId: parent.organizationId,
+            organizationId: parent.organizationId ?? args.organizationId,
             ...(host && { runner: "host" as const }),
             status: "active",
             tags: ["sub-agent", "worker"],
@@ -829,7 +831,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         depth,
         dispatchedBy: args.dispatchedBy ?? "lead",
         mode: "worker",
-        organizationId: parent.organizationId,
+        organizationId: parent.organizationId ?? args.organizationId,
         parentModel: args.parentModel,
         parentThreadId: parent._id,
         runner: origin?.runner ?? (host ? { deviceId: host.device._id, kind: "host" } : { kind: "headless" }),
@@ -881,6 +883,7 @@ export const createRun = internalMutation
         leadTools: v.optional(v.array(v.string().max(128))),
         model: v.optional(v.string().max(256)),
         name: v.optional(v.string().max(1000)),
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         parentModel: v.optional(v.string()),
         parentThreadId: v.string(),
         // A worker: the thread outlives this run and is messaged again with `messageWorker`.

@@ -244,6 +244,14 @@ export const setRunStartedBy = (ctx: object, startedBy: string | undefined): voi
 };
 
 /**
+ * The organization whose policy caps this run's tools. A sub-agent it dispatches records it when the parent thread has no
+ * stored organization, so the child is capped as the run was.
+ */
+export const setRunOrganizationId = (ctx: object, organizationId: string | null | undefined): void => {
+    (ctx as { organizationId?: string | null }).organizationId = organizationId ?? null;
+};
+
+/**
  * A reply ended for good — drop the ciphertext of that reply's saved secret references (`requestSecret`). Best
  * effort: it must never fail or delay the end of a run, and what it misses waits for the housekeeping sweep.
  */
@@ -1198,6 +1206,7 @@ export const resumeApprovedRun = async (
         setDispatchOrigin(ctx, config.dispatchOrigin ?? "lead");
         // The continuation runs as the owner; who started the turn it resumes is in the snapshot (none for a snapshot that predates it).
         setRunStartedBy(ctx, config.startedBy);
+        setRunOrganizationId(ctx, config.organizationId ?? config.group?.organizationId);
 
         const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({

@@ -46,6 +46,7 @@ import {
     resumeApprovedRun,
     setDispatchOrigin,
     setResearchDepth,
+    setRunOrganizationId,
     setRunStartedBy,
     setThreadStatus,
     readResumeInterruptedRuns,
@@ -526,6 +527,7 @@ export const runStreamingAgent = internalAction
                 setDispatchOrigin(ctx, origin ?? "lead");
                 // A write collaborator's turn runs as the collaborator: `startedBy` is what its continuation, run as the owner, still knows.
                 setRunStartedBy(ctx, userId);
+                setRunOrganizationId(ctx, organizationId);
 
                 // Build agent
                 const isAutoContinue = streamingConfig.shouldAutoContinue === true;
