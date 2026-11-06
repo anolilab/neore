@@ -3,7 +3,7 @@
  * observer, and changed on the backend's behalf (`setOption`) with only a value the agent offered and a fixed reason when it refuses.
  */
 import { capabilityOf, isAvailable } from "@neore/ai/capabilities";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { SessionStatePatch } from "./host-events";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
@@ -158,6 +158,33 @@ describe("setOption", () => {
         await player.play(steps);
         await expect(change).resolves.toBeUndefined();
         expect(states.at(-1)?.modes?.current).toBe("code");
+    });
+
+    it("applies a late answer to an earlier change of one option when a later change is asked for another", async () => {
+        const { player, session, states, steps } = await start("options-late-answer");
+
+        vi.useFakeTimers({ toFake: ["clearTimeout", "Date", "setTimeout"] });
+
+        try {
+            const first = session.setOption("model", "deep");
+            const timedOut = expect(first).rejects.toThrow("the agent did not answer");
+
+            await player.play(steps.slice(0, 1));
+            await vi.advanceTimersByTimeAsync(10_000);
+            await timedOut;
+
+            const second = session.setOption("effort", "high");
+
+            await player.play(steps.slice(1, 3));
+            await expect(second).resolves.toBeUndefined();
+
+            // The model's answer comes after the effort's: it is still the answer to the model change, and is applied.
+            await player.play(steps.slice(3));
+            await expect.poll(() => states.at(-1)?.configOptions?.find((option) => option.id === "model")?.currentValue).toBe("deep");
+            expect(states.at(-1)?.configOptions?.find((option) => option.id === "effort")?.currentValue).toBe("high");
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("sends nothing for a value the agent did not offer", async () => {

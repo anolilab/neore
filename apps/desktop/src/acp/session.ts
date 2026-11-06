@@ -179,8 +179,8 @@ export class AgentSession {
 
     private modeVersion = 0;
 
-    /** Counts the option changes asked for, so a late answer to an earlier one does not replace a later one. */
-    private optionRequests = 0;
+    /** Counts the changes asked for, by option (the legacy mode state is one): a late answer to an earlier change of an option does not replace a later one of it. */
+    private readonly optionRequests = new Map<string, number>();
 
     /** Whether the startup updates are the saved session's (while it loads) or a fresh session's (once it is opened). */
     private startupPhase: "loading" | "opening" = "opening";
@@ -312,15 +312,17 @@ export class AgentSession {
         let answer: unknown;
         const versionAtRequest = this.versionOf(optionId);
 
-        this.optionRequests += 1;
-        const request = this.optionRequests;
+        const key = optionId === undefined ? "mode" : `option:${optionId}`;
+        const request = (this.optionRequests.get(key) ?? 0) + 1;
+
+        this.optionRequests.set(key, request);
 
         // The timeout does not cancel the agent's request: an answer that arrives after it is applied here and reported, so what the
         // person sees follows what the agent did.
         const onLate = (late: unknown): void => {
-            // An answer older than a list the agent has sent since, or than a later change asked for, is not applied: that is what is
+            // An answer older than a list the agent has sent since, or than a later change of this option, is not applied: that is what is
             // true now.
-            if (this.status === "ended" || this.versionOf(optionId) !== versionAtRequest || request !== this.optionRequests) {
+            if (this.status === "ended" || this.versionOf(optionId) !== versionAtRequest || request !== this.optionRequests.get(key)) {
                 return;
             }
 
