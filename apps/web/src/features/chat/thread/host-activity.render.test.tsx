@@ -3,7 +3,7 @@
  * newest lines and keeps the reader's place once they scroll up.
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { HostToolRow } from "./host-activity";
@@ -100,6 +100,19 @@ describe("a coding agent's tool calls", () => {
         rerender(<HostToolCalls tools={[running("line 1\nline 2")]} />);
 
         expect(box.scrollTop).toBe(0);
+    });
+
+    it("keeps a command's status region in place from the start and fills it when the command finishes", () => {
+        const { rerender } = render(<HostToolCalls tools={[running("")]} />);
+        const row = screen.getByRole("listitem");
+        const region = within(row).getByRole("status");
+
+        expect(region.textContent).toBe("");
+
+        rerender(<HostToolCalls tools={[{ ...running(""), status: "completed" }]} />);
+
+        expect(within(row).getByRole("status")).toBe(region);
+        expect(region.textContent).toBe("Run tests: Done");
     });
 
     it("moves the reader's focus to the tool row when its output is cleared while they are in it", () => {

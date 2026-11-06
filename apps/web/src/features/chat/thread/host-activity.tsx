@@ -186,12 +186,11 @@ const HostToolCall: FC<{ tool: HostToolRow }> = memo(({ tool }) => {
                 <span className="text-muted-foreground shrink-0 text-xs">{statusText()}</span>
             </div>
             {exitText !== undefined && <p className="text-muted-foreground mt-1 text-xs">{exitText}</p>}
-            {/* Said once, when the call reaches its outcome; the output streams past it, so it is not part of this announcement. */}
-            {finished && (
-                <span className="sr-only" role="status">
-                    {exitText === undefined ? t`${title}: ${statusText()}` : t`${title}: ${statusText()}. ${exitText}`}
-                </span>
-            )}
+            {/* Said once, when the call reaches its outcome; the output streams past it, so it is not part of this announcement. The region
+                is mounted from the start and filled at the outcome: a live region inserted with its text already in it is often not announced. */}
+            <span className="sr-only" role="status">
+                {finished && (exitText === undefined ? t`${title}: ${statusText()}` : t`${title}: ${statusText()}. ${exitText}`)}
+            </span>
             {output !== undefined && output !== "" && (
                 // Scrolls on its own, so it takes keyboard focus (a keyboard user could not reach the rest otherwise); the name says
                 // whose output it is.
