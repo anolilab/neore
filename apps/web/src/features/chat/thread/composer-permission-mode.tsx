@@ -96,7 +96,7 @@ const ComposerThreadPermissionMode: FC = () => {
     const crpc = useCRPC();
     const isRunning = useChatIsRunning();
     const { data: access } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions(threadId ? { threadId: threadId as never } : skipToken));
-    // The mode the owner's runs use here: a comparison column with no mode of its own runs under its parent's.
+    // The mode the owner's runs use here (`modeOfThread`): a comparison column with a live parent runs under that parent's mode, whatever it holds.
     const { data: effective } = useQuery(
         // Owner-only: asked for once the ownership answer says so, so a shared viewer sends no request the server would refuse.
         crpc.chat.thread_state.getEffectivePermissionMode.queryOptions(threadId && access?.isOwner === true ? { threadId: threadId as never } : skipToken),

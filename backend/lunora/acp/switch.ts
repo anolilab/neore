@@ -601,7 +601,7 @@ const startOn = async (
 
 const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> => {
     const { current, handoff, leaf, native, now, taintedBy, target, thread, to, userId } = args;
-    // The mode the thread runs under: its own, or its comparison parent's when it has none (`modeOfThread`).
+    // The mode the thread runs under (`modeOfThread`): a live comparison parent's mode, else its own, supervised for an orphaned column with none.
     const inheritedMode = await modeOfThread(ctx, thread, userId);
 
     // Host to host: the thread and its runner stay; the session it ran in ends and the next one opens in it.

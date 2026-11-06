@@ -131,8 +131,10 @@ export const setThreadPermissionMode = authMutation
     });
 
 /**
- * The mode the owner's runs on this thread use: its own, or its comparison parent's when it has none (`modeOfThread`). Owner-only;
- * the composer shows it, so an opened comparison column does not read Auto while its runs use the parent's mode.
+ * The mode the owner's runs on this thread use (`modeOfThread`). A comparison column whose parent still exists runs under that parent's
+ * mode, whatever mode the column holds. A column whose parent is gone runs under its own mode, or supervised when it holds none. Any
+ * other thread runs under its own mode, Auto when it holds none. Owner-only; the composer shows it, so an opened comparison column does
+ * not read Auto while its runs use the parent's mode.
  */
 export const getEffectivePermissionMode = authQuery
     .input({ threadId: v.id("threads") })
