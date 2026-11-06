@@ -1653,6 +1653,44 @@ describe("what the agent reports about itself", () => {
         expect(statePosts()).toHaveLength(2);
         expect(statePosts()[1]?.post.events[0]).toMatchObject({ usage: usage(12) });
     });
+
+    it("keeps the options of a report the backend refuses, and sends them with the session's next report", async () => {
+        const host = poster();
+        const option = { category: "model", choices: [{ name: "Fast", value: "fast" }], currentValue: "fast", id: "model", name: "Model" };
+
+        await open(host);
+        backend.failNext.push(400);
+        host.sessionState("s1", { configOptions: [option] });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(1);
+
+        // The agent sends its options only on change, so the usage that follows must still carry them.
+        host.sessionState("s1", { usage: usage(12) });
+        await settle(2000);
+
+        expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ configOptions: [option], usage: usage(12) });
+    });
+
+    it("does not keep the options a second refusal refuses, so they cannot hold back the usage after them", async () => {
+        const host = poster();
+        const option = { category: "model", choices: [{ name: "Fast", value: "fast" }], currentValue: "fast", id: "model", name: "Model" };
+
+        await open(host);
+        backend.failNext.push(400, 400);
+        host.sessionState("s1", { configOptions: [option] });
+        await settle(2000);
+        host.sessionState("s1", { usage: usage(12) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(2);
+
+        host.sessionState("s1", { usage: usage(13) });
+        await settle(2000);
+
+        const last = statePosts().at(-1)?.post.events[0];
+
+        expect(last).toMatchObject({ usage: usage(13) });
+        expect(last).not.toHaveProperty("configOptions");
+    });
 });
 
 describe("a retry that finds a newer report waiting", () => {
