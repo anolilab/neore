@@ -309,6 +309,19 @@ export class AcpManager {
         await Promise.all(closing);
     }
 
+    /**
+     * The variables of `agentKey` (or of every agent) changed. The view carries their names only, so a replaced
+     * value cannot be seen in it: a plan made before the edit holds the old values (a removed credential among
+     * them) and is made again.
+     */
+    public environmentChanged(agentKey?: string): void {
+        const keys = agentKey === undefined ? new Set([...this.approvalState.keys(), ...this.planning.keys()]) : [agentKey];
+
+        for (const key of keys) {
+            this.revocations.set(key, (this.revocations.get(key) ?? 0) + 1);
+        }
+    }
+
     /** Forgets an ended session. */
     public remove(sessionId: string): void {
         if (this.sessions.get(sessionId)?.snapshot().status !== "ended") {

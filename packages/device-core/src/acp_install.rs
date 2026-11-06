@@ -493,7 +493,14 @@ impl DeviceState {
             run_id(),
             TRASHED.fetch_add(1, Ordering::Relaxed)
         ));
-        let moved = fs::create_dir_all(&trash).and_then(|()| fs::rename(path, &target));
+        let trash_is_link = fs::symlink_metadata(&trash).is_ok_and(|meta| !meta.is_dir());
+        let moved = if trash_is_link {
+            Err(std::io::Error::other(
+                "the trash folder is not a plain folder",
+            ))
+        } else {
+            fs::create_dir_all(&trash).and_then(|()| fs::rename(path, &target))
+        };
 
         match moved {
             Ok(()) => {
@@ -612,6 +619,11 @@ pub(crate) fn run_id() -> &'static str {
 /// Deletes what an earlier run left in `trash`, in the background. Entries are named `<run id>-<n>`; this run's
 /// own are being deleted by the thread that made them.
 fn sweep_trash(trash: PathBuf) {
+    // The trash is ours only while it is a real folder: through a link the sweep would delete what it points at.
+    if fs::symlink_metadata(&trash).map_or(true, |meta| !meta.is_dir()) {
+        return;
+    }
+
     std::thread::spawn(move || {
         let own = format!("{}-", run_id());
         let Ok(entries) = fs::read_dir(&trash) else {

@@ -32,16 +32,10 @@
   makes OPTIONAL (`npx`/`uvx` entries never have one). The window names an id and
   version; the main process takes archive, checksum and command from its own snapshot and words the native
   consent itself. Rust hashes, unpacks (no links, no `..`) and records the pin; there is no update path, by design.
-  **npm (`npx`) entries** install too (`device-core/src/acp_install_npm.rs`, `acp/npm-index.ts`): pinned to the exact
-  version the registry names, with the package index's `dist.integrity` looked up BEFORE the consent and shown as the
-  index's word (trust on first use), not the publisher's. npm runs with `--ignore-scripts` by absolute node/npm paths and
-  a scrubbed environment; the pin records a hash of the installed folder and the core re-hashes it before EVERY start
-  (`verify_installed_tree`, in `acp_spawn_plan`) and refuses on a mismatch. Binary installs are not re-hashed. `uvx`
-  entries stay listed as not installable, as does a `binary` entry without a checksum. Deleting an install (remove,
-  prune, replaced version) renames it into `acp-agents/.trash` under the install lock and deletes it on a thread, so
-  neither the lock nor the main thread waits on a `node_modules` tree. The start check also refuses when a
-  `node_modules` exists in `acp-agents/<key>/` or `acp-agents/`; folders above the app's data folder (home, projects)
-  are NOT checked, a stated limit that the consent text repeats.
+  **npm (`npx`) entries** install pinned to the exact registry version, with the package index's integrity read BEFORE
+  the consent and shown as the index's word (trust on first use). The core hashes the installed folder and re-hashes
+  it before EVERY start; it refuses on a mismatch, so do not add a start path that skips `acp_spawn_plan`. Detail
+  (trash, locks, what the check does not cover): `packages/device-core/README.md`.
 
 - **Desktop dictation** (`apps/desktop/src/dictation/`, desktop-dictation.md S2) is off until the settings
   switch turns it on (`DEFAULT_SETTINGS.enabled: false`); off, no shortcut is registered.

@@ -1212,3 +1212,24 @@ fn a_node_modules_folder_planted_next_to_the_install_refuses_the_start() {
         );
     }
 }
+
+#[test]
+fn a_trash_folder_that_is_a_link_is_not_swept() {
+    let (state, guard) = state("trash-link");
+    let dir = guard.path().to_path_buf();
+    let outside = dir.join("outside");
+    let precious = outside.join("99999999.1-0");
+
+    fs::create_dir_all(&precious).unwrap();
+    fs::write(precious.join("keep"), "x").unwrap();
+    fs::create_dir_all(dir.join("acp-agents")).unwrap();
+    std::os::unix::fs::symlink(&outside, dir.join("acp-agents/.trash")).unwrap();
+    state.acp_install_stage().unwrap();
+
+    // The sweep is a thread; give it ample time to have done damage if it were going to.
+    std::thread::sleep(Duration::from_millis(500));
+    assert!(
+        precious.join("keep").exists(),
+        "nothing behind the link is removed"
+    );
+}

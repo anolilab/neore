@@ -315,8 +315,7 @@ fn run_npm(
         }
     }
 
-    let mut child = command
-        .spawn()
+    let mut child = spawn_retrying_busy(&mut command)
         .map_err(|error| format!("npm could not be started: {error}"))?;
     let deadline = Instant::now() + timeout;
     let mut ticks = 0_u32;
@@ -351,6 +350,24 @@ fn run_npm(
                 );
             }
             None => std::thread::sleep(Duration::from_millis(100)),
+        }
+    }
+}
+
+/// Starts `command`, trying again a few times when the system says the program file is still open for writing
+/// (`ETXTBSY`): a script written just before, with another thread's `fork` still holding a copy of its write handle.
+/// The handle is closed as soon as that fork execs, so a short wait is enough.
+fn spawn_retrying_busy(command: &mut Command) -> std::io::Result<std::process::Child> {
+    let mut attempts = 0;
+
+    loop {
+        match command.spawn() {
+            #[cfg(unix)]
+            Err(error) if error.raw_os_error() == Some(libc::ETXTBSY) && attempts < 20 => {
+                attempts += 1;
+                std::thread::sleep(Duration::from_millis(25));
+            }
+            result => return result,
         }
     }
 }

@@ -735,7 +735,12 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     const updateAcp = async (update: string): Promise<AcpView> => {
         const view = JSON.parse(requireCore().acpUpdate(update)) as AcpView;
-        const { key, op } = JSON.parse(update) as { key?: string; op?: string };
+        const { agentKey, key, op } = JSON.parse(update) as { agentKey?: string; key?: string; op?: string };
+
+        // A plan in flight holds the variables as they were.
+        if (op === "setEnv" || op === "removeEnv") {
+            state.acp?.environmentChanged(agentKey);
+        }
 
         // What an agent reported says nothing about a different program.
         if (key !== undefined && (op === "saveAgent" || op === "removeAgent")) {

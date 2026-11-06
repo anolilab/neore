@@ -558,4 +558,46 @@ describe("starts that wait for their plan", () => {
         await second;
         expect(calls).toBeGreaterThanOrEqual(3);
     });
+
+    it("makes a plan again when the agent's variables were edited while it was made", async () => {
+        const bad = { args: [], command: "neore-no-such-agent", cwd: scratch.dir, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
+        let calls = 0;
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    calls += 1;
+
+                    if (calls === 1) {
+                        // A value is replaced (or removed) while the first plan is being made.
+                        target.environmentChanged("fake");
+                    }
+
+                    return bad;
+                },
+            },
+        );
+
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow(MISSING_COMMAND);
+        expect(calls).toBe(2);
+    });
+
+    it("leaves a plan of another agent alone when only this agent's variables changed", async () => {
+        const bad = { args: [], command: "neore-no-such-agent", cwd: scratch.dir, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
+        let calls = 0;
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    calls += 1;
+                    target.environmentChanged("someone-else");
+
+                    return bad;
+                },
+            },
+        );
+
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow(MISSING_COMMAND);
+        expect(calls).toBe(1);
+    });
 });
