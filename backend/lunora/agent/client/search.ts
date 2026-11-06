@@ -633,12 +633,12 @@ export const fetchContextWithPrompt = async (
     // A compaction REPLACES the turns up to its boundary: the notes stand in for them, so neither the window nor the
     // search hits show them again. The thread's stored rows are untouched; this is only what the model is sent.
     const boundary = olderSummary?.boundary;
-    const recentMessages = boundary ? filterOutOrphanedToolMessages(dropCompactedRows(windowMessages, boundary)) : windowMessages;
-    // The thread's own hits are on the prompt's path whenever that path is known (`fetchRecentAndSearchMessages` keeps only
-    // those): an unbranched thread always has its path, and a branched one has it when the prompt is named. Then a hit at
-    // or below the boundary is covered by the notes. Without a known path a sibling's hit at that order was never
-    // summarised, so it stays.
+    // The window and the thread's own hits are on the prompt's path whenever that path is known (`fetchRecentAndSearchMessages`
+    // keeps only those): an unbranched thread always has its path, and a branched one has it when the prompt is named. Then
+    // a row at or below the boundary is covered by the notes. Without a known path the window also holds sibling rows the
+    // summary never covered, so nothing is dropped by position: the notes may repeat a turn, but no turn goes missing.
     const pathKnown = olderSummary?.branched === false || args.promptMessageId !== undefined;
+    const recentMessages = boundary && pathKnown ? filterOutOrphanedToolMessages(dropCompactedRows(windowMessages, boundary)) : windowMessages;
     const searchMessages =
         boundary && pathKnown
             ? foundMessages.filter(
