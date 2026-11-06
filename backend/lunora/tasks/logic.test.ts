@@ -346,4 +346,16 @@ describe(latestSlotAtOrBefore, () => {
     it("is the due slot itself when no later slot has passed", () => {
         expect(latestSlotAtOrBefore("0 * * * *", nine, nine + 30 * 60_000)).toBe(nine);
     });
+
+    it("counts only slots the scheduler would run, at least 15 minutes apart", () => {
+        expect(latestSlotAtOrBefore("*/5 * * * *", nine, nine + 12 * 60_000)).toBe(nine);
+        expect(latestSlotAtOrBefore("*/5 * * * *", nine, nine + 16 * 60_000)).toBe(nine + 15 * 60_000);
+    });
+
+    it("stays a short walk after a long outage and still lands on the latest slot", () => {
+        const yearLater = nine + 365 * 24 * HOUR;
+
+        expect(latestSlotAtOrBefore("* * * * *", nine, yearLater + 20 * 60_000)).toBeGreaterThan(yearLater);
+        expect(latestSlotAtOrBefore("0 * * * *", nine, yearLater + 30 * 60_000)).toBe(yearLater);
+    });
 });

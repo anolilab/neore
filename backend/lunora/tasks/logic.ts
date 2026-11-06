@@ -472,16 +472,26 @@ export const nextRecurrenceAt = (cronExpression: string, after: number): number 
     return next;
 };
 
+/** How far back {@link latestSlotAtOrBefore} walks: a week of slots at the 15-minute floor is a bounded walk. */
+const SLOT_WALK_WINDOW_MS = 7 * 24 * 60 * 60_000;
+
 /**
- * The latest slot of `cronExpression` at or before `now`, starting from the due slot `from`: after an outage
- * that is the most recent missed slot, which a skip records. Bounded, so a long outage on a frequent schedule
- * stops at a slot near `now` rather than walking every one.
+ * The latest scheduled slot at or before `now`, counting from the due slot `from` on the same grid the
+ * scheduler uses (`nextRecurrenceAt`, so slots closer than the floor are not counted): after an outage that
+ * is the most recent missed slot, which a skip records. A `from` more than a week old is moved up to the
+ * first slot in the last week, so a long outage stays a short walk inside the sweep.
  */
 export const latestSlotAtOrBefore = (cronExpression: string, from: number, now: number): number => {
     let latest = from;
 
-    for (let guard = 0; guard < 10_000; guard += 1) {
-        const next = getNextCronTime(cronExpression, latest);
+    if (from < now - SLOT_WALK_WINDOW_MS) {
+        const recent = getNextCronTime(cronExpression, now - SLOT_WALK_WINDOW_MS);
+
+        latest = recent <= now ? recent : from;
+    }
+
+    for (let guard = 0; guard < 1000; guard += 1) {
+        const next = nextRecurrenceAt(cronExpression, latest);
 
         if (next > now || next <= latest) {
             break;
