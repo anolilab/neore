@@ -87,6 +87,7 @@ import { TEXT_TO_VIDEO_PROVIDERS } from "./lib/video-providers";
 import { gatewayFetch, NO_SERVICE_FETCH } from "../lib/services";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
 import getAgent from "./lib/get-agent";
+import { firstUserPromptText } from "./lib/first-user-prompt";
 import { getMessageFileIds, loadNsfwStatuses, redactUIMessagesForPublicViewer } from "./lib/public-thread";
 import { buildReasoningProviderOptions } from "./lib/reasoning-options";
 import {
@@ -1578,7 +1579,86 @@ export const convertTemporaryToPermanent = authMutation
         return threadId;
     });
 
-export const createTitleChat = internalAction.input({ prompt: v.string(), threadId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
+/**
+ * Whether the leaf a title was read from is still on the thread's active path. The leaf moves on along its own path when a
+ * message is added or a reply is in progress; it is switched away from only when the path no longer runs through it.
+ */
+const stillOnActivePath = async (context: ActionContext, threadId: string, currentLeaf: string | undefined, capturedLeaf: string | null): Promise<boolean> => {
+    if (capturedLeaf === null || currentLeaf === undefined) {
+        return capturedLeaf === null && currentLeaf === undefined;
+    }
+
+    if (currentLeaf === capturedLeaf) {
+        return true;
+    }
+
+    const ids = await context.runQuery(internal.agent.branches.getActivePathIds, {
+        leafMessageId: currentLeaf as Id<"messages">,
+        threadId: threadId as Id<"threads">,
+    });
+
+    return Array.isArray(ids) && ids.includes(capturedLeaf);
+};
+
+/**
+ * Why a background title may not be generated or written for this thread now, or undefined when it may: the thread is
+ * gone, locked, deleted or host-run; it was renamed or moved to another branch since the regenerate was asked; or the
+ * requester no longer has admin access. Checked before the model sees the prompt and again before the title is written.
+ */
+const titleIneligibility = async (
+    context: ActionContext,
+    arguments_: { expectedLeaf?: string | null; expectedTitle?: string; requestedBy?: string; threadId: string },
+): Promise<string | undefined> => {
+    const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: arguments_.threadId as Id<"threads"> });
+
+    if (!thread || isThreadLocked(thread) || thread.runner === "host" || thread.deletedAt !== undefined) {
+        return "ineligible";
+    }
+
+    if (arguments_.expectedTitle !== undefined && (thread.title ?? "") !== arguments_.expectedTitle) {
+        return "renamed-meanwhile";
+    }
+
+    if (
+        arguments_.expectedLeaf !== undefined &&
+        !(await stillOnActivePath(context, arguments_.threadId, thread.activeLeafMessageId, arguments_.expectedLeaf))
+    ) {
+        return "branch-switched";
+    }
+
+    if (arguments_.requestedBy !== undefined) {
+        const access = await context.runQuery(internal.chat.functions.gateThreadAction, {
+            level: "admin",
+            threadId: arguments_.threadId as Id<"threads">,
+            userId: arguments_.requestedBy,
+        });
+
+        if (access.outcome !== "ok") {
+            return "access-withdrawn";
+        }
+    }
+
+    return undefined;
+};
+
+/**
+ * Generates a title from `prompt` and writes it onto the thread. An automatic title never replaces one
+ * the owner set (`force` is false); only an explicit regenerate sets `force`, and it may replace any title.
+ * `expectedTitle` is the title a regenerate was asked to replace: when the thread has another title by the
+ * time the model answers, the owner renamed it meanwhile and that rename stays.
+ */
+const writeGeneratedTitle = async (
+    context: ActionContext,
+    arguments_: {
+        expectedLeaf?: string | null;
+        expectedTitle?: string;
+        force: boolean;
+        prompt: string;
+        requestedBy?: string;
+        stateless?: boolean;
+        threadId: string;
+    },
+): Promise<void> => {
     const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
         threadId: arguments_.threadId as Id<"threads">,
     });
@@ -1618,8 +1698,9 @@ export const createTitleChat = internalAction.input({ prompt: v.string(), thread
         language = threadLanguage;
     }
 
-    // The user's model filters decide the model; when they allow none the thread keeps its default title.
-    const background = await resolveBackgroundModel(context, userId, DEFAULT_TITLE_GENERATION_MODEL);
+    // The user's model filters decide the model; when they allow none the thread keeps its default title. A requester is
+    // billed for their own regenerate, as the summary is; the automatic title is the owner's.
+    const background = await resolveBackgroundModel(context, userId, DEFAULT_TITLE_GENERATION_MODEL, arguments_.requestedBy);
 
     if (!background) {
         context.log.event("chat.thread_title", { skipped: "no-allowed-model" });
@@ -1638,7 +1719,16 @@ export const createTitleChat = internalAction.input({ prompt: v.string(), thread
 
     // Only generate title if thread doesn't have a title or has the default title
     // This allows users to set custom titles that won't be overwritten
-    if (metadata.title && metadata.title !== DEFAULT_THREAD_TITLE) {
+    if (!arguments_.force && metadata.title && metadata.title !== DEFAULT_THREAD_TITLE) {
+        return;
+    }
+
+    // Checked again right before the model sees the prompt: the checks above ran before the model setup.
+    const beforeModel = await titleIneligibility(context, arguments_);
+
+    if (beforeModel) {
+        context.log.event("chat.thread_title", { skipped: `${beforeModel}-before-model` });
+
         return;
     }
 
@@ -1649,18 +1739,208 @@ export const createTitleChat = internalAction.input({ prompt: v.string(), thread
             prompt: `${threadTitlePrompt}\nHere is the user's prompt:\n"${arguments_.prompt}"\nGenerate a title that accurately represents what this conversation is about based on the prompt provided.`,
         },
         {
+            // A regenerate sends the prompt alone: the thread's other messages are not the title's content.
+            ...(arguments_.stateless && { contextOptions: { recentMessages: 0 } }),
             storageOptions: {
                 saveMessages: "none",
             },
         },
     );
 
+    // The model answered after the checks above: the thread may have been locked, deleted, become host-run, been renamed,
+    // switched branch, or lost the requester's write access since. Each of those keeps the thread as it is, and the log says why.
+    const afterModel = await titleIneligibility(context, arguments_);
+
+    if (afterModel) {
+        context.log.event("chat.thread_title", { skipped: `${afterModel}-after-generation` });
+
+        return;
+    }
+
     await thread.updateMetadata({
         title: textResult.text,
     });
 
     context.log.event("chat.thread_title", { inputTokens: textResult.usage.inputTokens, model, outputTokens: textResult.usage.outputTokens });
+};
+
+export const createTitleChat = internalAction.input({ prompt: v.string(), threadId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
+    await writeGeneratedTitle(context, { force: false, prompt: arguments_.prompt, threadId: arguments_.threadId });
 });
+
+/** The most rows read, oldest first, while looking for a title's prompt, and the page they are read in. */
+const REGENERATE_TITLE_WINDOW = 500;
+const TITLE_PROMPT_PAGE = 50;
+
+/**
+ * The earliest user prompt on the thread's active branch. A branched thread's path is read by id, so its sibling replies
+ * cannot push the prompt out of the read; an unbranched thread's rows are its path. The read stops at the first prompt,
+ * and only a message that succeeded can supply a title. `"too-long"` when the path is past the read's limit.
+ */
+const activeBranchPrompt = async (
+    context: ActionContext,
+    threadId: string,
+    activeLeafMessageId: string | undefined,
+): Promise<string | undefined | "too-long"> => {
+    if (activeLeafMessageId !== undefined) {
+        const pathIds = await context.runQuery(internal.agent.branches.getActivePathIds, {
+            leafMessageId: activeLeafMessageId as Id<"messages">,
+            threadId: threadId as Id<"threads">,
+        });
+
+        // A stored leaf that is gone leaves no branch to read: every branch's prompt is not this thread's title.
+        if (pathIds === null) {
+            return undefined;
+        }
+
+        if (pathIds === "too-long") {
+            return "too-long";
+        }
+
+        for (let start = 0; start < Math.min(pathIds.length, REGENERATE_TITLE_WINDOW); start += TITLE_PROMPT_PAGE) {
+            const rows = await context.runQuery(internal.agent.messages.getMessagesByIds, {
+                messageIds: pathIds.slice(start, start + TITLE_PROMPT_PAGE) as Id<"messages">[],
+                threadId: threadId as Id<"threads">,
+            });
+            const prompt = firstUserPromptText(rows.filter((row) => row !== null).filter((row) => row.status === "success"));
+
+            if (prompt) {
+                return prompt;
+            }
+        }
+
+        return undefined;
+    }
+
+    let cursor: string | null = null;
+
+    for (let read = 0; read < REGENERATE_TITLE_WINDOW; read += TITLE_PROMPT_PAGE) {
+        const { continueCursor, isDone, page }: { continueCursor: string | null; isDone: boolean; page: Parameters<typeof firstUserPromptText>[0] } =
+            await context.runQuery(internal.agent.messages.listMessagesByThreadIdInternal, {
+                excludeToolMessages: true,
+                order: "asc",
+                paginationOpts: { cursor, numItems: TITLE_PROMPT_PAGE },
+                statuses: ["success"],
+                threadId: threadId as Id<"threads">,
+            });
+        const prompt = firstUserPromptText(page);
+
+        if (prompt) {
+            return prompt;
+        }
+
+        if (isDone) {
+            break;
+        }
+
+        cursor = continueCursor;
+    }
+
+    return undefined;
+};
+
+/**
+ * Scheduled by `regenerateThreadTitle`. The title comes from the earliest user prompt on the thread's active branch, read
+ * from its first 500 rows, so a thread longer than that is titled from a later prompt. It is left as it is only when no
+ * user text is found.
+ */
+export const regenerateTitleChat = internalAction
+    .input({ expectedTitle: v.optional(v.string().max(MAX_LENGTH.long)), threadId: v.string(), userId: v.string() })
+    .action(async ({ args: arguments_, ctx: context }) => {
+        // Before any message is read: a locked, host-run or deleted thread, or a requester who lost access since, never reaches the model.
+        const beforeRead = await titleIneligibility(context, { requestedBy: arguments_.userId, threadId: arguments_.threadId });
+
+        if (beforeRead) {
+            context.log.event("chat.thread_title", { skipped: `${beforeRead}-at-start` });
+
+            return;
+        }
+
+        const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: arguments_.threadId as Id<"threads"> });
+
+        if (!thread) {
+            return;
+        }
+
+        // The active branch's history only: an edited prompt on another branch must not supply the title.
+        const prompt = await activeBranchPrompt(context, arguments_.threadId, thread.activeLeafMessageId);
+
+        if (prompt === "too-long") {
+            context.log.event("chat.thread_title", { skipped: "path-too-long" });
+
+            return;
+        }
+
+        if (!prompt) {
+            context.log.event("chat.thread_title", { skipped: "no-user-prompt" });
+
+            return;
+        }
+
+        await writeGeneratedTitle(context, {
+            expectedLeaf: thread.activeLeafMessageId ?? null,
+            expectedTitle: arguments_.expectedTitle,
+            force: true,
+            prompt,
+            requestedBy: arguments_.userId,
+            stateless: true,
+            threadId: arguments_.threadId,
+        });
+    });
+
+/**
+ * Replaces a thread's title with one generated from its first prompt. It needs admin access, as a rename does: the
+ * title is the owner's to set. The requester is billed for the generation through the gateway. A locked chat keeps
+ * its title (its content), and a host-run thread's messages never reach a cloud model.
+ */
+export const regenerateThreadTitle = authAction
+    .use(rateLimit("chat/regenerateTitle"))
+    .input({
+        threadId: v.id("threads"),
+    })
+    .output(v.object({ success: v.boolean() }))
+    .action(async ({ args: { threadId }, ctx: context }) => {
+        const { userId } = context.user;
+
+        const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "admin", threadId, userId });
+
+        throwUnlessGranted(gateResult.outcome, "Admin access denied to this thread");
+
+        if (gateResult.hostRun) {
+            throw new LunoraError("CONFLICT", "This thread runs on a paired computer, so its title is not generated in the cloud.");
+        }
+
+        const thread = await context.runQuery(internal.agent.threads.getThreadInternal, {
+            threadId: threadId as Id<"threads">,
+        });
+
+        if (!thread || thread.deletedAt !== undefined) {
+            return throwThreadNotFound("Thread not found");
+        }
+
+        if (isThreadLocked(thread)) {
+            throw new LunoraError("CONFLICT", "A locked chat keeps its title, so it cannot be regenerated.");
+        }
+
+        // A path past the read's limit is not titled, so the request is refused here, where the owner can see why.
+        const pathIds = thread.activeLeafMessageId
+            ? await context.runQuery(internal.agent.branches.getActivePathIds, {
+                  leafMessageId: thread.activeLeafMessageId as Id<"messages">,
+                  threadId: threadId as Id<"threads">,
+              })
+            : null;
+
+        if (pathIds === "too-long") {
+            throw new LunoraError("CONFLICT", "This chat is too long to retitle from its first prompt.");
+        }
+
+        // The title the owner saw when asking: a rename made while the model works is kept (`writeGeneratedTitle`).
+        await context.scheduler.runAfter(0, internal.chat.functions.regenerateTitleChat, { expectedTitle: thread.title ?? "", threadId, userId });
+
+        context.log.event("chat.regenerate_title", { scheduled: true });
+
+        return { success: true };
+    });
 
 /**
  * Thread categories for auto-categorization.

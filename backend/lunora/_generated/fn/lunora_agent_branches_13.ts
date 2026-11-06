@@ -5,6 +5,13 @@ import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash
 import * as lunora_agent_branches_13 from "../../agent/branches.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
+installCompiledValidatorMap(lunora_agent_branches_13.getActivePathIds.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["leafMessageId"] !== "string") return DEFER;
+if (typeof source["threadId"] !== "string") return DEFER;
+return { "leafMessageId": source["leafMessageId"], "threadId": source["threadId"] };
+});
 installCompiledValidatorMap(lunora_agent_branches_13.getContextPathIds.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;

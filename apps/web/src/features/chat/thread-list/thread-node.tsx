@@ -64,6 +64,7 @@ import { hasUnreadReply, isSnoozed } from "./lib/thread-state-rules";
 import MessageSearchMatches from "./message-search-matches";
 import SortableThreadItem from "./sortable-thread-item";
 import { selectSetShowManageTagsDialog, useThreadListUIStore } from "./stores/thread-list-ui-store";
+import ThreadOptionsMenu from "./thread-options-menu";
 import ThreadStatusIcon, { NEEDS_YOU_TEXT_CLASS } from "./thread-status-icon";
 import type { BranchNode, LoadingStates } from "./types";
 
@@ -858,6 +859,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         </DropdownMenuContent>
                     </DropdownMenu>
                 )}
+                <ThreadOptionsMenu isHostRun={node.runner === "host"} isLocked={isLocked} label={displayTitle} threadId={node.threadId} />
                 <DropdownMenu>
                     <Tooltip>
                         <TooltipTrigger

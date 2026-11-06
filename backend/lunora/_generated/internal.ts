@@ -59,6 +59,7 @@ export interface InternalApiTypes {
             autoArchiveInactiveThreads: FunctionReference<"mutation", {}, null>;
         };
         branches: {
+            getActivePathIds: FunctionReference<"query", { leafMessageId: Id<"messages">; threadId: Id<"threads"> }, null | Array<string> | "too-long">;
             getContextPathIds: FunctionReference<"query", { promptMessageId: Id<"messages">; threadId: Id<"threads"> }, null | Array<string>>;
             getForkContextIds: FunctionReference<"query", { index?: number; messageId?: string; threadId: Id<"threads"> }, Array<Id<"messages">>>;
             getMaxOrder: FunctionReference<"query", { threadId: Id<"threads"> }, number>;
@@ -395,6 +396,7 @@ export interface InternalApiTypes {
             improvePrompt: FunctionReference<"action", { improvementInstructions?: string; prompt: string; style?: string; threadId?: string; userId: string; userPlan?: "free" | "premium" }, { improvedPrompt: string; }>;
             iteratePrompt: FunctionReference<"action", { iterateInput: string; lastOptimizedPrompt: string; mode?: "user" | "system"; threadId?: string; userId: string; userPlan?: "free" | "premium" }, { improvedPrompt: string; }>;
             optimizeSystemPrompt: FunctionReference<"action", { improvementInstructions?: string; modelId?: string; prompt: string; style?: string; threadId?: string; userId: string; userPlan?: "free" | "premium" }, { improvedPrompt: string; }>;
+            regenerateTitleChat: FunctionReference<"action", { expectedTitle?: string; threadId: string; userId: string }, void>;
             streamAsync: FunctionReference<"action", { customSystemPrompt?: string; enabledFeatures?: Array<string>; jobId?: string; messageId: string; model: string; parentId?: string; prompt?: string; reasoningEffort?: number; statelessMode?: boolean; threadId: string }, null>;
             updateThreadModel: FunctionReference<"mutation", { autoModel?: boolean; customSystemPrompt?: string; dictationLanguage?: string; enabledFeatures?: Array<string>; model: string; order?: number; reasoningEffort?: number; statelessMode?: boolean; threadId: string; userId: string }, null>;
         };
@@ -1288,6 +1290,7 @@ export const internal: InternalApiTypes = {
             autoArchiveInactiveThreads: { __lunoraRef: "agent_auto_archive:autoArchiveInactiveThreads" },
         },
         branches: {
+            getActivePathIds: { __lunoraRef: "agent_branches:getActivePathIds" },
             getContextPathIds: { __lunoraRef: "agent_branches:getContextPathIds" },
             getForkContextIds: { __lunoraRef: "agent_branches:getForkContextIds" },
             getMaxOrder: { __lunoraRef: "agent_branches:getMaxOrder" },
@@ -1624,6 +1627,7 @@ export const internal: InternalApiTypes = {
             improvePrompt: { __lunoraRef: "chat_functions:improvePrompt" },
             iteratePrompt: { __lunoraRef: "chat_functions:iteratePrompt" },
             optimizeSystemPrompt: { __lunoraRef: "chat_functions:optimizeSystemPrompt" },
+            regenerateTitleChat: { __lunoraRef: "chat_functions:regenerateTitleChat" },
             streamAsync: { __lunoraRef: "chat_functions:streamAsync" },
             updateThreadModel: { __lunoraRef: "chat_functions:updateThreadModel" },
         },

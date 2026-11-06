@@ -163,6 +163,32 @@ export const withBranchInfo = <M extends { branch?: MessageBranch; id: string }>
     return messages;
 };
 
+/** The longest active path a title is read along: a longer one is not titled (`"too-long"`). */
+export const TITLE_PATH_LIMIT = 1000;
+
+/**
+ * The ids of the active path ending at `leafMessageId`, top first, read at most `TITLE_PATH_LIMIT` rows deep. `"too-long"`
+ * when the path is longer; `null` when the leaf is not a message of the thread.
+ */
+export const getActivePathIds = internalQuery
+    .input({ leafMessageId: v.id("messages"), threadId: v.id("threads") })
+    .output(v.union(v.null(), v.array(v.string()), v.literal("too-long")))
+    .query(async ({ args, ctx }) => {
+        const leaf = await ctx.db.get("messages", args.leafMessageId);
+
+        if (!leaf || leaf.threadId !== args.threadId) {
+            return null;
+        }
+
+        const { rows } = await walkPath(ctx, args.threadId, leaf, { limit: TITLE_PATH_LIMIT + 1 });
+
+        if (rows.length > TITLE_PATH_LIMIT) {
+            return "too-long";
+        }
+
+        return rows.toReversed().map((row) => row._id as string);
+    });
+
 /**
  * The ids an agent may read as history for `promptMessageId`, or `null` for an
  * unbranched thread, where every row already is history.

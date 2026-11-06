@@ -27,7 +27,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 vi.mock("@neore/backend/api", () => {
-    return { api: {} };
+    return { api: { chat: { functions: { regenerateThreadTitle: {}, updateThread: {} } } } };
 });
 
 vi.mock("@/features/develop/components/pull-request-counts", () => {
@@ -70,11 +70,14 @@ vi.mock("@/lib/lunora/crpc", () => {
         createLunoraQueryOptions: () => {
             return {};
         },
+        useLunoraActionOptions: () => {
+            return {};
+        },
         useCRPC: () => {
             return {
                 agent: { thread_lock: { lockThread: entry } },
                 chat: {
-                    functions: { abortThreadStream: entry, convertTemporaryToPermanent: entry, getThread: entry },
+                    functions: { abortThreadStream: entry, convertTemporaryToPermanent: entry, getThread: entry, regenerateThreadTitle: entry },
                     thread_state: { snoozeThread: entry, unsnoozeThread: entry },
                 },
             };
