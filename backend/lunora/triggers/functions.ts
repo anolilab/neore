@@ -1403,6 +1403,11 @@ export const pruneExpiredRunPrompts = internalMutation
             await patchRow(ctx.db, "triggerExecutions", row, { prompt: undefined, promptExpiresAt: undefined });
         }
 
+        // A full batch may leave more expired prompts: sweep again at once, so a backlog drains within this pass.
+        if (expired.length === PRUNE_RUN_PROMPTS_BATCH) {
+            await ctx.scheduler.runAfter(0, internal.triggers.functions.pruneExpiredRunPrompts, {});
+        }
+
         return null;
     });
 
