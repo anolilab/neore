@@ -620,7 +620,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 </Tooltip>
             )}
 
-            <div className="bg-accent-foreground/80 absolute right-0 flex items-center gap-1 rounded-l-lg opacity-0 transition-opacity group-hover/action-item:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
+            <div className="bg-accent-foreground/80 absolute right-0 flex items-center gap-1 rounded-l-lg opacity-0 transition-opacity group-hover/action-item:opacity-100 focus-within:opacity-100">
                 {node.status !== "archived" && (
                     <Tooltip>
                         <TooltipTrigger
