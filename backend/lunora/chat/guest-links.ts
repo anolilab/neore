@@ -112,7 +112,7 @@ export const createGuestLink = authMutation
     .output(v.object({ expiresAt: v.number(), linkToken: v.string() }))
     .mutation(async ({ args: { discardWaiting, threadId }, ctx: context }) => {
         const { userId } = context.user;
-        // The owner alone, and not a locked chat without its proof: a link into a locked chat would be a way around the lock.
+        // The owner alone, and never a locked chat: this takes no unlock proof, and a link into a locked chat would be a way around the lock.
         const thread = await requireOwnedThread(context, threadId, userId);
 
         if (thread.deleted === true || thread.isTemporary === true || thread.status === "archived") {
