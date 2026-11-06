@@ -1225,6 +1225,10 @@ msgstr "{providerName} · twój własny klucz API"
 msgid "{providerName} · your own Bedrock account ({region})"
 msgstr "{providerName} · twoje własne konto Bedrock ({region})"
 
+#: src/features/chat/thread/request-secret-prompt.tsx
+msgid "{refusedLabel} does not have the format this request asks for, so nothing was saved. Enter it again."
+msgstr "{refusedLabel} nie ma formatu wymaganego w tej prośbie, więc nic nie zapisano. Wpisz ponownie."
+
 #: src/features/settings/components/chat/usage-settings.tsx:391
 #: src/routes/admin/gateway/index.tsx:67
 msgid "{requestCount} req"

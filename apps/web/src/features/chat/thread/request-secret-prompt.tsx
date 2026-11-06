@@ -298,7 +298,15 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                     }
 
                     if (code === "SECRET_FORMAT_INVALID") {
-                        setSaveError(t`A value does not have the format this request asks for, so nothing was saved. Check it and enter it again.`);
+                        // The server names the refused field by its index in the request.
+                        const refusedIndex = (error as { data?: { field?: unknown } }).data?.field;
+                        const refusedLabel = typeof refusedIndex === "number" ? fields[refusedIndex]?.label : undefined;
+
+                        setSaveError(
+                            refusedLabel
+                                ? t`${refusedLabel} does not have the format this request asks for, so nothing was saved. Enter it again.`
+                                : t`A value does not have the format this request asks for, so nothing was saved. Check it and enter it again.`,
+                        );
 
                         return;
                     }

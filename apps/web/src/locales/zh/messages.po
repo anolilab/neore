@@ -1225,6 +1225,10 @@ msgstr "{providerName} · 你自己的 API 密钥"
 msgid "{providerName} · your own Bedrock account ({region})"
 msgstr "{providerName} · 你自己的 Bedrock 账号（{region}）"
 
+#: src/features/chat/thread/request-secret-prompt.tsx
+msgid "{refusedLabel} does not have the format this request asks for, so nothing was saved. Enter it again."
+msgstr "{refusedLabel} 的格式不符合此请求的要求，因此未保存任何内容。请重新输入。"
+
 #: src/features/settings/components/chat/usage-settings.tsx:391
 #: src/routes/admin/gateway/index.tsx:67
 msgid "{requestCount} req"
