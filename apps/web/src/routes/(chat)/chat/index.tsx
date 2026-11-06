@@ -54,7 +54,7 @@ const ChatPage = () => {
         linkModel === undefined &&
         resumeScopeReady;
 
-    usePromptLinkDraft({ model: linkModel, prompt: linkPrompt });
+    usePromptLinkDraft({ model: linkModel, otherDraftSource: Boolean(promptId) || Boolean(hasInitialMessage), prompt: linkPrompt });
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.
         crpc.chat.resume.latestResumableThread.queryOptions(

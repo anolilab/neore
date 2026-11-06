@@ -23,6 +23,8 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
         const prompt = getVisibleUserText({ parts: [...message.parts], text: message.text });
 
         if (!prompt.trim()) {
+            showWarning(t`This message has no text to copy as a prompt link.`);
+
             return;
         }
 
