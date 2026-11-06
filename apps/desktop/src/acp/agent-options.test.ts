@@ -221,6 +221,12 @@ describe("a change the agent reports", () => {
         expect(next.configOptions?.[0]?.currentValue).toBe("code");
     });
 
+    it("moves a mode option whatever the case of its category, as the check that refuses a change to it does", () => {
+        const cased = optionsOf({ configOptions: [select("mode", { category: "Mode" })] }, plain);
+
+        expect(withCurrentMode(cased, "b", plain).configOptions?.[0]?.currentValue).toBe("b");
+    });
+
     it("ignores a current mode that is not an id, and leaves a mode option that lacks the choice", () => {
         expect(withCurrentMode(raw, 3, plain)).toBe(raw);
         expect(withCurrentMode(raw, "other", plain).configOptions?.[0]?.currentValue).toBe("a");
