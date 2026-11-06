@@ -96,14 +96,20 @@ export const removeQueuedPrompt = <A>(state: PromptQueueState<A>, id: string): P
 
 /**
  * Moves a queued message to `toIndex` (clamped to the queue), keeping every other message in its order. A steer whose
- * call is still out holds its place, so it neither moves nor is overtaken by a move onto it. An unknown id or a move
+ * call is still out holds its place: a move that starts, ends, or passes over one is refused. An unknown id or a move
  * to the place it already has returns the same state.
  */
 export const moveQueuedPrompt = <A>(state: PromptQueueState<A>, id: string, toIndex: number): PromptQueueState<A> => {
     const from = state.items.findIndex((item) => item.id === id);
     const target = Math.min(Math.max(Math.trunc(toIndex), 0), state.items.length - 1);
 
-    if (from === -1 || from === target || state.items[from]?.steer?.pending || state.items[target]?.steer?.pending) {
+    if (from === -1 || from === target) {
+        return state;
+    }
+
+    const [low, high] = from < target ? [from, target] : [target, from];
+
+    if (state.items.slice(low, high + 1).some((item) => item.steer?.pending)) {
         return state;
     }
 

@@ -254,12 +254,15 @@ const useQueueActions = () => {
 };
 
 const QueueChip: FC<{
+    /** A pending steer sits directly above or below: a move that way would pass over it, which the queue refuses. */
+    blockedDown: boolean;
+    blockedUp: boolean;
     count: number;
     onMove: (id: string, step: -1 | 1) => void;
     onRemove: (id: string) => void;
     position: number;
     prompt: QueuedChatPrompt;
-}> = ({ count, onMove, onRemove, position, prompt }) => {
+}> = ({ blockedDown, blockedUp, count, onMove, onRemove, position, prompt }) => {
     const { t } = useLingui();
     const pending = Boolean(prompt.steer?.pending);
     const { isDragging, listeners, setNodeRef, transform, transition } = useSortable({ disabled: pending, id: prompt.id });
@@ -300,8 +303,8 @@ const QueueChip: FC<{
             )}
             <button
                 aria-label={t`Move queued message ${position} up`}
-                className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground rounded-full p-0.5 disabled:opacity-40"
-                disabled={pending || position === 1}
+                className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
+                disabled={pending || position === 1 || blockedUp}
                 onClick={() => onMove(prompt.id, -1)}
                 type="button"
             >
@@ -309,8 +312,8 @@ const QueueChip: FC<{
             </button>
             <button
                 aria-label={t`Move queued message ${position} down`}
-                className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground rounded-full p-0.5 disabled:opacity-40"
-                disabled={pending || position === count}
+                className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
+                disabled={pending || position === count || blockedDown}
                 onClick={() => onMove(prompt.id, 1)}
                 type="button"
             >
@@ -494,7 +497,16 @@ const ComposerPromptQueue: FC = () => {
                 <SortableContext items={queue.items.map((prompt) => prompt.id)} strategy={rectSortingStrategy}>
                     <ol aria-label={t`Queued messages`} className="flex min-w-0 flex-wrap gap-1.5">
                         {queue.items.map((prompt, index) => (
-                            <QueueChip count={count} key={prompt.id} onMove={handleMove} onRemove={handleRemove} position={index + 1} prompt={prompt} />
+                            <QueueChip
+                                blockedDown={queue.items[index + 1]?.steer?.pending === true}
+                                blockedUp={index > 0 && queue.items[index - 1]?.steer?.pending === true}
+                                count={count}
+                                key={prompt.id}
+                                onMove={handleMove}
+                                onRemove={handleRemove}
+                                position={index + 1}
+                                prompt={prompt}
+                            />
                         ))}
                     </ol>
                 </SortableContext>

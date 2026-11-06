@@ -474,6 +474,16 @@ describe("reordering queued prompts", () => {
         expect(moveQueuedPrompt(state, "c", 1)).toBe(state);
     });
 
+    it("refuses a move that passes over a pending steer, even when neither end is the steer", () => {
+        const state: PromptQueueState<never> = {
+            items: [item("a"), { ...item("s"), steer: { id: "s1", pending: true, streamId: "x" } }, item("c")],
+            paused: false,
+        };
+
+        expect(moveQueuedPrompt(state, "a", 2)).toBe(state);
+        expect(moveQueuedPrompt(state, "c", 0)).toBe(state);
+    });
+
     it("keeps the paused flag and survives a save and restore in the new order", () => {
         const moved = { ...moveQueuedPrompt(four(), "c", 0), paused: true };
         const restored = restorePromptQueue(serializePromptQueue(moved));
