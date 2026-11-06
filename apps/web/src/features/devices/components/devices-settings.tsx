@@ -180,7 +180,7 @@ const DeviceRow: FC<{
                 </p>
                 {/* A server over SSH runs the host software, not the desktop app, so it has no app version to report. */}
                 {device.transport !== "ssh" && (
-                    <p className="text-muted-foreground text-pretty text-xs tabular-nums">
+                    <p className="text-muted-foreground text-xs text-pretty tabular-nums">
                         {device.appVersion === undefined ? t`Neore version not reported` : t`Neore ${device.appVersion}`}
                     </p>
                 )}
