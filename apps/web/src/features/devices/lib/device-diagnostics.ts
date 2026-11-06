@@ -48,16 +48,17 @@ export const connectionFailureCategory = (message: string): string => {
     return found === undefined ? t`connection failed` : found[1]();
 };
 
-const routeText = (route: DeviceRoute): string => {
+/** The route as one translatable phrase; a name is a placeholder in it, so a translator can place it. */
+const routeText = (route: DeviceRoute, viaName: string | undefined): string => {
     switch (route) {
         case "relay": {
-            return t`relay (another paired computer)`;
+            return viaName === undefined ? t`relay (another paired computer)` : t`relay (another paired computer): ${viaName}`;
         }
         case "ssh-via-computer": {
-            return t`SSH server via a paired computer`;
+            return viaName === undefined ? t`SSH server via a paired computer` : t`SSH server via a paired computer: ${viaName}`;
         }
         default: {
-            return t`this computer`;
+            return viaName === undefined ? t`this computer` : t`this computer: ${viaName}`;
         }
     }
 };
@@ -77,7 +78,7 @@ export const buildDeviceDiagnostics = (input: DeviceDiagnosticsInput): string =>
     // One line each: a name with a line break must not be able to add a field of its own to the report.
     const oneLine = (value: string): string => value.replaceAll(/\s+/g, " ").trim();
     const name = oneLine(input.name);
-    const route = input.viaName ? `${routeText(input.route)} (${oneLine(input.viaName)})` : routeText(input.route);
+    const route = routeText(input.route, input.viaName ? oneLine(input.viaName) : undefined);
     const errors = input.errors.map((error) => {
         const text = error.kind === "connection" ? connectionFailureCategory(error.message) : error.message;
 

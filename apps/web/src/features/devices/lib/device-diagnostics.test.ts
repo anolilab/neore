@@ -27,7 +27,7 @@ describe("buildDeviceDiagnostics", () => {
         expect(text).toContain("App version: 1.2.3");
         expect(text).toContain("Client: Mozilla/5.0 Electron");
         expect(text).toContain("Host version: 0.4.0");
-        expect(text).toContain("Route: SSH server via a paired computer (My Mac)");
+        expect(text).toContain("Route: SSH server via a paired computer: My Mac");
         expect(text).toContain("Last seen: 2026-11-03T12:00:00.000Z");
         expect(text).toContain("Clock offset: about 12 minutes behind");
         expect(text).toContain("  - Could not connect");
