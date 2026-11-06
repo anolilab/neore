@@ -173,9 +173,9 @@ const scan = (value: string, { keepTrailingJoiner = false, layout = false, stric
 };
 
 /**
- * `layout`: a newline and a tab are plain layout, so a multi-line prompt can have them. `strict`: the joiners U+200C
- * and U+200D count as hidden too (prompts allow them for emoji and Persian; a name or glob has no use for them), and so
- * does every variation selector and tag character.
+ * `layout`: a newline and a tab are plain layout, so a multi-line prompt can have them. `strict`: every joiner counts as
+ * hidden, U+200C and U+200D included, and so does every variation selector and tag character. A name or glob has no
+ * use for any of them. A prompt keeps only the joiners described at the top of this file.
  */
 export const hasHiddenText = (value: string, options: { layout?: boolean; strict?: boolean } = {}): boolean => scan(value, options).length > 0;
 

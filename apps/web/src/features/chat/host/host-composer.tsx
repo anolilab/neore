@@ -121,12 +121,14 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
         toast.error(messages[result.error]);
     };
 
-    const trimmed = text.trim();
+    // The text the server will send: the editable draft keeps a trailing joiner, which the server removes before its checks,
+    // so the length and empty checks here use the same cleaned text.
+    const sendable = stripHiddenText(text).text.trim();
     const status = session?.status;
     const blocked = status === "ended";
-    const overLimit = trimmed.length > MAX_HOST_PROMPT_CHARS;
+    const overLimit = sendable.length > MAX_HOST_PROMPT_CHARS;
     const limitNote = overLimit || refusedPaste;
-    const canSend = trimmed !== "" && !overLimit && !sending && !running && !blocked;
+    const canSend = sendable !== "" && !overLimit && !sending && !running && !blocked;
     const lastEnd = session?.lastEndReason;
     const offerContinue = !running && !blocked && lastEnd !== undefined && CONTINUABLE.has(lastEnd);
 
@@ -136,7 +138,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
         }
 
         event.preventDefault();
-        void send(trimmed);
+        void send(sendable);
     };
 
     const answerRequest = (request: PendingRequest, optionId: string) => {
@@ -248,7 +250,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     <Button
                         disabled={!canSend}
                         onClick={() => {
-                            send(trimmed);
+                            send(sendable);
                         }}
                         type="button"
                     >

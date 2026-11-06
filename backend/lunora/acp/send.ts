@@ -77,6 +77,9 @@ export interface SendToHostInput {
 /** The body of {@link sendToHost}, callable from a mutation that sends a prompt as part of its own write. */
 export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Promise<Infer<typeof vSendResult>> => {
     const { requestId, userId } = args;
+    // Every caller passes through here (the HTTP action, and the pull-request guide, whose text carries third-party content),
+    // so the hidden-character strip is applied once, here, for all of them.
+    const { text } = stripHiddenText(args.text);
     const { now } = ctx;
     const key = `${userId}:${requestId}`;
     const threadId = ctx.db.normalizeId("threads", args.threadId);
@@ -139,7 +142,7 @@ export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Pr
     // The first prompt after a switch carries what the agent is taking over (harness-switch.md, S3); the saved
     // message is the user's own words alone. A prompt too long for the call with it is refused, never cut.
     const handoff = await pendingHandoffOf(ctx, thread);
-    const queued = await queueHostTurn(ctx, { handoff, session, taintedBy: args.taintedBy, text: args.text, threadId, userId }, now);
+    const queued = await queueHostTurn(ctx, { handoff, session, taintedBy: args.taintedBy, text, threadId, userId }, now);
 
     if ("error" in queued) {
         const outcomes = { busy: "busy", ineligible: "session_ended", input_too_large: "too_large", offline: "offline", outdated: "outdated" } as const;

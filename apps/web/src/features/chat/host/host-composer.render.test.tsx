@@ -157,6 +157,23 @@ describe("the coding-agent composer", () => {
         expect(ids[2]).not.toBe(ids[0]);
     });
 
+    it("counts the length the server will send, so a draft ending in a joiner that is removed is not refused", async () => {
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+        // 29,998 characters, an emoji (two units) and a trailing joiner: 30,001 units while typed, 30,000 once the joiner goes.
+        const draft = `${"a".repeat(29_998)}\u{1F600}‍`;
+
+        fireEvent.change(box, { target: { value: draft } });
+
+        const send = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
+
+        expect(send.disabled).toBe(false);
+        fireEvent.click(send);
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+        expect((harness.calls[0]?.[1] as { text: string }).text).toBe(`${"a".repeat(29_998)}\u{1F600}`);
+    });
+
     it("does not send an empty message", async () => {
         mount(session());
 
