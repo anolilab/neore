@@ -46,6 +46,7 @@ const textModel = MODEL_REGISTRY.find((model) => (model.mode ?? "text") === "tex
 const imageModel = MODEL_REGISTRY.find((model) => model.mode === "image" && model.enabled !== false);
 const disabledModel = "fal-ai/flux-schnell";
 const externalModel = "ext/mimo-v2-flash";
+const MODEL_NOTICE = "This link's model is not available in this chat. The chat keeps its model.";
 
 interface LinkProps {
     model?: string;
@@ -163,26 +164,45 @@ describe("usePromptLinkDraft", () => {
         });
     });
 
-    it("ignores a model that is not in the registry", () => {
+    it("ignores a model that is not in the registry, says so, and still applies the prompt", () => {
         renderLink({ model: "not-a-real-model", prompt: "hi" });
 
         expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
         expect(useChatUIStore.getState().composerText).toBe("hi");
+        expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
     });
 
-    it("ignores an image model, a disabled model and an external model, and still applies the prompt", () => {
+    it("ignores an image model, a disabled model and an external model, says so, and still applies the prompt", () => {
         expect(imageModel).toBeDefined();
 
         for (const model of [imageModel?.id, disabledModel, externalModel]) {
             useModelStore.setState({ selectedModel: DEFAULT_CHAT_MODEL as ModelId });
             useChatUIStore.getState().setComposerText("");
+            harness.showWarning.mockReset();
 
             const { unmount } = renderLink({ model, prompt: "hi" });
 
             expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
             expect(useChatUIStore.getState().composerText).toBe("hi");
+            expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
 
             unmount();
         }
+    });
+
+    it("does not apply a custom endpoint's model id, which a link can never carry, and says so", () => {
+        renderLink({ model: "custom:ollama/llama3.1:8b", prompt: "hi" });
+
+        expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+        expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
+    });
+
+    it("gives no model notice when the link's model is not applied because a draft is kept", () => {
+        useChatUIStore.getState().setComposerText("my own text");
+
+        renderLink({ model: "not-a-real-model", prompt: "from the link" });
+
+        expect(harness.showWarning).toHaveBeenCalledTimes(1);
+        expect(harness.showWarning).toHaveBeenCalledWith("Your draft is kept. The prompt from the link was not added.");
     });
 });

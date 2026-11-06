@@ -1,5 +1,4 @@
 import { useLingui } from "@lingui/react/macro";
-import { enabledModelOf } from "@neore/ai/models";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 
@@ -8,7 +7,7 @@ import { showWarning } from "@/lib/toast";
 import { useChatUIStore } from "../stores/chat-ui-store";
 import type { ModelId } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
-import { promptFromLink } from "../utils/prompt-link";
+import { carriableLinkModel, promptFromLink } from "../utils/prompt-link";
 
 /** The chat search without the prompt link's own parameters: a saved prompt or a message in the same URL stays. */
 const withoutLinkParameters = (search: Record<string, unknown>): Record<string, unknown> =>
@@ -67,11 +66,16 @@ export const usePromptLinkDraft = ({
             }
         }
 
-        // The composer takes text models only: a speech or image model named by a link is not applied to the text chat.
-        const definition = enabledModelOf(model, { mode: "text" });
+        // The composer takes text models only: a speech or image model, a custom endpoint's model or an external one a link
+        // names is not applied, and the person is told so rather than left on a model the link did not name.
+        if (applyLink && model !== undefined) {
+            const definition = carriableLinkModel(model);
 
-        if (applyLink && definition && definition.provider !== "external") {
-            useModelStore.getState().setSelectedModel(definition.id as ModelId, undefined);
+            if (definition) {
+                useModelStore.getState().setSelectedModel(definition.id as ModelId, undefined);
+            } else {
+                showWarning(t`This link's model is not available in this chat. The chat keeps its model.`);
+            }
         }
 
         void navigate({ replace: true, search: (previous: Record<string, unknown>) => withoutLinkParameters(previous), to: "/chat" });
