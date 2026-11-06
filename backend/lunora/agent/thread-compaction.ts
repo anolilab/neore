@@ -20,9 +20,10 @@
  * ## Flow ({@link compactThreadContext})
  *
  * `prepareThreadCompaction` (one mutation) checks the thread, finds the summary already on this path, plans the
- * cut and claims it; `summariseTranscript` makes ONE metered utility-model call; `finishThreadSummary` stores the
- * row, replacing the one it extends. The claim makes a redelivery or a double click do nothing twice, and is
- * released when the call fails.
+ * cut and claims it (`claimCut`: the cut, and the thread's one summarising call in flight); `summariseTranscript`
+ * makes ONE metered utility-model call; `finishThreadSummary` stores the row, replacing the one it extends. The claims
+ * make a redelivery, a double click or an idle summary planning another cut of the same rows refuse before paying for a
+ * call; the cut's is released when the call fails, the thread's when the call is over.
  *
  * ## Estimating the context ({@link estimateContext})
  *
@@ -36,15 +37,14 @@ import { type Infer, v } from "lunorash/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { type ActionCtx, internalMutation, type QueryCtx } from "../_generated/server";
-import { claimOnce, releaseClaim } from "../lib/claim-once";
 import { MAX_LENGTH } from "../lib/validators";
 import { isLocalBrowserModel, loadCustomProviders } from "../chat/lib/local-turn";
 import { getThreadRow, walkPath } from "./branch-rows";
 import { hasLiveDeltaStream } from "./thread-streaming";
 import { MAX_SEARCH_PAGES, pathTokens, rowCharacters } from "./handoff-source";
-import { AUTO_COMPACT_MAX_PASSES, COMPACT_MAX_PASSES, THREAD_CUT_CLAIM_SCOPE, compactionFoldCount, compactThresholdTokens } from "./thread-compaction-logic";
+import { AUTO_COMPACT_MAX_PASSES, COMPACT_MAX_PASSES, compactionFoldCount, compactThresholdTokens } from "./thread-compaction-logic";
 import {
-    claimKey,
+    claimCut,
     foldedTaint,
     hardBlockerOf,
     idleSummaryAbove,
@@ -58,7 +58,7 @@ import {
     summariesOptedIn,
     summariseTranscript,
 } from "./thread-summaries";
-import { renderTranscript, SUMMARY_MAX_PATH_ROWS, SUMMARY_READ_REACH_ROWS, SUMMARY_RECENT_ROWS, THREAD_SUMMARY_CLAIM_TTL_MS } from "./thread-summary-logic";
+import { renderTranscript, SUMMARY_MAX_PATH_ROWS, SUMMARY_READ_REACH_ROWS, SUMMARY_RECENT_ROWS } from "./thread-summary-logic";
 import { mergeTaint } from "../devices/lib/taint";
 
 type Reader = Pick<QueryCtx, "db">;
@@ -256,9 +256,16 @@ export const prepareThreadCompaction = internalMutation
         const afterIdle = idle ? successful.findIndex((row) => row._id === idle.covered._id) + 1 : 0;
         const skipped = base ? 0 : Math.max(0, successful.length - SUMMARY_RECENT_ROWS, afterIdle);
         const after = successful.slice(skipped);
-        // An auto-compact anchors on the prompt it answers, which opens a turn of its own. The two verbatim exchanges are the
-        // ones before that turn, so the keep point comes from the turn above it, as a manual compaction's does from the leaf.
-        const fold = compactionFoldCount(after, args.anchorMessageId ? tip.order - 1 : tip.order);
+        // An auto-compact anchors on the prompt it answers, which has no reply yet: the verbatim exchanges are the ones
+        // before it, as a manual compaction's are the last ones up to the leaf. The prompt is the last row, so leaving it
+        // out of the count does not move the indexes of the rows before it.
+        const fold = compactionFoldCount(
+            after
+                .filter((row) => !args.anchorMessageId || row._id !== tip._id)
+                .map((row) => {
+                    return { order: row.order, role: rowRole(row) };
+                }),
+        );
 
         if (fold === 0) {
             return { reason: "nothing" as const };
@@ -288,7 +295,9 @@ export const prepareThreadCompaction = internalMutation
             return { reason: "nothing" as const };
         }
 
-        if (!(await claimOnce(ctx, THREAD_CUT_CLAIM_SCOPE, claimKey(thread._id, covered._id), THREAD_SUMMARY_CLAIM_TTL_MS, thread.userId))) {
+        const foldClaimedAt = await claimCut(ctx, thread._id, covered._id, thread.userId);
+
+        if (foldClaimedAt === null) {
             return { reason: "busy" as const };
         }
 
@@ -298,6 +307,7 @@ export const prepareThreadCompaction = internalMutation
                 coveredCount: (base?.summary.coveredCount ?? skipped) + consumed,
                 coveredUpToMessageId: covered._id,
                 epoch: thread.summaryEpoch ?? 0,
+                foldClaimedAt,
                 ...(base && { previousSummary: base.summary.summary, previousSummaryId: base.summary._id }),
                 // Whatever untrusted content the folded rows held, and the previous summary already carried.
                 taintedBy: mergeTaint(
@@ -332,6 +342,7 @@ const foldJob = async (
         coveredCount: job.coveredCount,
         coveredUpToMessageId: job.coveredUpToMessageId,
         epoch: job.epoch,
+        foldClaimedAt: job.foldClaimedAt,
         kind: "compact" as const,
         ...(job.previousSummaryId && { previousSummaryId: job.previousSummaryId }),
         taintedBy: job.taintedBy,
@@ -344,7 +355,10 @@ const foldJob = async (
         return await ctx.runMutation(internal.agent.thread_summaries.finishThreadSummary, { ...stored, summary: job.previousSummary ?? "" });
     }
 
-    const release = async () => await releaseClaim(ctx, THREAD_CUT_CLAIM_SCOPE, claimKey(args.threadId, job.coveredUpToMessageId));
+    // With no summary the mutation stores nothing and releases the cut and the thread's fold claim.
+    const release = async () => {
+        await ctx.runMutation(internal.agent.thread_summaries.finishThreadSummary, stored);
+    };
 
     // The charge runs once the utility model is resolved, right before the call; a refusal (a limit) is kept apart from a
     // failed call, so it reaches the caller while a failed call only releases the cut.

@@ -173,7 +173,7 @@ export interface InternalApiTypes {
             timeoutStream: FunctionReference<"mutation", { streamId: Id<"streamingMessages"> }, null>;
         };
         thread_compaction: {
-            prepareThreadCompaction: FunctionReference<"mutation", { anchorMessageId?: Id<"messages">; minTokens?: number; threadId: Id<"threads">; userId: string }, { job?: { coveredCount: number; coveredUpToMessageId: Id<"messages">; epoch: number; previousSummary?: string; previousSummaryId?: Id<"threadContextSummaries">; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; transcript: string; userId: string }; reason?: "busy" | "failed" | "nothing" | "not_owner" | "too_long" | "unavailable" | "within_threshold" }>;
+            prepareThreadCompaction: FunctionReference<"mutation", { anchorMessageId?: Id<"messages">; minTokens?: number; threadId: Id<"threads">; userId: string }, { job?: { coveredCount: number; coveredUpToMessageId: Id<"messages">; epoch: number; foldClaimedAt: number; previousSummary?: string; previousSummaryId?: Id<"threadContextSummaries">; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; transcript: string; userId: string }; reason?: "busy" | "failed" | "nothing" | "not_owner" | "too_long" | "unavailable" | "within_threshold" }>;
         };
         thread_lock: {
             dropThreadPasscodeRows: FunctionReference<"mutation", { threadId: Id<"threads"> }, null>;
@@ -181,10 +181,10 @@ export interface InternalApiTypes {
         };
         thread_summaries: {
             eraseUserThreadSummaries: FunctionReference<"mutation", { batch?: number; before: number; userId: string }, boolean>;
-            finishThreadSummary: FunctionReference<"mutation", { coveredCount: number; coveredUpToMessageId: Id<"messages">; epoch: number; kind?: "compact"; previousSummaryId?: Id<"threadContextSummaries">; summary?: string; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: Id<"threads"> }, boolean>;
+            finishThreadSummary: FunctionReference<"mutation", { coveredCount: number; coveredUpToMessageId: Id<"messages">; epoch: number; foldClaimedAt?: number; kind?: "compact"; previousSummaryId?: Id<"threadContextSummaries">; summary?: string; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: Id<"threads"> }, boolean>;
             getThreadSummaryForContext: FunctionReference<"query", { promptMessageId?: Id<"messages">; threadId: Id<"threads"> }, { boundary?: { messageId: string; order: number; stepOrder: number }; branched: boolean; summary: string } | null>;
             listThreadSummariesForExport: FunctionReference<"query", { threadId: Id<"threads"> }, Array<{ coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string }>>;
-            prepareThreadSummary: FunctionReference<"mutation", { afterMessageId: Id<"messages">; threadId: Id<"threads"> }, { coveredCount: number; coveredUpToMessageId: Id<"messages">; epoch: number; previousSummary?: string; previousSummaryId?: Id<"threadContextSummaries">; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; transcript: string; userId: string } | null>;
+            prepareThreadSummary: FunctionReference<"mutation", { afterMessageId: Id<"messages">; threadId: Id<"threads"> }, { coveredCount: number; coveredUpToMessageId: Id<"messages">; epoch: number; foldClaimedAt: number; previousSummary?: string; previousSummaryId?: Id<"threadContextSummaries">; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; transcript: string; userId: string } | null>;
             runThreadSummary: FunctionReference<"action", { afterMessageId: Id<"messages">; threadId: Id<"threads"> }, null>;
         };
         threads: {
@@ -510,7 +510,7 @@ export interface InternalApiTypes {
         tools: {
             browser_node: {
                 closeBrowserSession: FunctionReference<"action", { sessionId: Id<"browserSessions"> }, void>;
-                executeBrowserAction: FunctionReference<"action", { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }, unknown>;
+                executeBrowserAction: FunctionReference<"action", { action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll"; browserSettings?: unknown; direction?: string; fullPage?: boolean; selector?: string; text?: string; threadId: Id<"threads">; url?: string; userId: string; userTier?: string }, import("@neore/service-sdk/browser-renderer").BrowserActionResponse>;
             };
             code_execution_node: {
                 default: FunctionReference<"action", { code: string; threadId?: Id<"threads">; timeoutMs?: number; userId?: string }, { files: import("../chat/tools/sandbox-outputs.js").SandboxOutputFile[]; skippedFiles: import("../chat/tools/sandbox-outputs.js").SkippedOutputFile[]; error: string | undefined; results: { type: "text"; value: string; }[]; stderr: string; stdout: string; } | { error: string; results: { type: "error"; value: string; }[]; stderr: string; stdout: string; } | { error: string | undefined; results: { format?: string; type: "text" | "image" | "error"; value: string; }[]; stderr: string; stdout: string; }>;

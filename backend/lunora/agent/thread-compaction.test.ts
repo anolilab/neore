@@ -523,6 +523,56 @@ describe("auto-compact", () => {
         expect(rows[0]?.coveredCount).toBe(2);
     });
 
+    it("keeps the two exchanges before the prompt when the path's orders have gaps", async () => {
+        expect.assertions(1);
+
+        threadId = await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "regular", title: "Gaps", userId: OWNER }));
+        rowIds = [];
+
+        // Orders 0, 1 and 5, then the prompt at 9: a continuation or another branch took the orders between them.
+        for (const [order, role] of [
+            [0, "user"],
+            [0, "assistant"],
+            [1, "user"],
+            [1, "assistant"],
+            [5, "user"],
+            [5, "assistant"],
+            [9, "user"],
+        ] as const) {
+            rowIds.push(
+                await harness.run(
+                    async (ctx: any) =>
+                        await ctx.db.insert("messages", {
+                            message: { content: `${role} ${order}`, role },
+                            order,
+                            status: "success",
+                            stepOrder: role === "user" ? 0 : 1,
+                            text: `${role} ${order}`,
+                            threadId,
+                            tool: false,
+                            userId: OWNER,
+                        }),
+                ),
+            );
+        }
+
+        await harness.action(
+            async (ctx: any) =>
+                await autoCompactBeforeReply(ctx, {
+                    anchorMessageId: rowIds.at(-1) as never,
+                    contextWindow: 4,
+                    threadId: threadId as never,
+                    thresholdPercent: 50,
+                    userId: OWNER,
+                }),
+        );
+
+        const [row] = await stored();
+
+        // Only the first exchange folds; the exchanges at orders 1 and 5 stay verbatim.
+        expect(row?.coveredUpToMessageId).toBe(rowIds[1]);
+    });
+
     it("compacts before the reply once the context passes the threshold, keeping the prompt's turn", async () => {
         expect.assertions(2);
 
@@ -764,6 +814,43 @@ describe("the idle-summary opt-out", () => {
         const claims = await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect());
 
         expect(claims).toContainEqual(expect.objectContaining({ key: claimKey(threadId, prepared?.coveredUpToMessageId ?? ""), scope: "thread-cut" }));
+    });
+
+    it("refuses a compaction of another cut while an idle summary's call is out, before it pays for a call, and runs once that call is over", async () => {
+        expect.assertions(6);
+
+        await seedThread(LONG_TURNS);
+        const job = (await prepareIdle()) as Record<string, any> | null;
+
+        expect(job).not.toBeNull();
+
+        // The idle run's model call is out; a compaction planning a different cut of the same rows starts now.
+        const outcome = await compact();
+
+        expect(outcome).toStrictEqual({ compacted: false, reason: "busy" });
+        expect(generateText).not.toHaveBeenCalled();
+
+        // The idle call ends (here: it failed); the thread's call slot is free again.
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(finishThreadSummary, {
+                    coveredCount: job?.coveredCount,
+                    coveredUpToMessageId: job?.coveredUpToMessageId,
+                    epoch: job?.epoch,
+                    foldClaimedAt: job?.foldClaimedAt,
+                    taintedBy: job?.taintedBy,
+                    threadId,
+                }),
+        );
+
+        const retried = await compact();
+
+        expect(retried.compacted).toBe(true);
+        expect(generateText).toHaveBeenCalled();
+        // A different cut from the idle run's: its own claim on the cut alone would not have refused it.
+        const rows = await stored();
+
+        expect(rows.find((row) => row.kind === "compact")?.coveredUpToMessageId).not.toBe(job?.coveredUpToMessageId);
     });
 
     it("refuses to store an idle summary prepared before a compaction landed on its path", async () => {
