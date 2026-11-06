@@ -8,9 +8,8 @@ import { basename, extname } from "node:path";
 import type { Flags, ParsedCommand } from "./args";
 import { limitFlag, requireArgument, UsageError } from "./args";
 import { ApiError, hintFor, NeoreClient, stripTrailingSlashes } from "./client";
-import type { CliConfig } from "./config";
 import { deleteConfig, insecurePermissions, readConfig, resolveCredentials, writeConfig } from "./config";
-import { formatUserCode, pollForKey, requestDeviceCode } from "./device-login";
+import { assertSecureBaseUrl, formatUserCode, pollForKey, requestDeviceCode, revokeIssuedKey } from "./device-login";
 import type { Io } from "./render";
 import { formatDate, formatTable, paint, printJson, renderStream, shouldUseColor } from "./render";
 
@@ -214,17 +213,6 @@ const deviceLogin = async (context: Context, apiUrl: string): Promise<string> =>
     return key.apiKey;
 };
 
-const LOOPBACK_HOSTS = new Set(["127.0.0.1", "[::1]", "localhost"]);
-
-/** Device sign-in receives a fresh key in a response, so it is HTTPS only; plain HTTP is for a server on this machine. */
-const assertDeviceUrl = (apiUrl: string): void => {
-    const { hostname, protocol } = new URL(apiUrl);
-
-    if (protocol !== "https:" && !(protocol === "http:" && LOOPBACK_HOSTS.has(hostname))) {
-        throw new UsageError("--device needs an https:// API URL (http:// is accepted only for localhost).");
-    }
-};
-
 /**
  * The device code goes to whatever host the URL names, so the person confirms that host first: they type it
  * (a plain string comparison), or a script passes it as `--confirm-host`. Nothing is sent before it matches.
@@ -274,7 +262,7 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
     }
 
     if (flags.device) {
-        assertDeviceUrl(apiUrl);
+        assertSecureBaseUrl(apiUrl, context.io.env);
         await confirmDeviceHost(context, apiUrl, flags["confirm-host"]);
     }
 
@@ -290,32 +278,29 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
         throw new UsageError("No API key given. Create one in Settings → API keys.");
     }
 
-    // The key is verified BEFORE it replaces a saved one, so a failed check never costs a working key. The one
-    // exception is a device sign-in with nothing saved: its code is spent, so the issued key is kept rather than lost.
-    const replaced = existing.apiKey;
+    // The key is verified BEFORE it replaces a saved one, so a failed check never costs a working key. A device
+    // sign-in has spent its code by now, so if the check or the save fails, the key it was just issued is revoked
+    // (best effort) rather than left active and unused, where retries would stack toward the key limit.
     const isDevice = Boolean(flags.device);
-
-    if (isDevice && !replaced) {
-        await writeConfig({ apiKey, apiUrl }, context.configFile);
-    }
-
+    const replaced = existing.apiKey;
     let me: { scopes: string[]; userId: string };
 
     try {
         me = await new NeoreClient({ apiKey, baseUrl: apiUrl, fetch: context.fetch }).request<{ scopes: string[]; userId: string }>("GET", "/me");
+        await writeConfig({ apiKey, apiUrl }, context.configFile);
     } catch (error) {
-        if (isDevice && replaced) {
+        if (isDevice) {
+            const isRevoked = await revokeIssuedKey(context, apiUrl, apiKey);
+
             context.io.stderr.write(
-                "The new key could not be checked, so the saved key was left as it was. The new key is active: revoke it in Settings -> API keys, then run `neore login --device` again.\n",
+                isRevoked
+                    ? "The new key could not be checked or saved, so it was revoked and nothing was changed. Run `neore login --device` again.\n"
+                    : "The new key could not be checked or saved and could not be revoked from here: revoke it in Settings -> API keys, then run `neore login --device` again.\n",
             );
         }
 
         throw error;
     }
-
-    const config: CliConfig = { apiKey, apiUrl };
-
-    await writeConfig(config, context.configFile);
 
     if (isDevice && replaced && replaced !== apiKey && existing.apiUrl === apiUrl) {
         context.io.stderr.write("The key this replaces is still valid; revoke it in Settings -> API keys if nothing else uses it.\n");

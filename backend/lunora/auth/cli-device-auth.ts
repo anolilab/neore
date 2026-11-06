@@ -19,6 +19,8 @@
  *   key. The key is minted only AFTER the claim succeeded, so two concurrent
  *   polls cannot produce two keys; it is returned once, in that response. If
  *   the mint itself fails, the claimed row is put back so the next poll retries.
+ *   `POST /device/revoke` lets the CLI delete a key it was just issued when it
+ *   could not check or save it, so retries do not stack toward the cap.
  *   A response lost in transit cannot be replayed (the key is never stored in
  *   the clear); the stranded key shows in Settings and can be revoked there.
  *   The per-person key cap is checked before the claim and again after the
@@ -77,6 +79,8 @@ export interface MintedCliKey {
 export interface CliDeviceAuthOptions {
     /** Mints a read-only public-API key for `userId`. Called once per redeemed code. */
     mintApiKey: (input: { expiresInSeconds: number; name: string; userId: string }) => Promise<MintedCliKey>;
+    /** Resolves a presented key to its row id and owner, or `null` when it is not a valid key. */
+    verifyApiKey: (key: string) => Promise<{ id: string; referenceId: string } | null>;
 }
 
 const oauthError = (status: "BAD_REQUEST" | "FORBIDDEN", error: string, description: string): APIError =>
@@ -243,6 +247,31 @@ const redeemKey = (options: CliDeviceAuthOptions) =>
         });
     });
 
+const revokeBodySchema = z.object({ api_key: z.string().max(256) });
+
+/**
+ * The CLI withdraws a key it was just issued when it could not check or save it, so retries do not stack toward
+ * the key limit. The credential is the key itself (whoever holds it could already use it, and this only deletes
+ * it), and only a key this flow minted (named by `cliKeyName`) can be deleted here; every refusal answers the same.
+ */
+const revokeKey = (options: CliDeviceAuthOptions) =>
+    createAuthEndpoint("/device/revoke", { body: revokeBodySchema, metadata: { noStore: true }, method: "POST" }, async (ctx) => {
+        const verified = await options.verifyApiKey(ctx.body.api_key).catch(() => null);
+        const row = verified
+            ? await ctx.context.adapter.findOne<{ name?: string | null }>({ model: "apikey", where: [{ field: "id", value: verified.id }] })
+            : null;
+
+        if (!verified || !row || typeof row.name !== "string" || !row.name.startsWith(KEY_NAME_PREFIX)) {
+            throw oauthError("BAD_REQUEST", "invalid_grant", "Invalid key");
+        }
+
+        await ctx.context.adapter.delete({ model: "apikey", where: [{ field: "id", value: verified.id }] });
+        authLogger.info("[auth] api_keys.revoke_cli_device_key", { apiKeyId: verified.id, userId: verified.referenceId });
+        ctx.setHeader("Cache-Control", "no-store");
+
+        return ctx.json({ revoked: true });
+    });
+
 /**
  * Both plugins, in the order better-auth wants them. Rate limits for the
  * routes live in `AUTH_RATE_LIMIT_CUSTOM_RULES` (`auth.ts`).
@@ -257,7 +286,7 @@ export const cliDeviceAuth = (options: CliDeviceAuthOptions): BetterAuthPlugin[]
     return [
         stock,
         {
-            endpoints: { redeemCliDeviceKey: redeemKey(options) },
+            endpoints: { redeemCliDeviceKey: redeemKey(options), revokeCliDeviceKey: revokeKey(options) },
             hooks: { before: [refuseGuestApproval] },
             id: "neore-cli-device-key",
         } satisfies BetterAuthPlugin,

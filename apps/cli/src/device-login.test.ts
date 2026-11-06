@@ -1,4 +1,4 @@
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,7 +9,7 @@ import { ApiError, EXIT, exitCodeFor } from "./client";
 import type { Context } from "./commands";
 import { readConfig, writeConfig } from "./config";
 import type { DeviceCode, DeviceFlowDependencies } from "./device-login";
-import { formatUserCode, pollForKey, requestDeviceCode } from "./device-login";
+import { DEV_INSECURE_LOOPBACK_VAR, formatUserCode, pollForKey, requestDeviceCode } from "./device-login";
 
 const BASE = "https://api.test";
 
@@ -216,6 +216,18 @@ describe("pollForKey", () => {
         expect(exitCodeFor(error)).toBe(EXIT.network);
     });
 
+    it("does not lengthen the poll interval for a 5xx, so a brief outage does not slow every later poll", async () => {
+        const { deps, log } = harness([
+            () => new Response("bad gateway", { status: 502 }),
+            () => new Response("bad gateway", { status: 503 }),
+            () => oauthError("authorization_pending"),
+            () => Response.json({ api_key: "nk_new" }),
+        ]);
+
+        expect(await pollForKey(deps, BASE, code())).toEqual({ apiKey: "nk_new", expiresAt: null });
+        expect(log.map((entry) => entry.sleptBefore)).toEqual([5000, 5000, 5000, 5000]);
+    });
+
     it("backs off on 429 and reports rate_limited (exit 5) when it persists", async () => {
         const { deps, log } = harness(Array.from({ length: 5 }, () => () => new Response("", { status: 429 })));
         const error = await pollForKey(deps, BASE, code()).catch((error_: unknown) => error_);
@@ -354,28 +366,63 @@ describe("neore login --device", () => {
         expect(wasAsked).toBe(false);
     });
 
-    it("keeps the key it was issued when the check afterwards fails", async () => {
-        const context = contextFor([
-            () => Response.json(CODE_RESPONSE),
-            () => Response.json({ api_key: "nk_device", expires_at: null }),
-            () => Response.json({ error: "unavailable" }, { status: 503 }),
-        ]);
-
-        expect(await run(["login", "--device", "--api-url", BASE, "--confirm-host", "api.test"], context)).not.toBe(EXIT.ok);
-        expect(await readConfig(context.configFile)).toEqual({ apiKey: "nk_device", apiUrl: BASE });
-    });
-
-    it("leaves the saved key alone when the new key cannot be checked", async () => {
+    it("revokes the key it was issued when the check afterwards fails, leaving a saved key alone", async () => {
+        const requested: { body: unknown; url: string }[] = [];
         const context = contextFor([
             () => Response.json(CODE_RESPONSE),
             () => Response.json({ api_key: "nk_new", expires_at: null }),
-            () => Response.json({ error: "unavailable" }, { status: 503 }),
+            () => Response.json({ error: { code: "unauthorized", message: "no" } }, { status: 401 }),
+            () => Response.json({ revoked: true }),
         ]);
+        const inner = context.fetch;
+
+        context.fetch = (async (url: string, init?: RequestInit) => {
+            requested.push({ body: init?.body ? JSON.parse(String(init.body)) : undefined, url });
+
+            return await inner(url, init);
+        }) as unknown as typeof fetch;
 
         await writeConfig({ apiKey: "nk_old", apiUrl: BASE }, context.configFile);
 
         expect(await run(["login", "--device", "--api-url", BASE, "--confirm-host", "api.test"], context)).not.toBe(EXIT.ok);
         expect(await readConfig(context.configFile)).toEqual({ apiKey: "nk_old", apiUrl: BASE });
+        expect(requested.at(-1)).toEqual({ body: { api_key: "nk_new" }, url: "https://api.test/api/auth/device/revoke" });
+        expect(context.io.stderr.text()).toContain("it was revoked");
+    });
+
+    it("revokes the issued key when it cannot be saved", async () => {
+        const requested: string[] = [];
+        const context = contextFor([
+            () => Response.json(CODE_RESPONSE),
+            () => Response.json({ api_key: "nk_new", expires_at: null }),
+            () => Response.json({ apiKeyId: "k2", scopes: [], userId: "u1" }),
+            () => Response.json({ revoked: true }),
+        ]);
+        const inner = context.fetch;
+
+        context.fetch = (async (url: string, init?: RequestInit) => {
+            requested.push(url);
+
+            return await inner(url, init);
+        }) as unknown as typeof fetch;
+        // The config folder can be read (nothing saved yet) but not written, so the save fails.
+        await mkdir(join(directory, "locked"));
+        await chmod(join(directory, "locked"), 0o500);
+        context.configFile = join(directory, "locked", "config.json");
+
+        expect(await run(["login", "--device", "--api-url", BASE, "--confirm-host", "api.test"], context)).not.toBe(EXIT.ok);
+        expect(requested.at(-1)).toBe("https://api.test/api/auth/device/revoke");
+    });
+
+    it("tells the person to revoke the key in Settings when it cannot be revoked from here", async () => {
+        const context = contextFor([
+            () => Response.json(CODE_RESPONSE),
+            () => Response.json({ api_key: "nk_new", expires_at: null }),
+            () => Response.json({ error: { code: "unauthorized", message: "no" } }, { status: 401 }),
+            () => Response.json({ error: "invalid_grant" }, { status: 400 }),
+        ]);
+
+        expect(await run(["login", "--device", "--api-url", BASE, "--confirm-host", "api.test"], context)).not.toBe(EXIT.ok);
         expect(context.io.stderr.text()).toContain("revoke it in Settings");
     });
 
@@ -400,11 +447,45 @@ describe("neore login --device", () => {
         expect(await run(["login", "--device", "--api-url", url], context)).toBe(EXIT.usage);
     });
 
-    it("accepts plain http for a server on this machine", async () => {
+    it("refuses plain http to localhost unless the development switch is set, and sends nothing", async () => {
+        const requested: string[] = [];
+        const context = contextFor([() => Response.json(CODE_RESPONSE)]);
+        const inner = context.fetch;
+
+        context.fetch = (async (url: string, init?: RequestInit) => {
+            requested.push(url);
+
+            return await inner(url, init);
+        }) as unknown as typeof fetch;
+
+        expect(await run(["login", "--device", "--api-url", "http://localhost:8788", "--confirm-host", "localhost:8788"], context)).toBe(EXIT.usage);
+        expect(requested).toEqual([]);
+    });
+
+    it("accepts plain http to localhost with the development switch", async () => {
         const context = contextFor([() => Response.json({ error: "x" }, { status: 500 })]);
 
+        context.io.env[DEV_INSECURE_LOOPBACK_VAR] = "1";
+
         expect(await run(["login", "--device", "--api-url", "http://localhost:8788", "--confirm-host", "localhost:8788"], context)).not.toBe(EXIT.usage);
-        expect(context.io.stderr.text()).not.toContain("https://");
+    });
+
+    it("refuses plain http to a foreign host even with the development switch", async () => {
+        const context = contextFor([]);
+
+        context.io.env[DEV_INSECURE_LOOPBACK_VAR] = "1";
+
+        // eslint-disable-next-line unicorn/prefer-https -- plain http is the case under test
+        expect(await run(["login", "--device", "--api-url", "http://api.example.com", "--confirm-host", "api.example.com"], context)).toBe(EXIT.usage);
+    });
+
+    it("validates the base URL before every request of the flow, not only at the command", async () => {
+        const { deps, log } = harness([() => Response.json(CODE_RESPONSE)]);
+
+        // eslint-disable-next-line unicorn/prefer-https -- plain http is the case under test
+        await expect(requestDeviceCode(deps, "http://api.example.com", "devbox")).rejects.toMatchObject({ name: "UsageError" });
+        await expect(pollForKey(deps, "ftp://api.example.com", code())).rejects.toMatchObject({ name: "UsageError" });
+        expect(log).toHaveLength(0);
     });
 
     describe("host confirmation", () => {

@@ -15,6 +15,7 @@
  * - `device_denied`, `device_expired`, `device_code_invalid` and `device_login_unsupported` exit 1 (sign-in failed)
  * - `rate_limited` exits 5, `network_error` and `service_unavailable` exit 6
  */
+import { UsageError } from "./args";
 import { ApiError, stripTrailingSlashes } from "./client";
 
 const CODE_PATH = "/api/auth/device/code";
@@ -38,6 +39,8 @@ const MIN_INTERVAL_MS = 1000;
 
 export interface DeviceFlowDependencies {
     fetch: typeof fetch;
+    /** The process environment; only `NEORE_HOST_DEV_INSECURE_LOOPBACK` is read, and only to allow http on a loopback host. */
+    io?: { env?: Record<string, string | undefined> };
     now: () => number;
     sleep: (ms: number) => Promise<void>;
 }
@@ -72,7 +75,37 @@ const readJson = async (response: Response): Promise<OAuthBody & Record<string, 
     }
 };
 
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "[::1]", "localhost"]);
+
+/** The same switch the paired-host pairing reads (`packages/device-core`): http to a loopback server, for local development only. */
+export const DEV_INSECURE_LOOPBACK_VAR = "NEORE_HOST_DEV_INSECURE_LOOPBACK";
+
+/**
+ * Device sign-in receives a fresh key (and sends a code) over this URL, so it is https only. Plain http is
+ * accepted for a loopback host when the development switch (`NEORE_HOST_DEV_INSECURE_LOOPBACK` set to 1) is on; any other scheme or host is a
+ * usage error and nothing is sent. Runs before every request of the flow, not only at the command.
+ */
+export const assertSecureBaseUrl = (baseUrl: string, env: Record<string, string | undefined> = {}): void => {
+    if (!URL.canParse(baseUrl)) {
+        throw new UsageError("An absolute API URL is required (--api-url).");
+    }
+
+    const { hostname, protocol } = new URL(baseUrl);
+
+    if (protocol === "https:") {
+        return;
+    }
+
+    if (protocol === "http:" && LOOPBACK_HOSTS.has(hostname) && env[DEV_INSECURE_LOOPBACK_VAR] === "1") {
+        return;
+    }
+
+    throw new UsageError(`--device needs an https:// API URL. http:// is accepted only for localhost, with ${DEV_INSECURE_LOOPBACK_VAR} set to 1.`);
+};
+
 const post = async (dependencies: DeviceFlowDependencies, baseUrl: string, path: string, body: unknown): Promise<Response> => {
+    assertSecureBaseUrl(baseUrl, dependencies.io?.env);
+
     try {
         return await dependencies.fetch(`${stripTrailingSlashes(baseUrl)}${path}`, {
             body: JSON.stringify(body),
@@ -248,7 +281,12 @@ export const pollForKey = async (dependencies: DeviceFlowDependencies, baseUrl: 
                 });
             }
 
-            intervalMs += SLOW_DOWN_STEP_MS;
+            // Only a 429 (the server saying "slower") lengthens the wait. A 5xx is an outage, and raising the
+            // interval for it would slow every later poll after the server is back.
+            if (response.status === 429) {
+                intervalMs += SLOW_DOWN_STEP_MS;
+            }
+
             continue;
         }
 
@@ -263,5 +301,23 @@ export const pollForKey = async (dependencies: DeviceFlowDependencies, baseUrl: 
         if (outcome === "slow_down") {
             intervalMs += SLOW_DOWN_STEP_MS;
         }
+    }
+};
+
+const REVOKE_PATH = "/api/auth/device/revoke";
+
+/**
+ * Best effort: ask the server to delete the key it just issued, for when this machine could not use it (the
+ * check or the save failed). Resolves false on any failure, so the caller can say to revoke it in Settings.
+ */
+export const revokeIssuedKey = async (dependencies: DeviceFlowDependencies, baseUrl: string, apiKey: string): Promise<boolean> => {
+    try {
+        const response = await post(dependencies, baseUrl, REVOKE_PATH, { api_key: apiKey });
+
+        await response.body?.cancel();
+
+        return response.ok;
+    } catch {
+        return false;
     }
 };

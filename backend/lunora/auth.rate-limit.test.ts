@@ -175,6 +175,7 @@ describe("CLI device sign-in rate limits", () => {
                     mintApiKey: async () => {
                         return { id: "k", key: "nk_x" };
                     },
+                    verifyApiKey: async () => null,
                 }),
             ],
             rateLimit: { customRules: AUTH_RATE_LIMIT_CUSTOM_RULES },
@@ -222,6 +223,45 @@ describe("CLI device sign-in rate limits", () => {
             result.push(response.status);
             await response.body?.cancel();
             vi.setSystemTime(Date.now() + 1000);
+        }
+
+        expect(result.filter((status) => status === 429)).toHaveLength(0);
+    }, 120_000);
+
+    it("cuts off a tight loop of invented codes, and lets the address poll again after a short pause", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-11-03T16:00:00Z"));
+
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const result = await statuses(auth, 130, () => poll(ip));
+
+        expect(result.slice(0, 120)).not.toContain(429);
+        expect(result.slice(120).every((status) => status === 429)).toBe(true);
+
+        // No lasting lockout: the count resets after a pause of 100 ms.
+        vi.setSystemTime(Date.now() + 150);
+
+        const after = await auth.handler(poll(ip));
+
+        expect(after.status).not.toBe(429);
+        await after.body?.cancel();
+    });
+
+    it("does not lock out ten people polling at an even half-second spacing from one address", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-11-03T17:00:00Z"));
+
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const result: number[] = [];
+
+        for (let index = 0; index < 400; index += 1) {
+            const response = await auth.handler(poll(ip));
+
+            result.push(response.status);
+            await response.body?.cancel();
+            vi.setSystemTime(Date.now() + 500);
         }
 
         expect(result.filter((status) => status === 429)).toHaveLength(0);
