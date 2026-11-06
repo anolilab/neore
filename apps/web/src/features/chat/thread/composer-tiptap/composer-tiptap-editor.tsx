@@ -40,7 +40,7 @@ import type { FileMentionMatch } from "./extensions/file-mention";
 import FileMention from "./extensions/file-mention";
 import GhostCompletion from "./extensions/ghost-completion";
 import PromptHistoryKeys from "./extensions/prompt-history-keys";
-import QuoteChip from "./extensions/quote-chip";
+import QuoteChip, { refreshQuoteChipLabels } from "./extensions/quote-chip";
 import type { SlashCommandMatch } from "./extensions/slash-command";
 import SlashCommand from "./extensions/slash-command";
 import SubmitOnEnter from "./extensions/submit-on-enter";
@@ -179,7 +179,7 @@ const ComposerTiptapEditor = ({
     suggestions = true,
     value,
 }: ComposerTiptapEditorProps & { ref?: React.RefObject<ComposerTiptapEditorRef | null> }) => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
     const placeholder = placeholderProp ?? t`Type your message...`;
     // Track whether the current text update originated from the editor
     // to avoid infinite sync loops
@@ -300,7 +300,9 @@ const ComposerTiptapEditor = ({
             }),
             BannedWordDecoration,
             QuoteChip.configure({
-                labels: { goToReply: t`Go to reply`, notOnScreen: t`The quoted reply is not on screen` },
+                labels: () => {
+                    return { goToReply: t`Go to reply`, notOnScreen: t`The quoted reply is not on screen` };
+                },
             }),
             // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             SlashCommand.configure({
@@ -421,6 +423,13 @@ const ComposerTiptapEditor = ({
             refreshVimMode(editor.view);
         }
     }, [isVimEnabled, editor]);
+
+    // A locale switch changes the labels of the quote chips already drawn; the editor itself is not recreated for it.
+    useEffect(() => {
+        if (editor && !editor.isDestroyed) {
+            refreshQuoteChipLabels(editor.view.dom);
+        }
+    }, [editor, i18n.locale]);
 
     // Update banned word decorations when matches change
     useEffect(() => {
