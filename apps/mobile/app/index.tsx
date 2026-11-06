@@ -1,9 +1,10 @@
 import { api } from "@neore/backend/api";
-import { Link } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { Link, useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, Pressable, Text } from "react-native";
 
 import { useAuth } from "@/auth/auth-state";
+import { lastChatToReopen } from "@/chat/last-thread-store";
 import { getClient } from "@/lib/lunora";
 import { isNetworkFailure } from "@/offline/connectivity";
 import { displayStatus } from "@/offline/labels";
@@ -17,6 +18,9 @@ import { useHostStatuses } from "@/offline/use-host-statuses";
 
 /** Threads per request. The list asks for the next page when its end comes into view. */
 const PAGE_SIZE = 100;
+
+/** Whether this launch has already had its chance to reopen the last chat, so going back to the list never does it again. */
+const launch = { hasReopened: false };
 
 const fetchThreadPage = async (cursor: string | null, startedAt: number): Promise<ThreadPage> => {
     const data = await getClient().query(api.chat.composite.getThreadListData, { paginationOpts: { cursor, numItems: PAGE_SIZE } });
@@ -66,7 +70,9 @@ const statusLine = (thread: ThreadRow, tracked: ShownStatus | undefined, isOffli
 };
 
 const ThreadList = () => {
-    const { hasToken, status } = useAuth();
+    const { hasToken, status, user } = useAuth();
+    const router = useRouter();
+    const userId = user?.id;
     const { cache, isOffline, refreshTick, reportRead } = useOffline();
     const startChat = useWriteControl("start");
     const statuses = useHostStatuses();
@@ -158,6 +164,30 @@ const ThreadList = () => {
             isCancelled = true;
         };
     }, [cache, hasToken, refreshTick, reportRead, status]);
+
+    // The list is in front on launch, so this is where the last chat reopens: once per launch, and only when a deep link
+    // did not open a chat instead (then the list is not focused).
+    useFocusEffect(
+        useCallback(() => {
+            if (status !== "signed-in" || !userId || launch.hasReopened) {
+                return undefined;
+            }
+
+            launch.hasReopened = true;
+
+            const reopen = async () => {
+                const threadId = await lastChatToReopen(userId);
+
+                if (threadId !== undefined) {
+                    router.push(`/chat/${threadId}`);
+                }
+            };
+
+            reopen();
+
+            return undefined;
+        }, [router, status, userId]),
+    );
 
     const loadMore = async () => {
         if (isDone || isLoadingMore) {

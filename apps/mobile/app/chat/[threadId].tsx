@@ -1,3 +1,4 @@
+import type { LegendListRef } from "@legendapp/list/react-native";
 import { LegendList } from "@legendapp/list/react-native";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
@@ -11,7 +12,9 @@ import { useAuth } from "@/auth/auth-state";
 import { fetchAccessToken } from "@/auth/grant";
 import { secureGrantStore } from "@/auth/secure-store";
 import { ChatError, startChat } from "@/chat/chat-api";
+import { forgetLastThread, rememberLastThread } from "@/chat/last-thread-store";
 import { displayTextOf, shareTextOf } from "@/chat/message-parts";
+import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import { relayReply } from "@/chat/stream";
 import { useReplyConfirmation } from "@/chat/use-reply-confirmation";
@@ -121,7 +124,7 @@ const fetchMessagePage = (threadId: string, cursor: string | null) =>
 const Chat = () => {
     const { threadId: routeThreadId } = useLocalSearchParams<{ threadId: string }>();
     const router = useRouter();
-    const { hasToken, status } = useAuth();
+    const { hasToken, status, user } = useAuth();
     const { cache, refreshTick, reportRead } = useOffline();
     const composer = useWriteControl("composer");
     const sendControl = useWriteControl("send");
@@ -149,6 +152,9 @@ const Chat = () => {
     const [draft, setDraft] = useState("");
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const listRef = useRef<LegendListRef>(null);
+    // Whether the list shows its last message: the jump button shows whenever it does not, and while a reply streams.
+    const [isAtEnd, setIsAtEnd] = useState(true);
     const insets = useSafeAreaInsets();
     const [keyboardShown, setKeyboardShown] = useState(false);
     // The header sits above this view, so the keyboard offset is the view's distance from the window top.
@@ -180,6 +186,8 @@ const Chat = () => {
         writeRows([]);
         setOlderCursor(null);
         setError(REFUSED_MESSAGE);
+        // A chat the server refuses is not reopened on launch.
+        settleQuietly(forgetLastThread());
     }, [writeRows]);
 
     // The newest pages load when a chat opens; "Load older messages" fetches the rest one page at a time.
@@ -340,6 +348,15 @@ const Chat = () => {
         return () => gate.invalidate();
     }, [threadId]);
 
+    // The chat on screen is the one a relaunch reopens, for the account that viewed it.
+    const accountId = user?.id;
+
+    useEffect(() => {
+        if (status === "signed-in" && accountId && threadId) {
+            settleQuietly(rememberLastThread({ threadId, userId: accountId }));
+        }
+    }, [status, threadId, accountId]);
+
     // The reply checks run in a hook; the screen decides what a refusal or a settled check means for the chat.
     const onConfirmationRefused = useCallback(
         (refusedThreadId: string) => {
@@ -492,6 +509,12 @@ const Chat = () => {
         }
     };
 
+    const onListScroll = (event: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }) => {
+        const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+
+        setIsAtEnd(isScrolledToEnd({ contentHeight: contentSize.height, layoutHeight: layoutMeasurement.height, offsetY: contentOffset.y }));
+    };
+
     const olderHeader
         = olderCursor === null
             ? undefined
@@ -533,33 +556,69 @@ const Chat = () => {
         <View onLayout={measureTopOffset} ref={rootRef} style={{ flex: 1 }}>
             <OfflineBanner syncedAt={syncedAt} />
             <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={topOffset} style={{ flex: 1 }}>
-                <LegendList
-                    data={rows}
-                    estimatedItemSize={72}
-                    keyExtractor={(row) => row.id}
-                    ListHeaderComponent={olderHeader}
-                    renderItem={({ item }) => {
-                        // Only a finished message can be shared: one still streaming, or one that failed, is not the whole text.
-                        const isFinished = item.status === "success" || item.finished === true;
-                        const shareText = isFinished ? shareableMessageText({ text: item.shareText }) : undefined;
+                <View style={{ flex: 1 }}>
+                    <LegendList
+                        data={rows}
+                        estimatedItemSize={72}
+                        keyExtractor={(row) => row.id}
+                        ListHeaderComponent={olderHeader}
+                        onScroll={onListScroll}
+                        ref={listRef}
+                        renderItem={({ item }) => {
+                            // Only a finished message can be shared: one still streaming, or one that failed, is not the whole text.
+                            const isFinished = item.status === "success" || item.finished === true;
+                            const shareText = isFinished ? shareableMessageText({ text: item.shareText }) : undefined;
 
-                        return (
-                            <View style={{ alignSelf: item.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", padding: 12 }}>
-                                <Text selectable>{item.text || (item.role === "assistant" ? "..." : "")}</Text>
-                                {shareText !== undefined && (
-                                    <Pressable
-                                        accessibilityLabel={shareLabel({ role: item.role, text: shareText })}
-                                        accessibilityRole="button"
-                                        onPress={() => shareRow(shareText)}
-                                        style={{ alignItems: "center", alignSelf: "flex-start", justifyContent: "center", minHeight: 44, minWidth: 44, paddingHorizontal: 12 }}
-                                    >
-                                        <Text style={{ fontSize: 12 }}>Share</Text>
-                                    </Pressable>
-                                )}
-                            </View>
-                        );
-                    }}
-                />
+                            return (
+                                <View style={{ alignSelf: item.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", padding: 12 }}>
+                                    <Text selectable>{item.text || (item.role === "assistant" ? "..." : "")}</Text>
+                                    {shareText !== undefined && (
+                                        <Pressable
+                                            accessibilityLabel={shareLabel({ role: item.role, text: shareText })}
+                                            accessibilityRole="button"
+                                            onPress={() => shareRow(shareText)}
+                                            style={{
+                                                alignItems: "center",
+                                                alignSelf: "flex-start",
+                                                justifyContent: "center",
+                                                minHeight: 44,
+                                                minWidth: 44,
+                                                paddingHorizontal: 12,
+                                            }}
+                                        >
+                                            <Text style={{ fontSize: 12 }}>Share</Text>
+                                        </Pressable>
+                                    )}
+                                </View>
+                            );
+                        }}
+                    />
+                    {shouldShowScrollToLatest({ isScrolledToEnd: isAtEnd, isStreaming: sending })
+                        ? (
+                        <Pressable
+                            accessibilityLabel={scrollToLatestLabel(sending)}
+                            accessibilityRole="button"
+                            onPress={() => settleQuietly(listRef.current?.scrollToEnd({ animated: true }))}
+                            style={{
+                                alignItems: "center",
+                                alignSelf: "center",
+                                backgroundColor: "#fff",
+                                borderColor: "#ccc",
+                                borderRadius: 22,
+                                borderWidth: 1,
+                                bottom: 12,
+                                justifyContent: "center",
+                                minHeight: 44,
+                                minWidth: 44,
+                                paddingHorizontal: 16,
+                                position: "absolute",
+                            }}
+                        >
+                            <Text style={{ fontWeight: "600" }}>{scrollToLatestText(sending)}</Text>
+                        </Pressable>
+                        )
+                        : null}
+                </View>
                 {error
                     ? (
                     <Text accessibilityRole="alert" style={{ color: "#b00020", padding: 12 }}>
@@ -590,11 +649,7 @@ const Chat = () => {
                         <Text style={{ fontWeight: "600" }}>Send</Text>
                     </Pressable>
                 </View>
-                {sendReason
-                    ? (
-                    <Text style={{ fontSize: 12, paddingBottom: 8 + safeBottom, paddingHorizontal: 12 }}>{sendReason}</Text>
-                    )
-                    : null}
+                {sendReason ? <Text style={{ fontSize: 12, paddingBottom: 8 + safeBottom, paddingHorizontal: 12 }}>{sendReason}</Text> : null}
             </KeyboardAvoidingView>
         </View>
     );
