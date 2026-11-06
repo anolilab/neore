@@ -8,7 +8,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 
-import { BRANCH_ROOT } from "../agent/branch-tree";
+import { TITLE_CHARGE_SCOPE, TITLE_READ_WINDOW } from "../agent/thread-title";
+import { claimFence } from "../lib/claim-once";
 import { MAX_LENGTH } from "../lib/validators";
 import schema from "../schema";
 import {
@@ -16,19 +17,14 @@ import {
     continueThread,
     generateSummary,
     getFollowupSuggestions,
-    admitTitleCharge,
     autoTitleChargeKey,
-    promptById,
-    promptGone,
+    firstResultOf,
     refusedBeforeDispatch,
     releaseTitleCharge,
     giveBackTitleCharge,
     releaseRegenerateClaim,
-    settleTitleWrite,
     titleModelPrompt,
     regenerateThreadTitle,
-    titleIneligibility,
-    throwAfterCleanup,
     titleUsageEvent,
     tryTimes,
 } from "./functions";
@@ -82,6 +78,7 @@ beforeAll(async () => {
     registerModule(registry, "lib_claim_once", await import("../lib/claim-once"));
     registerModule(registry, "agent_branches", await import("../agent/branches"));
     registerModule(registry, "agent_messages", await import("../agent/messages"));
+    registerModule(registry, "agent_thread_title", await import("../agent/thread-title"));
 }, 30_000);
 
 beforeEach(async () => {
@@ -164,216 +161,75 @@ describe("the last check before a background model call", () => {
     });
 });
 
-describe("the prompt a title is written from, and the charge for it", () => {
-    const insertCloud = async () =>
-        (await harness.run(
-            async (context: any) => await context.db.insert("threads", { model: "gpt-4o", status: "active", title: "Cloud", userId: OWNER }),
-        )) as string;
+describe("the charge for a title's model call", () => {
+    /** Takes a title charge the way `admitTitleRun` does once its checks pass. */
+    const charge = async (key: string) =>
+        (await harness.run(async (context: any) => await claimFence(context, TITLE_CHARGE_SCOPE, key, { ttlMs: 60_000, userId: OWNER }))) as number | null;
 
-    it("re-reads the prompt the request found by its id, and gives none for a row that is not a successful user prompt", async () => {
-        const cloud = await insertCloud();
-        const prompt = await appendMessage(cloud, undefined, { message: { content: "Plan a trip", role: "user" } });
-        const reply = await appendMessage(cloud, prompt, { message: { content: "Sure", role: "assistant" } });
-
-        await expect(harness.run(async (context: any) => await promptById(context, cloud, prompt))).resolves.toEqual({ id: prompt, text: "Plan a trip" });
-        await expect(harness.run(async (context: any) => await promptById(context, cloud, reply))).resolves.toBeUndefined();
-    });
-
-    it("treats a prompt that was deleted as gone, and a prompt still in the thread as present", async () => {
-        const cloud = await insertCloud();
-        const prompt = await appendMessage(cloud, undefined, { message: { content: "Plan a trip", role: "user" } });
-
-        await expect(harness.run(async (context: any) => await promptGone(context, cloud, prompt))).resolves.toBe(false);
-
-        await harness.run(async (context: any) => await context.db.delete("messages", prompt));
-
-        await expect(harness.run(async (context: any) => await promptGone(context, cloud, prompt))).resolves.toBe(true);
-        await expect(harness.run(async (context: any) => await promptById(context, cloud, prompt))).resolves.toBeUndefined();
-    });
-
-    it("admits a title's model call once per key, so a retried run that reaches the call again is refused", async () => {
-        const key = "thread-x:run-1";
-
-        await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toEqual(expect.any(Number));
-        await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toBeNull();
-    });
-
-    it("gives each automatic title job its own charge, so a later message on the thread can still title it", async () => {
-        const first = await harness.run(async (context: any) => await admitTitleCharge(context, autoTitleChargeKey("thread-z", "job-a"), OWNER));
-        const second = await harness.run(async (context: any) => await admitTitleCharge(context, autoTitleChargeKey("thread-z", "job-b"), OWNER));
-
-        expect(first).toEqual(expect.any(Number));
-        expect(second).toEqual(expect.any(Number));
-
-        // A retry of the same job carries the same id, and is refused.
-        await expect(harness.run(async (context: any) => await admitTitleCharge(context, autoTitleChargeKey("thread-z", "job-a"), OWNER))).resolves.toBeNull();
+    it("gives each automatic title job its own key, and a retry of a job the same one", () => {
+        expect(autoTitleChargeKey("thread-z", "job-a")).not.toBe(autoTitleChargeKey("thread-z", "job-b"));
+        expect(autoTitleChargeKey("thread-z", "job-a")).toBe(autoTitleChargeKey("thread-z", "job-a"));
     });
 
     it("gives a charge back when its call threw before answering, so a retry may ask, and a stale give-back takes nothing", async () => {
-        // Fake time, so the admissions below cannot share a timestamp and the fence means what it says.
+        // Fake time, so the charges below cannot share a timestamp and the fence means what it says.
         vi.useFakeTimers({ now: 1_800_000_000_000, toFake: ["Date"] });
 
         try {
             const key = "thread-y:run-2";
-            const first = (await harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))) as number;
+            const first = (await charge(key)) as number;
 
             vi.setSystemTime(1_800_000_001_000);
             await harness.run(async (context: any) => await releaseTitleCharge(context, key, first));
 
             vi.setSystemTime(1_800_000_002_000);
-            const retried = (await harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))) as number;
+            const retried = (await charge(key)) as number;
 
             expect(retried).toBeGreaterThan(first);
 
-            // The first call's fence is stale: giving it back again does not drop the retried run's claim.
+            // The first call's fence is stale: giving it back again does not drop the retried run's charge.
             await harness.run(async (context: any) => await releaseTitleCharge(context, key, first));
-            await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toBeNull();
+            await expect(charge(key)).resolves.toBeNull();
         } finally {
             vi.useRealTimers();
         }
     });
-
-    it("refuses a chat whose path is past the limit with a visible conflict, before it claims the regenerate", async () => {
-        const cloud = await insertCloud();
-        let parent = await appendMessage(cloud, undefined, { message: { content: "Plan a trip", role: "user" } });
-
-        for (let index = 0; index < 1000; index += 1) {
-            parent = await appendMessage(cloud, parent, { message: { content: `Reply ${index}`, role: "assistant" } });
-        }
-
-        await harness.run(async (context: any) => await context.db.patch("threads", cloud, { activeLeafMessageId: parent }));
-
-        await expect(harness.withIdentity({ userId: OWNER }).action(regenerateThreadTitle as never, { threadId: cloud } as never)).rejects.toMatchObject({
-            message: expect.stringContaining("too long"),
-        });
-        const claims = (await harness.run(async (context: any) => await context.db.query("idempotencyClaims").collect())) as {
-            key: string;
-            scope: string;
-        }[];
-
-        expect(claims.some((claim) => claim.scope === "regenerate-title" && claim.key === cloud)).toBe(false);
-    }, 60_000);
 });
 
-describe("a charged title run whose write does not land", () => {
-    it("gives its charge back when the write is refused, so the charge never stays with no title", async () => {
-        const key = "thread-w:run-refused";
-        const claimedAt = (await harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))) as number;
-
-        await expect(
-            settleTitleWrite(
-                async () => false,
-                async () => await harness.run(async (context: any) => await releaseTitleCharge(context, key, claimedAt)),
-            ),
-        ).resolves.toBe(false);
-
-        // The charge is free again: the run's retry (or a later one) may ask, and it is not refused as already charged.
-        await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toEqual(expect.any(Number));
-    });
-
-    it("gives its charge back when the write throws, and reports the write's error", async () => {
-        const key = "thread-w:run-thrown";
-        const claimedAt = (await harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))) as number;
-        const writeError = new Error("transient storage failure");
-
-        await expect(
-            settleTitleWrite(
-                async () => {
-                    throw writeError;
-                },
-                async () => await harness.run(async (context: any) => await releaseTitleCharge(context, key, claimedAt)),
-            ),
-        ).rejects.toBe(writeError);
-        await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toEqual(expect.any(Number));
-    });
-
-    it("retries a transient failure of the post-answer check and write while holding the charge, and lands the title", async () => {
+describe("writing a title after its model answered", () => {
+    it("retries a transient write failure and answers the write's result", async () => {
         let tries = 0;
-        let gaveBack = false;
 
         await expect(
-            settleTitleWrite(
-                async () => {
-                    tries += 1;
+            firstResultOf(3, async () => {
+                tries += 1;
 
-                    if (tries < 3) {
-                        throw new Error("transient");
-                    }
+                if (tries < 3) {
+                    throw new Error("transient");
+                }
 
-                    return true;
-                },
-                async () => {
-                    gaveBack = true;
-                },
-            ),
+                return true;
+            }),
         ).resolves.toBe(true);
         expect(tries).toBe(3);
-        expect(gaveBack).toBe(false);
     });
 
-    it("gives the charge back only after every try has failed, and reports the last error", async () => {
+    it("throws the last error once every try failed, so the run's retry resumes from the recorded answer", async () => {
         let tries = 0;
-        let gaveBack = 0;
         const lastError = new Error("storage down");
 
         await expect(
-            settleTitleWrite(
-                async () => {
-                    tries += 1;
+            firstResultOf(3, async () => {
+                tries += 1;
 
-                    throw tries === 3 ? lastError : new Error("transient");
-                },
-                async () => {
-                    gaveBack += 1;
-                },
-            ),
+                throw tries === 3 ? lastError : new Error("transient");
+            }),
         ).rejects.toBe(lastError);
         expect(tries).toBe(3);
-        expect(gaveBack).toBe(1);
-    });
-
-    it("reports a landed write as saved even when giving back its charge would fail", async () => {
-        await expect(
-            settleTitleWrite(
-                async () => true,
-                async () => {
-                    throw new Error("release failed");
-                },
-            ),
-        ).resolves.toBe(true);
-    });
-
-    it("keeps its charge when the title is written, so a retry after the write is refused", async () => {
-        const key = "thread-w:run-written";
-
-        await harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER));
-        let gaveBack = false;
-
-        await expect(
-            settleTitleWrite(
-                async () => true,
-                async () => {
-                    gaveBack = true;
-                },
-            ),
-        ).resolves.toBe(true);
-        expect(gaveBack).toBe(false);
-        await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toBeNull();
     });
 });
 
-describe("the error a title run reports, and the retries of its give-back", () => {
-    it("reports the model's error when the give-back after it fails too", async () => {
-        const modelError = new Error("gateway answered 503");
-
-        await expect(
-            throwAfterCleanup(async () => {
-                throw new Error("release failed");
-            }, modelError),
-        ).rejects.toBe(modelError);
-        await expect(throwAfterCleanup(async () => undefined, modelError)).rejects.toBe(modelError);
-    });
-
+describe("the retries of a release", () => {
     it("retries a release up to the limit, and says whether it landed", async () => {
         let transient = 0;
 
@@ -554,29 +410,22 @@ describe("regenerating the title of a cloud thread", () => {
         });
     });
 
-    it("keeps a title while its prompt is still on the active path, and drops it once the prompt is on another branch", async () => {
+    it("accepts a branched chat longer than the read window, titled from its recent prompt", async () => {
         const cloud = await insertThread({});
-        const prompt = await appendMessage(cloud, undefined, { message: { content: "Plan a trip", role: "user" } });
+        let parent = await appendMessage(cloud, undefined, { message: { content: "An old subject", role: "user" } });
 
-        await appendMessage(cloud, prompt, { message: { content: "Sure", role: "assistant" } });
+        for (let index = 0; index < TITLE_READ_WINDOW + 20; index += 1) {
+            parent = await appendMessage(cloud, parent, { message: { content: `Reply ${index}`, role: "assistant" } });
+        }
 
-        // A later reply regenerated: the leaf moved to a sibling reply, but the prompt is still on the path.
-        const regenerated = await appendMessage(cloud, prompt, { message: { content: "Certainly", role: "assistant" } });
+        const recent = await appendMessage(cloud, parent, { message: { content: "The subject now", role: "user" } });
 
-        await harness.run(async (context: any) => await context.db.patch("threads", cloud, { activeLeafMessageId: regenerated }));
-        await expect(harness.run(async (context: any) => await titleIneligibility(context, { expectedPromptId: prompt, threadId: cloud }))).resolves.toBe(
-            undefined,
-        );
+        await harness.run(async (context: any) => await context.db.patch("threads", cloud, { activeLeafMessageId: recent }));
 
-        // The first prompt was edited: the edit is another root, so the original prompt is on no path now.
-        // The edit is a root of its own: marked BRANCH_ROOT, so it does not adopt the row before it in storage order.
-        const edited = await appendMessage(cloud, BRANCH_ROOT, { message: { content: "Plan a trip to Porto", role: "user" } });
-
-        await harness.run(async (context: any) => await context.db.patch("threads", cloud, { activeLeafMessageId: edited }));
-        await expect(harness.run(async (context: any) => await titleIneligibility(context, { expectedPromptId: prompt, threadId: cloud }))).resolves.toBe(
-            "branch-switched",
-        );
-    });
+        await expect(harness.withIdentity({ userId: OWNER }).action(regenerateThreadTitle as never, { threadId: cloud } as never)).resolves.toEqual({
+            success: true,
+        });
+    }, 60_000);
 
     it("records a title call's tokens and model whether or not the title was written", () => {
         expect(titleUsageEvent("model-a", { inputTokens: 5, outputTokens: 2 })).toStrictEqual({ inputTokens: 5, model: "model-a", outputTokens: 2 });
@@ -586,6 +435,8 @@ describe("regenerating the title of a cloud thread", () => {
             outputTokens: 2,
             skipped: "changed-before-write",
         });
+        // A run that wrote an earlier try's recorded answer made no call: it carries no tokens, and says it resumed.
+        expect(titleUsageEvent("model-a", undefined)).toStrictEqual({ inputTokens: undefined, model: "model-a", outputTokens: undefined, resumed: true });
     });
 
     it("titles from the path the thread shows when a writer left the stored leaf behind new rows", async () => {

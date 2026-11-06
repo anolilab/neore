@@ -29,7 +29,7 @@
  * | `thread-cut`        | `<threadId>:<covered row id>` | 30 min | `agent/thread-summaries.ts` (idle summary) and `agent/thread-compaction.ts` (compaction): one scope, so a cut is paid for once |
  * | `thread-fold`       | `<threadId>`             | 3 min, released when the call ends | `agent/thread-summaries.ts` (`claimCut`): one paid summarising call in flight per thread, so two runs planning different cuts of the same rows do not both pay |
  * | `regenerate-title`  | `<threadId>`             | 5 min (released when the job ends) | `chat/functions.ts` (`regenerateThreadTitle`: one regenerate in flight per thread) |
- * | `title-charge`      | `<threadId>:<claimedAt>` (a regenerate run); `<threadId>:auto-title:<jobId>` (an automatic title job, `autoTitleChargeKey`; `<threadId>:auto-title` for a job queued without an id) | 24 h, given back when the run's write does not land | `chat/functions.ts` (`admitTitleCharge`, `settleTitleWrite`: one model call per title run) |
+ * | `title-charge`      | `<threadId>:<claimedAt>` (a regenerate run); `<threadId>:auto-title:<jobId>` (an automatic title job, `autoTitleChargeKey`; `<threadId>:auto-title` for a job queued without an id) | 24 h; given back only when the model call threw; holds the model's answer (`result`) so a retry writes it without a second call | `agent/thread-title.ts` (`admitTitleRun`, `recordTitleAnswer`: one model call per title run) |
  * | `organization-policy-create` | `<organizationId>` | {@link ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS} | `auth/organization-policy.ts` (`setOrganizationPolicy`: one writer creates an organization's first policy row) |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
@@ -223,6 +223,29 @@ export const claimedAtOf = async (ctx: Pick<QueryCtx, "db">, scope: string, key:
     const existing = await findClaim(ctx, scope, key);
 
     return existing !== null && existing.expiresAt > Date.now() ? existing.claimedAt : null;
+};
+
+/** The unexpired claim for `(scope, key)`, or `null`: for a caller that reads what the claim's holder recorded on it (`result`). */
+export const claimRow = async (ctx: Pick<QueryCtx, "db">, scope: string, key: string) => {
+    const existing = await findClaim(ctx, scope, key);
+
+    return existing !== null && existing.expiresAt > Date.now() ? existing : null;
+};
+
+/**
+ * Records what the work a claim guards produced (`result`), on the claim `claimedAt` only, so a retry of that work can pick it up instead
+ * of doing it again. `false` when that claim no longer holds the key.
+ */
+export const recordClaimResult = async (ctx: ClaimCtx, scope: string, key: string, claimedAt: number, result: string): Promise<boolean> => {
+    const existing = await claimRow(ctx, scope, key);
+
+    if (existing?.claimedAt !== claimedAt) {
+        return false;
+    }
+
+    await patchRow(ctx.db, "idempotencyClaims", existing, { result });
+
+    return true;
 };
 
 /** `true` for the first claim of `(scope, key)` within `ttlMs`, `false` for every later one. */

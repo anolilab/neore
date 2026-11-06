@@ -13,7 +13,7 @@ const READ_LIMIT = MAX_PROMPT_CHARS * 4;
 /** The first character that is not whitespace. */
 const NON_SPACE = /\S/u;
 
-interface ContextRow {
+export interface ContextRow {
     _id?: string;
     message?: { content: unknown; role: string };
 }

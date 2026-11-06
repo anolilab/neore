@@ -163,59 +163,6 @@ export const withBranchInfo = <M extends { branch?: MessageBranch; id: string }>
     return messages;
 };
 
-/** The longest active path a title is read along: a longer one is not titled (`"too-long"`). */
-export const TITLE_PATH_LIMIT = 1000;
-
-/**
- * The ids on the active path that ends at `leafMessageId`, root first: `null` when the thread has no rows, `"too-long"` past the
- * title limit. A stored leaf whose row is gone reads the thread's own active path, as the thread view shows it (`resolveLeafRow`).
- * Plain, so a write can check the path inside its own transaction.
- */
-export const activePathIdsOf = async (
-    context: Pick<QueryContext, "db">,
-    threadId: Id<"threads">,
-    leafMessageId: Id<"messages">,
-): Promise<string[] | null | "too-long"> => {
-    // The path the thread view shows: `resolveLeafRow` descends from the stored leaf to its latest child, and falls back to the thread's
-    // own active path when the stored row is gone. Walking up from the stored leaf alone would read a shortened path when a writer
-    // left the stored leaf behind new rows, so the title would come from a path that is not on screen.
-    const leaf = await resolveLeafRow(context, threadId, leafMessageId);
-
-    if (!leaf) {
-        return null;
-    }
-
-    const { rows } = await walkPath(context, threadId, leaf, { limit: TITLE_PATH_LIMIT + 1 });
-
-    if (rows.length > TITLE_PATH_LIMIT) {
-        return "too-long";
-    }
-
-    return rows.toReversed().map((row) => row._id as string);
-};
-
-/**
- * Whether the active path that ends at `leafMessageId` runs through `ancestorId`. The walk stops at `ancestorId`, so a leaf that
- * extends the one a title was read from costs only the rows between the two, not the whole path. `false` when the walk runs out
- * first (the leaf is on another branch); the caller then checks the whole path, within the same bound.
- */
-export const pathReachesLeaf = async (context: Pick<QueryContext, "db">, threadId: Id<"threads">, leafMessageId: string, ancestorId: string) => {
-    const leaf = await context.db.get("messages", leafMessageId as Id<"messages">);
-
-    if (!leaf || leaf.threadId !== threadId) {
-        return false;
-    }
-
-    const { next } = await walkPath(context, threadId, leaf, { limit: TITLE_PATH_LIMIT + 1, stopAtId: ancestorId });
-
-    return next?._id === ancestorId;
-};
-
-export const getActivePathIds = internalQuery
-    .input({ leafMessageId: v.id("messages"), threadId: v.id("threads") })
-    .output(v.union(v.null(), v.array(v.string()), v.literal("too-long")))
-    .query(async ({ args, ctx }) => await activePathIdsOf(ctx, args.threadId, args.leafMessageId));
-
 /**
  * The ids an agent may read as history for `promptMessageId`, or `null` for an
  * unbranched thread, where every row already is history.

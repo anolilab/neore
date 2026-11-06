@@ -48,7 +48,8 @@ import type { MessageDoc, ThreadDoc } from "../agent/validators";
 import type { UIMessage } from "../agent/ui-messages";
 import { docsToModelMessages, listMessagesByThreadIdHandler, storeFile, toUIMessages } from "../agent/client";
 import { autoRepairJsonMiddleware } from "../agent/client/middleware";
-import { listActivePathPage, TITLE_PATH_LIMIT, withBranchInfo } from "../agent/branches";
+import { listActivePathPage, withBranchInfo } from "../agent/branches";
+import { TITLE_CHARGE_SCOPE } from "../agent/thread-title";
 import { candidatesOnActivePath } from "../agent/branch-rows";
 import {
     redactThreadForPublicViewer,
@@ -89,7 +90,7 @@ import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
 import getAgent from "./lib/get-agent";
 import { holdTtlFrom } from "../lib/claim-once";
 import { sha256Hex } from "../lib/crypto";
-import { capTitlePrompt, firstUserPrompt } from "./lib/first-user-prompt";
+import { capTitlePrompt } from "./lib/first-user-prompt";
 import { getMessageFileIds, loadNsfwStatuses, redactUIMessagesForPublicViewer } from "./lib/public-thread";
 import { buildReasoningProviderOptions } from "./lib/reasoning-options";
 import {
@@ -1582,77 +1583,6 @@ export const convertTemporaryToPermanent = authMutation
     });
 
 /**
- * Whether the prompt a title was read from is still on the thread's active path. Regenerating a later reply or editing a later
- * prompt moves the leaf, but the prompt stays on the path; editing the first prompt takes it onto another branch, which is what
- * this refuses. An unbranched thread has no leaf, so its rows are its path.
- */
-const promptStillOnActivePath = async (context: ActionContext, threadId: string, currentLeaf: string | undefined, promptId: string): Promise<boolean> => {
-    if (currentLeaf === undefined) {
-        return true;
-    }
-
-    const ids = await context.runQuery(internal.agent.branches.getActivePathIds, {
-        leafMessageId: currentLeaf as Id<"messages">,
-        threadId: threadId as Id<"threads">,
-    });
-
-    return Array.isArray(ids) && ids.includes(promptId);
-};
-
-/**
- * Why a background title may not be generated or written for this thread now, or undefined when it may: the thread is
- * gone, locked, deleted or host-run; it was renamed or moved to another branch since the regenerate was asked; or the
- * requester no longer has admin access. Checked before the model sees the prompt and again before the title is written.
- */
-export const titleIneligibility = async (
-    context: ActionContext,
-    arguments_: { expectedPromptId?: string; expectedTitleDigest?: string; requestedBy?: string; threadId: string },
-): Promise<string | undefined> => {
-    const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: arguments_.threadId as Id<"threads"> });
-
-    if (!thread || isThreadLocked(thread) || thread.runner === "host" || thread.deletedAt !== undefined) {
-        return "ineligible";
-    }
-
-    if (arguments_.expectedTitleDigest !== undefined && (await sha256Hex(thread.title ?? "")) !== arguments_.expectedTitleDigest) {
-        return "renamed-meanwhile";
-    }
-
-    if (
-        arguments_.expectedPromptId !== undefined &&
-        !(await promptStillOnActivePath(context, arguments_.threadId, thread.activeLeafMessageId, arguments_.expectedPromptId))
-    ) {
-        return "branch-switched";
-    }
-
-    if (arguments_.requestedBy !== undefined) {
-        const access = await context.runQuery(internal.chat.functions.gateThreadAction, {
-            level: "admin",
-            threadId: arguments_.threadId as Id<"threads">,
-            userId: arguments_.requestedBy,
-        });
-
-        if (access.outcome !== "ok") {
-            return "access-withdrawn";
-        }
-    }
-
-    return undefined;
-};
-
-/** One admission per title run for billing (`idempotencyClaims`): a retried run is refused here, so its model call is not billed twice. */
-const TITLE_CHARGE_SCOPE = "title-charge";
-const TITLE_CHARGE_TTL_MS = 24 * 60 * 60 * 1000;
-
-/**
- * Admits one title model call for `chargeKey`: the claim's `claimedAt` the first time, `null` for every later admission of the same
- * key within the TTL. The claim is kept once the model has answered: a retried run that reaches this again is refused, so its model
- * call is not billed twice. It is given back only when the call threw before answering (`releaseTitleCharge`).
- */
-export const admitTitleCharge = async (context: Pick<ActionContext, "runMutation">, chargeKey: string, userId: string | undefined): Promise<number | null> =>
-    await context.runMutation(internal.lib.claim_once.claimKeyFenced, { key: chargeKey, scope: TITLE_CHARGE_SCOPE, ttlMs: TITLE_CHARGE_TTL_MS, userId });
-
-/**
  * The model prompt for a title: the instructions and the prompt, the prompt capped at the title's own limit before it is sent, so a
  * long prompt is not sent to the model in full.
  */
@@ -1660,8 +1590,8 @@ export const titleModelPrompt = (threadTitlePrompt: string, prompt: string): str
     `${threadTitlePrompt}\nHere is the user's prompt:\n"${capTitlePrompt(prompt)}"\nGenerate a title that accurately represents what this conversation is about based on the prompt provided.`;
 
 /**
- * Gives a charge back, retrying a failed release a few times. A release that still fails is logged, and never thrown: the caller's
- * own error is the one that gets reported, and the log says the charge was not given back.
+ * Gives a charge back after its model call threw before answering, so a retry of the run may ask again. Retried a few times; a release
+ * that still fails is logged, never thrown: the model's error is the one that gets reported.
  */
 export const giveBackTitleCharge = async (context: Pick<ActionContext, "log" | "runMutation">, chargeKey: string, claimedAt: number): Promise<void> => {
     if (!(await tryTimes(3, () => releaseTitleCharge(context, chargeKey, claimedAt)))) {
@@ -1669,54 +1599,9 @@ export const giveBackTitleCharge = async (context: Pick<ActionContext, "log" | "
     }
 };
 
-/** Gives a charge back when its call threw before answering, so a later run for the same key may ask again. Fenced by `claimedAt`. */
+/** Gives a charge back, fenced by `claimedAt`: a stale give-back cannot drop a newer run's charge. */
 export const releaseTitleCharge = async (context: Pick<ActionContext, "runMutation">, chargeKey: string, claimedAt: number): Promise<void> => {
     await context.runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: chargeKey, scope: TITLE_CHARGE_SCOPE });
-};
-
-/**
- * Runs `cleanup`, then throws `error`. A failing cleanup is not the one reported: the error that made the cleanup necessary is what
- * the caller and the scheduler see, so a release that fails cannot hide a model failure.
- */
-export const throwAfterCleanup = async (cleanup: () => Promise<unknown>, error: unknown): Promise<never> => {
-    try {
-        await cleanup();
-    } catch {
-        // The cleanup's own failure is logged by nothing here on purpose: the original error is the one that matters.
-    }
-
-    throw error;
-};
-
-/**
- * Runs a title's write after its model answer. A write that is refused, or that throws, gives the run's charge back (`giveBack`), so a
- * billed run never keeps its charge with no title. A thrown write's error is the one reported. Answers whether the title was written.
- */
-export const settleTitleWrite = async (
-    write: () => Promise<boolean>,
-    giveBack: () => Promise<void>,
-    attempts: number = TITLE_WRITE_ATTEMPTS,
-): Promise<boolean> => {
-    let lastError: unknown;
-
-    for (let attempt = 0; attempt < attempts; attempt += 1) {
-        try {
-            const written = await write();
-
-            // A refusal is a decision, not a transient failure: it is not retried, and its charge is given back.
-            if (!written) {
-                await giveBack();
-            }
-
-            return written;
-        } catch (error) {
-            // A transient failure (the eligibility read or the write) is tried again while the charge is still held, so the answer is
-            // not billed a second time: the charge is given back only once every try has failed.
-            lastError = error;
-        }
-    }
-
-    return await throwAfterCleanup(giveBack, lastError);
 };
 
 /**
@@ -1748,7 +1633,7 @@ export const releaseRegenerateClaim = async (
 /** How long after a failed release the release runs again, as a scheduled job: far sooner than the claim's TTL. */
 const REGENERATE_RELEASE_RETRY_MS = 30 * 1000;
 
-/** How many times a title's post-answer eligibility read and write are tried before its charge is given back. */
+/** How many times a title's write, and the recording of its answer, are tried within one run. */
 const TITLE_WRITE_ATTEMPTS = 3;
 
 /** Tries `attempt` up to `times` times, stopping at the first success. `false` when every try failed. */
@@ -1759,26 +1644,42 @@ export const tryTimes = async (times: number, attempt: () => Promise<unknown>): 
 
             return true;
         } catch {
-            // Try again: a release is a single small write, and a transient failure of one is usually gone on the next.
+            // Try again: a release or a record is a single small write, and a transient failure of one is usually gone on the next.
         }
     }
 
     return false;
 };
 
+/** Runs `attempt` up to `times` times and answers its first result; when every try threw, the last error is thrown. */
+export const firstResultOf = async <T>(times: number, attempt: () => Promise<T>): Promise<T> => {
+    let lastError: unknown;
+
+    for (let index = 0; index < times; index += 1) {
+        try {
+            return await attempt();
+        } catch (error) {
+            lastError = error;
+        }
+    }
+
+    throw lastError;
+};
+
 /**
- * Generates a title from `prompt` and writes it onto the thread. An automatic title never replaces one
- * the owner set (`force` is false); only an explicit regenerate sets `force`, and it may replace any title.
- * `expectedTitleDigest` is the digest of the title the run read (a regenerate's click-time title): when the thread has another title by
- * the time the write runs, the owner renamed it meanwhile and that rename stays. `chargeKey`, when given, is the run's identity for
- * billing: a retried run finds it taken and does not call the model again.
+ * Generates a title from `prompt` and writes it onto the thread. An automatic title never replaces one the owner set (`force` is
+ * false); only an explicit regenerate sets `force`, and it may replace any title. `expectedTitleDigest` is the digest of the title the
+ * run read (a regenerate's click-time title): a rename made since stays.
+ *
+ * `chargeKey` is the run's identity for billing. The run's last step before the model is `admitTitleRun`, which checks the thread and
+ * takes the charge in one transaction, so a chat locked before it is refused and its prompt never sent. Once the model answers, the
+ * answer is recorded on the charge, so a retry after a failed write writes it without a second, billed, call. Only a model call that
+ * threw gives its charge back.
  */
 const writeGeneratedTitle = async (
     context: ActionContext,
     arguments_: {
-        chargeKey?: string;
-        expectedLeaf?: string;
-        expectedPromptId?: string;
+        chargeKey: string;
         expectedTitleDigest?: string;
         force: boolean;
         prompt: string;
@@ -1806,11 +1707,8 @@ const writeGeneratedTitle = async (
     }
 
     const threadLanguage = threadData.language;
-
-    // Use thread.userId if available
     const { userId } = threadData;
 
-    // Get user preferences if userId is available
     let language: string | undefined;
     let location: string | undefined;
     let timezone: string | undefined;
@@ -1846,128 +1744,106 @@ const writeGeneratedTitle = async (
 
     const metadata = await thread.getMetadata();
 
-    // Only generate title if thread doesn't have a title or has the default title
-    // This allows users to set custom titles that won't be overwritten
+    // An automatic title replaces only the default one: a title the owner set is kept.
     if (!arguments_.force && metadata.title && metadata.title !== DEFAULT_THREAD_TITLE) {
         return;
     }
 
-    // Checked again right before the model sees the prompt: the checks above ran before the model setup.
-    const beforeModel = await titleIneligibility(context, arguments_);
-
-    if (beforeModel) {
-        context.log.event("chat.thread_title", { skipped: `${beforeModel}-before-model` });
-
-        return;
-    }
-
-    // A prompt deleted since the job was scheduled is no title's source: refused before anything is charged.
-    if (arguments_.promptId !== undefined && (await promptGone(context, arguments_.threadId, arguments_.promptId))) {
-        context.log.event("chat.thread_title", { skipped: "prompt-deleted" });
-
-        return;
-    }
-
-    // A model call is billed per call, and the scheduler retries a failed run. A run admitted once is not admitted again, so a retry
-    // after the answer does not bill it twice. A call that throws before answering gives its charge back (below), so a retry can ask.
-    let charge: number | null = null;
-
-    if (arguments_.chargeKey !== undefined) {
-        charge = await admitTitleCharge(context, arguments_.chargeKey, userId);
-
-        if (charge === null) {
-            context.log.event("chat.thread_title", { skipped: "already-charged" });
-
-            return;
-        }
-    }
-
-    // Pass timezone/location/language to getThreadTitlePrompt for context (date/time formatting, language)
+    const expectedTitleDigest = arguments_.expectedTitleDigest ?? (await sha256Hex(metadata.title ?? ""));
     const threadTitlePrompt = getThreadTitlePrompt(timezone, location, language, titleInstructions);
-    const textResult = await thread
-        .generateText(
-            {
-                prompt: titleModelPrompt(threadTitlePrompt, arguments_.prompt),
-            },
-            {
-                // A regenerate sends the prompt alone: the thread's other messages are not the title's content.
-                ...(arguments_.stateless && { contextOptions: { recentMessages: 0 } }),
-                storageOptions: {
-                    saveMessages: "none",
+
+    // The last step before the model: the thread is checked and the run charged in one transaction. Nothing is awaited between this and
+    // the model call below, so a lock committed before it refuses the run and the prompt is never sent.
+    const admission = await context.runMutation(internal.agent.thread_title.admitTitleRun, {
+        chargeKey: arguments_.chargeKey,
+        expectedTitleDigest,
+        promptId: arguments_.promptId,
+        requestedBy: arguments_.requestedBy,
+        threadId: arguments_.threadId as Id<"threads">,
+        userId,
+    });
+
+    if (admission.outcome === "refused") {
+        context.log.event("chat.thread_title", { skipped: `${admission.reason}-before-model` });
+
+        return;
+    }
+
+    if (admission.outcome === "in-flight") {
+        context.log.event("chat.thread_title", { skipped: "already-charged" });
+
+        return;
+    }
+
+    let title: string;
+    let { promptId } = arguments_;
+    let usage: { inputTokens?: number; outputTokens?: number } | undefined;
+
+    if (admission.outcome === "answered") {
+        // An earlier try of this run was charged and answered, and its write did not land: that answer is written, with no second call.
+        title = admission.title;
+        promptId = admission.promptId;
+    } else {
+        const { claimedAt } = admission;
+        const textResult = await thread
+            .generateText(
+                { prompt: titleModelPrompt(threadTitlePrompt, arguments_.prompt) },
+                {
+                    // A regenerate sends the prompt alone: the thread's other messages are not the title's content.
+                    ...(arguments_.stateless && { contextOptions: { recentMessages: 0 } }),
+                    storageOptions: { saveMessages: "none" },
                 },
-            },
-        )
-        .catch(async (error: unknown) => {
-            // The call threw before it answered: no title was generated, so the charge is given back and a retried run may ask again.
-            // A failed give-back does not replace the model error: it is logged, and the model error is the one thrown.
-            if (arguments_.chargeKey !== undefined && charge !== null) {
-                await giveBackTitleCharge(context, arguments_.chargeKey, charge);
-            }
+            )
+            .catch(async (error: unknown) => {
+                // The call threw before it answered: nothing was generated, so the charge is given back and a retried run may ask again.
+                await giveBackTitleCharge(context, arguments_.chargeKey, claimedAt);
 
-            throw error;
-        });
+                throw error;
+            });
 
-    // The model answered after the checks above: the thread may have been locked, deleted, become host-run, been renamed,
-    // switched branch, or lost the requester's write access since. Each of those keeps the thread as it is.
-    // The path is not re-read here: the write below checks the prompt on the active path in its own transaction, the authoritative check,
-    // and a second whole-path read after the answer would be the large read the write avoids.
-    // The eligibility read is part of the attempt below, so a transient failure in it is retried with the write, not left holding the charge.
-    let afterModel: string | undefined;
+        title = textResult.text;
+        usage = textResult.usage;
 
-    // The title the run read (a regenerate's click-time title, else the one read above). The write checks it, and the requester's
-    // admin access, in the same transaction, so a rename or a revoked grant committed since is kept.
-    // Once the model has answered, the answer is kept only in this write: a title that does not land gives its charge back, so the
-    // charge never stays with no title. The answer itself is not stored (that would need a schema decision).
-    const giveBackCharge = async (): Promise<void> => {
-        if (arguments_.chargeKey === undefined || charge === null) {
-            return;
+        // Recorded before the write, so a write that fails below is retried from this answer, not by asking the model again.
+        const recorded = await tryTimes(TITLE_WRITE_ATTEMPTS, () =>
+            context.runMutation(internal.agent.thread_title.recordTitleAnswer, { chargeKey: arguments_.chargeKey, claimedAt, promptId, title }),
+        );
+
+        if (!recorded) {
+            context.log.event("chat.thread_title", { skipped: "answer-not-recorded" });
         }
+    }
 
-        await giveBackTitleCharge(context, arguments_.chargeKey, charge);
-    };
-
-    const written = await settleTitleWrite(async () => {
-        afterModel = await titleIneligibility(context, { ...arguments_, expectedPromptId: undefined });
-
-        if (afterModel !== undefined) {
-            return false;
-        }
-
-        return await context.runMutation(internal.agent.threads.setGeneratedTitle, {
-            expectedLeaf: arguments_.expectedLeaf,
-            expectedPromptId: arguments_.expectedPromptId,
-            expectedTitleDigest: arguments_.expectedTitleDigest ?? (await sha256Hex(metadata.title ?? "")),
-            promptId: arguments_.promptId,
+    // The write checks everything again in its own transaction: a rename, a lock, a branch switch or a revoked grant committed while the
+    // model ran keeps the thread as it is. A transient failure is tried again; one that persists is thrown, and the run's retry resumes
+    // from the recorded answer.
+    const written = await firstResultOf(TITLE_WRITE_ATTEMPTS, () =>
+        context.runMutation(internal.agent.thread_title.setGeneratedTitle, {
+            expectedTitleDigest,
+            promptId,
             requestedBy: arguments_.requestedBy,
             threadId: arguments_.threadId as Id<"threads">,
-            title: textResult.text,
-        });
-    }, giveBackCharge);
+            title,
+        }),
+    );
 
-    // The model was billed whether or not the title was written: one event carries its usage, with the reason when it was not written.
-    const skipped = written ? undefined : skippedReason(afterModel);
-
-    context.log.event("chat.thread_title", titleUsageEvent(model, textResult.usage, skipped));
+    context.log.event("chat.thread_title", titleUsageEvent(model, usage, written ? undefined : "changed-before-write"));
 };
 
-/** Why a title model call's title was not written: the post-generation check's reason, or the write's own refusal. */
-const skippedReason = (afterModel: string | undefined): string => (afterModel === undefined ? "changed-before-write" : `${afterModel}-after-generation`);
-
-/** The one usage event a title model call records, whether its title was written or skipped (`skipped` names why it was not). */
-export const titleUsageEvent = (model: string, usage: { inputTokens?: number; outputTokens?: number }, skipped?: string) => {
+/** The one event a title run records: the model call's tokens (none for a run that resumed an earlier answer), and why it was not written. */
+export const titleUsageEvent = (model: string, usage: { inputTokens?: number; outputTokens?: number } | undefined, skipped?: string) => {
     return {
-        inputTokens: usage.inputTokens,
+        inputTokens: usage?.inputTokens,
         model,
-        outputTokens: usage.outputTokens,
+        outputTokens: usage?.outputTokens,
+        ...(usage === undefined && { resumed: true }),
         ...(skipped !== undefined && { skipped }),
     };
 };
 
 /**
- * The billing key of one automatic title job. A charge is held until its job settles: a written title keeps it, so a retry is refused,
- * and a refused or failed run gives it back. Keyed per thread, one job's held charge would refuse every other automatic job on that
- * thread for its whole TTL. Keyed per job, the job's retries (they share its id) are refused by its own charge, and no other job is.
- * A job queued without an id keeps the per-thread key.
+ * The billing key of one automatic title job. Keyed per job, the job's retries (they share its id) find its own charge and no other
+ * job's. A job queued without an id keeps the per-thread key.
  */
 export const autoTitleChargeKey = (threadId: string, jobId: string | undefined): string =>
     jobId === undefined ? `${threadId}:auto-title` : `${threadId}:auto-title:${jobId}`;
@@ -1989,10 +1865,6 @@ export const createTitleChat = internalAction
         });
     });
 
-/** The first user prompt a title is read from, and the id of the message it came from (`undefined` when the row has none). */
-type TitlePrompt = { id: string | undefined; text: string };
-const TITLE_PROMPT_PAGE = 50;
-
 /**
  * One regenerate in flight per thread (`idempotencyClaims`, released by its job). The TTL only matters when the job never
  * runs or never ends: then the claim lapses and the owner can ask again.
@@ -2007,156 +1879,33 @@ const REGENERATE_TITLE_CLAIM_TTL_MS = 5 * 60 * 1000;
 const REGENERATE_TITLE_RUN_TTL_MS = 15 * 60 * 1000;
 
 /**
- * The earliest user prompt on the thread's active branch. A branched thread's path is read by id, so its sibling replies
- * cannot push the prompt out of the read; an unbranched thread's rows are its path. The read stops at the first prompt,
- * and only a message that succeeded can supply a title. `"too-long"` when the path is past the read's limit.
- */
-const activeBranchPrompt = async (
-    context: ActionContext,
-    threadId: string,
-    activeLeafMessageId: string | undefined,
-): Promise<{ kind: "prompt"; prompt?: TitlePrompt } | { kind: "too-long" }> => {
-    if (activeLeafMessageId !== undefined) {
-        const pathIds = await context.runQuery(internal.agent.branches.getActivePathIds, {
-            leafMessageId: activeLeafMessageId as Id<"messages">,
-            threadId: threadId as Id<"threads">,
-        });
-
-        // No rows at all: a stored leaf that is gone falls back to the thread's own active path (`getActivePathIds`).
-        if (pathIds === null) {
-            return { kind: "prompt" };
-        }
-
-        if (pathIds === "too-long") {
-            return { kind: "too-long" };
-        }
-
-        // The whole path, which is at most TITLE_PATH_LIMIT rows: a prompt that sits past the first page is still found.
-        for (let start = 0; start < pathIds.length; start += TITLE_PROMPT_PAGE) {
-            const rows = await context.runQuery(internal.agent.messages.getMessagesByIds, {
-                messageIds: pathIds.slice(start, start + TITLE_PROMPT_PAGE) as Id<"messages">[],
-                threadId: threadId as Id<"threads">,
-            });
-            const prompt = firstUserPrompt(rows.filter((row) => row !== null).filter((row) => row.status === "success"));
-
-            if (prompt) {
-                return { kind: "prompt", prompt };
-            }
-        }
-
-        return { kind: "prompt" };
-    }
-
-    // Unbranched: the rows are the path, read from the first row. Reading to the limit with no prompt and rows still left is "too long",
-    // not "no prompt": the prompt may be further on.
-    let cursor: string | null = null;
-
-    for (let read = 0; read < TITLE_PATH_LIMIT; read += TITLE_PROMPT_PAGE) {
-        const { continueCursor, isDone, page }: { continueCursor: string | null; isDone: boolean; page: Parameters<typeof firstUserPrompt>[0] } =
-            await context.runQuery(internal.agent.messages.listMessagesByThreadIdInternal, {
-                excludeToolMessages: true,
-                order: "asc",
-                paginationOpts: { cursor, numItems: TITLE_PROMPT_PAGE },
-                statuses: ["success"],
-                threadId: threadId as Id<"threads">,
-            });
-        const prompt = firstUserPrompt(page);
-
-        if (prompt) {
-            return { kind: "prompt", prompt };
-        }
-
-        if (isDone) {
-            return { kind: "prompt" };
-        }
-
-        cursor = continueCursor;
-    }
-
-    return { kind: "too-long" };
-};
-
-/** Whether the prompt a title was scheduled from is gone: deleted, or no longer a message of this thread. */
-export const promptGone = async (context: ActionContext, threadId: string, promptId: string): Promise<boolean> => {
-    const [row] = await context.runQuery(internal.agent.messages.getMessagesByIds, {
-        messageIds: [promptId as Id<"messages">],
-        threadId: threadId as Id<"threads">,
-    });
-
-    return !row;
-};
-
-/**
- * The title's prompt, re-read by the id the request found: one row, not a second scan of the path. A row that is no longer a
- * successful user message gives none.
- */
-export const promptById = async (context: ActionContext, threadId: string, promptId: string): Promise<TitlePrompt | undefined> => {
-    const [row] = await context.runQuery(internal.agent.messages.getMessagesByIds, {
-        messageIds: [promptId as Id<"messages">],
-        threadId: threadId as Id<"threads">,
-    });
-
-    if (!row || row.status !== "success") {
-        return undefined;
-    }
-
-    return firstUserPrompt([row]);
-};
-
-/**
- * Scheduled by `regenerateThreadTitle`. The title comes from the earliest user prompt on the thread's active path, which is read
- * whole: a path of at most `TITLE_PATH_LIMIT` rows (1,000), searched oldest first, so a prompt past the first page is found. A
- * thread with no prompt within that limit is refused (`activeBranchPrompt`: "too-long"), and one with no user text at all is left
- * as it is.
+ * Scheduled by `regenerateThreadTitle`. The prompt is read when the job runs, from the branch the thread shows then: the earliest user
+ * prompt within the active path's recent window (`agent/thread-title.ts`). A thread with no such prompt is left as it is.
  */
 const runRegenerateTitle = async (
     context: ActionContext,
-    arguments_: { claimedAt?: number; expectedTitleDigest?: string; promptId?: string; threadId: string; userId: string },
+    arguments_: { claimedAt: number; expectedTitleDigest?: string; threadId: string; userId: string },
 ): Promise<void> => {
-    // Before any message is read: a locked, host-run or deleted thread, or a requester who lost access since, never reaches the model.
-    const beforeRead = await titleIneligibility(context, { requestedBy: arguments_.userId, threadId: arguments_.threadId });
+    // Refused before any message is read: a locked, host-run or deleted thread, or a requester who lost admin access since.
+    const read = await context.runQuery(internal.agent.thread_title.readTitlePrompt, {
+        requestedBy: arguments_.userId,
+        threadId: arguments_.threadId as Id<"threads">,
+    });
 
-    if (beforeRead) {
-        context.log.event("chat.thread_title", { skipped: `${beforeRead}-at-start` });
-
-        return;
-    }
-
-    const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: arguments_.threadId as Id<"threads"> });
-
-    if (!thread) {
-        return;
-    }
-
-    // The active branch's history only: an edited prompt on another branch must not supply the title. The request already found the
-    // prompt, so the job re-reads that one row by id; the path is scanned only for a job that was scheduled without the id.
-    const branch =
-        arguments_.promptId === undefined
-            ? await activeBranchPrompt(context, arguments_.threadId, thread.activeLeafMessageId)
-            : { kind: "prompt" as const, prompt: await promptById(context, arguments_.threadId, arguments_.promptId) };
-
-    if (branch.kind === "too-long") {
-        context.log.event("chat.thread_title", { skipped: "path-too-long" });
+    if (read.outcome !== "prompt") {
+        context.log.event("chat.thread_title", { skipped: read.outcome === "refused" ? "ineligible-at-start" : "no-user-prompt" });
 
         return;
     }
 
-    if (!branch.prompt) {
-        context.log.event("chat.thread_title", { skipped: "no-user-prompt" });
-
-        return;
-    }
-
-    // The write checks that this prompt is still on the active path, not the leaf: a later reply regenerated keeps the title.
-    // One billing key per run: the claim this request took. A scheduler retry of this run carries the same claim and is not billed again.
+    // One billing key per run: the claim this request took. A scheduler retry of this run carries the same claim, finds the charge, and
+    // writes the recorded answer instead of calling the model again.
     await writeGeneratedTitle(context, {
-        chargeKey: arguments_.claimedAt === undefined ? undefined : `${arguments_.threadId}:${arguments_.claimedAt}`,
-        expectedLeaf: thread.activeLeafMessageId,
-        expectedPromptId: branch.prompt.id,
+        chargeKey: `${arguments_.threadId}:${arguments_.claimedAt}`,
         expectedTitleDigest: arguments_.expectedTitleDigest,
         force: true,
-        prompt: branch.prompt.text,
-        promptId: branch.prompt.id,
+        prompt: read.text,
+        promptId: read.id,
         requestedBy: arguments_.userId,
         stateless: true,
         threadId: arguments_.threadId,
@@ -2165,30 +1914,27 @@ const runRegenerateTitle = async (
 
 export const regenerateTitleChat = internalAction
     .input({
-        claimedAt: v.optional(v.number()),
+        claimedAt: v.number(),
         expectedTitleDigest: v.optional(v.string().max(MAX_LENGTH.short)),
-        promptId: v.optional(v.string().max(MAX_LENGTH.id)),
         threadId: v.string(),
         userId: v.string(),
     })
     .action(async ({ args: arguments_, ctx: context }) => {
         // Admitted: the claim taken at the request is stretched for the run. When another request has taken the key meanwhile (this
         // job sat unstarted past its short claim), the key is not ours and the job does nothing.
-        if (arguments_.claimedAt !== undefined) {
-            const held = await context.runMutation(internal.lib.claim_once.holdKey, {
-                claimedAt: arguments_.claimedAt,
-                key: arguments_.threadId,
-                scope: REGENERATE_TITLE_SCOPE,
-                // Counted from this start, not from the request: a job that starts after the claim lapsed still holds for a full run.
-                ttlMs: holdTtlFrom(arguments_.claimedAt, REGENERATE_TITLE_RUN_TTL_MS),
-                userId: arguments_.userId,
-            });
+        const held = await context.runMutation(internal.lib.claim_once.holdKey, {
+            claimedAt: arguments_.claimedAt,
+            key: arguments_.threadId,
+            scope: REGENERATE_TITLE_SCOPE,
+            // Counted from this start, not from the request: a job that starts after the claim lapsed still holds for a full run.
+            ttlMs: holdTtlFrom(arguments_.claimedAt, REGENERATE_TITLE_RUN_TTL_MS),
+            userId: arguments_.userId,
+        });
 
-            if (!held) {
-                context.log.event("chat.thread_title", { skipped: "claim-taken" });
+        if (!held) {
+            context.log.event("chat.thread_title", { skipped: "claim-taken" });
 
-                return;
-            }
+            return;
         }
 
         let runFailure: { error: unknown } | undefined;
@@ -2201,9 +1947,7 @@ export const regenerateTitleChat = internalAction
 
         // The request is over however the run ended, so a later regenerate may ask again. A release that fails does not replace the run's
         // own error (the run's error is the one rethrown below), and is retried and logged by the helper.
-        if (arguments_.claimedAt !== undefined) {
-            await releaseRegenerateClaim(context, arguments_.threadId, arguments_.claimedAt);
-        }
+        await releaseRegenerateClaim(context, arguments_.threadId, arguments_.claimedAt);
 
         if (runFailure) {
             throw runFailure.error;
@@ -2211,9 +1955,9 @@ export const regenerateTitleChat = internalAction
     });
 
 /**
- * Replaces a thread's title with one generated from its first prompt. It needs admin access, as a rename does: the
- * title is the owner's to set. The requester is billed for the generation through the gateway. A locked chat keeps
- * its title (its content), and a host-run thread's messages never reach a cloud model.
+ * Replaces a thread's title with one generated from its prompt. It needs admin access, as a rename does: the title is the owner's to
+ * set. The requester is billed for the generation through the gateway. A locked chat keeps its title (its content), and a host-run
+ * thread's messages never reach a cloud model.
  */
 export const regenerateThreadTitle = authAction
     .input({
@@ -2244,23 +1988,23 @@ export const regenerateThreadTitle = authAction
             throw new LunoraError("CONFLICT", "A locked chat keeps its title, so it cannot be regenerated.");
         }
 
-        // A regenerate already running for this thread is refused before the prompt is read: the read is the costly part, and the
-        // claim is the answer. The claim is still taken atomically below, so a race between two requests is decided there.
+        // A regenerate already running for this thread is refused before the prompt is read: the claim is the answer. The claim is still
+        // taken atomically below, so a race between two requests is decided there.
         if (await context.runQuery(internal.lib.claim_once.claimHeld, { key: threadId, scope: REGENERATE_TITLE_SCOPE })) {
             context.log.event("chat.regenerate_title", { refused: "in-flight" });
 
             throw new LunoraError("CONFLICT", "A title is already being generated for this chat. Try again when it finishes.");
         }
 
-        // Refused here, where the owner can see why: a path past the read's limit, or no user prompt to title the chat from. The job
-        // finds the same prompt again, so nothing is scheduled for a regenerate that would change nothing.
-        const branch = await activeBranchPrompt(context, threadId, thread.activeLeafMessageId);
+        // Refused here, where the owner can see why: a chat with no prompt to title it from schedules nothing. The job reads the prompt
+        // again when it runs, from the branch the thread shows then.
+        const read = await context.runQuery(internal.agent.thread_title.readTitlePrompt, { requestedBy: userId, threadId });
 
-        if (branch.kind === "too-long") {
-            throw new LunoraError("CONFLICT", "This chat is too long to retitle from its first prompt.");
+        if (read.outcome === "refused") {
+            throw new LunoraError("CONFLICT", "This chat's title cannot be regenerated now.");
         }
 
-        if (!branch.prompt) {
+        if (read.outcome === "none") {
             throw new LunoraError("CONFLICT", "This chat has no user prompt to title it from.");
         }
 
@@ -2273,22 +2017,19 @@ export const regenerateThreadTitle = authAction
             userId,
         });
 
-        // A request made while one runs is refused, not reported as scheduled: the running job may skip its write (the branch or
-        // title it was asked about may have moved), so the owner asks again once it has finished.
+        // A request made while one runs is refused, not reported as scheduled, so the owner asks again once it has finished.
         if (claimedAt === null) {
             context.log.event("chat.regenerate_title", { refused: "in-flight" });
 
             throw new LunoraError("CONFLICT", "A title is already being generated for this chat. Try again when it finishes.");
         }
 
-        // The title the owner saw when asking: a rename made while the model works is kept (`writeGeneratedTitle`).
         try {
             await context.scheduler.runAfter(0, internal.chat.functions.regenerateTitleChat, {
                 claimedAt,
-                // A digest, not the title: a stored title of any length then travels as a short argument.
+                // The title the owner saw when asking, as a digest so a stored title of any length travels as a short argument: a rename
+                // made while the model works is kept.
                 expectedTitleDigest: await sha256Hex(thread.title ?? ""),
-                // The prompt the request found: the job re-reads that row rather than scanning the path a second time.
-                promptId: branch.prompt.id,
                 threadId,
                 userId,
             });

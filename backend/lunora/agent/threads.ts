@@ -24,9 +24,6 @@ import { deleteMessage } from "./messages";
 import { deleteChatFileLinksForThread } from "./files";
 import { deleteStreamsPageForThreadId } from "./streams";
 import { isThreadLocked, toLockedThreadStub } from "../lib/thread-lock";
-import { threadGateOutcome } from "../chat/lib/thread-gate";
-import { sha256Hex } from "../lib/crypto";
-import { activePathIdsOf, pathReachesLeaf } from "./branches";
 import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread, resolveThreadReadAccess, type ThreadPermission } from "./thread-read-access";
 import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadPatchFields, vThreadStatus } from "./validators";
 import { systemDb } from "../lib/rls/scope";
@@ -289,95 +286,6 @@ export const updateThread = internalMutation
         // Handle thread orders aggregate
         return publicThread(newThread);
     });
-
-/**
- * Writes a generated title, and only while the thread may still be titled (not locked, deleted or host-run); while it still carries
- * the title the run read (`expectedTitleDigest`, a digest so a stored title of any length compares); while the prompt the title came
- * from is still on the active path at the time of the write (`expectedPromptId`); and, when there is a `requestedBy`, while that user
- * still holds admin access. All of it is read here, in the same transaction as the patch. Answers whether the title was written.
- */
-export const writeTitleIfUnchanged = async (
-    ctx: Pick<MutationContext, "db">,
-    arguments_: {
-        expectedLeaf?: string;
-        expectedPromptId?: string;
-        expectedTitleDigest: string;
-        promptId?: string;
-        requestedBy?: string;
-        threadId: Id<"threads">;
-        title: string;
-    },
-): Promise<boolean> => {
-    const thread = await ctx.db.get("threads", arguments_.threadId);
-
-    if (!thread) {
-        return false;
-    }
-
-    // A title that already reads as this one landed in an earlier try whose response was lost: it is saved, whatever has happened to the
-    // thread since. Without this the retry would see the digest moved, refuse, and give the charge back for a title that is already there.
-    if (thread.title === arguments_.title) {
-        return true;
-    }
-
-    if (isThreadLocked(thread) || thread.runner === "host" || thread.deletedAt !== undefined) {
-        return false;
-    }
-
-    if ((await sha256Hex(thread.title ?? "")) !== arguments_.expectedTitleDigest) {
-        return false;
-    }
-
-    // The prompt the title came from must still be a message of this thread: a deleted prompt is no title's source.
-    if (arguments_.promptId !== undefined) {
-        const prompt = await ctx.db.get("messages", arguments_.promptId as Id<"messages">);
-
-        if (!prompt || prompt.threadId !== arguments_.threadId) {
-            return false;
-        }
-    }
-
-    // An unbranched thread has no leaf: its rows are its path. A branched one must still run through the prompt at the time of the write.
-    // A leaf that extends the one the job read still runs through the prompt, and the walk up to that leaf is short; only a switch to
-    // another branch reads the whole path, within the same bound the job used. The whole-path read is the large one, so it is avoided.
-    if (arguments_.expectedPromptId !== undefined && thread.activeLeafMessageId !== undefined) {
-        const stillOnPath =
-            arguments_.expectedLeaf !== undefined && (await pathReachesLeaf(ctx, arguments_.threadId, thread.activeLeafMessageId, arguments_.expectedLeaf));
-
-        if (!stillOnPath) {
-            const ids = await activePathIdsOf(ctx, arguments_.threadId, thread.activeLeafMessageId as Id<"messages">);
-
-            if (!Array.isArray(ids) || !ids.includes(arguments_.expectedPromptId)) {
-                return false;
-            }
-        }
-    }
-
-    if (arguments_.requestedBy !== undefined) {
-        const access = await threadGateOutcome(ctx, { level: "admin", threadId: arguments_.threadId, userId: arguments_.requestedBy });
-
-        if (access !== "ok") {
-            return false;
-        }
-    }
-
-    await ctx.db.patch("threads", arguments_.threadId, { title: arguments_.title });
-
-    return true;
-};
-
-export const setGeneratedTitle = internalMutation
-    .input({
-        expectedLeaf: v.optional(v.string().max(MAX_LENGTH.id)),
-        expectedPromptId: v.optional(v.string().max(MAX_LENGTH.id)),
-        expectedTitleDigest: v.string().max(MAX_LENGTH.short),
-        promptId: v.optional(v.string().max(MAX_LENGTH.id)),
-        requestedBy: v.optional(v.string()),
-        threadId: v.id("threads"),
-        title: v.string().max(MAX_LENGTH.long),
-    })
-    .output(v.boolean())
-    .mutation(async ({ args, ctx }) => await writeTitleIfUnchanged(ctx, args));
 
 /**
  * A continuation the user stopped answers no request any more: the pause it was resumed from ends with it. A newer
