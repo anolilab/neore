@@ -11,6 +11,7 @@ import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import Assistant from "@/features/chat/assistant";
 import { usePromptLinkDraft } from "@/features/chat/core/hooks/use-prompt-link-draft";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -194,11 +195,14 @@ const ChatPage = () => {
 
 export const Route = createFileRoute("/(chat)/chat/")({
     validateSearch: (search: Record<string, unknown>) => {
+        // A prompt link's draft and model, read by the same parser the link is built and tested with (`core/utils/prompt-link.ts`).
+        // Applied once, never sent (`core/hooks/use-prompt-link-draft.ts`).
+        const link = readPromptLinkSearch(search);
+
         return {
-            model: typeof search.model === "string" ? search.model : undefined,
+            model: link.model,
             promptId: search.promptId as string | undefined,
-            // A prompt link's draft: applied once, never sent (`core/hooks/use-prompt-link-draft.ts`).
-            prompt: typeof search.prompt === "string" ? search.prompt : undefined,
+            prompt: link.prompt,
             redirectReason: search.redirectReason as string | undefined,
             // `|| undefined`, not `false`: a default written into the search is put into the URL, and the
             // router then redirects a bare `/chat` to `/chat?initialMessage=false` before it renders.

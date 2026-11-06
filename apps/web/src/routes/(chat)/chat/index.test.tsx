@@ -209,4 +209,29 @@ describe("chat index route", () => {
             expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
         });
     });
+
+    describe("a copied link read from its own query string", () => {
+        it("opens the copied text, cleaned, as the draft on the copied model", async () => {
+            const link = buildPromptLink("https://app.example.com", {
+                model: textModel?.id,
+                prompt: "  Summarise\u{E0041} this\nin two lines  ",
+            });
+
+            openUrl(link);
+            renderPage();
+
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("Summarise this\nin two lines"));
+            expect(selectedModel()).toBe(textModel?.id);
+            expect(harness.navigate).toHaveBeenCalledTimes(1);
+        });
+
+        it("treats a blank prompt parameter as no link: nothing is drafted and no navigation strips it", () => {
+            openUrl("https://app.example.com/chat?prompt=%20%20%20");
+
+            renderPage();
+
+            expect(useChatUIStore.getState().composerText).toBe("");
+            expect(harness.navigate).not.toHaveBeenCalled();
+        });
+    });
 });
