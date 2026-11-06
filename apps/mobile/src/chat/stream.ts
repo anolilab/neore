@@ -11,10 +11,16 @@ import { CHAT_START_TIMEOUT_MS } from "./chat-api";
 
 export interface StreamDelta {
     reasoning: string;
+    /** Set on the first chunk after a steered message: what came before it is saved as a message of its own. */
+    restart?: true;
     text: string;
 }
 
-export type StreamOutcome = "failed" | "finished";
+/**
+ * "finished": every chunk through the end marker was relayed. "unconfirmed": the server answered 205, so there is nothing
+ * more to relay, but this client may not hold the whole reply, and a read has to supply it.
+ */
+export type StreamOutcome = "failed" | "finished" | "unconfirmed";
 
 /** Resumes after a relay ran out of its per-request budget. Bounds a stuck loop. */
 export const MAX_RESUMES = 50;
@@ -101,7 +107,7 @@ const readAttempt = async (
         }
 
         index += 1;
-        onChunk({ reasoning: parsed.reasoning, text: parsed.text }, index);
+        onChunk({ reasoning: parsed.reasoning, ...parsed.restart && { restart: true as const }, text: parsed.text }, index);
 
         return true;
     };
@@ -188,7 +194,7 @@ const postStream = async (input: { fetch: Fetch; gatewayUrl: string; signal?: Ab
 /**
  * Relay one reply. `onDelta` is called once per relayed chunk. A resume marker
  * makes the loop POST again with the counted `lastChunkIndex`, so nothing is sent
- * twice or skipped. Resolves "finished" for 205 or a relay that ends with the end
+ * twice or skipped. Resolves "unconfirmed" for 205, and "finished" for a relay that ends with the end
  * line, "failed" for a bad status, a missing body, an error line, or a stream that
  * closes with neither the end line nor a resume marker (cut off).
  */
@@ -214,7 +220,7 @@ export const relayReply = async (input: {
         if (response.status === 205) {
             await response.body?.cancel();
 
-            return "finished";
+            return "unconfirmed";
         }
 
         if (!response.ok || !response.body) {

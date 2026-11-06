@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 const row = (id: string, createdAt: number, syncedAt: number): MessageRow => {
-    return { createdAt, id, role: "assistant", status: "success", syncedAt, text: `text ${id}`, threadId: "t1", updatedAt: createdAt };
+    return { createdAt, id, role: "assistant", shareText: `text ${id}`, status: "success", syncedAt, text: `text ${id}`, threadId: "t1", updatedAt: createdAt };
 };
 
 const settle = () => new Promise<void>((resolve) => {
@@ -45,7 +45,7 @@ describe("a refused read", () => {
     it("drops the saved copy of a chat the server now reports as locked", async () => {
         const scoped = await setup();
 
-        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", status: "success", text: "secret", threadId: "t1" }]);
+        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", shareText: "secret", status: "success", text: "secret", threadId: "t1" }]);
         await scoped.saveStatuses([{ id: "h1", kind: "host", label: "Laptop", status: "busy", threadId: "t1", updatedAt: 5 }]);
 
         const result = await readThreadMessages({
@@ -66,7 +66,7 @@ describe("a refused read", () => {
     it("keeps the saved copy when the server never answered", async () => {
         const scoped = await setup();
 
-        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", status: "success", text: "kept", threadId: "t1" }]);
+        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", shareText: "kept", status: "success", text: "kept", threadId: "t1" }]);
 
         const result = await readThreadMessages({
             cache: scoped,
@@ -84,7 +84,7 @@ describe("a refused read", () => {
     it("keeps the saved copy on a failure that is neither a network failure nor a refusal of the chat", async () => {
         const scoped = await setup();
 
-        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", status: "success", text: "kept", threadId: "t1" }]);
+        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", shareText: "kept", status: "success", text: "kept", threadId: "t1" }]);
 
         const result = await readThreadMessages({
             cache: scoped,
@@ -196,7 +196,7 @@ describe("a revoked grant", () => {
     it("drops the saved copy of a chat that is no longer shared", async () => {
         const scoped = await setup();
 
-        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", status: "success", text: "secret", threadId: "t1" }]);
+        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", shareText: "secret", status: "success", text: "secret", threadId: "t1" }]);
 
         const result = await readThreadMessages({
             cache: scoped,
@@ -226,7 +226,7 @@ describe("an older page", () => {
     it("drops the saved copy when the server refuses the chat", async () => {
         const scoped = await setup();
 
-        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", status: "success", text: "secret", threadId: "t1" }]);
+        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", shareText: "secret", status: "success", text: "secret", threadId: "t1" }]);
 
         const result = await readOlderMessages({
             cache: scoped,
@@ -245,7 +245,7 @@ describe("an older page", () => {
     it("keeps the saved copy when the server never answered, and reports a plain failure", async () => {
         const scoped = await setup();
 
-        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", status: "success", text: "kept", threadId: "t1" }]);
+        await scoped.saveMessages("t1", [{ createdAt: 1, id: "m1", role: "user", shareText: "kept", status: "success", text: "kept", threadId: "t1" }]);
 
         const offline = await readOlderMessages({
             cache: scoped,
