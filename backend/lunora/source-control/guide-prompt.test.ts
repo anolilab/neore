@@ -61,6 +61,16 @@ describe("buildCloudGuidePrompt", () => {
         expect(prompt).toContain("+kept line");
     });
 
+    it("tells the model how a patch spells hidden characters, and keeps its ordinary escapes", () => {
+        const { prompt, system } = buildCloudGuidePrompt(input({ files: [file("src/a.ts", { patch: "+const re = /\\d+/;\\n+x\u{200B}" })] }));
+
+        expect(system).toContain("A patch uses the same escapes for hidden characters");
+        // The patch is quoted as JSON in the prompt: its regex backslash and its escape each show doubled there.
+        expect(prompt).toContain(String.raw`/\\d+/`);
+        expect(prompt).toContain(String.raw`x\\u200B`);
+        expect(prompt).not.toContain("\u200B");
+    });
+
     it("shows a hidden character in a diff as an escape, and keeps the diff's line breaks", () => {
         const { prompt } = buildCloudGuidePrompt(input({ files: [file("src/a.ts", { patch: "@@ -1,1 +1,2 @@\n a\n+b\u{200B}c\u{E0041}" })] }));
 
