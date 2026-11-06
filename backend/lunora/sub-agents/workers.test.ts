@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import type { WorkerRunArgs } from "./functions";
-import { admitSubAgentRun, admitWorkerRun, cancelSubAgentRunsForStop, claimQueuedRun, finishRun, isWorkerThread } from "./functions";
+import { admitSubAgentRun, admitWorkerRun, cancelSubAgentRunsForStop, claimQueuedRun, finishRun, isWorkerThread, messageWorker } from "./functions";
 import { intersectWithLeadTools, SUB_AGENT_MAX_CONCURRENT, SUB_AGENT_MAX_TOOLS } from "./logic";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -163,6 +163,36 @@ describe("dispatching to a worker", () => {
         const second = await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-org-2" });
 
         expect(second).toMatchObject({ run: { organizationId: "org-x" } });
+    });
+
+    it("caps a follow-up by the run's organization when neither the worker nor the lead thread stores one", async () => {
+        // Neither thread is stamped: the first run named no organization, and the lead has none.
+        const first = await create({ toolCallId: "call-unstamped-1" });
+
+        expect(first.run.organizationId).toBeUndefined();
+
+        await claim(first.run._id);
+        await finish(first.run._id);
+
+        const sent = await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(messageWorker, {
+                    dispatchedBy: "lead",
+                    message: "And the second part",
+                    organizationId: "org-run",
+                    parentThreadId: leadId,
+                    toolCallId: "call-unstamped-2",
+                    userId,
+                    workerId: first.run.childThreadId,
+                }),
+        );
+
+        expect(sent).toMatchObject({ workerId: first.run.childThreadId });
+
+        const allRuns = await runs();
+        const followUp = allRuns.find((run) => run._id === sent.runId);
+
+        expect(followUp).toMatchObject({ organizationId: "org-run" });
     });
 
     it("returns the same run for a redelivered tool call and consumes nothing more", async () => {
