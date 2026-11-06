@@ -278,6 +278,42 @@ export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null,
     return modeFor(thread, userId);
 };
 
+/** The continuation hops a computer's thread is walked back through before the walk gives up. */
+const MAX_CONTINUATION_HOPS = 8;
+
+/**
+ * The mode a cloud thread taking over from `thread` inherits. A computer's thread has no mode of its own (`modeOfThread`), so it is read
+ * from the cloud thread it was switched from: the nearest cloud thread up its continuation links. A round trip through a computer then
+ * keeps the mode the owner set. A chain too long to walk, or one whose origin is gone, runs supervised: its origin cannot be shown.
+ */
+export const modeInheritedFrom = async (ctx: QueryCtx, thread: Doc<"threads">, userId: string): Promise<ThreadPermissionMode | null> => {
+    let current: Doc<"threads"> | null = thread;
+    let hops = 0;
+
+    while (current?.runner === "host") {
+        if (hops >= MAX_CONTINUATION_HOPS) {
+            return "supervised";
+        }
+
+        hops += 1;
+
+        const links = await linksOf(ctx, current._id);
+        const continuation = links.find((link) => link.branchType === "continuation");
+
+        if (!continuation) {
+            return links.length >= MAX_LINKS_CHECKED ? "supervised" : null;
+        }
+
+        current = await ctx.db.get("threads", continuation.parentThreadId);
+
+        if (!current) {
+            return "supervised";
+        }
+    }
+
+    return await modeOfThread(ctx, current, userId);
+};
+
 /**
  * The permission mode a run on this thread builds its tools under (`lib/thread-permission-mode.ts`), or `null` for the
  * default. A host thread has none. In a thread someone else owns only the modes that ask MORE apply: `full` is the

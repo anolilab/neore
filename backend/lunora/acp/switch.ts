@@ -53,7 +53,7 @@ import {
 } from "../chat/agent-switch";
 import { getModelContextWindow } from "../chat/lib/auto-continue";
 import { assertPaidModel, requireEnabledModel } from "../chat/lib/enabled-model";
-import { modeOfThread } from "../chat/tool-permissions";
+import { modeInheritedFrom } from "../chat/tool-permissions";
 import { loadEligibleThread } from "../devices/internal";
 import { isDeviceInScope, resolveThreadProject } from "../devices/lib/scope";
 import { isDeviceOnline } from "../devices/lib/state";
@@ -601,8 +601,9 @@ const startOn = async (
 
 const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> => {
     const { current, handoff, leaf, native, now, taintedBy, target, thread, to, userId } = args;
-    // The mode the thread runs under (`modeOfThread`): a live comparison parent's mode, else its own, supervised for an orphaned column with none.
-    const inheritedMode = await modeOfThread(ctx, thread, userId);
+    // The mode a cloud thread taking over from this one inherits (`modeInheritedFrom`): this thread's own, or for a computer's thread the
+    // cloud thread it was switched from, so a round trip keeps the owner's mode.
+    const inheritedMode = await modeInheritedFrom(ctx, thread, userId);
 
     // Host to host: the thread and its runner stay; the session it ran in ends and the next one opens in it.
     if (target.kind === "host" && isHostRunThread(thread)) {
@@ -670,7 +671,7 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
             : await insertThread(ctx.db, {
                   activeAgent: { kind: "model", model: target.model },
                   createdBy: userId,
-                  // A handoff to a cloud agent keeps the mode of the thread it takes over from (a host thread has none).
+                  // A handoff to a cloud agent keeps the mode it inherits (a computer's thread has none, so the cloud chat it came from).
                   ...(inheritedMode && { permissionMode: inheritedMode }),
                   // A thread that took over from a coding agent is marked even when the agent said nothing in words: what it read
                   // and ran is in none of this thread's rows (`threadHandoffTaint`).

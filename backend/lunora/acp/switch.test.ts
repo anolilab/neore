@@ -658,6 +658,43 @@ describe("host to cloud", () => {
     });
 });
 
+describe("a round trip through a computer", () => {
+    it("gives the cloud chat it returns to the mode the owner set before the hop", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await run(async (ctx) => {
+            await ctx.db.patch("threads", source as never, { permissionMode: "supervised" } as never);
+        });
+
+        const out = await switchTo(source, hostTarget(device));
+        // The computer has opened its session: an agent that is still starting cannot be switched from.
+        const [session] = await rows("acpSessions", { threadId: out.forkedThreadId });
+
+        await run(async (ctx) => {
+            await ctx.db.patch("acpSessions", session?._id as never, { status: "idle" } as never);
+        });
+
+        const back = await switchTo(out.forkedThreadId as string, { kind: "model", model: OTHER_MODEL });
+        const [fork] = await rows("threads", { _id: back.forkedThreadId });
+
+        expect(fork).toMatchObject({ permissionMode: "supervised" });
+    });
+
+    it("gives the computer's thread no mode of its own", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await run(async (ctx) => {
+            await ctx.db.patch("threads", source as never, { permissionMode: "full" } as never);
+        });
+
+        const out = await switchTo(source, hostTarget(device));
+
+        expect(await row(out.forkedThreadId as string)).not.toHaveProperty("permissionMode");
+    });
+});
+
 describe("what a takeover carries into a command on the computer", () => {
     it("signs the source thread's taint onto every prompt sent to the agent that took over", async () => {
         const device = await pairedDevice(ownerId);
