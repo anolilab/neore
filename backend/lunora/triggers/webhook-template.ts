@@ -100,6 +100,16 @@ const lookupJson = (root: unknown, segments: ReadonlyArray<string>): unknown => 
     return current;
 };
 
+/** A high surrogate at the end of a string: the first half of a pair that a cut would split. */
+const TRAILING_HIGH_SURROGATE = /[\uD800-\uDBFF]$/u;
+
+/** The first `max` UTF-16 units, without a surrogate pair cut in two: a lone high surrogate at the end is dropped. */
+const sliceUnits = (text: string, max: number): string => {
+    const cut = text.slice(0, max);
+
+    return TRAILING_HIGH_SURROGATE.test(cut) ? cut.slice(0, -1) : cut;
+};
+
 /**
  * A value as the prompt reads it. A string is a quoted literal. `null`, a number, a boolean, an object or an array is
  * its JSON, and one whose JSON is over the limit is a quoted, cut copy of that JSON: a valid literal, never broken JSON.
@@ -111,7 +121,7 @@ const quoted = (value: unknown): string => {
     }
 
     if (typeof value === "string") {
-        return JSON.stringify(value.slice(0, MAX_RENDERED_VALUE_LENGTH));
+        return JSON.stringify(sliceUnits(value, MAX_RENDERED_VALUE_LENGTH));
     }
 
     const json = JSON.stringify(value);
@@ -139,7 +149,7 @@ const readNamed = (values: Readonly<Record<string, string>>, name: string): stri
  */
 export const renderWebhookPrompt = (template: string | undefined, input: WebhookInputs, frameId: string): string | undefined => {
     const tag = `webhook-data-${frameId}`;
-    const frame = `<${tag}>\n${input.body.slice(0, MAX_PAYLOAD_LENGTH)}\n</${tag}>`;
+    const frame = `<${tag}>\n${sliceUnits(input.body, MAX_PAYLOAD_LENGTH)}\n</${tag}>`;
 
     if (template === undefined || template.trim() === "") {
         return `${FRAME_LEAD}\n\n${frame}`;
