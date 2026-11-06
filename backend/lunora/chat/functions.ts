@@ -87,6 +87,7 @@ import { TEXT_TO_VIDEO_PROVIDERS } from "./lib/video-providers";
 import { gatewayFetch, NO_SERVICE_FETCH } from "../lib/services";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
 import getAgent from "./lib/get-agent";
+import { sha256Hex } from "../lib/crypto";
 import { firstUserPrompt } from "./lib/first-user-prompt";
 import { getMessageFileIds, loadNsfwStatuses, redactUIMessagesForPublicViewer } from "./lib/public-thread";
 import { buildReasoningProviderOptions } from "./lib/reasoning-options";
@@ -1604,7 +1605,7 @@ const promptStillOnActivePath = async (context: ActionContext, threadId: string,
  */
 export const titleIneligibility = async (
     context: ActionContext,
-    arguments_: { expectedPromptId?: string; expectedTitle?: string; requestedBy?: string; threadId: string },
+    arguments_: { expectedPromptId?: string; expectedTitleDigest?: string; requestedBy?: string; threadId: string },
 ): Promise<string | undefined> => {
     const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: arguments_.threadId as Id<"threads"> });
 
@@ -1612,7 +1613,7 @@ export const titleIneligibility = async (
         return "ineligible";
     }
 
-    if (arguments_.expectedTitle !== undefined && (thread.title ?? "") !== arguments_.expectedTitle) {
+    if (arguments_.expectedTitleDigest !== undefined && (await sha256Hex(thread.title ?? "")) !== arguments_.expectedTitleDigest) {
         return "renamed-meanwhile";
     }
 
@@ -1638,17 +1639,23 @@ export const titleIneligibility = async (
     return undefined;
 };
 
+/** One admission per title run for billing (`idempotencyClaims`): a retried run is refused here, so its model call is not billed twice. */
+const TITLE_CHARGE_SCOPE = "title-charge";
+const TITLE_CHARGE_TTL_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Generates a title from `prompt` and writes it onto the thread. An automatic title never replaces one
  * the owner set (`force` is false); only an explicit regenerate sets `force`, and it may replace any title.
- * `expectedTitle` is the title a regenerate was asked to replace: when the thread has another title by the
- * time the model answers, the owner renamed it meanwhile and that rename stays.
+ * `expectedTitleDigest` is the digest of the title the run read (a regenerate's click-time title): when the thread has another title by
+ * the time the write runs, the owner renamed it meanwhile and that rename stays. `chargeKey`, when given, is the run's identity for
+ * billing: a retried run finds it taken and does not call the model again.
  */
 const writeGeneratedTitle = async (
     context: ActionContext,
     arguments_: {
+        chargeKey?: string;
         expectedPromptId?: string;
-        expectedTitle?: string;
+        expectedTitleDigest?: string;
         force: boolean;
         prompt: string;
         requestedBy?: string;
@@ -1729,6 +1736,23 @@ const writeGeneratedTitle = async (
         return;
     }
 
+    // A model call is billed per call, and the scheduler retries a failed run. A run admitted once is not admitted again, so a retry
+    // after the call does not bill it twice. Taken just before the call, so a failure before it leaves the run retryable.
+    if (arguments_.chargeKey !== undefined) {
+        const admitted = await context.runMutation(internal.lib.claim_once.claimKey, {
+            key: arguments_.chargeKey,
+            scope: TITLE_CHARGE_SCOPE,
+            ttlMs: TITLE_CHARGE_TTL_MS,
+            userId,
+        });
+
+        if (!admitted) {
+            context.log.event("chat.thread_title", { skipped: "already-charged" });
+
+            return;
+        }
+    }
+
     // Pass timezone/location/language to getThreadTitlePrompt for context (date/time formatting, language)
     const threadTitlePrompt = getThreadTitlePrompt(timezone, location, language, titleInstructions);
     const textResult = await thread.generateText(
@@ -1753,7 +1777,8 @@ const writeGeneratedTitle = async (
     const written =
         afterModel === undefined &&
         (await context.runMutation(internal.agent.threads.setGeneratedTitle, {
-            expectedTitle: arguments_.expectedTitle ?? metadata.title ?? "",
+            expectedPromptId: arguments_.expectedPromptId,
+            expectedTitleDigest: arguments_.expectedTitleDigest ?? (await sha256Hex(metadata.title ?? "")),
             requestedBy: arguments_.requestedBy,
             threadId: arguments_.threadId as Id<"threads">,
             title: textResult.text,
@@ -1779,7 +1804,13 @@ export const titleUsageEvent = (model: string, usage: { inputTokens?: number; ou
 };
 
 export const createTitleChat = internalAction.input({ prompt: v.string(), threadId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
-    await writeGeneratedTitle(context, { force: false, prompt: arguments_.prompt, threadId: arguments_.threadId });
+    // The automatic title is written once per thread (it only fills a title that is still the default), so its billing key is the thread.
+    await writeGeneratedTitle(context, {
+        chargeKey: `${arguments_.threadId}:auto-title`,
+        force: false,
+        prompt: arguments_.prompt,
+        threadId: arguments_.threadId,
+    });
 });
 
 /** The most rows read, oldest first, while looking for a title's prompt, and the page they are read in. */
@@ -1871,11 +1902,15 @@ const activeBranchPrompt = async (
 };
 
 /**
- * Scheduled by `regenerateThreadTitle`. The title comes from the earliest user prompt on the thread's active branch, read
- * from its first 500 rows, so a thread longer than that is titled from a later prompt. It is left as it is only when no
- * user text is found.
+ * Scheduled by `regenerateThreadTitle`. The title comes from the earliest user prompt on the thread's active path, which is read
+ * whole: a path of at most `TITLE_PATH_LIMIT` rows (1,000), searched oldest first, so a prompt past the first page is found. A
+ * thread with no prompt within that limit is refused (`activeBranchPrompt`: "too-long"), and one with no user text at all is left
+ * as it is.
  */
-const runRegenerateTitle = async (context: ActionContext, arguments_: { expectedTitle?: string; threadId: string; userId: string }): Promise<void> => {
+const runRegenerateTitle = async (
+    context: ActionContext,
+    arguments_: { claimedAt?: number; expectedTitleDigest?: string; threadId: string; userId: string },
+): Promise<void> => {
     // Before any message is read: a locked, host-run or deleted thread, or a requester who lost access since, never reaches the model.
     const beforeRead = await titleIneligibility(context, { requestedBy: arguments_.userId, threadId: arguments_.threadId });
 
@@ -1907,9 +1942,11 @@ const runRegenerateTitle = async (context: ActionContext, arguments_: { expected
     }
 
     // The write checks that this prompt is still on the active path, not the leaf: a later reply regenerated keeps the title.
+    // One billing key per run: the claim this request took. A scheduler retry of this run carries the same claim and is not billed again.
     await writeGeneratedTitle(context, {
+        chargeKey: arguments_.claimedAt === undefined ? undefined : `${arguments_.threadId}:${arguments_.claimedAt}`,
         expectedPromptId: branch.prompt.id,
-        expectedTitle: arguments_.expectedTitle,
+        expectedTitleDigest: arguments_.expectedTitleDigest,
         force: true,
         prompt: branch.prompt.text,
         requestedBy: arguments_.userId,
@@ -1921,7 +1958,7 @@ const runRegenerateTitle = async (context: ActionContext, arguments_: { expected
 export const regenerateTitleChat = internalAction
     .input({
         claimedAt: v.optional(v.number()),
-        expectedTitle: v.optional(v.string().max(MAX_LENGTH.long)),
+        expectedTitleDigest: v.optional(v.string().max(MAX_LENGTH.short)),
         threadId: v.string(),
         userId: v.string(),
     })
@@ -2033,7 +2070,8 @@ export const regenerateThreadTitle = authAction
         try {
             await context.scheduler.runAfter(0, internal.chat.functions.regenerateTitleChat, {
                 claimedAt,
-                expectedTitle: thread.title ?? "",
+                // A digest, not the title: a stored title of any length then travels as a short argument.
+                expectedTitleDigest: await sha256Hex(thread.title ?? ""),
                 threadId,
                 userId,
             });

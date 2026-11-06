@@ -25,6 +25,8 @@ import { deleteChatFileLinksForThread } from "./files";
 import { deleteStreamsPageForThreadId } from "./streams";
 import { isThreadLocked, toLockedThreadStub } from "../lib/thread-lock";
 import { threadGateOutcome } from "../chat/lib/thread-gate";
+import { sha256Hex } from "../lib/crypto";
+import { activePathIdsOf } from "./branches";
 import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread, resolveThreadReadAccess, type ThreadPermission } from "./thread-read-access";
 import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadPatchFields, vThreadStatus } from "./validators";
 import { systemDb } from "../lib/rls/scope";
@@ -289,14 +291,14 @@ export const updateThread = internalMutation
     });
 
 /**
- * Writes a generated title, and only while the thread still carries `expectedTitle`, may still be titled (not locked, deleted
- * or host-run), and, when there is a `requestedBy`, that user still holds admin access. The access is read here, in the same
- * transaction as the compare and the patch, so a grant revoked after the job's own check cannot still write. Answers whether the
- * title was written.
+ * Writes a generated title, and only while the thread may still be titled (not locked, deleted or host-run); while it still carries
+ * the title the run read (`expectedTitleDigest`, a digest so a stored title of any length compares); while the prompt the title came
+ * from is still on the active path at the time of the write (`expectedPromptId`); and, when there is a `requestedBy`, while that user
+ * still holds admin access. All of it is read here, in the same transaction as the patch. Answers whether the title was written.
  */
 export const writeTitleIfUnchanged = async (
     ctx: Pick<MutationContext, "db">,
-    arguments_: { expectedTitle: string; requestedBy?: string; threadId: Id<"threads">; title: string },
+    arguments_: { expectedPromptId?: string; expectedTitleDigest: string; requestedBy?: string; threadId: Id<"threads">; title: string },
 ): Promise<boolean> => {
     const thread = await ctx.db.get("threads", arguments_.threadId);
 
@@ -304,8 +306,17 @@ export const writeTitleIfUnchanged = async (
         return false;
     }
 
-    if ((thread.title ?? "") !== arguments_.expectedTitle) {
+    if ((await sha256Hex(thread.title ?? "")) !== arguments_.expectedTitleDigest) {
         return false;
+    }
+
+    // An unbranched thread has no leaf: its rows are its path. A branched one must still run through the prompt at the time of the write.
+    if (arguments_.expectedPromptId !== undefined && thread.activeLeafMessageId !== undefined) {
+        const ids = await activePathIdsOf(ctx, arguments_.threadId, thread.activeLeafMessageId as Id<"messages">);
+
+        if (!Array.isArray(ids) || !ids.includes(arguments_.expectedPromptId)) {
+            return false;
+        }
     }
 
     if (arguments_.requestedBy !== undefined) {
@@ -323,7 +334,8 @@ export const writeTitleIfUnchanged = async (
 
 export const setGeneratedTitle = internalMutation
     .input({
-        expectedTitle: v.string().max(MAX_LENGTH.long),
+        expectedPromptId: v.optional(v.string().max(MAX_LENGTH.id)),
+        expectedTitleDigest: v.string().max(MAX_LENGTH.short),
         requestedBy: v.optional(v.string()),
         threadId: v.id("threads"),
         title: v.string().max(MAX_LENGTH.long),

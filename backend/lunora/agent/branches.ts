@@ -170,27 +170,38 @@ export const TITLE_PATH_LIMIT = 1000;
  * The ids of the active path ending at `leafMessageId`, top first, read at most `TITLE_PATH_LIMIT` rows deep. `"too-long"`
  * when the path is longer; `null` when the leaf is not a message of the thread.
  */
+/**
+ * The ids on the active path that ends at `leafMessageId`, root first: `null` when the thread has no rows, `"too-long"` past the
+ * title limit. A stored leaf whose row is gone reads the thread's own active path, as the thread view shows it (`resolveLeafRow`).
+ * Plain, so a write can check the path inside its own transaction.
+ */
+export const activePathIdsOf = async (
+    context: Pick<QueryContext, "db">,
+    threadId: Id<"threads">,
+    leafMessageId: Id<"messages">,
+): Promise<string[] | null | "too-long"> => {
+    // The stored leaf, or, when its row is gone, the thread's own active path. Taking the path from the leaf alone would read as
+    // "no rows" and refuse a thread that still has its prompts on screen.
+    const stored = await context.db.get("messages", leafMessageId);
+    const leaf = stored && stored.threadId === threadId ? stored : await resolveLeafRow(context, threadId, leafMessageId);
+
+    if (!leaf) {
+        return null;
+    }
+
+    const { rows } = await walkPath(context, threadId, leaf, { limit: TITLE_PATH_LIMIT + 1 });
+
+    if (rows.length > TITLE_PATH_LIMIT) {
+        return "too-long";
+    }
+
+    return rows.toReversed().map((row) => row._id as string);
+};
+
 export const getActivePathIds = internalQuery
     .input({ leafMessageId: v.id("messages"), threadId: v.id("threads") })
     .output(v.union(v.null(), v.array(v.string()), v.literal("too-long")))
-    .query(async ({ args, ctx }) => {
-        // The stored leaf, or, when its row is gone, the thread's own active path as the thread view shows it (`resolveLeafRow`).
-        // Taking the path from the leaf alone would read as "no rows" and refuse a thread that still has its prompts on screen.
-        const stored = await ctx.db.get("messages", args.leafMessageId);
-        const leaf = stored && stored.threadId === args.threadId ? stored : await resolveLeafRow(ctx, args.threadId, args.leafMessageId);
-
-        if (!leaf) {
-            return null;
-        }
-
-        const { rows } = await walkPath(ctx, args.threadId, leaf, { limit: TITLE_PATH_LIMIT + 1 });
-
-        if (rows.length > TITLE_PATH_LIMIT) {
-            return "too-long";
-        }
-
-        return rows.toReversed().map((row) => row._id as string);
-    });
+    .query(async ({ args, ctx }) => await activePathIdsOf(ctx, args.threadId, args.leafMessageId));
 
 /**
  * The ids an agent may read as history for `promptMessageId`, or `null` for an

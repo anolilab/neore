@@ -9,6 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 
 import { BRANCH_ROOT } from "../agent/branch-tree";
+import { MAX_LENGTH } from "../lib/validators";
 import schema from "../schema";
 import {
     branchThread,
@@ -290,6 +291,15 @@ describe("regenerating the title of a cloud thread", () => {
         const reply = await appendMessage(cloud, prompt, { message: { content: "Sure", role: "assistant" } });
 
         await harness.run(async (context: any) => await context.db.patch("threads", cloud, { activeLeafMessageId: reply }));
+
+        await expect(harness.withIdentity({ userId: OWNER }).action(regenerateThreadTitle as never, { threadId: cloud } as never)).resolves.toEqual({
+            success: true,
+        });
+        // 520 rows written one by one: the explicit timeout is the repo's pattern for such a test, so a loaded runner does not fail it.
+    }, 30_000);
+
+    it("retitles a chat whose stored title is longer than the title limit", async () => {
+        const cloud = await cloudThread({ title: "x".repeat(MAX_LENGTH.long + 1) });
 
         await expect(harness.withIdentity({ userId: OWNER }).action(regenerateThreadTitle as never, { threadId: cloud } as never)).resolves.toEqual({
             success: true,
