@@ -35,8 +35,15 @@ return { "from": source["from"], "rows": __arr1, "table": source["table"], "to":
 installCompiledValidatorMap(lunora_lib_account_merge_138.listShardRowIds.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["ownedBy"] !== undefined) {
+if (typeof source["ownedBy"] !== "string") return DEFER;
+__val1 = source["ownedBy"];
+__has1 = true;
+}
 if (typeof source["table"] !== "string") return DEFER;
-return { "table": source["table"] };
+return { ...(__has1 ? { "ownedBy": __val1 } : {}), "table": source["table"] };
 });
 installCompiledValidatorMap(lunora_lib_account_merge_138.reassignGlobalRows.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;

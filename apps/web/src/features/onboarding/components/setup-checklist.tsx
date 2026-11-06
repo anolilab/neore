@@ -46,12 +46,13 @@ const SetupChecklist: FC = () => {
     // Pairing happens in the desktop app, outside this page, and the list can be a one-shot read that nothing pushes to:
     // while the pairing step is still open the list is read again on focus and every few seconds, then left alone.
     const settingsQuery = useUserSettings();
+    // A skipped pairing step is not open, and neither is a paired one: only an open step is polled or read on focus.
+    const pairingOpen = (devices: Parameters<typeof detectSetupDone>[0]) =>
+        !detectSetupDone(devices).pair && settingsQuery.data?.setupStepsSkipped?.includes("pair") !== true;
     const devicesQuery = useQuery({
         ...crpc.devices.functions.listDevices.queryOptions({}),
-        // A skipped pairing step is not open, so it is not polled either.
-        refetchInterval: (query) =>
-            detectSetupDone(query.state.data).pair || settingsQuery.data?.setupStepsSkipped?.includes("pair") ? false : PAIRING_POLL_MS,
-        refetchOnWindowFocus: "always",
+        refetchInterval: (query) => (pairingOpen(query.state.data) ? PAIRING_POLL_MS : false),
+        refetchOnWindowFocus: (query) => (pairingOpen(query.state.data) ? "always" : false),
     });
     const settingsKey = crpc.auth.functions.getUserSettings.queryOptions({}).queryKey;
     // One step per call: the server applies it to the list it holds, so another tab's skip is never overwritten. The

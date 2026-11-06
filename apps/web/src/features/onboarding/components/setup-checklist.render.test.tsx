@@ -11,7 +11,7 @@ import SetupChecklist from "./setup-checklist";
 const { account, devices, mutate, server, sonnerMock } = vi.hoisted(() => {
     return {
         account: { id: "user-a" },
-        devices: { current: [] as unknown[], fail: false },
+        devices: { current: [] as unknown[], fail: false, reads: 0 },
         mutate: vi.fn(),
         server: {
             fail: false,
@@ -119,6 +119,8 @@ vi.mock("@/lib/lunora/crpc", () => {
                             queryOptions: () => {
                                 return {
                                     queryFn: async () => {
+                                        devices.reads += 1;
+
                                         if (devices.fail) {
                                             throw new Error("offline");
                                         }
@@ -419,6 +421,33 @@ describe("<SetupChecklist>", () => {
 
         expect(await screen.findAllByText("(Done)")).not.toHaveLength(0);
         expect(screen.queryByRole("link", { name: GO_TO_PAIRING })).toBeNull();
+    });
+
+    it("does not read the device list again on focus once the pairing step is done or skipped", async () => {
+        devices.current = [{ _id: "paired-laptop", name: "Laptop" }];
+        const view = renderChecklist();
+
+        await screen.findAllByText("(Done)");
+        devices.reads = 0;
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+        await new Promise((resolve) => {
+            setTimeout(resolve, 50);
+        });
+        expect(devices.reads).toBe(0);
+        view.unmount();
+
+        devices.current = [];
+        server.skipped = ["pair"];
+        renderChecklist();
+        await screen.findAllByText("(Skipped)");
+        devices.reads = 0;
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+        await new Promise((resolve) => {
+            setTimeout(resolve, 50);
+        });
+        expect(devices.reads).toBe(0);
     });
 
     it("lets the latest click win when Resume follows a Skip that has not been saved yet", async () => {

@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { deleteMergedGuest } from "../auth/hooks";
 import { requireOwnCollectionId } from "../knowledge/documents-shared";
 import type { MergeReferences, ShardCall } from "./account-merge";
-import { importShardRows, MERGE_PAGE_SIZE } from "./account-merge";
+import { importShardRows, listShardRowIds, MERGE_PAGE_SIZE } from "./account-merge";
 import { GLOBAL_USER_COLUMNS, GLOBAL_USER_TABLES_NOT_REASSIGNED, mergeGuestInto, reassignGlobalRows, rewriteOwner, shardLocalTables } from "./account-merge";
 import { schemaWithShardedTables } from "./test-schema";
 
@@ -375,5 +375,48 @@ describe("importShardRows for userSettings", () => {
 
         expect(rows[0]).toMatchObject({ language: "de-DE" });
         expect(rows[0]?.setupStepsSkipped).toBeUndefined();
+    });
+});
+
+describe("clearing the guest's settings", () => {
+    it("lists only the guest's own settings rows, so a shard that also holds the new account's keeps it", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const result = await harness.run(async (context: any) => {
+                const guestId = await context.db.insert("userSettings", { setupStepsSkipped: ["ssh"], userId: "guest" });
+
+                await context.db.insert("userSettings", { language: "de-DE", userId: "user" });
+
+                const ids = await context.runQuery(listShardRowIds, { ownedBy: "guest", table: "userSettings" });
+
+                return { guestId, ids };
+            });
+
+            expect(result.ids).toEqual([result.guestId]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("asks for the guest's rows alone when it clears the tables the new account keeps its own row of", async () => {
+        const { call } = fakeShards({ guest: { userSettings: [{ _id: "g1", userId: "guest" }] } });
+        const listIdCalls: Record<string, unknown>[] = [];
+
+        await mergeGuestInto(
+            async (reference, args, shardKey) => {
+                if (reference.__lunoraRef.endsWith(":listShardRowIds")) {
+                    listIdCalls.push(args);
+                }
+
+                return await call(reference, args, shardKey);
+            },
+            REFERENCES,
+            "guest",
+            "user",
+        );
+
+        expect(listIdCalls.find((args) => args.table === "userSettings")).toEqual({ ownedBy: "guest", table: "userSettings" });
+        expect(listIdCalls.find((args) => args.table === "threads")).toEqual({ table: "threads" });
     });
 });

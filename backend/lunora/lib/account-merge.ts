@@ -116,11 +116,25 @@ export const listShardRowsPage = internalQuery
         return { continueCursor, isDone, page };
     });
 
-/** On the GUEST's shard: the ids of the first page of `table` — for the delete pass. */
+/**
+ * On the GUEST's shard: the ids of the first page of `table` — for the delete pass. With `ownedBy`, only that user's
+ * rows: the tables the new account keeps its own row of are cleared of the guest's row alone, so a shard that also
+ * holds the new account's row (one shard serving both, as local routing can) keeps it.
+ */
 export const listShardRowIds = internalQuery
-    .input({ table: v.string() })
+    .input({ ownedBy: v.optional(v.string()), table: v.string() })
     .output(v.array(v.string()))
     .query(async ({ args, ctx }) => {
+        if (args.ownedBy !== undefined) {
+            const facades = ctx.db as unknown as Record<
+                string,
+                { findMany: (options: { limit: number; where: { userId: string } }) => Promise<{ page: Record<string, unknown>[] }> }
+            >;
+            const { page } = await facades[args.table]!.findMany({ limit: MERGE_PAGE_SIZE, where: { userId: args.ownedBy } });
+
+            return page.map((row) => row._id as string);
+        }
+
         const rows = await rawDb(ctx).query(args.table).take(MERGE_PAGE_SIZE);
 
         return rows.map((row) => row._id as string);
@@ -273,7 +287,7 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
         let emptied = false;
 
         for (let round = 0; round < MAX_ROUNDS_PER_TABLE; round += 1) {
-            const ids: string[] = await call(references.listIds, { table }, from);
+            const ids: string[] = await call(references.listIds, KEEP_NEW_USERS.has(table) ? { ownedBy: from, table } : { table }, from);
 
             if (ids.length === 0) {
                 emptied = true;

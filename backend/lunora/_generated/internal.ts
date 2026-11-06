@@ -787,7 +787,7 @@ export interface InternalApiTypes {
         account_merge: {
             deleteShardRows: FunctionReference<"mutation", { ids: Array<string>; table: string }, null>;
             importShardRows: FunctionReference<"mutation", { from: string; rows: Array<unknown>; table: string; to: string }, { imported: number }>;
-            listShardRowIds: FunctionReference<"query", { table: string }, Array<string>>;
+            listShardRowIds: FunctionReference<"query", { ownedBy?: string; table: string }, Array<string>>;
             listShardRowsPage: FunctionReference<"query", { cursor: string | null; table: string }, { continueCursor: string | null; isDone: boolean; page: Array<unknown> }>;
             reassignGlobalRows: FunctionReference<"mutation", { from: string; to: string }, { reassigned: number }>;
             runGuestMerge: FunctionReference<"action", { from: string; to: string }, { moved: number }>;
