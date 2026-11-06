@@ -31353,7 +31353,7 @@
     {
       "callsMail": false,
       "emitsEvent": false,
-      "fanOut": false,
+      "fanOut": true,
       "handlesErrors": false,
       "reachesOutbound": false,
       "runsAiGeneration": false,
