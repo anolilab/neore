@@ -409,6 +409,30 @@ describe("the options the agent offers", () => {
         expect(screen.queryByText(WAITING_STATUS)).toBeNull();
     });
 
+    it("names the option in its refusal, and while it waits, when the agent has removed the option since the change", async () => {
+        const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+        await waitFor(() => expect(mutations()).toHaveLength(1));
+
+        // Still waiting for its answer when the agent's list loses the option.
+        client.setQueryData(["acp.functions.getHostSession", { threadId: "thread-1" }], {
+            _id: "session-1",
+            agentState: { configOptions: [] },
+            status: "idle",
+        });
+        expect(await screen.findByText("Waiting for the agent to change Model to Deep.")).toBeTruthy();
+
+        client.setQueryData(["acp.functions.getHostSession", { threadId: "thread-1" }], {
+            _id: "session-1",
+            agentState: { configOptions: [] },
+            optionResult: { callId: "call-1", optionId: "model", outcome: "refused", reason: "the agent did not accept the change", valueId: "deep" },
+            status: "idle",
+        });
+        expect(await screen.findByText("The agent did not change Model: the agent did not accept the change")).toBeTruthy();
+    });
+
     it("says what the agent confirmed when the option it changed is no longer among its options", async () => {
         const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
