@@ -24,6 +24,7 @@ import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import { requireOwnedThread, requireOwnedThreadIgnoringLock } from "../agent/thread-read-access";
 import { refuseHostThread } from "../acp/lib/host-thread";
+import { isWorkerThread } from "../sub-agents/worker-thread";
 import { GUEST_POST_CLAIM_TTL_MS, GUEST_POST_SCOPE, claimOnce, hasClaim } from "../lib/claim-once";
 import { timingSafeEqual } from "../lib/crypto";
 import { callOnShard } from "../lib/cross-shard";
@@ -122,6 +123,11 @@ export const createGuestLink = authMutation
         }
 
         refuseHostThread(thread, "given a guest link");
+
+        // A worker's conversation takes turns only through a dispatch, so a note sent into it could never be sent.
+        if (await isWorkerThread(context, threadId)) {
+            throw new LunoraError("BAD_REQUEST", "A worker's conversation cannot be given a guest link.");
+        }
 
         // A new link replaces the old one and everything on it, so notes still waiting for review are not dropped silently.
         if (discardWaiting !== true && (await hasWaitingNotes(context, threadId))) {
@@ -465,6 +471,10 @@ export const holdGuestMessage = internalMutation
             thread.runner === "host" ||
             isThreadLocked(thread)
         ) {
+            return closed;
+        }
+
+        if (await isWorkerThread(ctx, thread._id)) {
             return closed;
         }
 

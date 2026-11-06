@@ -645,3 +645,28 @@ describe("a guest's text that cannot be sent", () => {
         expect(await rows("threadGuestMessages")).toHaveLength(0);
     });
 });
+
+describe("a worker's conversation", () => {
+    it("cannot be given a guest link, since a note sent into it could never be sent", async () => {
+        const workerThread = await harness.run(
+            async (ctx: any) => await ctx.db.insert("threads", { createdAt: 0, status: "active", title: "Worker", updatedAt: 0, userId: OWNER }),
+        );
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("subAgentRuns", {
+                    childThreadId: workerThread,
+                    createdAt: 0,
+                    depth: 1,
+                    mode: "worker",
+                    parentThreadId: threadId,
+                    status: "running",
+                    task: "Tidy up",
+                    updatedAt: 0,
+                    userId: OWNER,
+                }),
+        );
+
+        await expect(asOwner().mutation(guestLinks.createGuestLink as never, { threadId: workerThread } as never)).rejects.toBeDefined();
+    });
+});
