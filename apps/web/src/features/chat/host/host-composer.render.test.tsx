@@ -443,6 +443,22 @@ describe("the agent's slash commands", () => {
         expect(await screen.findByRole("listbox")).toBeTruthy();
     });
 
+    it("follows the end of a forward selection, where the caret sits, not its start", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re and /res");
+        // Selected forward from the first query into the second: the caret is at the end, in the second query.
+        box.setSelectionRange(3, 12, "forward");
+        fireEvent.keyUp(box);
+
+        expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([expect.stringContaining("/resume")]);
+        fireEvent.mouseDown(screen.getAllByRole("option")[0]!);
+
+        await waitFor(() => expect(box.value).toBe("/re and /resume "));
+    });
+
     it("closes the menu when the session has ended, since the input is disabled", async () => {
         mount(session({ agentLabel: "Example agent", agentState: { availableCommands: COMMANDS }, status: "ended" }));
 

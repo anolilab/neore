@@ -32,6 +32,9 @@ import { formatReportedCost } from "./reported-cost";
 /** The keys the open `/` menu takes for itself. */
 const SLASH_KEYS: ReadonlySet<string> = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape", "Tab"]);
 
+/** The caret of the textarea: the end a selection moves from. A forward selection leaves it at the end, a backward one at the start. */
+const caretOf = (element: HTMLTextAreaElement): number => (element.selectionDirection === "backward" ? element.selectionStart : element.selectionEnd);
+
 /** How the last turn ended when the person should be offered a way on. */
 const CONTINUABLE: ReadonlySet<string> = new Set(["interrupted", "timeout"]);
 
@@ -345,12 +348,12 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                             setText(event.target.value);
                             // Any edit reopens the menu: a dismissal holds for the text it was made on, and only until the next edit.
                             setClosedFor(undefined);
-                            setCursor(event.target.selectionStart);
+                            setCursor(caretOf(event.target));
                             setActiveIndex(0);
                         }}
-                        onClick={(event) => setCursor(event.currentTarget.selectionStart)}
+                        onClick={(event) => setCursor(caretOf(event.currentTarget))}
                         onKeyDown={onKeyDown}
-                        onKeyUp={(event) => setCursor(event.currentTarget.selectionStart)}
+                        onKeyUp={(event) => setCursor(caretOf(event.currentTarget))}
                         placeholder={t`Message the agent on your computer`}
                         ref={box}
                         role="combobox"
