@@ -40,3 +40,13 @@ export const useComposerModelsSettled = (): boolean => {
 
     return useGatewayModelsSettled() && (isSuccess || isError);
 };
+
+/**
+ * The ids of the composer's list, once it is final; `undefined` while it is not. A link's open and a copy both decide on these ids.
+ */
+export const useComposerModelIds = (): ReadonlySet<string> | undefined => {
+    const models = useComposerModels();
+    const settled = useComposerModelsSettled();
+
+    return useMemo(() => (settled ? new Set(models.map((entry) => entry.id)) : undefined), [models, settled]);
+};

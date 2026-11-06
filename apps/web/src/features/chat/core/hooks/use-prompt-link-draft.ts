@@ -7,9 +7,8 @@ import { showWarning } from "@/lib/toast";
 import { useChatUIStore } from "../stores/chat-ui-store";
 import type { ModelId } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
-import { composerModelOf } from "../utils/composer-model";
 import { promptFromLink } from "../utils/prompt-link";
-import { carriableLinkModel } from "../utils/prompt-link-model";
+import { carriableLinkModel, linkModelAppliesOnOpen } from "../utils/prompt-link-model";
 
 /** The chat search without the prompt link's own parameters: a saved prompt or a message in the same URL stays. */
 const withoutLinkParameters = (search: Record<string, unknown>): Record<string, unknown> =>
@@ -90,13 +89,9 @@ export const usePromptLinkDraft = ({
         if (applyLink && prompt !== undefined && model !== undefined) {
             const state = useModelStore.getState();
             const definition = carriableLinkModel(model);
-            // The model the composer sends with is the link's only in a text chat, and only where the composer shows that model
-            // (an anonymous visitor's text chat shows the free model instead). Anything else would send a different model.
-            const sendsLinkModel =
-                definition !== undefined &&
-                allowedModelIds.has(definition.id) &&
-                state.newThreadMode === "text" &&
-                composerModelOf({ isAnonymous, mode: "text", threadModel: definition.id }) === definition.id;
+            // The model the composer sends with is the link's only where the shared rule (`linkModelAppliesOnOpen`) holds; a copy
+            // names a model only under the same rule.
+            const sendsLinkModel = linkModelAppliesOnOpen({ allowedModelIds, isAnonymous, model, newThreadMode: state.newThreadMode });
 
             if (definition && sendsLinkModel) {
                 // A comparison left on from before would fan the draft out to its models, not to the one the link names.

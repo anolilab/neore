@@ -60,6 +60,8 @@ export interface ThreadData extends ThreadOwnerState {
 // --- Split Context Types ---
 
 export interface ChatThreadContextValue {
+    /** The models the composer's picker offers this user, once that list is final (`undefined` while it loads). A copied link checks it. */
+    composerModelIds: ReadonlySet<string> | undefined;
     /** The signed-in person is an anonymous guest (the composer shows the free model for a text chat). */
     isAnonymous: boolean;
     isNewThread: boolean;

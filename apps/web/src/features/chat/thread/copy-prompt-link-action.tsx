@@ -16,7 +16,7 @@ import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import { composerModelOf, composerModeOf, sendsToComparison } from "@/features/chat/core/utils/composer-model";
 import { buildPromptLink, isPromptLinkTooLong } from "@/features/chat/core/utils/prompt-link";
-import { carriableLinkModel } from "@/features/chat/core/utils/prompt-link-model";
+import { linkModelAppliesOnOpen } from "@/features/chat/core/utils/prompt-link-model";
 import type { UIMessage } from "@/lib/agent";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError, showSuccess, showWarning } from "@/lib/toast";
@@ -42,7 +42,7 @@ const writeLink = (link: () => Promise<string>): Promise<void> => {
 const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
     const { t } = useLingui();
     // Read from the chat's thread context, not a hook of its own: a message row renders without the auth provider.
-    const { isAnonymous, model, thread, threadId } = useChatThread();
+    const { composerModelIds, isAnonymous, model, thread, threadId } = useChatThread();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     const botId = thread?.botId ?? null;
@@ -53,6 +53,21 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
     const tooLong = t`This message is too long to copy as a prompt link.`;
     const comparisonRefused = t`This chat sends to several models, and a prompt link names one, so no link was copied.`;
     const botUnreadable = t`Could not read this chat's bot, so no link was copied.`;
+    const modelsLoading = t`Your model settings are still loading, so no link was copied. Try again in a moment.`;
+
+    /**
+     * Whether opening the copied link would select `linkModel`: the same rule the link's open applies (`linkModelAppliesOnOpen`), with
+     * the list the composer offers and the mode a new chat opens in. A copy names a model only when this holds, so it never names one
+     * the open would refuse.
+     */
+    const opensOnLinkModel = (linkModel: string | undefined): boolean =>
+        composerModelIds !== undefined &&
+        linkModelAppliesOnOpen({
+            allowedModelIds: composerModelIds,
+            isAnonymous,
+            model: linkModel,
+            newThreadMode: useModelStore.getState().newThreadMode,
+        });
 
     // A bot chat runs on the bot's current model, which the composer shows; the thread may still store an older one. The bot
     // list is read on the click, not per message row, and is fetched again then: a cached list may predate a model change.
@@ -133,9 +148,15 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
         // rather than opening on another model. A chat that is not a bot chat knows its model now, so its refusals are decided
         // before anything reaches the clipboard, and the warnings are exact.
         if (!isBotChat) {
+            if (composerModelIds === undefined) {
+                showWarning(modelsLoading);
+
+                return;
+            }
+
             const linkModel = shownModel(undefined);
 
-            if (!carriableLinkModel(linkModel)) {
+            if (!opensOnLinkModel(linkModel)) {
                 showWarning(modelRefused);
 
                 return;
@@ -157,7 +178,11 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
         await copyLink(async () => {
             const linkModel = shownModel(await freshBotModel());
 
-            if (!carriableLinkModel(linkModel)) {
+            if (composerModelIds === undefined) {
+                throw new LinkRefusal(modelsLoading);
+            }
+
+            if (!opensOnLinkModel(linkModel)) {
                 throw new LinkRefusal(modelRefused);
             }
 
