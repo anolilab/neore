@@ -9,7 +9,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
-import { stripHiddenText } from "@neore/ai/utils";
+import { findHiddenText, stripHiddenText } from "@neore/ai/utils";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import DiffCommentsDraft from "./diff-comments-draft";
+import { caretAfterRemoval } from "./host-caret";
 import { MAX_HOST_PROMPT_CHARS, sendHostMessage } from "./host-send";
 import useHostSendErrorMessages from "./host-send-errors";
 
@@ -193,13 +194,23 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     aria-label={t`Message to the coding agent`}
                     className="bg-background min-h-11 flex-1 resize-none rounded-lg border px-3 py-2 text-sm disabled:opacity-60"
                     disabled={blocked}
-                    maxLength={MAX_HOST_PROMPT_CHARS}
                     onChange={(event) => {
-                        // Typed and pasted text both come through here; a joiner at the end waits for the next letter.
-                        const { removed, text: clean } = stripHiddenText(event.target.value, { keepTrailingJoiner: true });
+                        // Typed and pasted text both come through here, whole: a length limit on the element would cut a paste
+                        // before its hidden characters are removed. A joiner at the end waits for the next letter.
+                        const element = event.currentTarget;
+                        const { selectionStart, selectionEnd, value } = element;
+                        const { removed, text: clean } = stripHiddenText(value, { keepTrailingJoiner: true });
 
                         if (removed > 0) {
                             toast.info(t`Hidden characters were removed from your message.`);
+
+                            // The controlled value is set back to the clean text after this handler, which moves the caret to the end.
+                            // Put it where the person left it, once that has happened.
+                            const hidden = findHiddenText(value, { keepTrailingJoiner: true });
+                            const start = caretAfterRemoval(selectionStart, hidden);
+                            const end = caretAfterRemoval(selectionEnd, hidden);
+
+                            queueMicrotask(() => element.setSelectionRange(start, end));
                         }
 
                         setText(clean);
@@ -225,6 +236,11 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
                     </Button>
                 )}
             </div>
+            {trimmed.length > MAX_HOST_PROMPT_CHARS && (
+                <p className="text-destructive text-xs" role="status">
+                    {messages.too_large}
+                </p>
+            )}
         </div>
     );
 };

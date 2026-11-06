@@ -11,7 +11,7 @@
  *   character that can take emoji presentation (`Extended_Pictographic`, `Emoji_Presentation`; after a keycap base,
  *   0-9 # *, only when U+20E3 follows); U+E0100 to U+E01EF after an ideograph; U+FE00 to U+FE0D after an ideograph or a
  *   math or other symbol (`Sm`, `So`), never after a letter or digit;
- * - U+200D (ZWJ) stays only between two emoji, or between an emoji and its own emoji selector (a ZWJ emoji sequence):
+ * - U+200D (ZWJ) stays only between an emoji, optionally followed by its own emoji selector, and another emoji (a ZWJ emoji sequence):
  *   a joiner between letters can carry a bit per gap, so it goes. U+200C (ZWNJ) never stays. The cost: the ZWNJ of
  *   Persian words and the ZWJ of Indic conjuncts no longer render;
  * - the tag letters and CANCEL TAG of the three subdivision flags (England, Scotland, Wales: `gbeng`, `gbsct`, `gbwls`)
