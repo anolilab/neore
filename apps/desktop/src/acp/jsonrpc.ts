@@ -48,8 +48,9 @@ export class JsonRpcConnection {
         };
         input.on("end", () => this.close(new Error("the agent closed its output")));
         input.on("error", (error) => this.close(error));
-        // A write to a dead child's stdin is an EPIPE: the exit is reported through `close`, not thrown here.
-        output.on("error", (error) => this.close(error));
+        // A write to a dead child's stdin is an EPIPE: the exit is reported through `close`, not thrown here. It names the same
+        // cause as an output that ends, so a missing command reads the same whichever of the two reaches `close` first.
+        output.on("error", (error) => this.close((error as NodeJS.ErrnoException).code === "EPIPE" ? new Error("the agent closed its output") : error));
     }
 
     public request<Result = unknown>(method: string, params: unknown): Promise<Result> {

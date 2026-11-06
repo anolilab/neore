@@ -117,6 +117,8 @@ const session = (fields: Record<string, unknown> = {}) => {
 beforeEach(() => {
     harness.calls = [];
     harness.sendResults = [];
+    // The popup brings its active command into view; jsdom has no layout, so the call is recorded instead.
+    Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: vi.fn(), writable: true });
 });
 
 afterEach(() => {
@@ -310,6 +312,185 @@ describe("what the agent reports about itself", () => {
         } finally {
             vi.unstubAllGlobals();
         }
+    });
+});
+
+describe("the agent's slash commands", () => {
+    const COMMANDS = [
+        { description: "Compact the context", name: "compact" },
+        { description: "Review the changes", hint: "a branch", name: "review" },
+        { description: "Resume a session", name: "resume" },
+    ];
+    const withCommands = () => session({ agentLabel: "Example agent", agentState: { availableCommands: COMMANDS } });
+    const typeInto = (box: HTMLTextAreaElement, value: string) => {
+        fireEvent.change(box, { target: { selectionStart: value.length, value } });
+    };
+
+    it("opens on a slash, names the agent as the source of each command, and filters by prefix", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        expect(screen.queryByRole("listbox")).toBeNull();
+        typeInto(box, "/");
+
+        expect(await screen.findByRole("listbox", { name: "Commands from Example agent" })).toBeTruthy();
+        expect(screen.getAllByRole("option")).toHaveLength(3);
+        expect(screen.getAllByText("Example agent")).toHaveLength(3);
+
+        typeInto(box, "/re");
+
+        const options = screen.getAllByRole("option");
+
+        expect(options.map((option) => option.textContent)).toEqual([expect.stringContaining("/review"), expect.stringContaining("/resume")]);
+        expect(box.getAttribute("aria-activedescendant")).toBe(options[0]?.id);
+    });
+
+    it("moves with the arrows and inserts the chosen command with Enter, which does not send", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+        fireEvent.keyDown(box, { key: "ArrowDown" });
+        expect(box.getAttribute("aria-activedescendant")).toBe(screen.getAllByRole("option")[1]?.id);
+        fireEvent.keyDown(box, { key: "Enter" });
+
+        await waitFor(() => expect(box.value).toBe("/resume "));
+        expect(screen.queryByRole("listbox")).toBeNull();
+        expect(harness.calls).toEqual([]);
+    });
+
+    it("picks with Tab too, after text and a space", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "please /com");
+        fireEvent.keyDown(box, { key: "Tab" });
+
+        await waitFor(() => expect(box.value).toBe("please /compact "));
+    });
+
+    it("inserts a command picked with the mouse or a tap, which keeps the textarea focused", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+        fireEvent.mouseDown(screen.getAllByRole("option")[1]!);
+
+        await waitFor(() => expect(box.value).toBe("/resume "));
+        expect(harness.calls).toEqual([]);
+    });
+
+    it("brings the active command into view as the arrows move it", async () => {
+        const scroll = vi.fn();
+
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll, writable: true });
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+        fireEvent.keyDown(box, { key: "ArrowDown" });
+
+        expect(scroll.mock.contexts.at(-1)).toBe(screen.getAllByRole("option")[1]);
+    });
+
+    it("sends with Ctrl+Enter while the menu is open, rather than picking the active command", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+        fireEvent.keyDown(box, { ctrlKey: true, key: "Enter" });
+
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+        expect(harness.calls[0]).toEqual(["send", { requestId: expect.any(String), text: "/re", threadId: "thread-1" }]);
+    });
+
+    it("dismisses the menu for one slash query only: a second query in the same draft opens it again", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re then /");
+        expect(await screen.findByRole("listbox")).toBeTruthy();
+        fireEvent.keyDown(box, { key: "Escape" });
+        expect(screen.queryByRole("listbox")).toBeNull();
+
+        // The caret moves to the first query, which is not the one dismissed.
+        box.setSelectionRange(3, 3);
+        fireEvent.keyUp(box);
+
+        expect(await screen.findByRole("listbox")).toBeTruthy();
+    });
+
+    it("closes the menu when the session has ended, since the input is disabled", async () => {
+        mount(session({ agentLabel: "Example agent", agentState: { availableCommands: COMMANDS }, status: "ended" }));
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+
+        expect(box.disabled).toBe(true);
+        expect(screen.queryByRole("listbox")).toBeNull();
+    });
+
+    it("refuses a pick that would make the draft too long to send, and keeps the draft", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+        // Filled to the limit: picking "resume" grows "/re" into "/resume " and takes the draft past it.
+        const draft = `${"x".repeat(30_000 - 4)} /re`; // 30,000 is the send limit the mock above sets.
+
+        typeInto(box, draft);
+        fireEvent.mouseDown(screen.getAllByRole("option")[1]!);
+
+        expect(box.value).toBe(draft);
+        expect(harness.calls).toEqual([]);
+    });
+
+    it("places the caret after a command that is already typed, when picking it changes no text", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/review and");
+        box.setSelectionRange(3, 3);
+        fireEvent.keyUp(box);
+        fireEvent.mouseDown(screen.getAllByRole("option")[0]!);
+
+        await waitFor(() => expect(box.selectionStart).toBe(8));
+        expect(box.value).toBe("/review and");
+    });
+
+    it("closes on Escape and reopens when the text changes", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/");
+        await screen.findByRole("listbox");
+        fireEvent.keyDown(box, { key: "Escape" });
+        expect(screen.queryByRole("listbox")).toBeNull();
+
+        typeInto(box, "/c");
+        expect(await screen.findByRole("listbox")).toBeTruthy();
+    });
+
+    it("shows no menu when the agent advertised no commands, and Enter still sends", async () => {
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/compact");
+        expect(screen.queryByRole("listbox")).toBeNull();
+        fireEvent.keyDown(box, { key: "Enter" });
+
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+        expect(harness.calls[0]).toEqual(["send", expect.objectContaining({ text: "/compact" })]);
     });
 });
 

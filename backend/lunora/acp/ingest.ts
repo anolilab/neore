@@ -36,7 +36,7 @@ import { patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
-import { mergeAgentState, sameOptionFields } from "./lib/agent-state";
+import { mergeAgentState, sameReportedFields } from "./lib/agent-state";
 import { MAX_EVENTS_PER_POST } from "./lib/constants";
 import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
@@ -193,6 +193,9 @@ const withKeptCost = (usage: Usage, stored: Usage | undefined): Usage => {
 const sameUsage = (a: Usage | undefined, b: Usage | undefined): boolean =>
     a?.used === b?.used && a?.size === b?.size && a?.cost?.amount === b?.cost?.amount && a?.cost?.currency === b?.cost?.currency;
 
+/** How far ahead of the server clock a report's time is believed (see `applySessionState`). */
+const MAX_CLOCK_AHEAD_MS = 5 * 60_000;
+
 /**
  * A `session_state` report: each field present replaces the stored one, an absent field keeps it. A report older than the
  * one applied is dropped, and one whose values are already stored writes nothing. Answered "applied" either way, so the
@@ -211,12 +214,17 @@ const applySessionState = async (
         return REFUSED;
     }
 
-    // A desktop clock running ahead cannot park the ordering watermark in the future: a report stamped later than the server
-    // clock is ordered at the server's time. The ordering time is the observation time, so a report still arriving after
-    // the session closed is stored too: a debounced report can outlive its close, and its usage is the final one.
-    const at = Math.min(event.at, now);
+    // The desktop's own time orders its reports, so a clock a little ahead keeps them in order. A time further ahead than
+    // MAX_CLOCK_AHEAD_MS is ordered at the server's time, so a clock that far off cannot park the watermark in the future. The
+    // ordering time is the observation time, so a report still arriving after the session closed is stored too: a debounced
+    // report can outlive its close, and its usage is the final one.
+    const at = event.at <= now + MAX_CLOCK_AHEAD_MS ? event.at : now;
 
-    if (session.agentStateAt !== undefined && at < session.agentStateAt) {
+    // A stored time further ahead of the server clock than that bound was stamped before the desktop's clock was corrected back.
+    // It orders nothing any more, so it must not hold the reports after the correction back until wall time catches up.
+    const watermark = session.agentStateAt !== undefined && session.agentStateAt <= now + MAX_CLOCK_AHEAD_MS ? session.agentStateAt : undefined;
+
+    if (watermark !== undefined && at < watermark) {
         return { ended: false, next: 0, outcome: "applied" };
     }
 
@@ -224,13 +232,13 @@ const applySessionState = async (
     const usage = event.usage === undefined ? undefined : withKeptCost(event.usage, session.agentState?.usage);
     const usageChanged = usage !== undefined && !sameUsage(usage, session.agentState?.usage);
 
-    if (usageChanged || !sameOptionFields(session.agentState, event)) {
+    if (usageChanged || !sameReportedFields(session.agentState, event)) {
         await ctx.db.patch("acpSessions", session._id, {
             agentState: mergeAgentState(session.agentState, { ...event, ...(usage !== undefined && { usage }) }),
             agentStateAt: at,
         });
-    } else if (session.agentStateAt === undefined || at > session.agentStateAt) {
-        // A newer report that repeats the stored values (or leaves them out) still moves the watermark, so an older report that
+    } else if (watermark === undefined || at > watermark) {
+        // A newer report that repeats what is stored (or leaves it out) still moves the watermark, so an older report that
         // arrives later cannot overwrite the newest observation.
         await ctx.db.patch("acpSessions", session._id, { agentStateAt: at });
     }

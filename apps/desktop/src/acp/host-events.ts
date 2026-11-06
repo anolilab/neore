@@ -54,11 +54,20 @@ export interface AgentUsage {
     used: number;
 }
 
+/** One slash command an agent advertised, bounded and scrubbed. */
+export interface AgentCommand {
+    description: string;
+    hint?: string;
+    name: string;
+}
+
 /**
  * What an agent reports about itself outside a turn. Each field present replaces the stored one; an absent field keeps it
  * (`applySessionState` in the backend). Sent as a turn-less post, not a turn event.
  */
 export interface SessionStatePatch {
+    /** The slash commands the agent advertised (ACP `available_commands_update`); the newest list replaces the last. */
+    availableCommands?: AgentCommand[];
     /** The options the agent offers (model, reasoning effort, mode ...). When present the legacy `modes` and `models` are not sent. */
     configOptions?: AgentOption[];
     /** The legacy model state; shown, never changed. */
@@ -115,7 +124,7 @@ export interface SessionObserver {
     sessionEnded: (sessionId: string) => void;
     /** `threadId` is known when the backend started the session (`acp_start`); otherwise opening it makes the thread. */
     sessionOpened: (sessionId: string, info: HostSessionInfo, threadId?: string) => void;
-    /** The agent reported something about itself outside a turn (its usage now). Coalesced by the poster. */
+    /** The agent reported something about itself outside a turn (its usage now, or its advertised commands). Coalesced by the poster. */
     sessionState?: (sessionId: string, patch: SessionStatePatch) => void;
     text: (sessionId: string, turnId: string, delta: string) => void;
     thought: (sessionId: string, turnId: string, delta: string) => void;

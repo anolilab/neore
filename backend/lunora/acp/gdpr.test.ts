@@ -325,6 +325,29 @@ describe("the export of coding-agent sessions and events", () => {
 
         expect(pages.flatMap((page) => [...page.sessions, ...page.events])).toEqual([]);
     });
+
+    it("exports a session's usage without the command list the agent advertised", async () => {
+        const device = await insertDevice(A);
+        const threadId = await insertSession(A, device, 0);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+            await ctx.db.patch("acpSessions", row._id, {
+                agentState: {
+                    availableCommands: [{ description: "Review the change", name: "review" }],
+                    usage: { size: 200_000, used: 12_000 },
+                },
+            });
+        });
+
+        const page = await collectPage(A);
+        const exported = page.sessions.find((session) => session.threadId === threadId);
+
+        expect(exported?.agentState).toBeDefined();
+        expect(exported?.agentState).not.toHaveProperty("availableCommands");
+        expect(exported?.agentState?.usage).toEqual({ size: 200_000, used: 12_000 });
+    });
 });
 
 describe("erasing a user's coding-agent data", () => {

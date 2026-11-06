@@ -301,6 +301,54 @@ describe("a session and turns the backend sent", () => {
     });
 });
 
+describe("a command list the agent sends before its session answers", () => {
+    it("is kept bounded, so a list whose raw size is over the early budget still reaches the menu", async () => {
+        const reported: { availableCommands?: { description: string; hint?: string; name: string }[] }[] = [];
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: {
+                ...recorder().observer,
+                sessionState: (_id, patch) => {
+                    reported.push(patch);
+                },
+            },
+            onChange: () => {},
+            process: agent.process,
+        });
+        const started = session.start();
+
+        await expect.poll(() => agent.written.some((frame) => frame.method === "initialize")).toBe(true);
+        const initialize = agent.written.find((frame) => frame.method === "initialize");
+
+        agent.say({ id: initialize?.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/new")).toBe(true);
+
+        // A hundred commands with 4000-character descriptions and hints: about 800 KB raw, and about 60 KB once bounded.
+        const long = "x".repeat(4000);
+        const commands = Array.from({ length: 100 }, (_, index) => {
+            return { description: long, input: { hint: long }, name: `command-${index}` };
+        });
+
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { availableCommands: commands, sessionUpdate: "available_commands_update" } } });
+
+        const opened = agent.written.find((frame) => frame.method === "session/new");
+
+        agent.say({ id: opened?.id, result: { sessionId: "sess_1" } });
+        await started;
+
+        const [first] = reported;
+
+        expect(first?.availableCommands).toHaveLength(100);
+        expect(first?.availableCommands?.[0]).toEqual({ description: "x".repeat(300), hint: "x".repeat(200), name: "command-0" });
+    });
+});
+
 describe("a usage report the agent sends before its session answers", () => {
     it("reaches the meter once the session has opened, rather than being dropped", async () => {
         const reported: { usage?: unknown }[] = [];

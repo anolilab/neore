@@ -21,6 +21,14 @@ const sameNamed = (first: Named, second: Named): boolean => first.id === second.
 const sameListed = (first: Listed | undefined, second: Listed | undefined): boolean =>
     first === undefined || second === undefined ? first === second : first.current === second.current && sameList(first.available, second.available, sameNamed);
 
+type Command = NonNullable<AgentState["availableCommands"]>[number];
+
+const sameCommand = (first: Command, second: Command): boolean =>
+    first.name === second.name && first.description === second.description && first.hint === second.hint;
+
+const sameCommands = (first: AgentState["availableCommands"], second: AgentState["availableCommands"]): boolean =>
+    first === undefined || second === undefined ? first === second : sameList(first, second, sameCommand);
+
 const sameOption = (first: Option, second: Option): boolean =>
     first.id === second.id &&
     first.name === second.name &&
@@ -31,11 +39,12 @@ const sameOption = (first: Option, second: Option): boolean =>
 const sameOptions = (first: AgentState["configOptions"], second: AgentState["configOptions"]): boolean =>
     first === undefined || second === undefined ? first === second : sameList(first, second, sameOption);
 
-/** Whether every option field the report carries is already stored as it is (usage is compared by the caller). */
-export const sameOptionFields = (stored: AgentState | undefined, report: AgentState): boolean =>
+/** Whether every field the report carries is already stored as it is (usage is compared by the caller). */
+export const sameReportedFields = (stored: AgentState | undefined, report: AgentState): boolean =>
     (report.configOptions === undefined || sameOptions(stored?.configOptions, report.configOptions)) &&
     (report.modes === undefined || sameListed(stored?.modes, report.modes)) &&
-    (report.models === undefined || sameListed(stored?.models, report.models));
+    (report.models === undefined || sameListed(stored?.models, report.models)) &&
+    (report.availableCommands === undefined || sameCommands(stored?.availableCommands, report.availableCommands));
 
 /** The stored state with a report applied: each field the report carries replaces the stored one, the others stay. */
 export const mergeAgentState = (stored: AgentState | undefined, report: AgentState): AgentState => {
@@ -44,6 +53,7 @@ export const mergeAgentState = (stored: AgentState | undefined, report: AgentSta
         ...(report.configOptions !== undefined && { configOptions: report.configOptions }),
         ...(report.modes !== undefined && { modes: report.modes }),
         ...(report.models !== undefined && { models: report.models }),
+        ...(report.availableCommands !== undefined && { availableCommands: report.availableCommands }),
         ...(report.usage !== undefined && { usage: report.usage }),
     };
 };

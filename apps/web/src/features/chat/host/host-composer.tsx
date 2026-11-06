@@ -15,7 +15,7 @@ import cn from "@neore/ui/utils/cn";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2, ShieldQuestion, Square } from "lucide-react";
 import type { FC, KeyboardEvent } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import ContextUsageMeter from "@/features/chat/thread/context-usage-meter";
@@ -25,7 +25,12 @@ import DiffCommentsDraft from "./diff-comments-draft";
 import HostOptions from "./host-options";
 import { MAX_HOST_PROMPT_CHARS, sendHostMessage } from "./host-send";
 import useHostSendErrorMessages from "./host-send-errors";
+import type { AgentCommand } from "./host-slash";
+import { insertCommand, matchingCommands, slashAtCursor } from "./host-slash";
 import { formatReportedCost } from "./reported-cost";
+
+/** The keys the open `/` menu takes for itself. */
+const SLASH_KEYS: ReadonlySet<string> = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape", "Tab"]);
 
 /** How the last turn ended when the person should be offered a way on. */
 const CONTINUABLE: ReadonlySet<string> = new Set(["interrupted", "timeout"]);
@@ -83,6 +88,14 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const id = threadId as Id<"threads">;
     const [text, setText] = useState("");
     const [sending, setSending] = useState(false);
+    const [cursor, setCursor] = useState(0);
+    const [activeIndex, setActiveIndex] = useState(0);
+    // The text an Escape closed the menu for: any edit reopens it.
+    const [closedFor, setClosedFor] = useState<{ start: number; text: string } | undefined>(undefined);
+    const box = useRef<HTMLTextAreaElement>(null);
+    const pendingCursor = useRef<number | undefined>(undefined);
+    const list = useRef<HTMLUListElement>(null);
+    const listId = useId();
     const attempt = useRef<{ id: string; text: string } | undefined>(undefined);
     const { data: session } = useQuery(crpc.acp.functions.getHostSession.queryOptions({ threadId }));
     const { data: live } = useQuery(crpc.chat.streaming.getActiveStreamForThread.queryOptions({ threadId: id }));
@@ -126,7 +139,88 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const lastEnd = session?.lastEndReason;
     const offerContinue = !running && !blocked && lastEnd !== undefined && CONTINUABLE.has(lastEnd);
 
+    const slash = slashAtCursor(text, cursor);
+    const commands = session?.agentState?.availableCommands;
+    const choices: AgentCommand[] =
+        slash === null || commands === undefined || (closedFor?.text === text && closedFor.start === slash.start)
+            ? []
+            : matchingCommands(commands, slash.query);
+    // A session that has ended disables the input, so its menu must not stay open over a control nobody can use.
+    const menuOpen = !blocked && slash !== null && choices.length > 0;
+    const active = Math.min(activeIndex, Math.max(choices.length - 1, 0));
+    const agentLabel = session?.agentLabel ?? t`Agent`;
+
+    // After a pick the text is replaced; the cursor can only be placed once the textarea shows it.
+    useEffect(() => {
+        if (pendingCursor.current === undefined || box.current === null) {
+            return;
+        }
+
+        box.current.setSelectionRange(pendingCursor.current, pendingCursor.current);
+        pendingCursor.current = undefined;
+    }, [text]);
+
+    // The popup scrolls, so the active command is brought into view as the arrows move it.
+    useEffect(() => {
+        if (menuOpen) {
+            list.current?.children.item(active)?.scrollIntoView({ block: "nearest" });
+        }
+    }, [active, menuOpen]);
+
+    const pick = (command: AgentCommand) => {
+        if (slash === null) {
+            return;
+        }
+
+        const next = insertCommand(text, slash, command);
+
+        // A pick that would make the draft too long to send is refused, so the draft stays one the person can send.
+        if (next.text.length > MAX_HOST_PROMPT_CHARS) {
+            toast.error(t`That command would make the message too long to send.`);
+
+            return;
+        }
+
+        setCursor(next.cursor);
+        setActiveIndex(0);
+        box.current?.focus();
+
+        if (next.text === text) {
+            // The text does not change, so the effect above would not run: the caret is placed now, or it would wait for a later edit.
+            pendingCursor.current = undefined;
+            box.current?.setSelectionRange(next.cursor, next.cursor);
+
+            return;
+        }
+
+        pendingCursor.current = next.cursor;
+        setText(next.text);
+    };
+
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+        const chosen = choices[active];
+
+        // Shift+Enter and Shift+Tab keep their usual meaning (a newline, the previous control), and Ctrl/Cmd+Enter still sends,
+        // even while the menu is open.
+        const menuKey =
+            SLASH_KEYS.has(event.key) &&
+            !(event.shiftKey && (event.key === "Enter" || event.key === "Tab")) &&
+            !((event.ctrlKey || event.metaKey) && event.key === "Enter");
+
+        if (menuOpen && !event.nativeEvent.isComposing && menuKey) {
+            event.preventDefault();
+
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                setActiveIndex((active + (event.key === "ArrowDown" ? 1 : -1) + choices.length) % choices.length);
+            } else if (event.key === "Escape") {
+                setClosedFor(slash === null ? undefined : { start: slash.start, text });
+            } else if (chosen !== undefined && !event.shiftKey) {
+                pick(chosen);
+            }
+
+            return;
+        }
+
         if (!(event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && canSend)) {
             return;
         }
@@ -202,17 +296,66 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
             )}
             <HostOptions ended={blocked} key={threadId} optionResult={session?.optionResult} state={session?.agentState} threadId={threadId} />
             <div className="flex items-end gap-2">
-                <textarea
-                    aria-label={t`Message to the coding agent`}
-                    className="bg-background min-h-11 flex-1 resize-none rounded-lg border px-3 py-2 text-sm disabled:opacity-60"
-                    disabled={blocked}
-                    maxLength={MAX_HOST_PROMPT_CHARS}
-                    onChange={(event) => setText(event.target.value)}
-                    onKeyDown={onKeyDown}
-                    placeholder={t`Message the agent on your computer`}
-                    rows={2}
-                    value={text}
-                />
+                <div className="relative min-w-0 flex-1">
+                    {menuOpen && (
+                        <ul
+                            aria-label={t`Commands from ${agentLabel}`}
+                            className="bg-popover absolute bottom-full left-0 z-10 mb-1 max-h-64 w-full max-w-md overflow-auto rounded-lg border p-1 text-sm shadow-md"
+                            id={listId}
+                            ref={list}
+                            role="listbox"
+                        >
+                            {choices.map((command, index) => (
+                                <li
+                                    aria-selected={index === active}
+                                    className={cn("flex cursor-pointer flex-col gap-0.5 rounded px-2 py-1.5", index === active && "bg-accent")}
+                                    id={`${listId}-${index}`}
+                                    key={command.name}
+                                    onMouseDown={(event) => {
+                                        event.preventDefault();
+                                        pick(command);
+                                    }}
+                                    role="option"
+                                >
+                                    <span className="flex items-baseline gap-2">
+                                        <span className="font-mono font-medium">{`/${command.name}`}</span>
+                                        {command.hint !== undefined && command.hint !== "" && (
+                                            <span className="text-muted-foreground font-mono text-xs">{command.hint}</span>
+                                        )}
+                                        <span className="text-muted-foreground ml-auto shrink-0 rounded border px-1 text-xs">{agentLabel}</span>
+                                    </span>
+                                    {command.description !== undefined && command.description !== "" && (
+                                        <span className="text-muted-foreground text-xs">{command.description}</span>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    <textarea
+                        aria-activedescendant={menuOpen ? `${listId}-${active}` : undefined}
+                        aria-controls={menuOpen ? listId : undefined}
+                        aria-expanded={menuOpen}
+                        aria-label={t`Message to the coding agent`}
+                        className="bg-background min-h-11 w-full resize-none rounded-lg border px-3 py-2 text-sm disabled:opacity-60"
+                        disabled={blocked}
+                        maxLength={MAX_HOST_PROMPT_CHARS}
+                        onChange={(event) => {
+                            setText(event.target.value);
+                            // Any edit reopens the menu: a dismissal holds for the text it was made on, and only until the next edit.
+                            setClosedFor(undefined);
+                            setCursor(event.target.selectionStart);
+                            setActiveIndex(0);
+                        }}
+                        onClick={(event) => setCursor(event.currentTarget.selectionStart)}
+                        onKeyDown={onKeyDown}
+                        onKeyUp={(event) => setCursor(event.currentTarget.selectionStart)}
+                        placeholder={t`Message the agent on your computer`}
+                        ref={box}
+                        role="combobox"
+                        rows={2}
+                        value={text}
+                    />
+                </div>
                 {running ? (
                     <Button aria-label={t`Stop`} disabled={cancel.isPending} onClick={() => cancel.mutate({ threadId: id })} type="button" variant="outline">
                         <Square aria-hidden="true" className="size-4" />

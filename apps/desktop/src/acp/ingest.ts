@@ -141,6 +141,9 @@ export class HostPoster implements SessionObserver {
 
     private stateTimer: ReturnType<typeof setTimeout> | undefined;
 
+    /** Sessions the desktop has ended: a report still waiting for a thread that will never come is dropped. */
+    private readonly endedSessions = new Set<string>();
+
     /** When the pending timer fires: a sooner report moves it earlier, a later one leaves it. */
     private stateDueAt: number | undefined;
 
@@ -245,9 +248,15 @@ export class HostPoster implements SessionObserver {
     }
 
     public sessionEnded(sessionId: string): void {
+        this.endedSessions.add(sessionId);
         this.sessions.get(sessionId)?.close();
         this.closing.add(sessionId);
         this.closeWhenDrained(sessionId);
+
+        // A report still waiting for its thread is dropped by the next flush: run that now, not with the next report.
+        if (this.pendingState.has(sessionId)) {
+            this.scheduleState(STATE_DEBOUNCE_MS);
+        }
     }
 
     public turnReceived(sessionId: string, turnId: string, user: string): void {
@@ -512,10 +521,9 @@ export class HostPoster implements SessionObserver {
 
         this.closing.delete(sessionId);
 
-        // A session that never reached the backend has nothing to deliver its last report to. Checked here, once the close has
-        // drained: a session whose open was still in flight only turns unbound into local when its link closes.
-        if (this.sessions.get(sessionId)?.threadId === null) {
-            this.pendingState.delete(sessionId);
+        // An ended session's id is needed only while a report of it may still be held back.
+        if (!this.pendingState.has(sessionId)) {
+            this.endedSessions.delete(sessionId);
         }
 
         this.sessions.get(sessionId)?.announceClose();
@@ -591,6 +599,17 @@ export class HostPoster implements SessionObserver {
 
             // Not posted now: a session not yet bound to its thread, or one held while unpaired. The report waits, and pairing
             // or the thread's binding flushes it.
+            // A session that ended without ever reaching the backend has nothing to deliver its report to. One whose open is still in
+            // flight keeps it: the open answers, the thread binds, and the report goes out before the close.
+            // An ended session that never got a link (its start failed before the open) or whose link never bound a thread has no
+            // thread to deliver to: its report is dropped here, and its ended mark with it.
+            if ((link === undefined || link.threadId === null) && this.endedSessions.has(sessionId)) {
+                this.pendingState.delete(sessionId);
+                this.endedSessions.delete(sessionId);
+
+                continue;
+            }
+
             if (deviceId === undefined || link?.threadId === undefined || link.threadId === null) {
                 continue;
             }
@@ -605,6 +624,12 @@ export class HostPoster implements SessionObserver {
             }
 
             this.pendingState.delete(sessionId);
+
+            // Posted: a session still closing takes its id out when it drains (`closeWhenDrained`).
+            if (!this.closing.has(sessionId)) {
+                this.endedSessions.delete(sessionId);
+            }
+
             // Sessions are independent: one slow post does not hold up another session's report. Each is signed when it is sent.
             sends.push(this.sendState(sessionId, pending, deviceId));
         }

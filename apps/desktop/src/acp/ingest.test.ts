@@ -1311,6 +1311,27 @@ describe("what the agent reports about itself", () => {
         expect(statePosts()[0]?.post.events[0]).toMatchObject({ usage: usage(4) });
     });
 
+    it("posts the agent's commands once, with the newest list, alongside a usage report", async () => {
+        const host = poster();
+
+        await open(host);
+        const observedAt = clock;
+
+        host.sessionState("s1", { availableCommands: [{ description: "old", name: "old" }] });
+        host.sessionState("s1", { usage: usage(3) });
+        host.sessionState("s1", { availableCommands: [{ description: "Compact", name: "compact" }] });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(1);
+        expect(statePosts()[0]?.post.events).toEqual([
+            { at: observedAt, availableCommands: [{ description: "Compact", name: "compact" }], kind: "session_state", usage: usage(3) },
+        ]);
+
+        await settle(30_000);
+
+        expect(statePosts()).toHaveLength(1);
+    });
+
     it("drops a report for a session that is local only, and never posts it", async () => {
         paired = undefined;
         const host = poster();

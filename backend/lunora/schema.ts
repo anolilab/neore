@@ -156,7 +156,8 @@ export const schema = defineSchema({
     acpSessions: defineTable({
         agentKey: v.string(),
         agentLabel: v.string(),
-        // What the agent reported about itself outside its turns (context use, cost). Unset until it reports.
+        // What the agent reported about itself outside its turns: context use and cost, and the slash commands it advertises
+        // (`availableCommands`, replaced whole). Unset until it reports.
         agentState: v.optional(vAcpAgentState),
         // The `at` of the newest report applied to `agentState`; an older report is dropped.
         agentStateAt: v.optional(v.number()),

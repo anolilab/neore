@@ -17,7 +17,7 @@ import { capabilityOf, isAvailable } from "@neore/ai/capabilities";
 
 import type { RawOptions } from "./agent-options";
 import { configOptionsOf, isOffered, optionsOf, resolveOptions, withCurrentMode, withOptionValue } from "./agent-options";
-import { usageOf } from "./agent-state";
+import { availableCommandsOf, usageOf } from "./agent-state";
 import { reportFromHandshake, withOptionCapabilities } from "./capabilities";
 import { TurnChanges } from "./changes";
 import { childEventOf, childParentOf, completionText, contentText, isRecord, text, toolIdOf } from "./child-updates";
@@ -117,7 +117,73 @@ export interface SessionOptions {
     threadId?: string;
 }
 
+/** How many updates may wait for the session's id: enough for an agent's startup burst, bounded against a flood. */
+const MAX_EARLY_UPDATES = 32;
+
+/** Replacing updates held while the session opens: one per native session and kind, at most this many, and the bytes of JSON all of them may take. */
+const MAX_EARLY_REPLACING = 64;
+const MAX_EARLY_REPLACING_BYTES = 512 * 1024;
+
+/** The bytes of JSON the other early updates may take. Their own budget: a replayed history cannot use up the replacing one. */
+const MAX_EARLY_BYTES = 512 * 1024;
+
+/**
+ * A usage report that leaves out the cost carries the cost of the report it replaces: the cost is cumulative, and only a report
+ * that names a cost changes it.
+ */
+const withCarriedCost = (params: Record<string, unknown>, previous: unknown): Record<string, unknown> => {
+    const earlierCost = isRecord(previous) && isRecord(previous.update) ? previous.update.cost : undefined;
+
+    if (earlierCost === undefined || !isRecord(params.update) || params.update.cost !== undefined) {
+        return params;
+    }
+
+    return { ...params, update: { ...params.update, cost: earlierCost } };
+};
+
+/** The updates that set what the agent offers, taken at once while the session opens (`takeStartupOptions`). */
+const OPTION_UPDATES: ReadonlySet<string> = new Set(["config_option_update", "current_mode_update"]);
+
+/**
+ * Updates that replace what came before them. While the session opens, only the latest of each kind is kept, so a replayed
+ * history of chunks cannot push out the agent's command list or its options.
+ */
+const REPLACING_UPDATES: ReadonlySet<string> = new Set(["available_commands_update", "config_option_update", "current_mode_update", "usage_update"]);
+
+/**
+ * What an early update keeps: a command list in the agent's own shape with its entries bounded, so the buffer charges what the
+ * menu will show, and the replay reads the same commands, hints included. Undefined when there is nothing to keep.
+ */
+const keptFormOf = (kind: string, params: Record<string, unknown>, scrub: (text: string) => string): Record<string, unknown> | undefined => {
+    if (kind !== "available_commands_update" || !isRecord(params.update)) {
+        return params;
+    }
+
+    const availableCommands = availableCommandsOf(params.update, scrub);
+
+    if (availableCommands === undefined) {
+        return undefined;
+    }
+
+    const wire = availableCommands.map((command) => {
+        return { description: command.description, name: command.name, ...command.hint !== undefined && { input: { hint: command.hint } } };
+    });
+
+    return { ...params, update: { ...params.update, availableCommands: wire } };
+};
+
 export class AgentSession {
+    private readonly earlyUpdates: unknown[] = [];
+
+    /** The latest replacing update per native session and kind: a failed load's updates never carry into the session that opened after it. */
+    private readonly earlyReplacing = new Map<string, Record<string, unknown>>();
+
+    /** The JSON bytes the other early updates hold, so an agent cannot grow them without limit while the session opens. */
+    private earlyBytes = 0;
+
+    /** The JSON bytes the replacing updates hold, on their own budget (see `MAX_EARLY_REPLACING_BYTES`). */
+    private earlyReplacingBytes = 0;
+
     private readonly sessionId: string;
 
     private agentSessionId = "";
@@ -179,9 +245,6 @@ export class AgentSession {
     /** Whether the startup updates are the saved session's (while it loads) or a fresh session's (once it is opened). */
     private startupPhase: "loading" | "opening" = "opening";
 
-    /** The newest usage report sent before the session answered, reported once it has opened. */
-    private startupUsage: Record<string, unknown> | undefined;
-
     /** What happened to the saved session the backend asked to load; unset when it asked for none. */
     private reattach: HostSessionInfo["reattach"];
 
@@ -218,16 +281,7 @@ export class AgentSession {
             this.agent = await initialize(this.connection, this.options.appVersion, this.options.startupTimeoutMs);
             this.report = this.options.capabilityReport?.(this.agent) ?? reportFromHandshake(this.agent.capabilities, Date.now());
             this.agentSessionId = await this.openAgentSession();
-
-            // A usage report the agent sent before its session answered reaches the meter now. Its session id is checked like any
-            // other update's, so a report from a failed load is not carried into this session.
-            const early = this.startupUsage;
-
-            this.startupUsage = undefined;
-
-            if (early !== undefined) {
-                this.onNotification(METHOD.sessionUpdate, early);
-            }
+            this.replayEarlyUpdates();
 
             // What the agent offered is known now, so the report says whether it has models, reasoning effort and modes.
             if (this.report !== undefined) {
@@ -735,6 +789,11 @@ export class AgentSession {
 
         this.status = "ended";
         this.endReason = said;
+        // An ended session replays nothing: what it buffered while it opened is dropped now, not kept with the session.
+        this.earlyUpdates.length = 0;
+        this.earlyReplacing.clear();
+        this.earlyBytes = 0;
+        this.earlyReplacingBytes = 0;
         clearTimeout(this.cancelTimer);
         this.connection.close(new Error(said));
         this.options.gate.cancelSession(this.id);
@@ -938,30 +997,99 @@ export class AgentSession {
 
     // ─── From the agent ────────────────────────────────────────────────────
 
+    /** Updates that arrive while the session is still opening (before its id is known) are kept and replayed once it is. */
+    private replayEarlyUpdates(): void {
+        // Only the replacing updates of the session that opened are replayed; a failed load's are not its.
+        const replacing: Record<string, unknown>[] = [];
+
+        for (const params of this.earlyReplacing.values()) {
+            if (params.sessionId === this.agentSessionId) {
+                replacing.push(params);
+            }
+        }
+
+        const early = [...this.earlyUpdates, ...replacing];
+
+        this.earlyUpdates.length = 0;
+        this.earlyReplacing.clear();
+        this.earlyBytes = 0;
+        this.earlyReplacingBytes = 0;
+
+        for (const params of early) {
+            this.onNotification(METHOD.sessionUpdate, params);
+        }
+    }
+
+    /** Keeps an update that arrives before the session's id. False when it has no room, and it is dropped. */
+    private keepEarly(params: Record<string, unknown>): boolean {
+        const kind = isRecord(params.update) ? params.update.sessionUpdate : undefined;
+
+        if (typeof kind === "string" && REPLACING_UPDATES.has(kind)) {
+            const key = JSON.stringify([params.sessionId, kind]);
+            const previous = this.earlyReplacing.get(key);
+
+            if (previous === undefined && this.earlyReplacing.size >= MAX_EARLY_REPLACING) {
+                return false;
+            }
+
+            const withCost = kind === "usage_update" ? withCarriedCost(params, previous) : params;
+            const kept = keptFormOf(String(kind), withCost, this.options.process.scrub);
+
+            if (kept === undefined) {
+                return true;
+            }
+
+            const keptBytes = Buffer.byteLength(JSON.stringify(kept));
+            const freed = previous === undefined ? 0 : Buffer.byteLength(JSON.stringify(previous));
+
+            if (this.earlyReplacingBytes - freed + keptBytes > MAX_EARLY_REPLACING_BYTES) {
+                return false;
+            }
+
+            this.earlyReplacingBytes += keptBytes - freed;
+            this.earlyReplacing.set(key, kept);
+
+            return true;
+        }
+
+        const bytes = Buffer.byteLength(JSON.stringify(params));
+
+        if (this.earlyUpdates.length >= MAX_EARLY_UPDATES || this.earlyBytes + bytes > MAX_EARLY_BYTES) {
+            return false;
+        }
+
+        this.earlyBytes += bytes;
+        this.earlyUpdates.push(params);
+
+        return true;
+    }
+
     /**
-     * An update that arrives while the session opens, before its id is known. While the saved session loads, only its updates
-     * count; once a fresh session is opened, the saved id's late updates are the failed load's. The options are taken at once; the
-     * newest usage report is kept for `start` to report.
+     * An update that arrives while the session opens. While the saved session loads, only its updates count; once a fresh session
+     * is opened, the saved id's late updates are the failed load's. The agent's options are taken as they come, as they always
+     * were; everything else waits in the buffer until the session has its id.
      */
-    private takeStartupUpdate(params: Record<string, unknown>): void {
+    private keepStartupUpdate(params: Record<string, unknown>): void {
         const { resumeSessionId } = this.options;
         const counts = resumeSessionId === undefined || (this.startupPhase === "loading" ? params.sessionId === resumeSessionId : params.sessionId !== resumeSessionId);
 
-        if (!counts || !isRecord(params.update)) {
+        if (!counts) {
             return;
         }
 
-        if (params.update.sessionUpdate === "usage_update") {
-            this.startupUsage = params;
+        const update = params.update as Record<string, unknown>;
+
+        if (OPTION_UPDATES.has(String(update.sessionUpdate))) {
+            this.takeStartupOptions(update);
         } else {
-            this.takeStartupOptions(params.update);
+            this.keepEarly(params);
         }
     }
 
     private onNotification(method: string, params: unknown): void {
-        // While the session opens its id is not known yet, and an agent may send its options before it answers.
-        if (this.agentSessionId === "" && this.status === "starting" && method === METHOD.sessionUpdate && isRecord(params) && isRecord(params.update)) {
-            this.takeStartupUpdate(params);
+        // While the session opens its id is not known yet, and an agent may send its updates before it answers.
+        if (method === METHOD.sessionUpdate && this.agentSessionId === "" && this.status === "starting" && isRecord(params) && isRecord(params.update)) {
+            this.keepStartupUpdate(params);
 
             return;
         }
@@ -991,6 +1119,15 @@ export class AgentSession {
                 turn?.append("thought", contentText(update.content));
                 this.observeDelta(turn, "thought", false);
                 break;
+            }
+            case "available_commands_update": {
+                const availableCommands = availableCommandsOf(update, this.options.process.scrub);
+
+                if (availableCommands !== undefined) {
+                    this.observe((observer) => observer.sessionState?.(this.id, { availableCommands }));
+                }
+
+                return;
             }
             case "config_option_update": {
                 const configOptions = configOptionsOf(update.configOptions, this.options.process.scrub);
