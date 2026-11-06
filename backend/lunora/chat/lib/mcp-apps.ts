@@ -306,14 +306,20 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
         return Response.json({ error: "Missing serverName or toolName" }, { status: 400 });
     }
 
+    // This route has no thread, so the caller's session names the organization that caps the call. Read before the server
+    // is resolved: under `off` every tool is refused, so no credential is refreshed and no server is contacted for it.
+    const permissionCap = await readRequestPermissionCap(context, user._id);
+
+    if (permissionCap === "off") {
+        return Response.json({ error: refusalFor("off", toolName, true) }, { status: 403 });
+    }
+
     const serverConfig = await findServerConfig(context, user._id, serverName);
 
     if (!serverConfig) {
         return Response.json({ error: `MCP server "${serverName}" not found` }, { status: 404 });
     }
 
-    // This route has no thread, so the caller's session names the organization that caps the call.
-    const permissionCap = await readRequestPermissionCap(context, user._id);
     const overrides = (await context.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId: user._id })) as ToolPermissionOverrides;
     const descriptor = descriptorFor(serverConfig, toolName);
     const chosen = isToolPermissionMode(overrides[descriptor.key]) ? resolveToolPermission(descriptor, overrides, { permissionCap }) : undefined;

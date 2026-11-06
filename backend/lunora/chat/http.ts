@@ -900,6 +900,10 @@ const runChatStartOnShard = async (
         // Title generation for existing threads too — scheduled after the agent run below.
         scheduleTitleJobs(threadId, false);
     } else {
+        // The organization goes in with the insert, so no chat exists without it. Read first: a failed lookup refuses the
+        // request before anything is saved, rather than leaving a chat a later run would cap by a broader space.
+        const threadOrganizationId = await sessionOrganizationPromise;
+
         // New thread: batched creation
         const result = await context.runMutation(internal.chat.functions.createThreadWithInitialMessage, {
             // A plain hosted text thread only: a guest, a media thread and a custom endpoint have nothing to route.
@@ -911,6 +915,7 @@ const runChatStartOnShard = async (
             messageContent,
             mode: body.mode,
             model: effectiveModel,
+            ...(threadOrganizationId && { organizationId: threadOrganizationId }),
             reasoningEffort: body.reasoningEffort,
             statelessMode: body.statelessMode,
             // Temporary only when the client asked for it; the composer applies the user's default itself.
@@ -922,22 +927,6 @@ const runChatStartOnShard = async (
 
         threadId = result.threadId;
         messageId = result.messageId;
-
-        // The thread records its organization so later runs on it are capped by it. Best-effort: a failed lookup or stamp must
-        // not strand the message, and the run's own organization (passed to its job below) still caps this run. Temporary
-        // threads stay unstamped, as `createThread` leaves them.
-        try {
-            const threadOrganizationId = await sessionOrganizationPromise;
-
-            if (threadOrganizationId && body.temporary !== true) {
-                await context.runMutation(internal.agent.threads.updateThread, {
-                    patch: { organizationId: threadOrganizationId },
-                    threadId: threadId as Id<"threads">,
-                });
-            }
-        } catch (error: unknown) {
-            chatLogger.warn("Failed to stamp a new chat with its organization; its run is still capped by it:", error);
-        }
 
         // Title + category generation — scheduled after the agent run below.
         scheduleTitleJobs(threadId, true);

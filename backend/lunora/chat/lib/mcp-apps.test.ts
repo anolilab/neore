@@ -196,6 +196,20 @@ describe("MCP Apps proxy with an OAuth grant", () => {
         await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("organization's tool policy") });
     });
 
+    it("refuses every call under an off cap without contacting the server or refreshing its token", async () => {
+        const oauth = oauthConfig("fresh");
+
+        state.cap = "off";
+
+        // No override: without the early refusal this call would connect to read the tool's annotations.
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("organization's tool policy") });
+        expect(state.connects).toBe(0);
+        expect(oauth.refresh).not.toHaveBeenCalled();
+    });
+
     it("refuses a tool the user set to ask before connecting, and runs one they allowed", async () => {
         oauthConfig("fresh");
         state.overrides = { "connector:notion:create_page": "auto", "connector:notion:search": "ask" };

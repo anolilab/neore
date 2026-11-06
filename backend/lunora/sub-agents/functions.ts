@@ -403,13 +403,6 @@ const isHostInLeadScope = async (ctx: MutationCtx, run: Pick<RunDoc, "parentThre
     return device !== null && lead !== null && isDeviceInScope(device, lead.projectId);
 };
 
-/**
- * Starts a host run in the caller's transaction: claims it (no charge: the agent bills its own account) and sends its
- * message as the `acp_send` call. A host that cannot be reached fails the run at once, through {@link finishRun}, so the
- * lead hears a failure like any other and the queue moves on. A computer that is only busy (its open-call budget is spent,
- * or a turn holds the session) is not a failure: the run goes back to the head of the line and
- * {@link retryHostRunStart} tries it again, so the messages behind it wait too instead of meeting the same refusal.
- */
 /** Whether the organization's current cap is `auto`. A computer agent's tools are approved there, out of the backend's reach. */
 const hostCapAllowsAuto = async (ctx: MutationCtx, organizationId: string | null | undefined): Promise<boolean> => {
     const policy = organizationId ? await ctx.db.organizationPolicies.findFirst({ where: { organizationId } }) : null;
@@ -417,6 +410,13 @@ const hostCapAllowsAuto = async (ctx: MutationCtx, organizationId: string | null
     return permissionCapOf(readPolicyState(policy?.document)) === "auto";
 };
 
+/**
+ * Starts a host run in the caller's transaction: claims it (no charge: the agent bills its own account) and sends its
+ * message as the `acp_send` call. A host that cannot be reached fails the run at once, through {@link finishRun}, so the
+ * lead hears a failure like any other and the queue moves on. A computer that is only busy (its open-call budget is spent,
+ * or a turn holds the session) is not a failure: the run goes back to the head of the line and
+ * {@link retryHostRunStart} tries it again, so the messages behind it wait too instead of meeting the same refusal.
+ */
 const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<void> => {
     const claimed = await claimQueuedRun(ctx, runId);
 
