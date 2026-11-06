@@ -20,7 +20,11 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import type { SecretFormat } from "@neore/backend/request-secret-limits";
-import { secretFormatProblem } from "@neore/backend/request-secret-limits";
+import {
+    SECRET_HEADER_VALUE_MAX as HEADER_VALUE_MAX,
+    SECRET_PROVIDER_KEY_MAX as PROVIDER_KEY_MAX,
+    secretFormatProblem,
+} from "@neore/backend/request-secret-limits";
 import type { ToolPart } from "@neore/chat-ui/types";
 import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
@@ -34,10 +38,6 @@ import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { providerLabel } from "./rate-limit-pause";
-
-/** Mirror `SECRET_HEADER_VALUE_MAX` and `SECRET_PROVIDER_KEY_MAX` on the server (`chat/tools/request-secret-constants.ts`). */
-const HEADER_VALUE_MAX = 10_000;
-const PROVIDER_KEY_MAX = 500;
 
 type SecretUse = { header: string; kind: "mcp_header"; server: string } | { kind: "provider_key"; provider: string };
 

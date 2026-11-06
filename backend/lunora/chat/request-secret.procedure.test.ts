@@ -9,6 +9,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 
+const REFS_PREFIX = /^refs:/u;
+
 // `lib/encryption` reads the key when it loads.
 const keyBytes = new Uint8Array(32);
 
@@ -433,7 +435,7 @@ describe("answerSecretRequest on a card with several fields", () => {
         expect(decrypted.toSorted((a, b) => a.localeCompare(b))).toStrictEqual([SECOND_VALUE, USERNAME].toSorted((a, b) => a.localeCompare(b)));
 
         // The continuation gets the references, keyed by field name, and nothing else.
-        const refs = JSON.parse((queued[0]!.args as { answer: string }).answer) as Record<string, string>;
+        const refs = JSON.parse((queued[0]!.args as { answer: string }).answer.replace(REFS_PREFIX, "")) as Record<string, string>;
 
         expect(Object.keys(refs).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["password", "username"]);
         expect(new Set(Object.values(refs))).toStrictEqual(new Set(stored.map((row) => row.ref)));

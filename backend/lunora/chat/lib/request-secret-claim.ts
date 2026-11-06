@@ -22,6 +22,7 @@ import {
     SECRET_FIELD_NAME_RE,
     SECRET_FIELDS_MAX,
     SECRET_FORMAT_INVALID,
+    REFS_ANSWER_PREFIX,
     SECRET_HEADER_VALUE_FORBIDDEN_RE,
     SECRET_LABEL_MAX,
     SECRET_SERVER_MOVED,
@@ -35,7 +36,7 @@ import { claimToolApproval, findPendingRequestOnLatestTurn } from "./tool-approv
 export type SecretReply = { kind: "decline" } | { kind: "save"; more?: ReadonlyArray<{ expectedUrl: string; value: string }>; value: string };
 
 /** `ref` for a request with one destination; `refs` (by field name) for one with `fields`. */
-export type SecretClaim = ClaimResult & { ref?: string; refs?: Record<string, string>; providerKeySaves?: number; use?: SecretUse };
+export type SecretClaim = ClaimResult & { providerKeySaves?: number; ref?: string; refs?: Record<string, string>; use?: SecretUse };
 
 interface StoredRequest {
     fields?: unknown;
@@ -270,15 +271,15 @@ export const claimSecretAnswer = async (
 
     return {
         ...claim,
-        refs: Object.fromEntries(asked.map((field, index) => [field.name!, refs[index]!])),
         providerKeySaves: prepared.filter(({ use }) => use.kind === "provider_key").length,
+        refs: Object.fromEntries(asked.map((field, index) => [field.name!, refs[index]!])),
     };
 };
 
 /** What `resumeClaimedRun` gets: the reference for a saved value, a denial for a decline — never the value. */
 export const secretResumeArgs = (claim: SecretClaim & { kind: "claimed" }): { answer: string; approved: true } | { approved: false; denyReason: string } => {
     if (claim.refs !== undefined) {
-        return { answer: JSON.stringify(claim.refs), approved: true };
+        return { answer: `${REFS_ANSWER_PREFIX}${JSON.stringify(claim.refs)}`, approved: true };
     }
 
     return claim.ref === undefined ? { approved: false, denyReason: SECRET_DECLINED_REASON } : { answer: claim.ref, approved: true };

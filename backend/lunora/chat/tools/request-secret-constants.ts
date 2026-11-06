@@ -20,6 +20,9 @@ export const SECRET_HEADER_NAME_MAX = 100;
 /** A provider key is capped like the settings page caps one (`MAX_LENGTH.short`); a header value like a stored MCP header (`MAX_LENGTH.long`). */
 export const SECRET_PROVIDER_KEY_MAX = 500;
 
+/** Marks the resume answer of a card with fields: the JSON of `{ name: reference }` follows it. A reference never starts with it. */
+export const REFS_ANSWER_PREFIX = "refs:";
+
 export const SECRET_HEADER_VALUE_MAX = 10_000;
 
 /** How long a saved value waits for the agent to use it, at most: it is also dropped when the reply that received it ends. */

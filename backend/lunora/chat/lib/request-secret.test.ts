@@ -416,7 +416,7 @@ describe("resuming the run", () => {
         const refs = { password: "sec_b", username: "sec_a" };
         const resume = secretResumeArgs({ kind: "claimed", refs } as never);
 
-        expect(resume).toStrictEqual({ answer: JSON.stringify(refs), approved: true });
+        expect(resume).toStrictEqual({ answer: `refs:${JSON.stringify(refs)}`, approved: true });
 
         const answered = createAnsweredRequestSecretTool((resume as { answer: string }).answer) as unknown as ToolDefinition;
 

@@ -33,6 +33,7 @@ import {
     SECRET_FIELDS_MAX,
     SECRET_FORMAT_PREFIX_MAX,
     SECRET_HEADER_NAME_RE,
+    REFS_ANSWER_PREFIX,
     SECRET_HEADER_VALUE_MAX,
     SECRET_LABEL_MAX,
     SECRET_HEADER_VALUE_FORBIDDEN_RE,
@@ -109,6 +110,17 @@ const inputSchema = z
     .refine((input) => input.fields === undefined || new Set(input.fields.map((field) => field.name)).size === input.fields.length, {
         error: "Field names must be unique",
     })
+    // Two fields on one destination would each save a value and the second would replace the first when it is used.
+    .refine(
+        (input) => {
+            const destinations = (input.fields ?? []).map(({ use }) =>
+                use.kind === "provider_key" ? `provider:${use.provider}` : `header:${use.server}:${use.header.toLowerCase()}`,
+            );
+
+            return new Set(destinations).size === destinations.length;
+        },
+        { error: "Two fields cannot save to the same destination" },
+    )
     // A header prefix with a character no header value may hold could never be matched, so the card would be unanswerable.
     .refine(
         (input) =>
@@ -150,9 +162,28 @@ const requestSecretTool = createTool<RequestSecretInput, RequestSecretOutput, To
     title: "Request Secret",
 });
 
-/** The resume carries one reference, or the JSON of `{ name: reference }` for a card with fields (see `secretResumeArgs`). */
-const answeredOutput = (answer: string): RequestSecretOutput =>
-    answer.startsWith("{") ? { refs: JSON.parse(answer) as Record<string, string>, status: "saved" } : { ref: answer, status: "saved" };
+/** The resume carries one reference, or `refs:` and the JSON of `{ name: reference }` for a card with fields (see `secretResumeArgs`). */
+const answeredOutput = (answer: string): RequestSecretOutput => {
+    if (!answer.startsWith(REFS_ANSWER_PREFIX)) {
+        return { ref: answer, status: "saved" };
+    }
+
+    let payload: unknown;
+
+    try {
+        payload = JSON.parse(answer.slice(REFS_ANSWER_PREFIX.length));
+    } catch {
+        payload = undefined;
+    }
+
+    const refs = z.record(z.string(), z.string()).safeParse(payload);
+
+    if (!refs.success) {
+        throw new Error("The saved references of this card could not be read");
+    }
+
+    return { refs: refs.data, status: "saved" };
+};
 
 /** The same tool for one resumed run, answering with the reference of the stored value. */
 export const createAnsweredRequestSecretTool = (answer: string) =>
