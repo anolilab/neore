@@ -38965,6 +38965,30 @@
                       "createdAt": {
                         "type": "number"
                       },
+                      "repositories": {
+                        "items": {
+                          "properties": {
+                            "defaultBranch": {
+                              "type": "string"
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "isDefault": {
+                              "type": "boolean"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "url"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
                       "updatedAt": {
                         "type": "number"
                       }
@@ -39288,6 +39312,30 @@
                           "createdAt": {
                             "type": "number"
                           },
+                          "repositories": {
+                            "items": {
+                              "properties": {
+                                "defaultBranch": {
+                                  "type": "string"
+                                },
+                                "id": {
+                                  "type": "string"
+                                },
+                                "isDefault": {
+                                  "type": "boolean"
+                                },
+                                "url": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "url"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
                           "updatedAt": {
                             "type": "number"
                           }
@@ -39593,6 +39641,114 @@
           }
         },
         "summary": "mutation: projects_functions:pinProject",
+        "tags": [
+          "projects"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#projects_functions:setProjectRepositories": {
+      "post": {
+        "description": "Invoke the `mutation` `projects_functions:setProjectRepositories` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "projects_functions:setProjectRepositories",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "projectId": {
+                        "description": "Id<\"projects\">",
+                        "type": "string",
+                        "x-lunora-table": "projects"
+                      },
+                      "repositories": {
+                        "items": {
+                          "properties": {
+                            "defaultBranch": {
+                              "type": "string"
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "isDefault": {
+                              "type": "boolean"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "url"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "projectId",
+                      "repositories"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "projects_functions:setProjectRepositories",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "defaultBranch": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "isDefault": {
+                        "type": "boolean"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "url"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: projects_functions:setProjectRepositories",
         "tags": [
           "projects"
         ],

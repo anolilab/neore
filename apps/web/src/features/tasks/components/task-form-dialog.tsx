@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import ProjectRepoPicker from "@/features/projects/components/project-repo-picker";
 import PromptModelSelector from "@/features/prompts/components/prompt-model-selector";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -259,6 +260,14 @@ const TaskFormDialogBody = ({ defaultGoalId, editingTask, goals, onClose, onSubm
 
                         {isCodingAgent && (
                             <div className="grid gap-4 sm:grid-cols-2">
+                                <ProjectRepoPicker
+                                    onPick={(repo) => {
+                                        setValues((current) => {
+                                            return { ...current, branch: repo.defaultBranch ?? "", repoUrl: repo.url };
+                                        });
+                                    }}
+                                    repoUrl={values.repoUrl}
+                                />
                                 <div className="space-y-2">
                                     <Label htmlFor={ids.repo}>{t`Repository`}</Label>
                                     <Input

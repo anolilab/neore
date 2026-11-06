@@ -872,6 +872,16 @@ export const vProjectDocFields = {
     _creationTime: v.number(),
     _id: v.string(),
     createdAt: v.number(),
+    repositories: v.optional(
+        v.array(
+            v.object({
+                defaultBranch: v.optional(v.string()),
+                id: v.string(),
+                isDefault: v.optional(v.boolean()),
+                url: v.string(),
+            }),
+        ),
+    ),
     updatedAt: v.optional(v.number()),
 };
 
@@ -897,6 +907,16 @@ export const vProjectPatchFields = {
     organizationId: v.optional(v.string()),
     projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
     publicAccessToken: v.optional(v.string()),
+    repositories: v.optional(
+        v.array(
+            v.object({
+                defaultBranch: v.optional(v.string()),
+                id: v.string(),
+                isDefault: v.optional(v.boolean()),
+                url: v.string(),
+            }),
+        ),
+    ),
     title: v.optional(v.string()),
     workflowContent: v.optional(vWorkflowContent),
 };

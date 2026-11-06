@@ -1268,6 +1268,7 @@ export interface Doc_projects {
     pinnedAt?: number;
     projectType?: "chat" | "workflow";
     publicAccessToken?: string;
+    repositories?: Array<{ defaultBranch?: string; id: string; isDefault?: boolean; url: string }>;
     title: string;
     updatedAt?: number;
     userId?: string;
@@ -4261,6 +4262,7 @@ export interface Insert_projects {
     pinnedAt?: number;
     projectType?: "chat" | "workflow";
     publicAccessToken?: string;
+    repositories?: Array<{ defaultBranch?: string; id: string; isDefault?: boolean; url: string }>;
     title: string;
     updatedAt?: number;
     userId?: string;

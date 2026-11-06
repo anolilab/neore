@@ -377,6 +377,7 @@ export const projects = sqliteTable("projects", {
     pinnedAt: real("pinnedAt"),
     projectType: text("projectType", { mode: "json" }).$type<"chat" | "workflow">(),
     publicAccessToken: text("publicAccessToken"),
+    repositories: text("repositories", { mode: "json" }).$type<Array<{ defaultBranch?: string; id: string; isDefault?: boolean; url: string }>>(),
     title: text("title").notNull(),
     updatedAt: real("updatedAt"),
     userId: text("userId"),

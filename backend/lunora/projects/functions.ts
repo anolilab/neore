@@ -13,6 +13,7 @@ import { authMutation, authQuery, internalQuery, rateLimit } from "../lib/crpc";
 import { throwForbidden } from "../lib/error-helpers";
 import { admitOrganization, systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
+import { MAX_PROJECT_REPOSITORIES, normalizeProjectRepositories, ProjectRepoError } from "./repositories";
 
 /** The project when the caller owns it or belongs to its organization, else `null` (also for a missing one). */
 export const readableProject = async (context: QueryCtx | MutationCtx, projectId: Id<"projects">, userId: string): Promise<Doc<"projects"> | null> => {
@@ -175,6 +176,69 @@ export const updateProject = authMutation
         context.log.event("projects.update_project", { projectId, updatedFieldCount: Object.keys(patch).length });
 
         return updatedProject._id;
+    });
+
+/**
+ * Replaces the project's repository list — what a coding-agent run picker
+ * offers for it. The project's owner only; entries are normalised and checked
+ * by `normalizeProjectRepositories`.
+ */
+export const setProjectRepositories = authMutation
+    .use(rateLimit("projects/update"))
+    .input({
+        projectId: v.id("projects"),
+        repositories: v
+            .array(
+                v.object({
+                    defaultBranch: v.optional(v.string().max(200)),
+                    id: v.optional(v.string().max(MAX_LENGTH.id)),
+                    isDefault: v.optional(v.boolean()),
+                    url: v.string().max(MAX_LENGTH.url),
+                }),
+            )
+            .check((value) => value.length <= MAX_PROJECT_REPOSITORIES, { message: "Too many repositories" }),
+    })
+    .output(
+        v.array(
+            v.object({
+                defaultBranch: v.optional(v.string()),
+                id: v.string(),
+                isDefault: v.optional(v.boolean()),
+                url: v.string(),
+            }),
+        ),
+    )
+    .mutation(async ({ args: { projectId, repositories }, ctx: context }) => {
+        const project = await context.runQuery(api.agent.projects.getProject, { projectId: projectId as Id<"projects"> });
+
+        if (!project) {
+            throw new LunoraError("NOT_FOUND", "Project not found");
+        }
+
+        if (project.userId !== context.user.userId) {
+            throwForbidden("Only the project's owner can change its repositories");
+        }
+
+        let normalized: ReturnType<typeof normalizeProjectRepositories>;
+
+        try {
+            normalized = normalizeProjectRepositories(repositories, context.now);
+        } catch (error) {
+            if (error instanceof ProjectRepoError) {
+                throw new LunoraError("BAD_REQUEST", error.message);
+            }
+
+            throw error;
+        }
+
+        await context.runMutation(internal.agent.projects.updateProject, {
+            patch: { repositories: normalized },
+            projectId: projectId as Id<"projects">,
+        });
+
+        context.log.event("projects.set_project_repositories", { count: normalized.length, projectId });
+
+        return normalized;
     });
 
 export const deleteProject = authMutation

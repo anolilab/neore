@@ -21,6 +21,7 @@ import * as z from "zod";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { ReasoningEffortSelector } from "@/features/chat/model-settings/reasoning-effort-selector";
 import ProjectKnowledgeCollections from "@/features/knowledge/components/project-knowledge-collections";
+import ProjectRepositories from "@/features/projects/components/project-repositories";
 import PromptModelSelector from "@/features/prompts/components/prompt-model-selector";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -384,6 +385,7 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                             </div>
                             {/* Links, saved as they change — only a saved project has an id to link to. */}
                             {editingProject && <ProjectKnowledgeCollections projectId={editingProject._id} />}
+                            {editingProject && <ProjectRepositories projectId={editingProject._id} />}
                         </DialogPanel>
                         <DialogFooter>
                             <Button onClick={onClose} type="button" variant="outline">
