@@ -37,6 +37,9 @@ describe("thread permission mode", () => {
         expect(resolveToolPermission(builtin("knowledgeSearch"), undefined, options)).toBe("ask");
         expect(resolveToolPermission(mcp({ readOnlyHint: true }), undefined, options)).toBe("ask");
         expect(resolveToolPermission(mcp(), undefined, options)).toBe("ask");
+        // Their queries or lookups reach a provider (a currency list fetches rates; a memory search embeds the query).
+        expect(resolveToolPermission(builtin("listCurrencies"), undefined, options)).toBe("ask");
+        expect(resolveToolPermission(builtin("searchMemory"), undefined, options)).toBe("ask");
     });
 
     it("auto-edit asks for document edits too, since its file-edit list is empty", () => {

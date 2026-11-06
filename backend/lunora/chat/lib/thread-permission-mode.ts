@@ -21,9 +21,9 @@ export const isThreadPermissionMode = (value: unknown): value is ThreadPermissio
 /**
  * Built-ins that answer from data the app already holds, with no outbound call: they spend nothing, start nothing and send nothing
  * the model chose to a third party. `supervised` and `auto-edit` leave these at their own mode. An allowlist: a built-in not named
- * here asks, including every search and lookup that sends its query or a location to a provider.
+ * here asks. A search, a lookup, or a memory query that reaches a provider (even one of the app's own, billed per request) asks.
  */
-export const BUILTIN_TOOLS_READ_ONLY: ReadonlySet<string> = new Set(["dateTime", "listCurrencies", "listLanguages", "searchMemory"]);
+export const BUILTIN_TOOLS_READ_ONLY: ReadonlySet<string> = new Set(["dateTime", "listLanguages"]);
 
 /**
  * Built-ins that write files or artifacts with no outward reach, which `auto-edit` may let run. Empty for now: the document
