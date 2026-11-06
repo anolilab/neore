@@ -24,6 +24,7 @@ import { AcpImporter } from "../acp/import";
 import { HostPoster } from "../acp/ingest";
 import { AgentInstaller } from "../acp/install";
 import { AcpManager } from "../acp/manager";
+import { findNodeTools } from "../acp/node-tools";
 import { coreGate } from "../acp/permission";
 import { acpSupported, spawnAgent } from "../acp/process";
 import { AgentRegistry } from "../acp/registry";
@@ -358,7 +359,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             log: (message) => console.error(message),
             observer: host,
             onChange: () => send(state.local?.webContents, LOCAL_EVENT.acp),
-            plan: (agentKey, folder) => JSON.parse(core.acpSpawnPlan(agentKey, folder)) as SpawnPlan,
+            // Off the main thread: the plan hashes an installed npm agent's files before it answers.
+            plan: async (agentKey, folder) => JSON.parse(await core.acpSpawnPlanAsync(agentKey, folder)) as SpawnPlan,
             spawn: spawnAgent,
         });
 
@@ -733,7 +735,12 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     const updateAcp = async (update: string): Promise<AcpView> => {
         const view = JSON.parse(requireCore().acpUpdate(update)) as AcpView;
-        const { key, op } = JSON.parse(update) as { key?: string; op?: string };
+        const { agentKey, key, op } = JSON.parse(update) as { agentKey?: string; key?: string; op?: string };
+
+        // A plan in flight holds the variables as they were.
+        if (op === "setEnv" || op === "removeEnv") {
+            state.acp?.environmentChanged(agentKey);
+        }
 
         // What an agent reported says nothing about a different program.
         if (key !== undefined && (op === "saveAgent" || op === "removeAgent")) {
@@ -753,7 +760,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     // The registry is read when the window searches, never otherwise: there is no timer and no check of installed
     // agents against it, so nothing updates an agent but an install the user confirms again.
     const requireRegistry = (): AgentRegistry => {
-        state.registry ??= new AgentRegistry({ fetch: options.fetch, supported: acpSupported });
+        state.registry ??= new AgentRegistry({ fetch: options.fetch, hasNpmTools: () => findNodeTools() !== undefined, supported: acpSupported });
 
         return state.registry;
     };

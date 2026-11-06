@@ -214,6 +214,7 @@ export interface DeviceCore {
     /** What to start for an approved agent on a server (JSON): only the user's variables, the server builds the rest. */
     acpHostSpawnPlan: (deviceId: string, agentKey: string, folder: string) => string;
     acpInstall: (request: string) => string;
+    acpInstallNpm: (request: string) => Promise<string>;
     acpInstallPrune: (agentKey: string) => void;
     acpInstallStage: () => string;
     /** Coding agents (ACP): JSON strings, parsed by `acp/`. The spawn plan holds secrets and never leaves the main process. */
@@ -230,6 +231,7 @@ export interface DeviceCore {
     acpReadMedia: (agentKey: string, folder: string, reference: string) => Promise<MediaRead>;
     acpSign: (envelope: string, signature: string, outcome: string) => string;
     acpSpawnPlan: (agentKey: string, folder: string | null) => string;
+    acpSpawnPlanAsync: (agentKey: string, folder: string | null) => Promise<string>;
     acpUpdate: (update: string) => string;
     acpView: () => string;
     auditTail: () => string[];

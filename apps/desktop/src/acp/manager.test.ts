@@ -4,6 +4,7 @@
  * asserting there were none.
  */
 import { existsSync, mkdirSync } from "node:fs";
+import { mkdtemp } from "node:fs/promises";
 import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -24,7 +25,7 @@ let scratch: Scratch;
 let manager: AcpManager;
 const plans: { env: Record<string, string>; folder: string | null; key: string }[] = [];
 
-const make = (env: Record<string, string> = {}, options: { cancelGraceMs?: number; plan?: (key: string, folder: string | null) => SpawnPlan } = {}): AcpManager => new AcpManager({
+const make = (env: Record<string, string> = {}, options: { cancelGraceMs?: number; plan?: (key: string, folder: string | null) => Promise<SpawnPlan> | SpawnPlan } = {}): AcpManager => new AcpManager({
     appVersion: "9.9.9",
     cancelGraceMs: options.cancelGraceMs ?? 400,
     onChange: () => {},
@@ -438,5 +439,165 @@ describe("unsupported platforms and missing commands", () => {
         );
 
         await expect(target.probe("missing")).rejects.toThrow(MISSING_COMMAND);
+    });
+});
+
+describe("starts that wait for their plan", () => {
+    it("hold their place, so overlapping starts cannot pass the session limit together", async () => {
+        const target = make({}, { plan: () => new Promise<SpawnPlan>(() => {}) });
+
+        for (let index = 0; index < 8; index += 1) {
+            // eslint-disable-next-line unicorn/prefer-await -- the start never settles in this test; only the limit is under test
+            target.startSession("fake", "Fake", scratch.work).catch(() => {});
+        }
+
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow("at most");
+    });
+
+    it("plan again when approvals were revoked while the plan was being made", async () => {
+        const calls: number[] = [];
+        const bad = { args: [], command: "neore-no-such-agent", cwd: scratch.dir, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    calls.push(calls.length);
+
+                    if (calls.length === 1) {
+                        await target.closeUnapproved({ agents: [], consents: [] });
+                    }
+
+                    return bad;
+                },
+            },
+        );
+
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow(MISSING_COMMAND);
+        expect(calls).toHaveLength(2);
+    });
+
+    it("removes the scratch folder of a probe plan it drops, on a retry and at the retry limit", async () => {
+        const made: string[] = [];
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    const cwd = await mkdtemp(path.join(scratch.dir, "probe-"));
+
+                    made.push(cwd);
+                    await target.closeUnapproved({ agents: [], consents: [] });
+
+                    return { args: [], command: "neore-no-such-agent", cwd, env: { PATH: "/nonexistent" }, scratch: true, secretNames: [] };
+                },
+            },
+        );
+
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow("approvals changed");
+        expect(made).toHaveLength(4);
+        expect(made.every((folder) => !existsSync(folder))).toBe(true);
+    });
+
+    it("is not held up by updates of other agents or of this one's unrelated settings during a slow plan", async () => {
+        const calls: number[] = [];
+        const cwd = scratch.dir;
+        const unrelated = { agents: [{ args: [], command: "other", envNames: [], install: null, key: "other", label: "Other" }], consents: [] };
+        const mine = { args: [], command: "fake", envNames: [], install: null, key: "fake", label: "Fake" };
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    calls.push(calls.length);
+
+                    if (calls.length === 1) {
+                        for (let index = 0; index < 4; index += 1) {
+                            // eslint-disable-next-line no-await-in-loop -- the updates arrive one after another
+                            await target.closeUnapproved({ agents: [...unrelated.agents, { ...mine, envNames: [`V${String(index)}`], label: `Fake ${String(index)}` }], consents: [] });
+                        }
+                    }
+
+                    return { args: [], command: "neore-no-such-agent", cwd, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
+                },
+            },
+        );
+
+        // The agent is known before the slow plan starts.
+        await target.closeUnapproved({ agents: [...unrelated.agents, mine], consents: [] });
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow(MISSING_COMMAND);
+        expect(calls).toHaveLength(1);
+    });
+
+    it("still sees a start in flight after another start of the same agent has finished", async () => {
+        const bad = { args: [], command: "neore-no-such-agent", cwd: scratch.dir, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
+        let released = false;
+        let calls = 0;
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    calls += 1;
+
+                    // The first start answers at once; the second waits.
+                    if (calls === 2) {
+                        await vi.waitFor(() => expect(released).toBe(true));
+                    }
+
+                    return bad;
+                },
+            },
+        );
+
+        const first = messageOf(target.startSession("fake", "Fake", scratch.work));
+        const second = messageOf(target.startSession("fake", "Fake", scratch.work));
+
+        await first;
+        // The agent is removed while the second start still waits for its plan.
+        await target.closeUnapproved({ agents: [], consents: [] });
+        released = true;
+
+        // Its plan is made again (a third call) rather than used as it came.
+        await second;
+        expect(calls).toBeGreaterThanOrEqual(3);
+    });
+
+    it("makes a plan again when the agent's variables were edited while it was made", async () => {
+        const bad = { args: [], command: "neore-no-such-agent", cwd: scratch.dir, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
+        let calls = 0;
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    calls += 1;
+
+                    if (calls === 1) {
+                        // A value is replaced (or removed) while the first plan is being made.
+                        target.environmentChanged("fake");
+                    }
+
+                    return bad;
+                },
+            },
+        );
+
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow(MISSING_COMMAND);
+        expect(calls).toBe(2);
+    });
+
+    it("leaves a plan of another agent alone when only this agent's variables changed", async () => {
+        const bad = { args: [], command: "neore-no-such-agent", cwd: scratch.dir, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
+        let calls = 0;
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    calls += 1;
+                    target.environmentChanged("someone-else");
+
+                    return bad;
+                },
+            },
+        );
+
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow(MISSING_COMMAND);
+        expect(calls).toBe(1);
     });
 });

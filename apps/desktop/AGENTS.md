@@ -29,9 +29,13 @@
 - **Registry installs** (`apps/desktop/src/acp/{registry,install}.ts`, `device-core/src/acp_install.rs`):
   the desktop reads the ACP registry (`cdn.agentclientprotocol.com/registry/v1/latest/registry.json`) only when
   the local window searches. A `binary` download is installable only with a published `sha256`, which the schema
-  makes OPTIONAL (`npx`/`uvx` entries never have one), so those are listed and refused. The window names an id and
+  makes OPTIONAL (`npx`/`uvx` entries never have one). The window names an id and
   version; the main process takes archive, checksum and command from its own snapshot and words the native
   consent itself. Rust hashes, unpacks (no links, no `..`) and records the pin; there is no update path, by design.
+  **npm (`npx`) entries** install pinned to the exact registry version, with the package index's integrity read BEFORE
+  the consent and shown as the index's word (trust on first use). The core hashes the installed folder and re-hashes
+  it before EVERY start; it refuses on a mismatch, so do not add a start path that skips `acp_spawn_plan`. Detail
+  (trash, locks, what the check does not cover): `packages/device-core/README.md`.
 
 - **Desktop dictation** (`apps/desktop/src/dictation/`, desktop-dictation.md S2) is off until the settings
   switch turns it on (`DEFAULT_SETTINGS.enabled: false`); off, no shortcut is registered.

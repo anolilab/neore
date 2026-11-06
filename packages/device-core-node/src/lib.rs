@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 use device_core::acp::AcpUpdate;
 use device_core::acp_install::InstallRequest;
+use device_core::acp_install_npm::NpmInstallRequest;
 use device_core::acp_permission::PermissionRequest;
 use device_core::engine::{HostSpec, SettingsUpdate};
 use device_core::envelope::Signed;
@@ -527,6 +528,29 @@ impl DeviceCore {
         to_json(&view)
     }
 
+    /// Verifies a downloaded npm tarball against the package index's integrity, installs it with npm without
+    /// running any lifecycle script, and registers the agent pinned, with the hash of the installed files
+    /// (`NpmInstallRequest`, JSON). Not reachable through `acp_update`. Validation is in Rust.
+    ///
+    /// Asynchronous: npm can run for minutes, and the thread that calls this is the app's main thread.
+    #[napi]
+    pub fn acp_install_npm<'env>(
+        &self,
+        env: &'env Env,
+        request: String,
+    ) -> Result<PromiseRaw<'env, String>> {
+        // The request can carry variable values; a parse error must not quote them.
+        let request: NpmInstallRequest = serde_json::from_str(&request)
+            .map_err(|_| Error::from_reason("invalid install request"))?;
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let view = state.acp_install_npm(request)?;
+
+            serde_json::to_string(&view).map_err(|error| error.to_string())
+        })
+    }
+
     /// Deletes the installed versions of an agent other than the pinned one. Run it after closing the sessions
     /// the install took the approval from.
     #[napi]
@@ -544,6 +568,24 @@ impl DeviceCore {
             .map_err(Error::from_reason)?;
 
         to_json(&plan)
+    }
+
+    /// `acpSpawnPlan` on a worker thread: an installed npm agent's files are hashed first, which can take long
+    /// on a big dependency tree, so the app's main thread must not do it.
+    #[napi]
+    pub fn acp_spawn_plan_async<'env>(
+        &self,
+        env: &'env Env,
+        agent_key: String,
+        folder: Option<String>,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let plan = state.acp_spawn_plan(&agent_key, folder.as_deref())?;
+
+            serde_json::to_string(&plan).map_err(|error| error.to_string())
+        })
     }
 
     /// Registers, changes or removes a coding agent of a server, or approves it for a folder shared with the server

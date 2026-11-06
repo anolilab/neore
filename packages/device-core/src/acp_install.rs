@@ -36,9 +36,13 @@ use crate::hmac::to_hex;
 
 const INSTALL_DIR: &str = "acp-agents";
 const STAGING_DIR: &str = ".staging";
-const UNPACKED_DIR: &str = "unpacked";
+const TRASH_DIR: &str = ".trash";
+pub(crate) const UNPACKED_DIR: &str = "unpacked";
 const MAX_UNPACKED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_ENTRIES: usize = 20_000;
+/// All of a registry entry's variables together (names and values), so that starting the agent cannot fail on the
+/// size of its environment. The desktop applies the same number before the install is offered.
+pub(crate) const MAX_ENV_TOTAL_BYTES: usize = 32 * 1024;
 /// A staging folder left by a crash is removed after this long.
 const STALE_STAGING_MS: u64 = 24 * 60 * 60 * 1000;
 
@@ -75,11 +79,11 @@ pub struct InstallRequest {
     pub version: String,
 }
 
-fn has_control(text: &str) -> bool {
+pub(crate) fn has_control(text: &str) -> bool {
     text.chars().any(char::is_control)
 }
 
-fn valid_version(version: &str) -> bool {
+pub(crate) fn valid_version(version: &str) -> bool {
     (1..=40).contains(&version.len())
         && version.starts_with(|c: char| c.is_ascii_digit())
         && !version.contains("..")
@@ -89,7 +93,7 @@ fn valid_version(version: &str) -> bool {
 }
 
 /// `path` as a relative path of plain names. `.` is dropped; an absolute path, a drive prefix or `..` is refused.
-fn safe_relative(path: &Path) -> Result<PathBuf, String> {
+pub(crate) fn safe_relative(path: &Path) -> Result<PathBuf, String> {
     let mut clean = PathBuf::new();
 
     for component in path.components() {
@@ -110,14 +114,27 @@ fn validate(request: &InstallRequest) -> Result<(), String> {
         return Err("the registry gave no usable SHA-256 for this download".into());
     }
 
-    if !valid_version(&request.version) {
+    validate_provenance(
+        &request.version,
+        &request.publisher,
+        &request.source,
+        &request.env,
+    )
+}
+
+/// The registry-supplied text every install shares: a plain version, bounded publisher and source, and variables
+/// that pass the checks of a typed one.
+pub(crate) fn validate_provenance(
+    version: &str,
+    publisher: &str,
+    source: &str,
+    env: &BTreeMap<String, String>,
+) -> Result<(), String> {
+    if !valid_version(version) {
         return Err("the registry's version is not a plain version number".into());
     }
 
-    for (name, text, max) in [
-        ("publisher", &request.publisher, 200),
-        ("source", &request.source, 1000),
-    ] {
+    for (name, text, max) in [("publisher", publisher, 200), ("source", source, 1000)] {
         if text.trim().is_empty() || text.len() > max || has_control(text) {
             return Err(format!("the registry's {name} is empty or too long"));
         }
@@ -125,7 +142,20 @@ fn validate(request: &InstallRequest) -> Result<(), String> {
 
     // Every variable goes through the same checks as one the user types, and a name that changes which code runs
     // would make this a different program than the one the approvals were given for.
-    for (name, value) in &request.env {
+    if env.len() > crate::acp::MAX_ENV_VARS {
+        return Err(format!("at most {} variables", crate::acp::MAX_ENV_VARS));
+    }
+
+    if env
+        .iter()
+        .map(|(name, value)| name.len() + value.len())
+        .sum::<usize>()
+        > MAX_ENV_TOTAL_BYTES
+    {
+        return Err("the variables are longer than Neore accepts".into());
+    }
+
+    for (name, value) in env {
         validate_env_var(name, value)?;
 
         if changes_program(name) {
@@ -134,6 +164,17 @@ fn validate(request: &InstallRequest) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// One change to the installed agents at a time: an install's renames and settings write, a removal's settings
+/// change and file deletion, and a prune of old versions would otherwise interleave and delete each other's folders.
+/// Not held while npm runs.
+pub(crate) fn lock_installs() -> std::sync::MutexGuard<'static, ()> {
+    static COMMITTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    COMMITTING
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 impl DeviceState {
@@ -149,6 +190,8 @@ impl DeviceState {
 
         fs::create_dir_all(&staging).map_err(|error| error.to_string())?;
         remove_stale(&staging);
+        // Deletions a crash cut short, on a thread: they can be whole `node_modules` trees.
+        sweep_trash(self.install_root().join(TRASH_DIR));
 
         let name = format!(
             "{}-{}-{}",
@@ -182,7 +225,7 @@ impl DeviceState {
     }
 
     /// The archive's canonical path, which must be a file directly inside one folder made by `acp_install_stage`.
-    fn staged_archive(&self, archive: &str) -> Result<PathBuf, String> {
+    pub(crate) fn staged_archive(&self, archive: &str) -> Result<PathBuf, String> {
         let staging = self.install_root().join(STAGING_DIR);
         let staging = fs::canonicalize(&staging)
             .map_err(|_| "no download was staged: start the install again".to_owned())?;
@@ -255,22 +298,52 @@ impl DeviceState {
             command,
             env: EnvVars(request.env.clone()),
             install: Some(AcpInstall {
+                index_integrity: None,
                 publisher: request.publisher.clone(),
                 sha256: actual,
                 source: request.source.clone(),
+                tree_sha256: None,
                 version: request.version.clone(),
             }),
             key: request.key.clone(),
             label: request.label.trim().to_owned(),
         };
 
-        validate_agent(&agent)?;
-        self.check_free(&agent)?;
+        self.commit_install(&mut agent, &unpacked, &final_dir)?;
+
+        self.audit(json!({
+            "at": now_ms(), "decision": "approved", "detail": format!("{} {} by {} sha256 {}", request.label, request.version, request.publisher, request.sha256.to_ascii_lowercase()),
+            "status": "installed", "tool": "acp_install",
+        }));
+        self.emit(Event::Changed);
+
+        Ok(self.acp_view())
+    }
+
+    /// Moves the verified `unpacked` folder to `final_dir` (`<data dir>/acp-agents/<key>/<version>`) and records
+    /// `agent` with its pin. A failure leaves the agent, and any earlier install of the same version, as it was.
+    /// Installing over an installed key drops its folder approvals unless it is the same program.
+    pub(crate) fn commit_install(
+        &self,
+        agent: &mut AcpAgent,
+        unpacked: &Path,
+        final_dir: &Path,
+    ) -> Result<(), String> {
+        let version = agent
+            .install
+            .as_ref()
+            .map(|pin| pin.version.clone())
+            .ok_or("an install needs a pin")?;
+
+        let _committing = lock_installs();
+
+        validate_agent(agent)?;
+        self.check_free(agent)?;
 
         // An explicit reinstall of the same version keeps the old folder until the new one is recorded, so a
         // failure leaves the agent as it was. The name starts with a dot: a version starts with a digit.
-        let key_dir = self.install_root().join(&request.key);
-        let aside = key_dir.join(format!(".{}.old", request.version));
+        let key_dir = self.install_root().join(&agent.key);
+        let aside = key_dir.join(format!(".{version}.old"));
         let replaced = final_dir.exists();
 
         // The agent's folder must be a real folder under app data: through a symlink the cleanup below would
@@ -280,7 +353,7 @@ impl DeviceState {
         }
 
         fs::create_dir_all(&key_dir).map_err(|error| error.to_string())?;
-        let _ = fs::remove_dir_all(&aside);
+        self.discard(&aside);
 
         if replaced {
             fs::rename(&final_dir, &aside).map_err(|error| error.to_string())?;
@@ -299,6 +372,9 @@ impl DeviceState {
 
             return Err(error.to_string());
         }
+
+        #[cfg(test)]
+        tests_hook::after_rename(&agent.key);
 
         let recorded = self.change_settings(|settings| {
             let existing = settings
@@ -327,8 +403,11 @@ impl DeviceState {
                         // A launch variable that changed (a registry one the new version adds, drops or sets
                         // differently) is not the program the folders were approved for.
                         || before.env != agent.env
-                        || before.install.as_ref().map(|pin| &pin.sha256)
-                            != agent.install.as_ref().map(|pin| &pin.sha256)
+                        || before.install.as_ref().map(|pin| (&pin.sha256, &pin.tree_sha256))
+                            != agent
+                                .install
+                                .as_ref()
+                                .map(|pin| (&pin.sha256, &pin.tree_sha256))
                     {
                         settings.acp_consents.retain(|c| c.agent_key != agent.key);
                     }
@@ -350,20 +429,17 @@ impl DeviceState {
             return Err(error);
         }
 
-        let _ = fs::remove_dir_all(&aside);
+        self.discard(&aside);
 
-        self.audit(json!({
-            "at": now_ms(), "decision": "approved", "detail": format!("{} {} by {} sha256 {}", request.label, request.version, request.publisher, request.sha256.to_ascii_lowercase()),
-            "status": "installed", "tool": "acp_install",
-        }));
-        self.emit(Event::Changed);
-
-        Ok(self.acp_view())
+        Ok(())
     }
 
     /// Deletes the installed versions of `key` other than the pinned one. The caller runs it after it closed any
     /// session that was started under the approvals the install dropped, so no running agent loses its files.
     pub fn acp_install_prune(&self, key: &str) {
+        // Under the commit lock, reading the pin now: an install that committed a newer version meanwhile is the
+        // pin this sees, and its folder is the one kept.
+        let _committing = lock_installs();
         let settings = self.settings();
 
         if let Some(pin) = settings
@@ -373,7 +449,7 @@ impl DeviceState {
             .and_then(|agent| agent.install.as_ref())
         {
             if safe_relative(Path::new(key)).is_ok_and(|clean| clean.components().count() == 1) {
-                prune_other_versions(&self.install_root().join(key), &pin.version);
+                self.prune_other_versions(&self.install_root().join(key), &pin.version);
             }
         }
     }
@@ -396,16 +472,99 @@ impl DeviceState {
     /// installed one. `key` is a validated agent key, so it is one folder name.
     pub(crate) fn remove_installed_files(&self, key: &str) {
         if safe_relative(Path::new(key)).is_ok_and(|clean| clean.components().count() == 1) {
-            let _ = fs::remove_dir_all(self.install_root().join(key));
+            self.discard(&self.install_root().join(key));
+        }
+    }
+
+    /// Takes `path` out of the install tree at once (a rename into `.trash`, which is quick whatever the size) and
+    /// deletes it on a thread of its own: an npm install is a `node_modules` tree of tens of thousands of files,
+    /// and the callers hold the install lock and may be on the app's main thread. A crash during the delete leaves
+    /// the trash for the next stage to clear.
+    pub(crate) fn discard(&self, path: &Path) {
+        if fs::symlink_metadata(path).is_err() {
+            return;
+        }
+
+        static TRASHED: AtomicU64 = AtomicU64::new(0);
+
+        let trash = self.install_root().join(TRASH_DIR);
+        let target = trash.join(format!(
+            "{}-{}",
+            run_id(),
+            TRASHED.fetch_add(1, Ordering::Relaxed)
+        ));
+        let trash_is_link = fs::symlink_metadata(&trash).is_ok_and(|meta| !meta.is_dir());
+        let moved = if trash_is_link {
+            Err(std::io::Error::other(
+                "the trash folder is not a plain folder",
+            ))
+        } else {
+            fs::create_dir_all(&trash).and_then(|()| fs::rename(path, &target))
+        };
+
+        match moved {
+            Ok(()) => {
+                std::thread::spawn(move || remove_entry(&target));
+            }
+            // Could not be moved: delete it where it is, as before.
+            Err(_) => remove_entry(path),
+        }
+    }
+
+    fn prune_other_versions(&self, key_dir: &Path, keep: &str) {
+        // A symlink where the agent's folder should be is not ours to walk: removing "other versions" there would
+        // delete what it points at.
+        if fs::symlink_metadata(key_dir).map_or(true, |meta| !meta.is_dir()) {
+            return;
+        }
+
+        let Ok(entries) = fs::read_dir(key_dir) else {
+            return;
+        };
+
+        for entry in entries.flatten() {
+            if entry.file_name() != keep {
+                self.discard(&entry.path());
+            }
         }
     }
 }
 
-fn already_registered(key: &str) -> String {
+/// A hook the tests use to hold a commit between its rename and its settings write, where another change to the
+/// install tree would otherwise slip in.
+#[cfg(test)]
+pub(crate) mod tests_hook {
+    use std::sync::Mutex;
+
+    type Hook = std::sync::Arc<dyn Fn() + Send + Sync>;
+
+    static HOOK: Mutex<Option<(String, Hook)>> = Mutex::new(None);
+
+    pub(crate) fn set(key: &str, hook: Hook) {
+        *HOOK.lock().unwrap() = Some((key.to_owned(), hook));
+    }
+
+    pub(crate) fn clear() {
+        *HOOK.lock().unwrap() = None;
+    }
+
+    pub(super) fn after_rename(key: &str) {
+        let hook = match HOOK.lock().unwrap().as_ref() {
+            Some((hooked, hook)) if hooked == key => Some(std::sync::Arc::clone(hook)),
+            _ => None,
+        };
+
+        if let Some(hook) = hook {
+            hook();
+        }
+    }
+}
+
+pub(crate) fn already_registered(key: &str) -> String {
     format!("an agent with the key “{key}” is already registered by hand: remove it first")
 }
 
-fn create_private_dir(dir: &Path) -> Result<(), String> {
+pub(crate) fn create_private_dir(dir: &Path) -> Result<(), String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
@@ -439,25 +598,54 @@ fn remove_stale(staging: &Path) {
     }
 }
 
-fn prune_other_versions(key_dir: &Path, keep: &str) {
-    // A symlink where the agent's folder should be is not ours to walk: removing "other versions" there would
-    // delete what it points at.
-    if fs::symlink_metadata(key_dir).map_or(true, |meta| !meta.is_dir()) {
-        return;
-    }
-
-    let Ok(entries) = fs::read_dir(key_dir) else {
-        return;
+/// Removes whatever `path` is without following it: a folder with its contents, a file or a link (dangling or not)
+/// by itself.
+fn remove_entry(path: &Path) {
+    let is_folder = fs::symlink_metadata(path).is_ok_and(|meta| meta.is_dir());
+    let _ = if is_folder {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
     };
-
-    for entry in entries.flatten() {
-        if entry.file_name() != keep {
-            let _ = fs::remove_dir_all(entry.path());
-        }
-    }
 }
 
-fn sha256_reader(file: &mut fs::File) -> Result<String, String> {
+/// Names this run in the trash: the pid alone is reused by the operating system, so a crashed run's tree would be
+/// taken for a live one's. The start time in nanoseconds makes it unique per run.
+pub(crate) fn run_id() -> &'static str {
+    static ID: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+    ID.get_or_init(|| {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |elapsed| elapsed.as_nanos());
+
+        format!("{}.{nanos}", std::process::id())
+    })
+}
+
+/// Deletes what an earlier run left in `trash`, in the background. Entries are named `<run id>-<n>`; this run's
+/// own are being deleted by the thread that made them.
+fn sweep_trash(trash: PathBuf) {
+    // The trash is ours only while it is a real folder: through a link the sweep would delete what it points at.
+    if fs::symlink_metadata(&trash).map_or(true, |meta| !meta.is_dir()) {
+        return;
+    }
+
+    std::thread::spawn(move || {
+        let own = format!("{}-", run_id());
+        let Ok(entries) = fs::read_dir(&trash) else {
+            return;
+        };
+
+        for entry in entries.flatten() {
+            if !entry.file_name().to_string_lossy().starts_with(&own) {
+                let _ = fs::remove_dir_all(entry.path());
+            }
+        }
+    });
+}
+
+pub(crate) fn sha256_reader(file: &mut fs::File) -> Result<String, String> {
     let mut hasher = Sha256::new();
     let mut buffer = vec![0_u8; 64 * 1024];
 

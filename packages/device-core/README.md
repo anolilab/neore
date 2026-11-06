@@ -198,3 +198,18 @@ The list (`egress::DEPENDENCY_HOSTS`; `cargo test egress` fails if this table an
 `objects` entries come from the tools' documented defaults and were not exercised.
 
 SSH servers (`neore-host`) keep the on/off shell-network switch; the tiers are not offered for them yet.
+
+## npm registry agents
+
+`acp_install_npm.rs` installs a registry agent that is an npm package: pinned to the registry's exact version, with
+the package index's `dist.integrity` as the only integrity (trust on first use, shown before the person confirms).
+npm runs with `--ignore-scripts`, by the absolute `node`/`npm` paths the desktop found, in its own process group and
+with a scrubbed environment; the tarball is hashed again after npm exits.
+
+- The pin records a hash of the installed folder (raw file names, contents, executable bits, links that stay inside).
+  `verify_installed_tree`, called by `acp_spawn_plan`, re-hashes it before every start, and also refuses when a
+  `node_modules` exists in `acp-agents/<key>/` or `acp-agents/`. Folders above the app's data folder are not checked
+  (a stated limit, also in the consent text). The Node binary is neither hashed nor pinned.
+- One lock (`lock_installs`) orders install commits, removals and prunes. It is not held while npm runs.
+- Deleting an install renames it into `acp-agents/.trash` under the lock and deletes it on a thread. Trash names
+  carry a per-run id (`run_id`); the sweep at the next install stage removes the entries of other runs only.
