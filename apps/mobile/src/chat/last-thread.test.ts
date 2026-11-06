@@ -58,11 +58,12 @@ describe("threadToReopen", () => {
 });
 
 describe("isSavedThread", () => {
-    it("is true only for the chat that is saved", () => {
-        const saved = { threadId: "t-1", userId: "u-1" };
+    const saved = { threadId: "t-1", userId: "u-1" };
 
-        expect(isSavedThread(saved, "t-1")).toBe(true);
-        expect(isSavedThread(saved, "t-2")).toBe(false);
-        expect(isSavedThread(undefined, "t-1")).toBe(false);
+    it("is true only for the same chat of the same account", () => {
+        expect(isSavedThread(saved, { threadId: "t-1", userId: "u-1" })).toBe(true);
+        expect(isSavedThread(saved, { threadId: "t-2", userId: "u-1" })).toBe(false);
+        expect(isSavedThread(saved, { threadId: "t-1", userId: "u-2" })).toBe(false);
+        expect(isSavedThread(undefined, { threadId: "t-1", userId: "u-1" })).toBe(false);
     });
 });

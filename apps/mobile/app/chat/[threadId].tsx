@@ -2,7 +2,7 @@ import type { LegendListRef } from "@legendapp/list/react-native";
 import { LegendList } from "@legendapp/list/react-native";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import type { ComponentRef } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Pressable, Share, Text, TextInput, View } from "react-native";
@@ -13,7 +13,6 @@ import { fetchAccessToken } from "@/auth/grant";
 import { secureGrantStore } from "@/auth/secure-store";
 import { ChatError, startChat } from "@/chat/chat-api";
 import { forgetLastThread, rememberLastThread } from "@/chat/last-thread-store";
-import { canClaimLaunchReopen } from "@/chat/launch-reopen";
 import { displayTextOf, shareTextOf } from "@/chat/message-parts";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
@@ -137,6 +136,8 @@ const Chat = () => {
     // Whether "Load older messages" has added pages here: only then does the cursor on screen continue a loaded run.
     const hasLoadedOlder = useRef(false);
     const readGate = useRef(createMessageReadGate());
+    // Whether this chat is the one on screen: a read that lands after another chat was pushed over it must not save it.
+    const isFocusedRef = useRef(false);
     const [threadId, setThreadId] = useState<string | undefined>(routeThreadId === NEW_THREAD ? undefined : routeThreadId);
     const [rows, setRows] = useState<Row[]>([]);
     // The rows as the last write left them. Every write goes through `writeRows`, so a read can decide against the rows on
@@ -189,10 +190,10 @@ const Chat = () => {
             writeRows([]);
             setOlderCursor(null);
             setError(REFUSED_MESSAGE);
-            // A chat the server refuses is not reopened on launch.
-            settleQuietly(forgetLastThread(refusedThreadId));
+            // A chat the server refuses is not reopened on launch, and only this account's record of it is forgotten.
+            settleQuietly(accountId ? forgetLastThread({ threadId: refusedThreadId, userId: accountId }) : undefined);
         },
-        [writeRows],
+        [accountId, writeRows],
     );
 
     // The newest pages load when a chat opens; "Load older messages" fetches the rest one page at a time.
@@ -248,7 +249,7 @@ const Chat = () => {
                     setError(withoutRefusal);
 
                     // Only a chat the server has just let this account read is saved as the one to reopen.
-                    if (accountId) {
+                    if (accountId && isFocusedRef.current) {
                         settleQuietly(rememberLastThread({ threadId: id, userId: accountId }));
                     }
 
@@ -359,10 +360,15 @@ const Chat = () => {
         return () => gate.invalidate();
     }, [threadId]);
 
-    // A chat opened on its own, such as from a link, takes this launch's reopen: the saved chat must not open later from the list.
-    useEffect(() => {
-        canClaimLaunchReopen();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            isFocusedRef.current = true;
+
+            return () => {
+                isFocusedRef.current = false;
+            };
+        }, []),
+    );
 
     // The reply checks run in a hook; the screen decides what a refusal or a settled check means for the chat.
     const onConfirmationRefused = useCallback(

@@ -18,10 +18,10 @@ export const rememberLastThread = async (last: LastThread): Promise<void> => {
     });
 };
 
-/** Forgets the saved chat, but only while it is `threadId`: a chat saved since then is not the refused one. */
-export const forgetLastThread = async (threadId: string): Promise<void> => {
+/** Forgets the saved chat, but only while it is `target`: a chat saved since then, or by another account, is not the refused one. */
+export const forgetLastThread = async (target: LastThread): Promise<void> => {
     await inOrder(async () => {
-        if (isSavedThread(parseLastThread(await getItemAsync(LAST_THREAD_KEY)), threadId)) {
+        if (isSavedThread(parseLastThread(await getItemAsync(LAST_THREAD_KEY)), target)) {
             await deleteItemAsync(LAST_THREAD_KEY);
         }
     });

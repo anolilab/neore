@@ -7,6 +7,7 @@ import { Pressable, Text, View } from "react-native";
 
 import { AuthProvider } from "@/auth/auth-context";
 import { useAuth } from "@/auth/auth-state";
+import { canClaimLaunchReopen } from "@/chat/launch-reopen";
 import { loadConfig } from "@/lib/config";
 import { revocationFlag } from "@/lib/crash-report-revocation";
 import { crashReportStore } from "@/lib/crash-report-store";
@@ -49,6 +50,18 @@ const SignInGate = () => {
             router.replace("/");
         }
     }, [isOnSettings, isOnSignIn, router, status]);
+
+    // The launch's reopen goes to the first signed-in screen that is not the chat list (which takes it itself) and not the
+    // sign-in screen (which leads to the list). Any other screen opened first, such as a chat from a link, takes it, so the
+    // list cannot open the saved chat long after the launch.
+    useEffect(() => {
+        const first: string | undefined = segments[0];
+        const isListOrSignIn = first === undefined || first === "index" || isOnSignIn;
+
+        if (status === "signed-in" && !isListOrSignIn) {
+            canClaimLaunchReopen();
+        }
+    }, [isOnSignIn, segments, status]);
 
     return (
         <Stack>
