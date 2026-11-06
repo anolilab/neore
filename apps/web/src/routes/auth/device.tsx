@@ -298,7 +298,11 @@ const DeviceApproval = () => {
     const userId = data?.user?.id;
 
     // Opening the code while signed in claims it for this account, so it runs once per code and account.
-    const { data: lookup, error: lookupError, refetch: retryLookup } = useQuery({
+    const {
+        data: lookup,
+        error: lookupError,
+        refetch: retryLookup,
+    } = useQuery({
         enabled: Boolean(userCode && userId && !isAnonymous),
         gcTime: 0,
         queryFn: async (): Promise<Lookup> => {
