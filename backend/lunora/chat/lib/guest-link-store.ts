@@ -3,6 +3,8 @@
  * the token helpers, and the removal that archiving or deleting a thread shares with a revoke. Kept apart
  * so `agent/threads.ts` can call the removal without importing the procedures.
  */
+import { stripHiddenText } from "@neore/ai/utils";
+
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { sha256Hex } from "../../lib/crypto";
@@ -30,7 +32,8 @@ export const hashGuestToken = async (token: string): Promise<string> => await sh
 
 /** The text a guest may leave, trimmed, or `null` when it is empty or over the cap. */
 export const cleanGuestText = (text: string): string | null => {
-    const trimmed = text.trim();
+    // Hidden characters can carry instructions the person never sees: they go, as they do from an ordinary prompt.
+    const trimmed = stripHiddenText(text).text.trim();
 
     return trimmed.length === 0 || trimmed.length > GUEST_MESSAGE_MAX_CHARS ? null : trimmed;
 };

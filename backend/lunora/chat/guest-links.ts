@@ -20,7 +20,8 @@
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import { internalMutation, internalQuery } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
+import { internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import { requireOwnedThread, requireOwnedThreadIgnoringLock } from "../agent/thread-read-access";
 import { refuseHostThread } from "../acp/lib/host-thread";
 import { GUEST_POST_CLAIM_TTL_MS, GUEST_POST_SCOPE, claimOnce, hasClaim } from "../lib/claim-once";
@@ -76,11 +77,35 @@ const tooLong = (token: string): boolean => token.length === 0 || token.length >
 // ---------------------------------------------------------------------------
 
 /** Makes the thread's guest link (replacing any earlier one). The token comes back once; only its hash is kept. */
+/** Whether a note on any link of the thread is still waiting for the owner's review. */
+const hasWaitingNotes = async (context: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
+    const links = await context.db
+        .query("threadGuestLinks")
+        .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+        .take(GUEST_LINK_SCAN);
+
+    for (const link of links) {
+        const notes = await context.db
+            .query("threadGuestMessages")
+            .withIndex("by_link", (q) => q.eq("linkId", link._id))
+            .take(GUEST_MAX_ROWS_PER_LINK);
+
+        if (notes.some((note) => note.status === "held")) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
+/** The most links of a thread read when looking for waiting notes: a thread has one live link at a time. */
+const GUEST_LINK_SCAN = 10;
+
 export const createGuestLink = authMutation
     .use(rateLimit("sharing/create"))
-    .input({ threadId: v.id("threads") })
+    .input({ discardWaiting: v.optional(v.boolean()), threadId: v.id("threads") })
     .output(v.object({ expiresAt: v.number(), linkToken: v.string() }))
-    .mutation(async ({ args: { threadId }, ctx: context }) => {
+    .mutation(async ({ args: { discardWaiting, threadId }, ctx: context }) => {
         const { userId } = context.user;
         // The owner alone, and not a locked chat without its proof: a link into a locked chat would be a way around the lock.
         const thread = await requireOwnedThread(context, threadId, userId);
@@ -90,6 +115,12 @@ export const createGuestLink = authMutation
         }
 
         refuseHostThread(thread, "given a guest link");
+
+        // A new link replaces the old one and everything on it, so notes still waiting for review are not dropped silently.
+        if (discardWaiting !== true && (await hasWaitingNotes(context, threadId))) {
+            throw new LunoraError("BAD_REQUEST", "Send or dismiss the waiting guest messages first, or discard them to make a new link.");
+        }
+
         // The old rows go first and their routes last: a failure before the end leaves the old link reachable.
         const replacedHashes = await removeGuestLinkRows(context, threadId);
 

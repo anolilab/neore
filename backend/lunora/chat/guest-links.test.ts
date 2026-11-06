@@ -592,3 +592,28 @@ describe("a held note on a lapsed link", () => {
         expect(await harness.run(async (ctx: any) => await ctx.runQuery(guestLinks.getGuestNoteForSend, { messageId, userId: OWNER }))).toBeNull();
     });
 });
+
+describe("making a new link while notes wait", () => {
+    it("is refused until the waiting notes are sent or discarded, and a discard removes them", async () => {
+        const { linkToken } = await createLink();
+
+        await hold(linkToken, "still waiting");
+
+        await expect(asOwner().mutation(guestLinks.createGuestLink as never, { threadId } as never)).rejects.toBeDefined();
+        expect(await rows("threadGuestMessages")).toHaveLength(1);
+
+        await asOwner().mutation(guestLinks.createGuestLink as never, { discardWaiting: true, threadId } as never);
+
+        expect(await rows("threadGuestMessages")).toHaveLength(0);
+    });
+});
+
+describe("a note's text", () => {
+    it("has its hidden characters removed, as an ordinary prompt's are", async () => {
+        const { linkToken } = await createLink();
+
+        await hold(linkToken, "hi\u{E0061}");
+
+        expect(await rows("threadGuestMessages")).toMatchObject([{ text: "hi" }]);
+    });
+});

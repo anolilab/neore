@@ -21793,6 +21793,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "discardWaiting": {
+                        "type": "boolean"
+                      },
                       "threadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",

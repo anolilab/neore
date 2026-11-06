@@ -595,7 +595,8 @@ const runChatStartOnShard = async (
     const messageContent: any[] = [];
 
     if (guestNote) {
-        messageContent.push(guestTextPart(guestNote.text));
+        // The stored note is sanitized again here, so a row written before the filter existed reaches the agent clean too.
+        messageContent.push(guestTextPart(stripHiddenText(guestNote.text).text));
     } else if (body.prompt) {
         messageContent.push({ text: body.prompt.trim(), type: "text" });
     } else if (contentType === "image") {
@@ -908,12 +909,15 @@ const runChatStartOnShard = async (
         threadId = validThreadId;
         messageId = result.messageId;
 
-        // The held note's text is now in the chat: the guest sees it as sent.
+        // The held note's text is now in the chat: the guest sees it as sent. The message is already saved, so a failure to mark
+        // the note is logged rather than failing a request whose message is in the chat.
         if (guestNote) {
-            await context.runMutation(internal.chat.guest_links.markGuestNoteSent, {
-                messageId: body.guestMessageId as Id<"threadGuestMessages">,
-                userId,
-            });
+            await context
+                .runMutation(internal.chat.guest_links.markGuestNoteSent, {
+                    messageId: body.guestMessageId as Id<"threadGuestMessages">,
+                    userId,
+                })
+                .catch((error: unknown) => chatLogger.error("[GuestLink] Could not mark a sent note as sent:", error));
         }
 
         // Title generation for existing threads too — scheduled after the agent run below.
