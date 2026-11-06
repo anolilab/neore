@@ -83,7 +83,7 @@ vi.mock("./message-content", async () => {
     const ColumnMessageContent = () => {
         const context = use(Context);
 
-        return <div data-testid="column-lock">{context.thread?.lockedAt ? "locked" : "open"}</div>;
+        return <div data-testid="column-lock">{context?.thread?.lockedAt ? "locked" : "open"}</div>;
     };
 
     return { default: ColumnMessageContent };
