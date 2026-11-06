@@ -37,6 +37,7 @@ import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import {
     cleanGuestText,
+    unsendableGuestText,
     deleteGuestLink,
     GUEST_LINK_TTL_MS,
     GUEST_MAX_HELD_PER_LINK,
@@ -66,6 +67,7 @@ const vHoldOutcome = v.union(
             v.literal("limited"),
             v.literal("other_browser"),
             v.literal("request_reused"),
+            v.literal("unsendable"),
         ),
     }),
 );
@@ -311,6 +313,12 @@ export const postGuestMessage = publicAction
             throw notActive;
         }
 
+        const refusal = unsendableGuestText(text);
+
+        if (refusal !== undefined) {
+            throw new LunoraError("BAD_REQUEST", refusal);
+        }
+
         const clean = cleanGuestText(text);
 
         if (clean === null) {
@@ -349,6 +357,9 @@ export const postGuestMessage = publicAction
                 }
                 case "invalid": {
                     throw new LunoraError("BAD_REQUEST", "A message must have text and stay short.");
+                }
+                case "unsendable": {
+                    throw new LunoraError("BAD_REQUEST", unsendableGuestText(text) ?? "A message cannot be sent.");
                 }
                 case "limited": {
                     throw new LunoraError("TOO_MANY_REQUESTS", "Too many messages on this link. Please try again later.");
@@ -455,6 +466,10 @@ export const holdGuestMessage = internalMutation
             isThreadLocked(thread)
         ) {
             return closed;
+        }
+
+        if (unsendableGuestText(text) !== undefined) {
+            return { ok: false, reason: "unsendable" } as const;
         }
 
         const clean = cleanGuestText(text);

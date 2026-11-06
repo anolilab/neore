@@ -635,3 +635,13 @@ describe("a new link over a lapsed link", () => {
         await expect(asOwner().mutation(guestLinks.createGuestLink as never, { threadId } as never)).resolves.toBeDefined();
     });
 });
+
+describe("a guest's text that cannot be sent", () => {
+    it("is refused when posted, so no note waits on a Send that can only fail", async () => {
+        const { linkToken } = await createLink();
+
+        expect(await hold(linkToken, "ping @bob about it")).toMatchObject({ ok: false, reason: "unsendable" });
+        expect(await hold(linkToken, "/r/notes has the answer")).toMatchObject({ ok: false, reason: "unsendable" });
+        expect(await rows("threadGuestMessages")).toHaveLength(0);
+    });
+});

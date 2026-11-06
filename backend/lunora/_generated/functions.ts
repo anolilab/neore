@@ -3810,7 +3810,7 @@ export interface Caller {
             getGuestLinkOwner: (args: { linkHash: string }) => Promise<string | null>;
             getGuestNoteForSend: (args: { messageId: Id<"threadGuestMessages">; userId: string }) => Promise<{ status: "held" | "sent"; text: string; threadId: string } | null>;
             getGuestView: (args: { guestToken: string; linkToken: string }) => Promise<{ expiresAt: number; messages: Array<{ createdAt: number; status: "held" | "sent"; text: string }> } | null>;
-            holdGuestMessage: (args: { freshGuestHash: string; linkHash: string; presentedGuestHash?: string; requestHash?: string; requestKey?: string; text: string }) => Promise<{ messageId: string; minted: boolean; ok: true } | { duplicate: true; minted: boolean; ok: true } | { ok: false; reason: "closed" | "full" | "invalid" | "limited" | "other_browser" | "request_reused" }>;
+            holdGuestMessage: (args: { freshGuestHash: string; linkHash: string; presentedGuestHash?: string; requestHash?: string; requestKey?: string; text: string }) => Promise<{ messageId: string; minted: boolean; ok: true } | { duplicate: true; minted: boolean; ok: true } | { ok: false; reason: "closed" | "full" | "invalid" | "limited" | "other_browser" | "request_reused" | "unsendable" }>;
             isBoundGuest: (args: { guestHash: string; linkHash: string }) => Promise<boolean>;
             listGuestNotesForExport: (args: { threadId: Id<"threads"> }) => Promise<Array<{ createdAt: number; status: "held" | "sent"; text: string }>>;
             markGuestNoteSent: (args: { messageId: Id<"threadGuestMessages">; userId: string }) => Promise<null>;

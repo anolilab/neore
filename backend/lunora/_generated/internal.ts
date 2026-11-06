@@ -423,7 +423,7 @@ export interface InternalApiTypes {
         guest_links: {
             getGuestLinkOwner: FunctionReference<"query", { linkHash: string }, string | null>;
             getGuestNoteForSend: FunctionReference<"query", { messageId: Id<"threadGuestMessages">; userId: string }, { status: "held" | "sent"; text: string; threadId: string } | null>;
-            holdGuestMessage: FunctionReference<"mutation", { freshGuestHash: string; linkHash: string; presentedGuestHash?: string; requestHash?: string; requestKey?: string; text: string }, { messageId: string; minted: boolean; ok: true } | { duplicate: true; minted: boolean; ok: true } | { ok: false; reason: "closed" | "full" | "invalid" | "limited" | "other_browser" | "request_reused" }>;
+            holdGuestMessage: FunctionReference<"mutation", { freshGuestHash: string; linkHash: string; presentedGuestHash?: string; requestHash?: string; requestKey?: string; text: string }, { messageId: string; minted: boolean; ok: true } | { duplicate: true; minted: boolean; ok: true } | { ok: false; reason: "closed" | "full" | "invalid" | "limited" | "other_browser" | "request_reused" | "unsendable" }>;
             isBoundGuest: FunctionReference<"query", { guestHash: string; linkHash: string }, boolean>;
             listGuestNotesForExport: FunctionReference<"query", { threadId: Id<"threads"> }, Array<{ createdAt: number; status: "held" | "sent"; text: string }>>;
             markGuestNoteSent: FunctionReference<"mutation", { messageId: Id<"threadGuestMessages">; userId: string }, null>;

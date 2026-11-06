@@ -26,6 +26,7 @@ import { parseSkillCommand } from "../skills/slash-command";
 import { clampGoalEffort, GOAL_TEXT_MAX } from "./goals/shared";
 import { vGoalRunConfig } from "./goals/validators";
 import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
+import { unsendableGuestText } from "./lib/guest-link-store";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
@@ -346,9 +347,6 @@ export const chatStartHttpAction = async (context: HttpActionCtx, request: Reque
     return await runChatStart(context, body, signingSecret);
 };
 
-/** A mention as the group parser reads one (`chat/group/logic.ts`): refused in a guest's note, which cannot choose a speaker. */
-const GUEST_MENTION_RE = /(?:^|[^\w@.])@[a-z0-9]/i;
-
 /** The `/chat/start` request body. Also built by the public API's chat route. */
 export interface ChatStartBody {
     /** New thread only: each send routes to a model the gateway picks (`chat/lib/auto-model.ts`). An existing thread keeps its own setting. */
@@ -599,15 +597,12 @@ const runChatStartOnShard = async (
         return Response.json({ error: "That guest note is not waiting in this chat." }, { status: 400 });
     }
 
-    // A guest's note is never a command: text that starts with "/" could select one of the owner's skills or commands.
-    if (guestNote && stripHiddenText(guestNote.text).text.trimStart().startsWith("/")) {
-        return Response.json({ error: "A guest note that starts with / cannot be sent." }, { status: 400 });
-    }
+    // A note a guest posted that cannot be sent (a command, or a mention) is refused here too, for rows posted before the post
+    // path refused them.
+    const unsendable = guestNote ? unsendableGuestText(guestNote.text) : undefined;
 
-    // Nor can it @mention: in a group chat a mention picks who answers, which is the owner's choice. The shape matches the
-    // parser's (`chat/group/logic.ts`), without its participant list, so any mention a guest writes is refused.
-    if (guestNote && GUEST_MENTION_RE.test(stripHiddenText(guestNote.text).text)) {
-        return Response.json({ error: "A guest note cannot @mention anyone." }, { status: 400 });
+    if (unsendable !== undefined) {
+        return Response.json({ error: unsendable }, { status: 400 });
     }
 
     // Build message content

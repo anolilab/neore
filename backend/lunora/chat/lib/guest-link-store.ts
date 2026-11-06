@@ -31,6 +31,24 @@ export const newGuestToken = (): string => `${crypto.randomUUID()}${crypto.rando
 export const hashGuestToken = async (token: string): Promise<string> => await sha256Hex(token);
 
 /** The text a guest may leave, trimmed, or `null` when it is empty or over the cap. */
+/** The shape of a mention as the group parser reads one (`chat/group/logic.ts`), without its participant list. */
+const GUEST_MENTION_SHAPE = /(?:^|[^\w@.])@[a-z0-9]/i;
+
+/**
+ * Why a guest's text cannot be sent later, or `undefined`. A text that starts with `/` could select one of the owner's
+ * commands or skills, and a mention could choose who answers in a group chat: neither is a guest's to decide. Refused when
+ * posted, so no note is left waiting on a Send that can only fail.
+ */
+export const unsendableGuestText = (text: string): string | undefined => {
+    const plain = stripHiddenText(text).text.trimStart();
+
+    if (plain.startsWith("/")) {
+        return "A message cannot start with /.";
+    }
+
+    return GUEST_MENTION_SHAPE.test(plain) ? "A message cannot @mention anyone." : undefined;
+};
+
 export const cleanGuestText = (text: string): string | null => {
     // Hidden characters can carry instructions the person never sees: they go, as they do from an ordinary prompt.
     const trimmed = stripHiddenText(text).text.trim();
