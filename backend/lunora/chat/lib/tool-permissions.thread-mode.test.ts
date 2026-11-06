@@ -134,7 +134,13 @@ describe("modeOfThread", () => {
     const databaseWith = (links: Record<string, unknown>[]) => {
         return {
             get: async (_table: string, id: string) => threads[id] ?? null,
-            query: () => ({ withIndex: () => ({ take: async () => links }) }),
+            query: () => {
+                return {
+                    withIndex: () => {
+                        return { take: async () => links };
+                    },
+                };
+            },
         };
     };
 
