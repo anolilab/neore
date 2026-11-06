@@ -176,6 +176,7 @@ const OWNER_TABLES = [
     "codingAgentRuns",
     "dailyBriefState",
     "deviceCalls",
+    "deviceCode",
     "devices",
     "documentVersions",
     "embeddings_1024",

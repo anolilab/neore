@@ -32,6 +32,10 @@ Usage: neore <command> [options]
 
 Account
   login [--api-url URL] [--key KEY]   Save an API key (prompted, or piped on stdin)
+  login --device [--api-url URL]      Sign in by code: shows a URL and a code to approve
+                                      in the web app (works over SSH, opens no browser).
+                                      Type the API host to confirm it, or pass --confirm-host HOST
+                                      when there is no terminal
   logout                              Forget the saved key
   whoami                              Show the key's user and scopes
   doctor                              Check config, connectivity and the key
@@ -72,6 +76,15 @@ Global options
 Prefer the prompt or stdin over --key: flags end up in shell history.
 
 Exit codes: 0 ok, 1 error, 2 usage, 3 auth/scope, 4 not found, 5 rate/daily limit, 6 network.
+
+Sign in by code (no browser needed on this machine):
+  neore login --device --api-url https://api.example.com
+      asks you to type the API host, then shows a URL and a code to approve
+  neore login --device --api-url https://api.example.com --confirm-host api.example.com
+      the same without a terminal (CI, scripts): the host must equal the URL's host
+
+"login --device" exits 1 when the code is denied, expired or already used (the message
+says which), 5 when the server limits the polling, 6 when it cannot be reached.
 `;
 
 type Handler = (context: Context, command: ParsedCommand) => Promise<boolean | void>;

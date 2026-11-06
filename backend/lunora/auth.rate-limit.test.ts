@@ -18,11 +18,19 @@ import { resolveAuthOptions } from "@lunora/auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { anonymous } from "better-auth/plugins";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AUTH_RATE_LIMIT_CUSTOM_RULES } from "./auth";
+import { cliDeviceAuth } from "./auth/cli-device-auth";
 
 const BASE_URL = "http://localhost:3000";
+
+/**
+ * `@lunora/auth` resolves NO trusted client-IP header unless the app sets one, and better-auth then keys every
+ * request of a path on one shared bucket (127.0.0.1 under test, "no-trusted-ip" otherwise). These tests need the
+ * per-address behaviour they describe, so they name the header the requests carry.
+ */
+const IP_OPTIONS = { advanced: { ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] } } };
 
 const buildLimitedAuth = (customRules: typeof AUTH_RATE_LIMIT_CUSTOM_RULES = AUTH_RATE_LIMIT_CUSTOM_RULES) => {
     const resolved = resolveAuthOptions({
@@ -32,6 +40,7 @@ const buildLimitedAuth = (customRules: typeof AUTH_RATE_LIMIT_CUSTOM_RULES = AUT
         plugins: [anonymous()],
         rateLimit: { customRules },
         secret: "a-test-secret-that-is-long-enough-for-lunora-auth",
+        ...IP_OPTIONS,
     });
 
     return betterAuth({
@@ -149,5 +158,162 @@ describe("better-auth rate limit rules", () => {
         const result = await statuses(auth, 101, () => request("/ok", ip));
 
         expect(result.at(-1)).toBe(429);
+    });
+});
+
+describe("CLI device sign-in rate limits", () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    const buildDeviceAuth = () => {
+        const resolved = resolveAuthOptions({
+            baseURL: BASE_URL,
+            database: memoryAdapter({ account: [], deviceCode: [], rateLimit: [], session: [], user: [], verification: [] }),
+            plugins: [
+                ...cliDeviceAuth({
+                    mintApiKey: async () => {
+                        return { id: "k", key: "nk_x" };
+                    },
+                    verifyApiKey: async () => null,
+                }),
+            ],
+            rateLimit: { customRules: AUTH_RATE_LIMIT_CUSTOM_RULES },
+            secret: "a-test-secret-that-is-long-enough-for-lunora-auth",
+            ...IP_OPTIONS,
+        });
+
+        return betterAuth({ ...resolved, rateLimit: { ...resolved.rateLimit, enabled: true, storage: "memory" } });
+    };
+
+    const poll = (ip: string) =>
+        request("/device/key", ip, { body: JSON.stringify({ client_id: "neore-cli", device_code: "not-a-real-code" }), method: "POST" });
+
+    it("never limits a CLI polling every 5 seconds for the whole 30 minutes a code lives", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-11-03T12:00:00Z"));
+
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const result: number[] = [];
+
+        for (let index = 0; index < 360; index += 1) {
+            const response = await auth.handler(poll(ip));
+
+            result.push(response.status);
+            await response.body?.cancel();
+            vi.setSystemTime(Date.now() + 5000);
+        }
+
+        expect(result.filter((status) => status === 429)).toHaveLength(0);
+    }, 120_000);
+
+    it("does not lock out several people polling at once from one shared address", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-11-03T15:00:00Z"));
+
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const result: number[] = [];
+
+        // Five people behind one office address, each polling every 5 s, so a request arrives about every second.
+        for (let index = 0; index < 360; index += 1) {
+            const response = await auth.handler(poll(ip));
+
+            result.push(response.status);
+            await response.body?.cancel();
+            vi.setSystemTime(Date.now() + 1000);
+        }
+
+        expect(result.filter((status) => status === 429)).toHaveLength(0);
+    }, 120_000);
+
+    it("cuts off a tight loop of invented codes, and lets the address poll again after a short pause", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-11-03T16:00:00Z"));
+
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const result = await statuses(auth, 130, () => poll(ip));
+
+        expect(result.slice(0, 120)).not.toContain(429);
+        expect(result.slice(120).every((status) => status === 429)).toBe(true);
+
+        // No lasting lockout: the count resets after a pause of 100 ms.
+        vi.setSystemTime(Date.now() + 150);
+
+        const after = await auth.handler(poll(ip));
+
+        expect(after.status).not.toBe(429);
+        await after.body?.cancel();
+    });
+
+    it("does not lock out ten people polling at an even half-second spacing from one address", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-11-03T17:00:00Z"));
+
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const result: number[] = [];
+
+        for (let index = 0; index < 400; index += 1) {
+            const response = await auth.handler(poll(ip));
+
+            result.push(response.status);
+            await response.body?.cancel();
+            vi.setSystemTime(Date.now() + 500);
+        }
+
+        expect(result.filter((status) => status === 429)).toHaveLength(0);
+    }, 120_000);
+
+    it("lets two people behind one address both get a code and be answered on their polls", async () => {
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const codes = [];
+
+        for (const hostname of ["alice-laptop", "bob-laptop"]) {
+            const response = await auth.handler(request("/device/code", ip, { body: JSON.stringify({ client_id: "neore-cli", hostname }), method: "POST" }));
+
+            expect(response.status).toBe(200);
+            codes.push((await response.json()) as { device_code: string });
+        }
+
+        for (const { device_code: deviceCode } of codes) {
+            const response = await auth.handler(
+                request("/device/key", ip, { body: JSON.stringify({ client_id: "neore-cli", device_code: deviceCode }), method: "POST" }),
+            );
+
+            expect(response.status).toBe(400);
+            expect(((await response.json()) as { error: string }).error).toBe("authorization_pending");
+        }
+    });
+
+    it("limits issuing codes to 60 a minute per address", async () => {
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const result = await statuses(auth, 62, () =>
+            request("/device/code", ip, { body: JSON.stringify({ client_id: "neore-cli", hostname: "devbox" }), method: "POST" }),
+        );
+
+        expect(result.slice(0, 60).every((status) => status === 200)).toBe(true);
+        expect(result.slice(60)).toStrictEqual([429, 429]);
+    });
+
+    it("limits deny retries", async () => {
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const deny = await statuses(auth, 12, () => request("/device/deny", ip, { body: JSON.stringify({ userCode: "ABCDEFGH" }), method: "POST" }));
+
+        expect(deny.slice(10)).toStrictEqual([429, 429]);
+        expect(deny.slice(0, 10)).not.toContain(429);
+    });
+
+    it("limits approve retries", async () => {
+        const auth = buildDeviceAuth();
+        const ip = nextIp();
+        const approve = await statuses(auth, 12, () => request("/device/approve", ip, { body: JSON.stringify({ userCode: "ABCDEFGH" }), method: "POST" }));
+
+        expect(approve.slice(10)).toStrictEqual([429, 429]);
     });
 });

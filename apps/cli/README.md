@@ -18,6 +18,26 @@ neore doctor                                     # config, connectivity, key val
 neore logout
 ```
 
+Sign in by code instead of pasting a key (works over SSH: no browser and no
+local port are used on the machine running the CLI):
+
+```bash
+neore login --device --api-url https://api.example.com
+# asks you to type the API host (api.example.com) before it sends anything, then prints a URL and a
+# short code; open the URL on any device, sign in, and approve the code
+neore login --device --api-url https://api.example.com --confirm-host api.example.com   # no terminal
+```
+
+The API URL must be https://. Plain http:// is accepted only for localhost, 127.0.0.1 or [::1], and only with
+`NEORE_HOST_DEV_INSECURE_LOOPBACK` set to 1 (local development). The host check exists because the
+code goes to whatever host the URL names; without a terminal the host must be passed with
+`--confirm-host`, and it must equal the URL's host exactly.
+
+The approval mints a read-only API key named `Neore CLI on <hostname>` (valid for a
+year; revoke it in Settings -> API keys) and saves it like a pasted key. Codes live
+30 minutes and the CLI polls every 5 seconds. A denied, expired or already used code
+exits 1 with a message that says which; `--device` and `--key` cannot be combined.
+
 - The key is stored in the OS config directory with mode `0600`;
   `neore doctor` flags a looser file.
 - `NEORE_API_URL` and `NEORE_API_KEY` override the saved file, for CI. So do

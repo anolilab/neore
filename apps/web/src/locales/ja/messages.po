@@ -3316,7 +3316,7 @@ msgstr "WeChat 公式アカウント（安全モード）へのメッセージ�
 msgid "Answer ready"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:303
+#: src/features/chat/thread/ask-user-prompt.tsx:134
 msgid "Answer sent — continuing"
 msgstr "回答を送信しました — 続行中"
 
@@ -3324,7 +3324,7 @@ msgstr "回答を送信しました — 続行中"
 msgid "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 msgstr "WhatsApp Business 番号（Meta Cloud API）経由で WhatsApp メッセージに応答します。返信は WhatsApp の 24 時間ルールに従います。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:299
+#: src/features/chat/thread/ask-user-prompt.tsx:130
 msgid "Answered"
 msgstr "回答済み"
 
@@ -3541,6 +3541,7 @@ msgstr ""
 #: src/features/chat/thread/tool-approval.tsx:121
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:102
+#: src/routes/auth/device.tsx:189
 msgid "Approve"
 msgstr "承認"
 
@@ -3558,6 +3559,14 @@ msgstr ""
 
 #: src/features/chat/thread/tool-auto-approval.tsx:19
 msgid "Approved automatically — low risk"
+msgstr ""
+
+#: src/routes/auth/device.tsx:107
+msgid "Approved. Return to your terminal: the command line is signed in. You can close this tab."
+msgstr ""
+
+#: src/routes/auth/device.tsx:94
+msgid "Approving…"
 msgstr ""
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:246
@@ -3843,7 +3852,7 @@ msgstr ""
 msgid "Attach as file"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:437
+#: src/features/chat/thread/ask-user-prompt.tsx:262
 msgid "Attach file"
 msgstr "ファイルを添付"
 
@@ -3851,7 +3860,7 @@ msgstr "ファイルを添付"
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "この会話で AI が参照・引用できるように、ファイルまたはコレクション全体を添付します。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:388
+#: src/features/chat/thread/ask-user-prompt.tsx:219
 msgid "Attached files"
 msgstr "添付ファイル"
 
@@ -3859,15 +3868,15 @@ msgstr "添付ファイル"
 msgid "Attached image"
 msgstr "添付画像"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:344
+#: src/features/chat/thread/ask-user-prompt.tsx:175
 msgid "Attached:"
 msgstr "添付:"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:425
+#: src/features/chat/thread/ask-user-prompt.tsx:250
 msgid "Attaching files…"
 msgstr "ファイルを添付しています…"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:437
+#: src/features/chat/thread/ask-user-prompt.tsx:262
 msgid "Attaching…"
 msgstr "添付しています…"
 
@@ -5693,6 +5702,10 @@ msgstr ""
 msgid "Checking image safety..."
 msgstr "画像の安全性を確認しています..."
 
+#: src/routes/auth/device.tsx:277
+msgid "Checking the code…"
+msgstr ""
+
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:43
 msgid "Checking..."
 msgstr "確認しています..."
@@ -6209,6 +6222,8 @@ msgid "Cloudflare Workers AI models run wherever Cloudflare has capacity, so any
 msgstr "Cloudflare Workers AI のモデルは Cloudflare に空きのある場所で実行されるため、リージョンのルールを設定すると表示されなくなります。"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:40
+#: src/features/auth/components/device-code-parts.tsx:23
+#: src/features/auth/components/device-code-parts.tsx:56
 #: src/features/canvas/canvas-panel.tsx:754
 #: src/features/chat/thread/composer-search-mode.tsx:56
 #: src/features/code/components/code-workspace.tsx:219
@@ -6817,6 +6832,7 @@ msgstr "圧縮された遠近感"
 msgid "Compressing context..."
 msgstr "コンテキストを圧縮しています..."
 
+#: src/features/auth/components/device-code-parts.tsx:52
 #: src/features/settings/components/chat/bots-settings.tsx:140
 msgid "Computer"
 msgstr ""
@@ -7316,6 +7332,7 @@ msgid "Context-aware generation"
 msgstr "コンテキストを考慮した生成"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
+#: src/features/auth/components/device-code-parts.tsx:107
 #: src/features/chat/host/host-composer.tsx:186
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
@@ -7733,12 +7750,12 @@ msgid "Could not apply the changes"
 msgstr "変更を適用できませんでした"
 
 #. placeholder {0}: failed.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:283
+#: src/features/chat/thread/use-ask-user-attachments.ts:186
 msgid "Could not attach {0}. The other files were attached; try those again."
 msgstr "{0} を添付できませんでした。ほかのファイルは添付されました。それらは再度お試しください。"
 
 #. placeholder {0}: failed.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:284
+#: src/features/chat/thread/use-ask-user-attachments.ts:187
 msgid "Could not attach {0}. Try those again."
 msgstr "{0} を添付できませんでした。もう一度お試しください。"
 
@@ -8024,7 +8041,7 @@ msgstr ""
 msgid "Could not send your answer."
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:147
+#: src/features/chat/thread/ask-user-prompt.tsx:97
 #: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "回答を送信できませんでした。もう一度お試しください。"
@@ -9441,6 +9458,10 @@ msgstr "拒否されました — ツールなしで続行します"
 msgid "Denied on {device}"
 msgstr "{device} で拒否されました"
 
+#: src/routes/auth/device.tsx:108
+msgid "Denied. The command line was not signed in. You can close this tab."
+msgstr ""
+
 #: src/features/chat/core/utils/language-utilities.ts:346
 msgid "Denmark"
 msgstr "デンマーク"
@@ -9454,6 +9475,7 @@ msgid "Density updated"
 msgstr ""
 
 #: src/features/chat/thread/tool-approval.tsx:125
+#: src/routes/auth/device.tsx:180
 msgid "Deny"
 msgstr "拒否"
 
@@ -9465,6 +9487,10 @@ msgstr "{tool} を拒否"
 #: src/features/settings/components/chat/model-filter-settings.tsx:397
 msgid "Deny Data Collection"
 msgstr "データ収集を拒否"
+
+#: src/routes/auth/device.tsx:94
+msgid "Denying…"
+msgstr ""
 
 #: src/features/chat/thread/widgets/flight-widget.tsx:142
 msgid "Depart:"
@@ -9872,7 +9898,7 @@ msgstr "Discord 公開鍵"
 
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:54
 #: src/features/changelog/components/changelog-card.tsx:59
-#: src/features/chat/thread/ask-user-prompt.tsx:445
+#: src/features/chat/thread/ask-user-prompt.tsx:270
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:202
@@ -9908,7 +9934,7 @@ msgstr "Webhook シークレットを閉じる"
 msgid "Dismissed"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:301
+#: src/features/chat/thread/ask-user-prompt.tsx:132
 msgid "Dismissed — continuing without an answer"
 msgstr "閉じました — 回答なしで続行中"
 
@@ -11132,6 +11158,10 @@ msgstr ""
 msgid "enter"
 msgstr ""
 
+#: src/routes/auth/device.tsx:84
+msgid "Enter a different code"
+msgstr ""
+
 #: src/features/local-models/components/ollama-model-manager.tsx:106
 msgid "Enter a model name such as llama3.2 or qwen3:8b"
 msgstr "llama3.2 や qwen3:8b などのモデル名を入力してください"
@@ -11218,11 +11248,15 @@ msgstr "テキストを入力..."
 msgid "Enter the API key"
 msgstr "API キーを入力してください"
 
+#: src/features/auth/components/device-code-parts.tsx:21
+msgid "Enter the code that `neore login --device` shows in your terminal, then choose Continue."
+msgstr ""
+
 #: src/features/settings/components/chat/custom-providers-settings.tsx:113
 msgid "Enter the endpoint URL first"
 msgstr "先にエンドポイント URL を入力してください"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:411
+#: src/features/chat/thread/ask-user-prompt.tsx:236
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "Enter で送信、Shift+Enter で改行。"
 
@@ -13360,7 +13394,7 @@ msgstr "ファイル名を空にすることはできません"
 msgid "Files"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:427
+#: src/features/chat/thread/ask-user-prompt.tsx:252
 msgid "Files cannot be attached in a locked chat."
 msgstr "ロックされたチャットではファイルを添付できません。"
 
@@ -17941,6 +17975,7 @@ msgstr "読み込んでいます..."
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
+#: src/routes/auth/device.tsx:248
 #: src/routes/auth/extension.tsx:66
 msgid "Loading…"
 msgstr "読み込んでいます…"
@@ -21166,7 +21201,7 @@ msgid "Not set"
 msgstr "未設定"
 
 #. placeholder {0}: unreadFiles.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:348
+#: src/features/chat/thread/ask-user-prompt.tsx:179
 msgid "Not shown to this model: {0}"
 msgstr "このモデルには表示されていません: {0}"
 
@@ -21563,6 +21598,10 @@ msgstr "比較できるのは{0}モデルのみです。種類を切り替える
 msgid "Only 3B activated per token for efficiency"
 msgstr "効率のためトークンあたりのアクティブパラメータはわずか 3B"
 
+#: src/features/auth/components/device-code-parts.tsx:61
+msgid "Only continue if you started this just now by running `neore login --device`, and the code above matches the one in your terminal."
+msgstr ""
+
 #: src/features/evals/components/run-comparison.tsx:54
 msgid "Only in one run"
 msgstr "一方の実行のみ"
@@ -21575,7 +21614,7 @@ msgstr "請求設定を管理できるのは組織のオーナーのみです"
 msgid "Only participants you @mention answer."
 msgstr "@メンションした参加者のみが回答します。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:193
+#: src/features/chat/thread/use-ask-user-attachments.ts:96
 msgid "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
 msgstr "添付できるのは PNG・JPEG・WEBP・GIF の画像と、10 MB までの PDF です。合計 20 MB まで、最大 4 つまでです。"
 
@@ -22351,7 +22390,7 @@ msgstr ""
 msgid "Or from a terminal:"
 msgstr "またはターミナルから："
 
-#: src/features/chat/thread/ask-user-prompt.tsx:377
+#: src/features/chat/thread/ask-user-prompt.tsx:208
 msgid "Or type your own answer…"
 msgstr "または自分で回答を入力…"
 
@@ -23592,7 +23631,7 @@ msgstr "プレミアムクラスの推論と指示追従"
 msgid "Premium-tier reasoning transparency"
 msgstr "プレミアムクラスの推論の透明性"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:305
+#: src/features/chat/thread/ask-user-prompt.tsx:136
 msgid "Preparing a question…"
 msgstr "質問を準備中…"
 
@@ -25340,7 +25379,7 @@ msgstr "「{0}」を削除しますか？"
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
 #: src/features/chat/group/group-participant-bar.tsx:210
-#: src/features/chat/thread/ask-user-prompt.tsx:393
+#: src/features/chat/thread/ask-user-prompt.tsx:224
 #: src/features/prompts/components/thread-variables-config.tsx:232
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
@@ -27376,7 +27415,7 @@ msgstr "メッセージを送信して始めましょう"
 msgid "Send a new verification link"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:441
+#: src/features/chat/thread/ask-user-prompt.tsx:266
 msgid "Send answer"
 msgstr "回答を送信"
 
@@ -27964,6 +28003,7 @@ msgstr "サイドバーを右に"
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/marketing/components/landing-page.tsx:1058
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
+#: src/routes/auth/device.tsx:260
 #: src/routes/auth/extension.tsx:78
 msgid "Sign in"
 msgstr "サインイン"
@@ -27986,6 +28026,15 @@ msgstr ""
 #: src/features/settings/components/chat/mcp-settings.tsx:486
 msgid "Sign in on another site?"
 msgstr "別のサイトでサインインしますか？"
+
+#: src/features/auth/components/device-code-parts.tsx:93
+#: src/routes/auth/device.tsx:292
+msgid "Sign in the command line"
+msgstr ""
+
+#: src/routes/auth/device.tsx:158
+msgid "Sign in the command line?"
+msgstr ""
 
 #: src/features/develop/components/failure-notice.tsx:18
 msgid "Sign in to {label} again"
@@ -28089,6 +28138,10 @@ msgstr "サインアップしてすべてのモデルを利用"
 #: src/features/settings/components/chat/mcp/server-list.tsx:98
 msgid "Sign-in expired"
 msgstr "サインインの有効期限が切れました"
+
+#: src/features/auth/components/device-code-parts.tsx:50
+msgid "Sign-in request"
+msgstr ""
 
 #: src/features/layout/components/nav-user.tsx:292
 msgid "Sign-out failed. Please try again."
@@ -29729,7 +29782,7 @@ msgstr "テック系 YouTube チャンネルの動画アイデアを提案する
 msgid "Suggested"
 msgstr "おすすめ"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:353
+#: src/features/chat/thread/ask-user-prompt.tsx:184
 #: src/features/skills/components/skill-builder-dialog.tsx:235
 msgid "Suggested answers"
 msgstr "回答の候補"
@@ -30580,6 +30633,10 @@ msgstr ""
 msgid "That computer is not online."
 msgstr ""
 
+#: src/routes/auth/device.tsx:148
+msgid "That did not go through. Try again."
+msgstr ""
+
 #: src/features/develop/components/guide-tab.tsx:145
 msgid "That did not work. Try again."
 msgstr ""
@@ -30685,7 +30742,7 @@ msgstr "アーカイブに安全でないファイルパスが含まれていま
 msgid "The archive holds too many files."
 msgstr "アーカイブに含まれるファイルが多すぎます。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:327
+#: src/features/chat/thread/ask-user-prompt.tsx:158
 msgid "The assistant has a question"
 msgstr "アシスタントから質問があります"
 
@@ -30733,9 +30790,21 @@ msgstr "変更が大きすぎるため、すべてを表示できません。"
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "チャットエージェントがツールを使ってタスクを処理します。スキルに従わせることもできます。"
 
+#: src/routes/auth/device.tsx:75
+msgid "The code could not be checked right now. Try again in a moment."
+msgstr ""
+
+#: src/features/auth/components/device-code-parts.tsx:104
+msgid "The code must contain the letters and digits shown in your terminal."
+msgstr ""
+
 #: src/features/coding-agents/components/coding-agent-tool-view.tsx:41
 msgid "The coding agent could not start."
 msgstr "コーディングエージェントを起動できませんでした。"
+
+#: src/routes/auth/device.tsx:160
+msgid "The command line on the computer below will be signed in as {email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings."
+msgstr ""
 
 #: src/features/evals/components/model-comparison.tsx:62
 msgid "The comparison could not be loaded."
@@ -31405,6 +31474,22 @@ msgstr ""
 #: src/features/chat/thread/composer.tsx:585
 #~ msgid "This chat is run by a coding agent on your computer. Send messages from the desktop app; sending from here is not available yet."
 #~ msgstr ""
+
+#: src/routes/auth/device.tsx:124
+msgid "This code has already been answered."
+msgstr ""
+
+#: src/routes/auth/device.tsx:72
+msgid "This code has expired. Run `neore login --device` again to get a new one."
+msgstr ""
+
+#: src/routes/auth/device.tsx:73
+msgid "This code is not valid, or it was already used. Run `neore login --device` again to get a new one."
+msgstr ""
+
+#: src/routes/auth/device.tsx:116
+msgid "This code was opened with a different account. Sign in with that account, or run `neore login --device` again."
+msgstr ""
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:294
 msgid "This collection is shared with you by a member of your organization. You can attach it to chats and projects; only its owner can change its files."
@@ -32185,7 +32270,7 @@ msgid "too large"
 msgstr "大きすぎます"
 
 #. placeholder {0}: tooLarge.join(", ")
-#: src/features/chat/thread/ask-user-prompt.tsx:277
+#: src/features/chat/thread/use-ask-user-attachments.ts:180
 msgid "Too large to attach: {0}. Reduce the file and attach it again."
 msgstr "大きすぎて添付できません: {0}。ファイルを小さくしてから、もう一度添付してください。"
 
@@ -32562,6 +32647,7 @@ msgstr "検索キーワードを変えてみてください。"
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/home/components/home-page.tsx:144
+#: src/routes/auth/device.tsx:239
 msgid "Try again"
 msgstr "再試行"
 
@@ -32737,7 +32823,7 @@ msgstr ""
 msgid "Type to search"
 msgstr "入力して検索"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:377
+#: src/features/chat/thread/ask-user-prompt.tsx:208
 msgid "Type your answer…"
 msgstr "回答を入力…"
 
@@ -32965,6 +33051,10 @@ msgstr "言語モデリングへの独自のアプローチ"
 #: src/features/settings/components/chat/model-filter-settings.tsx:29
 msgid "United States"
 msgstr "米国"
+
+#: src/features/auth/components/device-code-parts.tsx:53
+msgid "unknown"
+msgstr ""
 
 #: src/features/admin/components/user-sessions-dialog.tsx:74
 #: src/features/admin/components/user-sessions-dialog.tsx:118
@@ -34487,7 +34577,7 @@ msgstr ""
 msgid "Waiting for the owner"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:307
+#: src/features/chat/thread/ask-user-prompt.tsx:138
 msgid "Waiting for the owner to answer"
 msgstr "オーナーの回答を待っています"
 
@@ -34508,7 +34598,7 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
-#: src/features/chat/thread/ask-user-prompt.tsx:307
+#: src/features/chat/thread/ask-user-prompt.tsx:138
 msgid "Waiting for your answer"
 msgstr "あなたの回答を待っています"
 
@@ -34543,6 +34633,10 @@ msgstr ""
 #: src/features/develop/components/watched-repositories.tsx:144
 #: src/features/develop/components/watched-repositories.tsx:145
 msgid "Watched repositories"
+msgstr ""
+
+#: src/routes/auth/device.tsx:230
+msgid "We could not check that you are signed in. Try again in a moment."
 msgstr ""
 
 #: src/features/chat/core/context/chat-context.tsx:709
@@ -35032,6 +35126,7 @@ msgstr ""
 #: src/features/chat/thread/streaming-placeholder.tsx:631
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
+#: src/routes/auth/device.tsx:189
 msgid "Working…"
 msgstr "処理しています…"
 
@@ -35247,6 +35342,10 @@ msgstr "ドキュメントの追加が速すぎます。しばらく待ってか
 msgid "You are browsing as a guest. Sign in with your account to connect the extension."
 msgstr "ゲストとして閲覧中です。拡張機能を接続するには、アカウントでサインインしてください。"
 
+#: src/routes/auth/device.tsx:258
+msgid "You are browsing as a guest. Sign in with your account to sign in the command line."
+msgstr ""
+
 #: src/features/admin/components/impersonation-banner.tsx:55
 msgid "You are currently impersonating a user"
 msgstr "現在ユーザーになりすましています"
@@ -35446,6 +35545,10 @@ msgstr ""
 msgid "Your {label} sign-in has expired. Connect it again."
 msgstr ""
 
+#: src/routes/auth/device.tsx:74
+msgid "Your account already has the maximum number of API keys, so the command line was not signed in. Revoke one in Settings, then run `neore login --device` again."
+msgstr ""
+
 #: src/features/auth/components/settings/account/delete-account-card.tsx:56
 msgid "Your account and all associated data are being deleted. This cannot be cancelled."
 msgstr "アカウントと関連するすべてのデータを削除しています。この操作は取り消せません。"
@@ -35454,7 +35557,7 @@ msgstr "アカウントと関連するすべてのデータを削除していま
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "あなたの AI ワークスペースは<0>ここから始まります。</0>"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:369
+#: src/features/chat/thread/ask-user-prompt.tsx:200
 msgid "Your answer"
 msgstr "あなたの回答"
 
@@ -35462,7 +35565,7 @@ msgstr "あなたの回答"
 msgid "Your answer in Neore has finished."
 msgstr "Neore での回答が完了しました。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:337
+#: src/features/chat/thread/ask-user-prompt.tsx:168
 msgid "Your answer:"
 msgstr "あなたの回答："
 

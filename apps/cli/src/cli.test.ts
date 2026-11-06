@@ -276,10 +276,13 @@ describe("chat end to end against a fake API", () => {
         return {
             configFile: join(directory, "config.json"),
             fetch: fetchImpl,
+            hostname: "devbox",
             io: ioFor(),
+            now: () => 0,
             readFile: async () => new Uint8Array(),
             readLine: async () => null,
             readStdin: async () => null,
+            sleep: async () => {},
             stdinIsTTY: true,
         };
     };

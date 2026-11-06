@@ -670,6 +670,7 @@ class AppBuilder<Env extends object> {
             ["cronRuns", { mode: { kind: "root" } }],
             ["dailyBriefState", { mode: { field: "userId", kind: "shardBy" } }],
             ["deviceCalls", { mode: { field: "userId", kind: "shardBy" } }],
+            ["deviceCode", { mode: { kind: "global" } }],
             ["devices", { mode: { field: "userId", kind: "shardBy" } }],
             ["documentHistory", { mode: { kind: "global" } }],
             ["documents", { mode: { field: "userId", kind: "shardBy" } }],
