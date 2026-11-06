@@ -30,12 +30,22 @@ const threadWith = async (fields: Record<string, unknown> = {}) =>
     )) as string;
 
 /** Writes "Generated" as the title the run read `expectedTitle`: the write gets the digest of that title, as the job does. */
-const writeTitle = async (threadId: string, expectedTitle: string, requestedBy?: string, expectedPromptId?: string) => {
+/** Inserts a message on a thread with the given order and fields; each branch test builds its rows through it. */
+const rowIn =
+    (threadId: string) =>
+    async (order: number, fields: Record<string, unknown>): Promise<string> =>
+        (await harness.run(
+            async (context: any) =>
+                await context.db.insert("messages", { order, status: "success", stepOrder: 0, threadId, tool: false, userId: OWNER, ...fields }),
+        )) as string;
+
+const writeTitle = async (threadId: string, expectedTitle: string, requestedBy?: string, expectedPromptId?: string, expectedLeaf?: string) => {
     const expectedTitleDigest = await sha256Hex(expectedTitle);
 
     return await harness.run(
         async (context: any) =>
             await writeTitleIfUnchanged(context, {
+                expectedLeaf,
                 expectedPromptId,
                 expectedTitleDigest,
                 requestedBy,
@@ -145,17 +155,13 @@ describe("writing a title at the time of the write, against the active branch", 
     /** A thread with a prompt and a reply under it, the reply as the active leaf. */
     const branchedThread = async () => {
         const threadId = await threadWith({ title: "Old" });
-        const row = async (order: number, fields: Record<string, unknown>) =>
-            (await harness.run(
-                async (context: any) =>
-                    await context.db.insert("messages", { order, status: "success", stepOrder: 0, threadId, tool: false, userId: OWNER, ...fields }),
-            )) as string;
+        const row = rowIn(threadId);
         const prompt = await row(1, { message: { content: "Plan a trip", role: "user" } });
         const reply = await row(2, { message: { content: "Sure", role: "assistant" }, parentMessageId: prompt });
 
         await harness.run(async (context: any) => await context.db.patch("threads", threadId, { activeLeafMessageId: reply }));
 
-        return { prompt, row, threadId };
+        return { prompt, reply, row, threadId };
     };
 
     it("writes while the prompt the title came from is still on the active path", async () => {
@@ -174,5 +180,57 @@ describe("writing a title at the time of the write, against the active branch", 
 
         await expect(writeTitle(threadId, "Old", undefined, prompt)).resolves.toBe(false);
         await expect(titleOf(threadId)).resolves.toBe("Old");
+    });
+});
+
+describe("writing a title for a chat whose leaf moved during generation", () => {
+    it("writes a leaf that extends the one the job read, even when the path grew past the limit meanwhile", async () => {
+        const threadId = await threadWith({ title: "Old" });
+        let order = 0;
+        const add = async (parent: string | undefined, fields: Record<string, unknown>): Promise<string> => {
+            order += 1;
+
+            return (await harness.run(
+                async (context: any) =>
+                    await context.db.insert("messages", {
+                        order,
+                        parentMessageId: parent,
+                        status: "success",
+                        stepOrder: 0,
+                        threadId,
+                        tool: false,
+                        userId: OWNER,
+                        ...fields,
+                    }),
+            )) as string;
+        };
+
+        const prompt = await add(undefined, { message: { content: "Plan a trip", role: "user" } });
+        let leafRead = prompt;
+
+        // 1,000 rows when the job read the path: at the limit, not past it.
+        for (let index = 0; index < 999; index += 1) {
+            leafRead = await add(leafRead, { message: { content: `Reply ${index}`, role: "assistant" } });
+        }
+
+        const leafNow = await add(leafRead, { message: { content: "Thanks", role: "assistant" } });
+
+        await harness.run(async (context: any) => await context.db.patch("threads", threadId, { activeLeafMessageId: leafNow }));
+
+        // The path is 1,001 rows now, so a whole-path read would refuse it; the leaf still runs through the prompt the title came from.
+        await expect(writeTitle(threadId, "Old", undefined, prompt, leafRead)).resolves.toBe(true);
+        await expect(titleOf(threadId)).resolves.toBe("Generated");
+    }, 60_000);
+
+    it("writes after the leaf moved to a reply along its own path, reading only the rows between the two", async () => {
+        const threadId = await threadWith({ title: "Old" });
+        const row = rowIn(threadId);
+        const prompt = await row(1, { message: { content: "Plan a trip", role: "user" } });
+        const reply = await row(2, { message: { content: "Sure", role: "assistant" }, parentMessageId: prompt });
+        const next = await row(3, { message: { content: "And more", role: "assistant" }, parentMessageId: reply });
+
+        await harness.run(async (context: any) => await context.db.patch("threads", threadId, { activeLeafMessageId: next }));
+
+        await expect(writeTitle(threadId, "Old", undefined, prompt, reply)).resolves.toBe(true);
     });
 });

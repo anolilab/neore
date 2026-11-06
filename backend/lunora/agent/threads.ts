@@ -26,7 +26,7 @@ import { deleteStreamsPageForThreadId } from "./streams";
 import { isThreadLocked, toLockedThreadStub } from "../lib/thread-lock";
 import { threadGateOutcome } from "../chat/lib/thread-gate";
 import { sha256Hex } from "../lib/crypto";
-import { activePathIdsOf } from "./branches";
+import { activePathIdsOf, pathReachesLeaf } from "./branches";
 import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread, resolveThreadReadAccess, type ThreadPermission } from "./thread-read-access";
 import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadPatchFields, vThreadStatus } from "./validators";
 import { systemDb } from "../lib/rls/scope";
@@ -298,7 +298,7 @@ export const updateThread = internalMutation
  */
 export const writeTitleIfUnchanged = async (
     ctx: Pick<MutationContext, "db">,
-    arguments_: { expectedPromptId?: string; expectedTitleDigest: string; requestedBy?: string; threadId: Id<"threads">; title: string },
+    arguments_: { expectedLeaf?: string; expectedPromptId?: string; expectedTitleDigest: string; requestedBy?: string; threadId: Id<"threads">; title: string },
 ): Promise<boolean> => {
     const thread = await ctx.db.get("threads", arguments_.threadId);
 
@@ -311,11 +311,18 @@ export const writeTitleIfUnchanged = async (
     }
 
     // An unbranched thread has no leaf: its rows are its path. A branched one must still run through the prompt at the time of the write.
+    // A leaf that extends the one the job read still runs through the prompt, and the walk up to that leaf is short; only a switch to
+    // another branch reads the whole path, within the same bound the job used. The whole-path read is the large one, so it is avoided.
     if (arguments_.expectedPromptId !== undefined && thread.activeLeafMessageId !== undefined) {
-        const ids = await activePathIdsOf(ctx, arguments_.threadId, thread.activeLeafMessageId as Id<"messages">);
+        const stillOnPath =
+            arguments_.expectedLeaf !== undefined && (await pathReachesLeaf(ctx, arguments_.threadId, thread.activeLeafMessageId, arguments_.expectedLeaf));
 
-        if (!Array.isArray(ids) || !ids.includes(arguments_.expectedPromptId)) {
-            return false;
+        if (!stillOnPath) {
+            const ids = await activePathIdsOf(ctx, arguments_.threadId, thread.activeLeafMessageId as Id<"messages">);
+
+            if (!Array.isArray(ids) || !ids.includes(arguments_.expectedPromptId)) {
+                return false;
+            }
         }
     }
 
@@ -334,6 +341,7 @@ export const writeTitleIfUnchanged = async (
 
 export const setGeneratedTitle = internalMutation
     .input({
+        expectedLeaf: v.optional(v.string().max(MAX_LENGTH.id)),
         expectedPromptId: v.optional(v.string().max(MAX_LENGTH.id)),
         expectedTitleDigest: v.string().max(MAX_LENGTH.short),
         requestedBy: v.optional(v.string()),

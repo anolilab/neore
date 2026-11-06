@@ -1668,6 +1668,7 @@ const writeGeneratedTitle = async (
     context: ActionContext,
     arguments_: {
         chargeKey?: string;
+        expectedLeaf?: string;
         expectedPromptId?: string;
         expectedTitleDigest?: string;
         force: boolean;
@@ -1790,13 +1791,16 @@ const writeGeneratedTitle = async (
 
     // The model answered after the checks above: the thread may have been locked, deleted, become host-run, been renamed,
     // switched branch, or lost the requester's write access since. Each of those keeps the thread as it is.
-    const afterModel = await titleIneligibility(context, arguments_);
+    // The path is not re-read here: the write below checks the prompt on the active path in its own transaction, the authoritative check,
+    // and a second whole-path read after the answer would be the large read the write avoids.
+    const afterModel = await titleIneligibility(context, { ...arguments_, expectedPromptId: undefined });
 
     // The title the run read (a regenerate's click-time title, else the one read above). The write checks it, and the requester's
     // admin access, in the same transaction, so a rename or a revoked grant committed since is kept.
     const written =
         afterModel === undefined &&
         (await context.runMutation(internal.agent.threads.setGeneratedTitle, {
+            expectedLeaf: arguments_.expectedLeaf,
             expectedPromptId: arguments_.expectedPromptId,
             expectedTitleDigest: arguments_.expectedTitleDigest ?? (await sha256Hex(metadata.title ?? "")),
             requestedBy: arguments_.requestedBy,
@@ -1985,6 +1989,7 @@ const runRegenerateTitle = async (
     // One billing key per run: the claim this request took. A scheduler retry of this run carries the same claim and is not billed again.
     await writeGeneratedTitle(context, {
         chargeKey: arguments_.claimedAt === undefined ? undefined : `${arguments_.threadId}:${arguments_.claimedAt}`,
+        expectedLeaf: thread.activeLeafMessageId,
         expectedPromptId: branch.prompt.id,
         expectedTitleDigest: arguments_.expectedTitleDigest,
         force: true,

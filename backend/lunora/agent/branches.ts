@@ -194,6 +194,23 @@ export const activePathIdsOf = async (
     return rows.toReversed().map((row) => row._id as string);
 };
 
+/**
+ * Whether the active path that ends at `leafMessageId` runs through `ancestorId`. The walk stops at `ancestorId`, so a leaf that
+ * extends the one a title was read from costs only the rows between the two, not the whole path. `false` when the walk runs out
+ * first (the leaf is on another branch); the caller then checks the whole path, within the same bound.
+ */
+export const pathReachesLeaf = async (context: Pick<QueryContext, "db">, threadId: Id<"threads">, leafMessageId: string, ancestorId: string) => {
+    const leaf = await context.db.get("messages", leafMessageId as Id<"messages">);
+
+    if (!leaf || leaf.threadId !== threadId) {
+        return false;
+    }
+
+    const { next } = await walkPath(context, threadId, leaf, { limit: TITLE_PATH_LIMIT + 1, stopAtId: ancestorId });
+
+    return next?._id === ancestorId;
+};
+
 export const getActivePathIds = internalQuery
     .input({ leafMessageId: v.id("messages"), threadId: v.id("threads") })
     .output(v.union(v.null(), v.array(v.string()), v.literal("too-long")))
