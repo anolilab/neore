@@ -10,6 +10,27 @@ describe("default keyboard shortcuts", () => {
     });
 });
 
+describe("thread action defaults against saved bindings", () => {
+    it("leaves archive unbound when a saved binding already takes its chord, and keeps that binding", () => {
+        const merged = mergeKeyboardShortcuts({ newChat: defaultKeyboardShortcuts.archiveThread });
+
+        expect(merged.archiveThread).toBe("");
+        expect(merged.newChat).toBe(defaultKeyboardShortcuts.archiveThread);
+    });
+
+    it("leaves delete unbound on the same collision", () => {
+        expect(mergeKeyboardShortcuts({ newChat: defaultKeyboardShortcuts.deleteThread }).deleteThread).toBe("");
+    });
+
+    it("keeps the default when no saved binding takes its chord", () => {
+        expect(mergeKeyboardShortcuts({ newChat: "ctrl+j" }).archiveThread).toBe(defaultKeyboardShortcuts.archiveThread);
+    });
+
+    it("keeps a binding the user saved for the thread action itself", () => {
+        expect(mergeKeyboardShortcuts({ archiveThread: "ctrl+j" }).archiveThread).toBe("ctrl+j");
+    });
+});
+
 describe("find in thread shortcut", () => {
     const oldFocusSearch = defaultKeyboardShortcuts.findInThread;
 

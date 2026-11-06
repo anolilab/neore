@@ -122,6 +122,16 @@ export const mergeKeyboardShortcuts = (saved: Partial<KeyboardShortcuts> | undef
     // A binding on F6 or Shift+F6 is cleared: those keys move focus, and a saved action on them would run as well.
     const merged = withoutFocusAreaKeys({ ...defaultKeyboardShortcuts, ...saved });
 
+    // The thread actions are newer than many saved sets. A saved binding already on one of their default chords would make
+    // both fire, so the new action stays unbound there; a binding the user saved for it is theirs and stays.
+    for (const key of ["archiveThread", "deleteThread"] as const) {
+        const takenBySaved = Object.values(saved ?? {}).includes(defaultKeyboardShortcuts[key]);
+
+        if (saved?.[key] === undefined && takenBySaved) {
+            merged[key] = "";
+        }
+    }
+
     if (saved?.findInThread === undefined && saved?.focusSearch === `${platformModifier}+f`) {
         merged.focusSearch = defaultKeyboardShortcuts.focusSearch;
     }

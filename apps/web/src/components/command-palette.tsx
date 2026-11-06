@@ -183,7 +183,9 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     // While the input and the debounced query differ, the query is skipped and no hits show.
     const trimmedSearch = searchInput.trim();
     const debouncedSearch = useDebouncedValue(trimmedSearch, MESSAGE_SEARCH_DEBOUNCE_MS);
-    const isMessageSearchCurrent = shouldQuery && trimmedSearch.length >= MESSAGE_SEARCH_MIN_CHARS && trimmedSearch === debouncedSearch;
+    // A state tag narrows to threads and drops message hits, so a tagged input never needs the full-text query.
+    const isStateTagged = parseStateQuery(trimmedSearch).state !== undefined;
+    const isMessageSearchCurrent = shouldQuery && !isStateTagged && trimmedSearch.length >= MESSAGE_SEARCH_MIN_CHARS && trimmedSearch === debouncedSearch;
     const { data: messageSearchResults } = useQuery(
         crpc.chat.functions.searchMessages.queryOptions(
             isMessageSearchCurrent ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS, searchQuery: debouncedSearch } : skipToken,

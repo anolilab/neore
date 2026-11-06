@@ -83,8 +83,10 @@ const keyboardShortcutSchema = z
             context.issues.push({ code: "custom", input: context.value, message: DUPLICATE_SHORTCUT_MESSAGE, path: [key] });
         }
 
+        // Runtime bindings this page does not edit: audio recording and list navigation. Read from the store, since they can be rebound.
+        const runtime = useUIStateStore.getState().keyboardShortcuts;
         const fixedChords = new Set<string>([
-            shortcutIdentity(useUIStateStore.getState().keyboardShortcuts.audioRecord),
+            ...[runtime.audioRecord, runtime.nextItem, runtime.prevItem, runtime.firstItem, runtime.lastItem].map((value) => shortcutIdentity(value)),
             ...SHORTCUT_ENTRIES.flatMap((entry) => ("fixed" in entry ? [shortcutIdentity(entry.fixed)] : [])),
         ]);
 
