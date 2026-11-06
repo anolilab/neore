@@ -560,6 +560,13 @@ export class HostPoster implements SessionObserver {
         }
 
         this.pendingState.delete(sessionId);
+
+        // Posted: an id is kept only while a report of its ended session is held back, and this one is no longer held. A session
+        // still closing keeps its id until it drains (`closeWhenDrained`), as the flush does.
+        if (!this.closing.has(sessionId)) {
+            this.endedSessions.delete(sessionId);
+        }
+
         await this.sendState(sessionId, pending, deviceId);
     }
 

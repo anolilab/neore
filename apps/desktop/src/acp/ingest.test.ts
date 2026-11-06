@@ -1104,6 +1104,22 @@ describe("a session that ends locally", () => {
         expect(closes()).toHaveLength(1);
     });
 
+    it("forgets an ended session's id once the report held for it is posted, and before the close", async () => {
+        const host = poster();
+        const bookkeeping = host as unknown as Record<"endedSessions", Set<string>>;
+
+        await open(host);
+        host.sessionState("s1", { usage: { size: 200_000, used: 10 } });
+        host.sessionEnded("s1");
+        await settle(POST_INTERVAL_MS);
+
+        const reportIndex = backend.posts.findIndex(({ post }) => (post.events[0] as { kind?: string } | undefined)?.kind === "session_state");
+
+        expect(reportIndex).toBeGreaterThanOrEqual(0);
+        expect(backend.posts.indexOf(closes()[0] as never)).toBeGreaterThan(reportIndex);
+        expect(bookkeeping.endedSessions.size).toBe(0);
+    });
+
     it("sends the close at once when no turn ever ran", async () => {
         const host = poster();
 
