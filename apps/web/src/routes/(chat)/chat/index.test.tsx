@@ -20,9 +20,11 @@ import { Route } from "./index";
 const harness = vi.hoisted(() => {
     return {
         assistantProps: undefined as { initialMessage?: string } | undefined,
+        latestThread: undefined as string | undefined,
         locationSearch: "",
         navigate: vi.fn(),
         search: {} as Record<string, unknown>,
+        settings: undefined as { resumeLastChat?: boolean } | undefined,
         showWarning: vi.fn(),
     };
 });
@@ -72,8 +74,15 @@ vi.mock("@/components/error-boundaries/route-error-boundary", () => {
 vi.mock("@/features/auth/hooks/use-user-settings", () => {
     return {
         useUserSettings: () => {
-            return { data: undefined };
+            return { data: harness.settings };
         },
+    };
+});
+
+// The app reads this once at boot from the first URL; the tests open the route with a query, so they turn it on directly.
+vi.mock("@/features/chat/core/utils/resume-boot", () => {
+    return {
+        BOOTED_ON_CHAT_INDEX: true,
     };
 });
 
@@ -102,7 +111,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                     resume: {
                         latestResumableThread: {
                             queryOptions: () => {
-                                return { queryFn: () => null, queryKey: ["latest-resumable-thread"] };
+                                return { queryFn: () => harness.latestThread ?? null, queryKey: ["latest-resumable-thread"] };
                             },
                         },
                     },
@@ -155,6 +164,8 @@ const selectedModel = (): string => useModelStore.getState().selectedModel;
 describe("chat index route", () => {
     beforeEach(() => {
         harness.assistantProps = undefined;
+        harness.latestThread = undefined;
+        harness.settings = undefined;
         harness.navigate.mockReset();
         harness.showWarning.mockReset();
         sessionStorage.clear();
@@ -207,6 +218,75 @@ describe("chat index route", () => {
             expect(useChatUIStore.getState().composerText).toBe("");
             expect(harness.showWarning).toHaveBeenCalledWith("This chat already has a prompt. The prompt from the link was not added.");
             expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+        });
+    });
+
+    describe("a link with no usable prompt, with resume-last-chat on", () => {
+        // The route decides once per page load whether to resume (a module-level flag), so each case loads a fresh route and stores.
+        const loadFresh = async () => {
+            vi.resetModules();
+
+            const route = await import("./index");
+            const chatUI = await import("@/features/chat/core/stores/chat-ui-store");
+            const models = await import("@/features/chat/core/stores/model-store");
+
+            return { chatUI: chatUI.useChatUIStore, models: models.useModelStore, Route: route.Route };
+        };
+
+        const resumes = (): boolean => harness.navigate.mock.calls.some((call) => (call[0] as { to?: string }).to === "/chat/$threadId");
+
+        beforeEach(() => {
+            harness.settings = { resumeLastChat: true };
+            harness.latestThread = "thread-9";
+        });
+
+        it("a blank prompt with a model still resumes the last chat, and the chat keeps its model", async () => {
+            const fresh = await loadFresh();
+            const link = new URL(`https://app.example.com/chat?model=${encodeURIComponent(textModel?.id ?? "")}&prompt=%20%20%20`);
+
+            harness.locationSearch = link.search;
+            harness.search = (fresh.Route.options.validateSearch as unknown as ValidateSearch)(Object.fromEntries(link.searchParams));
+
+            const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+            const Page = fresh.Route.options.component as ComponentType;
+
+            render(<Page />, { wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+
+            await waitFor(() => expect(resumes()).toBe(true));
+            expect(fresh.models.getState().selectedModel).toBe(DEFAULT_CHAT_MODEL);
+            expect(fresh.chatUI.getState().composerText).toBe("");
+        });
+
+        it("a model-only link still resumes the last chat, and the chat keeps its model", async () => {
+            const fresh = await loadFresh();
+            const link = new URL(`https://app.example.com/chat?model=${encodeURIComponent(textModel?.id ?? "")}`);
+
+            harness.locationSearch = link.search;
+            harness.search = (fresh.Route.options.validateSearch as unknown as ValidateSearch)(Object.fromEntries(link.searchParams));
+
+            const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+            const Page = fresh.Route.options.component as ComponentType;
+
+            render(<Page />, { wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+
+            await waitFor(() => expect(resumes()).toBe(true));
+            expect(fresh.models.getState().selectedModel).toBe(DEFAULT_CHAT_MODEL);
+        });
+
+        it("a link with a usable prompt does not resume: it opens a draft instead", async () => {
+            const fresh = await loadFresh();
+            const link = new URL(buildPromptLink("https://app.example.com", { model: textModel?.id, prompt: "from the link" }));
+
+            harness.locationSearch = link.search;
+            harness.search = (fresh.Route.options.validateSearch as unknown as ValidateSearch)(Object.fromEntries(link.searchParams));
+
+            const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+            const Page = fresh.Route.options.component as ComponentType;
+
+            render(<Page />, { wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+
+            await waitFor(() => expect(fresh.chatUI.getState().composerText).toBe("from the link"));
+            expect(resumes()).toBe(false);
         });
     });
 

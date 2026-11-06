@@ -227,6 +227,22 @@ describe("usePromptLinkDraft", () => {
         expect(harness.showWarning).not.toHaveBeenCalled();
     });
 
+    it("a model-only link leaves an existing draft, its model, Auto and comparison as they were", () => {
+        useChatUIStore.getState().setComposerText("my own text");
+        useModelStore.setState({
+            comparisonMode: true,
+            pendingSettings: { autoModel: true },
+            selectedModelsForComparison: [textModel?.id ?? "", otherTextModel?.id ?? ""] as ModelId[],
+        });
+
+        renderLink({ model: textModel?.id });
+
+        expect(useChatUIStore.getState().composerText).toBe("my own text");
+        expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+        expect(useModelStore.getState().pendingSettings?.autoModel).toBe(true);
+        expect(useModelStore.getState().comparisonMode).toBe(true);
+    });
+
     it("ends Auto as a pick does, so the link's model is the one a send runs on", () => {
         useModelStore.setState({ pendingSettings: { autoModel: true } });
 
