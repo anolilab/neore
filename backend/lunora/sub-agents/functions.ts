@@ -404,11 +404,23 @@ const isHostInLeadScope = async (ctx: MutationCtx, run: Pick<RunDoc, "parentThre
     return device !== null && lead !== null && isDeviceInScope(device, lead.projectId);
 };
 
-/** Whether the organization's current cap is `auto`. A computer agent's tools are approved there, out of the backend's reach. */
-const hostCapAllowsAuto = async (ctx: MutationCtx, organizationId: string | null | undefined): Promise<boolean> => {
-    const policy = organizationId ? await ctx.db.organizationPolicies.findFirst({ where: { organizationId } }) : null;
+/**
+ * Why a computer worker cannot run for this organization, or `null`. The owner must still be a member, and the cap must be
+ * `auto`: a computer agent's tools are approved there, out of the backend's reach. Checked at admission, before any session
+ * is opened, and again when a queued turn is sent.
+ */
+const hostOrganizationRefusal = async (ctx: MutationCtx, organizationId: string | null | undefined, userId: string): Promise<string | null> => {
+    if (!organizationId) {
+        return null;
+    }
 
-    return permissionCapOf(readPolicyState(policy?.document)) === "auto";
+    if (!(await getMemberByOrganizationAndUser(ctx, organizationId, userId))) {
+        return LEFT_ORGANIZATION_MESSAGE;
+    }
+
+    const policy = await ctx.db.organizationPolicies.findFirst({ where: { organizationId } });
+
+    return permissionCapOf(readPolicyState(policy?.document)) === "auto" ? null : HOST_NOT_UNDER_AUTO;
 };
 
 /**
@@ -439,16 +451,12 @@ const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promis
         return;
     }
 
-    // The owner may have left the organization while the turn waited, as `runHeadlessAgent` checks for a cloud run.
-    if (claimed.organizationId && !(await getMemberByOrganizationAndUser(ctx, claimed.organizationId, claimed.userId))) {
-        await finishRun(ctx, runId, { error: LEFT_ORGANIZATION_MESSAGE, kind: "failed" });
+    // Read again here: a turn can wait behind another for a long time, and meanwhile the owner may have left the
+    // organization or the organization may have tightened its cap.
+    const refused = await hostOrganizationRefusal(ctx, claimed.organizationId, claimed.userId);
 
-        return;
-    }
-
-    // The cap is read again here: a turn can wait behind another for a long time, and the organization may have tightened in that time.
-    if (!(await hostCapAllowsAuto(ctx, claimed.organizationId))) {
-        await finishRun(ctx, runId, { error: HOST_NOT_UNDER_AUTO, kind: "failed" });
+    if (refused) {
+        await finishRun(ctx, runId, { error: refused, kind: "failed" });
 
         return;
     }
@@ -698,10 +706,15 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         return await refuse({ error: HOST_NEEDS_OWN_CONVERSATION, kind: "forbidden" });
     }
 
-    // The organization's cap must allow `auto`: a computer agent's tools are approved there, out of the backend's reach.
-    // A new worker takes the organization its thread is stamped with; an existing one keeps its own.
-    if (runnerKind === "host" && !(await hostCapAllowsAuto(ctx, child?.organizationId ?? parent.organizationId ?? args.organizationId))) {
-        return await refuse({ error: HOST_NOT_UNDER_AUTO, kind: "forbidden" });
+    // The owner must still be a member and the organization's cap must allow `auto` (`hostOrganizationRefusal`), before any
+    // thread, session or start call exists. A new worker takes the organization its thread is stamped with; an existing one
+    // keeps its own.
+    if (runnerKind === "host") {
+        const refused = await hostOrganizationRefusal(ctx, child?.organizationId ?? parent.organizationId ?? args.organizationId, args.userId);
+
+        if (refused) {
+            return await refuse({ error: refused, kind: "forbidden" });
+        }
     }
 
     // Only the task text reaches a coding agent on a computer: a tool list or skill the caller asks for would read as a

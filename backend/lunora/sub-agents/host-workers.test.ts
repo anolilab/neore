@@ -336,6 +336,24 @@ describe("creating a worker on a computer", () => {
         expect(await table("acpSessions")).toHaveLength(0);
     });
 
+    it("refuses a former member a worker on a computer under their organization's lead, opening nothing", async () => {
+        const device = await pairedDevice();
+        const lead = await newThread({ organizationId: "org-former" });
+
+        leftOrganizations.add("org-former");
+
+        try {
+            await expect(createHostWorker(device, { leadThreadId: lead })).rejects.toMatchObject({
+                message: expect.stringMatching(LEFT_ORGANIZATION),
+            });
+            expect(await table("subAgentRuns")).toHaveLength(0);
+            expect(await table("acpSessions")).toHaveLength(0);
+            expect(await table("deviceCalls")).toHaveLength(0);
+        } finally {
+            leftOrganizations.delete("org-former");
+        }
+    });
+
     it("refuses a worker on a computer under an unstamped lead when the member's active organization is capped", async () => {
         const device = await pairedDevice();
         // A bot, comparison or temporary chat: no stored organization.
