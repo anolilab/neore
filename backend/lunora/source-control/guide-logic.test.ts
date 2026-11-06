@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { assembleGuide, extractJsonObject, folderMatchesRepo, guideFreshness, isMechanicalFile, parsePatchLines } from "./guide-logic";
+import { assembleGuide, decodePath, encodePath, extractJsonObject, folderMatchesRepo, guideFreshness, isMechanicalFile, parsePatchLines } from "./guide-logic";
 import type { GuideFile } from "./guide-logic";
 
 const PATCH = ["@@ -1,3 +1,4 @@", " keep", "-old line", "+new line", "+added line", " tail"].join("\n");
@@ -121,6 +121,35 @@ describe("assembleGuide", () => {
 
         expect(placed.toSorted((a, b) => a.localeCompare(b))).toEqual(["src/a\u{34F}b.ts", "src/a\u{E0100}b.ts"].toSorted((a, b) => a.localeCompare(b)));
         expect(guide.stops.some((stop) => stop.kind === "uncovered")).toBe(false);
+    });
+
+    it("keeps a file apart from one whose name spells the same characters as a literal escape", () => {
+        const hidden = "src/a\u{200C}b.ts";
+        const spelled = String.raw`src/a\u200Cb.ts`;
+        const guide = assembleGuide(
+            [file(hidden), file(spelled)],
+            {
+                proposals: [],
+                stops: [
+                    { explanation: "", files: [{ path: String.raw`src/a\u200Cb.ts` }], role: "core", title: "Hidden" },
+                    { explanation: "", files: [{ path: String.raw`src/a\\u200Cb.ts` }], role: "dependent", title: "Spelled" },
+                ],
+                summary: "",
+            },
+            0,
+        );
+        const placed = guide.stops.flatMap((stop) => stop.files.map((entry) => entry.path));
+
+        expect(placed.toSorted((a, b) => a.localeCompare(b))).toEqual([hidden, spelled].toSorted((a, b) => a.localeCompare(b)));
+        expect(guide.stops.some((stop) => stop.kind === "uncovered")).toBe(false);
+    });
+
+    it("reads back every path it writes, so two files never share a spelling", () => {
+        const paths = ["plain.ts", "src/a\u{200C}b.ts", String.raw`src/a\u200Cb.ts`, String.raw`dir\\x`, "x\u{E0100}y", "a\u{34F}b"];
+
+        for (const path of paths) {
+            expect(decodePath(encodePath(path))).toBe(path);
+        }
     });
 
     it("orders core, then dependents, then mechanical changes, then what is not covered", () => {

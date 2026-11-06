@@ -200,15 +200,41 @@ const escapeChar = (char: string): string => {
     return hex.length > 4 ? String.raw`\u{${hex}}` : String.raw`\u${hex.padStart(4, "0")}`;
 };
 
+const BACKSLASH = "\\";
+
 /**
- * A changed file's path as the guide reads it. Each character that cannot be shown, or that the prompt's cleaner would
- * remove, is written as an escape, so the prompt shows the exact path and the agent's answer names it the same way, and two
- * files whose names differ only by such a character stay two files. The prompt and the answer both go through this, so
- * either spelling of the same path matches. A literal backslash-u sequence in a real path would read the same as its escape:
- * an accepted edge.
+ * A changed file's path as the prompt shows it, in a form that can be read back exactly. A literal backslash is doubled,
+ * and each character that cannot be shown, or that the prompt's cleaner would remove, is written as an escape. The cleaner
+ * therefore leaves the path unchanged, and the agent names the file in this same form.
  */
-export const pathKey = (path: string): string =>
-    [...path].map((char) => (UNSHOWN_IN_PATH.test(char) || removedByCleaner(char) ? escapeChar(char) : char)).join("");
+export const encodePath = (path: string): string =>
+    [...path]
+        .map((char) => {
+            if (char === BACKSLASH) {
+                return BACKSLASH + BACKSLASH;
+            }
+
+            return UNSHOWN_IN_PATH.test(char) || removedByCleaner(char) ? escapeChar(char) : char;
+        })
+        .join("");
+
+/** The escapes `encodePath` writes: a doubled backslash, `\uXXXX`, and `\u{X…}` past the BMP. */
+const ESCAPE_IN_PATH = /\\\\|\\u\{([\dA-Fa-f]{1,6})\}|\\u([\dA-Fa-f]{4})/gu;
+
+/**
+ * The real path an answer names, read back from `encodePath`'s form. Its inverse: `decodePath(encodePath(p)) === p` for
+ * every path, so two different files never read as one. A text that is not in that form is read as written.
+ */
+export const decodePath = (value: string): string =>
+    value.replaceAll(ESCAPE_IN_PATH, (match: string, braced: string | undefined, plain: string | undefined) => {
+        if (braced === undefined && plain === undefined) {
+            return BACKSLASH;
+        }
+
+        const code = Number.parseInt(braced ?? plain ?? "", 16);
+
+        return code <= 1_114_111 ? String.fromCodePoint(code) : match;
+    });
 
 const wholeLine = (value: unknown): number | null => (typeof value === "number" && Number.isSafeInteger(value) && value >= 1 ? value : null);
 
@@ -275,7 +301,7 @@ const modelStopsOf = (value: unknown, byPath: Map<string, GuideFile>, lines: Map
 
         for (const entryNamed of named) {
             const fileEntry = record(entryNamed);
-            const path = pathKey(text(fileEntry?.path, 1024));
+            const path = decodePath(text(fileEntry?.path, 1024));
             const known = byPath.get(path);
 
             // A path the pull request does not change, a mechanical file, or one the stop already names is not a place to read.
@@ -284,8 +310,7 @@ const modelStopsOf = (value: unknown, byPath: Map<string, GuideFile>, lines: Map
             }
 
             seen.add(path);
-            // The stop names the file as the pull request does, not as the escaped key spells it.
-            files.push({ path: known.path, ranges: rangesOf(fileEntry?.ranges, path, lines) });
+            files.push({ path, ranges: rangesOf(fileEntry?.ranges, path, lines) });
         }
 
         if (files.length > 0) {
@@ -319,8 +344,8 @@ const proposalsOf = (value: unknown, byPath: Map<string, GuideFile>, lines: Map<
         const id = `proposal-${String(proposals.length + 1)}`;
 
         if (candidate?.kind === "comment") {
-            const key = pathKey(text(candidate.path, 1024));
-            const known = byPath.get(key);
+            const path = decodePath(text(candidate.path, 1024));
+            const known = byPath.get(path);
             const body = text(candidate.body, MAX_COMMENT);
             const line = wholeLine(candidate.line);
             const side = sideOf(candidate.side);
@@ -330,15 +355,15 @@ const proposalsOf = (value: unknown, byPath: Map<string, GuideFile>, lines: Map<
             }
 
             const startLine = wholeLine(candidate.startLine);
-            const shown = linesOf(lines, key, side);
-            const hunks = side === "new" ? lines.get(key)?.newHunks : lines.get(key)?.oldHunks;
+            const shown = linesOf(lines, path, side);
+            const hunks = side === "new" ? lines.get(path)?.newHunks : lines.get(path)?.oldHunks;
 
             // A comment the host would refuse (a line outside the diff, or a range across two hunks) is not worth proposing.
             if (!shown.has(line) || (startLine !== null && (startLine >= line || !shown.has(startLine) || hunks?.get(startLine) !== hunks?.get(line)))) {
                 continue;
             }
 
-            proposals.push({ body, id, kind: "comment", line, path: known.path, side, startLine, status: "proposed" });
+            proposals.push({ body, id, kind: "comment", line, path, side, startLine, status: "proposed" });
         } else if (candidate?.kind === "label" && labels < MAX_LABEL_PROPOSALS) {
             // eslint-disable-next-line no-control-regex -- a label with a control character is not a label
             const name = text(candidate.name, MAX_LABEL).replaceAll(/[\u{0}-\u{1F}\u{7F}]/gu, "");
@@ -362,8 +387,8 @@ const proposalsOf = (value: unknown, byPath: Map<string, GuideFile>, lines: Map<
  * `files` is the FULL list of changed files, not the subset whose patches fit the prompt.
  */
 export const assembleGuide = (files: ReadonlyArray<GuideFile>, output: unknown, leftOut: number): AssembledGuide => {
-    const byPath = new Map(files.map((entry) => [pathKey(entry.path), entry]));
-    const lines = new Map(files.map((entry) => [pathKey(entry.path), parsePatchLines(entry.patch)]));
+    const byPath = new Map(files.map((entry) => [entry.path, entry]));
+    const lines = new Map(files.map((entry) => [entry.path, parsePatchLines(entry.patch)]));
     const answer = record(output);
     const modelStops = modelStopsOf(answer?.stops, byPath, lines);
 
