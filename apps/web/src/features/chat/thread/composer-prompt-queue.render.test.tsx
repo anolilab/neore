@@ -71,6 +71,15 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
 
 describe("composer prompt queue", () => {
     beforeEach(() => {
+        // jsdom has none, and the drag-and-drop context observes sizes with it.
+        vi.stubGlobal(
+            "ResizeObserver",
+            // A constructor mock must be a `function`, not an arrow.
+            // eslint-disable-next-line prefer-arrow-callback
+            vi.fn(function ResizeObserverStub() {
+                return { disconnect: vi.fn(), observe: vi.fn(), unobserve: vi.fn() };
+            }),
+        );
         chat.error = new Error("the reply failed");
         chat.isStreaming = false;
         chat.sendMessage.mockReset();
@@ -109,5 +118,29 @@ describe("composer prompt queue", () => {
 
         expect(chat.sendMessage).toHaveBeenCalledTimes(1);
         expect(chat.sendMessage).toHaveBeenCalledWith("queued", []);
+    });
+
+    it("moves a queued message up and down with its buttons, and sends the moved one first", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two", "three"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        expect((screen.getByLabelText("Move queued message 1 up") as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByLabelText("Move queued message 3 down") as HTMLButtonElement).disabled).toBe(true);
+
+        fireEvent.click(screen.getByLabelText("Move queued message 3 up"));
+        fireEvent.click(screen.getByLabelText("Move queued message 2 up"));
+
+        const order = () => usePromptQueueStore.getState().queues[chat.threadId]?.items.map((item) => item.text);
+
+        expect(order()).toEqual(["three", "one", "two"]);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+        await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("three", []));
     });
 });

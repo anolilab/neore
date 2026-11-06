@@ -19,15 +19,23 @@
  * that lands after the reply ended (nothing will observe the stream end for it)
  * is sent straight away, through the same path.
  *
+ * A chip moves up or down with its buttons (the keyboard path) or by dragging it
+ * to a new place; either way the store keeps the order and mirrors it to
+ * sessionStorage.
+ *
  * Transition rules: `core/utils/prompt-queue.ts`. Mount exactly once per thread
  * — two mounted runners would each drain an item per stream.
  */
 
+import type { DragEndEvent } from "@dnd-kit/core";
+import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { rectSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Plural, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
-import { CornerDownRightIcon, ListOrderedIcon, PaperclipIcon, SendIcon, XIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronUpIcon, CornerDownRightIcon, ListOrderedIcon, PaperclipIcon, SendIcon, XIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { useCallback, useEffect, useRef } from "react";
 
@@ -245,14 +253,27 @@ const useQueueActions = () => {
     return { removePrompt, sendNextPrompt };
 };
 
-const QueueChip: FC<{ onRemove: (id: string) => void; position: number; prompt: QueuedChatPrompt }> = ({ onRemove, position, prompt }) => {
+const QueueChip: FC<{
+    count: number;
+    onMove: (id: string, step: -1 | 1) => void;
+    onRemove: (id: string) => void;
+    position: number;
+    prompt: QueuedChatPrompt;
+}> = ({ count, onMove, onRemove, position, prompt }) => {
     const { t } = useLingui();
+    const pending = Boolean(prompt.steer?.pending);
+    const { isDragging, listeners, setNodeRef, transform, transition } = useSortable({ disabled: pending, id: prompt.id });
     const preview = prompt.text.trim() || t`(attachments only)`;
     const attachmentCount = prompt.attachments.length;
     const droppedCount = prompt.droppedAttachments ?? 0;
 
     return (
-        <li className="bg-muted/60 flex max-w-full min-w-0 items-center gap-1.5 rounded-full border py-0.5 pr-0.5 pl-2.5 text-xs">
+        <li
+            className={`bg-muted/60 flex max-w-full min-w-0 items-center gap-1.5 rounded-full border py-0.5 pr-0.5 pl-2.5 text-xs ${pending ? "" : "cursor-grab"} ${isDragging ? "opacity-50" : ""}`}
+            ref={setNodeRef}
+            style={{ transform: CSS.Transform.toString(transform), transition }}
+            {...listeners}
+        >
             <span aria-hidden="true" className="text-muted-foreground tabular-nums">
                 {position}.
             </span>
@@ -278,9 +299,27 @@ const QueueChip: FC<{ onRemove: (id: string) => void; position: number; prompt: 
                 </span>
             )}
             <button
+                aria-label={t`Move queued message ${position} up`}
+                className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground rounded-full p-0.5 disabled:opacity-40"
+                disabled={pending || position === 1}
+                onClick={() => onMove(prompt.id, -1)}
+                type="button"
+            >
+                <ChevronUpIcon aria-hidden="true" className="size-3" />
+            </button>
+            <button
+                aria-label={t`Move queued message ${position} down`}
+                className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground rounded-full p-0.5 disabled:opacity-40"
+                disabled={pending || position === count}
+                onClick={() => onMove(prompt.id, 1)}
+                type="button"
+            >
+                <ChevronDownIcon aria-hidden="true" className="size-3" />
+            </button>
+            <button
                 aria-label={t`Remove queued message ${position}`}
                 className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground rounded-full p-0.5"
-                disabled={Boolean(prompt.steer?.pending)}
+                disabled={pending}
                 onClick={() => onRemove(prompt.id)}
                 type="button"
             >
@@ -399,6 +438,30 @@ const ComposerPromptQueue: FC = () => {
         [removePrompt, threadId],
     );
 
+    const handleMove = useCallback(
+        (id: string, step: -1 | 1) => {
+            if (threadId) {
+                usePromptQueueStore.getState().move(threadId, id, { step });
+            }
+        },
+        [threadId],
+    );
+
+    // A small distance before a drag starts, so a click on a chip's buttons stays a click.
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+    const handleDragEnd = useCallback(
+        ({ active, over }: DragEndEvent) => {
+            const items = usePromptQueueStore.getState().queues[threadId ?? ""]?.items ?? [];
+            const toIndex = over ? items.findIndex((item) => item.id === over.id) : -1;
+
+            if (threadId && toIndex !== -1) {
+                usePromptQueueStore.getState().move(threadId, String(active.id), toIndex);
+            }
+        },
+        [threadId],
+    );
+
     const handleSendNext = useCallback(() => {
         if (!threadId) {
             return;
@@ -427,11 +490,15 @@ const ComposerPromptQueue: FC = () => {
                 <ListOrderedIcon aria-hidden="true" className="size-3.5" />
                 {statusText}
             </span>
-            <ol aria-label={t`Queued messages`} className="flex min-w-0 flex-wrap gap-1.5">
-                {queue.items.map((prompt, index) => (
-                    <QueueChip key={prompt.id} onRemove={handleRemove} position={index + 1} prompt={prompt} />
-                ))}
-            </ol>
+            <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd} sensors={sensors}>
+                <SortableContext items={queue.items.map((prompt) => prompt.id)} strategy={rectSortingStrategy}>
+                    <ol aria-label={t`Queued messages`} className="flex min-w-0 flex-wrap gap-1.5">
+                        {queue.items.map((prompt, index) => (
+                            <QueueChip count={count} key={prompt.id} onMove={handleMove} onRemove={handleRemove} position={index + 1} prompt={prompt} />
+                        ))}
+                    </ol>
+                </SortableContext>
+            </DndContext>
             {!isStreaming && (
                 <Button className="h-6 gap-1 px-2 text-xs" onClick={handleSendNext} size="sm" type="button" variant="outline">
                     <SendIcon aria-hidden="true" className="size-3" />

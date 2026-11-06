@@ -19705,6 +19705,14 @@ msgstr "Move down one page"
 msgid "Move out one level"
 msgstr "Move out one level"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:1
+msgid "Move queued message {position} down"
+msgstr "Move queued message {position} down"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:1
+msgid "Move queued message {position} up"
+msgstr "Move queued message {position} up"
+
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:100
 msgid "Move to first cell"
 msgstr "Move to first cell"

@@ -95,6 +95,34 @@ export const removeQueuedPrompt = <A>(state: PromptQueueState<A>, id: string): P
 };
 
 /**
+ * Moves a queued message to `toIndex` (clamped to the queue), keeping every other message in its order. A steer whose
+ * call is still out holds its place, so it neither moves nor is overtaken by a move onto it. An unknown id or a move
+ * to the place it already has returns the same state.
+ */
+export const moveQueuedPrompt = <A>(state: PromptQueueState<A>, id: string, toIndex: number): PromptQueueState<A> => {
+    const from = state.items.findIndex((item) => item.id === id);
+    const target = Math.min(Math.max(Math.trunc(toIndex), 0), state.items.length - 1);
+
+    if (from === -1 || from === target || state.items[from]?.steer?.pending || state.items[target]?.steer?.pending) {
+        return state;
+    }
+
+    const items = [...state.items];
+    const [moved] = items.splice(from, 1);
+
+    items.splice(target, 0, moved as QueuedPrompt<A>);
+
+    return { ...state, items };
+};
+
+/** One place earlier (`-1`) or later (`1`). */
+export const stepQueuedPrompt = <A>(state: PromptQueueState<A>, id: string, direction: -1 | 1): PromptQueueState<A> => {
+    const from = state.items.findIndex((item) => item.id === id);
+
+    return from === -1 ? state : moveQueuedPrompt(state, id, from + direction);
+};
+
+/**
  * `steerRun` answered for the steer `steerId`: `accepted` keeps it as a steer
  * (also for a call whose outcome is unknown, which the withdrawal reconciles by
  * id); a refusal turns it into an ordinary queued message, in the same place.

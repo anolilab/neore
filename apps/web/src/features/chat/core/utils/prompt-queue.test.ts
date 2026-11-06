@@ -8,11 +8,13 @@ import {
     editQueuedPrompt,
     EMPTY_PROMPT_QUEUE,
     enqueuePrompt,
+    moveQueuedPrompt,
     prependPrompt,
     removeQueuedPrompt,
     restorePromptQueue,
     serializePromptQueue,
     settleQueuedSteer,
+    stepQueuedPrompt,
     takeNextToSend,
 } from "./prompt-queue";
 
@@ -419,5 +421,63 @@ describe("editing a queued prompt", () => {
         const steered = { ...item("s"), steer: { id: "steer-1", streamId: "stream-1" } };
 
         expect(editQueuedPrompt({ items: [steered], paused: false }, "s", "changed", "fresh").items[0]?.text).toBe("text s");
+    });
+});
+
+describe("reordering queued prompts", () => {
+    const four = (): PromptQueueState<never> => {
+        return { items: [item("a"), item("b"), item("c"), item("d")], paused: false };
+    };
+    const ids = (state: PromptQueueState<never>) => state.items.map((entry) => entry.id);
+    const movedTo = (id: string, to: number) => ids(moveQueuedPrompt(four(), id, to));
+    const stepped = (id: string, direction: -1 | 1) => ids(stepQueuedPrompt(four(), id, direction));
+
+    it("sends the third message first once it is moved to the top", () => {
+        const moved = moveQueuedPrompt(four(), "c", 0);
+        const { next, state } = dequeuePrompt(moved);
+
+        expect(next?.id).toBe("c");
+        expect(ids(state)).toEqual(["a", "b", "d"]);
+    });
+
+    it("moves to any index and keeps the rest in order", () => {
+        expect(movedTo("a", 2)).toEqual(["b", "c", "a", "d"]);
+        expect(movedTo("d", 1)).toEqual(["a", "d", "b", "c"]);
+    });
+
+    it("moves one place up or down and keeps the rest in order", () => {
+        expect(stepped("c", -1)).toEqual(["a", "c", "b", "d"]);
+        expect(stepped("b", 1)).toEqual(["a", "c", "b", "d"]);
+    });
+
+    it("leaves the queue as it is at the edges, for an unknown id and for a move in place", () => {
+        const state = four();
+
+        expect(stepQueuedPrompt(state, "a", -1)).toBe(state);
+        expect(stepQueuedPrompt(state, "d", 1)).toBe(state);
+        expect(moveQueuedPrompt(state, "zzz", 0)).toBe(state);
+        expect(moveQueuedPrompt(state, "b", 1)).toBe(state);
+    });
+
+    it("clamps an index outside the queue", () => {
+        expect(movedTo("a", 99)).toEqual(["b", "c", "d", "a"]);
+        expect(movedTo("d", -5)).toEqual(["d", "a", "b", "c"]);
+    });
+
+    it("keeps a pending steer in its place", () => {
+        const state: PromptQueueState<never> = {
+            items: [item("a"), { ...item("s"), steer: { id: "s1", pending: true, streamId: "x" } }, item("c")],
+            paused: false,
+        };
+
+        expect(moveQueuedPrompt(state, "s", 0)).toBe(state);
+        expect(moveQueuedPrompt(state, "c", 1)).toBe(state);
+    });
+
+    it("keeps the paused flag and survives a save and restore in the new order", () => {
+        const moved = { ...moveQueuedPrompt(four(), "c", 0), paused: true };
+        const restored = restorePromptQueue(serializePromptQueue(moved));
+
+        expect(restored && ids(restored)).toEqual(["c", "a", "b", "d"]);
     });
 });

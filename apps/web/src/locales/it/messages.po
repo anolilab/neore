@@ -19658,6 +19658,14 @@ msgstr "Scendi di una pagina"
 msgid "Move out one level"
 msgstr "Sposta fuori di un livello"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:1
+msgid "Move queued message {position} down"
+msgstr "Sposta in basso il messaggio in coda {position}"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:1
+msgid "Move queued message {position} up"
+msgstr "Sposta in alto il messaggio in coda {position}"
+
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:100
 msgid "Move to first cell"
 msgstr "Vai alla prima cella"

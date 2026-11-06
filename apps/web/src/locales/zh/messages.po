@@ -19658,6 +19658,14 @@ msgstr "向下移动一页"
 msgid "Move out one level"
 msgstr "上移一级"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:1
+msgid "Move queued message {position} down"
+msgstr "下移队列中的消息 {position}"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:1
+msgid "Move queued message {position} up"
+msgstr "上移队列中的消息 {position}"
+
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:100
 msgid "Move to first cell"
 msgstr "移到第一个单元格"
