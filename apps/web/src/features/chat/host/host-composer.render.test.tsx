@@ -325,6 +325,22 @@ describe("the coding-agent composer", () => {
         expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
     });
 
+    it("keeps an unsent draft that matches the Continue prompt when Continue succeeds", async () => {
+        mount(session({ lastEndReason: "interrupted" }));
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "Continue where you left off." } });
+        fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+        // One turn of the event loop lets the mocked send finish before the box is read.
+        await new Promise((resolve) => {
+            setTimeout(resolve, 0);
+        });
+        expect(box.value).toBe("Continue where you left off.");
+    });
+
     it("offers no Continue after a turn that finished or was stopped", async () => {
         mount(session({ lastEndReason: "finished" }));
 

@@ -39,6 +39,12 @@ const evidenceOf = (prompt: string): Record<string, unknown> => {
 };
 
 describe("buildCloudGuidePrompt", () => {
+    it("keeps a large diff within the budget, however many hidden characters it holds", () => {
+        const { prompt } = buildCloudGuidePrompt(input({ files: [file("src/a.ts", { patch: "\u{200B}".repeat(200_000) })] }));
+
+        expect(prompt.length).toBeLessThan(200_000);
+    });
+
     it("shows a hidden character in a diff as an escape, and keeps the diff's line breaks", () => {
         const { prompt } = buildCloudGuidePrompt(input({ files: [file("src/a.ts", { patch: "@@ -1,1 +1,2 @@\n a\n+b\u{200B}c\u{E0041}" })] }));
 

@@ -83,9 +83,6 @@ const cleanedInput = (input: GuidePromptInput): GuidePromptInput => {
         commits: input.commits.map((commit) => {
             return { ...commit, message: clean(commit.message) };
         }),
-        files: input.files.map((file) => {
-            return { ...file, patch: file.patch === null ? null : showHiddenText(file.patch) };
-        }),
         headBranch: encodePath(input.headBranch),
         instructions: clean(input.instructions),
         repository: encodePath(input.repository),
@@ -142,11 +139,27 @@ const pullRequestEntry = (input: GuidePromptInput, bodyMax: number): string =>
 const instructionsOf = (instructions: string): string => (instructions.trim() === "" ? "(none)" : `${quote(instructions.trim())} (the reviewer's own words)`);
 
 /** The prompt the gateway-routed model gets: the diff itself, within a budget. Files past it keep their line in the list. */
+/**
+ * The first part of a patch that fits the budget, with its hidden characters written out. Only the part kept is escaped, so
+ * a large diff costs no more than the budget; the part is halved until its escaped form fits.
+ */
+const boundedPatch = (patch: string, budget: number): string => {
+    let kept = patch.slice(0, Math.min(PATCH_FILE_MAX_CHARS, budget));
+    let shown = showHiddenText(kept);
+
+    while (shown.length > budget && kept.length > 0) {
+        kept = kept.slice(0, Math.floor(kept.length / 2));
+        shown = showHiddenText(kept);
+    }
+
+    return shown;
+};
+
 export const buildCloudGuidePrompt = (given: GuidePromptInput): { prompt: string; system: string } => {
     const input = cleanedInput(given);
     let budget = PATCH_BUDGET_CHARS;
     const files = input.files.slice(0, FILE_LIST_MAX).map((file) => {
-        const patch = file.patch === null || isMechanicalFile(file) ? undefined : file.patch.slice(0, Math.min(PATCH_FILE_MAX_CHARS, budget));
+        const patch = file.patch === null || isMechanicalFile(file) ? undefined : boundedPatch(file.patch, budget);
 
         budget -= patch?.length ?? 0;
 

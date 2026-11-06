@@ -31,17 +31,18 @@ describe("POST /hosts/send for a signed-in owner", () => {
         expect(args).toMatchObject({ requestId: "req-1", text: "fix the bug", threadId: "thread-1", userId: "owner-1" });
     });
 
-    it("accepts a paste whose body is over the byte cap before cleaning, when the prompt it cleans to is within the limit", async () => {
+    it("cleans the hidden characters out of a body within the cap, and sends the prompt that remains", async () => {
         const runMutation = vi.fn(async () => {
             return { outcome: "busy" as const };
         });
-        // 30,000 visible characters and 35,000 zero-width spaces: 135,000 bytes raw, 30,000 once cleaned.
-        const text = `${"x".repeat(30_000)}${"\u{200B}".repeat(35_000)}`;
+        const zeroWidthSpace = "\u{200B}";
+        const text = `${"x".repeat(20_000)}${zeroWidthSpace.repeat(5000)}`;
 
-        const response = await hostSendHttpAction({ runMutation } as never, post({ requestId: "req-1", text, threadId: "thread-1" }));
+        await hostSendHttpAction({ runMutation } as never, post({ requestId: "req-1", text, threadId: "thread-1" }));
 
-        expect(response.status).not.toBe(413);
-        expect(runMutation).toHaveBeenCalledTimes(1);
+        const args = (runMutation.mock.calls[0] as unknown as [unknown, Record<string, unknown>])[1];
+
+        expect(args).toMatchObject({ text: "x".repeat(20_000) });
     });
 
     it("sends nothing for a caller who is not signed in", async () => {

@@ -101,7 +101,7 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
 
     // `draft` is the editable text the prompt came from, as it was when the send began: a success clears the box only if
     // the person has not typed since.
-    const send = async (prompt: string, draft: string = prompt) => {
+    const send = async (prompt: string, draft?: string) => {
         // One request id per message: a retry of a lost answer finds the first try, not a second turn. A different
         // text (an edit after a failure, or Continue) is a different message and gets its own, or the backend would
         // call it a repeat of the first and drop it.
@@ -121,7 +121,8 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
 
             // Continue sends a fixed prompt, and a draft typed while a send was pending is not the one sent: the box and any
             // refusal stay as they are. Only the draft that was sent clears, and a refusal that came before the send lapses with it.
-            if (boxText.current === draft) {
+            // Only a textarea send has a draft; Continue sends a fixed prompt and leaves the box alone.
+            if (draft !== undefined && boxText.current === draft) {
                 boxText.current = "";
                 setText("");
 
