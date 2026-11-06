@@ -163,7 +163,7 @@ const ComposerTiptapEditor = ({
     requestCompletion,
     value,
 }: ComposerTiptapEditorProps & { ref?: React.RefObject<ComposerTiptapEditorRef | null> }) => {
-    const { i18n, t } = useLingui();
+    const { t } = useLingui();
     const placeholder = placeholderProp ?? t`Type your message...`;
     // Track whether the current text update originated from the editor
     // to avoid infinite sync loops
@@ -402,12 +402,14 @@ const ComposerTiptapEditor = ({
         }
     }, [isVimEnabled, editor]);
 
-    // A locale switch changes the labels of the quote chips already drawn; the editor itself is not recreated for it.
+    // A locale switch changes the labels of the quote chips already drawn; the editor itself is not recreated for it. The
+    // switch re-renders the composer, so the chips are repainted after each render. That is one small query, and a repaint
+    // only writes a label that changed.
     useEffect(() => {
         if (editor && !editor.isDestroyed) {
             refreshQuoteChipLabels(editor.view.dom);
         }
-    }, [editor, i18n.locale]);
+    });
 
     // Update banned word decorations when matches change
     useEffect(() => {
