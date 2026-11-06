@@ -211,7 +211,7 @@ const modeFor = (thread: Doc<"threads"> | null, userId: string): ThreadPermissio
 const MAX_LINKS_CHECKED = 50;
 
 export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null, userId: string): Promise<ThreadPermissionMode | null> => {
-    if (!thread || thread.permissionMode !== undefined) {
+    if (!thread) {
         return modeFor(thread, userId);
     }
 
@@ -223,9 +223,13 @@ export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null,
         .take(MAX_LINKS_CHECKED);
     const comparison = links.find((link) => link.branchType === "comparison");
 
-    const source = comparison ? await ctx.db.get("threads", comparison.parentThreadId) : thread;
+    // A comparison column always runs under its parent's mode, even one it holds of its own: the shared composer changes the parent's,
+    // so a mode saved on the column would otherwise hold while the parent's changes never reach it.
+    if (comparison) {
+        return modeFor(await ctx.db.get("threads", comparison.parentThreadId), userId);
+    }
 
-    return modeFor(source, userId);
+    return modeFor(thread, userId);
 };
 
 /**

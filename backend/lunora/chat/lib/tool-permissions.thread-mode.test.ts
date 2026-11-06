@@ -153,6 +153,15 @@ describe("modeOfThread", () => {
         await expect(modeOfThread({ db } as never, threads.child as never, "u1")).resolves.toBe("supervised");
     });
 
+    it("runs a comparison column under its parent's mode even when the column holds a mode of its own", async () => {
+        const own = { _id: "child-own", permissionMode: "full", userId: "u1" };
+        const db = databaseWith([{ branchType: "comparison", parentThreadId: "parent", threadId: "child-own" }]);
+
+        threads["child-own"] = own;
+
+        await expect(modeOfThread({ db } as never, own as never, "u1")).resolves.toBe("supervised");
+    });
+
     it("uses the thread's own mode, and no parent, when no link is a comparison", async () => {
         const db = databaseWith([{ branchType: "continuation", parentThreadId: "parent", threadId: "child" }]);
 
