@@ -362,6 +362,21 @@ describe("the agent's slash commands", () => {
         expect(harness.calls).toEqual([]);
     });
 
+    it("leaves Shift+Arrow to the textarea, which extends the selection, while the menu is open", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "first line\n/re");
+        const active = box.getAttribute("aria-activedescendant");
+
+        // fireEvent returns false when the handler prevented the default action: the arrows must not be taken by the menu.
+        expect(fireEvent.keyDown(box, { key: "ArrowUp", shiftKey: true })).toBe(true);
+        expect(fireEvent.keyDown(box, { key: "ArrowDown", shiftKey: true })).toBe(true);
+        expect(box.getAttribute("aria-activedescendant")).toBe(active);
+        expect(screen.getAllByRole("option")).toHaveLength(2);
+    });
+
     it("picks with Tab too, after text and a space", async () => {
         mount(withCommands());
 

@@ -200,12 +200,14 @@ const HostComposer: FC<{ className?: string; threadId: string }> = ({ className,
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
         const chosen = choices[active];
 
-        // Shift+Enter and Shift+Tab keep their usual meaning (a newline, the previous control), and Ctrl/Cmd+Enter still sends,
-        // even while the menu is open.
+        // Shift+Enter and Shift+Tab keep their usual meaning (a newline, the previous control), Ctrl/Cmd+Enter still sends, and an
+        // arrow with a modifier (Shift extends the selection) is the textarea's, even while the menu is open.
+        const arrow = event.key === "ArrowDown" || event.key === "ArrowUp";
         const menuKey =
             SLASH_KEYS.has(event.key) &&
             !(event.shiftKey && (event.key === "Enter" || event.key === "Tab")) &&
-            !((event.ctrlKey || event.metaKey) && event.key === "Enter");
+            !((event.ctrlKey || event.metaKey) && event.key === "Enter") &&
+            !(arrow && (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey));
 
         if (menuOpen && !event.nativeEvent.isComposing && menuKey) {
             event.preventDefault();
