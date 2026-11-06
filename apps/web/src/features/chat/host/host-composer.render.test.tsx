@@ -3,7 +3,7 @@
  * permission buttons send only an option the agent offered (allow once, decline), by the ids the backend gave.
  */
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -589,6 +589,77 @@ describe("the options the agent offers", () => {
         expect(((await screen.findByLabelText("Model")) as unknown as HTMLSelectElement).value).toBe("fast");
         expect((screen.getByLabelText("Reasoning effort") as unknown as HTMLSelectElement).value).toBe("high");
         expect(screen.getByRole("list", { name: "Agent options" })).toBeTruthy();
+    });
+
+    it("shows a mode option read-only whatever the case of its category, since the computer refuses to change it", async () => {
+        const MODE = {
+            category: "Mode",
+            choices: [
+                { name: "Ask", value: "ask" },
+                { name: "Code", value: "code" },
+            ],
+            currentValue: "ask",
+            id: "mode",
+            name: "Mode",
+        };
+
+        mountWith({ agentState: { configOptions: [MODE] } });
+
+        await screen.findByRole("list", { name: "Agent options" });
+        expect(screen.queryByLabelText("Mode")).toBeNull();
+        expect(screen.getByText("Ask")).toBeTruthy();
+    });
+
+    it("says what the agent confirmed when the option it changed is no longer among its options", async () => {
+        const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+        await waitFor(() => expect(mutations()).toHaveLength(1));
+
+        // The agent's list no longer has the model, and the session holds its confirmed answer for that change.
+        client.setQueryData(["acp.functions.getHostSession", { threadId: "thread-1" }], {
+            _id: "session-1",
+            agentState: { configOptions: [] },
+            optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+            status: "idle",
+        });
+
+        expect(await screen.findByText("The agent confirmed: Model is now Deep, but no longer lists Model.")).toBeTruthy();
+    });
+
+    it("gives a new session in the thread its own options, not the change still waiting on the old session", async () => {
+        const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        fireEvent.change(model, { target: { value: "deep" } });
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        // The thread's newest session is another one: the old session's answer never comes, so its wait must not carry over.
+        client.setQueryData(["acp.functions.getHostSession", { threadId: "thread-1" }], {
+            _id: "session-2",
+            agentState: { configOptions: [MODEL] },
+            status: "idle",
+        });
+
+        await waitFor(() => expect((screen.getByLabelText("Model") as unknown as HTMLSelectElement).disabled).toBe(false));
+    });
+
+    it("hands a change to the client while the browser is offline, so the client can queue it", async () => {
+        mountWith({ agentState: { configOptions: [MODEL, EFFORT] } }, { callId: "call-1", sent: true });
+
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        onlineManager.setOnline(false);
+
+        try {
+            fireEvent.change(model, { target: { value: "deep" } });
+
+            // The mutation is not paused by the offline state: the client receives it, and queues it.
+            await waitFor(() => expect(mutations()).toHaveLength(1));
+        } finally {
+            onlineManager.setOnline(true);
+        }
     });
 
     it("renders no options row for an agent that reported none", async () => {

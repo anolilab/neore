@@ -68,7 +68,7 @@
   The handoff for the new agent rides the first `acp_send` (`acp/lib/pending-handoff.ts`, derived from the path, no flag), never
   the saved message; a switch across the runner makes a new thread linked by a `continuation` relationship.
     - **Agent-reported state** (`session_state`, a turn-less post like `session_open`):
-        - Usage (`usage_update`) is stored on `acpSessions.agentState` with `agentStateAt`; each field present replaces the stored one.
+        - Usage (`usage_update`) is stored on `acpSessions.agentState` with `agentStateAt`; each field present replaces the stored one, and a usage report without a cost keeps the stored cost.
         - A report older than `agentStateAt` is dropped; a repeated value still moves `agentStateAt`.
         - The desktop coalesces it to one post per session every 2 s (`HostPoster.flushState`).
         - The advertised commands (`available_commands_update`) are stored as `agentState.availableCommands`, replaced whole when present, and compared field by field, in order, to skip an unchanged list. Their bounds are shared between `vAgentCommands` and the desktop's `agent-state.ts`. The GDPR export leaves the list out.

@@ -141,20 +141,25 @@ const withCarriedCost = (params: Record<string, unknown>, previous: unknown): Re
     return { ...params, update: { ...params.update, cost: earlierCost } };
 };
 
-/** The updates that set what the agent offers, taken at once while the session opens (`takeStartupOptions`). */
+/** The updates that set what the agent offers. A loaded session's are taken at once while it opens; a fresh session's wait for its id (`takeEarlyOptions`). */
 const OPTION_UPDATES: ReadonlySet<string> = new Set(["config_option_update", "current_mode_update"]);
 
 /**
- * Updates that replace what came before them. While the session opens, only the latest of each kind is kept, so a replayed
- * history of chunks cannot push out the agent's command list. The option updates are not here: `takeStartupOptions` takes them at once.
+ * Updates that replace what came before them. While the session opens, only the latest of each kind per native session is kept, so a
+ * replayed history of chunks cannot push out the agent's command list or options.
  */
-const REPLACING_UPDATES: ReadonlySet<string> = new Set(["available_commands_update", "usage_update"]);
+const REPLACING_UPDATES: ReadonlySet<string> = new Set(["available_commands_update", "config_option_update", "current_mode_update", "usage_update"]);
 
 /**
  * What an early update keeps: a command list in the agent's own shape with its entries bounded, so the buffer charges what the
  * menu will show, and the replay reads the same commands, hints included. Undefined when there is nothing to keep.
  */
 const keptFormOf = (kind: string, params: Record<string, unknown>, scrub: (text: string) => string): Record<string, unknown> | undefined => {
+    // A malformed report does not replace a valid one sent before it.
+    if (kind === "usage_update") {
+        return isRecord(params.update) && usageOf(params.update, scrub) !== undefined ? params : undefined;
+    }
+
     if (kind !== "available_commands_update" || !isRecord(params.update)) {
         return params;
     }
@@ -173,7 +178,7 @@ const keptFormOf = (kind: string, params: Record<string, unknown>, scrub: (text:
 };
 
 export class AgentSession {
-    private readonly earlyUpdates: unknown[] = [];
+    private readonly earlyUpdates: Record<string, unknown>[] = [];
 
     /** The latest replacing update per native session and kind: a failed load's updates never carry into the session that opened after it. */
     private readonly earlyReplacing = new Map<string, Record<string, unknown>>();
@@ -239,8 +244,8 @@ export class AgentSession {
 
     private modeVersion = 0;
 
-    /** Counts the option changes asked for, so a late answer to an earlier one does not replace a later one. */
-    private optionRequests = 0;
+    /** Counts the changes asked for, by option (the legacy mode state is one): a late answer to an earlier change of an option does not replace a later one of it. */
+    private readonly optionRequests = new Map<string, number>();
 
     /** Whether the startup updates are the saved session's (while it loads) or a fresh session's (once it is opened). */
     private startupPhase: "loading" | "opening" = "opening";
@@ -357,15 +362,17 @@ export class AgentSession {
         let answer: unknown;
         const versionAtRequest = this.versionOf(optionId);
 
-        this.optionRequests += 1;
-        const request = this.optionRequests;
+        const key = optionId === undefined ? "mode" : `option:${optionId}`;
+        const request = (this.optionRequests.get(key) ?? 0) + 1;
+
+        this.optionRequests.set(key, request);
 
         // The timeout does not cancel the agent's request: an answer that arrives after it is applied here and reported, so what the
         // person sees follows what the agent did.
         const onLate = (late: unknown): void => {
-            // An answer older than a list the agent has sent since, or than a later change asked for, is not applied: that is what is
+            // An answer older than a list the agent has sent since, or than a later change of this option, is not applied: that is what is
             // true now.
-            if (this.status === "ended" || this.versionOf(optionId) !== versionAtRequest || request !== this.optionRequests) {
+            if (this.status === "ended" || this.versionOf(optionId) !== versionAtRequest || request !== this.optionRequests.get(key)) {
                 return;
             }
 
@@ -614,6 +621,9 @@ export class AgentSession {
 
     private async openFresh(folder: string, timeoutMs?: number): Promise<string> {
         const { response, sessionId } = await openNewSession(this.connection, folder, timeoutMs);
+
+        // What the agent sent for this session before its answer is older than the answer, which wins below.
+        this.takeEarlyOptions(sessionId);
 
         this.offered = { ...this.offered, ...optionsOf(response, this.options.process.scrub) };
 
@@ -999,7 +1009,7 @@ export class AgentSession {
 
     /** Updates that arrive while the session is still opening (before its id is known) are kept and replayed once it is. */
     private replayEarlyUpdates(): void {
-        // Only the replacing updates of the session that opened are replayed; a failed load's are not its.
+        // Only the updates of the session that opened are replayed; a failed load's are not its.
         const replacing: Record<string, unknown>[] = [];
 
         for (const params of this.earlyReplacing.values()) {
@@ -1008,7 +1018,7 @@ export class AgentSession {
             }
         }
 
-        const early = [...this.earlyUpdates, ...replacing];
+        const early = [...this.earlyUpdates.filter((params) => params.sessionId === this.agentSessionId), ...replacing];
 
         this.earlyUpdates.length = 0;
         this.earlyReplacing.clear();
@@ -1065,9 +1075,9 @@ export class AgentSession {
     }
 
     /**
-     * An update that arrives while the session opens. While the saved session loads, only its updates count; once a fresh session
-     * is opened, the saved id's late updates are the failed load's. The agent's options are taken as they come, as they always
-     * were; everything else waits in the buffer until the session has its id.
+     * An update that arrives while the session opens. While the saved session loads, only its updates count, and its option updates
+     * are taken at once. Once a fresh session is opened, the saved id's late updates are the failed load's; every other update waits
+     * in the buffer until the session has its id, and the options of its own are taken then (`takeEarlyOptions`, before the answer).
      */
     private keepStartupUpdate(params: Record<string, unknown>): void {
         const { resumeSessionId } = this.options;
@@ -1079,10 +1089,23 @@ export class AgentSession {
 
         const update = params.update as Record<string, unknown>;
 
-        if (OPTION_UPDATES.has(String(update.sessionUpdate))) {
+        if (this.startupPhase === "loading" && OPTION_UPDATES.has(String(update.sessionUpdate))) {
             this.takeStartupOptions(update);
         } else {
             this.keepEarly(params);
+        }
+    }
+
+    /** Applies the option updates a fresh session sent before its answer, once its id is known. The answer is merged after them, so it wins. */
+    private takeEarlyOptions(sessionId: unknown): void {
+        for (const [key, params] of this.earlyReplacing) {
+            if (params.sessionId !== sessionId || !isRecord(params.update) || !OPTION_UPDATES.has(String(params.update.sessionUpdate))) {
+                continue;
+            }
+
+            this.takeStartupOptions(params.update);
+            this.earlyReplacingBytes -= Buffer.byteLength(JSON.stringify(params));
+            this.earlyReplacing.delete(key);
         }
     }
 
@@ -1141,9 +1164,14 @@ export class AgentSession {
                 return;
             }
             case "current_mode_update": {
-                this.offered = withCurrentMode(this.offered, update.currentModeId, this.options.process.scrub);
-                this.modeVersion += 1;
-                this.reportOptions();
+                const offered = withCurrentMode(this.offered, update.currentModeId, this.options.process.scrub);
+
+                // A mode id the agent did not name validly changes nothing, so it does not supersede a change in flight.
+                if (offered !== this.offered) {
+                    this.offered = offered;
+                    this.modeVersion += 1;
+                    this.reportOptions();
+                }
 
                 return;
             }

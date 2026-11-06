@@ -134,9 +134,12 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
     const messages = useHostSendErrorMessages();
     const groupId = useId();
     // The change this view made last: its answer is shown, and the controls stay off until the agent has given it.
-    const [change, setChange] = useState<{ callId?: string; rowId: string; valueId: string } | undefined>(undefined);
+    // Names are kept with the change: the option may be gone from the agent's list by the time its answer comes.
+    const [change, setChange] = useState<{ callId?: string; name: string; rowId: string; valueId: string; valueName: string } | undefined>(undefined);
     const [failure, setFailure] = useState<string | undefined>(undefined);
-    const set = useMutation(crpc.acp.remote.setHostOption.mutationOptions());
+    // Offline, the default network mode would pause the call before the Lunora client sees it, and the client is what queues a write.
+    // Offline, the default network mode would pause the call before the Lunora client sees it, and the client is what queues a write.
+    const set = useMutation({ ...crpc.acp.remote.setHostOption.mutationOptions(), networkMode: "always" });
     // The call whose confirmed value never showed in the options, so the wait for it ended.
     const [gaveUp, setGaveUp] = useState<string | undefined>(undefined);
     const rows = rowsOf(state, { mode: t`Mode`, model: t`Model` });
@@ -225,7 +228,7 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
         }
 
         setFailure(undefined);
-        setChange({ rowId: row.id, valueId });
+        setChange({ name: row.name, rowId: row.id, valueId, valueName: nameOfValue(row, valueId) });
         set.mutate(
             { threadId: threadId as Id<"threads">, valueId, ...(row.optionId !== undefined && { optionId: row.optionId }) },
             {
@@ -234,7 +237,7 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
                 },
                 onSuccess: (result) => {
                     if (result.sent) {
-                        setChange({ callId: result.callId, rowId: row.id, valueId });
+                        setChange({ callId: result.callId, name: row.name, rowId: row.id, valueId, valueName: nameOfValue(row, valueId) });
 
                         return;
                     }
@@ -271,6 +274,9 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
     ) {
         // The agent confirmed the change, but the option has not shown it in the time the page waited: say so, not that it changed.
         status = t`The agent confirmed ${nameOfValue(changed, answered.valueId)}, but ${changed.name} still shows ${nameOfValue(changed, changed.current)}. Check the agent before changing it again.`;
+    } else if (answered?.outcome === "confirmed" && changed === undefined && change !== undefined) {
+        // The option the change named is no longer offered: the confirmation still says what was changed, and that it is gone.
+        status = t`The agent confirmed: ${change.name} is now ${change.valueName}, but no longer lists ${change.name}.`;
     } else if (answered !== undefined && (answered.outcome === "refused" || changed?.current === answered.valueId)) {
         refused = answered.outcome === "refused";
         status = refused

@@ -21,7 +21,14 @@ const costOf = (value: unknown, scrub: (text: string) => string): AgentUsage["co
         return undefined;
     }
 
-    return { amount: value.amount, currency: scrub(value.currency).slice(0, MAX_CURRENCY_CHARS) };
+    // A code the scrub changes held a configured secret: it is not the agent's currency, so the cost is left out rather than relabelled.
+    const currency = scrub(value.currency);
+
+    if (currency !== value.currency) {
+        return undefined;
+    }
+
+    return { amount: value.amount, currency: currency.slice(0, MAX_CURRENCY_CHARS) };
 };
 
 /** `usage_update`: `used` and `size` are token counts; `cost` is the session's cumulative cost, when the agent sends one. */

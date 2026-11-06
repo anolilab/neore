@@ -79,6 +79,8 @@ const vExportSession = v.object({
     // What the agent reported about itself (`session_state`): its context use and cost, and its advertised commands, as the thread's
     // meter and command menu showed them. The export leaves the command list out (see `withoutCommands`).
     agentState: v.optional(vAcpAgentState),
+    // When the agent's report was observed: the time the stored values are dated by.
+    agentStateAt: v.optional(v.number()),
     capabilities: v.optional(vCapabilityReport),
     createdAt: v.number(),
     folderLabel: v.string(),
@@ -136,6 +138,7 @@ export const collectAcpSessionsForExport = internalQuery
                         agentKey,
                         agentLabel,
                         agentState,
+                        agentStateAt,
                         capabilities,
                         createdAt,
                         folderLabel,
@@ -155,6 +158,7 @@ export const collectAcpSessionsForExport = internalQuery
                             status,
                             threadId: threadId as string,
                             ...(agentState !== undefined && { agentState: withoutCommands(agentState) }),
+                            ...(agentStateAt !== undefined && { agentStateAt }),
                             ...(capabilities !== undefined && { capabilities }),
                             ...(importedTurns !== undefined && { importedTurns }),
                             ...(importState !== undefined && { importState }),
