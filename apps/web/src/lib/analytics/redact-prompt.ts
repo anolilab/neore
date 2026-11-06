@@ -21,8 +21,11 @@ const PROMPT_SEGMENT = /^prompt=/i;
 /** Any `prompt=` at all, in decoded text. A snapshot that holds one is not sent. */
 const PROMPT_ASSIGNMENT = /prompt=/i;
 
-/** The word a prompt is named by: checked before any decoding, since most strings never contain it. */
+/** The word a prompt is named by. A string with no `%` and no such word cannot name a prompt, so it is not decoded at all. */
 const PROMPT_WORD = /prompt/i;
+
+/** Whether a string may name a prompt, checked before any decoding: an encoded key can hide the word, so a `%` always decodes. */
+const mayNamePrompt = (value: string): boolean => value.includes("%") || PROMPT_WORD.test(value);
 
 /** A run of percent-encoded bytes, decoded run by run so a malformed run does not stop the others. */
 const ENCODED_RUN = /(?:%[\da-f]{2})+/gi;
@@ -96,7 +99,7 @@ const redactQuery = (query: string, redact: (text: string) => string): string =>
  * removed; every other query parameter and the fragment are kept as written. A string that names no prompt is returned as it is.
  */
 export const redactPromptFromUrl = (value: string): string => {
-    if (!PROMPT_WORD.test(value) || !PROMPT_PARAMETER.test(decodeFully(value))) {
+    if (!mayNamePrompt(value) || !PROMPT_PARAMETER.test(decodeFully(value))) {
         return value;
     }
 
@@ -123,7 +126,7 @@ export const redactPromptFromUrl = (value: string): string => {
 
 const containsPrompt = (value: unknown): boolean => {
     if (typeof value === "string") {
-        return PROMPT_WORD.test(value) && PROMPT_ASSIGNMENT.test(decodeFully(value));
+        return mayNamePrompt(value) && PROMPT_ASSIGNMENT.test(decodeFully(value));
     }
 
     if (Array.isArray(value)) {

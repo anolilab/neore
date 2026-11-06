@@ -225,3 +225,19 @@ describe("the event's own fields", () => {
         expect(redactPromptFromEvent(event)).toBe(event);
     });
 });
+
+describe("an encoded top-level prompt in an analytics URL", () => {
+    it.each([
+        ["an encoded key, p as %70", "https://app.example.com/chat?%70rompt=hi&model=gpt-4o"],
+        ["an encoded equals sign", "https://app.example.com/chat?prompt%3Dhi&model=gpt-4o"],
+        ["an encoded key in capitals", "https://app.example.com/chat?%50ROMPT%3Dhi&model=gpt-4o"],
+        ["a key encoded twice", "https://app.example.com/chat?%2570rompt%253Dhi&model=gpt-4o"],
+        ["a value encoded as a quoted string", "https://app.example.com/chat?prompt=%22hi%22&model=gpt-4o"],
+        ["every letter of the key encoded", "https://app.example.com/chat?model=gpt-4o&%70%72%6F%6D%70%74=hi"],
+    ])("removes the prompt from a URL with %s, and keeps the model", (_name, url) => {
+        const cleaned = redactPromptFromUrl(url);
+
+        expect(cleaned).not.toContain("hi");
+        expect(cleaned).toBe("https://app.example.com/chat?model=gpt-4o");
+    });
+});
