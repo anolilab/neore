@@ -52,23 +52,23 @@ msgstr "「{0}」には値の入力が必要な変数があります。"
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "「{0}」は依存タスクの完了後に開始されます"
 
-#: src/features/chat/thread/composer-input.tsx:572
+#: src/features/chat/thread/composer-input.tsx:575
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "「{fileName}」は添付できません。このファイル形式はサポートされていません。"
 
-#: src/features/chat/thread/composer-input.tsx:565
+#: src/features/chat/thread/composer-input.tsx:568
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "「{fileName}」を添付できませんでした。内容がファイル形式と一致しません。"
 
-#: src/features/chat/thread/composer-input.tsx:567
+#: src/features/chat/thread/composer-input.tsx:570
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "「{fileName}」をアップロードできませんでした。接続を確認して、もう一度お試しください。"
 
-#: src/features/chat/thread/composer-input.tsx:570
+#: src/features/chat/thread/composer-input.tsx:573
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "「{fileName}」は大きすぎます。ドキュメントは最大 {maxMegabytes} MB までです。"
 
-#: src/features/chat/thread/composer-input.tsx:571
+#: src/features/chat/thread/composer-input.tsx:574
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "「{fileName}」は大きすぎます。この種類のファイルは最大 {maxMegabytes} MB までです。"
 
@@ -3124,7 +3124,7 @@ msgstr "Alloy（ニュートラル）"
 msgid "Alphabetical"
 msgstr "アルファベット順"
 
-#: src/features/auth/components/auth/auth-card.tsx:437
+#: src/features/auth/components/auth/auth-card.tsx:439
 msgid "Already have an account?"
 msgstr "アカウントをお持ちですか？"
 
@@ -3316,7 +3316,7 @@ msgstr "WeChat 公式アカウント（安全モード）へのメッセージ�
 msgid "Answer ready"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:120
+#: src/features/chat/thread/ask-user-prompt.tsx:303
 msgid "Answer sent — continuing"
 msgstr "回答を送信しました — 続行中"
 
@@ -3324,7 +3324,7 @@ msgstr "回答を送信しました — 続行中"
 msgid "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 msgstr "WhatsApp Business 番号（Meta Cloud API）経由で WhatsApp メッセージに応答します。返信は WhatsApp の 24 時間ルールに従います。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:116
+#: src/features/chat/thread/ask-user-prompt.tsx:299
 msgid "Answered"
 msgstr "回答済み"
 
@@ -3843,13 +3843,33 @@ msgstr ""
 msgid "Attach as file"
 msgstr ""
 
+#: src/features/chat/thread/ask-user-prompt.tsx:437
+msgid "Attach file"
+msgstr "ファイルを添付"
+
 #: src/features/chat/header/kb-attachment-button.tsx:187
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "この会話で AI が参照・引用できるように、ファイルまたはコレクション全体を添付します。"
 
+#: src/features/chat/thread/ask-user-prompt.tsx:388
+msgid "Attached files"
+msgstr "添付ファイル"
+
 #: ../../packages/chat-ui/src/chat/message-item.tsx:121
 msgid "Attached image"
 msgstr "添付画像"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:344
+msgid "Attached:"
+msgstr "添付:"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:425
+msgid "Attaching files…"
+msgstr "ファイルを添付しています…"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:437
+msgid "Attaching…"
+msgstr "添付しています…"
 
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 msgid "Attachment"
@@ -3928,7 +3948,7 @@ msgstr "オーストリア"
 msgid "Auth"
 msgstr "認証"
 
-#: src/features/auth/components/auth/auth-card.tsx:390
+#: src/features/auth/components/auth/auth-card.tsx:392
 #: src/features/settings/components/chat/native-providers-settings.tsx:575
 msgid "Authentication"
 msgstr "認証"
@@ -4932,7 +4952,7 @@ msgstr "ブルガリア語"
 msgid "Bulgarian (Bulgaria)"
 msgstr "ブルガリア語（ブルガリア）"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:155
+#: src/features/chat/signed-out/signed-out-chat.tsx:156
 #: src/features/chat/thread-list/thread-list-header.tsx:167
 #: src/features/chat/thread-list/thread-list-header.tsx:178
 msgid "Bulk actions"
@@ -6060,7 +6080,7 @@ msgstr "メッセージのピンアイコンをクリックすると、ここに
 msgid "Click the star on any model in All models to add it here."
 msgstr "「すべてのモデル」で任意のモデルの星をクリックすると、ここに追加されます。"
 
-#: src/features/chat/thread/composer-input.tsx:302
+#: src/features/chat/thread/composer-input.tsx:303
 msgid "Click to edit"
 msgstr "クリックして編集"
 
@@ -7274,7 +7294,7 @@ msgstr "コンテキスト再現率"
 msgid "Context that never resets"
 msgstr "リセットされないコンテキスト"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:196
+#: src/features/chat/signed-out/signed-out-chat.tsx:197
 #: src/features/chat/thread/composer-context-count.tsx:116
 msgid "Context Usage"
 msgstr "コンテキスト使用量"
@@ -7415,8 +7435,8 @@ msgstr ""
 msgid "Conversations on lines this diff no longer shows"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:751
-#: src/features/chat/thread/composer-input.tsx:1315
+#: src/features/chat/thread/composer-input.tsx:754
+#: src/features/chat/thread/composer-input.tsx:1327
 msgid "Conversion failed"
 msgstr "変換に失敗しました"
 
@@ -7712,7 +7732,17 @@ msgstr ""
 msgid "Could not apply the changes"
 msgstr "変更を適用できませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1337
+#. placeholder {0}: failed.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:283
+msgid "Could not attach {0}. The other files were attached; try those again."
+msgstr "{0} を添付できませんでした。ほかのファイルは添付されました。それらは再度お試しください。"
+
+#. placeholder {0}: failed.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:284
+msgid "Could not attach {0}. Try those again."
+msgstr "{0} を添付できませんでした。もう一度お試しください。"
+
+#: src/features/chat/thread/composer-input.tsx:1349
 msgid "Could not attach the chat"
 msgstr "チャットを添付できませんでした"
 
@@ -7730,7 +7760,7 @@ msgstr "実行をキャンセルできませんでした。"
 
 #: src/features/chat/thread/composer-model-selector.tsx:127
 msgid "Could not change Auto. Please try again."
-msgstr ""
+msgstr "Autoを変更できませんでした。もう一度お試しください。"
 
 #: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
@@ -7739,7 +7769,7 @@ msgstr "プッシュ通知を変更できませんでした。もう一度お試
 #: src/features/chat/model-settings/use-model-combobox.ts:283
 #: src/features/chat/model-settings/use-model-combobox.ts:307
 msgid "Could not change the model. Please try again."
-msgstr ""
+msgstr "モデルを変更できませんでした。もう一度お試しください。"
 
 #: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
@@ -7920,11 +7950,11 @@ msgstr ""
 msgid "Could not reach the server. Try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1340
+#: src/features/chat/thread/composer-input.tsx:1352
 msgid "Could not read that chat"
 msgstr "そのチャットを読み込めませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1341
+#: src/features/chat/thread/composer-input.tsx:1353
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "そのチャットを読み込めませんでした。ロックされている場合は、先にロックを解除してください。"
 
@@ -7994,7 +8024,7 @@ msgstr ""
 msgid "Could not send your answer."
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:83
+#: src/features/chat/thread/ask-user-prompt.tsx:147
 #: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "回答を送信できませんでした。もう一度お試しください。"
@@ -8263,7 +8293,7 @@ msgstr "組織を作成"
 msgid "Create PR"
 msgstr "PR を作成"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:146
+#: src/features/chat/signed-out/signed-out-chat.tsx:147
 #: src/features/chat/thread-list/thread-list-header.tsx:127
 #: src/features/chat/thread-list/thread-list-header.tsx:137
 msgid "Create project"
@@ -9842,7 +9872,7 @@ msgstr "Discord 公開鍵"
 
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:54
 #: src/features/changelog/components/changelog-card.tsx:59
-#: src/features/chat/thread/ask-user-prompt.tsx:191
+#: src/features/chat/thread/ask-user-prompt.tsx:445
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:202
@@ -9878,7 +9908,7 @@ msgstr "Webhook シークレットを閉じる"
 msgid "Dismissed"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:118
+#: src/features/chat/thread/ask-user-prompt.tsx:301
 msgid "Dismissed — continuing without an answer"
 msgstr "閉じました — 回答なしで続行中"
 
@@ -9983,7 +10013,7 @@ msgstr "繰り返さない"
 msgid "Dominican Republic"
 msgstr "ドミニカ共和国"
 
-#: src/features/auth/components/auth/auth-card.tsx:433
+#: src/features/auth/components/auth/auth-card.tsx:435
 msgid "Don't have an account?"
 msgstr "アカウントをお持ちでないですか？"
 
@@ -10218,7 +10248,7 @@ msgstr "ファイルをドロップするか、クリックしてアップロー
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1525
+#: src/features/chat/thread/composer-input.tsx:1537
 msgid "Drop files here"
 msgstr "ここにファイルをドロップ"
 
@@ -10494,8 +10524,8 @@ msgstr "コレクションを編集"
 msgid "Edit comment"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:309
-#: src/features/chat/thread/composer-input.tsx:321
+#: src/features/chat/thread/composer-input.tsx:310
+#: src/features/chat/thread/composer-input.tsx:322
 msgid "Edit content"
 msgstr "内容を編集"
 
@@ -10794,7 +10824,7 @@ msgstr ""
 #: src/features/auth/components/auth/forms/email-otp-form.tsx:232
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:107
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:124
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:84
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:90
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:529
 #: src/features/auth/components/organization/invite-member-dialog.tsx:108
 msgid "Email"
@@ -10809,7 +10839,7 @@ msgstr "メールアドレス"
 msgid "Email banner"
 msgstr "メールバナー"
 
-#: src/features/auth/components/auth/auth-card.tsx:335
+#: src/features/auth/components/auth/auth-card.tsx:337
 msgid "Email Code"
 msgstr "メールコード"
 
@@ -10826,7 +10856,7 @@ msgstr "メールヒーロー"
 msgid "Email is the same"
 msgstr "メールアドレスが同じです"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:81
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:87
 msgid "Email or Username"
 msgstr "メールアドレスまたはユーザー名"
 
@@ -11043,7 +11073,7 @@ msgid "English (UK)"
 msgstr "英語（英国）"
 
 #: src/features/chat/core/utils/language-utilities.ts:151
-#: src/features/chat/signed-out/signed-out-chat.tsx:177
+#: src/features/chat/signed-out/signed-out-chat.tsx:178
 #: src/features/chat/thread/composer-language-selector.tsx:102
 msgid "English (US)"
 msgstr "英語（米国）"
@@ -11192,7 +11222,7 @@ msgstr "API キーを入力してください"
 msgid "Enter the endpoint URL first"
 msgstr "先にエンドポイント URL を入力してください"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:182
+#: src/features/chat/thread/ask-user-prompt.tsx:411
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "Enter で送信、Shift+Enter で改行。"
 
@@ -11228,7 +11258,7 @@ msgstr "カスタムシステムプロンプトをここに入力してくださ
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:188
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:118
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:135
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:96
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:102
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:540
 msgid "Enter your email"
 msgstr "メールアドレスを入力"
@@ -11238,23 +11268,23 @@ msgstr "メールアドレスを入力"
 msgid "Enter your email address"
 msgstr "メールアドレスを入力してください"
 
-#: src/features/auth/components/auth/auth-card.tsx:364
+#: src/features/auth/components/auth/auth-card.tsx:366
 msgid "Enter your email below to login to your account"
 msgstr "アカウントにサインインするには、下にメールアドレスを入力してください"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:93
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:99
 msgid "Enter your email or username"
 msgstr "メールアドレスまたはユーザー名を入力"
 
-#: src/features/auth/components/auth/auth-card.tsx:334
+#: src/features/auth/components/auth/auth-card.tsx:336
 msgid "Enter your email to receive a code"
 msgstr "コードを受け取るメールアドレスを入力してください"
 
-#: src/features/auth/components/auth/auth-card.tsx:346
+#: src/features/auth/components/auth/auth-card.tsx:348
 msgid "Enter your email to receive a magic link"
 msgstr "マジックリンクを受け取るメールアドレスを入力してください"
 
-#: src/features/auth/components/auth/auth-card.tsx:340
+#: src/features/auth/components/auth/auth-card.tsx:342
 msgid "Enter your email to reset your password"
 msgstr "パスワードをリセットするにはメールアドレスを入力してください"
 
@@ -11262,7 +11292,7 @@ msgstr "パスワードをリセットするにはメールアドレスを入力
 msgid "Enter your full name or display name"
 msgstr "氏名または表示名を入力"
 
-#: src/features/auth/components/auth/auth-card.tsx:377
+#: src/features/auth/components/auth/auth-card.tsx:379
 msgid "Enter your information to create an account"
 msgstr "アカウントを作成するには情報を入力してください"
 
@@ -11279,7 +11309,7 @@ msgstr "名前を入力"
 msgid "Enter your new email address below"
 msgstr "新しいメールアドレスを下に入力してください"
 
-#: src/features/auth/components/auth/auth-card.tsx:358
+#: src/features/auth/components/auth/auth-card.tsx:360
 msgid "Enter your new password below"
 msgstr "新しいパスワードを下に入力してください"
 
@@ -11288,7 +11318,7 @@ msgid "Enter your nickname"
 msgstr "ニックネームを入力"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:210
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:369
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:378
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:566
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:157
 msgid "Enter your password"
@@ -11318,7 +11348,7 @@ msgstr "プロンプトの内容をここに入力してください... 動的�
 msgid "Enter your title instructions..."
 msgstr ""
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:89
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:95
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:515
 #: src/features/auth/components/settings/account/update-username-card.tsx:30
 msgid "Enter your username"
@@ -12133,7 +12163,7 @@ msgid "Failed to attach collection"
 msgstr "コレクションを添付できませんでした"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1177
+#: src/features/chat/thread/composer-input.tsx:1189
 msgid "Failed to attach file"
 msgstr "ファイルを添付できませんでした"
 
@@ -12530,7 +12560,7 @@ msgstr "エクスポートをリクエストできませんでした"
 msgid "Failed to reset to defaults"
 msgstr "既定にリセットできませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1209
+#: src/features/chat/thread/composer-input.tsx:1221
 msgid "Failed to restore attachment"
 msgstr "添付ファイルを復元できませんでした"
 
@@ -13330,6 +13360,10 @@ msgstr "ファイル名を空にすることはできません"
 msgid "Files"
 msgstr ""
 
+#: src/features/chat/thread/ask-user-prompt.tsx:427
+msgid "Files cannot be attached in a locked chat."
+msgstr "ロックされたチャットではファイルを添付できません。"
+
 #: src/features/chat/thread/host-changes.tsx:50
 msgid "Files changed by this turn"
 msgstr ""
@@ -13708,13 +13742,13 @@ msgstr ""
 msgid "Forgot authenticator"
 msgstr "認証アプリを使えない場合"
 
-#: src/features/auth/components/auth/auth-card.tsx:341
+#: src/features/auth/components/auth/auth-card.tsx:343
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:134
 #: src/routes/auth/forgot-password.tsx:17
 msgid "Forgot Password"
 msgstr "パスワードを忘れた場合"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:357
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:366
 msgid "Forgot password?"
 msgstr "パスワードをお忘れですか？"
 
@@ -14491,7 +14525,7 @@ msgid "Global analyst research, market analysis, and investment data"
 msgstr "グローバルなアナリストリサーチ、市場分析、投資データ"
 
 #: ../../packages/chat-ui/src/chat/chat-view.tsx:96
-#: src/features/auth/components/auth/auth-card.tsx:495
+#: src/features/auth/components/auth/auth-card.tsx:497
 msgid "Go back"
 msgstr "戻る"
 
@@ -15109,7 +15143,7 @@ msgstr "高さ"
 msgid "Hello {0}! What would you like to do today?"
 msgstr "こんにちは、{0} さん！今日は何をしますか？"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:115
+#: src/features/chat/signed-out/signed-out-chat.tsx:116
 #: src/features/layout/components/mobile-section-nav.tsx:72
 #: src/features/layout/components/sidebar-shortcut.tsx:301
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:113
@@ -16383,7 +16417,7 @@ msgstr "無効な OAuth コールバックです"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:77
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:57
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:83
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:144
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:150
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:122
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:151
 #: src/features/auth/components/settings/security/change-password-card.tsx:73
@@ -16795,7 +16829,7 @@ msgid "Key file (optional, absolute path)"
 msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
-#: src/features/chat/signed-out/signed-out-chat.tsx:152
+#: src/features/chat/signed-out/signed-out-chat.tsx:153
 #: src/features/chat/thread-list/thread-list-header.tsx:146
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:122
 #: src/features/workflow/components/canvas/workflow-controls.tsx:374
@@ -17897,7 +17931,7 @@ msgstr ""
 #: src/features/settings/components/chat/trigger-settings.tsx:958
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
-#: src/routes/_shortcut.tsx:16
+#: src/routes/_shortcut.tsx:17
 msgid "Loading..."
 msgstr "読み込んでいます..."
 
@@ -17988,7 +18022,7 @@ msgid "Log out"
 msgstr "サインアウト"
 
 #: src/features/auth/components/auth/login-modal.tsx:46
-#: src/features/chat/signed-out/signed-out-chat.tsx:283
+#: src/features/chat/signed-out/signed-out-chat.tsx:284
 #: src/features/layout/components/app-sidebar.tsx:54
 #: src/features/layout/components/app-sidebar.tsx:67
 #: src/features/marketing/components/gateway-navbar.tsx:90
@@ -18058,7 +18092,7 @@ msgstr "長いテキストが検出されました"
 msgid "Long text generation in images"
 msgstr "画像内の長文テキスト生成"
 
-#: src/features/chat/thread/composer-input.tsx:809
+#: src/features/chat/thread/composer-input.tsx:812
 msgid "Long text was attached as a file."
 msgstr ""
 
@@ -18189,7 +18223,7 @@ msgstr "マクロ望遠、タイトなフレーミング"
 msgid "Madrid"
 msgstr "マドリード"
 
-#: src/features/auth/components/auth/auth-card.tsx:347
+#: src/features/auth/components/auth/auth-card.tsx:349
 msgid "Magic Link"
 msgstr "マジックリンク"
 
@@ -19890,7 +19924,7 @@ msgstr "neore"
 msgid "Neore"
 msgstr "Neore"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:89
+#: src/features/chat/signed-out/signed-out-chat.tsx:90
 #: src/features/layout/components/sidebar-shortcut.tsx:238
 #: src/features/marketing/components/navbar-menu.tsx:44
 msgid "Neore - AI Text & Video & Audio & Image & Documents Generation Platform"
@@ -20064,7 +20098,7 @@ msgstr "新しいチャット"
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:46
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
 #: src/features/chat/header/chat-header.tsx:30
-#: src/features/chat/signed-out/signed-out-chat.tsx:315
+#: src/features/chat/signed-out/signed-out-chat.tsx:305
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:239
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:115
 #: src/features/settings/lib/settings-keywords.ts:37
@@ -20109,7 +20143,7 @@ msgstr "新しい目標"
 #: src/features/chat/group/create-group-chat-button.tsx:115
 #: src/features/chat/group/create-group-chat-button.tsx:120
 #: src/features/chat/group/create-group-chat-button.tsx:129
-#: src/features/chat/signed-out/signed-out-chat.tsx:149
+#: src/features/chat/signed-out/signed-out-chat.tsx:150
 msgid "New group chat"
 msgstr "新しいグループチャット"
 
@@ -20185,7 +20219,7 @@ msgstr "今週の新着"
 msgid "New thread"
 msgstr "新しいスレッド"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:140
+#: src/features/chat/signed-out/signed-out-chat.tsx:141
 #: src/features/chat/thread-list/thread-list-header.tsx:99
 msgid "New Thread"
 msgstr "新しいスレッド"
@@ -20903,7 +20937,7 @@ msgstr "このグループにスレッドはありません"
 msgid "No threads were active in that date range."
 msgstr ""
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:272
+#: src/features/chat/signed-out/signed-out-chat.tsx:273
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1065
 msgid "No threads yet"
 msgstr "スレッドはまだありません"
@@ -21130,6 +21164,11 @@ msgstr ""
 #: src/features/settings/components/privacy/data-access.tsx:36
 msgid "Not set"
 msgstr "未設定"
+
+#. placeholder {0}: unreadFiles.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:348
+msgid "Not shown to this model: {0}"
+msgstr "このモデルには表示されていません: {0}"
 
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:75
 msgid "Not started"
@@ -21536,6 +21575,10 @@ msgstr "請求設定を管理できるのは組織のオーナーのみです"
 msgid "Only participants you @mention answer."
 msgstr "@メンションした参加者のみが回答します。"
 
+#: src/features/chat/thread/ask-user-prompt.tsx:193
+msgid "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
+msgstr "添付できるのは PNG・JPEG・WEBP・GIF の画像と、10 MB までの PDF です。合計 20 MB まで、最大 4 つまでです。"
+
 #: src/features/settings/components/chat/trigger-settings.tsx:263
 msgid "Only post when there is something to report"
 msgstr ""
@@ -21767,7 +21810,7 @@ msgstr "検索を開く"
 msgid "Open settings"
 msgstr "設定を開く"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:112
+#: src/features/chat/signed-out/signed-out-chat.tsx:113
 #: src/features/layout/components/sidebar-shortcut.tsx:282
 msgid "Open Settings"
 msgstr "設定を開く"
@@ -21870,7 +21913,7 @@ msgstr ""
 msgid "Open thread"
 msgstr "スレッドを開く"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:118
+#: src/features/chat/signed-out/signed-out-chat.tsx:119
 #: src/features/layout/components/sidebar-shortcut.tsx:221
 #: src/features/layout/components/sidebar-shortcut.tsx:328
 msgid "Open user menu"
@@ -22296,7 +22339,7 @@ msgstr "またはクリックして参照"
 msgid "Or connect a Text node to provide the prompt"
 msgstr "または Text ノードを接続してプロンプトを指定"
 
-#: src/features/auth/components/auth/auth-card.tsx:217
+#: src/features/auth/components/auth/auth-card.tsx:219
 msgid "or continue with"
 msgstr "または次で続行"
 
@@ -22308,7 +22351,7 @@ msgstr ""
 msgid "Or from a terminal:"
 msgstr "またはターミナルから："
 
-#: src/features/chat/thread/ask-user-prompt.tsx:176
+#: src/features/chat/thread/ask-user-prompt.tsx:377
 msgid "Or type your own answer…"
 msgstr "または自分で回答を入力…"
 
@@ -22754,7 +22797,7 @@ msgstr "パスキーを使うと、デバイスの生体認証やセキュリテ
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:84
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:201
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:350
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
 msgid "Password"
@@ -22765,7 +22808,7 @@ msgid "Password changed successfully"
 msgstr "パスワードを変更しました"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:60
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:127
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:133
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:105
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:42
 msgid "Password is required"
@@ -22774,7 +22817,7 @@ msgstr "パスワードは必須です"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:71
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:51
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:77
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:138
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:144
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:116
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:145
 #: src/features/auth/components/settings/security/change-password-card.tsx:67
@@ -22786,7 +22829,7 @@ msgstr "パスワードが長すぎます"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:65
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:45
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:71
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:132
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:138
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:110
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:139
 #: src/features/auth/components/settings/security/change-password-card.tsx:61
@@ -23254,7 +23297,7 @@ msgstr "再生"
 msgid "Play a short sound when a reply finishes. Applies to this browser only."
 msgstr "返信が完了したら短い音を鳴らします。このブラウザーのみに適用されます。"
 
-#: src/features/auth/components/auth/auth-card.tsx:389
+#: src/features/auth/components/auth/auth-card.tsx:391
 msgid "Please authenticate to continue"
 msgstr "続行するには認証してください"
 
@@ -23266,7 +23309,7 @@ msgstr "メールを確認し、認証リンクをクリックしてください
 msgid "Please confirm your password"
 msgstr "パスワードを確認してください"
 
-#: src/features/auth/components/auth/auth-card.tsx:352
+#: src/features/auth/components/auth/auth-card.tsx:354
 msgid "Please enter a backup code to access your account"
 msgstr "アカウントにアクセスするにはバックアップコードを入力してください"
 
@@ -23274,7 +23317,7 @@ msgstr "アカウントにアクセスするにはバックアップコードを
 msgid "Please enter an email address"
 msgstr "メールアドレスを入力してください"
 
-#: src/features/auth/components/auth/auth-card.tsx:383
+#: src/features/auth/components/auth/auth-card.tsx:385
 msgid "Please enter your one-time password to continue"
 msgstr "続行するにはワンタイムパスワードを入力してください"
 
@@ -23549,7 +23592,7 @@ msgstr "プレミアムクラスの推論と指示追従"
 msgid "Premium-tier reasoning transparency"
 msgstr "プレミアムクラスの推論の透明性"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:122
+#: src/features/chat/thread/ask-user-prompt.tsx:305
 msgid "Preparing a question…"
 msgstr "質問を準備中…"
 
@@ -24674,7 +24717,7 @@ msgstr "読み取り専用プレビュー - 編集するにはフォークして
 msgid "Read-only shared conversation"
 msgstr "読み取り専用の共有会話"
 
-#: src/features/chat/thread/composer-input.tsx:266
+#: src/features/chat/thread/composer-input.tsx:267
 msgid "Reading \"{attachmentName}\"…"
 msgstr "「{attachmentName}」を読み込んでいます…"
 
@@ -24943,7 +24986,7 @@ msgstr "音声入力を録音しています"
 msgid "Recover account"
 msgstr "アカウントを復旧"
 
-#: src/features/auth/components/auth/auth-card.tsx:353
+#: src/features/auth/components/auth/auth-card.tsx:355
 msgid "Recover Account"
 msgstr "アカウントを復旧"
 
@@ -25134,7 +25177,7 @@ msgstr "リージョンの制限"
 msgid "Register it with Telegram's setWebhook, passing your webhook secret as secret_token."
 msgstr "Telegram の setWebhook で登録し、Webhook シークレットを secret_token として渡してください。"
 
-#: src/features/auth/components/auth/auth-card.tsx:371
+#: src/features/auth/components/auth/auth-card.tsx:373
 msgid "Registration is by invitation only. Open the link from your invitation, or sign in if you already have an account."
 msgstr "登録は招待制です。招待のリンクを開くか、アカウントをお持ちの場合はサインインしてください。"
 
@@ -25259,7 +25302,7 @@ msgstr "相手のバージョンを再読み込み"
 msgid "remember"
 msgstr ""
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:391
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:400
 msgid "Remember me"
 msgstr "サインイン状態を保持"
 
@@ -25267,10 +25310,10 @@ msgstr "サインイン状態を保持"
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:328
-#: src/features/chat/thread/composer-input.tsx:340
-#: src/features/chat/thread/composer-input.tsx:394
-#: src/features/chat/thread/composer-input.tsx:403
+#: src/features/chat/thread/composer-input.tsx:329
+#: src/features/chat/thread/composer-input.tsx:341
+#: src/features/chat/thread/composer-input.tsx:395
+#: src/features/chat/thread/composer-input.tsx:404
 #: src/features/devices/components/devices-settings.tsx:206
 #: src/features/devices/components/devices-settings.tsx:212
 #: src/features/projects/components/project-form-dialog.tsx:263
@@ -25293,10 +25336,11 @@ msgstr "「{0}」を削除しますか？"
 msgid "Remove “{0}”?"
 msgstr "「{0}」を削除しますか？"
 
+#. placeholder {0}: file.name
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
-#. placeholder {0}: variable.name
 #: src/features/chat/group/group-participant-bar.tsx:210
+#: src/features/chat/thread/ask-user-prompt.tsx:393
 #: src/features/prompts/components/thread-variables-config.tsx:232
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
@@ -25768,7 +25812,7 @@ msgstr ""
 msgid "Reset password"
 msgstr "パスワードをリセット"
 
-#: src/features/auth/components/auth/auth-card.tsx:359
+#: src/features/auth/components/auth/auth-card.tsx:361
 #: src/routes/auth/reset-password.tsx:13
 msgid "Reset Password"
 msgstr "パスワードをリセット"
@@ -25971,11 +26015,11 @@ msgstr "{retryAfterMinutes} 分後に再試行"
 msgid "Retry now"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:417
+#: src/features/chat/thread/composer-input.tsx:418
 msgid "Retry upload"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:412
+#: src/features/chat/thread/composer-input.tsx:413
 msgid "Retry upload of {attachmentName}"
 msgstr ""
 
@@ -26698,7 +26742,7 @@ msgstr "スコア"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "期待される回答またはルーブリックに照らして、各回答を 0〜100% で採点します。ケースごとに小規模なモデル呼び出しが追加されます。"
 
-#: src/features/chat/thread/composer-input.tsx:1136
+#: src/features/chat/thread/composer-input.tsx:1148
 msgid "Screen capture failed. Please try again."
 msgstr "画面のキャプチャに失敗しました。もう一度お試しください。"
 
@@ -26945,7 +26989,7 @@ msgstr ""
 msgid "Search thread titles..."
 msgstr "スレッドのタイトルを検索..."
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:143
+#: src/features/chat/signed-out/signed-out-chat.tsx:144
 #: src/features/chat/thread-list/thread-list-header.tsx:70
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:78
 msgid "Search threads"
@@ -27328,11 +27372,11 @@ msgstr "下にメッセージを送信して始めましょう"
 msgid "Send a message to begin"
 msgstr "メッセージを送信して始めましょう"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:421
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:430
 msgid "Send a new verification link"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:187
+#: src/features/chat/thread/ask-user-prompt.tsx:441
 msgid "Send answer"
 msgstr "回答を送信"
 
@@ -27915,8 +27959,8 @@ msgstr "サイドバーを右に"
 #: ../../packages/chat-ui/src/auth/login-form.tsx:43
 #: src/components/not-found.tsx:12
 #: src/components/settings/settings-modal.tsx:163
-#: src/features/auth/components/auth/auth-card.tsx:491
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:406
+#: src/features/auth/components/auth/auth-card.tsx:493
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:415
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/marketing/components/landing-page.tsx:1058
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
@@ -27955,7 +27999,7 @@ msgstr ""
 msgid "Sign in to fork this workflow"
 msgstr "このワークフローをフォークするにはサインインしてください"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:273
+#: src/features/chat/signed-out/signed-out-chat.tsx:274
 msgid "Sign in to see your chats."
 msgstr "サインインするとチャットが表示されます。"
 
@@ -27989,11 +28033,11 @@ msgstr "利用するにはアカウントにサインインしてください。
 msgid "Sign in with {0}"
 msgstr "{0} でサインイン"
 
-#: src/features/auth/components/auth/email-otp-button.tsx:32
+#: src/features/auth/components/auth/email-otp-button.tsx:35
 msgid "Sign in with email code"
 msgstr "メールコードでサインイン"
 
-#: src/features/auth/components/auth/magic-link-button.tsx:32
+#: src/features/auth/components/auth/magic-link-button.tsx:35
 msgid "Sign in with magic link"
 msgstr "マジックリンクでサインイン"
 
@@ -28001,8 +28045,8 @@ msgstr "マジックリンクでサインイン"
 msgid "Sign in with passkey"
 msgstr "パスキーでサインイン"
 
-#: src/features/auth/components/auth/email-otp-button.tsx:32
-#: src/features/auth/components/auth/magic-link-button.tsx:32
+#: src/features/auth/components/auth/email-otp-button.tsx:35
+#: src/features/auth/components/auth/magic-link-button.tsx:35
 msgid "Sign in with password"
 msgstr "パスワードでサインイン"
 
@@ -28017,13 +28061,13 @@ msgstr "サインアウト"
 msgid "Sign out of {0}"
 msgstr "{0} からサインアウト"
 
-#: src/features/auth/components/auth/auth-card.tsx:491
+#: src/features/auth/components/auth/auth-card.tsx:493
 #: src/features/marketing/components/landing-page.tsx:332
 #: src/features/marketing/components/landing-page.tsx:350
 msgid "Sign up"
 msgstr "サインアップ"
 
-#: src/features/auth/components/auth/auth-card.tsx:378
+#: src/features/auth/components/auth/auth-card.tsx:380
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:678
 #: src/routes/auth/sign-up.tsx:26
 msgid "Sign Up"
@@ -28050,7 +28094,7 @@ msgstr "サインインの有効期限が切れました"
 msgid "Sign-out failed. Please try again."
 msgstr "サインアウトに失敗しました。もう一度お試しください。"
 
-#: src/features/auth/components/auth/auth-card.tsx:372
+#: src/features/auth/components/auth/auth-card.tsx:374
 msgid "Sign-up needs an invitation"
 msgstr "登録には招待が必要です"
 
@@ -29685,7 +29729,7 @@ msgstr "テック系 YouTube チャンネルの動画アイデアを提案する
 msgid "Suggested"
 msgstr "おすすめ"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:159
+#: src/features/chat/thread/ask-user-prompt.tsx:353
 #: src/features/skills/components/skill-builder-dialog.tsx:235
 msgid "Suggested answers"
 msgstr "回答の候補"
@@ -30276,7 +30320,7 @@ msgid "Temporary chat"
 msgstr "一時チャット"
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:293
-#: src/features/chat/signed-out/signed-out-chat.tsx:309
+#: src/features/chat/signed-out/signed-out-chat.tsx:299
 msgid "Temporary Chat"
 msgstr "一時チャット"
 
@@ -30418,7 +30462,7 @@ msgstr "テキストの方向を LTR に設定しました"
 msgid "Text direction set to RTL"
 msgstr "テキストの方向を RTL に設定しました"
 
-#: src/features/chat/thread/composer-input.tsx:302
+#: src/features/chat/thread/composer-input.tsx:303
 msgid "Text document"
 msgstr "テキストドキュメント"
 
@@ -30641,7 +30685,7 @@ msgstr "アーカイブに安全でないファイルパスが含まれていま
 msgid "The archive holds too many files."
 msgstr "アーカイブに含まれるファイルが多すぎます。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:141
+#: src/features/chat/thread/ask-user-prompt.tsx:327
 msgid "The assistant has a question"
 msgstr "アシスタントから質問があります"
 
@@ -31008,7 +31052,7 @@ msgstr "ページには相手のバージョンが表示されています。残
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "ページ、すべてのサブページ、コメント、バージョン履歴が削除されます。この操作は元に戻せません。"
 
-#: src/features/chat/thread/composer-input.tsx:887
+#: src/features/chat/thread/composer-input.tsx:890
 msgid "The pasted text could not be attached and was not inserted."
 msgstr ""
 
@@ -31120,7 +31164,7 @@ msgstr ""
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "モダンな AI アプリケーションのための統合 LLM ゲートウェイ。"
 
-#: src/features/chat/thread/composer-input.tsx:566
+#: src/features/chat/thread/composer-input.tsx:569
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "「{fileName}」のアップロードの有効期限が切れました。もう一度添付してください。"
 
@@ -32083,7 +32127,6 @@ msgstr "右サイドバーの切り替え（{0}）"
 #: ../../packages/ui/src/components/sidebar.tsx:358
 #: ../../packages/ui/src/components/sidebar.tsx:380
 #: ../../packages/ui/src/components/sidebar.tsx:394
-#: src/features/chat/signed-out/signed-out-chat.tsx:297
 msgid "Toggle Sidebar"
 msgstr "サイドバーを切り替え"
 
@@ -32140,6 +32183,11 @@ msgstr ""
 #: src/features/chat/thread/sandbox-files.tsx:278
 msgid "too large"
 msgstr "大きすぎます"
+
+#. placeholder {0}: tooLarge.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:277
+msgid "Too large to attach: {0}. Reduce the file and attach it again."
+msgstr "大きすぎて添付できません: {0}。ファイルを小さくしてから、もう一度添付してください。"
 
 #: src/features/workflow/components/nodes/text-node.tsx:78
 msgid "Too long to check as JSON"
@@ -32638,7 +32686,7 @@ msgstr "2 つの接続方法"
 msgid "Two-factor authentication"
 msgstr "二要素認証"
 
-#: src/features/auth/components/auth/auth-card.tsx:384
+#: src/features/auth/components/auth/auth-card.tsx:386
 #: src/features/auth/components/settings/two-factor/two-factor-card.tsx:49
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:126
 #: src/routes/auth/two-factor/index.tsx:13
@@ -32689,12 +32737,12 @@ msgstr ""
 msgid "Type to search"
 msgstr "入力して検索"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:176
+#: src/features/chat/thread/ask-user-prompt.tsx:377
 msgid "Type your answer…"
 msgstr "回答を入力…"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:248
-#: src/features/chat/thread/composer-input.tsx:1515
+#: src/features/chat/signed-out/signed-out-chat.tsx:249
+#: src/features/chat/thread/composer-input.tsx:1527
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:182
 msgid "Type your message..."
 msgstr "メッセージを入力..."
@@ -32857,7 +32905,7 @@ msgstr "内部の仕組み"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:48
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:64
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:811
+#: src/features/chat/thread/composer-input.tsx:814
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "元に戻す"
@@ -33085,7 +33133,7 @@ msgstr "あらゆるライブラリやフレームワークの最新ドキュメ
 msgid "Update Duration"
 msgstr "期間を更新"
 
-#: src/features/chat/thread/composer-input.tsx:1372
+#: src/features/chat/thread/composer-input.tsx:1384
 msgid "Update failed"
 msgstr "更新に失敗しました"
 
@@ -33273,14 +33321,14 @@ msgstr "CSV をアップロードし、Python で分析してグラフをエク�
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "ドキュメントをナレッジベースにアップロードし、コレクションにまとめます。AI は関連するコンテキストを検索し、使用したパッセージを引用します。"
 
-#: src/features/chat/thread/composer-input.tsx:409
-#: src/features/chat/thread/composer-input.tsx:611
-#: src/features/chat/thread/composer-input.tsx:1293
+#: src/features/chat/thread/composer-input.tsx:410
+#: src/features/chat/thread/composer-input.tsx:614
+#: src/features/chat/thread/composer-input.tsx:1305
 msgid "Upload failed"
 msgstr "アップロードに失敗しました"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1286
+#: src/features/chat/thread/composer-input.tsx:1298
 msgid "Upload failed: {0}"
 msgstr ""
 
@@ -33330,7 +33378,7 @@ msgstr "アップロード済み"
 msgid "Uploaded {fileName}"
 msgstr "{fileName} をアップロードしました"
 
-#: src/features/chat/thread/composer-input.tsx:346
+#: src/features/chat/thread/composer-input.tsx:347
 msgid "Uploading {attachmentName}"
 msgstr "{attachmentName} をアップロードしています"
 
@@ -33621,18 +33669,18 @@ msgstr "ユーザーの組織"
 msgid "User's role"
 msgstr "ユーザーのロール"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:77
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:83
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:504
 #: src/features/auth/components/settings/account/update-username-card.tsx:28
 msgid "Username"
 msgstr "ユーザー名"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:107
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:113
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:171
 msgid "Username is required"
 msgstr "ユーザー名は必須です"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:115
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:121
 msgid "Username or email is required"
 msgstr "ユーザー名またはメールアドレスは必須です"
 
@@ -33808,7 +33856,7 @@ msgstr "確認コードをメールで送信しました"
 msgid "Verification could not run, so nobody has checked this result. Review the answer yourself: approve it as is, reject it, or send it back with a note."
 msgstr "検証を実行できなかったため、この結果は誰もチェックしていません。回答をご自身で確認し、そのまま承認するか、却下するか、メモを付けて差し戻してください。"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:292
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:301
 #: src/features/auth/components/settings/security/change-email-card.tsx:105
 msgid "Verification email sent"
 msgstr "確認メールを送信しました"
@@ -34439,7 +34487,7 @@ msgstr ""
 msgid "Waiting for the owner"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:124
+#: src/features/chat/thread/ask-user-prompt.tsx:307
 msgid "Waiting for the owner to answer"
 msgstr "オーナーの回答を待っています"
 
@@ -34460,7 +34508,7 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
-#: src/features/chat/thread/ask-user-prompt.tsx:124
+#: src/features/chat/thread/ask-user-prompt.tsx:307
 msgid "Waiting for your answer"
 msgstr "あなたの回答を待っています"
 
@@ -34639,7 +34687,7 @@ msgstr "週間の増加"
 msgid "Weight"
 msgstr "太さ"
 
-#: src/features/auth/components/auth/auth-card.tsx:365
+#: src/features/auth/components/auth/auth-card.tsx:367
 msgid "Welcome back"
 msgstr "おかえりなさい"
 
@@ -35406,7 +35454,7 @@ msgstr "アカウントと関連するすべてのデータを削除していま
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "あなたの AI ワークスペースは<0>ここから始まります。</0>"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:168
+#: src/features/chat/thread/ask-user-prompt.tsx:369
 msgid "Your answer"
 msgstr "あなたの回答"
 
@@ -35414,7 +35462,7 @@ msgstr "あなたの回答"
 msgid "Your answer in Neore has finished."
 msgstr "Neore での回答が完了しました。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:151
+#: src/features/chat/thread/ask-user-prompt.tsx:337
 msgid "Your answer:"
 msgstr "あなたの回答："
 
@@ -35504,12 +35552,12 @@ msgid "Your First Chat"
 msgstr "はじめてのチャット"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:671
+#: src/features/chat/thread/composer-input.tsx:674
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "入力が大きく（約 {0} トークン）、モデルのコンテキストウィンドウのかなりの部分を消費します。"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:664
+#: src/features/chat/thread/composer-input.tsx:667
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "入力が大きすぎ（約 {0} トークン）、モデルのコンテキストウィンドウを超えています。送信するには、メッセージを短くするか添付ファイルを削除してください。"
 

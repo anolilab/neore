@@ -52,23 +52,23 @@ msgstr "“{0}” 中有变量需要填写。"
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "“{0}” 将在其依赖项完成后开始"
 
-#: src/features/chat/thread/composer-input.tsx:572
+#: src/features/chat/thread/composer-input.tsx:575
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "无法附加“{fileName}”：不支持此文件类型。"
 
-#: src/features/chat/thread/composer-input.tsx:565
+#: src/features/chat/thread/composer-input.tsx:568
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "无法附加“{fileName}”：文件内容与其文件类型不符。"
 
-#: src/features/chat/thread/composer-input.tsx:567
+#: src/features/chat/thread/composer-input.tsx:570
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "无法上传“{fileName}”。请检查你的网络连接，然后重试。"
 
-#: src/features/chat/thread/composer-input.tsx:570
+#: src/features/chat/thread/composer-input.tsx:573
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。文档最大为 {maxMegabytes} MB。"
 
-#: src/features/chat/thread/composer-input.tsx:571
+#: src/features/chat/thread/composer-input.tsx:574
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。此类文件最大为 {maxMegabytes} MB。"
 
@@ -3124,7 +3124,7 @@ msgstr "Alloy（中性）"
 msgid "Alphabetical"
 msgstr "按字母顺序"
 
-#: src/features/auth/components/auth/auth-card.tsx:437
+#: src/features/auth/components/auth/auth-card.tsx:439
 msgid "Already have an account?"
 msgstr "已有账号？"
 
@@ -3316,7 +3316,7 @@ msgstr "回复 WeChat 公众号的消息（安全模式）。Beta：尚未在真
 msgid "Answer ready"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:120
+#: src/features/chat/thread/ask-user-prompt.tsx:303
 msgid "Answer sent — continuing"
 msgstr "已发送回答 — 正在继续"
 
@@ -3324,7 +3324,7 @@ msgstr "已发送回答 — 正在继续"
 msgid "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 msgstr "通过你的 WhatsApp Business 号码回复 WhatsApp 消息（Meta Cloud API）。回复遵循 WhatsApp 的 24 小时规则。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:116
+#: src/features/chat/thread/ask-user-prompt.tsx:299
 msgid "Answered"
 msgstr "已回答"
 
@@ -3843,13 +3843,33 @@ msgstr ""
 msgid "Attach as file"
 msgstr ""
 
+#: src/features/chat/thread/ask-user-prompt.tsx:437
+msgid "Attach file"
+msgstr "附加文件"
+
 #: src/features/chat/header/kb-attachment-button.tsx:187
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "附加文件或整个集合，供 AI 在此对话中参考和引用。"
 
+#: src/features/chat/thread/ask-user-prompt.tsx:388
+msgid "Attached files"
+msgstr "已附加的文件"
+
 #: ../../packages/chat-ui/src/chat/message-item.tsx:121
 msgid "Attached image"
 msgstr "附加的图片"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:344
+msgid "Attached:"
+msgstr "已附加："
+
+#: src/features/chat/thread/ask-user-prompt.tsx:425
+msgid "Attaching files…"
+msgstr "正在附加文件…"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:437
+msgid "Attaching…"
+msgstr "正在附加…"
 
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 msgid "Attachment"
@@ -3928,7 +3948,7 @@ msgstr "奥地利"
 msgid "Auth"
 msgstr "身份验证"
 
-#: src/features/auth/components/auth/auth-card.tsx:390
+#: src/features/auth/components/auth/auth-card.tsx:392
 #: src/features/settings/components/chat/native-providers-settings.tsx:575
 msgid "Authentication"
 msgstr "身份验证"
@@ -4932,7 +4952,7 @@ msgstr "保加利亚语"
 msgid "Bulgarian (Bulgaria)"
 msgstr "保加利亚语（保加利亚）"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:155
+#: src/features/chat/signed-out/signed-out-chat.tsx:156
 #: src/features/chat/thread-list/thread-list-header.tsx:167
 #: src/features/chat/thread-list/thread-list-header.tsx:178
 msgid "Bulk actions"
@@ -6060,7 +6080,7 @@ msgstr "点击任意消息上的图钉图标即可保存到这里。"
 msgid "Click the star on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型的星标即可将其添加到这里。"
 
-#: src/features/chat/thread/composer-input.tsx:302
+#: src/features/chat/thread/composer-input.tsx:303
 msgid "Click to edit"
 msgstr "点击编辑"
 
@@ -7274,7 +7294,7 @@ msgstr "上下文召回率"
 msgid "Context that never resets"
 msgstr "永不重置的上下文"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:196
+#: src/features/chat/signed-out/signed-out-chat.tsx:197
 #: src/features/chat/thread/composer-context-count.tsx:116
 msgid "Context Usage"
 msgstr "上下文用量"
@@ -7415,8 +7435,8 @@ msgstr ""
 msgid "Conversations on lines this diff no longer shows"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:751
-#: src/features/chat/thread/composer-input.tsx:1315
+#: src/features/chat/thread/composer-input.tsx:754
+#: src/features/chat/thread/composer-input.tsx:1327
 msgid "Conversion failed"
 msgstr "转换失败"
 
@@ -7712,7 +7732,17 @@ msgstr ""
 msgid "Could not apply the changes"
 msgstr "无法应用更改"
 
-#: src/features/chat/thread/composer-input.tsx:1337
+#. placeholder {0}: failed.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:283
+msgid "Could not attach {0}. The other files were attached; try those again."
+msgstr "无法附加 {0}。其他文件已附加；请重试这些文件。"
+
+#. placeholder {0}: failed.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:284
+msgid "Could not attach {0}. Try those again."
+msgstr "无法附加 {0}。请重试。"
+
+#: src/features/chat/thread/composer-input.tsx:1349
 msgid "Could not attach the chat"
 msgstr "无法附加该聊天"
 
@@ -7730,7 +7760,7 @@ msgstr "无法取消运行。"
 
 #: src/features/chat/thread/composer-model-selector.tsx:127
 msgid "Could not change Auto. Please try again."
-msgstr ""
+msgstr "无法更改 Auto。请重试。"
 
 #: src/features/notifications/components/notification-settings.tsx:169
 msgid "Could not change push notifications. Try again."
@@ -7739,7 +7769,7 @@ msgstr "无法更改推送通知，请重试。"
 #: src/features/chat/model-settings/use-model-combobox.ts:283
 #: src/features/chat/model-settings/use-model-combobox.ts:307
 msgid "Could not change the model. Please try again."
-msgstr ""
+msgstr "无法更改模型。请重试。"
 
 #: src/features/devices/components/device-scope.tsx:46
 msgid "Could not change where this device is offered."
@@ -7920,11 +7950,11 @@ msgstr ""
 msgid "Could not reach the server. Try again."
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:1340
+#: src/features/chat/thread/composer-input.tsx:1352
 msgid "Could not read that chat"
 msgstr "无法读取该聊天"
 
-#: src/features/chat/thread/composer-input.tsx:1341
+#: src/features/chat/thread/composer-input.tsx:1353
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 
@@ -7994,7 +8024,7 @@ msgstr ""
 msgid "Could not send your answer."
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:83
+#: src/features/chat/thread/ask-user-prompt.tsx:147
 #: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "无法发送你的答复，请重试。"
@@ -8263,7 +8293,7 @@ msgstr "创建组织"
 msgid "Create PR"
 msgstr "创建 PR"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:146
+#: src/features/chat/signed-out/signed-out-chat.tsx:147
 #: src/features/chat/thread-list/thread-list-header.tsx:127
 #: src/features/chat/thread-list/thread-list-header.tsx:137
 msgid "Create project"
@@ -9842,7 +9872,7 @@ msgstr "Discord 公钥"
 
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:54
 #: src/features/changelog/components/changelog-card.tsx:59
-#: src/features/chat/thread/ask-user-prompt.tsx:191
+#: src/features/chat/thread/ask-user-prompt.tsx:445
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:202
@@ -9878,7 +9908,7 @@ msgstr "关闭 Webhook 密钥"
 msgid "Dismissed"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:118
+#: src/features/chat/thread/ask-user-prompt.tsx:301
 msgid "Dismissed — continuing without an answer"
 msgstr "已忽略 — 在没有回答的情况下继续"
 
@@ -9983,7 +10013,7 @@ msgstr "不重复"
 msgid "Dominican Republic"
 msgstr "多米尼加共和国"
 
-#: src/features/auth/components/auth/auth-card.tsx:433
+#: src/features/auth/components/auth/auth-card.tsx:435
 msgid "Don't have an account?"
 msgstr "还没有账号？"
 
@@ -10218,7 +10248,7 @@ msgstr "拖放文件或点击上传"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1525
+#: src/features/chat/thread/composer-input.tsx:1537
 msgid "Drop files here"
 msgstr "将文件拖放到此处"
 
@@ -10494,8 +10524,8 @@ msgstr "编辑集合"
 msgid "Edit comment"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:309
-#: src/features/chat/thread/composer-input.tsx:321
+#: src/features/chat/thread/composer-input.tsx:310
+#: src/features/chat/thread/composer-input.tsx:322
 msgid "Edit content"
 msgstr "编辑内容"
 
@@ -10794,7 +10824,7 @@ msgstr ""
 #: src/features/auth/components/auth/forms/email-otp-form.tsx:232
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:107
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:124
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:84
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:90
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:529
 #: src/features/auth/components/organization/invite-member-dialog.tsx:108
 msgid "Email"
@@ -10809,7 +10839,7 @@ msgstr "邮箱地址"
 msgid "Email banner"
 msgstr "邮件横幅"
 
-#: src/features/auth/components/auth/auth-card.tsx:335
+#: src/features/auth/components/auth/auth-card.tsx:337
 msgid "Email Code"
 msgstr "邮箱验证码"
 
@@ -10826,7 +10856,7 @@ msgstr "邮件主视觉"
 msgid "Email is the same"
 msgstr "邮箱未改变"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:81
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:87
 msgid "Email or Username"
 msgstr "邮箱或用户名"
 
@@ -11043,7 +11073,7 @@ msgid "English (UK)"
 msgstr "英语（英国）"
 
 #: src/features/chat/core/utils/language-utilities.ts:151
-#: src/features/chat/signed-out/signed-out-chat.tsx:177
+#: src/features/chat/signed-out/signed-out-chat.tsx:178
 #: src/features/chat/thread/composer-language-selector.tsx:102
 msgid "English (US)"
 msgstr "英语（美国）"
@@ -11192,7 +11222,7 @@ msgstr "请输入 API 密钥"
 msgid "Enter the endpoint URL first"
 msgstr "请先输入端点 URL"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:182
+#: src/features/chat/thread/ask-user-prompt.tsx:411
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "按 Enter 发送，按 Shift+Enter 换行。"
 
@@ -11228,7 +11258,7 @@ msgstr "在此输入你的自定义系统提示词。它将用于每一条消息
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:188
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:118
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:135
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:96
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:102
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:540
 msgid "Enter your email"
 msgstr "输入你的邮箱"
@@ -11238,23 +11268,23 @@ msgstr "输入你的邮箱"
 msgid "Enter your email address"
 msgstr "输入你的邮箱地址"
 
-#: src/features/auth/components/auth/auth-card.tsx:364
+#: src/features/auth/components/auth/auth-card.tsx:366
 msgid "Enter your email below to login to your account"
 msgstr "在下方输入邮箱以登录你的账号"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:93
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:99
 msgid "Enter your email or username"
 msgstr "输入你的邮箱或用户名"
 
-#: src/features/auth/components/auth/auth-card.tsx:334
+#: src/features/auth/components/auth/auth-card.tsx:336
 msgid "Enter your email to receive a code"
 msgstr "输入邮箱以接收验证码"
 
-#: src/features/auth/components/auth/auth-card.tsx:346
+#: src/features/auth/components/auth/auth-card.tsx:348
 msgid "Enter your email to receive a magic link"
 msgstr "输入邮箱以接收魔法链接"
 
-#: src/features/auth/components/auth/auth-card.tsx:340
+#: src/features/auth/components/auth/auth-card.tsx:342
 msgid "Enter your email to reset your password"
 msgstr "输入邮箱以重置密码"
 
@@ -11262,7 +11292,7 @@ msgstr "输入邮箱以重置密码"
 msgid "Enter your full name or display name"
 msgstr "输入你的全名或显示名称"
 
-#: src/features/auth/components/auth/auth-card.tsx:377
+#: src/features/auth/components/auth/auth-card.tsx:379
 msgid "Enter your information to create an account"
 msgstr "输入你的信息以创建账号"
 
@@ -11279,7 +11309,7 @@ msgstr "输入你的名字"
 msgid "Enter your new email address below"
 msgstr "在下方输入你的新邮箱地址"
 
-#: src/features/auth/components/auth/auth-card.tsx:358
+#: src/features/auth/components/auth/auth-card.tsx:360
 msgid "Enter your new password below"
 msgstr "在下方输入你的新密码"
 
@@ -11288,7 +11318,7 @@ msgid "Enter your nickname"
 msgstr "输入你的昵称"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:210
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:369
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:378
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:566
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:157
 msgid "Enter your password"
@@ -11318,7 +11348,7 @@ msgstr "在此输入提示词内容... 使用 {VARIABLE_PLACEHOLDER} 表示动�
 msgid "Enter your title instructions..."
 msgstr ""
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:89
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:95
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:515
 #: src/features/auth/components/settings/account/update-username-card.tsx:30
 msgid "Enter your username"
@@ -12133,7 +12163,7 @@ msgid "Failed to attach collection"
 msgstr "附加集合失败"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1177
+#: src/features/chat/thread/composer-input.tsx:1189
 msgid "Failed to attach file"
 msgstr "附加文件失败"
 
@@ -12530,7 +12560,7 @@ msgstr "请求导出失败"
 msgid "Failed to reset to defaults"
 msgstr "恢复默认设置失败"
 
-#: src/features/chat/thread/composer-input.tsx:1209
+#: src/features/chat/thread/composer-input.tsx:1221
 msgid "Failed to restore attachment"
 msgstr "恢复附件失败"
 
@@ -13330,6 +13360,10 @@ msgstr "文件名不能为空"
 msgid "Files"
 msgstr ""
 
+#: src/features/chat/thread/ask-user-prompt.tsx:427
+msgid "Files cannot be attached in a locked chat."
+msgstr "锁定的聊天中无法附加文件。"
+
 #: src/features/chat/thread/host-changes.tsx:50
 msgid "Files changed by this turn"
 msgstr ""
@@ -13708,13 +13742,13 @@ msgstr ""
 msgid "Forgot authenticator"
 msgstr "忘记身份验证器"
 
-#: src/features/auth/components/auth/auth-card.tsx:341
+#: src/features/auth/components/auth/auth-card.tsx:343
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:134
 #: src/routes/auth/forgot-password.tsx:17
 msgid "Forgot Password"
 msgstr "忘记密码"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:357
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:366
 msgid "Forgot password?"
 msgstr "忘记密码？"
 
@@ -14491,7 +14525,7 @@ msgid "Global analyst research, market analysis, and investment data"
 msgstr "全球分析师研究、市场分析和投资数据"
 
 #: ../../packages/chat-ui/src/chat/chat-view.tsx:96
-#: src/features/auth/components/auth/auth-card.tsx:495
+#: src/features/auth/components/auth/auth-card.tsx:497
 msgid "Go back"
 msgstr "返回"
 
@@ -15109,7 +15143,7 @@ msgstr "高度"
 msgid "Hello {0}! What would you like to do today?"
 msgstr "你好，{0}！今天想做点什么？"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:115
+#: src/features/chat/signed-out/signed-out-chat.tsx:116
 #: src/features/layout/components/mobile-section-nav.tsx:72
 #: src/features/layout/components/sidebar-shortcut.tsx:301
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:113
@@ -16383,7 +16417,7 @@ msgstr "OAuth 回调无效"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:77
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:57
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:83
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:144
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:150
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:122
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:151
 #: src/features/auth/components/settings/security/change-password-card.tsx:73
@@ -16795,7 +16829,7 @@ msgid "Key file (optional, absolute path)"
 msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
-#: src/features/chat/signed-out/signed-out-chat.tsx:152
+#: src/features/chat/signed-out/signed-out-chat.tsx:153
 #: src/features/chat/thread-list/thread-list-header.tsx:146
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:122
 #: src/features/workflow/components/canvas/workflow-controls.tsx:374
@@ -17897,7 +17931,7 @@ msgstr ""
 #: src/features/settings/components/chat/trigger-settings.tsx:958
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
-#: src/routes/_shortcut.tsx:16
+#: src/routes/_shortcut.tsx:17
 msgid "Loading..."
 msgstr "正在加载..."
 
@@ -17988,7 +18022,7 @@ msgid "Log out"
 msgstr "退出登录"
 
 #: src/features/auth/components/auth/login-modal.tsx:46
-#: src/features/chat/signed-out/signed-out-chat.tsx:283
+#: src/features/chat/signed-out/signed-out-chat.tsx:284
 #: src/features/layout/components/app-sidebar.tsx:54
 #: src/features/layout/components/app-sidebar.tsx:67
 #: src/features/marketing/components/gateway-navbar.tsx:90
@@ -18058,7 +18092,7 @@ msgstr "检测到长文本"
 msgid "Long text generation in images"
 msgstr "图像中的长文本生成"
 
-#: src/features/chat/thread/composer-input.tsx:809
+#: src/features/chat/thread/composer-input.tsx:812
 msgid "Long text was attached as a file."
 msgstr ""
 
@@ -18189,7 +18223,7 @@ msgstr "微距长焦，紧凑构图"
 msgid "Madrid"
 msgstr "马德里"
 
-#: src/features/auth/components/auth/auth-card.tsx:347
+#: src/features/auth/components/auth/auth-card.tsx:349
 msgid "Magic Link"
 msgstr "魔法链接"
 
@@ -19890,7 +19924,7 @@ msgstr "neore"
 msgid "Neore"
 msgstr "Neore"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:89
+#: src/features/chat/signed-out/signed-out-chat.tsx:90
 #: src/features/layout/components/sidebar-shortcut.tsx:238
 #: src/features/marketing/components/navbar-menu.tsx:44
 msgid "Neore - AI Text & Video & Audio & Image & Documents Generation Platform"
@@ -20064,7 +20098,7 @@ msgstr "新聊天"
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:46
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
 #: src/features/chat/header/chat-header.tsx:30
-#: src/features/chat/signed-out/signed-out-chat.tsx:315
+#: src/features/chat/signed-out/signed-out-chat.tsx:305
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:239
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:115
 #: src/features/settings/lib/settings-keywords.ts:37
@@ -20109,7 +20143,7 @@ msgstr "新建目标"
 #: src/features/chat/group/create-group-chat-button.tsx:115
 #: src/features/chat/group/create-group-chat-button.tsx:120
 #: src/features/chat/group/create-group-chat-button.tsx:129
-#: src/features/chat/signed-out/signed-out-chat.tsx:149
+#: src/features/chat/signed-out/signed-out-chat.tsx:150
 msgid "New group chat"
 msgstr "新建群聊"
 
@@ -20185,7 +20219,7 @@ msgstr "本周新增"
 msgid "New thread"
 msgstr "新建对话"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:140
+#: src/features/chat/signed-out/signed-out-chat.tsx:141
 #: src/features/chat/thread-list/thread-list-header.tsx:99
 msgid "New Thread"
 msgstr "新建对话"
@@ -20903,7 +20937,7 @@ msgstr "此分组中没有对话"
 msgid "No threads were active in that date range."
 msgstr ""
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:272
+#: src/features/chat/signed-out/signed-out-chat.tsx:273
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1065
 msgid "No threads yet"
 msgstr "还没有对话"
@@ -21130,6 +21164,11 @@ msgstr ""
 #: src/features/settings/components/privacy/data-access.tsx:36
 msgid "Not set"
 msgstr "未设置"
+
+#. placeholder {0}: unreadFiles.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:348
+msgid "Not shown to this model: {0}"
+msgstr "未向此模型展示：{0}"
 
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:75
 msgid "Not started"
@@ -21536,6 +21575,10 @@ msgstr "只有组织所有者才能管理账单设置"
 msgid "Only participants you @mention answer."
 msgstr "只有你 @提及 的参与者才会回答。"
 
+#: src/features/chat/thread/ask-user-prompt.tsx:193
+msgid "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
+msgstr "仅支持 PNG、JPEG、WEBP 或 GIF 图片，以及不超过 10 MB 的 PDF；总计不超过 20 MB，最多 4 个。"
+
 #: src/features/settings/components/chat/trigger-settings.tsx:263
 msgid "Only post when there is something to report"
 msgstr ""
@@ -21767,7 +21810,7 @@ msgstr "打开搜索"
 msgid "Open settings"
 msgstr "打开设置"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:112
+#: src/features/chat/signed-out/signed-out-chat.tsx:113
 #: src/features/layout/components/sidebar-shortcut.tsx:282
 msgid "Open Settings"
 msgstr "打开设置"
@@ -21870,7 +21913,7 @@ msgstr ""
 msgid "Open thread"
 msgstr "打开对话"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:118
+#: src/features/chat/signed-out/signed-out-chat.tsx:119
 #: src/features/layout/components/sidebar-shortcut.tsx:221
 #: src/features/layout/components/sidebar-shortcut.tsx:328
 msgid "Open user menu"
@@ -22296,7 +22339,7 @@ msgstr "或点击浏览"
 msgid "Or connect a Text node to provide the prompt"
 msgstr "或连接一个文本节点来提供提示词"
 
-#: src/features/auth/components/auth/auth-card.tsx:217
+#: src/features/auth/components/auth/auth-card.tsx:219
 msgid "or continue with"
 msgstr "或使用以下方式继续"
 
@@ -22308,7 +22351,7 @@ msgstr ""
 msgid "Or from a terminal:"
 msgstr "或在终端中："
 
-#: src/features/chat/thread/ask-user-prompt.tsx:176
+#: src/features/chat/thread/ask-user-prompt.tsx:377
 msgid "Or type your own answer…"
 msgstr "或输入你自己的回答…"
 
@@ -22754,7 +22797,7 @@ msgstr "通行密钥让你可以使用设备的生物识别或安全密钥安全
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:84
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:201
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:350
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
 msgid "Password"
@@ -22765,7 +22808,7 @@ msgid "Password changed successfully"
 msgstr "密码已修改"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:60
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:127
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:133
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:105
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:42
 msgid "Password is required"
@@ -22774,7 +22817,7 @@ msgstr "请输入密码"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:71
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:51
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:77
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:138
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:144
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:116
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:145
 #: src/features/auth/components/settings/security/change-password-card.tsx:67
@@ -22786,7 +22829,7 @@ msgstr "密码过长"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:65
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:45
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:71
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:132
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:138
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:110
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:139
 #: src/features/auth/components/settings/security/change-password-card.tsx:61
@@ -23254,7 +23297,7 @@ msgstr "播放"
 msgid "Play a short sound when a reply finishes. Applies to this browser only."
 msgstr "回复完成时播放短提示音。仅适用于此浏览器。"
 
-#: src/features/auth/components/auth/auth-card.tsx:389
+#: src/features/auth/components/auth/auth-card.tsx:391
 msgid "Please authenticate to continue"
 msgstr "请进行身份验证以继续"
 
@@ -23266,7 +23309,7 @@ msgstr "请查收邮件并点击验证链接"
 msgid "Please confirm your password"
 msgstr "请确认你的密码"
 
-#: src/features/auth/components/auth/auth-card.tsx:352
+#: src/features/auth/components/auth/auth-card.tsx:354
 msgid "Please enter a backup code to access your account"
 msgstr "请输入备用码以访问你的账号"
 
@@ -23274,7 +23317,7 @@ msgstr "请输入备用码以访问你的账号"
 msgid "Please enter an email address"
 msgstr "请输入电子邮件地址"
 
-#: src/features/auth/components/auth/auth-card.tsx:383
+#: src/features/auth/components/auth/auth-card.tsx:385
 msgid "Please enter your one-time password to continue"
 msgstr "请输入一次性密码以继续"
 
@@ -23549,7 +23592,7 @@ msgstr "高端级推理与指令遵循"
 msgid "Premium-tier reasoning transparency"
 msgstr "高端级推理透明度"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:122
+#: src/features/chat/thread/ask-user-prompt.tsx:305
 msgid "Preparing a question…"
 msgstr "正在准备问题…"
 
@@ -24674,7 +24717,7 @@ msgstr "只读预览——复刻后可编辑"
 msgid "Read-only shared conversation"
 msgstr "只读共享对话"
 
-#: src/features/chat/thread/composer-input.tsx:266
+#: src/features/chat/thread/composer-input.tsx:267
 msgid "Reading \"{attachmentName}\"…"
 msgstr "正在读取“{attachmentName}”…"
 
@@ -24943,7 +24986,7 @@ msgstr "正在录制语音输入"
 msgid "Recover account"
 msgstr "恢复账号"
 
-#: src/features/auth/components/auth/auth-card.tsx:353
+#: src/features/auth/components/auth/auth-card.tsx:355
 msgid "Recover Account"
 msgstr "恢复账号"
 
@@ -25134,7 +25177,7 @@ msgstr "地区限制"
 msgid "Register it with Telegram's setWebhook, passing your webhook secret as secret_token."
 msgstr "通过 Telegram 的 setWebhook 注册，并将你的 webhook 密钥作为 secret_token 传入。"
 
-#: src/features/auth/components/auth/auth-card.tsx:371
+#: src/features/auth/components/auth/auth-card.tsx:373
 msgid "Registration is by invitation only. Open the link from your invitation, or sign in if you already have an account."
 msgstr "仅限受邀注册。请打开邀请中的链接；如果已有账户，请登录。"
 
@@ -25259,7 +25302,7 @@ msgstr "重新加载对方的版本"
 msgid "remember"
 msgstr ""
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:391
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:400
 msgid "Remember me"
 msgstr "记住我"
 
@@ -25267,10 +25310,10 @@ msgstr "记住我"
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:328
-#: src/features/chat/thread/composer-input.tsx:340
-#: src/features/chat/thread/composer-input.tsx:394
-#: src/features/chat/thread/composer-input.tsx:403
+#: src/features/chat/thread/composer-input.tsx:329
+#: src/features/chat/thread/composer-input.tsx:341
+#: src/features/chat/thread/composer-input.tsx:395
+#: src/features/chat/thread/composer-input.tsx:404
 #: src/features/devices/components/devices-settings.tsx:206
 #: src/features/devices/components/devices-settings.tsx:212
 #: src/features/projects/components/project-form-dialog.tsx:263
@@ -25293,10 +25336,11 @@ msgstr "移除“{0}”？"
 msgid "Remove “{0}”?"
 msgstr "移除“{0}”？"
 
+#. placeholder {0}: file.name
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
-#. placeholder {0}: variable.name
 #: src/features/chat/group/group-participant-bar.tsx:210
+#: src/features/chat/thread/ask-user-prompt.tsx:393
 #: src/features/prompts/components/thread-variables-config.tsx:232
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
@@ -25768,7 +25812,7 @@ msgstr ""
 msgid "Reset password"
 msgstr "重置密码"
 
-#: src/features/auth/components/auth/auth-card.tsx:359
+#: src/features/auth/components/auth/auth-card.tsx:361
 #: src/routes/auth/reset-password.tsx:13
 msgid "Reset Password"
 msgstr "重置密码"
@@ -25971,11 +26015,11 @@ msgstr "{retryAfterMinutes} 分钟后重试"
 msgid "Retry now"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:417
+#: src/features/chat/thread/composer-input.tsx:418
 msgid "Retry upload"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:412
+#: src/features/chat/thread/composer-input.tsx:413
 msgid "Retry upload of {attachmentName}"
 msgstr ""
 
@@ -26698,7 +26742,7 @@ msgstr "得分"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "根据预期答案或评分标准为每个答案打 0–100% 的分。每个用例会额外调用一次小模型。"
 
-#: src/features/chat/thread/composer-input.tsx:1136
+#: src/features/chat/thread/composer-input.tsx:1148
 msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
@@ -26945,7 +26989,7 @@ msgstr ""
 msgid "Search thread titles..."
 msgstr "搜索对话标题..."
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:143
+#: src/features/chat/signed-out/signed-out-chat.tsx:144
 #: src/features/chat/thread-list/thread-list-header.tsx:70
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:78
 msgid "Search threads"
@@ -27328,11 +27372,11 @@ msgstr "在下方发送消息以开始"
 msgid "Send a message to begin"
 msgstr "发送一条消息开始"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:421
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:430
 msgid "Send a new verification link"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:187
+#: src/features/chat/thread/ask-user-prompt.tsx:441
 msgid "Send answer"
 msgstr "发送回答"
 
@@ -27915,8 +27959,8 @@ msgstr "右侧边栏"
 #: ../../packages/chat-ui/src/auth/login-form.tsx:43
 #: src/components/not-found.tsx:12
 #: src/components/settings/settings-modal.tsx:163
-#: src/features/auth/components/auth/auth-card.tsx:491
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:406
+#: src/features/auth/components/auth/auth-card.tsx:493
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:415
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/marketing/components/landing-page.tsx:1058
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
@@ -27955,7 +27999,7 @@ msgstr ""
 msgid "Sign in to fork this workflow"
 msgstr "登录以复刻此工作流"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:273
+#: src/features/chat/signed-out/signed-out-chat.tsx:274
 msgid "Sign in to see your chats."
 msgstr "登录以查看你的对话。"
 
@@ -27989,11 +28033,11 @@ msgstr "登录你的账户即可使用。"
 msgid "Sign in with {0}"
 msgstr "使用 {0} 登录"
 
-#: src/features/auth/components/auth/email-otp-button.tsx:32
+#: src/features/auth/components/auth/email-otp-button.tsx:35
 msgid "Sign in with email code"
 msgstr "使用邮箱验证码登录"
 
-#: src/features/auth/components/auth/magic-link-button.tsx:32
+#: src/features/auth/components/auth/magic-link-button.tsx:35
 msgid "Sign in with magic link"
 msgstr "使用魔法链接登录"
 
@@ -28001,8 +28045,8 @@ msgstr "使用魔法链接登录"
 msgid "Sign in with passkey"
 msgstr "使用通行密钥登录"
 
-#: src/features/auth/components/auth/email-otp-button.tsx:32
-#: src/features/auth/components/auth/magic-link-button.tsx:32
+#: src/features/auth/components/auth/email-otp-button.tsx:35
+#: src/features/auth/components/auth/magic-link-button.tsx:35
 msgid "Sign in with password"
 msgstr "使用密码登录"
 
@@ -28017,13 +28061,13 @@ msgstr "退出登录"
 msgid "Sign out of {0}"
 msgstr "退出 {0} 的登录"
 
-#: src/features/auth/components/auth/auth-card.tsx:491
+#: src/features/auth/components/auth/auth-card.tsx:493
 #: src/features/marketing/components/landing-page.tsx:332
 #: src/features/marketing/components/landing-page.tsx:350
 msgid "Sign up"
 msgstr "注册"
 
-#: src/features/auth/components/auth/auth-card.tsx:378
+#: src/features/auth/components/auth/auth-card.tsx:380
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:678
 #: src/routes/auth/sign-up.tsx:26
 msgid "Sign Up"
@@ -28050,7 +28094,7 @@ msgstr "登录已过期"
 msgid "Sign-out failed. Please try again."
 msgstr "退出登录失败，请重试。"
 
-#: src/features/auth/components/auth/auth-card.tsx:372
+#: src/features/auth/components/auth/auth-card.tsx:374
 msgid "Sign-up needs an invitation"
 msgstr "注册需要邀请"
 
@@ -29685,7 +29729,7 @@ msgstr "为科技类 YouTube 频道提供视频创意"
 msgid "Suggested"
 msgstr "推荐"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:159
+#: src/features/chat/thread/ask-user-prompt.tsx:353
 #: src/features/skills/components/skill-builder-dialog.tsx:235
 msgid "Suggested answers"
 msgstr "建议的答案"
@@ -30276,7 +30320,7 @@ msgid "Temporary chat"
 msgstr "临时聊天"
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:293
-#: src/features/chat/signed-out/signed-out-chat.tsx:309
+#: src/features/chat/signed-out/signed-out-chat.tsx:299
 msgid "Temporary Chat"
 msgstr "临时聊天"
 
@@ -30418,7 +30462,7 @@ msgstr "文字方向已设为 LTR"
 msgid "Text direction set to RTL"
 msgstr "文字方向已设为 RTL"
 
-#: src/features/chat/thread/composer-input.tsx:302
+#: src/features/chat/thread/composer-input.tsx:303
 msgid "Text document"
 msgstr "文本文档"
 
@@ -30641,7 +30685,7 @@ msgstr "压缩包中包含不安全的文件路径。"
 msgid "The archive holds too many files."
 msgstr "压缩包中的文件过多。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:141
+#: src/features/chat/thread/ask-user-prompt.tsx:327
 msgid "The assistant has a question"
 msgstr "助手有一个问题"
 
@@ -31008,7 +31052,7 @@ msgstr "页面现在显示的是另一个版本。请从你的版本中复制想
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "该页面、所有子页面、评论及版本历史都将被删除。此操作无法撤销。"
 
-#: src/features/chat/thread/composer-input.tsx:887
+#: src/features/chat/thread/composer-input.tsx:890
 msgid "The pasted text could not be attached and was not inserted."
 msgstr ""
 
@@ -31120,7 +31164,7 @@ msgstr ""
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "面向现代 AI 应用的统一 LLM 网关。"
 
-#: src/features/chat/thread/composer-input.tsx:566
+#: src/features/chat/thread/composer-input.tsx:569
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "“{fileName}”的上传已过期。请重新附加该文件。"
 
@@ -32083,7 +32127,6 @@ msgstr "切换右侧边栏（{0}）"
 #: ../../packages/ui/src/components/sidebar.tsx:358
 #: ../../packages/ui/src/components/sidebar.tsx:380
 #: ../../packages/ui/src/components/sidebar.tsx:394
-#: src/features/chat/signed-out/signed-out-chat.tsx:297
 msgid "Toggle Sidebar"
 msgstr "切换侧边栏"
 
@@ -32140,6 +32183,11 @@ msgstr ""
 #: src/features/chat/thread/sandbox-files.tsx:278
 msgid "too large"
 msgstr "文件过大"
+
+#. placeholder {0}: tooLarge.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:277
+msgid "Too large to attach: {0}. Reduce the file and attach it again."
+msgstr "文件过大，无法附加：{0}。请缩小文件后重新附加。"
 
 #: src/features/workflow/components/nodes/text-node.tsx:78
 msgid "Too long to check as JSON"
@@ -32638,7 +32686,7 @@ msgstr "两种连接方式"
 msgid "Two-factor authentication"
 msgstr "双重验证"
 
-#: src/features/auth/components/auth/auth-card.tsx:384
+#: src/features/auth/components/auth/auth-card.tsx:386
 #: src/features/auth/components/settings/two-factor/two-factor-card.tsx:49
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:126
 #: src/routes/auth/two-factor/index.tsx:13
@@ -32689,12 +32737,12 @@ msgstr ""
 msgid "Type to search"
 msgstr "输入以搜索"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:176
+#: src/features/chat/thread/ask-user-prompt.tsx:377
 msgid "Type your answer…"
 msgstr "输入你的回答…"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:248
-#: src/features/chat/thread/composer-input.tsx:1515
+#: src/features/chat/signed-out/signed-out-chat.tsx:249
+#: src/features/chat/thread/composer-input.tsx:1527
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:182
 msgid "Type your message..."
 msgstr "输入你的消息..."
@@ -32857,7 +32905,7 @@ msgstr "技术内幕"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:48
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:64
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:811
+#: src/features/chat/thread/composer-input.tsx:814
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "撤销"
@@ -33085,7 +33133,7 @@ msgstr "任意库或框架的最新文档"
 msgid "Update Duration"
 msgstr "更新时长"
 
-#: src/features/chat/thread/composer-input.tsx:1372
+#: src/features/chat/thread/composer-input.tsx:1384
 msgid "Update failed"
 msgstr "更新失败"
 
@@ -33273,14 +33321,14 @@ msgstr "上传 CSV、运行 Python 分析并导出图表——无需配置 Jupyt
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "将文档上传到知识库并分组为集合。AI 会从中搜索相关上下文，并引用所用的段落。"
 
-#: src/features/chat/thread/composer-input.tsx:409
-#: src/features/chat/thread/composer-input.tsx:611
-#: src/features/chat/thread/composer-input.tsx:1293
+#: src/features/chat/thread/composer-input.tsx:410
+#: src/features/chat/thread/composer-input.tsx:614
+#: src/features/chat/thread/composer-input.tsx:1305
 msgid "Upload failed"
 msgstr "上传失败"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1286
+#: src/features/chat/thread/composer-input.tsx:1298
 msgid "Upload failed: {0}"
 msgstr ""
 
@@ -33330,7 +33378,7 @@ msgstr "已上传"
 msgid "Uploaded {fileName}"
 msgstr "已上传 {fileName}"
 
-#: src/features/chat/thread/composer-input.tsx:346
+#: src/features/chat/thread/composer-input.tsx:347
 msgid "Uploading {attachmentName}"
 msgstr "正在上传 {attachmentName}"
 
@@ -33621,18 +33669,18 @@ msgstr "用户的组织"
 msgid "User's role"
 msgstr "用户的角色"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:77
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:83
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:504
 #: src/features/auth/components/settings/account/update-username-card.tsx:28
 msgid "Username"
 msgstr "用户名"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:107
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:113
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:171
 msgid "Username is required"
 msgstr "请输入用户名"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:115
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:121
 msgid "Username or email is required"
 msgstr "请输入用户名或邮箱"
 
@@ -33808,7 +33856,7 @@ msgstr "验证码已发送到你的邮箱"
 msgid "Verification could not run, so nobody has checked this result. Review the answer yourself: approve it as is, reject it, or send it back with a note."
 msgstr "验证未能运行，因此没有人检查过此结果。请自行审阅答案：原样批准、拒绝，或附上备注退回。"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:292
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:301
 #: src/features/auth/components/settings/security/change-email-card.tsx:105
 msgid "Verification email sent"
 msgstr "验证邮件已发送"
@@ -34439,7 +34487,7 @@ msgstr ""
 msgid "Waiting for the owner"
 msgstr ""
 
-#: src/features/chat/thread/ask-user-prompt.tsx:124
+#: src/features/chat/thread/ask-user-prompt.tsx:307
 msgid "Waiting for the owner to answer"
 msgstr "正在等待所有者回答"
 
@@ -34460,7 +34508,7 @@ msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
-#: src/features/chat/thread/ask-user-prompt.tsx:124
+#: src/features/chat/thread/ask-user-prompt.tsx:307
 msgid "Waiting for your answer"
 msgstr "正在等待你的回答"
 
@@ -34639,7 +34687,7 @@ msgstr "每周增长"
 msgid "Weight"
 msgstr "粗细"
 
-#: src/features/auth/components/auth/auth-card.tsx:365
+#: src/features/auth/components/auth/auth-card.tsx:367
 msgid "Welcome back"
 msgstr "欢迎回来"
 
@@ -35406,7 +35454,7 @@ msgstr "你的账号及所有相关数据正在被删除，此操作无法取消
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "你的 AI 工作区<0>从这里开始。</0>"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:168
+#: src/features/chat/thread/ask-user-prompt.tsx:369
 msgid "Your answer"
 msgstr "你的回答"
 
@@ -35414,7 +35462,7 @@ msgstr "你的回答"
 msgid "Your answer in Neore has finished."
 msgstr "你在 Neore 中的回复已生成完毕。"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:151
+#: src/features/chat/thread/ask-user-prompt.tsx:337
 msgid "Your answer:"
 msgstr "你的回答："
 
@@ -35504,12 +35552,12 @@ msgid "Your First Chat"
 msgstr "你的第一次聊天"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:671
+#: src/features/chat/thread/composer-input.tsx:674
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "你的输入较大（约 {0} 个 token），将占用模型上下文窗口的很大一部分。"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:664
+#: src/features/chat/thread/composer-input.tsx:667
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "你的输入过大（约 {0} 个 token），超出了模型的上下文窗口。请缩短消息或移除附件后再提交。"
 

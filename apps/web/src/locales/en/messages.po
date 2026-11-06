@@ -51,23 +51,23 @@ msgstr "\"{0}\" has variables that need values."
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "\"{0}\" will start once its dependencies are done"
 
-#: src/features/chat/thread/composer-input.tsx:572
+#: src/features/chat/thread/composer-input.tsx:575
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "\"{fileName}\" cannot be attached: this file type is not supported."
 
-#: src/features/chat/thread/composer-input.tsx:565
+#: src/features/chat/thread/composer-input.tsx:568
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "\"{fileName}\" could not be attached: its contents do not match its file type."
 
-#: src/features/chat/thread/composer-input.tsx:567
+#: src/features/chat/thread/composer-input.tsx:570
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "\"{fileName}\" could not be uploaded. Check your connection and try again."
 
-#: src/features/chat/thread/composer-input.tsx:570
+#: src/features/chat/thread/composer-input.tsx:573
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 
-#: src/features/chat/thread/composer-input.tsx:571
+#: src/features/chat/thread/composer-input.tsx:574
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 
@@ -3123,7 +3123,7 @@ msgstr "Alloy (Neutral)"
 msgid "Alphabetical"
 msgstr "Alphabetical"
 
-#: src/features/auth/components/auth/auth-card.tsx:437
+#: src/features/auth/components/auth/auth-card.tsx:439
 msgid "Already have an account?"
 msgstr "Already have an account?"
 
@@ -3315,7 +3315,7 @@ msgstr "Answer messages to a WeChat Official Account (safe mode). Beta: not yet 
 msgid "Answer ready"
 msgstr "Answer ready"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:120
+#: src/features/chat/thread/ask-user-prompt.tsx:303
 msgid "Answer sent — continuing"
 msgstr "Answer sent — continuing"
 
@@ -3323,7 +3323,7 @@ msgstr "Answer sent — continuing"
 msgid "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 msgstr "Answer WhatsApp messages through your WhatsApp Business number (Meta Cloud API). Replies follow WhatsApp's 24-hour rule."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:116
+#: src/features/chat/thread/ask-user-prompt.tsx:299
 msgid "Answered"
 msgstr "Answered"
 
@@ -3842,13 +3842,33 @@ msgstr "At least {EVENT_MIN_INTERVAL_MINUTES} minutes between checks."
 msgid "Attach as file"
 msgstr "Attach as file"
 
+#: src/features/chat/thread/ask-user-prompt.tsx:437
+msgid "Attach file"
+msgstr "Attach file"
+
 #: src/features/chat/header/kb-attachment-button.tsx:187
 msgid "Attach files or whole collections for the AI to reference and cite in this conversation."
 msgstr "Attach files or whole collections for the AI to reference and cite in this conversation."
 
+#: src/features/chat/thread/ask-user-prompt.tsx:388
+msgid "Attached files"
+msgstr "Attached files"
+
 #: ../../packages/chat-ui/src/chat/message-item.tsx:121
 msgid "Attached image"
 msgstr "Attached image"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:344
+msgid "Attached:"
+msgstr "Attached:"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:425
+msgid "Attaching files…"
+msgstr "Attaching files…"
+
+#: src/features/chat/thread/ask-user-prompt.tsx:437
+msgid "Attaching…"
+msgstr "Attaching…"
 
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 msgid "Attachment"
@@ -3927,7 +3947,7 @@ msgstr "Austria"
 msgid "Auth"
 msgstr "Auth"
 
-#: src/features/auth/components/auth/auth-card.tsx:390
+#: src/features/auth/components/auth/auth-card.tsx:392
 #: src/features/settings/components/chat/native-providers-settings.tsx:575
 msgid "Authentication"
 msgstr "Authentication"
@@ -4931,7 +4951,7 @@ msgstr "Bulgarian"
 msgid "Bulgarian (Bulgaria)"
 msgstr "Bulgarian (Bulgaria)"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:155
+#: src/features/chat/signed-out/signed-out-chat.tsx:156
 #: src/features/chat/thread-list/thread-list-header.tsx:167
 #: src/features/chat/thread-list/thread-list-header.tsx:178
 msgid "Bulk actions"
@@ -6059,7 +6079,7 @@ msgstr "Click the pin icon on any message to save it here."
 msgid "Click the star on any model in All models to add it here."
 msgstr "Click the star on any model in All models to add it here."
 
-#: src/features/chat/thread/composer-input.tsx:302
+#: src/features/chat/thread/composer-input.tsx:303
 msgid "Click to edit"
 msgstr "Click to edit"
 
@@ -7273,7 +7293,7 @@ msgstr "Context recall"
 msgid "Context that never resets"
 msgstr "Context that never resets"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:196
+#: src/features/chat/signed-out/signed-out-chat.tsx:197
 #: src/features/chat/thread/composer-context-count.tsx:116
 msgid "Context Usage"
 msgstr "Context Usage"
@@ -7414,8 +7434,8 @@ msgstr "Conversations and pending comments on files this list does not show"
 msgid "Conversations on lines this diff no longer shows"
 msgstr "Conversations on lines this diff no longer shows"
 
-#: src/features/chat/thread/composer-input.tsx:751
-#: src/features/chat/thread/composer-input.tsx:1315
+#: src/features/chat/thread/composer-input.tsx:754
+#: src/features/chat/thread/composer-input.tsx:1327
 msgid "Conversion failed"
 msgstr "Conversion failed"
 
@@ -7711,7 +7731,17 @@ msgstr "Could not answer. Please try again."
 msgid "Could not apply the changes"
 msgstr "Could not apply the changes"
 
-#: src/features/chat/thread/composer-input.tsx:1337
+#. placeholder {0}: failed.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:283
+msgid "Could not attach {0}. The other files were attached; try those again."
+msgstr "Could not attach {0}. The other files were attached; try those again."
+
+#. placeholder {0}: failed.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:284
+msgid "Could not attach {0}. Try those again."
+msgstr "Could not attach {0}. Try those again."
+
+#: src/features/chat/thread/composer-input.tsx:1349
 msgid "Could not attach the chat"
 msgstr "Could not attach the chat"
 
@@ -7919,11 +7949,11 @@ msgstr "Could not reach the server to start generating. Check your connection an
 msgid "Could not reach the server. Try again."
 msgstr "Could not reach the server. Try again."
 
-#: src/features/chat/thread/composer-input.tsx:1340
+#: src/features/chat/thread/composer-input.tsx:1352
 msgid "Could not read that chat"
 msgstr "Could not read that chat"
 
-#: src/features/chat/thread/composer-input.tsx:1341
+#: src/features/chat/thread/composer-input.tsx:1353
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Could not read that chat. If it is locked, unlock it first."
 
@@ -7993,7 +8023,7 @@ msgstr "Could not send the message."
 msgid "Could not send your answer."
 msgstr "Could not send your answer."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:83
+#: src/features/chat/thread/ask-user-prompt.tsx:147
 #: src/features/chat/thread/tool-approval.tsx:68
 msgid "Could not send your answer. Please try again."
 msgstr "Could not send your answer. Please try again."
@@ -8262,7 +8292,7 @@ msgstr "Create Organization"
 msgid "Create PR"
 msgstr "Create PR"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:146
+#: src/features/chat/signed-out/signed-out-chat.tsx:147
 #: src/features/chat/thread-list/thread-list-header.tsx:127
 #: src/features/chat/thread-list/thread-list-header.tsx:137
 msgid "Create project"
@@ -9841,7 +9871,7 @@ msgstr "Discord Public Key"
 
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:54
 #: src/features/changelog/components/changelog-card.tsx:59
-#: src/features/chat/thread/ask-user-prompt.tsx:191
+#: src/features/chat/thread/ask-user-prompt.tsx:445
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:202
@@ -9877,7 +9907,7 @@ msgstr "Dismiss webhook secret"
 msgid "Dismissed"
 msgstr "Dismissed"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:118
+#: src/features/chat/thread/ask-user-prompt.tsx:301
 msgid "Dismissed — continuing without an answer"
 msgstr "Dismissed — continuing without an answer"
 
@@ -9982,7 +10012,7 @@ msgstr "Does not repeat"
 msgid "Dominican Republic"
 msgstr "Dominican Republic"
 
-#: src/features/auth/components/auth/auth-card.tsx:433
+#: src/features/auth/components/auth/auth-card.tsx:435
 msgid "Don't have an account?"
 msgstr "Don't have an account?"
 
@@ -10217,7 +10247,7 @@ msgstr "Drop file or click to upload"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1525
+#: src/features/chat/thread/composer-input.tsx:1537
 msgid "Drop files here"
 msgstr "Drop files here"
 
@@ -10493,8 +10523,8 @@ msgstr "Edit collection"
 msgid "Edit comment"
 msgstr "Edit comment"
 
-#: src/features/chat/thread/composer-input.tsx:309
-#: src/features/chat/thread/composer-input.tsx:321
+#: src/features/chat/thread/composer-input.tsx:310
+#: src/features/chat/thread/composer-input.tsx:322
 msgid "Edit content"
 msgstr "Edit content"
 
@@ -10793,7 +10823,7 @@ msgstr "email"
 #: src/features/auth/components/auth/forms/email-otp-form.tsx:232
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:107
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:124
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:84
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:90
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:529
 #: src/features/auth/components/organization/invite-member-dialog.tsx:108
 msgid "Email"
@@ -10808,7 +10838,7 @@ msgstr "Email Address"
 msgid "Email banner"
 msgstr "Email banner"
 
-#: src/features/auth/components/auth/auth-card.tsx:335
+#: src/features/auth/components/auth/auth-card.tsx:337
 msgid "Email Code"
 msgstr "Email Code"
 
@@ -10825,7 +10855,7 @@ msgstr "Email Hero"
 msgid "Email is the same"
 msgstr "Email is the same"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:81
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:87
 msgid "Email or Username"
 msgstr "Email or Username"
 
@@ -11042,7 +11072,7 @@ msgid "English (UK)"
 msgstr "English (UK)"
 
 #: src/features/chat/core/utils/language-utilities.ts:151
-#: src/features/chat/signed-out/signed-out-chat.tsx:177
+#: src/features/chat/signed-out/signed-out-chat.tsx:178
 #: src/features/chat/thread/composer-language-selector.tsx:102
 msgid "English (US)"
 msgstr "English (US)"
@@ -11191,7 +11221,7 @@ msgstr "Enter the API key"
 msgid "Enter the endpoint URL first"
 msgstr "Enter the endpoint URL first"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:182
+#: src/features/chat/thread/ask-user-prompt.tsx:411
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "Enter to send, Shift+Enter for a new line."
 
@@ -11227,7 +11257,7 @@ msgstr "Enter your custom system prompt here. This will be used for every messag
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:188
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:118
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:135
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:96
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:102
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:540
 msgid "Enter your email"
 msgstr "Enter your email"
@@ -11237,23 +11267,23 @@ msgstr "Enter your email"
 msgid "Enter your email address"
 msgstr "Enter your email address"
 
-#: src/features/auth/components/auth/auth-card.tsx:364
+#: src/features/auth/components/auth/auth-card.tsx:366
 msgid "Enter your email below to login to your account"
 msgstr "Enter your email below to login to your account"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:93
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:99
 msgid "Enter your email or username"
 msgstr "Enter your email or username"
 
-#: src/features/auth/components/auth/auth-card.tsx:334
+#: src/features/auth/components/auth/auth-card.tsx:336
 msgid "Enter your email to receive a code"
 msgstr "Enter your email to receive a code"
 
-#: src/features/auth/components/auth/auth-card.tsx:346
+#: src/features/auth/components/auth/auth-card.tsx:348
 msgid "Enter your email to receive a magic link"
 msgstr "Enter your email to receive a magic link"
 
-#: src/features/auth/components/auth/auth-card.tsx:340
+#: src/features/auth/components/auth/auth-card.tsx:342
 msgid "Enter your email to reset your password"
 msgstr "Enter your email to reset your password"
 
@@ -11261,7 +11291,7 @@ msgstr "Enter your email to reset your password"
 msgid "Enter your full name or display name"
 msgstr "Enter your full name or display name"
 
-#: src/features/auth/components/auth/auth-card.tsx:377
+#: src/features/auth/components/auth/auth-card.tsx:379
 msgid "Enter your information to create an account"
 msgstr "Enter your information to create an account"
 
@@ -11278,7 +11308,7 @@ msgstr "Enter your name"
 msgid "Enter your new email address below"
 msgstr "Enter your new email address below"
 
-#: src/features/auth/components/auth/auth-card.tsx:358
+#: src/features/auth/components/auth/auth-card.tsx:360
 msgid "Enter your new password below"
 msgstr "Enter your new password below"
 
@@ -11287,7 +11317,7 @@ msgid "Enter your nickname"
 msgstr "Enter your nickname"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:210
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:369
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:378
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:566
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:157
 msgid "Enter your password"
@@ -11317,7 +11347,7 @@ msgstr "Enter your prompt content here... Use {VARIABLE_PLACEHOLDER} for dynamic
 msgid "Enter your title instructions..."
 msgstr "Enter your title instructions..."
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:89
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:95
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:515
 #: src/features/auth/components/settings/account/update-username-card.tsx:30
 msgid "Enter your username"
@@ -12132,7 +12162,7 @@ msgid "Failed to attach collection"
 msgstr "Failed to attach collection"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1177
+#: src/features/chat/thread/composer-input.tsx:1189
 msgid "Failed to attach file"
 msgstr "Failed to attach file"
 
@@ -12529,7 +12559,7 @@ msgstr "Failed to request export"
 msgid "Failed to reset to defaults"
 msgstr "Failed to reset to defaults"
 
-#: src/features/chat/thread/composer-input.tsx:1209
+#: src/features/chat/thread/composer-input.tsx:1221
 msgid "Failed to restore attachment"
 msgstr "Failed to restore attachment"
 
@@ -13329,6 +13359,10 @@ msgstr "Filename cannot be empty"
 msgid "Files"
 msgstr "Files"
 
+#: src/features/chat/thread/ask-user-prompt.tsx:427
+msgid "Files cannot be attached in a locked chat."
+msgstr "Files cannot be attached in a locked chat."
+
 #: src/features/chat/thread/host-changes.tsx:50
 msgid "Files changed by this turn"
 msgstr "Files changed by this turn"
@@ -13707,13 +13741,13 @@ msgstr "forget"
 msgid "Forgot authenticator"
 msgstr "Forgot authenticator"
 
-#: src/features/auth/components/auth/auth-card.tsx:341
+#: src/features/auth/components/auth/auth-card.tsx:343
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:134
 #: src/routes/auth/forgot-password.tsx:17
 msgid "Forgot Password"
 msgstr "Forgot Password"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:357
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:366
 msgid "Forgot password?"
 msgstr "Forgot password?"
 
@@ -14490,7 +14524,7 @@ msgid "Global analyst research, market analysis, and investment data"
 msgstr "Global analyst research, market analysis, and investment data"
 
 #: ../../packages/chat-ui/src/chat/chat-view.tsx:96
-#: src/features/auth/components/auth/auth-card.tsx:495
+#: src/features/auth/components/auth/auth-card.tsx:497
 msgid "Go back"
 msgstr "Go back"
 
@@ -15108,7 +15142,7 @@ msgstr "Height"
 msgid "Hello {0}! What would you like to do today?"
 msgstr "Hello {0}! What would you like to do today?"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:115
+#: src/features/chat/signed-out/signed-out-chat.tsx:116
 #: src/features/layout/components/mobile-section-nav.tsx:72
 #: src/features/layout/components/sidebar-shortcut.tsx:301
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:113
@@ -16382,7 +16416,7 @@ msgstr "Invalid OAuth callback"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:77
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:57
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:83
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:144
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:150
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:122
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:151
 #: src/features/auth/components/settings/security/change-password-card.tsx:73
@@ -16794,7 +16828,7 @@ msgid "Key file (optional, absolute path)"
 msgstr "Key file (optional, absolute path)"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
-#: src/features/chat/signed-out/signed-out-chat.tsx:152
+#: src/features/chat/signed-out/signed-out-chat.tsx:153
 #: src/features/chat/thread-list/thread-list-header.tsx:146
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:122
 #: src/features/workflow/components/canvas/workflow-controls.tsx:374
@@ -17896,7 +17930,7 @@ msgstr "Loading your projects…"
 #: src/features/settings/components/chat/trigger-settings.tsx:958
 #: src/features/settings/components/privacy/data-access.tsx:25
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:229
-#: src/routes/_shortcut.tsx:16
+#: src/routes/_shortcut.tsx:17
 msgid "Loading..."
 msgstr "Loading..."
 
@@ -17987,7 +18021,7 @@ msgid "Log out"
 msgstr "Log out"
 
 #: src/features/auth/components/auth/login-modal.tsx:46
-#: src/features/chat/signed-out/signed-out-chat.tsx:283
+#: src/features/chat/signed-out/signed-out-chat.tsx:284
 #: src/features/layout/components/app-sidebar.tsx:54
 #: src/features/layout/components/app-sidebar.tsx:67
 #: src/features/marketing/components/gateway-navbar.tsx:90
@@ -18057,7 +18091,7 @@ msgstr "Long text detected"
 msgid "Long text generation in images"
 msgstr "Long text generation in images"
 
-#: src/features/chat/thread/composer-input.tsx:809
+#: src/features/chat/thread/composer-input.tsx:812
 msgid "Long text was attached as a file."
 msgstr "Long text was attached as a file."
 
@@ -18188,7 +18222,7 @@ msgstr "Macro telephoto, tight framing"
 msgid "Madrid"
 msgstr "Madrid"
 
-#: src/features/auth/components/auth/auth-card.tsx:347
+#: src/features/auth/components/auth/auth-card.tsx:349
 msgid "Magic Link"
 msgstr "Magic Link"
 
@@ -19889,7 +19923,7 @@ msgstr "neore"
 msgid "Neore"
 msgstr "Neore"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:89
+#: src/features/chat/signed-out/signed-out-chat.tsx:90
 #: src/features/layout/components/sidebar-shortcut.tsx:238
 #: src/features/marketing/components/navbar-menu.tsx:44
 msgid "Neore - AI Text & Video & Audio & Image & Documents Generation Platform"
@@ -20063,7 +20097,7 @@ msgstr "New chat"
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:46
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
 #: src/features/chat/header/chat-header.tsx:30
-#: src/features/chat/signed-out/signed-out-chat.tsx:315
+#: src/features/chat/signed-out/signed-out-chat.tsx:305
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:239
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:115
 #: src/features/settings/lib/settings-keywords.ts:37
@@ -20108,7 +20142,7 @@ msgstr "New goal"
 #: src/features/chat/group/create-group-chat-button.tsx:115
 #: src/features/chat/group/create-group-chat-button.tsx:120
 #: src/features/chat/group/create-group-chat-button.tsx:129
-#: src/features/chat/signed-out/signed-out-chat.tsx:149
+#: src/features/chat/signed-out/signed-out-chat.tsx:150
 msgid "New group chat"
 msgstr "New group chat"
 
@@ -20184,7 +20218,7 @@ msgstr "New this week"
 msgid "New thread"
 msgstr "New thread"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:140
+#: src/features/chat/signed-out/signed-out-chat.tsx:141
 #: src/features/chat/thread-list/thread-list-header.tsx:99
 msgid "New Thread"
 msgstr "New Thread"
@@ -20902,7 +20936,7 @@ msgstr "No threads in this group"
 msgid "No threads were active in that date range."
 msgstr "No threads were active in that date range."
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:272
+#: src/features/chat/signed-out/signed-out-chat.tsx:273
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:1065
 msgid "No threads yet"
 msgstr "No threads yet"
@@ -21129,6 +21163,11 @@ msgstr "Not read yet."
 #: src/features/settings/components/privacy/data-access.tsx:36
 msgid "Not set"
 msgstr "Not set"
+
+#. placeholder {0}: unreadFiles.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:348
+msgid "Not shown to this model: {0}"
+msgstr "Not shown to this model: {0}"
 
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:75
 msgid "Not started"
@@ -21535,6 +21574,10 @@ msgstr "Only organization owners can manage billing settings"
 msgid "Only participants you @mention answer."
 msgstr "Only participants you @mention answer."
 
+#: src/features/chat/thread/ask-user-prompt.tsx:193
+msgid "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
+msgstr "Only PNG, JPEG, WEBP or GIF images, and PDFs up to 10 MB, 20 MB in all and four at most."
+
 #: src/features/settings/components/chat/trigger-settings.tsx:263
 msgid "Only post when there is something to report"
 msgstr "Only post when there is something to report"
@@ -21766,7 +21809,7 @@ msgstr "Open search"
 msgid "Open settings"
 msgstr "Open settings"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:112
+#: src/features/chat/signed-out/signed-out-chat.tsx:113
 #: src/features/layout/components/sidebar-shortcut.tsx:282
 msgid "Open Settings"
 msgstr "Open Settings"
@@ -21869,7 +21912,7 @@ msgstr "Open the thread list search and focus it ({0})"
 msgid "Open thread"
 msgstr "Open thread"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:118
+#: src/features/chat/signed-out/signed-out-chat.tsx:119
 #: src/features/layout/components/sidebar-shortcut.tsx:221
 #: src/features/layout/components/sidebar-shortcut.tsx:328
 msgid "Open user menu"
@@ -22295,7 +22338,7 @@ msgstr "or click to browse"
 msgid "Or connect a Text node to provide the prompt"
 msgstr "Or connect a Text node to provide the prompt"
 
-#: src/features/auth/components/auth/auth-card.tsx:217
+#: src/features/auth/components/auth/auth-card.tsx:219
 msgid "or continue with"
 msgstr "or continue with"
 
@@ -22307,7 +22350,7 @@ msgstr "Or fetch from a link"
 msgid "Or from a terminal:"
 msgstr "Or from a terminal:"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:176
+#: src/features/chat/thread/ask-user-prompt.tsx:377
 msgid "Or type your own answer…"
 msgstr "Or type your own answer…"
 
@@ -22753,7 +22796,7 @@ msgstr "Passkeys allow you to sign in securely using your device's biometric aut
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:84
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:201
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:350
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
 msgid "Password"
@@ -22764,7 +22807,7 @@ msgid "Password changed successfully"
 msgstr "Password changed successfully"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:60
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:127
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:133
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:105
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:42
 msgid "Password is required"
@@ -22773,7 +22816,7 @@ msgstr "Password is required"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:71
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:51
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:77
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:138
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:144
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:116
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:145
 #: src/features/auth/components/settings/security/change-password-card.tsx:67
@@ -22785,7 +22828,7 @@ msgstr "Password is too long"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:65
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:45
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:71
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:132
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:138
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:110
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:139
 #: src/features/auth/components/settings/security/change-password-card.tsx:61
@@ -23253,7 +23296,7 @@ msgstr "Play"
 msgid "Play a short sound when a reply finishes. Applies to this browser only."
 msgstr "Play a short sound when a reply finishes. Applies to this browser only."
 
-#: src/features/auth/components/auth/auth-card.tsx:389
+#: src/features/auth/components/auth/auth-card.tsx:391
 msgid "Please authenticate to continue"
 msgstr "Please authenticate to continue"
 
@@ -23265,7 +23308,7 @@ msgstr "Please check your email and click the verification link"
 msgid "Please confirm your password"
 msgstr "Please confirm your password"
 
-#: src/features/auth/components/auth/auth-card.tsx:352
+#: src/features/auth/components/auth/auth-card.tsx:354
 msgid "Please enter a backup code to access your account"
 msgstr "Please enter a backup code to access your account"
 
@@ -23273,7 +23316,7 @@ msgstr "Please enter a backup code to access your account"
 msgid "Please enter an email address"
 msgstr "Please enter an email address"
 
-#: src/features/auth/components/auth/auth-card.tsx:383
+#: src/features/auth/components/auth/auth-card.tsx:385
 msgid "Please enter your one-time password to continue"
 msgstr "Please enter your one-time password to continue"
 
@@ -23548,7 +23591,7 @@ msgstr "Premium-tier reasoning and instruction following"
 msgid "Premium-tier reasoning transparency"
 msgstr "Premium-tier reasoning transparency"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:122
+#: src/features/chat/thread/ask-user-prompt.tsx:305
 msgid "Preparing a question…"
 msgstr "Preparing a question…"
 
@@ -24673,7 +24716,7 @@ msgstr "Read-only preview - Fork to edit"
 msgid "Read-only shared conversation"
 msgstr "Read-only shared conversation"
 
-#: src/features/chat/thread/composer-input.tsx:266
+#: src/features/chat/thread/composer-input.tsx:267
 msgid "Reading \"{attachmentName}\"…"
 msgstr "Reading \"{attachmentName}\"…"
 
@@ -24942,7 +24985,7 @@ msgstr "Recording voice input"
 msgid "Recover account"
 msgstr "Recover account"
 
-#: src/features/auth/components/auth/auth-card.tsx:353
+#: src/features/auth/components/auth/auth-card.tsx:355
 msgid "Recover Account"
 msgstr "Recover Account"
 
@@ -25133,7 +25176,7 @@ msgstr "Region Restrictions"
 msgid "Register it with Telegram's setWebhook, passing your webhook secret as secret_token."
 msgstr "Register it with Telegram's setWebhook, passing your webhook secret as secret_token."
 
-#: src/features/auth/components/auth/auth-card.tsx:371
+#: src/features/auth/components/auth/auth-card.tsx:373
 msgid "Registration is by invitation only. Open the link from your invitation, or sign in if you already have an account."
 msgstr "Registration is by invitation only. Open the link from your invitation, or sign in if you already have an account."
 
@@ -25258,7 +25301,7 @@ msgstr "Reload their version"
 msgid "remember"
 msgstr "remember"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:391
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:400
 msgid "Remember me"
 msgstr "Remember me"
 
@@ -25266,10 +25309,10 @@ msgstr "Remember me"
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
-#: src/features/chat/thread/composer-input.tsx:328
-#: src/features/chat/thread/composer-input.tsx:340
-#: src/features/chat/thread/composer-input.tsx:394
-#: src/features/chat/thread/composer-input.tsx:403
+#: src/features/chat/thread/composer-input.tsx:329
+#: src/features/chat/thread/composer-input.tsx:341
+#: src/features/chat/thread/composer-input.tsx:395
+#: src/features/chat/thread/composer-input.tsx:404
 #: src/features/devices/components/devices-settings.tsx:206
 #: src/features/devices/components/devices-settings.tsx:212
 #: src/features/projects/components/project-form-dialog.tsx:263
@@ -25292,10 +25335,11 @@ msgstr "Remove \"{0}\"?"
 msgid "Remove “{0}”?"
 msgstr "Remove “{0}”?"
 
+#. placeholder {0}: file.name
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
-#. placeholder {0}: variable.name
 #: src/features/chat/group/group-participant-bar.tsx:210
+#: src/features/chat/thread/ask-user-prompt.tsx:393
 #: src/features/prompts/components/thread-variables-config.tsx:232
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
@@ -25767,7 +25811,7 @@ msgstr "Reset models to defaults?"
 msgid "Reset password"
 msgstr "Reset password"
 
-#: src/features/auth/components/auth/auth-card.tsx:359
+#: src/features/auth/components/auth/auth-card.tsx:361
 #: src/routes/auth/reset-password.tsx:13
 msgid "Reset Password"
 msgstr "Reset Password"
@@ -25970,11 +26014,11 @@ msgstr "Retry in {retryAfterMinutes}m"
 msgid "Retry now"
 msgstr "Retry now"
 
-#: src/features/chat/thread/composer-input.tsx:417
+#: src/features/chat/thread/composer-input.tsx:418
 msgid "Retry upload"
 msgstr "Retry upload"
 
-#: src/features/chat/thread/composer-input.tsx:412
+#: src/features/chat/thread/composer-input.tsx:413
 msgid "Retry upload of {attachmentName}"
 msgstr "Retry upload of {attachmentName}"
 
@@ -26697,7 +26741,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 
-#: src/features/chat/thread/composer-input.tsx:1136
+#: src/features/chat/thread/composer-input.tsx:1148
 msgid "Screen capture failed. Please try again."
 msgstr "Screen capture failed. Please try again."
 
@@ -26944,7 +26988,7 @@ msgstr "Search thread titles and summaries"
 msgid "Search thread titles..."
 msgstr "Search thread titles..."
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:143
+#: src/features/chat/signed-out/signed-out-chat.tsx:144
 #: src/features/chat/thread-list/thread-list-header.tsx:70
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:78
 msgid "Search threads"
@@ -27327,11 +27371,11 @@ msgstr "Send a message below to start"
 msgid "Send a message to begin"
 msgstr "Send a message to begin"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:421
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:430
 msgid "Send a new verification link"
 msgstr "Send a new verification link"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:187
+#: src/features/chat/thread/ask-user-prompt.tsx:441
 msgid "Send answer"
 msgstr "Send answer"
 
@@ -27914,8 +27958,8 @@ msgstr "Sidebar Right"
 #: ../../packages/chat-ui/src/auth/login-form.tsx:43
 #: src/components/not-found.tsx:12
 #: src/components/settings/settings-modal.tsx:163
-#: src/features/auth/components/auth/auth-card.tsx:491
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:406
+#: src/features/auth/components/auth/auth-card.tsx:493
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:415
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/marketing/components/landing-page.tsx:1058
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
@@ -27954,7 +27998,7 @@ msgstr "Sign in to an account to write a guide."
 msgid "Sign in to fork this workflow"
 msgstr "Sign in to fork this workflow"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:273
+#: src/features/chat/signed-out/signed-out-chat.tsx:274
 msgid "Sign in to see your chats."
 msgstr "Sign in to see your chats."
 
@@ -27988,11 +28032,11 @@ msgstr "Sign in to your account to use it."
 msgid "Sign in with {0}"
 msgstr "Sign in with {0}"
 
-#: src/features/auth/components/auth/email-otp-button.tsx:32
+#: src/features/auth/components/auth/email-otp-button.tsx:35
 msgid "Sign in with email code"
 msgstr "Sign in with email code"
 
-#: src/features/auth/components/auth/magic-link-button.tsx:32
+#: src/features/auth/components/auth/magic-link-button.tsx:35
 msgid "Sign in with magic link"
 msgstr "Sign in with magic link"
 
@@ -28000,8 +28044,8 @@ msgstr "Sign in with magic link"
 msgid "Sign in with passkey"
 msgstr "Sign in with passkey"
 
-#: src/features/auth/components/auth/email-otp-button.tsx:32
-#: src/features/auth/components/auth/magic-link-button.tsx:32
+#: src/features/auth/components/auth/email-otp-button.tsx:35
+#: src/features/auth/components/auth/magic-link-button.tsx:35
 msgid "Sign in with password"
 msgstr "Sign in with password"
 
@@ -28016,13 +28060,13 @@ msgstr "Sign Out"
 msgid "Sign out of {0}"
 msgstr "Sign out of {0}"
 
-#: src/features/auth/components/auth/auth-card.tsx:491
+#: src/features/auth/components/auth/auth-card.tsx:493
 #: src/features/marketing/components/landing-page.tsx:332
 #: src/features/marketing/components/landing-page.tsx:350
 msgid "Sign up"
 msgstr "Sign up"
 
-#: src/features/auth/components/auth/auth-card.tsx:378
+#: src/features/auth/components/auth/auth-card.tsx:380
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:678
 #: src/routes/auth/sign-up.tsx:26
 msgid "Sign Up"
@@ -28049,7 +28093,7 @@ msgstr "Sign-in expired"
 msgid "Sign-out failed. Please try again."
 msgstr "Sign-out failed. Please try again."
 
-#: src/features/auth/components/auth/auth-card.tsx:372
+#: src/features/auth/components/auth/auth-card.tsx:374
 msgid "Sign-up needs an invitation"
 msgstr "Sign-up needs an invitation"
 
@@ -29684,7 +29728,7 @@ msgstr "Suggest video ideas for a tech YouTube channel"
 msgid "Suggested"
 msgstr "Suggested"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:159
+#: src/features/chat/thread/ask-user-prompt.tsx:353
 #: src/features/skills/components/skill-builder-dialog.tsx:235
 msgid "Suggested answers"
 msgstr "Suggested answers"
@@ -30275,7 +30319,7 @@ msgid "Temporary chat"
 msgstr "Temporary chat"
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:293
-#: src/features/chat/signed-out/signed-out-chat.tsx:309
+#: src/features/chat/signed-out/signed-out-chat.tsx:299
 msgid "Temporary Chat"
 msgstr "Temporary Chat"
 
@@ -30417,7 +30461,7 @@ msgstr "Text direction set to LTR"
 msgid "Text direction set to RTL"
 msgstr "Text direction set to RTL"
 
-#: src/features/chat/thread/composer-input.tsx:302
+#: src/features/chat/thread/composer-input.tsx:303
 msgid "Text document"
 msgstr "Text document"
 
@@ -30640,7 +30684,7 @@ msgstr "The archive contains an unsafe file path."
 msgid "The archive holds too many files."
 msgstr "The archive holds too many files."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:141
+#: src/features/chat/thread/ask-user-prompt.tsx:327
 msgid "The assistant has a question"
 msgstr "The assistant has a question"
 
@@ -31007,7 +31051,7 @@ msgstr "The page now shows the other version. Copy anything you want to keep fro
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 
-#: src/features/chat/thread/composer-input.tsx:887
+#: src/features/chat/thread/composer-input.tsx:890
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "The pasted text could not be attached and was not inserted."
 
@@ -31119,7 +31163,7 @@ msgstr "The two passcodes do not match."
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "The unified LLM gateway for modern AI applications."
 
-#: src/features/chat/thread/composer-input.tsx:566
+#: src/features/chat/thread/composer-input.tsx:569
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "The upload of \"{fileName}\" expired. Please attach it again."
 
@@ -32082,7 +32126,6 @@ msgstr "Toggle right sidebar ({0})"
 #: ../../packages/ui/src/components/sidebar.tsx:358
 #: ../../packages/ui/src/components/sidebar.tsx:380
 #: ../../packages/ui/src/components/sidebar.tsx:394
-#: src/features/chat/signed-out/signed-out-chat.tsx:297
 msgid "Toggle Sidebar"
 msgstr "Toggle Sidebar"
 
@@ -32139,6 +32182,11 @@ msgstr "tone"
 #: src/features/chat/thread/sandbox-files.tsx:278
 msgid "too large"
 msgstr "too large"
+
+#. placeholder {0}: tooLarge.join(", ")
+#: src/features/chat/thread/ask-user-prompt.tsx:277
+msgid "Too large to attach: {0}. Reduce the file and attach it again."
+msgstr "Too large to attach: {0}. Reduce the file and attach it again."
 
 #: src/features/workflow/components/nodes/text-node.tsx:78
 msgid "Too long to check as JSON"
@@ -32637,7 +32685,7 @@ msgstr "Two ways to connect"
 msgid "Two-factor authentication"
 msgstr "Two-factor authentication"
 
-#: src/features/auth/components/auth/auth-card.tsx:384
+#: src/features/auth/components/auth/auth-card.tsx:386
 #: src/features/auth/components/settings/two-factor/two-factor-card.tsx:49
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:126
 #: src/routes/auth/two-factor/index.tsx:13
@@ -32688,12 +32736,12 @@ msgstr "Type it again"
 msgid "Type to search"
 msgstr "Type to search"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:176
+#: src/features/chat/thread/ask-user-prompt.tsx:377
 msgid "Type your answer…"
 msgstr "Type your answer…"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:248
-#: src/features/chat/thread/composer-input.tsx:1515
+#: src/features/chat/signed-out/signed-out-chat.tsx:249
+#: src/features/chat/thread/composer-input.tsx:1527
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:182
 msgid "Type your message..."
 msgstr "Type your message..."
@@ -32856,7 +32904,7 @@ msgstr "Under the Hood"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:48
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:64
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:811
+#: src/features/chat/thread/composer-input.tsx:814
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "Undo"
@@ -33084,7 +33132,7 @@ msgstr "Up-to-date docs for any library or framework"
 msgid "Update Duration"
 msgstr "Update Duration"
 
-#: src/features/chat/thread/composer-input.tsx:1372
+#: src/features/chat/thread/composer-input.tsx:1384
 msgid "Update failed"
 msgstr "Update failed"
 
@@ -33272,14 +33320,14 @@ msgstr "Upload CSVs, run Python analysis, and export charts — no Jupyter setup
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 
-#: src/features/chat/thread/composer-input.tsx:409
-#: src/features/chat/thread/composer-input.tsx:611
-#: src/features/chat/thread/composer-input.tsx:1293
+#: src/features/chat/thread/composer-input.tsx:410
+#: src/features/chat/thread/composer-input.tsx:614
+#: src/features/chat/thread/composer-input.tsx:1305
 msgid "Upload failed"
 msgstr "Upload failed"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1286
+#: src/features/chat/thread/composer-input.tsx:1298
 msgid "Upload failed: {0}"
 msgstr "Upload failed: {0}"
 
@@ -33329,7 +33377,7 @@ msgstr "Uploaded"
 msgid "Uploaded {fileName}"
 msgstr "Uploaded {fileName}"
 
-#: src/features/chat/thread/composer-input.tsx:346
+#: src/features/chat/thread/composer-input.tsx:347
 msgid "Uploading {attachmentName}"
 msgstr "Uploading {attachmentName}"
 
@@ -33620,18 +33668,18 @@ msgstr "User's organization"
 msgid "User's role"
 msgstr "User's role"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:77
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:83
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:504
 #: src/features/auth/components/settings/account/update-username-card.tsx:28
 msgid "Username"
 msgstr "Username"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:107
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:113
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:171
 msgid "Username is required"
 msgstr "Username is required"
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:115
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:121
 msgid "Username or email is required"
 msgstr "Username or email is required"
 
@@ -33807,7 +33855,7 @@ msgstr "Verification code sent to your email"
 msgid "Verification could not run, so nobody has checked this result. Review the answer yourself: approve it as is, reject it, or send it back with a note."
 msgstr "Verification could not run, so nobody has checked this result. Review the answer yourself: approve it as is, reject it, or send it back with a note."
 
-#: src/features/auth/components/auth/forms/sign-in-form.tsx:292
+#: src/features/auth/components/auth/forms/sign-in-form.tsx:301
 #: src/features/auth/components/settings/security/change-email-card.tsx:105
 msgid "Verification email sent"
 msgstr "Verification email sent"
@@ -34438,7 +34486,7 @@ msgstr "Waiting for the agent…"
 msgid "Waiting for the owner"
 msgstr "Waiting for the owner"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:124
+#: src/features/chat/thread/ask-user-prompt.tsx:307
 msgid "Waiting for the owner to answer"
 msgstr "Waiting for the owner to answer"
 
@@ -34459,7 +34507,7 @@ msgstr "Waiting for you"
 
 #: src/features/chat/thread-list/thread-node.tsx:539
 #: src/features/chat/thread-list/thread-node.tsx:546
-#: src/features/chat/thread/ask-user-prompt.tsx:124
+#: src/features/chat/thread/ask-user-prompt.tsx:307
 msgid "Waiting for your answer"
 msgstr "Waiting for your answer"
 
@@ -34638,7 +34686,7 @@ msgstr "Weekly Growth"
 msgid "Weight"
 msgstr "Weight"
 
-#: src/features/auth/components/auth/auth-card.tsx:365
+#: src/features/auth/components/auth/auth-card.tsx:367
 msgid "Welcome back"
 msgstr "Welcome back"
 
@@ -35405,7 +35453,7 @@ msgstr "Your account and all associated data are being deleted. This cannot be c
 msgid "Your AI workspace <0>starts here.</0>"
 msgstr "Your AI workspace <0>starts here.</0>"
 
-#: src/features/chat/thread/ask-user-prompt.tsx:168
+#: src/features/chat/thread/ask-user-prompt.tsx:369
 msgid "Your answer"
 msgstr "Your answer"
 
@@ -35413,7 +35461,7 @@ msgstr "Your answer"
 msgid "Your answer in Neore has finished."
 msgstr "Your answer in Neore has finished."
 
-#: src/features/chat/thread/ask-user-prompt.tsx:151
+#: src/features/chat/thread/ask-user-prompt.tsx:337
 msgid "Your answer:"
 msgstr "Your answer:"
 
@@ -35503,12 +35551,12 @@ msgid "Your First Chat"
 msgstr "Your First Chat"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:671
+#: src/features/chat/thread/composer-input.tsx:674
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:664
+#: src/features/chat/thread/composer-input.tsx:667
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 
