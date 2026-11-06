@@ -69,9 +69,12 @@ const ChatPage = () => {
     const [handoffWaiting] = useState(landingMessageWaiting);
 
     usePromptLinkDraft({
+        // The composer sends the free model to an anonymous visitor's text chat, so the link's model waits for the session.
+        isAnonymous: sessionData?.user?.isAnonymous === true,
         model: linkModel,
         otherDraftSource: Boolean(promptId) || (Boolean(hasInitialMessage) && handoffWaiting),
         prompt: linkPrompt,
+        ready: !isSessionPending,
     });
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.

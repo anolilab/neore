@@ -7,6 +7,7 @@ import { showWarning } from "@/lib/toast";
 import { useChatUIStore } from "../stores/chat-ui-store";
 import type { ModelId } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
+import { composerModelOf } from "../utils/composer-model";
 import { promptFromLink } from "../utils/prompt-link";
 import { carriableLinkModel } from "../utils/prompt-link-model";
 
@@ -15,26 +16,37 @@ const withoutLinkParameters = (search: Record<string, unknown>): Record<string, 
     Object.fromEntries(Object.entries(search).filter(([key]) => key !== "model" && key !== "prompt"));
 
 /**
- * Applies a prompt link once: its prompt becomes the draft, and its model is chosen when the link can name it
- * (`carriableLinkModel`). A draft or a saved prompt already in place is kept with a notice, and so is the model the person
- * chose. A model the link cannot name is left alone, with a notice. The link's parameters are then removed from the address.
- * It never sends.
+ * Applies a prompt link once: its prompt becomes the draft, and its model is chosen only when the composer would send with
+ * that model (a text new chat, and not an anonymous visitor's, who sends the free model). Naming it ends Auto, as a pick in
+ * the model picker does. A draft or a saved prompt already in place is kept with a notice, and so is the model the person
+ * chose. A model the composer would not send is left alone, with a notice. The link's parameters are then removed from the
+ * address. It never sends. Nothing is decided until `ready`: the anonymity it reads comes from the session.
  */
 export const usePromptLinkDraft = ({
+    isAnonymous = false,
     model,
     otherDraftSource = false,
     prompt,
+    ready = true,
 }: {
+    /** The signed-in person is an anonymous guest: the composer sends the free model for them in a text chat. */
+    isAnonymous?: boolean;
     model?: string;
     /** A saved prompt or a message in the same URL already supplies this chat's draft: the link does not replace it. */
     otherDraftSource?: boolean;
     prompt?: string;
+    /** False until the session is known; the link waits, so its model is never decided on a guess about who is signed in. */
+    ready?: boolean;
 }): void => {
     const { t } = useLingui();
     const navigate = useNavigate();
     const appliedRef = useRef(false);
 
     useEffect(() => {
+        if (!ready) {
+            return;
+        }
+
         // The link's parameters are gone once it is applied, so the next link on this mounted page applies too.
         if (prompt === undefined && model === undefined) {
             appliedRef.current = false;
@@ -68,18 +80,30 @@ export const usePromptLinkDraft = ({
             }
         }
 
-        // The composer takes text models only: a speech or image model, a custom endpoint's model or an external one a link
-        // names is not applied, and the person is told so rather than left on a model the link did not name.
         if (applyLink && model !== undefined) {
+            const state = useModelStore.getState();
             const definition = carriableLinkModel(model);
+            // The model the composer sends with is the link's only in a text chat, and only where the composer shows that model
+            // (an anonymous visitor's text chat shows the free model instead). Anything else would send a different model.
+            const sendsLinkModel =
+                definition !== undefined &&
+                state.newThreadMode === "text" &&
+                composerModelOf({ isAnonymous, mode: "text", threadModel: definition.id }) === definition.id;
 
-            if (definition) {
-                useModelStore.getState().setSelectedModel(definition.id as ModelId, undefined);
+            if (definition && sendsLinkModel) {
+                state.setSelectedModel(definition.id as ModelId, undefined);
+
+                // Naming a model is choosing it, so Auto ends with the pick, as it does in the model picker for a new chat.
+                if (state.pendingSettings?.autoModel === true) {
+                    state.setPendingSettings((previous) => {
+                        return { ...previous, autoModel: false };
+                    });
+                }
             } else {
                 showWarning(t`This link's model is not available in this chat. The chat keeps its model.`);
             }
         }
 
         void navigate({ replace: true, search: (previous: Record<string, unknown>) => withoutLinkParameters(previous), to: "/chat" });
-    }, [model, navigate, otherDraftSource, prompt, t]);
+    }, [isAnonymous, model, navigate, otherDraftSource, prompt, ready, t]);
 };

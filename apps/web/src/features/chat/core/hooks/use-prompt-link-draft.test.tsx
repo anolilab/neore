@@ -2,7 +2,7 @@
  * A prompt link applies once, as an unsent draft, and its own parameters leave the address. A draft or a saved prompt
  * already in place keeps its text and model.
  */
-import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
+import { ANONYMOUS_FREE_MODEL, DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { MODEL_REGISTRY } from "@neore/ai/models";
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -49,9 +49,11 @@ const externalModel = "ext/mimo-v2-flash";
 const MODEL_NOTICE = "This link's model is not available in this chat. The chat keeps its model.";
 
 interface LinkProps {
+    isAnonymous?: boolean;
     model?: string;
     otherDraftSource?: boolean;
     prompt?: string;
+    ready?: boolean;
 }
 
 const renderLink = (initial: LinkProps) => renderHook((props: LinkProps) => usePromptLinkDraft(props), { initialProps: initial });
@@ -64,7 +66,7 @@ describe("usePromptLinkDraft", () => {
         harness.showWarning.mockReset();
         useChatUIStore.getState().setComposerText("");
         useChatUIStore.setState({ attachedReferences: [], composerAttachments: [] });
-        useModelStore.setState({ selectedModel: DEFAULT_CHAT_MODEL as ModelId });
+        useModelStore.setState({ newThreadMode: "text", pendingSettings: undefined, selectedModel: DEFAULT_CHAT_MODEL as ModelId });
     });
 
     afterEach(() => {
@@ -195,6 +197,54 @@ describe("usePromptLinkDraft", () => {
 
         expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
         expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
+    });
+
+    it("ends Auto as a pick does, so the link's model is the one a send runs on", () => {
+        useModelStore.setState({ pendingSettings: { autoModel: true } });
+
+        renderLink({ model: textModel?.id, prompt: "hi" });
+
+        expect(selectedModel()).toBe(textModel?.id);
+        expect(useModelStore.getState().pendingSettings?.autoModel).toBe(false);
+        expect(harness.showWarning).not.toHaveBeenCalled();
+    });
+
+    it("does not apply a link's model to an image, video or audio new chat, which would send in that mode", () => {
+        useModelStore.setState({ newThreadMode: "image" });
+
+        renderLink({ model: textModel?.id, prompt: "hi" });
+
+        expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+        expect(useChatUIStore.getState().composerText).toBe("hi");
+        expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
+    });
+
+    it("does not apply a text model to an anonymous visitor, whose text chat sends the free model, and says so", () => {
+        renderLink({ isAnonymous: true, model: textModel?.id, prompt: "hi" });
+
+        expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+        expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
+    });
+
+    it("applies the free model to an anonymous visitor, since that is the model the composer sends", () => {
+        renderLink({ isAnonymous: true, model: ANONYMOUS_FREE_MODEL, prompt: "hi" });
+
+        expect(selectedModel()).toBe(ANONYMOUS_FREE_MODEL);
+        expect(harness.showWarning).not.toHaveBeenCalled();
+    });
+
+    it("waits for the session before it decides, then applies the link once", () => {
+        const { rerender } = renderLink({ model: textModel?.id, prompt: "hi", ready: false });
+
+        expect(harness.navigate).not.toHaveBeenCalled();
+        expect(useChatUIStore.getState().composerText).toBe("");
+        expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+
+        rerender({ model: textModel?.id, prompt: "hi", ready: true });
+
+        expect(useChatUIStore.getState().composerText).toBe("hi");
+        expect(selectedModel()).toBe(textModel?.id);
+        expect(harness.navigate).toHaveBeenCalledTimes(1);
     });
 
     it("gives no model notice when the link's model is not applied because a draft is kept", () => {
