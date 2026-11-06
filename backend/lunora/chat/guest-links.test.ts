@@ -76,6 +76,10 @@ const asOwner = () => harness.withIdentity({ userId: OWNER } as never);
 
 const rows = async (table: string) => await harness.run(async (ctx: any) => await ctx.db.query(table).collect());
 
+/** `/chat/start` saved the note into the chat: the server marks it taken. */
+const takeNote = async (messageId: string) =>
+    await harness.run(async (ctx: any) => await ctx.runMutation(guestLinks.markGuestNoteSent, { messageId, userId: OWNER }));
+
 const createLink = async () =>
     (await asOwner().mutation(guestLinks.createGuestLink as never, { threadId } as never)) as { expiresAt: number; linkToken: string };
 
@@ -248,7 +252,9 @@ describe("the owner", () => {
         expect(await rows("threadGuestMessages")).toMatchObject([{ status: "held" }, { status: "held" }]);
         // A retry after a failed client send returns it again.
         expect(await asOwner().mutation(guestLinks.sendHeldGuestMessage as never, { messageId: first.id } as never)).toMatchObject({ text: "first" });
-        await asOwner().mutation(guestLinks.confirmGuestMessageSent as never, { messageId: first.id } as never);
+        // A confirmation before the text is in the chat is refused.
+        await expect(asOwner().mutation(guestLinks.confirmGuestMessageSent as never, { messageId: first.id } as never)).rejects.toBeDefined();
+        await takeNote(first.id);
         // Confirmed once more (a retried confirm) changes nothing; handing it out again is refused, so it is not sent twice.
         await asOwner().mutation(guestLinks.confirmGuestMessageSent as never, { messageId: first.id } as never);
         await expect(asOwner().mutation(guestLinks.sendHeldGuestMessage as never, { messageId: first.id } as never)).rejects.toBeDefined();
@@ -267,7 +273,7 @@ describe("the owner", () => {
         const message = (await rows("threadGuestMessages"))[0] as { _id: string };
 
         await asOwner().mutation(guestLinks.sendHeldGuestMessage as never, { messageId: message._id } as never);
-        await asOwner().mutation(guestLinks.confirmGuestMessageSent as never, { messageId: message._id } as never);
+        await takeNote(message._id);
 
         await expect(asOwner().mutation(guestLinks.dismissHeldGuestMessage as never, { messageId: message._id } as never)).rejects.toBeDefined();
         expect(await rows("threadGuestMessages")).toHaveLength(1);
@@ -359,7 +365,7 @@ describe("the guest's view", () => {
 
         expect(await view("fresh-browser-token")).toMatchObject({ messages: [{ status: "held", text: "mine" }] });
 
-        await asOwner().mutation(guestLinks.confirmGuestMessageSent as never, { messageId } as never);
+        await takeNote(messageId as string);
 
         expect(await view("fresh-browser-token")).toMatchObject({ messages: [{ status: "sent", text: "mine" }] });
     });
@@ -527,7 +533,7 @@ describe("the owner's export", () => {
         const first = ((await rows("threadGuestMessages")) as { _id: string; text: string }[]).find((row) => row.text === "first")!;
 
         await asOwner().mutation(guestLinks.sendHeldGuestMessage as never, { messageId: first._id } as never);
-        await asOwner().mutation(guestLinks.confirmGuestMessageSent as never, { messageId: first._id } as never);
+        await takeNote(first._id);
 
         const notes = (await harness.run(async (ctx: any) => await ctx.runQuery(guestLinks.listGuestNotesForExport, { threadId }))) as {
             status: string;
@@ -563,7 +569,26 @@ describe("a held note sent on from a chat", () => {
         const own = await harness.run(async (ctx: any) => await ctx.runQuery(guestLinks.getGuestNoteForSend, { messageId, userId: OWNER }));
         const stranger = await harness.run(async (ctx: any) => await ctx.runQuery(guestLinks.getGuestNoteForSend, { messageId, userId: "user-stranger" }));
 
-        expect(own).toEqual({ status: "held", threadId: threadId as string });
+        expect(own).toEqual({ status: "held", text: "a note", threadId: threadId as string });
         expect(stranger).toBeNull();
+    });
+});
+
+describe("a held note on a lapsed link", () => {
+    it("is not looked up for sending, even before the sweep removes the link", async () => {
+        await createLink();
+
+        const messageId = await harness.run(async (ctx: any) => {
+            const link = await ctx.db
+                .query("threadGuestLinks")
+                .withIndex("by_thread", (q: any) => q.eq("threadId", threadId))
+                .first();
+
+            await ctx.db.patch("threadGuestLinks", link._id, { expiresAt: 1 });
+
+            return await ctx.db.insert("threadGuestMessages", { createdAt: 0, linkId: link._id, status: "held", text: "late", threadId, userId: OWNER });
+        });
+
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(guestLinks.getGuestNoteForSend, { messageId, userId: OWNER }))).toBeNull();
     });
 });

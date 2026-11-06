@@ -5,8 +5,8 @@
  * - A held message is a row in `threadGuestMessages`, not a `messages` row: no agent context, title,
  *   summary or usage job ever reads it, and the post schedules nothing. It reaches the owner's own client
  *   only through {@link sendHeldGuestMessage}, which hands it over for the ordinary send path (the owner's
- *   credits, model and limits); the client confirms with {@link confirmGuestMessageSent} once that send
- *   went through, and only then does the guest see it as sent.
+ *   credits, model and limits); `/chat/start` saves the note's own text into the chat and marks the note
+ *   sent (`markGuestNoteSent`), so the guest sees it as sent only once it is in the conversation.
  * - The link is a bearer capability to POST, not to read. Its token is shown once and stored as a hash; the
  *   first browser to post is bound with a token of its own (also stored as a hash), and every later post or
  *   view must present it. The guest's view is their own messages and whether the owner took them up.
@@ -163,9 +163,8 @@ export const getGuestLink = authQuery
  * The owner's Send: hands back the guest's text so the owner's client sends it through the ordinary send path
  * (this procedure runs no model and starts no run itself). The client must send the text with this message's id as
  * `guestMessageId` on `/chat/start`: that marks it as guest text, so the quick approval check never reads it as the owner's.
- * The message stays HELD until the client confirms
- * the send ({@link confirmGuestMessageSent}), so a send that failed can be retried and the guest never sees a
- * failed one as sent. A message already confirmed is not handed out again.
+ * The message stays HELD until `/chat/start` saves it ({@link markGuestNoteSent}), so a send that failed can be retried and the
+ * guest never sees a failed one as sent. A message already sent is not handed out again.
  */
 export const sendHeldGuestMessage = authMutation
     .use(rateLimit("guest/review"))
@@ -211,8 +210,10 @@ export const confirmGuestMessageSent = authMutation
 
         await requireOwnedThread(context, row.threadId, userId, unlockProof);
 
+        // The note is taken as sent when its text is saved into the chat (`/chat/start`). A confirmation alone proves nothing,
+        // so it is refused until that has happened.
         if (row.status !== "sent") {
-            await context.db.patch("threadGuestMessages", messageId, { status: "sent" });
+            throw new LunoraError("BAD_REQUEST", "That message was not sent yet.");
         }
 
         context.log.event("chat.confirm_guest_message_sent", { sent: true });
@@ -491,7 +492,7 @@ export const holdGuestMessage = internalMutation
  */
 export const getGuestNoteForSend = internalQuery
     .input({ messageId: v.id("threadGuestMessages"), userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.union(v.object({ status: vGuestMessageStatus, threadId: v.string() }), v.null()))
+    .output(v.union(v.object({ status: vGuestMessageStatus, text: v.string(), threadId: v.string() }), v.null()))
     .query(async ({ args, ctx }) => {
         const row = await ctx.db.get("threadGuestMessages", args.messageId);
 
@@ -499,7 +500,31 @@ export const getGuestNoteForSend = internalQuery
             return null;
         }
 
-        return { status: row.status, threadId: row.threadId as string };
+        // A note on a lapsed link is no longer sendable, as the owner's Send refuses it, even before the sweep removes it.
+        const link = await ctx.db.get("threadGuestLinks", row.linkId);
+
+        if (!link || link.expiresAt <= ctx.now) {
+            return null;
+        }
+
+        return { status: row.status, text: row.text, threadId: row.threadId as string };
+    });
+
+/**
+ * `/chat/start` saved the held note's text as the owner's message: the note is taken, so the guest sees it as sent. Only a
+ * held note of the caller's is taken; any other row is left as it is.
+ */
+export const markGuestNoteSent = internalMutation
+    .input({ messageId: v.id("threadGuestMessages"), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const row = await ctx.db.get("threadGuestMessages", args.messageId);
+
+        if (row && row.userId === args.userId && row.status === "held") {
+            await ctx.db.patch("threadGuestMessages", args.messageId, { status: "sent" });
+        }
+
+        return null;
     });
 
 /** `getGuestView`'s read: the guest's own rows, only for the browser the link is bound to. */

@@ -471,7 +471,8 @@ export const runChatStart = async (
         return Response.json({ error: "Invalid pageContext" }, { status: 400 });
     }
 
-    // Only the shape is checked: a made-up id marks the owner's own text as guest text, which only ever asks for approval.
+    // The shape is checked here. `runChatStartOnShard` then refuses with 400 any id that is not one of the caller's held notes in
+    // the target chat (`getGuestNoteForSend`), and saves that note's own text.
     if (
         body.guestMessageId !== undefined &&
         (typeof body.guestMessageId !== "string" || body.guestMessageId.length === 0 || body.guestMessageId.length > 200)
@@ -575,11 +576,28 @@ const runChatStartOnShard = async (
     // A request refused below never awaits it; it is only a read.
     activeOrganizationPromise.catch(() => undefined);
 
+    const validThreadId = body.threadId && body.threadId !== "default" ? body.threadId : undefined;
+
+    // A held guest note is sent only into the chat it was left in, and its own text is what is saved: the prompt the client
+    // sent is not read for it. (Sent elsewhere, it would be confirmed against its own link.)
+    const guestNote =
+        body.guestMessageId === undefined
+            ? undefined
+            : await context
+                  .runQuery(internal.chat.guest_links.getGuestNoteForSend, { messageId: body.guestMessageId as Id<"threadGuestMessages">, userId })
+                  .catch(() => null);
+
+    if (body.guestMessageId !== undefined && (!guestNote || guestNote.status !== "held" || guestNote.threadId !== validThreadId)) {
+        return Response.json({ error: "That guest note is not waiting in this chat." }, { status: 400 });
+    }
+
     // Build message content
     const messageContent: any[] = [];
 
-    if (body.prompt) {
-        messageContent.push(body.guestMessageId === undefined ? { text: body.prompt.trim(), type: "text" } : guestTextPart(body.prompt.trim()));
+    if (guestNote) {
+        messageContent.push(guestTextPart(guestNote.text));
+    } else if (body.prompt) {
+        messageContent.push({ text: body.prompt.trim(), type: "text" });
     } else if (contentType === "image") {
         messageContent.push({ text: "Generate an image", type: "text" });
     } else {
@@ -592,8 +610,6 @@ const runChatStartOnShard = async (
     if (pageContext && contentType === "text") {
         messageContent.unshift(formatPageContextPart(pageContext));
     }
-
-    const validThreadId = body.threadId && body.threadId !== "default" ? body.threadId : undefined;
 
     // Continuing a thread needs write access to it. Nothing checked this: the
     // continue branch below saved the prompt into whatever thread id it was
@@ -655,17 +671,6 @@ const runChatStartOnShard = async (
     }
 
     const access = await accessPromise;
-
-    // A held guest note is sent only into the chat it was left in: sent elsewhere, it would be confirmed against its own link.
-    if (body.guestMessageId !== undefined) {
-        const note = await context
-            .runQuery(internal.chat.guest_links.getGuestNoteForSend, { messageId: body.guestMessageId as Id<"threadGuestMessages">, userId })
-            .catch(() => null);
-
-        if (!note || note.status !== "held" || note.threadId !== validThreadId) {
-            return Response.json({ error: "That guest note is not waiting in this chat." }, { status: 400 });
-        }
-    }
 
     if (access?.outcome === "locked" && !isRegenerate) {
         return threadLockedResponse();
@@ -902,6 +907,14 @@ const runChatStartOnShard = async (
 
         threadId = validThreadId;
         messageId = result.messageId;
+
+        // The held note's text is now in the chat: the guest sees it as sent.
+        if (guestNote) {
+            await context.runMutation(internal.chat.guest_links.markGuestNoteSent, {
+                messageId: body.guestMessageId as Id<"threadGuestMessages">,
+                userId,
+            });
+        }
 
         // Title generation for existing threads too — scheduled after the agent run below.
         scheduleTitleJobs(threadId, false);
