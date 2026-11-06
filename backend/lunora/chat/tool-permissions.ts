@@ -298,10 +298,18 @@ export const modeInheritedFrom = async (ctx: QueryCtx, thread: Doc<"threads">, u
         hops += 1;
 
         const links = await linksOf(ctx, current._id);
-        const continuation = links.find((link) => link.branchType === "continuation");
+        const continuations = links.filter((link) => link.branchType === "continuation");
+
+        // Two origins leave no one origin to take a mode from, and a read that reached the bound may hide a second one: fail closed rather
+        // than take whichever is listed first.
+        if (links.length >= MAX_LINKS_CHECKED || new Set(continuations.map((link) => link.parentThreadId)).size > 1) {
+            return "supervised";
+        }
+
+        const [continuation] = continuations;
 
         if (!continuation) {
-            return links.length >= MAX_LINKS_CHECKED ? "supervised" : null;
+            return null;
         }
 
         current = await ctx.db.get("threads", continuation.parentThreadId);

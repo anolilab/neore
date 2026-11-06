@@ -658,6 +658,54 @@ describe("host to cloud", () => {
     });
 });
 
+describe("the origin of a computer's thread", () => {
+    const originOf = async (hostId: string, parentId: string, mode: string | undefined) => {
+        await run(async (ctx) => {
+            await ctx.db.insert("threadRelationships", {
+                branchType: "continuation",
+                createdAt: 1,
+                parentThreadId: parentId,
+                threadId: hostId,
+                userId: ownerId,
+            } as never);
+        });
+
+        if (mode !== undefined) {
+            await run(async (ctx) => {
+                await ctx.db.patch("threads", parentId as never, { permissionMode: mode } as never);
+            });
+        }
+    };
+
+    it("is supervised when a computer's thread has two origins, whichever is listed first", async () => {
+        const device = await pairedDevice(ownerId);
+        const host = await hostThread(device);
+        const full = await cloudThread();
+        const other = await cloudThread();
+
+        await originOf(host, full, "full");
+        await originOf(host, other, undefined);
+
+        const result = await switchTo(host, { kind: "model", model: OTHER_MODEL });
+        const [fork] = await rows("threads", { _id: result.forkedThreadId });
+
+        expect(fork).toMatchObject({ permissionMode: "supervised" });
+    });
+
+    it("keeps the mode of its one origin", async () => {
+        const device = await pairedDevice(ownerId);
+        const host = await hostThread(device);
+        const origin = await cloudThread();
+
+        await originOf(host, origin, "full");
+
+        const result = await switchTo(host, { kind: "model", model: OTHER_MODEL });
+        const [fork] = await rows("threads", { _id: result.forkedThreadId });
+
+        expect(fork).toMatchObject({ permissionMode: "full" });
+    });
+});
+
 describe("a round trip through a computer", () => {
     it("gives the cloud chat it returns to the mode the owner set before the hop", async () => {
         const device = await pairedDevice(ownerId);
