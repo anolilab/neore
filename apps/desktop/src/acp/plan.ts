@@ -18,6 +18,9 @@ export interface PlanEntry {
 export const MAX_PLAN_ENTRIES = 50;
 export const MAX_PLAN_ENTRY_CHARS = 500;
 
+/** A lone high surrogate at the end: the first half of a character the cut split (as `tool-output.ts` checks). */
+const HIGH_SURROGATE_AT_END = /[\uD800-\uDBFF]$/u;
+
 const PRIORITIES = new Set<string>(["high", "low", "medium"]);
 const STATUSES = new Set<string>(["completed", "in_progress", "pending"]);
 
@@ -41,8 +44,9 @@ export const planOf = (update: Record<string, unknown>, scrub: (text: string) =>
             continue;
         }
 
-        // Masked before it is cut, so a value straddling the cut cannot leave its first half readable.
-        const content = scrub(entry.content).slice(0, MAX_PLAN_ENTRY_CHARS);
+        // Masked before it is cut, so a value straddling the cut cannot leave its first half readable. The cut counts UTF-16 units,
+        // so it can split a character outside the basic plane: its first half is dropped, as the output tail drops its own.
+        const content = scrub(entry.content).slice(0, MAX_PLAN_ENTRY_CHARS).replace(HIGH_SURROGATE_AT_END, "");
 
         if (content.trim() === "") {
             continue;

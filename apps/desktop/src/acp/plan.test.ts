@@ -38,6 +38,14 @@ describe(planOf, () => {
         expect(entry?.content).not.toContain("s3cr");
     });
 
+    it("does not end a cut entry on half of a character outside the basic plane", () => {
+        // The cut falls between the two halves of an emoji, which would end the entry on its first half.
+        const content = `${"x".repeat(MAX_PLAN_ENTRY_CHARS - 1)}😀`;
+        const [entry] = planOf({ entries: [{ content, priority: "high", status: "pending" }] }, keep) ?? [];
+
+        expect(entry?.content).toBe("x".repeat(MAX_PLAN_ENTRY_CHARS - 1));
+    });
+
     it("keeps at most the entries one event may carry", () => {
         const entries = Array.from({ length: MAX_PLAN_ENTRIES + 5 }, (_, index) => {
             return { content: `step ${String(index)}`, priority: "medium", status: "pending" };
