@@ -136,7 +136,16 @@ mod tests {
     use crate::engine::SettingsUpdate;
 
     /// A device with one registered agent, a shared folder holding the agent's approved folder, and a folder next to it.
-    fn setup(name: &str) -> (DeviceState, PathBuf, PathBuf, PathBuf) {
+    /// Removes a test's folder tree when the test ends, whether it passed or not.
+    struct Scratch(PathBuf);
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn setup(name: &str) -> (DeviceState, PathBuf, PathBuf, PathBuf, Scratch) {
         let dir =
             std::env::temp_dir().join(format!("neore-acp-term-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
@@ -175,7 +184,7 @@ mod tests {
 
         state.settings_update(roots).unwrap();
 
-        (state, project, other, shared)
+        (state, project, other, shared, Scratch(dir))
     }
 
     fn request(folder: &Path, line: &str) -> TerminalRequest {
@@ -198,7 +207,7 @@ mod tests {
 
     #[test]
     fn refuses_an_agent_not_approved_for_the_folder_and_a_working_folder_outside_it() {
-        let (state, project, other, shared) = setup("refusals");
+        let (state, project, other, shared, _scratch) = setup("refusals");
         let stranger = TerminalRequest {
             agent_key: "someone-else".into(),
             ..request(&project, "echo hi")
@@ -219,7 +228,7 @@ mod tests {
 
     #[test]
     fn refuses_a_variable_the_agent_may_not_set_and_an_empty_command() {
-        let (state, project, _, _) = setup("variables");
+        let (state, project, _, _, _scratch) = setup("variables");
         let reserved = TerminalRequest {
             env: vec![("NEORE_DEVICE_SECRET".into(), "x".into())],
             ..request(&project, "echo hi")
@@ -237,7 +246,7 @@ mod tests {
             return;
         }
 
-        let (state, project, _, shared) = setup("sibling");
+        let (state, project, _, shared, _scratch) = setup("sibling");
         // A folder the person shares, next to the agent's approved one, and not approved for the agent.
         let sibling = shared.join("sibling");
 
@@ -264,15 +273,16 @@ mod tests {
             return;
         }
 
-        let (state, project, _, _) = setup("runs");
+        let (state, project, _, _, _scratch) = setup("runs");
         let terminal =
             match state.acp_terminal_start(&request(&project, "pwd; echo made > made.txt")) {
                 Ok(terminal) => terminal,
-                // A Linux machine without the network filter refuses an `Off` tier: that is the sandbox saying no, not a bug.
-                Err(error) => {
+                // A machine whose sandbox cannot run this tier says so, and only that skips the test. Any other refusal is a regression.
+                Err(error) if error.contains("there is none here") => {
                     eprintln!("skipping: {error}");
                     return;
                 }
+                Err(error) => panic!("the terminal did not start: {error}"),
             };
         let exit = terminal.wait(Duration::from_secs(20)).expect("ended");
 

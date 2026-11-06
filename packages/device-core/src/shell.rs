@@ -1382,9 +1382,10 @@ mod tests {
         let Some((policy, shared, _)) = terminal_policy("term-exit") else {
             return;
         };
-        let started = Instant::now();
+        // The command waits for a gate the test opens after `start` has returned: returning at once is then shown by the command
+        // still running, not by a wall-clock limit that a loaded machine can miss.
         let terminal = Terminal::start(
-            "echo first; sleep 1; echo second 1>&2; exit 3",
+            "until [ -f gate ]; do sleep 0.05; done; echo first; echo second 1>&2; exit 3",
             &shared,
             &policy,
             &[],
@@ -1393,8 +1394,8 @@ mod tests {
         )
         .unwrap();
 
-        assert!(started.elapsed() < Duration::from_millis(800));
         assert!(terminal.output().exit_status.is_none());
+        std::fs::write(shared.join("gate"), b"").unwrap();
 
         let exit = terminal.wait(Duration::from_secs(20)).expect("ended");
         let output = terminal.output();
