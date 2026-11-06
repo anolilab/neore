@@ -44,6 +44,10 @@ describe(createRequestOf, () => {
             { command: "ls", cwd: "relative" },
             { command: "ls", env: [{ name: "1BAD", value: "x" }] },
             { command: "ls", env: [{ name: "A", value: "a\0b" }] },
+            // A bidi override or a zero-width joiner would show a different command than the one that runs.
+            { command: "echo\u{202E}eil" },
+            { command: "ls\u{200D}x" },
+            { command: "ls", cwd: "/work\u{2066}x" },
             { command: "x".repeat(4001) },
             // The line fits, but not with the variables in front of it: the person must read whole what they allow.
             { command: "ls", env: Array.from({ length: 10 }, (_, index) => { return { name: `V${String(index)}`, value: "v".repeat(400) }; }) },

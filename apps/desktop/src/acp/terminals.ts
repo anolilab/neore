@@ -22,6 +22,9 @@ export const MAX_SESSION_TERMINALS = 4;
  * (`acp_permission.rs`, `MAX_TEXT * 4`), and a command allowed must be one the person read whole.
  */
 const MAX_SHOWN_BYTES = 4000;
+
+/** Control, format and line-separator characters: text a reader cannot see as it runs. */
+const INVISIBLE = /[\p{Cc}\p{Cf}\u{2028}\u{2029}]/u;
 /** Ended terminals whose results a session keeps after their release, for the tool rows that show them. */
 const KEPT_RESULTS = 16;
 const MAX_ENV = 64;
@@ -158,6 +161,12 @@ export const createRequestOf = (params: Record<string, unknown>): { cwd?: string
 
     if (Buffer.byteLength(shown) > MAX_SHOWN_BYTES || line.includes("\0")) {
         throw new RpcError(INVALID_PARAMS, "the command is too long");
+    }
+
+    // The person approves the shown text, so it must read as the bytes that run: a control or invisible character (a bidi override,
+    // a zero-width joiner, a line separator) would let the approval window show something other than the command.
+    if (INVISIBLE.test(shown) || (typeof cwd === "string" && INVISIBLE.test(cwd))) {
+        throw new RpcError(INVALID_PARAMS, "the command has control or invisible characters");
     }
 
     return {
