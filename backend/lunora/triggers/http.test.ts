@@ -208,10 +208,13 @@ describe("trigger webhook signing", () => {
         const { post, scheduled } = await setup();
         // Every quote is escaped in the scheduled arguments, so this body is near 1.2 MiB there and under the 1 MiB body cap here.
         const body = '"'.repeat(600_000);
+        const headers = await signedHeaders(body);
 
-        const response = await post(body, await signedHeaders(body));
+        const response = await post(body, headers);
+        // The sender's retry is the same signed delivery: it must be refused again, not taken as a duplicate of the first.
+        const retry = await post(body, headers);
 
-        expect(response.status).toBe(413);
+        expect([response.status, retry.status]).toEqual([413, 413]);
         expect(scheduled).toHaveLength(0);
     });
 

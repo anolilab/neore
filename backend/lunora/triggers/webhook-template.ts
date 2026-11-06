@@ -36,7 +36,7 @@ const CREDENTIAL_WORD = /authorization|assertion|bearer|cookie|credential|hmac|p
 const NAME_SEPARATOR = /[-_.]/u;
 
 /** Credential words that are only a credential as a whole segment of a name (`x-api-key`, `sig`), since they occur inside ordinary words. */
-const CREDENTIAL_SEGMENT = new Set(["apikey", "auth", "csrf", "jwt", "key", "oauth", "otp", "pass", "pwd", "session", "sig", "xsrf"]);
+const CREDENTIAL_SEGMENT = new Set(["apikey", "auth", "code", "csrf", "jwt", "key", "oauth", "otp", "pass", "pwd", "session", "sid", "sig", "xsrf"]);
 
 /**
  * Whether a header or query name carries a credential. A false positive only blanks a value; a false negative leaks one.

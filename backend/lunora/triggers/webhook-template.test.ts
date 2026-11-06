@@ -124,6 +124,14 @@ describe("renderWebhookPrompt", () => {
         expect(renderWebhookPrompt("{{header.x-passphrase}}|{{header.x-hub-passphrase}}|{{query.passphrase}}", secrets, FRAME)).toBe('""|""|""');
     });
 
+    it("never reads a session, sid or code name, as a header or a query", () => {
+        const secrets = inputs({ body: "", headers: { "x-session-id": "a", "x-sid": "b" }, query: { code: "c", session_id: "e", sid: "d" } });
+
+        expect(renderWebhookPrompt("{{header.x-session-id}}|{{header.x-sid}}|{{query.code}}|{{query.sid}}|{{query.session_id}}", secrets, FRAME)).toBe(
+            '""|""|""|""|""',
+        );
+    });
+
     it("reads ordinary names that contain a short credential word", () => {
         const ordinary = inputs({ body: "", headers: { assignee: "a", author: "b", bypass: "c", design: "d", keyword: "e" }, query: {} });
 
