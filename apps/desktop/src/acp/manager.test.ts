@@ -426,6 +426,44 @@ describe("an agent that quotes its environment in an error", () => {
     });
 });
 
+describe("a start the computer's terminal check refuses", () => {
+    it("stops the agent it spawned, and still reports the refusal", async () => {
+        const spawned: { pid: number | undefined }[] = [];
+        const target = new AcpManager({
+            appVersion: "9.9.9",
+            cancelGraceMs: 400,
+            onChange: () => {},
+            plan: (_key, folder) => scratch.plan({}, folder),
+            spawn: (plan, key) => {
+                const child = spawnAgent(plan, key);
+
+                spawned.push(child);
+
+                return child;
+            },
+            startupTimeoutMs: 8000,
+            terminals: {
+                available: () => {
+                    throw new Error("the terminal check failed");
+                },
+                kill: () => {},
+                output: () => {
+                    return { exitStatus: null, output: "", truncated: false };
+                },
+                release: () => {},
+                start: async () => 0,
+                wait: async () => {
+                    return { exitCode: null, signal: null };
+                },
+            } as never,
+        });
+
+        expect(await messageOf(target.startSession("fake", "Fake", scratch.work))).toBe("the terminal check failed");
+        expect(spawned).toHaveLength(1);
+        await expectGone(spawned[0]?.pid ?? -1);
+    });
+});
+
 describe("unsupported platforms and missing commands", () => {
     it("explains a command that does not exist", async () => {
         const target = make(

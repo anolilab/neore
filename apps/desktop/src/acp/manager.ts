@@ -188,24 +188,34 @@ export class AcpManager {
         const { hooks } = this.options;
         // The runner needs the session to prompt and the session needs the runner to say when its turns start and end.
         let runner: HookRunner | undefined;
-        const session = new AgentSession({
-            agentKey,
-            agentLabel,
-            appVersion: this.options.appVersion,
-            cancelGraceMs: this.options.cancelGraceMs,
-            folder: plan.cwd,
-            folderIsRemote: this.options.folderIsRemote,
-            gate: this.options.gate ?? declineGate,
-            lifecycle: hooks === undefined ? undefined : { ended: () => runner?.stop(), turnEnded: () => runner?.turnEnded(), turnStarted: () => runner?.turnStarted() },
-            log: this.options.log,
-            onChange: () => this.changed(),
-            process: child,
-            startupTimeoutMs: this.options.startupTimeoutMs,
-            ...this.options.terminals !== undefined && { terminals: this.options.terminals },
-            ...remote !== undefined && { sessionId: remote.sessionId, threadId: remote.threadId },
-            ...remote?.nativeSessionId !== undefined && { resumeSessionId: remote.nativeSessionId },
-            ...folderInfo !== undefined && this.options.observer !== undefined && { hostInfo: { agentKey, agentLabel, ...folderInfo }, observer: this.options.observer },
-        });
+        let session: AgentSession;
+
+        try {
+            session = new AgentSession({
+                agentKey,
+                agentLabel,
+                appVersion: this.options.appVersion,
+                cancelGraceMs: this.options.cancelGraceMs,
+                folder: plan.cwd,
+                folderIsRemote: this.options.folderIsRemote,
+                gate: this.options.gate ?? declineGate,
+                lifecycle: hooks === undefined ? undefined : { ended: () => runner?.stop(), turnEnded: () => runner?.turnEnded(), turnStarted: () => runner?.turnStarted() },
+                log: this.options.log,
+                onChange: () => this.changed(),
+                process: child,
+                startupTimeoutMs: this.options.startupTimeoutMs,
+                ...this.options.terminals !== undefined && { terminals: this.options.terminals },
+                ...remote !== undefined && { sessionId: remote.sessionId, threadId: remote.threadId },
+                ...remote?.nativeSessionId !== undefined && { resumeSessionId: remote.nativeSessionId },
+                ...folderInfo !== undefined && this.options.observer !== undefined && { hostInfo: { agentKey, agentLabel, ...folderInfo }, observer: this.options.observer },
+            });
+        } catch (error) {
+            // Nothing holds the agent yet: no session was registered, so nothing else would stop it. It is stopped here, and the
+            // refusal is reported as it was.
+            child.killNow();
+
+            throw error;
+        }
 
         this.sessions.set(session.id, session);
 
