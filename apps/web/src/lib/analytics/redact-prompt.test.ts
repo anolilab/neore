@@ -356,3 +356,23 @@ describe("a prompt in an event's property name", () => {
         expect(JSON.stringify(redactPromptFromEvent({ event: "$pageview", properties: nested }))).not.toContain("secret");
     });
 });
+
+describe("free text with a ? before a prompt link", () => {
+    it("removes the prompt from the exact input the review named, and keeps the text before it", () => {
+        expect(redactPromptFromUrl("What? https://app/chat?prompt=secret")).toBe("What? https://app/chat");
+    });
+
+    it.each([
+        ["two question marks before the link", "What? why? https://app/chat?prompt=secret", "What? why? https://app/chat"],
+        [
+            "a link with another parameter after it",
+            "Summarise & ask? https://app/chat?prompt=secret&model=gpt-4o",
+            "Summarise & ask? https://app/chat&model=gpt-4o",
+        ],
+    ])("removes the prompt with %s", (_name, input, expected) => {
+        const cleaned = redactPromptFromUrl(input);
+
+        expect(cleaned).not.toContain("secret");
+        expect(cleaned).toBe(expected);
+    });
+});

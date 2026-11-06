@@ -102,12 +102,38 @@ const redactSegment = (segment: string, redact: (text: string) => string): strin
 };
 
 /** A query with its prompt parameters removed. Every other segment is kept as it was written. */
-const redactQuery = (query: string, redact: (text: string) => string): string =>
-    query
-        .split("&")
-        .map((segment) => redactSegment(segment, redact))
-        .filter((segment): segment is string => segment !== undefined)
-        .join("&");
+
+/**
+ * The delimiters a query is cut at: `&` between parameters, and `?` or `#` where free text (an exception message, say) or a second address
+ * begins before a link. Cutting at each one means a prompt after any of them is found, and the text before it is kept.
+ */
+const QUERY_DELIMITER = /([&?#])/;
+
+/**
+ * A query with its prompt parameters removed. Every other piece is kept as it was written, with its own delimiter; a removed piece takes
+ * the delimiter before it.
+ */
+const redactQuery = (query: string, redact: (text: string) => string): string => {
+    // The split keeps each delimiter, so the pieces alternate: segment, delimiter, segment, and so on.
+    const pieces = query.split(QUERY_DELIMITER);
+    let out = "";
+    let emitted = false;
+
+    for (let index = 0; index < pieces.length; index += 2) {
+        const kept = redactSegment(pieces[index] ?? "", redact);
+
+        if (kept === undefined) {
+            continue;
+        }
+
+        const delimiter = index === 0 ? "" : (pieces[index - 1] ?? "");
+
+        out += emitted ? `${delimiter}${kept}` : kept;
+        emitted = true;
+    }
+
+    return out;
+};
 
 /**
  * A URL, or any string that may hold one, with no prompt text left in it. The prompt parameter and a nested link's prompt are
