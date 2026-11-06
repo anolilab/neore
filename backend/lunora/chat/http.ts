@@ -545,16 +545,13 @@ const runChatStartOnShard = async (
         }
     }
 
-    // The caller's active organization, from the session row (`user.activeOrganization` is always null here: no session
-    // read from an HTTP action). It also re-checks membership. It depends on nothing below, so it is read alongside the
-    // rest instead of just before enqueueing the run.
+    // The caller's active organization, from the identity's `orgId` claim (checked against membership by the auth worker;
+    // an HTTP action carries no session id). It depends on nothing below, so it is read alongside the rest instead of
+    // just before enqueueing the run.
     const sessionOrganizationPromise = (async (): Promise<string | null> => {
         const identity = await context.auth.getIdentity();
-        const sessionId = identity?.sessionId;
 
-        return typeof sessionId === "string"
-            ? await context.runQuery(internal.auth.session_organization.getActiveOrganizationIdForSession, { sessionId, userId })
-            : null;
+        return typeof identity?.orgId === "string" ? identity.orgId : null;
     })();
 
     // Scopes organization-shared skills and goals. Only a text run has one.

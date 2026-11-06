@@ -72,27 +72,29 @@ describe("readRunPermissionCap", () => {
 });
 
 describe("readRequestPermissionCap", () => {
-    const requestCtx = (sessionId: string | undefined, runQuery: ReturnType<typeof vi.fn>) =>
-        ({ auth: { getIdentity: async () => (sessionId === undefined ? null : { sessionId }) }, runQuery }) as never;
+    // An HTTP action's identity carries `orgId` and no session id.
+    const requestCtx = (identity: { orgId?: string; userId: string } | null, runQuery: ReturnType<typeof vi.fn>) =>
+        ({ auth: { getIdentity: async () => identity }, runQuery }) as never;
 
-    it("reads the active organization from the caller's session and caps by it", async () => {
-        const runQuery = vi.fn().mockResolvedValueOnce("org_a").mockResolvedValueOnce("ask");
+    it("caps by the organization claim of the identity, with no session id", async () => {
+        const runQuery = vi.fn().mockResolvedValueOnce("ask");
 
-        expect(await readRequestPermissionCap(requestCtx("session_1", runQuery), "user_1")).toBe("ask");
-        expect(runQuery).toHaveBeenNthCalledWith(1, expect.anything(), { sessionId: "session_1", userId: "user_1" });
-        expect(runQuery).toHaveBeenNthCalledWith(2, expect.anything(), { organizationId: "org_a" });
+        expect(await readRequestPermissionCap(requestCtx({ orgId: "org_a", userId: "user_1" }, runQuery))).toBe("ask");
+        expect(runQuery).toHaveBeenCalledTimes(1);
+        expect(runQuery).toHaveBeenCalledWith(expect.anything(), { organizationId: "org_a" });
     });
 
-    it("gives auto without a session, which is the personal space", async () => {
+    it("gives auto without an organization claim, which is the personal space", async () => {
         const runQuery = vi.fn();
 
-        expect(await readRequestPermissionCap(requestCtx(undefined, runQuery), "user_1")).toBe("auto");
+        expect(await readRequestPermissionCap(requestCtx({ userId: "user_1" }, runQuery))).toBe("auto");
+        expect(await readRequestPermissionCap(requestCtx(null, runQuery))).toBe("auto");
         expect(runQuery).not.toHaveBeenCalled();
     });
 
-    it("caps at ask when the session lookup throws", async () => {
-        const runQuery = vi.fn().mockRejectedValueOnce(new Error("session read failed"));
+    it("caps at ask when the policy read throws", async () => {
+        const runQuery = vi.fn().mockRejectedValueOnce(new Error("policy read failed"));
 
-        expect(await readRequestPermissionCap(requestCtx("session_1", runQuery), "user_1")).toBe("ask");
+        expect(await readRequestPermissionCap(requestCtx({ orgId: "org_a", userId: "user_1" }, runQuery))).toBe("ask");
     });
 });
