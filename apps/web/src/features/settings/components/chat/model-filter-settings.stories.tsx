@@ -103,9 +103,13 @@ export const ToggleZeroDataRetention: Story = {
 
         await lunoraAnswered(api.auth.functions.getAIUserPreferences);
         await userEvent.click(toggle);
-        // Saved through the stateful fixture, so the refetch keeps it on.
-        await waitFor(async () => {
-            await expect(toggle).toBeChecked();
-        });
+        // Saved through the stateful fixture, so the refetch keeps it on. `waitFor` defaults to 1 s, which a loaded
+        // machine does not always give the save and the refetch.
+        await waitFor(
+            async () => {
+                await expect(toggle).toBeChecked();
+            },
+            { timeout: 5000 },
+        );
     },
 };

@@ -38,6 +38,9 @@ export default mergeConfig(
                     extends: true,
                     plugins: [storybookTest({ configDir: join(import.meta.dirname, ".storybook") })],
                     test: {
+                        // A page story's `play` waits for several loaded queries (up to 5 s each, see `PAGE_WAIT`);
+                        // under a loaded machine the 15 s default is not enough for the chat pages.
+                        testTimeout: 30_000,
                         browser: {
                             enabled: true,
                             headless: true,
