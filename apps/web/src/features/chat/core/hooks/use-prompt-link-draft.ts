@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { MODEL_LOOKUP } from "@neore/ai/models";
+import { enabledModelOf } from "@neore/ai/models";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 
@@ -67,9 +67,10 @@ export const usePromptLinkDraft = ({
             }
         }
 
-        const definition = model === undefined ? undefined : MODEL_LOOKUP.get(model);
+        // The composer takes text models only: a speech or image model named by a link is not applied to the text chat.
+        const definition = enabledModelOf(model, { mode: "text" });
 
-        if (applyLink && definition && definition.enabled !== false && definition.provider !== "external") {
+        if (applyLink && definition && definition.provider !== "external") {
             useModelStore.getState().setSelectedModel(definition.id as ModelId, undefined);
         }
 
