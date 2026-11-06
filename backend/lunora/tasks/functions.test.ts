@@ -156,4 +156,26 @@ describe("recurring tasks", () => {
 
         await expect(as(USER).mutation(updateTask as never, definition({ cronExpression: "0 10 * * *", taskId: recurring._id }) as never)).resolves.toBeNull();
     });
+
+    it("drop a recorded skip once the schedule changes or is removed, and keep it otherwise", async () => {
+        const { taskId } = (await as(USER).mutation(createTask as never, definition({ cronExpression: "0 9 * * *" }) as never)) as { taskId: string };
+        const markSkipped = async () =>
+            await harness.run(async (ctx: any) => await ctx.db.patch("tasks", taskId, { lastSkippedAt: 1000, lastSkipReason: "still_running" }));
+        const skipOf = async () => {
+            const row: any = await harness.run(async (ctx: any) => await ctx.db.get("tasks", taskId));
+
+            return [row.lastSkippedAt, row.lastSkipReason];
+        };
+
+        await markSkipped();
+        await as(USER).mutation(updateTask as never, definition({ cronExpression: "0 9 * * *", taskId, title: "Renamed" }) as never);
+        expect(await skipOf()).toStrictEqual([1000, "still_running"]);
+
+        await as(USER).mutation(updateTask as never, definition({ cronExpression: "0 10 * * *", taskId }) as never);
+        expect(await skipOf()).toStrictEqual([undefined, undefined]);
+
+        await markSkipped();
+        await as(USER).mutation(updateTask as never, definition({ taskId }) as never);
+        expect(await skipOf()).toStrictEqual([undefined, undefined]);
+    });
 });

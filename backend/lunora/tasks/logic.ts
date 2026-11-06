@@ -455,7 +455,12 @@ export const computeGoalProgress = (statuses: ReadonlyArray<TaskStatus>): GoalPr
 /** Every recurrence fires at least this far apart, whatever the expression says — each firing is a full agent run. */
 export const MIN_RECURRENCE_INTERVAL_MS = 15 * 60_000;
 
-/** The next time a recurring task should re-run after `after`. */
+/**
+ * The next time a recurring task should re-run after `after`. The sweep passes
+ * its own `now`, never the slot it is serving: a sweep that was down for several
+ * slots then runs ONE catch-up and moves on to the next future slot, never a
+ * burst of the missed ones (`tasks/AGENTS.md`).
+ */
 export const nextRecurrenceAt = (cronExpression: string, after: number): number => {
     let next = getNextCronTime(cronExpression, after);
 
@@ -465,6 +470,27 @@ export const nextRecurrenceAt = (cronExpression: string, after: number): number 
     }
 
     return next;
+};
+
+/**
+ * The latest slot of `cronExpression` at or before `now`, starting from the due slot `from`: after an outage
+ * that is the most recent missed slot, which a skip records. Bounded, so a long outage on a frequent schedule
+ * stops at a slot near `now` rather than walking every one.
+ */
+export const latestSlotAtOrBefore = (cronExpression: string, from: number, now: number): number => {
+    let latest = from;
+
+    for (let guard = 0; guard < 10_000; guard += 1) {
+        const next = getNextCronTime(cronExpression, latest);
+
+        if (next > now || next <= latest) {
+            break;
+        }
+
+        latest = next;
+    }
+
+    return latest;
 };
 
 /** Recurrences one user may start per sweep, so a user with many due tasks cannot hold everyone else back. */
@@ -499,3 +525,18 @@ const AT_REST: ReadonlySet<TaskStatus> = new Set(["done", "failed", "todo"]);
 
 /** A due recurrence only re-queues a task that is at rest; one still in flight or awaiting review is left alone. */
 export const shouldRecurNow = (status: TaskStatus): boolean => AT_REST.has(status);
+
+export type TaskSkipReason = "awaiting_review" | "blocked" | "still_running";
+
+/** Why a due slot cannot start a task in `status`, or `undefined` when it can. */
+export const recurrenceSkipReason = (status: TaskStatus): TaskSkipReason | undefined => {
+    if (shouldRecurNow(status)) {
+        return undefined;
+    }
+
+    if (status === "needs_review") {
+        return "awaiting_review";
+    }
+
+    return status === "blocked" ? "blocked" : "still_running";
+};

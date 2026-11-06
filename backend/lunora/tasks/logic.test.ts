@@ -13,6 +13,7 @@ import {
     findUnblockedDependents,
     initialRunStatus,
     isTaskModelAllowed,
+    latestSlotAtOrBefore,
     MIN_RECURRENCE_INTERVAL_MS,
     nextRecurrenceAt,
     parseVerifierOutput,
@@ -331,5 +332,18 @@ describe(pickFairRecurrences, () => {
 
     it("stops at the overall total", () => {
         expect(pickFairRecurrences(due("abcdef"), 2, 3).map((task) => task.userId)).toStrictEqual(["a", "b", "c"]);
+    });
+});
+
+describe(latestSlotAtOrBefore, () => {
+    const HOUR = 60 * 60_000;
+    const nine = Date.UTC(2026, 10, 6, 9);
+
+    it("is the most recent slot at or before now", () => {
+        expect(latestSlotAtOrBefore("0 * * * *", nine, nine + 2 * HOUR + 59_000)).toBe(nine + 2 * HOUR);
+    });
+
+    it("is the due slot itself when no later slot has passed", () => {
+        expect(latestSlotAtOrBefore("0 * * * *", nine, nine + 30 * 60_000)).toBe(nine);
     });
 });
