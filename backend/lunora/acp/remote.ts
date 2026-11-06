@@ -357,7 +357,8 @@ export const setHostOption = authMutation
         // decline: so a mode is changed on the computer, where the person sees what it grants. Only other options change from here.
         const option = args.optionId === undefined ? undefined : session.agentState?.configOptions?.find((entry) => entry.id === args.optionId);
 
-        if (args.optionId === undefined || option?.category === "mode") {
+        // The computer matches the category without regard to case, so this does too.
+        if (args.optionId === undefined || option?.category?.toLowerCase() === "mode") {
             throw new LunoraError("BAD_REQUEST", "A mode is changed on the computer, not from here.");
         }
 

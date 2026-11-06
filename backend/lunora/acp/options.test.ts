@@ -209,6 +209,13 @@ describe("setHostOption", () => {
         expect(await rows("deviceCalls", { toolName: "acp_set_config" })).toHaveLength(0);
     });
 
+    it("refuses a mode filed under a category in another case, since the computer matches it without regard to case", async () => {
+        const { threadId } = await readySession({ configOptions: [{ ...MODE_OPTION, category: "Mode" }, MODEL] });
+
+        await expect(setOption(threadId, { optionId: "mode", valueId: "auto" })).rejects.toThrow(MODE_REFUSAL);
+        expect(await rows("deviceCalls", { toolName: "acp_set_config" })).toHaveLength(0);
+    });
+
     it("refuses an option of the mode category from the web, and still changes the other options", async () => {
         const { threadId } = await readySession({ configOptions: [MODE_OPTION, MODEL] });
 
