@@ -214,8 +214,11 @@ export class AgentSession {
             scrub: options.process.scrub,
             secretLength: options.process.secretLength,
         });
+        // Windows has no sandbox to run a terminal in (`device-core`), so the capability is not offered there: the agent runs its
+        // commands itself rather than being asked to approve a command that cannot start. Elsewhere the core still refuses a terminal
+        // whose sandbox is missing (no Landlock), since the desktop cannot tell that from here.
         this.terminals
-            = options.terminals === undefined || options.folderIsRemote === true
+            = options.terminals === undefined || options.folderIsRemote === true || process.platform === "win32"
                 ? undefined
                 : new SessionTerminals(options.terminals, (terminalId) => this.onTerminalEnded(terminalId));
         this.connection = new JsonRpcConnection(options.process.stdout, options.process.stdin, {
