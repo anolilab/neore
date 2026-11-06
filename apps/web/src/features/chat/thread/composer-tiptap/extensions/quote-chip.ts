@@ -9,6 +9,7 @@
 import type { Editor } from "@tiptap/core";
 import { mergeAttributes, Node } from "@tiptap/core";
 
+import { textAfterRestore } from "@/features/chat/core/utils/composer-restore";
 import { formatQuote } from "@/features/chat/core/utils/quote-selection";
 import { scrollToMessage } from "@/features/chat/core/utils/scroll-to-message";
 import { showWarning } from "@/lib/toast";
@@ -105,4 +106,19 @@ export const insertQuoteChip = (editor: Editor, quote: { messageId: string; text
     }
 
     editor.commands.insertContentAt(editor.state.doc.content.size, content);
+};
+
+/**
+ * The draft after a quote restore. With the editor mounted, the chip goes in and the draft is the editor's text. Without
+ * it (the request was taken before Tiptap created the editor), the quote is added to the draft as plain quoted lines.
+ * The composer's sync puts that text into the editor when it mounts, so the selection is not lost; it is just not a chip.
+ */
+export const quoteRestoreDraft = (editor: Editor | null, quote: { messageId: string; text: string }, draft: string): string => {
+    if (!editor) {
+        return textAfterRestore(draft, { append: true, files: [], text: formatQuote(quote.text) });
+    }
+
+    insertQuoteChip(editor, quote);
+
+    return editor.getText({ blockSeparator: "\n" });
 };
