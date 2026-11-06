@@ -15,6 +15,7 @@ import { useId, useState } from "react";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import { createDialogVisits } from "../lib/dialog-visit";
 import { MAX_PULL_REQUESTS_PER_ATTACH, parsePullRequestAddresses } from "../lib/pull-request-address";
 import { useAttachPullRequests, useThreadPullRequests } from "../lib/use-develop";
 
@@ -53,6 +54,7 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
     const [failures, setFailures] = useState<string[]>([]);
     const [inputProblem, setInputProblem] = useState(false);
     const [busy, setBusy] = useState(false);
+    const [visits] = useState(createDialogVisits);
 
     // Only the owner can link: the attach action refuses anyone else, so the control is not shown to them.
     if (threadId === undefined || access.data?.isOwner !== true) {
@@ -104,8 +106,16 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
         setBusy(true);
         reset();
 
+        const visit = visits.current();
+
         try {
             const outcome = await attach({ pullRequests: parsed, threadId });
+
+            // Closed (and maybe opened again) while the host answered: this result is not the new visit's.
+            if (!visits.isCurrent(visit)) {
+                return;
+            }
+
             const linked = outcome.results.filter((result) => result.status === "attached").length;
             const alreadyLinked = outcome.results.some((result) => result.status === "already_linked");
             const failed = outcome.results.filter((result) => result.status !== "attached" && result.status !== "already_linked");
@@ -133,9 +143,13 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
                 setText("");
             }
         } catch {
-            setFailures([t`Could not link. Try again.`]);
+            if (visits.isCurrent(visit)) {
+                setFailures([t`Could not link. Try again.`]);
+            }
         } finally {
-            setBusy(false);
+            if (visits.isCurrent(visit)) {
+                setBusy(false);
+            }
         }
     };
 
@@ -178,9 +192,13 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
             </Button>
             <Dialog
                 onOpenChange={(next) => {
-                    // A new visit starts clean: the last visit's result is not this one's.
+                    // Opening or closing ends the visit: a request still in flight writes nothing into the next one.
+                    visits.next();
+
+                    // A new visit starts clean: the last visit's result is not this one's, and nothing of it is still linking.
                     if (next) {
                         reset();
+                        setBusy(false);
                     }
 
                     setOpen(next);

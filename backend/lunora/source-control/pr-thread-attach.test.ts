@@ -13,7 +13,7 @@ import schema from "../schema";
 import { GITHUB_WEB_ORIGIN } from "./drivers/github";
 import { attachPullRequests, countsForThreads, listForThread, recordAttachedPullRequests } from "./pr-thread-attach";
 import { listForPullRequest } from "./pr-threads";
-import { setLinksThreadDeleted } from "./pr-thread-deleted";
+import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "./pr-thread-links";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -347,6 +347,34 @@ describe("the thread list and the sidebar counts", () => {
 
         expect(found).toHaveLength(1);
         expect(await record(threadId, A, [link(5, "octo/HELLO")])).toEqual([{ number: 5, repository: "octo/hello", status: "already_linked" }]);
+    });
+
+    it("marks and removes every link of a thread, past one page of them", async () => {
+        const threadId = await threadOf(A);
+
+        await harness.run(async (ctx: any) => {
+            for (let number = 1; number <= 150; number += 1) {
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: number,
+                    kind: "opened",
+                    number,
+                    repository: "octo/hello",
+                    threadId,
+                    title: "t",
+                    url: `https://github.com/octo/hello/pull/${String(number)}`,
+                    userId: A,
+                });
+            }
+        });
+        await harness.run(async (ctx: any) => await setLinksThreadDeleted(ctx, A, threadId as never, true));
+
+        const marked = await links();
+
+        expect(marked.filter((row: any) => row.threadDeleted !== true)).toEqual([]);
+
+        await harness.run(async (ctx: any) => await deletePullRequestLinksOfThread(ctx, A, threadId as never));
+
+        expect(await links()).toEqual([]);
     });
 
     it("does not list one user's links to another user's thread", async () => {
