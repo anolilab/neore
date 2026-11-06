@@ -197,7 +197,7 @@ export interface ApiTypes {
             askAside: FunctionReference<"action", { entryId: string; question: string; threadId: Id<"threads">; unlockProof?: string }, { answer: string; token: string; withThread: boolean }>;
         };
         ask_user: {
-            answerAskUser: FunctionReference<"mutation", { answer: string | null; approvalId: string; fileIds?: Array<string>; threadId: Id<"threads">; unlockProof?: string }, { alreadyResolved: boolean; streamId: string | null }>;
+            answerAskUser: FunctionReference<"mutation", { answer?: string | null; answers?: Array<{ note?: string; selected: Array<string> }>; approvalId: string; fileIds?: Array<string>; threadId: Id<"threads">; unlockProof?: string }, { alreadyResolved: boolean; streamId: string | null }>;
         };
         autocomplete: {
             suggestCompletion: FunctionReference<"action", { text: string }, { completion: string }>;
@@ -865,7 +865,7 @@ export interface ApiTypes {
             updateGalleryMeta: FunctionReference<"mutation", { category?: "image" | "text" | "video" | "audio" | "automation"; description?: string; projectId: Id<"projects">; tags?: Array<string> }, { success: boolean }>;
         };
         generate: {
-            generateWorkflowFromPrompt: FunctionReference<"action", { prompt: string }, { edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "text" | "output" | "image" | "file" | "code" | "branch" | "video" | "audio" | "img2img" | "inpaint" | "outpaint" | "transcription" | "upscale" | "ai" | "background-removal" | "image-to-video"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
+            generateWorkflowFromPrompt: FunctionReference<"action", { prompt: string }, { edges: { sourceHandle: string; targetHandle: string; type: "animated"; id: string; source: string; target: string; }[]; nodes: { data: { [x: string]: unknown; label: string; description?: string | undefined; }; id: string; position: { x: number; y: number; }; type: "text" | "output" | "image" | "file" | "code" | "branch" | "video" | "audio" | "img2img" | "upscale" | "inpaint" | "outpaint" | "transcription" | "ai" | "background-removal" | "image-to-video"; }[]; viewport: { x: number; y: number; zoom: number; }; }>;
         };
         presence: {
             checkNodeLock: FunctionReference<"query", { nodeId: string; projectId: Id<"projects"> }, { locked: boolean; lockedBy: string | null; lockerColor: string | null }>;

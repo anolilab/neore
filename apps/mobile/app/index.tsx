@@ -1,9 +1,11 @@
 import { api } from "@neore/backend/api";
-import { Link } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { Link, useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, Pressable, Text } from "react-native";
 
 import { useAuth } from "@/auth/auth-state";
+import { lastChatToReopen } from "@/chat/last-thread-store";
+import { canClaimLaunchReopen } from "@/chat/launch-reopen";
 import { getClient } from "@/lib/lunora";
 import { isNetworkFailure } from "@/offline/connectivity";
 import { displayStatus } from "@/offline/labels";
@@ -66,7 +68,9 @@ const statusLine = (thread: ThreadRow, tracked: ShownStatus | undefined, isOffli
 };
 
 const ThreadList = () => {
-    const { hasToken, status } = useAuth();
+    const { hasToken, status, user } = useAuth();
+    const router = useRouter();
+    const userId = user?.id;
     const { cache, isOffline, refreshTick, reportRead } = useOffline();
     const startChat = useWriteControl("start");
     const statuses = useHostStatuses();
@@ -158,6 +162,33 @@ const ThreadList = () => {
             isCancelled = true;
         };
     }, [cache, hasToken, refreshTick, reportRead, status]);
+
+    // The list is in front on launch, so this is where the last chat reopens: once per launch. A chat opened from a link
+    // claims the launch first (see the chat screen), so the list does not reopen one after it.
+    useFocusEffect(
+        useCallback(() => {
+            if (status !== "signed-in" || !userId || !canClaimLaunchReopen()) {
+                return undefined;
+            }
+
+            let isActive = true;
+
+            const reopen = async () => {
+                const threadId = await lastChatToReopen(userId);
+
+                // Leaving the list, or switching account, while the saved chat loads must not open it over what the user chose.
+                if (threadId !== undefined && isActive) {
+                    router.push(`/chat/${threadId}`);
+                }
+            };
+
+            reopen();
+
+            return () => {
+                isActive = false;
+            };
+        }, [router, status, userId]),
+    );
 
     const loadMore = async () => {
         if (isDone || isLoadingMore) {

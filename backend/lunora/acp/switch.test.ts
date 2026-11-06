@@ -52,6 +52,7 @@ const { listMessagesByThreadId } = await import("../agent/messages");
 const { agentKeyOf, sameAgent } = await import("../agent/agent-switch-logic");
 const { reattachFailureOf } = await import("./lib/reattach");
 const { stopHostTurn } = await import("./lib/finish");
+const { stripHiddenText } = await import("@neore/ai/utils");
 const calls = await import("./calls");
 const send = await import("./send");
 const switchModule = await import("./switch");
@@ -399,6 +400,26 @@ describe("cloud to host", () => {
         const thread = (await row(forked)) as never;
 
         expect(await run(async (ctx) => await pendingHandoffOf(ctx, thread))).toBeUndefined();
+    });
+
+    it("strips hidden characters from the handoff too, so the earlier conversation reaches the computer as the visible text", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        // An earlier reply carries a tag character, which the handoff quotes.
+        await addRow(source, 50, "assistant", "answer with \u{E0041} a hidden tag");
+        const { forkedThreadId } = await switchTo(source, hostTarget(device));
+        const forked = forkedThreadId as string;
+
+        await openStartedSession(device, forked);
+
+        expect((await sendText(forked, "now fix the failing test")).outcome).toBe("sent");
+
+        const [first] = await acpSends();
+
+        expect(first).toContain("answer with  a hidden tag");
+        expect(first).not.toContain("\u{E0041}");
+        expect(stripHiddenText(first ?? "").text).toBe(first);
     });
 
     it("keeps the handoff for the next prompt when the send that carried it was stopped before the computer took it", async () => {

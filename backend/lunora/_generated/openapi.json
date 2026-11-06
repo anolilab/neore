@@ -15517,6 +15517,26 @@
                           }
                         ]
                       },
+                      "answers": {
+                        "items": {
+                          "properties": {
+                            "note": {
+                              "type": "string"
+                            },
+                            "selected": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "selected"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
                       "approvalId": {
                         "type": "string"
                       },
@@ -15536,7 +15556,6 @@
                       }
                     },
                     "required": [
-                      "answer",
                       "approvalId",
                       "threadId"
                     ],

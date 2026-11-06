@@ -69,6 +69,7 @@ import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
 import { getToolsForModelAndMode, type SearchMode } from "./lib/tool-builder";
 import { getAgentForUser } from "./lib/thread-helpers";
 import { vToolRunConfig } from "./lib/tool-run-config";
+import { vAskUserAnswers } from "./tools/ask-user-validators";
 import { pauseOnRateLimit } from "./lib/pause-run";
 import { scheduleRepliesUsage } from "./lib/pause-usage";
 import { runStreamingAgentFields } from "./lib/streaming-run-args";
@@ -903,6 +904,8 @@ export const continueAfterToolApproval = internalAction
         answer: v.optional(v.string()),
         /** Files the answer carries; read as the owner by the continuation (`lib/ask-user-files.ts`). */
         answerFileIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
+        /** The answers to a multi-question `askUser` call, one per question: its tool result in place of `answer`. */
+        answers: v.optional(vAskUserAnswers),
         approvalId: v.string(),
         approved: v.boolean(),
         config: vToolRunConfig,
@@ -912,7 +915,7 @@ export const continueAfterToolApproval = internalAction
         threadId: v.string(),
         userId: v.string(),
     })
-    .action(async ({ args: { answer, answerFileIds, approvalId, approved, config, denyReason, streamId, threadId, userId }, ctx }) => {
+    .action(async ({ args: { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId }, ctx }) => {
         // Enqueued on the jobs queue (at-least-once): only the claiming delivery resumes the run.
         if (!(await ctx.runMutation(internal.chat.streaming.persistent.library.claimStreamRun, { streamId: streamId as Id<"persistentStreams"> }))) {
             streamLogger.warn(`[ToolApproval] Stream ${streamId} already claimed — ignoring a redelivered continuation`);
@@ -942,6 +945,7 @@ export const continueAfterToolApproval = internalAction
                 await continueGroupAfterToolApproval(ctx, {
                     answer,
                     answerFileIds,
+                    answers,
                     approvalId,
                     approved,
                     config: { ...config, group: config.group },
@@ -957,7 +961,7 @@ export const continueAfterToolApproval = internalAction
             // The gate above admitted this continuation, so its knowledge search may read the chat's own files.
             const resumed = await resumeApprovedRun(
                 ctx,
-                { answer, answerFileIds, approvalId, approved, config, denyReason, streamId, threadId, userId },
+                { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId },
                 { admittedRun: true, steerable: true },
             );
 
