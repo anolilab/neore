@@ -1,3 +1,4 @@
+import { Link } from "expo-router";
 import { useState } from "react";
 import { AccessibilityInfo, Pressable, Text, View } from "react-native";
 
@@ -41,6 +42,11 @@ const SignInScreen = () => {
                 </Text>
                 )
                 : null}
+            <Link asChild href="/settings">
+                <Pressable accessibilityRole="link" style={{ alignItems: "center", justifyContent: "center", minHeight: 44, paddingHorizontal: 12 }}>
+                    <Text style={{ textDecorationLine: "underline" }}>Settings</Text>
+                </Pressable>
+            </Link>
         </View>
     );
 };

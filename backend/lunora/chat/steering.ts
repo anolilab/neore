@@ -94,7 +94,7 @@ export const steerRun = authMutation
             return { steerId: requestedId };
         }
 
-        const steerId = requestedId ?? crypto.randomUUID();
+        const steerId = requestedId ?? ctx.newId();
         const steers = queueSteer(stream.steers ?? [], { id: steerId, text });
 
         if (!steers) {

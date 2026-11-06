@@ -248,5 +248,7 @@ export const dismissGuideProposal = authMutation
             updatedAt: ctx.now,
         });
 
+        ctx.log.event("source_control.guide_proposal_dismissed", { kind: proposal.kind });
+
         return { status: "dismissed" as const };
     });

@@ -55,11 +55,11 @@ differently.
   not here.
 - `MessageItem` and `MessageList` are `memo`-wrapped and rows are memoised on
   message identity. A prop that changes on every live push re-renders every row of a
-  long thread (root `CLAUDE.md`, "Chat rows are memoized on message IDENTITY").
+  long thread (`apps/web/AGENTS.md`, "Chat rows are memoized on message IDENTITY").
 - KaTeX and Mermaid must stay off the startup path: reach them only through
   `@neore/ui/hooks/use-streamdown-plugins`, never a static import here.
 - Components that use destructuring defaults are skipped by the React Compiler
-  in this repo's current setup; see root `CLAUDE.md` before "fixing" that.
+  in this repo's current setup; see the Frontend notes in `apps/web/AGENTS.md` before "fixing" that.
 
 ## Development
 

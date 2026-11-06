@@ -3,8 +3,8 @@
  * coding-agent steps, enqueued with `lib/job-queue.ts:enqueueJob`.
  *
  * Why a queue at all: a `ctx.scheduler` job is dispatched by a SchedulerDO whose
- * alarm keeps at most six in flight and awaits each to the end (root AGENTS.md,
- * "Scheduler"; anolilab/lunora#793 lifted it from one). A queue consumer instead
+ * alarm keeps at most six in flight and awaits each to the end (`backend/AGENTS.md`,
+ * "Scheduler lanes"; anolilab/lunora#793 lifted it from one). A queue consumer instead
  * runs up to `maxConcurrency` invocations at once, so one user's agent run no
  * longer holds up everyone else's.
  *

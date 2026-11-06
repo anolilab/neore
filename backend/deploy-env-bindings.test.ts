@@ -35,6 +35,7 @@ const REPO_ROOT = join(import.meta.dirname, "..");
 
 const alchemyScript = readFileSync(join(REPO_ROOT, "alchemy.run.ts"), "utf8");
 const deployWorkflow = readFileSync(join(REPO_ROOT, ".github/workflows/deploy.yml"), "utf8");
+const sourceMapScript = readFileSync(join(REPO_ROOT, "scripts/upload-web-sourcemaps.sh"), "utf8");
 
 /** An indented `KEY: value` line, matched after its indentation is trimmed. */
 const ENV_KEY_LINE = /^([A-Z][A-Z0-9_]*):\s/u;
@@ -345,15 +346,18 @@ describe("deploy env bindings", () => {
             expect(deployWorkflow).toMatch(ACCESS_ENABLED_FROM_VARIABLE);
         });
 
-        it("uploads the web source maps to PostHog before it deletes them, ahead of the deploy", () => {
-            const upload = deployWorkflow.indexOf('name: "Upload the web source maps to PostHog, then delete them"');
+        it("uploads the web source maps to PostHog before it deletes them, after the build and ahead of the deploy", () => {
+            const build = deployWorkflow.indexOf("pnpm --dir apps/web build");
+            const upload = deployWorkflow.indexOf("bash scripts/upload-web-sourcemaps.sh");
             const deploy = deployWorkflow.indexOf('name: "Deploy all Cloudflare Workers via Alchemy"');
 
-            expect(upload).toBeGreaterThan(-1);
+            expect(build).toBeGreaterThan(-1);
+            expect(upload).toBeGreaterThan(build);
             expect(upload).toBeLessThan(deploy);
-            // Pinned with its checksum, deleted whether or not the upload ran.
-            expect(deployWorkflow).toMatch(PINNED_SHA256);
-            expect(deployWorkflow).toContain("find apps/web/dist -name '*.map' -delete");
+            // Pinned with its checksum, deleted whether or not the upload ran: the delete is the
+            // script's last command, outside the upload's branches.
+            expect(sourceMapScript).toMatch(PINNED_SHA256);
+            expect(sourceMapScript.trimEnd().endsWith("find apps/web/dist -name '*.map' -delete")).toBe(true);
         });
 
         it("builds the app and deploys the backend against the same origins", () => {

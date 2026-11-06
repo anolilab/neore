@@ -5,6 +5,7 @@
  * Replaces direct `@ai-sdk/google` and CF Workers AI embedding calls.
  */
 import type { EmbeddingModelV3, EmbeddingModelV3CallOptions, EmbeddingModelV3Result } from "@ai-sdk/provider";
+import { dataHandlingRules, deriveModelRegions, getModelRejectionReason, hasActiveFilters, type ModelFilterRules } from "@neore/ai/models";
 
 import { fetchWithDeadline } from "../../lib/fetch-timeout";
 import { SERVICE_ORIGIN, type ServiceFetch } from "../../lib/services.js";
@@ -13,6 +14,11 @@ import { generateTraceparent } from "../../lib/traceparent.js";
 export interface GatewayEmbeddingModelOptions {
     /** The gateway's service binding (`gatewayFetch(ctx)`). */
     gateway: ServiceFetch;
+    /**
+     * The user's model filters, read fail-closed (`loadModelFilterRules`). The gateway refuses the embedding model
+     * when they exclude it (`MODEL_BLOCKED`): Workers AI embeddings are served from any region, so any region rule does.
+     */
+    modelFilterRules?: ModelFilterRules;
     modelId: string;
     orgId?: string;
     threadId?: string;
@@ -47,6 +53,8 @@ export class GatewayEmbeddingModel implements EmbeddingModelV3 {
 
     private readonly orgId?: string;
 
+    private readonly modelFilterRules?: ModelFilterRules;
+
     private readonly threadId?: string;
 
     /**
@@ -60,6 +68,7 @@ export class GatewayEmbeddingModel implements EmbeddingModelV3 {
         this.gateway = options.gateway;
         this.userId = options.userId ?? "system";
         this.orgId = options.orgId;
+        this.modelFilterRules = hasActiveFilters(options.modelFilterRules) ? options.modelFilterRules : undefined;
         this.threadId = options.threadId;
         this.traceparent = options.traceparent ?? generateTraceparent();
     }
@@ -68,6 +77,7 @@ export class GatewayEmbeddingModel implements EmbeddingModelV3 {
         const requestBody = JSON.stringify({
             input: options.values,
             model: this.modelId,
+            modelFilterRules: this.modelFilterRules,
             orgId: this.orgId,
             requestId: `embed-${this.userId}-${Date.now()}`,
             threadId: this.threadId,
@@ -115,17 +125,37 @@ export class GatewayEmbeddingModel implements EmbeddingModelV3 {
     }
 }
 
+/** The memory and knowledge embedding model, Workers AI `bge-m3`, as the gateway's catalog names it. */
+const EMBEDDING_MODEL = { modelApiId: "@cf/baai/bge-m3", modelId: "bge-m3", provider: "cloudflare" } as const;
+
+/**
+ * Whether `rules` allow the embedding model. When they do not (Workers AI: any region rule, zero data retention or no
+ * data collection), the gateway refuses it with `MODEL_BLOCKED`, so a caller can skip the call and use keyword search.
+ */
+export const embeddingModelAllowed = (rules: ModelFilterRules | undefined): boolean => {
+    const dataRules = rules && dataHandlingRules(rules);
+
+    return (
+        !hasActiveFilters(dataRules) ||
+        getModelRejectionReason(
+            { modelId: EMBEDDING_MODEL.modelId, provider: EMBEDDING_MODEL.provider, regions: deriveModelRegions(EMBEDDING_MODEL) },
+            dataRules,
+        ) === null
+    );
+};
+
 /**
  * Create a gateway embedding model for memory/knowledge embedding calls,
  * bound to the calling action's gateway binding (`gatewayFetch(ctx)`).
  */
 export const createGatewayEmbeddingModel = (
     gateway: ServiceFetch,
-    options?: { threadId?: string; traceparent?: string; userId?: string },
+    options?: { modelFilterRules?: ModelFilterRules; threadId?: string; traceparent?: string; userId?: string },
 ): GatewayEmbeddingModel =>
     new GatewayEmbeddingModel({
         gateway,
-        modelId: "text-embedding-004",
+        modelFilterRules: options?.modelFilterRules,
+        modelId: EMBEDDING_MODEL.modelId,
         threadId: options?.threadId,
         traceparent: options?.traceparent,
         userId: options?.userId,

@@ -44,8 +44,8 @@ export const deleteUserSettingRows = async (ctx: MutationCtx, userId: string): P
     ]);
 
     // Audited tables: one delete at a time (`gdpr/batch.ts`).
-    await deleteOneByOne(ctx, "userSettings", settings);
-    await deleteOneByOne(ctx, "aiUserPreferences", aiPreferences);
+    await deleteOneByOne(settings, (row) => ctx.db.delete("userSettings", row._id));
+    await deleteOneByOne(aiPreferences, (row) => ctx.db.delete("aiUserPreferences", row._id));
 };
 
 /**

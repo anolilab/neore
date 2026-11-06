@@ -51,8 +51,8 @@ connectLiveQueries(lunora, queryClient, createWsTicketMinter(env.VITE_LUNORA_URL
   `setAuthToken` does not re-authenticate an open socket; the manager bounces
   it when the token's subject changes (`tokenSubject`).
 - **Live queries seed at most 3 at a time** (`MAX_CONCURRENT_SEEDS`). Raising it
-  reproduced a fatal dev-backend `Network connection lost.`; see root
-  `CLAUDE.md`, "Frontend".
+  reproduced a fatal dev-backend `Network connection lost.`; see
+  `apps/web/AGENTS.md`, "Frontend".
 - **A call about someone else's thread or page must name the owner's shard.**
   The registry here is filled by the app (`useThreadShard`, `usePageShard`,
   invite-accept results); any hook that calls the Lunora client directly must

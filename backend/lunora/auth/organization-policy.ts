@@ -67,7 +67,7 @@ export const setOrganizationPolicy = authMutation
             document: serializeOrganizationPolicy(parsed.policy),
             revision,
             schemaVersion: parsed.policy.schemaVersion,
-            updatedAt: Date.now(),
+            updatedAt: context.now,
         };
 
         if (existing) {

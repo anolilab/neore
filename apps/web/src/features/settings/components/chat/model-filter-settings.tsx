@@ -37,6 +37,7 @@ const PROVIDERS = [
     { id: "xai", label: "xAI" },
     { id: "openai", label: "OpenAI" },
     { id: "requesty", label: "Requesty" },
+    { id: "cloudflare", label: "Cloudflare Workers AI" },
 ] as const;
 
 const ModelFilterSettings: FC = () => {
@@ -154,7 +155,8 @@ const ModelFilterSettings: FC = () => {
                         {t`Region Restrictions`}
                     </CardTitle>
                     <CardDescription className="text-xs">
-                        {t`Restrict which regions models can be hosted in. Useful for GDPR, data residency, and compliance requirements.`}
+                        {t`Restrict which regions models can be hosted in. Useful for GDPR, data residency, and compliance requirements.`}{" "}
+                        {t`Cloudflare Workers AI models run wherever Cloudflare has capacity, so any region rule hides them.`}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -361,7 +363,8 @@ const ModelFilterSettings: FC = () => {
                         {t`Privacy`}
                     </CardTitle>
                     <CardDescription className="text-xs">
-                        {t`Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter.`}
+                        {t`Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter.`}{" "}
+                        {t`Either setting also hides the Cloudflare Workers AI models, which cannot guarantee it.`}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

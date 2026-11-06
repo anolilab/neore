@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { env, jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import { sendMagicLink } from "./functions";
-import { mailer } from "./mailer";
+import { deliversMail, mailer } from "./mailer";
 
 vi.mock("cloudflare:email", () => {
     return {
@@ -50,6 +50,58 @@ describe("queued mail", () => {
             },
         });
         expect(body?.args?.["message"]).not.toHaveProperty("react");
+    });
+});
+
+describe(deliversMail, () => {
+    const stubEnv = env as typeof env & { LUNORA_MAIL_CAPTURE?: string };
+
+    afterEach(() => {
+        delete stubEnv.LUNORA_MAIL_CAPTURE;
+    });
+
+    it("is true with the EMAIL binding (Cloudflare Email Service)", () => {
+        stubEnv.EMAIL = { send: vi.fn() };
+        expect(deliversMail()).toBe(true);
+    });
+
+    it("is false without a sender, even with the binding", () => {
+        const sender = stubEnv.MAIL_FROM;
+
+        stubEnv.EMAIL = { send: vi.fn() };
+        stubEnv.MAIL_FROM = " ";
+        expect(deliversMail()).toBe(false);
+        stubEnv.MAIL_FROM = sender;
+    });
+
+    it("is false without the binding, and while mail is captured", () => {
+        expect(deliversMail()).toBe(false);
+
+        stubEnv.EMAIL = { send: vi.fn() };
+        stubEnv.LUNORA_MAIL_CAPTURE = "1";
+        expect(deliversMail()).toBe(false);
+    });
+});
+
+describe("a leftover Resend key", () => {
+    it("never sends through Resend: without the EMAIL binding nothing delivers", async () => {
+        vi.resetModules();
+
+        const stub = (await import("cloudflare:workers")) as unknown as { env: Record<string, unknown> };
+        const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+        stub.env.RESEND_API_KEY = "re_leftover";
+
+        try {
+            const fresh = await import("./mailer");
+
+            await expect(fresh.mailer().send({ html: "<p>hi</p>", subject: "Hi", to: "user@example.com" })).rejects.toThrow();
+            expect(fetchSpy).not.toHaveBeenCalled();
+            expect(fresh.deliversMail()).toBe(false);
+        } finally {
+            delete stub.env.RESEND_API_KEY;
+            fetchSpy.mockRestore();
+        }
     });
 });
 

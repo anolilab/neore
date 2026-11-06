@@ -6,15 +6,18 @@ import { LockIcon, MailIcon } from "lucide-react";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
 import type { AuthView } from "../../lib/auth-view-paths";
+import { authViewSearch } from "../../lib/auth-view-paths";
 import type { AuthCardClassNames } from "./auth-card";
 
 interface EmailOTPButtonProperties {
     classNames?: AuthCardClassNames;
     isSubmitting?: boolean;
+    /** Where the flow returns to; carried onto the view this links to. */
+    redirectTo?: string;
     view: AuthView;
 }
 
-const EmailOTPButton = ({ classNames, isSubmitting, view }: EmailOTPButtonProperties) => {
+const EmailOTPButton = ({ classNames, isSubmitting, redirectTo, view }: EmailOTPButtonProperties) => {
     const { basePath, navigate, viewPaths } = useAuth();
     const { t } = useLingui();
 
@@ -23,7 +26,7 @@ const EmailOTPButton = ({ classNames, isSubmitting, view }: EmailOTPButtonProper
             className={cn("w-full", classNames?.form?.button, classNames?.form?.secondaryButton)}
             disabled={isSubmitting}
             onClick={() => {
-                navigate(`${basePath}/${view === "EMAIL_OTP" ? viewPaths.SIGN_IN : viewPaths.EMAIL_OTP}${globalThis.location.search}`);
+                navigate(`${basePath}/${view === "EMAIL_OTP" ? viewPaths.SIGN_IN : viewPaths.EMAIL_OTP}${authViewSearch(redirectTo)}`);
             }}
             type="button"
             variant="secondary"

@@ -111,8 +111,7 @@ Email sending and template management.
 
 **Files:**
 
-- `functions.tsx` - Email sending functions and Resend integration
-- `schema.ts` - Email-related table schemas
+- `functions.ts` - Email sending functions
 - `templates/` - React-based email templates
     - `baseEmail.tsx` - Base email component
     - `welcomeEmail.tsx` - Welcome email
@@ -126,8 +125,7 @@ Email sending and template management.
 
 **Key Functions:**
 
-- `queueEmail()` (`mailer.ts`) - Render and queue an email through `@lunora/mail` (Cloudflare Email Service, or Resend)
-- `handleResendWebhook()` - Handle Resend webhook events
+- `queueEmail()` (`mailer.ts`) - Render and queue an email through `@lunora/mail` (Cloudflare Email Service)
 
 #### `vault/` - File Vault
 
@@ -363,7 +361,6 @@ HTTP endpoints are defined in `http.ts` using Hono router. They handle:
 - Authentication routes (`/api/auth/*`)
 - Chat streaming (`POST /chat/stream`)
 - Prompt improvement (`POST /chat/improve-prompt`)
-- Email webhooks (`POST /email/resend/webhook`)
 
 **Adding a New HTTP Endpoint:**
 
@@ -398,7 +395,7 @@ Environment variables are exported from `env.ts`. Required variables include:
 
 - `SITE_URL` - Application site URL
 - `PUBLIC_ORIGIN` - this Worker's own public origin
-- `RESEND_API_KEY` - Resend API key for emails
+- `MAIL_FROM` - sender for all mail; Cloudflare Email Service delivers it once the deploy sets `MAIL_EMAIL_SERVICE=1` (a GitHub environment variable, required in production)
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - Google OAuth credentials
 - API keys for AI providers (OpenAI, Anthropic, Google, Groq, FAL)
 - R2 storage credentials (if using R2)

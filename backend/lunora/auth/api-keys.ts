@@ -86,7 +86,7 @@ export const createScopedApiKey = authAction
         const state = await ctx.runQuery(internal.auth.api_keys.getApiKeyCreationState, { userId: ctx.user.userId });
 
         // A guest session is disposable and uninvited (see "INVITE-ONLY
-        // REGISTRATION" in CLAUDE.md); a long-lived credential for it would
+        // REGISTRATION" in `auth/AGENTS.md`); a long-lived credential for it would
         // outlive both properties.
         if (state.isAnonymous) {
             throw new LunoraError("FORBIDDEN", "Create an account to use API keys");

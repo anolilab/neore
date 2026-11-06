@@ -14,7 +14,7 @@ import {
     MESSENGER_PENDING_STALE_MS,
     planThreadReply,
     saveMessengerMessage,
-    threadHasRecentMedia,
+    threadRecentMedia,
 } from "./functions";
 
 const OWNER = "owner";
@@ -77,7 +77,36 @@ describe("saveMessengerMessage", () => {
             { image: `storage:agent-files/${HASH}`, mediaType: "image/png", type: "image" },
         ]);
         expect(file.refcount).toBe(1);
-        expect(await harness.run(async (ctx: any) => await ctx.runQuery(threadHasRecentMedia, { threadId }))).toBe(true);
+        expect(await harness.run(async (ctx: any) => await ctx.runQuery(threadRecentMedia, { threadId }))).toBe("images");
+    });
+});
+
+describe("threadRecentMedia", () => {
+    it("reports a stored file part over images, and none for a text-only thread", async () => {
+        const threadId = await thread();
+        const media = async () => await harness.run(async (ctx: any) => await ctx.runQuery(threadRecentMedia, { threadId }));
+        const insert = async (order: number, content: unknown) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("messages", {
+                        message: { content, role: "user" },
+                        order,
+                        status: "success",
+                        stepOrder: 0,
+                        threadId,
+                        tool: false,
+                        userId: OWNER,
+                    }),
+            );
+
+        await insert(0, "hello");
+        expect(await media()).toBe("none");
+
+        await insert(1, [{ image: `storage:agent-files/${HASH}`, mediaType: "image/png", type: "image" }]);
+        expect(await media()).toBe("images");
+
+        await insert(2, [{ data: `storage:agent-files/${HASH}`, mediaType: "application/pdf", type: "file" }]);
+        expect(await media()).toBe("files");
     });
 });
 

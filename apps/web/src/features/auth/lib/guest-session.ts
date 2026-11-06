@@ -136,8 +136,17 @@ export interface IdentityTokenClient {
  * client already holds (the one whose probe failed). Clearing it first forces
  * the change; the client is unauthenticated at that point, so nothing is lost.
  */
-export const adoptSessionToken = async (client: IdentityTokenClient, fetchToken: () => Promise<string | null | undefined>): Promise<void> => {
+export const adoptSessionToken = async (
+    client: IdentityTokenClient,
+    fetchToken: () => Promise<string | null | undefined>,
+    signal?: AbortSignal,
+): Promise<void> => {
     const token = await fetchToken();
+
+    // The caller went away while the token was on its way (the gate opened): leave the client alone.
+    if (signal?.aborted) {
+        return;
+    }
 
     if (!token) {
         throw new Error("No RPC token for the current session");
@@ -186,4 +195,46 @@ export const nextAdoptionDelay = (now: number = Date.now()): number => {
 export const resetAdoptionBackoff = (): void => {
     adoption.count = 0;
     adoption.lastAt = -Infinity;
+};
+
+/**
+ * Keep handing the RPC client the session's token until one adoption succeeds
+ * or `signal` aborts (the `<Unauthenticated>` gate opened and unmounted the
+ * caller). Waits {@link nextAdoptionDelay} before each try. For a caller that
+ * knows a session exists while the client reads unauthenticated: the guest
+ * sign-in, and the signed-out chat shell when a session turns up under it.
+ */
+export const adoptSessionTokenWhileShut = async (
+    client: IdentityTokenClient,
+    fetchToken: () => Promise<string | null | undefined>,
+    signal: AbortSignal,
+): Promise<void> => {
+    while (!signal.aborted) {
+        await new Promise<void>((resolve) => {
+            const timers: { wait?: ReturnType<typeof setTimeout> } = {};
+            const onAbort = (): void => {
+                clearTimeout(timers.wait);
+                resolve();
+            };
+
+            // One listener per wait, removed when the wait ends normally, so a long outage does not pile them up.
+            timers.wait = setTimeout(() => {
+                signal.removeEventListener("abort", onAbort);
+                resolve();
+            }, nextAdoptionDelay());
+            signal.addEventListener("abort", onAbort, { once: true });
+        });
+
+        if (signal.aborted) {
+            return;
+        }
+
+        try {
+            await adoptSessionToken(client, fetchToken, signal);
+
+            return;
+        } catch (error) {
+            console.warn("Session token adoption failed:", error);
+        }
+    }
 };

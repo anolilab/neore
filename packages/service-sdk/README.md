@@ -34,7 +34,7 @@ const { data, error } = await extractDocument({ body, client, headers: { "conten
 In the backend, get the `fetch` from `lib/services.ts` (`serviceFetch`,
 `gatewayFetch`), never by passing `ctx.services.x.fetch` detached: a `Fetcher`
 method called off its binding throws `Illegal invocation`. `ctx.services`
-exists on actions only. See root `CLAUDE.md`, "Services (service bindings)".
+exists on actions only. See `backend/AGENTS.md`, "Services (service bindings)".
 
 ## Layout
 

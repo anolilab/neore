@@ -191,6 +191,7 @@ export const deviceCode = sqliteTable("deviceCode", {
     userId: text("userId"),
 }, (t) => ({
     deviceCode: index("deviceCode").on(t.deviceCode),
+    expiresAt: index("expiresAt").on(t.expiresAt),
     userCode: index("userCode").on(t.userCode),
     userId: index("userId").on(t.userId),
 }));
@@ -213,15 +214,6 @@ export const documentHistory = sqliteTable("documentHistory", {
     by_user_ts: index("by_user_ts").on(t.userId, t.ts),
     by_org_ts: index("by_org_ts").on(t.organizationId, t.ts),
     by_ts: index("by_ts").on(t.ts),
-}));
-
-export const emails = sqliteTable("emails", {
-    _id: text("_id").primaryKey(),
-    _creationTime: integer("_creationTime").notNull(),
-    email: text("email").notNull(),
-    expectation: text("expectation", { mode: "json" }).$type<"delivered" | "bounced" | "complained">().notNull(),
-}, (t) => ({
-    by_email: index("by_email").on(t.email),
 }));
 
 export const invitation = sqliteTable("invitation", {

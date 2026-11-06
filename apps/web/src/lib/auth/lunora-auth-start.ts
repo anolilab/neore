@@ -9,7 +9,7 @@ import React from "react";
  * connection hung the request forever (a `has-permission` call never answered,
  * another took 122s). Auth endpoints answer in milliseconds; 30s only bounds a
  * wedged connection. The BROWSER's abort signal is deliberately not forwarded —
- * an abandoned request mid-write was a `wrangler dev` crash trigger (CLAUDE.md).
+ * an abandoned request mid-write was a `wrangler dev` crash trigger (`docs/agents/local-dev.md`).
  */
 const AUTH_PROXY_TIMEOUT_MS = 30_000;
 
@@ -265,7 +265,7 @@ export const fetchSessionToken = async (siteUrl: string, headers: Headers, optio
         }
 
         if (!response.ok) {
-            // Nobody reads this body; an unconsumed one is a `wrangler dev` crash trigger (CLAUDE.md).
+            // Nobody reads this body; an unconsumed one is a `wrangler dev` crash trigger (`docs/agents/local-dev.md`).
             await response.body?.cancel().catch(() => undefined);
 
             // 429 / 5xx: the backend could not answer. 401 and friends: it did — no session.
