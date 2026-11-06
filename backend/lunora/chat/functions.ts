@@ -1644,6 +1644,13 @@ const TITLE_CHARGE_SCOPE = "title-charge";
 const TITLE_CHARGE_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * Admits one title model call for `chargeKey`: `true` the first time, `false` for every later admission of the same key within the
+ * TTL. The claim is not released: a retried run that reaches this again is refused, so its model call is not billed twice.
+ */
+export const admitTitleCharge = async (context: Pick<ActionContext, "runMutation">, chargeKey: string, userId: string | undefined): Promise<boolean> =>
+    await context.runMutation(internal.lib.claim_once.claimKey, { key: chargeKey, scope: TITLE_CHARGE_SCOPE, ttlMs: TITLE_CHARGE_TTL_MS, userId });
+
+/**
  * Generates a title from `prompt` and writes it onto the thread. An automatic title never replaces one
  * the owner set (`force` is false); only an explicit regenerate sets `force`, and it may replace any title.
  * `expectedTitleDigest` is the digest of the title the run read (a regenerate's click-time title): when the thread has another title by
@@ -1739,12 +1746,7 @@ const writeGeneratedTitle = async (
     // A model call is billed per call, and the scheduler retries a failed run. A run admitted once is not admitted again, so a retry
     // after the call does not bill it twice. Taken just before the call, so a failure before it leaves the run retryable.
     if (arguments_.chargeKey !== undefined) {
-        const admitted = await context.runMutation(internal.lib.claim_once.claimKey, {
-            key: arguments_.chargeKey,
-            scope: TITLE_CHARGE_SCOPE,
-            ttlMs: TITLE_CHARGE_TTL_MS,
-            userId,
-        });
+        const admitted = await admitTitleCharge(context, arguments_.chargeKey, userId);
 
         if (!admitted) {
             context.log.event("chat.thread_title", { skipped: "already-charged" });
@@ -1902,6 +1904,23 @@ const activeBranchPrompt = async (
 };
 
 /**
+ * The title's prompt, re-read by the id the request found: one row, not a second scan of the path. A row that is no longer a
+ * successful user message gives none.
+ */
+export const promptById = async (context: ActionContext, threadId: string, promptId: string): Promise<TitlePrompt | undefined> => {
+    const [row] = await context.runQuery(internal.agent.messages.getMessagesByIds, {
+        messageIds: [promptId as Id<"messages">],
+        threadId: threadId as Id<"threads">,
+    });
+
+    if (!row || row.status !== "success") {
+        return undefined;
+    }
+
+    return firstUserPrompt([row]);
+};
+
+/**
  * Scheduled by `regenerateThreadTitle`. The title comes from the earliest user prompt on the thread's active path, which is read
  * whole: a path of at most `TITLE_PATH_LIMIT` rows (1,000), searched oldest first, so a prompt past the first page is found. A
  * thread with no prompt within that limit is refused (`activeBranchPrompt`: "too-long"), and one with no user text at all is left
@@ -1909,7 +1928,7 @@ const activeBranchPrompt = async (
  */
 const runRegenerateTitle = async (
     context: ActionContext,
-    arguments_: { claimedAt?: number; expectedTitleDigest?: string; threadId: string; userId: string },
+    arguments_: { claimedAt?: number; expectedTitleDigest?: string; promptId?: string; threadId: string; userId: string },
 ): Promise<void> => {
     // Before any message is read: a locked, host-run or deleted thread, or a requester who lost access since, never reaches the model.
     const beforeRead = await titleIneligibility(context, { requestedBy: arguments_.userId, threadId: arguments_.threadId });
@@ -1926,8 +1945,12 @@ const runRegenerateTitle = async (
         return;
     }
 
-    // The active branch's history only: an edited prompt on another branch must not supply the title.
-    const branch = await activeBranchPrompt(context, arguments_.threadId, thread.activeLeafMessageId);
+    // The active branch's history only: an edited prompt on another branch must not supply the title. The request already found the
+    // prompt, so the job re-reads that one row by id; the path is scanned only for a job that was scheduled without the id.
+    const branch =
+        arguments_.promptId === undefined
+            ? await activeBranchPrompt(context, arguments_.threadId, thread.activeLeafMessageId)
+            : { kind: "prompt" as const, prompt: await promptById(context, arguments_.threadId, arguments_.promptId) };
 
     if (branch.kind === "too-long") {
         context.log.event("chat.thread_title", { skipped: "path-too-long" });
@@ -1959,6 +1982,7 @@ export const regenerateTitleChat = internalAction
     .input({
         claimedAt: v.optional(v.number()),
         expectedTitleDigest: v.optional(v.string().max(MAX_LENGTH.short)),
+        promptId: v.optional(v.string().max(MAX_LENGTH.id)),
         threadId: v.string(),
         userId: v.string(),
     })
@@ -2072,6 +2096,8 @@ export const regenerateThreadTitle = authAction
                 claimedAt,
                 // A digest, not the title: a stored title of any length then travels as a short argument.
                 expectedTitleDigest: await sha256Hex(thread.title ?? ""),
+                // The prompt the request found: the job re-reads that row rather than scanning the path a second time.
+                promptId: branch.prompt.id,
                 threadId,
                 userId,
             });

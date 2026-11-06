@@ -16,6 +16,8 @@ import {
     continueThread,
     generateSummary,
     getFollowupSuggestions,
+    admitTitleCharge,
+    promptById,
     refusedBeforeDispatch,
     regenerateThreadTitle,
     titleIneligibility,
@@ -151,6 +153,50 @@ describe("the last check before a background model call", () => {
         await expect(harness.run(async (context: any) => await refusedBeforeDispatch(context, deleted))).resolves.toBe(true);
         await expect(harness.run(async (context: any) => await refusedBeforeDispatch(context, open))).resolves.toBe(false);
     });
+});
+
+describe("the prompt a title is written from, and the charge for it", () => {
+    const insertCloud = async () =>
+        (await harness.run(
+            async (context: any) => await context.db.insert("threads", { model: "gpt-4o", status: "active", title: "Cloud", userId: OWNER }),
+        )) as string;
+
+    it("re-reads the prompt the request found by its id, and gives none for a row that is not a successful user prompt", async () => {
+        const cloud = await insertCloud();
+        const prompt = await appendMessage(cloud, undefined, { message: { content: "Plan a trip", role: "user" } });
+        const reply = await appendMessage(cloud, prompt, { message: { content: "Sure", role: "assistant" } });
+
+        await expect(harness.run(async (context: any) => await promptById(context, cloud, prompt))).resolves.toEqual({ id: prompt, text: "Plan a trip" });
+        await expect(harness.run(async (context: any) => await promptById(context, cloud, reply))).resolves.toBeUndefined();
+    });
+
+    it("admits a title's model call once per key, so a retried run that reaches the call again is refused", async () => {
+        const key = "thread-x:run-1";
+
+        await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toBe(true);
+        await expect(harness.run(async (context: any) => await admitTitleCharge(context, key, OWNER))).resolves.toBe(false);
+    });
+
+    it("refuses a chat whose path is past the limit with a visible conflict, before it claims the regenerate", async () => {
+        const cloud = await insertCloud();
+        let parent = await appendMessage(cloud, undefined, { message: { content: "Plan a trip", role: "user" } });
+
+        for (let index = 0; index < 1000; index += 1) {
+            parent = await appendMessage(cloud, parent, { message: { content: `Reply ${index}`, role: "assistant" } });
+        }
+
+        await harness.run(async (context: any) => await context.db.patch("threads", cloud, { activeLeafMessageId: parent }));
+
+        await expect(harness.withIdentity({ userId: OWNER }).action(regenerateThreadTitle as never, { threadId: cloud } as never)).rejects.toMatchObject({
+            message: expect.stringContaining("too long"),
+        });
+        const claims = (await harness.run(async (context: any) => await context.db.query("idempotencyClaims").collect())) as {
+            key: string;
+            scope: string;
+        }[];
+
+        expect(claims.some((claim) => claim.scope === "regenerate-title" && claim.key === cloud)).toBe(false);
+    }, 60_000);
 });
 
 describe("continueThread", () => {
