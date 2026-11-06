@@ -16,6 +16,12 @@ const harness = vi.hoisted(() => {
     };
 });
 
+vi.mock("@lingui/core/macro", () => {
+    return {
+        plural: (count: number, forms: { one: string; other: string }) => (count === 1 ? forms.one : forms.other),
+    };
+});
+
 vi.mock("@lingui/react/macro", () => {
     return {
         Trans: ({ children }: { children: unknown }) => children,
