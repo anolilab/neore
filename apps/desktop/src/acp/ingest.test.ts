@@ -704,9 +704,10 @@ describe("a turn", () => {
         host.plan("s1", "t1", second);
         await settle(POST_INTERVAL_MS);
 
+        // The three plan updates wait in one batch: the first and the repeat are replaced by the latest, which sits where the
+        // last one was sent, after the text.
         expect(backend.chunks.get("t1")).toEqual([
             { kind: "turn_start", text: "go" },
-            { entries: first, kind: "plan" },
             { kind: "text", text: "ok" },
             { entries: second, kind: "plan" },
         ]);

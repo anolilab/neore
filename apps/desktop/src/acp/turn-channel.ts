@@ -118,10 +118,8 @@ export class TurnChannel {
         if (isText && last?.kind === event.kind && last.text.length + event.text.length <= MAX_EVENT_TEXT) {
             last.text += event.text;
             this.pendingJson += event.text.length;
-        } else if (event.kind === "plan" && last?.kind === "plan") {
-            // A plan is the whole list each time: one still waiting is replaced, so a burst of updates costs one slot.
-            this.pendingJson += jsonLength(event) - jsonLength(last);
-            this.pending[this.pending.length - 1] = event;
+        } else if (event.kind === "plan" && this.replacePendingPlan(event)) {
+            // A plan is the whole list each time: the one still waiting is replaced, so a burst of updates costs one slot.
         } else if (event.kind === "tool_output" && this.replacePendingOutput(event)) {
             // Only the latest output of a call is shown: one still waiting is replaced in place.
         } else {
@@ -163,6 +161,26 @@ export class TurnChannel {
         this.stopped = true;
         clearTimeout(this.timer);
         clearTimeout(this.keepalive);
+    }
+
+    /**
+     * Replaces the plan still waiting, wherever it sits in the queue. The latest plan goes to the end, where it was last sent: a plan
+     * with reply text sent after it keeps that order, and a burst of updates between two texts still costs one slot.
+     */
+    private replacePendingPlan(event: HostEvent & { kind: "plan" }): boolean {
+        const index = this.pending.findIndex((queued) => queued.kind === "plan");
+        const queued = this.pending[index];
+
+        if (queued === undefined) {
+            return false;
+        }
+
+        this.pendingJson -= jsonLength(queued);
+        this.pending.splice(index, 1);
+        this.pending.push(event);
+        this.pendingJson += jsonLength(event);
+
+        return true;
     }
 
     private replacePendingOutput(event: HostEvent & { kind: "tool_output" }): boolean {
