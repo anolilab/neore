@@ -392,13 +392,15 @@ export class SessionTerminals {
             if (current !== undefined) {
                 current.ended = { exit, output, truncated };
 
+                // The rows are told first: releasing prunes, and a cancelled command's result must still be there to show.
+                this.ended(terminalId);
+
                 // A cancelled turn may never release what it started: its result is kept for the row, and its slot is freed here.
                 if (current.cancelled) {
                     this.release(terminalId);
+                } else {
+                    this.prune();
                 }
-
-                this.ended(terminalId);
-                this.prune();
             }
         } catch {
             // The core no longer has it (stopped on quit): nothing will show it.

@@ -226,4 +226,58 @@ describe(SessionTerminals, () => {
         expect(terminals.result(id)).toBeUndefined();
         expect(ended).not.toHaveBeenCalled();
     });
+
+    it("records a cancelled command's result before pruning, even after more than the kept results ended", async () => {
+        const ends = new Map<number, (exit: { exitCode: number | null; signal: string | null }) => void>();
+        let next = 10;
+        const host = {
+            kill: vi.fn((handle: number) => {
+                ends.get(handle)?.({ exitCode: null, signal: "SIGKILL" });
+            }),
+            output: vi.fn(() => {
+                return { output: "partial", truncated: false };
+            }),
+            release: vi.fn(),
+            start: vi.fn(async () => {
+                next += 1;
+
+                return next - 1;
+            }),
+            wait: vi.fn(
+                async (handle: number) =>
+                    await new Promise((resolve) => {
+                        ends.set(handle, resolve);
+                    }),
+            ),
+        };
+        const flush = async () =>
+            await new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve(undefined);
+                }, 0);
+            });
+        const reported: (string | undefined)[] = [];
+        const terminals: SessionTerminals = new SessionTerminals(host as never, (terminalId) => {
+            if (terminalId === cancelled) {
+                reported.push(terminals.result(terminalId)?.output);
+            }
+        });
+        const cancelled = await terminals.create(request, "turn-2");
+
+        // Sixteen commands of an earlier turn end and are released first: they are the kept results the cancelled one is up against.
+        for (let index = 0; index < 16; index += 1) {
+            // eslint-disable-next-line no-await-in-loop -- at most four commands are live, so each one is made after the last released
+            const id = await terminals.create(request);
+
+            ends.get(10 + index + 1)?.({ exitCode: 0, signal: null });
+            // eslint-disable-next-line no-await-in-loop -- each command must end before the next one is made
+            await flush();
+            terminals.release(id);
+        }
+
+        terminals.killTurn("turn-2");
+        await flush();
+
+        expect(reported).toEqual(["partial"]);
+    });
 });
