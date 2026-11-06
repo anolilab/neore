@@ -10,7 +10,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { HostEvent, PosterOptions } from "./ingest";
-import { HostPoster, KEEPALIVE_MS, newerPending, POST_INTERVAL_MS } from "./ingest";
+import { HostPoster, KEEPALIVE_MS, MAX_STATE_ATTEMPTS, newerPending, POST_INTERVAL_MS } from "./ingest";
 
 interface Post {
     close?: boolean;
@@ -1449,6 +1449,67 @@ describe("what the agent reports about itself", () => {
 
         await settle(30_000);
         expect(statePosts().filter((entry) => entry.post.sessionId === "s1")).toHaveLength(2);
+    });
+
+    it("sends a fresh report at its debounce when it arrived while the post it follows was failing", async () => {
+        const host = poster();
+        let release = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the supported Node range starts before it exists
+        const held = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        let holdFirst = true;
+        let failFirst = true;
+
+        backend.gate = (post) => {
+            if (holdFirst && (post.events[0] as { kind?: string } | undefined)?.kind === "session_state") {
+                holdFirst = false;
+
+                return held;
+            }
+
+            return undefined;
+        };
+        backend.respond = (post) => {
+            if (!failFirst || (post.events[0] as { kind?: string } | undefined)?.kind !== "session_state") {
+                return undefined;
+            }
+
+            failFirst = false;
+
+            return Response.json({ error: "x" }, { status: 503 });
+        };
+
+        await open(host);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(1);
+
+        // The first post is still in flight when a newer report arrives; it then fails.
+        clock += 1000;
+        host.sessionState("s1", { usage: usage(11) });
+        release();
+        backend.gate = undefined;
+        await settle(2000);
+
+        // The fresh report goes at its own debounce, not after the failed post's 30 s backoff.
+        expect(statePosts()).toHaveLength(2);
+        expect(statePosts()[1]?.post.events[0]).toMatchObject({ usage: usage(11) });
+    });
+
+    it("gives up on a report the backend keeps refusing, so a session that ended is not retried for ever", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.respond = (post) => (post.events[0] as { kind?: string } | undefined)?.kind === "session_state" ? Response.json({ error: "x" }, { status: 503 }) : undefined;
+        host.sessionState("s1", { usage: usage(10) });
+        await settleInSteps(10 * 60_000);
+
+        expect(statePosts()).toHaveLength(MAX_STATE_ATTEMPTS);
+
+        await settleInSteps(60 * 60_000);
+
+        expect(statePosts()).toHaveLength(MAX_STATE_ATTEMPTS);
     });
 
     it("retries a failed report with what was observed, under a fresh issuedAt, when nothing newer is reported", async () => {

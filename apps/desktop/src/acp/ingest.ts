@@ -50,6 +50,9 @@ const REFUSED_STATUSES = new Set([400, 403, 413]);
 const STATE_DEBOUNCE_MS = 2000;
 const STATE_RETRY_MS = 30_000;
 
+/** A report is posted this many times at most while nothing newer replaces it; then it is dropped (the agent's next report carries the value again). */
+export const MAX_STATE_ATTEMPTS = 10;
+
 /**
  * A report waiting to be posted. `at` is when the agent's value was observed, not when it is sent: a value sent again
  * after a newer one was posted carries its old `at`, and the backend drops it.
@@ -147,6 +150,9 @@ export class HostPoster implements SessionObserver {
     /** When a session's failed report may be retried: its own backoff, unaffected by other sessions' reports. */
     private readonly stateRetryAt = new Map<string, number>();
 
+    /** Failed posts of a session's current report, reset by a fresh report or a success (`MAX_STATE_ATTEMPTS`). */
+    private readonly stateAttempts = new Map<string, number>();
+
     /** The text of each running turn, kept for the references its reply makes (capped). */
     private readonly texts = new Map<string, string>();
 
@@ -222,6 +228,7 @@ export class HostPoster implements SessionObserver {
         this.pendingState.set(sessionId, { ...pending, ...patch, ...usage !== undefined && { usage }, at: this.now() });
         // A fresh report is the newest value, so it does not wait out its own session's backoff: the next flush sends it.
         this.stateRetryAt.delete(sessionId);
+        this.stateAttempts.delete(sessionId);
         this.scheduleState(STATE_DEBOUNCE_MS);
     }
 
@@ -626,11 +633,28 @@ export class HostPoster implements SessionObserver {
             }
 
             if (result.kind === "retry") {
-                this.pendingState.set(sessionId, newerPending(pending, this.pendingState.get(sessionId)));
-                this.stateRetryAt.set(sessionId, this.now() + STATE_RETRY_MS);
-                this.scheduleState(STATE_RETRY_MS);
+                const waiting = this.pendingState.get(sessionId);
+                const attempts = (this.stateAttempts.get(sessionId) ?? 0) + 1;
+
+                if (waiting === undefined && attempts >= MAX_STATE_ATTEMPTS) {
+                    // Nothing newer replaces it, and it has failed this many times: dropped, not written back.
+                    this.pendingState.delete(sessionId);
+                    this.stateAttempts.delete(sessionId);
+                    this.stateRetryAt.delete(sessionId);
+                } else {
+                    this.pendingState.set(sessionId, newerPending(pending, waiting));
+                    this.stateAttempts.set(sessionId, attempts);
+
+                    // A fresh report that arrived meanwhile is not held behind this failure: the finally block sends it at its
+                    // debounce. Only a failed report with nothing newer waiting backs off.
+                    if (waiting === undefined) {
+                        this.stateRetryAt.set(sessionId, this.now() + STATE_RETRY_MS);
+                        this.scheduleState(STATE_RETRY_MS);
+                    }
+                }
             } else {
                 this.stateRetryAt.delete(sessionId);
+                this.stateAttempts.delete(sessionId);
             }
         } finally {
             this.stateInFlight.delete(sessionId);
