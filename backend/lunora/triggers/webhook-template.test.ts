@@ -140,13 +140,10 @@ describe("renderWebhookPrompt", () => {
             query: { accessKey: "c", phpsessid: "d", privateKey: "e", sessionId: "f", xApiKey: "g" },
         });
 
-        expect(
-            renderWebhookPrompt(
-                "{{header.sessionid}}|{{header.sign}}|{{query.accessKey}}|{{query.phpsessid}}|{{query.privateKey}}|{{query.sessionId}}|{{query.xApiKey}}",
-                secrets,
-                FRAME,
-            ),
-        ).toBe('""|""|""|""|""|""|""');
+        const template =
+            "{{header.sessionid}}|{{header.sign}}|{{query.accessKey}}|{{query.phpsessid}}|{{query.privateKey}}|{{query.sessionId}}|{{query.xApiKey}}";
+
+        expect(renderWebhookPrompt(template, secrets, FRAME)).toBe('""|""|""|""|""|""|""');
     });
 
     it("reads ordinary names that contain a short credential word", () => {

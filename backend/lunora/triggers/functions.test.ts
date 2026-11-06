@@ -301,9 +301,8 @@ describe("trigger schedules", () => {
     });
 
     it("lets an edit to another field through when the stored template is over the limit", async () => {
-        const { triggerId } = (await as().mutation(createTrigger as never, { inputTemplate: "Hi", model: "m", name: "Hook", type: "webhook" } as never)) as {
-            triggerId: string;
-        };
+        const hook = { inputTemplate: "Hi", model: "m", name: "Hook", type: "webhook" };
+        const { triggerId } = (await as().mutation(createTrigger as never, hook as never)) as { triggerId: string };
         const longTemplate = "x".repeat(MAX_WEBHOOK_TEMPLATE_LENGTH + 1);
 
         await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId as never, { inputTemplate: longTemplate }));
