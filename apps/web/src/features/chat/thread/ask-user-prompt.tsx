@@ -45,6 +45,8 @@ const ANSWER_MAX = 4000;
 const FILES_MAX = 4;
 const FILE_TYPES: ReadonlyArray<string> = ["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"];
 const FILE_MAX_BYTES = 10 * 1024 * 1024;
+/** Mirrors `ASK_USER_FILES_TOTAL_MAX_BYTES` on the server. */
+const FILES_TOTAL_MAX_BYTES = 20 * 1024 * 1024;
 /** A photo may be larger than the file limit as selected: it is re-encoded before upload. This caps what is read into memory. */
 const IMAGE_SELECT_MAX_BYTES = 40 * 1024 * 1024;
 /** Mirrors `ASK_USER_IMAGE_MAX_BYTES` on the server: the largest image a provider takes as base64 in one call. */
@@ -63,8 +65,6 @@ const renamedFor = (name: string, type: string): string => {
 
 /** The largest a selected file may be: a photo gets the wider limit, since it is re-encoded before upload. */
 const selectLimitOf = (file: File): number => (file.type.startsWith("image/") ? IMAGE_SELECT_MAX_BYTES : FILE_MAX_BYTES);
-/** Mirrors `ASK_USER_FILES_TOTAL_MAX_BYTES` on the server. */
-const FILES_TOTAL_MAX_BYTES = 20 * 1024 * 1024;
 
 interface AskUserInput {
     choices?: string[];

@@ -901,7 +901,7 @@ export const continueAfterToolApproval = internalAction
     .input({
         /** The user's answer to an approved `askUser` call — its tool result (`chat/ask-user.ts`). */
         answer: v.optional(v.string()),
-        /** Images the answer carries; read as the owner by the continuation (`lib/ask-user-files.ts`). */
+        /** Files the answer carries; read as the owner by the continuation (`lib/ask-user-files.ts`). */
         answerFileIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
         approvalId: v.string(),
         approved: v.boolean(),
