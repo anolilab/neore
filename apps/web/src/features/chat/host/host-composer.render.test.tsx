@@ -85,6 +85,7 @@ const { default: HostComposer } = await import("./host-composer");
 
 const ALWAYS = /always/iu;
 const CUT = /too long to show whole/u;
+const STILL_SHOWS_FAST = /The agent confirmed Deep, but Model still shows Fast/u;
 
 const OPTIONS = [
     { kind: "allow_once", name: "Allow", optionId: "r1-allow" },
@@ -477,7 +478,7 @@ describe("the options the agent offers", () => {
         };
         await client.invalidateQueries();
 
-        expectShown(await screen.findByText(/The agent confirmed Deep, but Model still shows Fast/, undefined, { timeout: 25_000 }));
+        expectShown(await screen.findByText(STILL_SHOWS_FAST, undefined, { timeout: 25_000 }));
         expect(screen.queryByText("The agent confirmed: Model is now Deep.")).toBeNull();
         expect(model.disabled).toBe(false);
     }, 40_000);
