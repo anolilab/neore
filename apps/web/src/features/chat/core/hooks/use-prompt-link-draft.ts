@@ -7,7 +7,8 @@ import { showWarning } from "@/lib/toast";
 import { useChatUIStore } from "../stores/chat-ui-store";
 import type { ModelId } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
-import { carriableLinkModel, promptFromLink } from "../utils/prompt-link";
+import { promptFromLink } from "../utils/prompt-link";
+import { carriableLinkModel } from "../utils/prompt-link-model";
 
 /** The chat search without the prompt link's own parameters: a saved prompt or a message in the same URL stays. */
 const withoutLinkParameters = (search: Record<string, unknown>): Record<string, unknown> =>

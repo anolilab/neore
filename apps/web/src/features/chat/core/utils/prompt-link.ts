@@ -1,5 +1,3 @@
-import type { ModelDefinition } from "@neore/ai/models";
-import { enabledModelOf } from "@neore/ai/models";
 import { stripHiddenText } from "@neore/ai/utils";
 
 /**
@@ -24,16 +22,6 @@ export const promptFromLink = (raw: string): string => cleanedPrompt(raw).slice(
 
 /** Whether a link for `raw` would carry less than all of it. Copying such a message is refused rather than truncated. */
 export const isPromptLinkTooLong = (raw: string): boolean => cleanedPrompt(raw).length > PROMPT_LINK_MAX_CHARS;
-
-/**
- * The registry row a link can name: an enabled text model the composer picks, and not an external one. Both ends use it, so a
- * link is copied only with a model the link opens on. A custom endpoint's model is not in the registry, so it has no row here.
- */
-export const carriableLinkModel = (model: string | undefined): ModelDefinition | undefined => {
-    const definition = enabledModelOf(model, { mode: "text" });
-
-    return definition?.provider === "external" ? undefined : definition;
-};
 
 /** The search values a prompt link carries, trimmed and capped; absent or blank values are dropped. */
 export const readPromptLinkSearch = (search: { model?: unknown; prompt?: unknown }): { model?: string; prompt?: string } => {
