@@ -51,27 +51,53 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
         };
     }, []);
 
+    // A download belongs to the document it started for. Showing another document, or closing the panel, abandons it: its fetch is
+    // aborted, and a late answer saves nothing, so the reader never gets a PDF they have left.
+    const pendingDownload = useRef<AbortController | null>(null);
+
+    useEffect(
+        () => () => {
+            pendingDownload.current?.abort();
+            pendingDownload.current = null;
+        },
+        [file.url],
+    );
+
     // The link is cross-origin, and a browser opens a cross-origin PDF inline whatever the `download` attribute says.
     // The file is fetched and saved from a local object URL instead.
     const download = async () => {
-        if (!isFetchableUrl(file.url, PANEL_ORIGINS)) {
+        const { filename, url } = file;
+
+        if (!isFetchableUrl(url, PANEL_ORIGINS)) {
             showError(t`The PDF could not be downloaded.`);
 
             return;
         }
 
+        pendingDownload.current?.abort();
+
+        const attempt = new AbortController();
+
+        pendingDownload.current = attempt;
+
         try {
-            const response = await fetch(file.url);
+            const response = await fetch(url, { signal: attempt.signal });
 
             if (!response.ok) {
                 throw new Error("The PDF could not be fetched.");
             }
 
-            const objectUrl = URL.createObjectURL(await response.blob());
+            const blob = await response.blob();
+
+            if (attempt.signal.aborted) {
+                return;
+            }
+
+            const objectUrl = URL.createObjectURL(blob);
             const link = globalThis.document.createElement("a");
 
             link.href = objectUrl;
-            link.download = file.filename ?? "document.pdf";
+            link.download = filename ?? "document.pdf";
             // Attached while it is clicked: a detached link is ignored by some browsers. The URL outlives the click, so the
             // download can start before it is revoked.
             document.body.appendChild(link);
@@ -82,9 +108,17 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
             }, DOWNLOAD_URL_LIFETIME_MS);
             setDownloadFailed(false);
         } catch (error) {
+            if (attempt.signal.aborted) {
+                return;
+            }
+
             console.error("Failed to download the PDF:", error);
             setDownloadFailed(true);
             showError(t`The PDF could not be downloaded.`);
+        } finally {
+            if (pendingDownload.current === attempt) {
+                pendingDownload.current = null;
+            }
         }
     };
 
