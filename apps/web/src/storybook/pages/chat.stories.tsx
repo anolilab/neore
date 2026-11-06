@@ -12,6 +12,9 @@ import { userFixtures } from "@/storybook/fixtures/user";
 import { lunoraHandlers } from "@/storybook/lunora";
 import { StoryPage } from "@/storybook/page";
 
+// Page data arrives after the route loads; under a loaded machine that can outlast the 1 s default of `find*`.
+const PAGE_WAIT = { timeout: 5000 } as const;
+
 /** The chat: the real `(chat)` layout (sidebar, header, command palette) and the thread page. */
 const meta = {
     args: {
@@ -23,7 +26,11 @@ const meta = {
     },
     component: StoryPage,
     parameters: {
-        // Sortable thread rows nest buttons, plus contrast and naming gaps: #548.
+        // Composer controls (model picker, search mode, goal) still set their labels at /30–/50 opacity: the picker
+        // work is the one with its own `todo`. Thread rows, sidebar and code blocks are checked here.
+        // Still failing axe, so the page is `todo` for now: the composer's muted labels (model trigger "Select model...",
+        // the search-mode and goal labels) at about 1.5–1.9:1, and the scroll wrapper Streamdown puts round a code block
+        // (not focusable, no `tabIndex` hook in its API). Thread rows, the sidebar and code tokens pass.
         a11y: { test: "todo" },
         layout: "fullscreen",
         msw: { handlers: { gateway: gatewayModelsHandler(), lunora: lunoraHandlers(...userFixtures(), ...shellFixtures(), ...chatFixtures()) } },
@@ -38,10 +45,10 @@ type Story = StoryObj<typeof meta>;
 export const Thread: Story = {
     play: async ({ canvas }) => {
         // Named (it had no accessible name before these stories); its fade-in can outlast the query.
-        await expect(await canvas.findByRole("textbox", { name: "Message" })).toBeInTheDocument();
+        await expect(await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT)).toBeInTheDocument();
         // The composer's controls had no accessible name before these stories (#548).
-        await expect(await canvas.findAllByRole("button", { name: "Model: Claude Sonnet 4.5" })).not.toHaveLength(0);
-        await expect(await canvas.findAllByRole("combobox", { name: "Response language: English (US)" })).not.toHaveLength(0);
+        await expect(await canvas.findAllByRole("button", { name: "Model: Claude Sonnet 4.5" }, PAGE_WAIT)).not.toHaveLength(0);
+        await expect(await canvas.findAllByRole("combobox", { name: "Response language: English (US)" }, PAGE_WAIT)).not.toHaveLength(0);
     },
 };
 

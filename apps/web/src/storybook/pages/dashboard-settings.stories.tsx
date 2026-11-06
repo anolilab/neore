@@ -11,6 +11,9 @@ import { userFixtures } from "@/storybook/fixtures/user";
 import { lunoraHandlers } from "@/storybook/lunora";
 import { StoryPage } from "@/storybook/page";
 
+// Page data arrives after the route loads; under a loaded machine that can outlast the 1 s default of `find*`.
+const PAGE_WAIT = { timeout: 5000 } as const;
+
 /**
  * Settings pages inside the real dashboard layout (sidebar, breadcrumbs, page outline).
  * The layout's `<Authenticated>` gate opens because the persona's session and bearer are
@@ -19,10 +22,6 @@ import { StoryPage } from "@/storybook/page";
 const meta = {
     component: StoryPage,
     parameters: {
-        // An app bug, not a Storybook gap: the dashboard nav uses `colorMode="dark"` (`text-white/80`), but the
-        // light `--sidebar` token is white (`packages/ui/src/global.css`), so the nav is 1.1:1 in light mode.
-        // Dark mode reads fine. Tracked in #547.
-        a11y: { test: "todo" },
         layout: "fullscreen",
         msw: {
             handlers: {
@@ -47,7 +46,7 @@ export const ModelFilters: Story = {
         url: "/dashboard/settings/chat/model-filters",
     },
     play: async ({ canvas }) => {
-        await expect(await canvas.findByText(/region restrictions/i)).toBeVisible();
+        await expect(await canvas.findByText(/region restrictions/i, undefined, PAGE_WAIT)).toBeVisible();
     },
 };
 
@@ -57,6 +56,6 @@ export const ApiKeys: Story = {
         url: "/dashboard/settings/auth/api-keys",
     },
     play: async ({ canvas }) => {
-        await expect(await canvas.findByText("Laptop CLI")).toBeVisible();
+        await expect(await canvas.findByText("Laptop CLI", undefined, PAGE_WAIT)).toBeVisible();
     },
 };

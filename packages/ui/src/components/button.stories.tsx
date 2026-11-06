@@ -63,9 +63,6 @@ export const IconOnly: Story = {
 
 /** Every variant at every text size, for a contrast check per theme and accent. */
 export const Matrix: Story = {
-    // `link` is `text-primary`: the lime accent as text, 1.05:1 on the light page. Moving it to
-    // `--primary-text` is #546; `destructive` as above.
-    parameters: { a11y: { test: "todo" } },
     render: (args) => (
         <div className="grid grid-cols-6 items-center gap-3">
             {(["default", "secondary", "outline", "ghost", "destructive", "link"] as const).map((variant) =>

@@ -51,8 +51,6 @@ export const AsLink: Story = {
 };
 
 export const AllVariants: Story = {
-    // `link` is `text-primary` (#546, see Button/Matrix) and `destructive` is 4.1:1.
-    parameters: { a11y: { test: "todo" } },
     render: (args) => (
         <div className="flex flex-wrap gap-2">
             {VARIANTS.map((variant) => (

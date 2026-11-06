@@ -81,6 +81,10 @@ export const sessionHandlers = (): HttpHandler[] => {
 
     return [
         http.get("*/api/auth/get-session", () => HttpResponse.json(current())),
+        // The sign-in UI asks which methods the deployment offers: email only, invite-only.
+        http.get("*/api/auth/sign-in-methods", () =>
+            HttpResponse.json({ inviteOnly: true, oidc: null, passkey: false, social: [] }),
+        ),
         http.get("*/api/auth/token", () => {
             const session = current();
 
