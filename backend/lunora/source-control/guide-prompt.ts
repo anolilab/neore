@@ -140,16 +140,20 @@ const instructionsOf = (instructions: string): string => (instructions.trim() ==
 
 /** The prompt the gateway-routed model gets: the diff itself, within a budget. Files past it keep their line in the list. */
 /**
- * The first part of a patch that fits the budget, with its hidden characters written out. Only the part kept is escaped, so
- * a large diff costs no more than the budget; the part is halved until its escaped form fits.
+ * The first part of a patch that fits the budget, with its hidden characters written out. The patch is escaped one character
+ * at a time and stops when the next character would not fit, so a large diff costs no more than the budget.
  */
 const boundedPatch = (patch: string, budget: number): string => {
-    let kept = patch.slice(0, Math.min(PATCH_FILE_MAX_CHARS, budget));
-    let shown = showHiddenText(kept);
+    let shown = "";
 
-    while (shown.length > budget && kept.length > 0) {
-        kept = kept.slice(0, Math.floor(kept.length / 2));
-        shown = showHiddenText(kept);
+    for (const char of patch.slice(0, PATCH_FILE_MAX_CHARS)) {
+        const piece = showHiddenText(char);
+
+        if (shown.length + piece.length > budget) {
+            break;
+        }
+
+        shown += piece;
     }
 
     return shown;

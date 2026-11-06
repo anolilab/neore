@@ -197,6 +197,8 @@ const removedByCleaner = (char: string): boolean => hasHiddenText(char, { strict
 
 /** Characters that need a look to be classed: anything outside printable ASCII, and the line breaks and tabs a patch keeps. */
 const NEEDS_LOOK = /[^\n\t\u{20}-\u{7E}]/u;
+/** A letter is never hidden: the hidden classes are controls, formats, private use, surrogates, separators and selectors. */
+const LETTER = /\p{L}/u;
 
 /**
  * `text` with each hidden character written as an escape, so a reader sees that it is there. Line breaks and tabs stay as
@@ -205,7 +207,7 @@ const NEEDS_LOOK = /[^\n\t\u{20}-\u{7E}]/u;
 export const showHiddenText = (value: string): string =>
     [...value]
         .map((char) => {
-            if (!NEEDS_LOOK.test(char)) {
+            if (!NEEDS_LOOK.test(char) || LETTER.test(char)) {
                 return char;
             }
 

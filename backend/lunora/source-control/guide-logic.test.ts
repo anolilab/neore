@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { assembleGuide, decodePath, encodePath, extractJsonObject, folderMatchesRepo, guideFreshness, isMechanicalFile, parsePatchLines } from "./guide-logic";
+import {
+    assembleGuide,
+    decodePath,
+    encodePath,
+    extractJsonObject,
+    folderMatchesRepo,
+    guideFreshness,
+    isMechanicalFile,
+    parsePatchLines,
+    showHiddenText,
+} from "./guide-logic";
 import type { GuideFile } from "./guide-logic";
 
 const PATCH = ["@@ -1,3 +1,4 @@", " keep", "-old line", "+new line", "+added line", " tail"].join("\n");
@@ -142,6 +152,11 @@ describe("assembleGuide", () => {
 
         expect(placed.toSorted((a, b) => a.localeCompare(b))).toEqual([hidden, spelled].toSorted((a, b) => a.localeCompare(b)));
         expect(guide.stops.some((stop) => stop.kind === "uncovered")).toBe(false);
+    });
+
+    it("leaves letters of any script as they are, and escapes only what cannot be shown", () => {
+        expect(showHiddenText("日本語é中文ö")).toBe("日本語é中文ö");
+        expect(showHiddenText("a\u{200B}b")).toBe(String.raw`a\u200Bb`);
     });
 
     it("reads back every path it writes, so two files never share a spelling", () => {
