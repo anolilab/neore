@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { documentTextPart, guestTextPart, isAttachedContentText, messagesCarryAttachedText } from "./attached-text";
+import { documentTextPart, guestTextPart, isAttachedContentText, messageCarriesGuestText, messagesCarryAttachedText } from "./attached-text";
 import { formatPageContextPart } from "./page-context";
 
 describe("documentTextPart", () => {
@@ -21,6 +21,15 @@ describe("isAttachedContentText", () => {
     it("does not flag ordinary typed text", () => {
         expect(isAttachedContentText("summarise the Document class")).toBe(false);
         expect(isAttachedContentText("")).toBe(false);
+    });
+});
+
+describe("messageCarriesGuestText", () => {
+    it("reads a user message whose text part the server marked as guest text", () => {
+        expect(messageCarriesGuestText({ content: [guestTextPart("note")], role: "user" })).toBe(true);
+        expect(messageCarriesGuestText({ content: [{ text: "typed", type: "text" }], role: "user" })).toBe(false);
+        expect(messageCarriesGuestText({ content: [guestTextPart("note")], role: "assistant" })).toBe(false);
+        expect(messageCarriesGuestText(undefined)).toBe(false);
     });
 });
 

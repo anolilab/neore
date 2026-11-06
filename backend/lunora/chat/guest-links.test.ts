@@ -546,3 +546,24 @@ describe("the owner's export", () => {
         ]);
     });
 });
+
+describe("a held note sent on from a chat", () => {
+    it("is looked up only for its owner, and tells the chat it was left in", async () => {
+        await createLink();
+
+        const messageId = await harness.run(async (ctx: any) => {
+            const link = await ctx.db
+                .query("threadGuestLinks")
+                .withIndex("by_thread", (q: any) => q.eq("threadId", threadId))
+                .first();
+
+            return await ctx.db.insert("threadGuestMessages", { createdAt: 0, linkId: link._id, status: "held", text: "a note", threadId, userId: OWNER });
+        });
+
+        const own = await harness.run(async (ctx: any) => await ctx.runQuery(guestLinks.getGuestNoteForSend, { messageId, userId: OWNER }));
+        const stranger = await harness.run(async (ctx: any) => await ctx.runQuery(guestLinks.getGuestNoteForSend, { messageId, userId: "user-stranger" }));
+
+        expect(own).toEqual({ status: "held", threadId: threadId as string });
+        expect(stranger).toBeNull();
+    });
+});

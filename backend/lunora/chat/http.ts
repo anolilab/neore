@@ -29,7 +29,7 @@ import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
-import { documentTextPart, guestTextPart } from "./lib/attached-text";
+import { documentTextPart, guestTextPart, messageCarriesGuestText } from "./lib/attached-text";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
 import { createStreamToken } from "./streaming/persistent/stream-token";
 
@@ -656,6 +656,17 @@ const runChatStartOnShard = async (
 
     const access = await accessPromise;
 
+    // A held guest note is sent only into the chat it was left in: sent elsewhere, it would be confirmed against its own link.
+    if (body.guestMessageId !== undefined) {
+        const note = await context
+            .runQuery(internal.chat.guest_links.getGuestNoteForSend, { messageId: body.guestMessageId as Id<"threadGuestMessages">, userId })
+            .catch(() => null);
+
+        if (!note || note.status !== "held" || note.threadId !== validThreadId) {
+            return Response.json({ error: "That guest note is not waiting in this chat." }, { status: 400 });
+        }
+    }
+
     if (access?.outcome === "locked" && !isRegenerate) {
         return threadLockedResponse();
     }
@@ -1083,6 +1094,8 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
         }
 
         const { threadId } = message;
+        // An edit of a guest's note the owner sent on is still the guest's words: its text keeps the guest mark.
+        const editsGuestText = messageCarriesGuestText(message.message as Parameters<typeof messageCarriesGuestText>[0]);
 
         // Get thread to determine model
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
@@ -1223,7 +1236,7 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
                         break;
                     }
 
-                    messageContent.push({ text, type: "text" });
+                    messageContent.push(editsGuestText ? guestTextPart(text) : { text, type: "text" });
 
                     break;
                 }

@@ -485,6 +485,23 @@ export const holdGuestMessage = internalMutation
         return { messageId: messageId as string, minted, ok: true } as const;
     });
 
+/**
+ * `/chat/start`'s check on a note it is asked to send on: the owner's own note, still waiting, and the chat it was left in.
+ * A note sent into another chat would be confirmed against its own link, so the caller compares `threadId` before saving.
+ */
+export const getGuestNoteForSend = internalQuery
+    .input({ messageId: v.id("threadGuestMessages"), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.union(v.object({ status: vGuestMessageStatus, threadId: v.string() }), v.null()))
+    .query(async ({ args, ctx }) => {
+        const row = await ctx.db.get("threadGuestMessages", args.messageId);
+
+        if (!row || row.userId !== args.userId) {
+            return null;
+        }
+
+        return { status: row.status, threadId: row.threadId as string };
+    });
+
 /** `getGuestView`'s read: the guest's own rows, only for the browser the link is bound to. */
 export const readGuestView = internalQuery
     .input({ guestHash: v.string().max(MAX_LENGTH.short), linkHash: v.string().max(MAX_LENGTH.short) })

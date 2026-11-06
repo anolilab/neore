@@ -41,6 +41,17 @@ export const guestTextPart = (text: string): { providerOptions: { neore: { guest
     return { providerOptions: { neore: { guestText: true } }, text, type: "text" };
 };
 
+/** Whether a stored user message carries guest text the owner sent on, so an edit of it keeps the mark. */
+export const messageCarriesGuestText = (message: MessageLike | undefined): boolean => {
+    if (message?.role !== "user" || !Array.isArray(message.content)) {
+        return false;
+    }
+
+    return (message.content as ReadonlyArray<{ providerOptions?: unknown }>).some(
+        (part) => (part.providerOptions as { neore?: { guestText?: unknown } } | undefined)?.neore?.guestText === true,
+    );
+};
+
 /** A structural mark the server put on the part: a captured page, or guest text the owner sent on. */
 const hasStructuralMarker = (part: { providerOptions?: unknown }): boolean => {
     const options = part.providerOptions as { neore?: { guestText?: unknown; pageContext?: unknown } } | undefined;

@@ -5,7 +5,7 @@
  * the owner's. Batching follows `gdpr/batch.ts`.
  */
 import type { MutationCtx } from "../_generated/server";
-import { deleteShardRoute } from "../lib/shard-routes";
+import { dropGuestLinkRoutes } from "./lib/guest-link-store";
 import { BATCH, type BatchResult, deleteParentsWithChildren } from "../gdpr/batch";
 
 /**
@@ -76,7 +76,11 @@ export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: st
 
     if (messagesDrained) {
         await Promise.all(guestLinks.map(async (row) => await ctx.db.delete("threadGuestLinks", row._id)));
-        await Promise.all(guestLinks.map(async (link) => await deleteShardRoute(ctx, "guest-link", link.linkHash)));
+        // A route that fails to drop is logged, not thrown: a leftover route answers "not active", and the erasure must not stall on it.
+        await dropGuestLinkRoutes(
+            ctx,
+            guestLinks.map((link) => link.linkHash),
+        );
     }
 
     const streamsLeft = await deleteParentsWithChildren(

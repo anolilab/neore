@@ -422,6 +422,7 @@ export interface InternalApiTypes {
         };
         guest_links: {
             getGuestLinkOwner: FunctionReference<"query", { linkHash: string }, string | null>;
+            getGuestNoteForSend: FunctionReference<"query", { messageId: Id<"threadGuestMessages">; userId: string }, { status: "held" | "sent"; threadId: string } | null>;
             holdGuestMessage: FunctionReference<"mutation", { freshGuestHash: string; linkHash: string; presentedGuestHash?: string; requestHash?: string; requestKey?: string; text: string }, { messageId: string; minted: boolean; ok: true } | { duplicate: true; minted: boolean; ok: true } | { ok: false; reason: "closed" | "full" | "invalid" | "limited" | "other_browser" | "request_reused" }>;
             isBoundGuest: FunctionReference<"query", { guestHash: string; linkHash: string }, boolean>;
             listGuestNotesForExport: FunctionReference<"query", { threadId: Id<"threads"> }, Array<{ createdAt: number; status: "held" | "sent"; text: string }>>;
@@ -1645,6 +1646,7 @@ export const internal: InternalApiTypes = {
         },
         guest_links: {
             getGuestLinkOwner: { __lunoraRef: "chat_guest_links:getGuestLinkOwner" },
+            getGuestNoteForSend: { __lunoraRef: "chat_guest_links:getGuestNoteForSend" },
             holdGuestMessage: { __lunoraRef: "chat_guest_links:holdGuestMessage" },
             isBoundGuest: { __lunoraRef: "chat_guest_links:isBoundGuest" },
             listGuestNotesForExport: { __lunoraRef: "chat_guest_links:listGuestNotesForExport" },
