@@ -11,7 +11,7 @@ import useAuthenticate from "@/features/auth/hooks/use-authenticate";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { authClient } from "@/lib/auth/client";
 import type { DeviceProblem as Problem } from "@/lib/auth/device-problem";
-import { problemOf } from "@/lib/auth/device-problem";
+import { canRetry, problemOf } from "@/lib/auth/device-problem";
 import { DEVICE_PROBLEM_MESSAGES } from "@/lib/auth/device-problem-messages";
 import { seo } from "@/lib/seo";
 
@@ -99,7 +99,7 @@ const ProblemMessage = ({ onRetry, problem }: { onRetry?: () => void; problem: P
             <p className="text-sm text-red-600" role="alert">
                 {i18n._(DEVICE_PROBLEM_MESSAGES[problem])}
             </p>
-            {problem === "unavailable" && onRetry && (
+            {canRetry(problem) && onRetry && (
                 <Button onClick={onRetry} type="button">
                     {t`Try again`}
                 </Button>

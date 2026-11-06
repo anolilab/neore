@@ -1280,6 +1280,29 @@ describe("a headless machine paired by code", () => {
         expect(await pairHeadless(ownerId, "build-box", "code-own")).toEqual(own);
     });
 
+    it("hands a code's own device to nobody once the account's deletion has begun", async () => {
+        const own = await pairHeadless(ownerId, "build-box", "code-deleting");
+        const check = async () =>
+            await harness.run(async (ctx: any) => await ctx.runQuery(internals.checkHeadlessPairing, { codeId: "code-deleting", userId: ownerId }));
+
+        await expect(check()).resolves.toBeNull();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("gdprRequests", {
+                requestedAt: Date.now(),
+                requestType: "deletion",
+                status: "pending",
+                userEmail: "owner@example.com",
+                userId: ownerId,
+            });
+        });
+
+        // Neither the precheck nor the registration retry gets past the account check to the existing device.
+        await expect(check()).rejects.toThrow("being deleted");
+        await expect(pairHeadless(ownerId, "build-box", "code-deleting")).rejects.toThrow("being deleted");
+        expect(own.secret).toMatch(HEX_SECRET);
+    });
+
     it("never exceeds the device cap when two pairings register at once", async () => {
         for (let index = 0; index < 9; index += 1) {
             await pairHeadless(ownerId, `filler-${String(index)}`);

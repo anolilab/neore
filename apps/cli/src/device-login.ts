@@ -78,6 +78,8 @@ const post = async (dependencies: DeviceFlowDependencies, baseUrl: string, path:
             body: JSON.stringify(body),
             headers: { Accept: "application/json", "Content-Type": "application/json" },
             method: "POST",
+            // A 307/308 would replay the code to another origin; the person confirmed THIS host only.
+            redirect: "error",
             signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         });
     } catch (error) {

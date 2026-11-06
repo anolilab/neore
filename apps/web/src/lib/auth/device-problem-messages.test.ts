@@ -26,4 +26,11 @@ describe("DEVICE_PROBLEM_MESSAGES", () => {
     it("only sends a key-cap refusal back to the command line, where it can happen", () => {
         expect(String(DEVICE_PROBLEM_MESSAGES.keyLimit.message)).not.toContain("neore-host");
     });
+
+    it("says why a refused session cannot use a code", () => {
+        const text = String(DEVICE_PROBLEM_MESSAGES.notAllowed.message);
+
+        expect(text).toContain("impersonating");
+        expect(text).toContain("guest");
+    });
 });

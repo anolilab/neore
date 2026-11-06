@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { problemOf } from "./device-problem";
+import { canRetry, problemOf } from "./device-problem";
 
 describe("problemOf", () => {
     it("shows an expired code as expired, not as a retryable failure", () => {
@@ -18,10 +18,20 @@ describe("problemOf", () => {
         expect(problemOf({ error: "invalid_grant", status: 400 })).toBe("invalid");
     });
 
+    it("does not call a refused session retryable", () => {
+        expect(problemOf({ error: "access_denied", status: 403 })).toBe("notAllowed");
+        expect(problemOf({ error: { error: "access_denied" }, status: 403 })).toBe("notAllowed");
+    });
+
     it("keeps everything else retryable", () => {
         expect(problemOf(null)).toBe("unavailable");
         expect(problemOf({ status: 500 })).toBe("unavailable");
-        expect(problemOf({ error: "access_denied" })).toBe("unavailable");
         expect(problemOf({ error: 42 })).toBe("unavailable");
+    });
+
+    it("offers Try again only for an outage, never for a refused session", () => {
+        expect(canRetry(problemOf({ status: 500 }))).toBe(true);
+        expect(canRetry(problemOf({ error: "access_denied", status: 403 }))).toBe(false);
+        expect(canRetry(problemOf({ error: "expired_token" }))).toBe(false);
     });
 });

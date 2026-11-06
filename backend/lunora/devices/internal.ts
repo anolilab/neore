@@ -314,8 +314,8 @@ const findDeviceForCode = async (ctx: Pick<QueryCtx, "db">, userId: string, code
     return page.find((device) => device.pairedByCode === codeId && device.encryptedSecret !== undefined);
 };
 
-/** Whether a machine may pair itself to this account: a real account, not being deleted, with room for one more device. */
-const assertMayPairHeadless = async (ctx: QueryCtx, userId: string): Promise<void> => {
+/** The account must be a real one and not being deleted: checked before anything is handed out, a retry included. */
+const assertAccountMayPair = async (ctx: QueryCtx, userId: string): Promise<void> => {
     const account = await ctx.db.user.findFirst({ consistency: "primary", where: { _id: ctx.db.asId("user", userId) } });
 
     if (!account || account.isAnonymous === true) {
@@ -325,8 +325,6 @@ const assertMayPairHeadless = async (ctx: QueryCtx, userId: string): Promise<voi
     if (await isAccountDeletionUnderway(ctx, userId)) {
         throw new LunoraError("FORBIDDEN", "This account is being deleted");
     }
-
-    await assertRoomForDevice(ctx, userId);
 };
 
 /**
@@ -337,13 +335,16 @@ export const checkHeadlessPairing = internalQuery
     .input({ codeId: v.optional(v.string().max(MAX_LENGTH.id)), userId: v.string().max(MAX_LENGTH.short) })
     .output(v.null())
     .query(async ({ args, ctx }) => {
+        // The account checks come first, always: a retry must not be handed a secret after deletion began.
+        await assertAccountMayPair(ctx, args.userId);
+
         // A retried poll of a code whose device already exists is finishing that pairing: its own device must not
         // count against the cap (`registerHeadlessDevice` hands it back).
         if (args.codeId !== undefined && (await findDeviceForCode(ctx, args.userId, args.codeId))) {
             return null;
         }
 
-        await assertMayPairHeadless(ctx, args.userId);
+        await assertRoomForDevice(ctx, args.userId);
 
         return null;
     });
@@ -364,13 +365,15 @@ export const registerHeadlessDevice = internalMutation
     })
     .output(v.object({ deviceId: v.string(), secret: v.string() }))
     .mutation(async ({ args, ctx }) => {
+        await assertAccountMayPair(ctx, args.userId);
+
         const existing = await findDeviceForCode(ctx, args.userId, args.codeId);
 
         if (existing?.encryptedSecret) {
             return { deviceId: existing._id as string, secret: await decryptKey(existing.encryptedSecret, "device-secrets") };
         }
 
-        await assertMayPairHeadless(ctx, args.userId);
+        await assertRoomForDevice(ctx, args.userId);
 
         const registered = await insertDevice(ctx, {
             name: args.name,

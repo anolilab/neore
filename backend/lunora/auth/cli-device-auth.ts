@@ -320,11 +320,26 @@ const redeemKey = (options: CliDeviceAuthOptions) =>
         // definite refusal below (the CLI prints it and stops). The code stays spent, because nothing will poll
         // it again after that answer. Two racing mints can both withdraw; neither can leave the person over
         // the cap, and the person starts a new code once a key is revoked.
-        const total = await ctx.context.adapter.count({ model: "apikey", where: [{ field: "referenceId", value: user.id }] });
+        let overCap: boolean;
 
-        if (total > MAX_API_KEYS_PER_USER) {
-            await ctx.context.adapter.delete({ model: "apikey", where: [{ field: "id", value: minted.id }] });
+        try {
+            const total = await ctx.context.adapter.count({ model: "apikey", where: [{ field: "referenceId", value: user.id }] });
 
+            overCap = total > MAX_API_KEYS_PER_USER;
+
+            if (overCap) {
+                await ctx.context.adapter.delete({ model: "apikey", where: [{ field: "id", value: minted.id }] });
+            }
+        } catch (error) {
+            // The adapter failed after the mint: the key was never revealed, so withdraw it (best effort) and put the
+            // code back, and the CLI's next poll mints a fresh one instead of finding a spent code and a lost key.
+            await ctx.context.adapter.delete({ model: "apikey", where: [{ field: "id", value: minted.id }] }).catch(() => undefined);
+            await restoreClaimedCode(ctx.context.adapter, claimedDeviceCode, error);
+
+            throw error;
+        }
+
+        if (overCap) {
             throw oauthError("FORBIDDEN", "access_denied", keyLimitMessage);
         }
 

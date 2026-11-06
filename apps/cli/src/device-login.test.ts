@@ -235,6 +235,59 @@ describe("pollForKey", () => {
     });
 });
 
+describe("redirects", () => {
+    it("never follows one: every request is made with redirect: error", async () => {
+        const seen: (RequestInit["redirect"] | undefined)[] = [];
+        const dependencies: DeviceFlowDependencies = {
+            fetch: (async (_url: string, init: RequestInit) => {
+                seen.push(init.redirect);
+
+                return Response.json(CODE_RESPONSE);
+            }) as never,
+            now: () => 0,
+            sleep: async () => undefined,
+        };
+
+        await requestDeviceCode(dependencies, BASE, "devbox");
+
+        expect(seen).toEqual(["error"]);
+    });
+
+    it("refuses a 307 from a real server without a second request to the other origin", async () => {
+        const { createServer } = await import("node:http");
+        const hits: string[] = [];
+        const target = createServer((request, response) => {
+            hits.push(`target ${request.url}`);
+            response.end("{}");
+        });
+        const origin = createServer((request, response) => {
+            hits.push(`origin ${request.url}`);
+            response.writeHead(307, { Location: `http://127.0.0.1:${String((target.address() as { port: number }).port)}/stolen` });
+            response.end();
+        });
+
+        await new Promise<void>((resolve) => {
+            target.listen(0, "127.0.0.1", resolve);
+        });
+        await new Promise<void>((resolve) => {
+            origin.listen(0, "127.0.0.1", resolve);
+        });
+
+        try {
+            const dependencies: DeviceFlowDependencies = { fetch, now: () => 0, sleep: async () => undefined };
+            const failure = await requestDeviceCode(dependencies, `http://127.0.0.1:${String((origin.address() as { port: number }).port)}`, "devbox").catch(
+                (error: unknown) => error,
+            );
+
+            expect(failure).toBeInstanceOf(ApiError);
+            expect(hits).toEqual(["origin /api/auth/device/code"]);
+        } finally {
+            origin.close();
+            target.close();
+        }
+    });
+});
+
 describe("formatUserCode", () => {
     it("groups an 8-character code", () => {
         expect(formatUserCode("ABCDEFGH")).toBe("ABCD-EFGH");
@@ -420,6 +473,23 @@ describe("neore login --device", () => {
 
             return { context, urls };
         };
+
+        it("without a terminal and without an API URL, says to pass --api-url or NEORE_API_URL instead of waiting", async () => {
+            const { context, urls } = requests([() => Response.json(CODE_RESPONSE)]);
+            let wasAsked = false;
+
+            context.readLine = async () => {
+                wasAsked = true;
+
+                return null;
+            };
+
+            expect(await run(["login", "--device"], context)).toBe(EXIT.usage);
+            expect(context.io.stderr.text()).toContain("--api-url");
+            expect(context.io.stderr.text()).toContain("NEORE_API_URL");
+            expect(wasAsked).toBe(false);
+            expect(urls).toEqual([]);
+        });
 
         it("without a terminal, refuses unless the host is passed, and sends nothing", async () => {
             const { context, urls } = requests([() => Response.json(CODE_RESPONSE)]);

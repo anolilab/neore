@@ -1,5 +1,5 @@
 /** What the CLI approval page tells the person when a lookup, approval or denial fails. */
-export type DeviceProblem = "expired" | "invalid" | "keyLimit" | "unavailable";
+export type DeviceProblem = "expired" | "invalid" | "keyLimit" | "notAllowed" | "unavailable";
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
 
@@ -33,5 +33,13 @@ export const problemOf = (failure: unknown): DeviceProblem => {
         return "keyLimit";
     }
 
+    // The session may not use a code at all (a guest, or an admin impersonating): trying again cannot work.
+    if (code === "access_denied") {
+        return "notAllowed";
+    }
+
     return code === "invalid_request" || code === "invalid_grant" ? "invalid" : "unavailable";
 };
+
+/** Only a failure that may pass by itself offers "Try again"; a refused session or a spent code never does. */
+export const canRetry = (problem: DeviceProblem): boolean => problem === "unavailable";

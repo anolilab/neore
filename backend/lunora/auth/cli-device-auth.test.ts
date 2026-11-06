@@ -568,4 +568,55 @@ describe("hostname handling", () => {
         expect(cliKeyName("a".repeat(100))).toHaveLength(32);
         expect(cliKeyName("devbox")).toBe("Neore CLI on devbox");
     });
+
+    it("restores the code and withdraws the key when the cap count fails after the mint", async () => {
+        const holder: { harness?: Harness } = {};
+        let sabotage = true;
+        const harness = build(async (input) => {
+            const live = holder.harness as Harness;
+            const context = await live.auth.$context;
+            const count = context.adapter.count.bind(context.adapter);
+
+            if (sabotage) {
+                sabotage = false;
+                // The next count (the one after the mint) fails once.
+                context.adapter.count = (async () => {
+                    context.adapter.count = count;
+
+                    throw new Error("adapter unavailable");
+                }) as typeof context.adapter.count;
+            }
+
+            return await (live.auth.api as unknown as ApiKeyAuthApi).createApiKey({
+                body: {
+                    expiresIn: input.expiresInSeconds,
+                    name: input.name,
+                    permissions: DEFAULT_API_SCOPES as Record<string, string[]>,
+                    userId: input.userId,
+                },
+            });
+        });
+
+        holder.harness = harness;
+
+        const person = await signUp(harness);
+        const code = await requestCode(harness);
+
+        await approve(harness, person.cookie, code.user_code);
+        vi.setSystemTime(Date.now() + 6000);
+
+        const failed = await poll(harness, code.device_code);
+
+        expect(failed.response.status).toBeGreaterThanOrEqual(500);
+        // The code is back and the unrevealed key is gone.
+        expect(await rowsOf(harness, "deviceCode")).toHaveLength(1);
+        expect(await rowsOf(harness, "apikey")).toHaveLength(0);
+
+        vi.setSystemTime(Date.now() + 6000);
+
+        const retried = await poll(harness, code.device_code);
+
+        expect(retried.response.status).toBe(200);
+        expect(await rowsOf(harness, "apikey")).toHaveLength(1);
+    });
 });

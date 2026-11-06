@@ -5690,7 +5690,7 @@ msgstr "Checked: {0}"
 msgid "Checking image safety..."
 msgstr "Checking image safety..."
 
-#: src/routes/auth/device.tsx:394
+#: src/routes/auth/device.tsx:398
 msgid "Checking the code…"
 msgstr "Checking the code…"
 
@@ -17959,7 +17959,7 @@ msgstr "Loading..."
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
-#: src/routes/auth/device.tsx:357
+#: src/routes/auth/device.tsx:361
 #: src/routes/auth/extension.tsx:66
 msgid "Loading…"
 msgstr "Loading…"
@@ -27993,7 +27993,7 @@ msgstr "Sidebar Right"
 #: src/features/layout/components/nav-user.tsx:237
 #: src/features/marketing/components/landing-page.tsx:1058
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
-#: src/routes/auth/device.tsx:369
+#: src/routes/auth/device.tsx:373
 #: src/routes/auth/extension.tsx:78
 msgid "Sign in"
 msgstr "Sign in"
@@ -28018,7 +28018,7 @@ msgid "Sign in on another site?"
 msgstr "Sign in on another site?"
 
 #: src/routes/auth/device.tsx:87
-#: src/routes/auth/device.tsx:409
+#: src/routes/auth/device.tsx:413
 msgid "Sign in the command line"
 msgstr "Sign in the command line"
 
@@ -30784,7 +30784,7 @@ msgstr "The change is too large to show in full."
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "The chat agent works the task with its tools, optionally following a skill."
 
-#: src/lib/auth/device-problem-messages.ts:13
+#: src/lib/auth/device-problem-messages.ts:14
 msgid "The code could not be checked right now. Try again in a moment."
 msgstr "The code could not be checked right now. Try again in a moment."
 
@@ -31822,6 +31822,10 @@ msgstr "This server's address changed. Check the address below and save again."
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
 msgstr "This server's registry entry asks for the values below. They fill in the URL and headers."
 
+#: src/lib/auth/device-problem-messages.ts:13
+msgid "This session cannot use a code: a guest session, or an admin impersonating someone, cannot approve one. Sign in to your own account, then open the code again."
+msgstr "This session cannot use a code: a guest session, or an admin impersonating someone, cannot approve one. Sign in to your own account, then open the code again."
+
 #: src/features/chat/host/host-composer.tsx:171
 #: src/features/chat/host/host-send-errors.ts:19
 msgid "This session has ended. Start a new one from the desktop app."
@@ -32641,7 +32645,7 @@ msgstr "Try adjusting your search terms."
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/home/components/home-page.tsx:144
 #: src/routes/auth/device.tsx:104
-#: src/routes/auth/device.tsx:348
+#: src/routes/auth/device.tsx:352
 msgid "Try again"
 msgstr "Try again"
 
@@ -34631,7 +34635,7 @@ msgstr "Watch only this part (optional)"
 msgid "Watched repositories"
 msgstr "Watched repositories"
 
-#: src/routes/auth/device.tsx:339
+#: src/routes/auth/device.tsx:343
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr "We could not check that you are signed in. Try again in a moment."
 
@@ -35339,7 +35343,7 @@ msgstr "You are adding documents too quickly. Wait a moment and try again."
 msgid "You are browsing as a guest. Sign in with your account to connect the extension."
 msgstr "You are browsing as a guest. Sign in with your account to connect the extension."
 
-#: src/routes/auth/device.tsx:367
+#: src/routes/auth/device.tsx:371
 msgid "You are browsing as a guest. Sign in with your account to sign in the command line."
 msgstr "You are browsing as a guest. Sign in with your account to sign in the command line."
 
