@@ -195,4 +195,35 @@ describe(SessionTerminals, () => {
         expect(host.wait).toHaveBeenCalledTimes(1);
     });
 
+    it("keeps no result for a command that ends after its session did", async () => {
+        const ends: ((exit: { exitCode: number | null; signal: string | null }) => void)[] = [];
+        const host = {
+            kill: vi.fn(),
+            output: vi.fn(() => {
+                return { output: "printed late", truncated: false };
+            }),
+            release: vi.fn(),
+            start: vi.fn(async () => 9),
+            wait: vi.fn(
+                async () =>
+                    await new Promise<{ exitCode: number | null; signal: string | null }>((resolve) => {
+                        ends.push(resolve);
+                    }),
+            ),
+        };
+        const ended = vi.fn();
+        const terminals = new SessionTerminals(host as never, ended);
+        const id = await terminals.create(request);
+
+        terminals.releaseAll();
+        ends[0]?.({ exitCode: 0, signal: null });
+        await new Promise((resolve) => {
+            setTimeout(() => {
+                resolve(undefined);
+            }, 0);
+        });
+
+        expect(terminals.result(id)).toBeUndefined();
+        expect(ended).not.toHaveBeenCalled();
+    });
 });

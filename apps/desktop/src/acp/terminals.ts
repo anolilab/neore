@@ -329,7 +329,10 @@ export class SessionTerminals {
         }
     }
 
-    /** The session ended: every terminal is killed and freed. */
+    /**
+     * The session ended: every terminal is killed and freed, and its results are forgotten. A command that is still starting is
+     * freed when its start answers; one that ends later finds nothing here to record its output in.
+     */
     public releaseAll(): void {
         this.closed = true;
 
@@ -346,6 +349,8 @@ export class SessionTerminals {
                 // The core forgot it already (it was stopped); there is nothing left to free.
             }
         }
+
+        this.open.clear();
     }
 
     /** Forgets the oldest results of terminals that ended and were released, past the last {@link KEPT_RESULTS}. */

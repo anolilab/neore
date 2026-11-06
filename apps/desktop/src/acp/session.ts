@@ -777,8 +777,6 @@ export class AgentSession {
         clearTimeout(this.cancelTimer);
         this.connection.close(new Error(said));
         this.options.gate.cancelSession(this.id);
-        // No terminal outlives its session.
-        this.terminals?.releaseAll();
         // An ended session never leaves its process behind, whatever ended it (an error answer, a closed
         // output, a cancel that went unanswered).
         this.stopping = this.stopProcess();
@@ -791,6 +789,12 @@ export class AgentSession {
             tool.status = this.cancelRequested ? "cancelled" : "failed";
             this.observeTool(tool);
         }
+
+        // The rows above read the terminals' results, so those go only now: no terminal outlives its session, and no printed
+        // output stays in memory with the session object the manager keeps until it is removed.
+        this.terminals?.releaseAll();
+        this.toolOutput.clear();
+        this.toolTerminal.clear();
 
         this.children.endAll(this.cancelRequested ? "cancelled" : "failed");
         this.finishChildren();
