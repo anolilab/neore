@@ -12,7 +12,7 @@
 //! rejects it.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -124,6 +124,8 @@ pub struct DeviceCore {
     state: Arc<DeviceState>,
     next_terminal: AtomicU64,
     terminals: Terminals,
+    /// Set by `stop` before it drains the terminals. A start that spawned after that is killed, not added to the map.
+    stopping: Arc<AtomicBool>,
 }
 
 #[napi]
@@ -169,6 +171,7 @@ impl DeviceCore {
         Ok(DeviceCore {
             next_terminal: AtomicU64::new(1),
             state,
+            stopping: Arc::default(),
             terminals: Arc::default(),
         })
     }
@@ -753,6 +756,7 @@ impl DeviceCore {
             .map_err(|_| Error::from_reason("invalid terminal request"))?;
         let state = Arc::clone(&self.state);
         let terminals = Arc::clone(&self.terminals);
+        let stopping = Arc::clone(&self.stopping);
         let handle = self.next_terminal.fetch_add(1, Ordering::Relaxed);
 
         blocking(env, move || {
@@ -762,6 +766,14 @@ impl DeviceCore {
 
             let terminal = state.acp_terminal_start(&request)?;
             let mut running = terminals.lock().unwrap();
+
+            // Shutdown has begun (`stop` drains under this lock, after setting the flag): the command just started is killed here,
+            // since nothing else will reach it.
+            if stopping.load(Ordering::SeqCst) {
+                terminal.kill();
+
+                return Err("the app is shutting down".into());
+            }
 
             // Checked again: another start may have filled the last place while this one was planned.
             if running.len() >= MAX_TERMINALS {
@@ -839,6 +851,10 @@ impl DeviceCore {
     #[napi]
     pub fn stop(&self) {
         self.state.stop_servers();
+
+        // The flag is set, then the map is drained under its lock: a start either inserted before this (and is drained here), or
+        // sees the flag and kills its own command.
+        self.stopping.store(true, Ordering::SeqCst);
 
         for (_, terminal) in self.terminals.lock().unwrap().drain() {
             terminal.kill();
