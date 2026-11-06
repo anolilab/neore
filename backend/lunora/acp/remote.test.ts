@@ -564,6 +564,21 @@ describe("sendToHost", () => {
         expect(await sessionStatus()).toBe("busy");
     });
 
+    it("strips hidden characters from the prompt on every send, so the saved message and the computer get only the visible text", async () => {
+        const { threadId } = await readyThread();
+        const hidden = "fix\u{E0041} the\u{202E} bug\u{200B}";
+        const result = await sendText(threadId, hidden);
+
+        expect(result.outcome).toBe("sent");
+
+        const call = await sendCall();
+        const envelope = JSON.parse(call.envelope as string) as Row;
+        const [prompt] = await rows("messages", { threadId });
+
+        expect(prompt?.message).toMatchObject({ content: "fix the bug", role: "user" });
+        expect(envelope.input).toMatchObject({ text: "fix the bug" });
+    });
+
     it("answers a retry of the same request with the first try, not a second turn", async () => {
         const { threadId } = await readyThread();
         const first = await sendText(threadId, "fix the bug", "req-1");
@@ -1176,5 +1191,15 @@ describe("POST /hosts/send", () => {
         await expect(post({ requestId: "", text: "hi", threadId: "t" })).resolves.toBe(400);
         await expect(post({ requestId: "r", text: "hi", threadId: "t", unlockProof: 5 })).resolves.toBe(400);
         await expect(post({ requestId: "r", text: "hi", threadId: "t", unlockProof: "x".repeat(5000) })).resolves.toBe(400);
+    });
+
+    it("takes hidden characters out before the checks, so the cap and the empty check apply to the text sent", async () => {
+        vi.stubEnv("LLM_GATEWAY_SIGNING_SECRET", "secret");
+
+        // Only hidden characters is an empty prompt.
+        await expect(post({ requestId: "r", text: "\u{E0041}\u{202E}", threadId: "t" })).resolves.toBe(400);
+        // 30,000 visible characters and one tag character: the tag goes, so the text is within the cap and the request
+        // reaches the caller check (401 with no identity).
+        await expect(post({ requestId: "r", text: `${"x".repeat(30_000)}\u{E0041}`, threadId: "t" })).resolves.toBe(401);
     });
 });
