@@ -13,6 +13,7 @@ import { claimFence, ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS, ORGANIZATION_POLIC
 import { authMutation, authQuery, internalQuery, rateLimit } from "../lib/crpc";
 import { logger } from "../lib/logger";
 import { MAX_LENGTH } from "../lib/validators";
+import { getMemberByOrganizationAndUser } from "./lib/better-auth-queries";
 import { parseOrganizationPolicy, permissionCapOf, readPolicyState, serializeOrganizationPolicy } from "./lib/organization-policy";
 
 const policyLogger = logger.scope("organization-policy");
@@ -161,3 +162,12 @@ export const getPermissionCapQuery = internalQuery
 
         return permissionCapOf(state);
     });
+
+/**
+ * Whether a user is still a member of an organization. Internal: a headless run (a trigger, task, eval or sub-agent that
+ * outlived its owner's membership) checks it before the run files a thread under that organization.
+ */
+export const isOrganizationMemberQuery = internalQuery
+    .input({ organizationId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .query(async ({ args, ctx: context }) => (await getMemberByOrganizationAndUser(context, args.organizationId, args.userId)) !== null);

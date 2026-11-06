@@ -291,6 +291,7 @@ export interface InternalApiTypes {
         };
         organization_policy: {
             getPermissionCapQuery: FunctionReference<"query", { organizationId: string }, "off" | "ask" | "auto">;
+            isOrganizationMemberQuery: FunctionReference<"query", { organizationId: string; userId: string }, boolean>;
         };
         organization_policy_erase: {
             deleteOrganizationPolicy: FunctionReference<"mutation", { organizationId: string }, null>;
@@ -1538,6 +1539,7 @@ export const internal: InternalApiTypes = {
         },
         organization_policy: {
             getPermissionCapQuery: { __lunoraRef: "auth_organization_policy:getPermissionCapQuery" },
+            isOrganizationMemberQuery: { __lunoraRef: "auth_organization_policy:isOrganizationMemberQuery" },
         },
         organization_policy_erase: {
             deleteOrganizationPolicy: { __lunoraRef: "auth_organization_policy_erase:deleteOrganizationPolicy" },

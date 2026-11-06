@@ -410,6 +410,13 @@ const isHostInLeadScope = async (ctx: MutationCtx, run: Pick<RunDoc, "parentThre
  * or a turn holds the session) is not a failure: the run goes back to the head of the line and
  * {@link retryHostRunStart} tries it again, so the messages behind it wait too instead of meeting the same refusal.
  */
+/** Whether the organization's current cap is `auto`. A computer agent's tools are approved there, out of the backend's reach. */
+const hostCapAllowsAuto = async (ctx: MutationCtx, organizationId: string | null | undefined): Promise<boolean> => {
+    const policy = organizationId ? await ctx.db.organizationPolicies.findFirst({ where: { organizationId } }) : null;
+
+    return permissionCapOf(readPolicyState(policy?.document)) === "auto";
+};
+
 const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<void> => {
     const claimed = await claimQueuedRun(ctx, runId);
 
@@ -427,6 +434,13 @@ const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promis
     // ...and the computer's projects may have changed, or the lead moved to another project.
     if (!(await isHostInLeadScope(ctx, claimed))) {
         await finishRun(ctx, runId, { error: HOST_OUT_OF_SCOPE, kind: "failed" });
+
+        return;
+    }
+
+    // The cap is read again here: a turn can wait behind another for a long time, and the organization may have tightened in that time.
+    if (!(await hostCapAllowsAuto(ctx, claimed.organizationId))) {
+        await finishRun(ctx, runId, { error: HOST_NOT_UNDER_AUTO, kind: "failed" });
 
         return;
     }
@@ -678,13 +692,8 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
 
     // The organization's cap must allow `auto`: a computer agent's tools are approved there, out of the backend's reach.
     // A new worker takes the organization its thread is stamped with; an existing one keeps its own.
-    if (runnerKind === "host") {
-        const organizationId = child?.organizationId ?? parent.organizationId ?? args.organizationId;
-        const policy = organizationId ? await ctx.db.organizationPolicies.findFirst({ where: { organizationId } }) : null;
-
-        if (permissionCapOf(readPolicyState(policy?.document)) !== "auto") {
-            return await refuse({ error: HOST_NOT_UNDER_AUTO, kind: "forbidden" });
-        }
+    if (runnerKind === "host" && !(await hostCapAllowsAuto(ctx, child?.organizationId ?? parent.organizationId ?? args.organizationId))) {
+        return await refuse({ error: HOST_NOT_UNDER_AUTO, kind: "forbidden" });
     }
 
     // Only the task text reaches a coding agent on a computer: a tool list or skill the caller asks for would read as a

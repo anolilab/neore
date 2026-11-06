@@ -569,6 +569,33 @@ describe("the end of a host turn", () => {
         expect(await sendCalls()).toHaveLength(2);
         expect((await sessionOf(receipt.workerId)).status).toBe("busy");
     });
+
+    it("fails a queued message, sending nothing, when the organization's cap drops below auto while it waits", async () => {
+        const device = await pairedDevice();
+        const lead = await newThread({ organizationId: "org-tightened" });
+        const receipt = await createHostWorker(device, { leadThreadId: lead });
+
+        await sessionOpen(device, receipt.workerId);
+
+        const queued = await dispatchFromUser(receipt.workerId, "second");
+
+        expect(queued.state).toBe("queued");
+
+        await run(
+            async (context) =>
+                await context.db.insert("organizationPolicies", {
+                    document: JSON.stringify({ permissionCap: "ask", schemaVersion: 1 }),
+                    organizationId: "org-tightened",
+                    revision: 1,
+                    schemaVersion: 1,
+                    updatedAt: Date.now(),
+                }),
+        );
+        await finishTurn(device, receipt.workerId);
+
+        expect(await runRow(queued.runId)).toMatchObject({ error: expect.stringMatching(NOT_ALLOWED_BY_CAP), status: "failed" });
+        expect(await sendCalls()).toHaveLength(1);
+    });
 });
 
 const dispatchWithLead = async (device: Device) => {

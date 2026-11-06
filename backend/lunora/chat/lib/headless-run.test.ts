@@ -24,6 +24,8 @@ const seen = vi.hoisted(() => {
         filterRules: undefined as Record<string, string[]> | undefined,
         filters: [] as unknown[],
         met: [] as boolean[],
+        /** The owner has left the run's organization. */
+        notMember: false,
         prepareSteps: [] as unknown[],
         prompts: [] as (string | undefined)[],
         providerOptions: [] as unknown[],
@@ -139,6 +141,10 @@ const fakeCtx = (prefs: typeof PREFS = PREFS) =>
 
             if (reference === "auth_functions:getAgentModulePreferencesQuery") {
                 return { modelFilterRules: seen.filterRules };
+            }
+
+            if (reference === "auth_organization_policy:isOrganizationMemberQuery") {
+                return !seen.notMember;
             }
 
             if (reference === "auth_functions:getDecryptedProviderKeysQuery") {
@@ -366,6 +372,7 @@ describe("runHeadlessAgent context sizing for a backup", () => {
 describe("runHeadlessAgent thread tags", () => {
     beforeEach(() => {
         seen.created = [];
+        seen.notMember = false;
     });
 
     const run = async (ctx: unknown, extra: Partial<Parameters<typeof runHeadlessAgent>[1]> = {}) =>
@@ -416,6 +423,15 @@ describe("runHeadlessAgent thread tags", () => {
         const patches = ctx.runMutation.mock.calls.map(([, args]) => (args as { patch?: object }).patch);
 
         expect(patches.some((patch) => patch && "organizationId" in patch)).toBe(false);
+    });
+
+    it("refuses a run whose owner left its organization, filing no thread under it", async () => {
+        const ctx = fakeCtx();
+
+        seen.notMember = true;
+
+        await expect(run(ctx, { organizationId: "org-left" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+        expect(seen.created).toEqual([]);
     });
 
     it("never moves an existing thread into another organization", async () => {

@@ -198,6 +198,16 @@ const withoutHiddenText = (options: HeadlessRunOptions): HeadlessRunOptions => {
 export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOptions): Promise<HeadlessRunResult> => {
     const options = withoutHiddenText(rawOptions);
     const { prompt, skill, userId } = options;
+
+    // A run outlives its owner's membership (a scheduled trigger, a task, a sub-agent). Refused here, before any thread is
+    // filed under an organization the owner can no longer open, or any tool is built under its cap.
+    if (
+        options.organizationId &&
+        !(await ctx.runQuery(internal.auth.organization_policy.isOrganizationMemberQuery, { organizationId: options.organizationId, userId }))
+    ) {
+        throw new LunoraError("FORBIDDEN", "The owner is no longer a member of this organization");
+    }
+
     // The Workers AI default cannot keep to a region rule: a user with one runs on a default their rules allow.
     const model =
         options.model === DEFAULT_CHAT_MODEL
