@@ -1,6 +1,7 @@
 import { LunoraError, v } from "lunorash/server";
 
 import { collectAcpSessionPages } from "../acp/gdpr";
+import { collectAllTriggers } from "../triggers/export-pages";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalQuery } from "../_generated/server";
@@ -515,6 +516,9 @@ export const generateExportFile = internalAction
         // Optional so an export workflow already in flight when this shipped
         // still replays against the new signature.
         threadTags: v.optional(v.any()),
+        // Triggers with their settings and their newest runs, read in this action when the workflow does not pass them
+        // (`triggers/gdpr.ts`). Optional so an export already in flight still replays with the list it recorded.
+        triggers: v.optional(v.any()),
         userEmail: v.string(),
         userId: v.string(),
         // The user's watched repositories (`source-control/gdpr.ts`). Optional for the same in-flight-replay reason.
@@ -555,6 +559,12 @@ export const generateExportFile = internalAction
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadTags: args.threadTags ?? [],
+            triggers:
+                args.triggers ??
+                (await collectAllTriggers(
+                    async (cursor) => await context.runQuery(internal.triggers.gdpr.collectTriggersForExport, { cursor, userId: args.userId }),
+                    MAX_EXPORT_BYTES,
+                )),
             usageDaily: activity?.usageDaily ?? [],
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };

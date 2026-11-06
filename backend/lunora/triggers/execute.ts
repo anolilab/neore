@@ -13,6 +13,7 @@ import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { SANDBOX_TOOLS } from "../chat/lib/tool-builder";
 import { AgentRunError } from "../chat/lib/agent-run";
+import { agentPromptText } from "../chat/lib/agent-prompt";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { MAX_LENGTH } from "../lib/validators";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
@@ -25,6 +26,29 @@ import { MAX_PAYLOAD_LENGTH, randomFrameId, renderWebhookPrompt } from "./webhoo
 
 /** Waits before the admission transaction is tried again after it threw: it is all-or-nothing, so a retry cannot charge twice. */
 const ADMISSION_RETRY_DELAYS_MS = [100, 400];
+
+/** The most of a run's prompt the run log keeps; the run itself gets the whole prompt. */
+const MAX_LOGGED_PROMPT_LENGTH = 2000;
+
+/**
+ * The text a run logs: what the agent is given (`agentPromptText`), capped. A refused prompt never reaches the agent, so it
+ * logs nothing. Ordinary whitespace is a prompt the agent accepts, so it is logged.
+ */
+export const promptForLog = (input: string): string | undefined => {
+    const agentInput = agentPromptText(input);
+
+    return agentInput === undefined ? undefined : cutOnCodePoint(agentInput, MAX_LOGGED_PROMPT_LENGTH);
+};
+
+/** A high surrogate at the end of a string: the first half of a pair that a cut would split. */
+const TRAILING_HIGH_SURROGATE = /[\uD800-\uDBFF]$/u;
+
+/** The first `max` UTF-16 units, without a surrogate pair cut in two: a lone high surrogate at the end is dropped. */
+export const cutOnCodePoint = (text: string, max: number): string => {
+    const cut = text.slice(0, max);
+
+    return TRAILING_HIGH_SURROGATE.test(cut) ? cut.slice(0, -1) : cut;
+};
 
 const RELEASE_DEFERRED_NOTE = "Giving this delivery back failed; a retry is scheduled, and a redelivery is refused as a duplicate until it succeeds.";
 
@@ -228,6 +252,8 @@ export const executeTrigger = internalAction
                     triggerId,
                 }),
         );
+        // The prompt the run was given, for the run log. Set once the input is built; a run that fails before that logs none.
+        let loggedPrompt: string | undefined;
         let started = false;
 
         try {
@@ -321,6 +347,8 @@ export const executeTrigger = internalAction
                 inputMessage = sanitizedPayload || "Trigger activated.";
             }
 
+            loggedPrompt = promptForLog(inputMessage);
+
             // 4. Run the agent in a new thread (auto-continue: up to 25 steps)
             // A scheduled bot routine may use the bot's shell and file tools, and only those.
             // Headless runs drop `ask` tools, so each one still needs the owner's `auto` setting.
@@ -352,6 +380,7 @@ export const executeTrigger = internalAction
             // 5. Update execution as completed
             await ctx.runMutation(internal.triggers.functions.updateExecution, {
                 executionId,
+                prompt: loggedPrompt,
                 status: "completed",
                 threadId,
             });
@@ -405,6 +434,7 @@ export const executeTrigger = internalAction
             await ctx.runMutation(internal.triggers.functions.updateExecution, {
                 error: [errorMessage, note].filter(Boolean).join(" ").slice(0, 2000),
                 executionId,
+                prompt: loggedPrompt,
                 status: "failed",
                 userFixable,
             });

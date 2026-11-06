@@ -135,6 +135,7 @@ interface TriggerExecutionRow {
     _id: string;
     completedAt: number | null;
     error: string | null;
+    prompt: string | null;
     startedAt: number;
     status: string;
     threadId: string | null;
@@ -973,41 +974,48 @@ const TriggerSettings: FC = () => {
                                                     executions &&
                                                     executions.length > 0 &&
                                                     executions.map((exec: TriggerExecutionRow) => (
-                                                        <div
-                                                            className="bg-muted/50 flex items-center justify-between rounded-md px-3 py-2 text-xs"
-                                                            key={exec._id}
-                                                        >
-                                                            <div className="flex items-center gap-2">
-                                                                <ExecutionStatusIcon status={exec.status} />
-                                                                <span className="capitalize">{executionStatusLabel(exec.status)}</span>
-                                                                <span className="text-muted-foreground" suppressHydrationWarning>
-                                                                    {formatDateTime(exec.startedAt, i18n.locale)}
-                                                                </span>
-                                                                {exec.completedAt && (
-                                                                    <span className="text-muted-foreground">
-                                                                        ({Math.round((exec.completedAt - exec.startedAt) / 1000)}s)
+                                                        <div className="bg-muted/50 space-y-1.5 rounded-md px-3 py-2 text-xs" key={exec._id}>
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-2">
+                                                                    <ExecutionStatusIcon status={exec.status} />
+                                                                    <span className="capitalize">{executionStatusLabel(exec.status)}</span>
+                                                                    <span className="text-muted-foreground" suppressHydrationWarning>
+                                                                        {formatDateTime(exec.startedAt, i18n.locale)}
                                                                     </span>
-                                                                )}
+                                                                    {exec.completedAt && (
+                                                                        <span className="text-muted-foreground">
+                                                                            ({Math.round((exec.completedAt - exec.startedAt) / 1000)}s)
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    {exec.error && (
+                                                                        <span
+                                                                            className={`max-w-[200px] truncate ${exec.status === "filtered" ? "text-muted-foreground" : "text-red-500"}`}
+                                                                            title={exec.error}
+                                                                        >
+                                                                            {exec.error}
+                                                                        </span>
+                                                                    )}
+                                                                    {exec.threadId && (
+                                                                        <a
+                                                                            className="text-primary flex items-center gap-0.5 hover:underline"
+                                                                            href={`/chat/${exec.threadId}`}
+                                                                        >
+                                                                            <ExternalLink aria-hidden="true" className="size-3" />
+                                                                            {t`Thread`}
+                                                                        </a>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                            <div className="flex items-center gap-2">
-                                                                {exec.error && (
-                                                                    <span
-                                                                        className={`max-w-[200px] truncate ${exec.status === "filtered" ? "text-muted-foreground" : "text-red-500"}`}
-                                                                        title={exec.error}
-                                                                    >
-                                                                        {exec.error}
-                                                                    </span>
-                                                                )}
-                                                                {exec.threadId && (
-                                                                    <a
-                                                                        className="text-primary flex items-center gap-0.5 hover:underline"
-                                                                        href={`/chat/${exec.threadId}`}
-                                                                    >
-                                                                        <ExternalLink aria-hidden="true" className="size-3" />
-                                                                        {t`Thread`}
-                                                                    </a>
-                                                                )}
-                                                            </div>
+                                                            {exec.prompt && (
+                                                                <details className="text-muted-foreground">
+                                                                    <summary className="cursor-pointer hover:underline">{t`Prompt`}</summary>
+                                                                    <pre className="mt-1 max-h-48 overflow-auto font-mono text-[11px] break-words whitespace-pre-wrap">
+                                                                        {exec.prompt}
+                                                                    </pre>
+                                                                </details>
+                                                            )}
                                                         </div>
                                                     ))}
                                                 {!executionsLoading && !(executions && executions.length > 0) && (

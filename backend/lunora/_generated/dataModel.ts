@@ -1916,6 +1916,8 @@ export interface Doc_triggerExecutions {
     firing?: number;
     pausedTrigger?: boolean;
     payload?: string;
+    prompt?: string;
+    promptExpiresAt?: number;
     startedAt: number;
     status: "running" | "completed" | "failed" | "filtered";
     threadId?: string;
@@ -2534,7 +2536,7 @@ export interface IndexNamesByTable {
     threadTags: "by_user_and_order";
     threadVariables: "by_thread" | "by_user";
     toolApprovalRuns: "by_approvalId" | "by_threadId" | "by_threadId_status_createdAt" | "by_status_createdAt" | "by_status_resolvedAt" | "by_userId_status_createdAt";
-    triggerExecutions: "by_triggerId_startedAt" | "by_triggerId_status";
+    triggerExecutions: "by_triggerId_startedAt" | "by_triggerId_status" | "by_promptExpiresAt";
     triggers: "by_userId_organizationId" | "by_type_enabled" | "by_enabled_nextTriggerAt" | "by_userId_type_enabled" | "by_type_enabled_nextTriggerAt";
     twoFactor: "userId";
     usageBackfill: "by_userId";
@@ -4909,6 +4911,8 @@ export interface Insert_triggerExecutions {
     firing?: number;
     pausedTrigger?: boolean;
     payload?: string;
+    prompt?: string;
+    promptExpiresAt?: number;
     startedAt: number;
     status: "running" | "completed" | "failed" | "filtered";
     threadId?: string;

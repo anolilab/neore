@@ -135,15 +135,21 @@ if (source["threadTags"] !== undefined) {
 __val14 = source["threadTags"];
 __has14 = true;
 }
-if (typeof source["userEmail"] !== "string") return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
 let __has15 = false;
 let __val15;
-if (source["watchedRepositories"] !== undefined) {
-__val15 = source["watchedRepositories"];
+if (source["triggers"] !== undefined) {
+__val15 = source["triggers"];
 __has15 = true;
 }
-return { ...(__has1 ? { "acpSessions": __val1 } : {}), ...(__has2 ? { "activity": __val2 } : {}), ...(__has3 ? { "bots": __val3 } : {}), ...(__has4 ? { "codingAgentRuns": __val4 } : {}), "conversations": source["conversations"], ...(__has5 ? { "devices": __val5 } : {}), ...(__has6 ? { "evals": __val6 } : {}), "files": source["files"], ...(__has7 ? { "memories": __val7 } : {}), ...(__has8 ? { "notifications": __val8 } : {}), ...(__has9 ? { "pages": __val9 } : {}), "profile": source["profile"], "prompts": source["prompts"], ...(__has10 ? { "pullRequestGuides": __val10 } : {}), ...(__has11 ? { "pullRequestThreads": __val11 } : {}), "requestId": source["requestId"], ...(__has12 ? { "reviewDrafts": __val12 } : {}), "settings": source["settings"], ...(__has13 ? { "tasks": __val13 } : {}), ...(__has14 ? { "threadTags": __val14 } : {}), "userEmail": source["userEmail"], "userId": source["userId"], ...(__has15 ? { "watchedRepositories": __val15 } : {}) };
+if (typeof source["userEmail"] !== "string") return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+let __has16 = false;
+let __val16;
+if (source["watchedRepositories"] !== undefined) {
+__val16 = source["watchedRepositories"];
+__has16 = true;
+}
+return { ...(__has1 ? { "acpSessions": __val1 } : {}), ...(__has2 ? { "activity": __val2 } : {}), ...(__has3 ? { "bots": __val3 } : {}), ...(__has4 ? { "codingAgentRuns": __val4 } : {}), "conversations": source["conversations"], ...(__has5 ? { "devices": __val5 } : {}), ...(__has6 ? { "evals": __val6 } : {}), "files": source["files"], ...(__has7 ? { "memories": __val7 } : {}), ...(__has8 ? { "notifications": __val8 } : {}), ...(__has9 ? { "pages": __val9 } : {}), "profile": source["profile"], "prompts": source["prompts"], ...(__has10 ? { "pullRequestGuides": __val10 } : {}), ...(__has11 ? { "pullRequestThreads": __val11 } : {}), "requestId": source["requestId"], ...(__has12 ? { "reviewDrafts": __val12 } : {}), "settings": source["settings"], ...(__has13 ? { "tasks": __val13 } : {}), ...(__has14 ? { "threadTags": __val14 } : {}), ...(__has15 ? { "triggers": __val15 } : {}), "userEmail": source["userEmail"], "userId": source["userId"], ...(__has16 ? { "watchedRepositories": __val16 } : {}) };
 });
 installCompiledValidatorMap(lunora_gdpr_steps_120.sendExportReadyEmail.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;

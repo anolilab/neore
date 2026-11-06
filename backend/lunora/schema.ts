@@ -3144,6 +3144,11 @@ export const schema = defineSchema({
         // Set on the run whose failure paused its trigger, so a redelivered settlement re-sends the pause notice rather than the plain one.
         pausedTrigger: v.optional(v.boolean()),
         payload: v.optional(v.string()),
+        // The text the agent was given (the rendered Input Template for a webhook, hidden characters removed), cut to 2,000 characters.
+        // Set when the run settles.
+        prompt: v.optional(v.string()),
+        // When the saved prompt is cleared (`pruneExpiredRunPrompts`): 30 days after the run settled. Set with the prompt.
+        promptExpiresAt: v.optional(v.number()),
         startedAt: v.number(),
         // "filtered": a run that was skipped and ran nothing: a verified delivery whose payload failed the
         // trigger's filters, or a quiet routine's scheduled run with nothing to report. `error` holds the reason.
@@ -3153,7 +3158,9 @@ export const schema = defineSchema({
     })
         .index("by_triggerId_startedAt", ["triggerId", "startedAt"])
         // Finds a trigger's one "filtered" row however many runs followed it (`recordFilteredExecution`).
-        .index("by_triggerId_status", ["triggerId", "status"]),
+        .index("by_triggerId_status", ["triggerId", "status"])
+        // Finds the prompts past their expiry, so the sweep never rescans rows it already cleared.
+        .index("by_promptExpiresAt", ["promptExpiresAt"]),
 
     triggers: defineTable({
         // Set when the routine belongs to a bot: the run uses the bot's model and instructions.

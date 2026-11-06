@@ -879,6 +879,7 @@ const vGetTriggerExecutionsOutput = v.array(
         _id: v.string(),
         completedAt: v.union(v.number(), v.null()),
         error: v.union(v.string(), v.null()),
+        prompt: v.union(v.string(), v.null()),
         startedAt: v.number(),
         status: v.string(),
         threadId: v.union(v.string(), v.null()),
@@ -927,6 +928,7 @@ export const getTriggerExecutions = authQuery
                 _id: entry._id as string,
                 completedAt: entry.completedAt ?? null,
                 error: entry.error ?? null,
+                prompt: entry.prompt ?? null,
                 startedAt: entry.startedAt,
                 status: entry.status as string,
                 threadId: entry.threadId ?? null,
@@ -1374,6 +1376,41 @@ const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, s
     return pause;
 };
 
+/** How long a run keeps its saved prompt after it settles. The run row, its status and its thread stay; only the prompt text goes. */
+export const RUN_PROMPT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * The most runs one housekeeping pass rewrites. A run row can hold a webhook body of up to 1 MiB, and a pass reads and
+ * rewrites each row inside one transaction, so the batch is sized for the largest rows; a larger backlog is worked off
+ * over later passes.
+ */
+const PRUNE_RUN_PROMPTS_BATCH = 16;
+
+/**
+ * Housekeeping sweep (`shardSweeps()`): clears the saved prompt of each run past its expiry. Rows without an expiry are in
+ * the index too, so the range starts above zero, as `reapLapsedClaims` does; otherwise they would fill every batch.
+ */
+export const pruneExpiredRunPrompts = internalMutation
+    .input({})
+    .output(v.null())
+    .mutation(async ({ ctx }) => {
+        const expired = await ctx.db
+            .query("triggerExecutions")
+            .withIndex("by_promptExpiresAt", (q) => q.gt("promptExpiresAt", 0).lt("promptExpiresAt", ctx.now))
+            .take(PRUNE_RUN_PROMPTS_BATCH);
+
+        for (const row of expired) {
+            await patchRow(ctx.db, "triggerExecutions", row, { prompt: undefined, promptExpiresAt: undefined });
+        }
+
+        // A full batch may leave more expired prompts: sweep again at once, so a backlog drains within this pass.
+        if (expired.length === PRUNE_RUN_PROMPTS_BATCH) {
+            await ctx.scheduler.runAfter(0, internal.triggers.functions.pruneExpiredRunPrompts, {});
+        }
+
+        return null;
+    });
+
 /**
  * Closes an execution and tells the owner. A run is counted toward the trigger's failure
  * streak once, on the `running` to settled transition of its own execution row: a
@@ -1384,12 +1421,14 @@ export const updateExecution = internalMutation
     .input({
         error: v.optional(v.string()),
         executionId: v.id("triggerExecutions"),
+        // The prompt the run was given, for the run log. Written only by the settle that changes the row.
+        prompt: v.optional(v.string().max(MAX_LENGTH.long)),
         status: v.string(),
         threadId: v.optional(v.string()),
         userFixable: v.optional(v.boolean()),
     })
     .output(v.null())
-    .mutation(async ({ args: { error, executionId, status, threadId, userFixable }, ctx }) => {
+    .mutation(async ({ args: { error, executionId, prompt, status, threadId, userFixable }, ctx }) => {
         const execution = await ctx.db.get("triggerExecutions", executionId);
 
         if (!execution) {
@@ -1405,6 +1444,7 @@ export const updateExecution = internalMutation
                 status,
                 ...(threadId && { threadId }),
                 ...(error && { error }),
+                ...(prompt !== undefined && { prompt, promptExpiresAt: ctx.now + RUN_PROMPT_RETENTION_MS }),
                 completedAt: ctx.now,
             });
         }

@@ -79,6 +79,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "sweepUsageRollup", ref: internal.usage.backfill.sweepUsageRollup },
     { name: "sweepStagedChatUploads", ref: internal.file.sweepStagedChatUploads },
     { name: "pruneExpiredToolPermissionGrants", ref: internal.chat.tool_permissions.pruneExpiredToolPermissionGrants },
+    // A run's saved prompt is cleared 30 days after the run settles (`triggers/functions.ts`); the run row stays.
+    { name: "pruneExpiredRunPrompts", ref: internal.triggers.functions.pruneExpiredRunPrompts },
     // References the agent was never able to spend within their 24 hours (`chat/request-secret.ts`).
     { name: "sweepRequestedSecrets", ref: internal.chat.request_secret.sweepRequestedSecrets },
     { name: "backfillUnindexedFileLinks", ref: internal.agent.file_link_backfill.backfillUnindexedFileLinks },

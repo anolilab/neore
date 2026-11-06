@@ -18,13 +18,17 @@ import {
     deleteTrigger,
     getTriggerExecutions,
     getTriggers,
+    pruneExpiredRunPrompts,
     releaseQuietWindow,
     reserveQuietWindow,
     setTriggerEnabled,
     testRunTrigger,
+    updateExecution,
     updateTrigger,
     updateTriggerStats,
 } from "./functions";
+import { collectTriggersForExport } from "./gdpr";
+import { collectAllTriggers } from "./export-pages";
 import { MAX_ACTIVE_EVENT_WATCHERS } from "./event-sources/types";
 import { compileWebhookPreset } from "./presets";
 import { findNextCronTime } from "./schedule";
@@ -1099,6 +1103,23 @@ describe("getTriggerExecutions", () => {
         expect(rows[0]?.status).toBe("filtered");
     });
 
+    it("lists the prompt a run settled with, and keeps the first settlement's prompt", async () => {
+        const triggerId = await seed(0);
+        const executionId = await harness.run(async (ctx: any) => await ctx.db.insert("triggerExecutions", { startedAt: 500, status: "running", triggerId }));
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(updateExecution, { executionId, prompt: "Summarise the issue", status: "completed", threadId: "t1" }),
+        );
+        // A second settlement (a redelivered catch path) must not overwrite the row's prompt.
+        await harness.run(async (ctx: any) => await ctx.runMutation(updateExecution, { executionId, prompt: "other", status: "failed" }));
+
+        const rows = (await as().query(getTriggerExecutions as never, { limit: 5, triggerId } as never)) as { prompt: string | null; status: string }[];
+        const settled = rows.find((row) => row.status === "completed");
+
+        expect(settled?.prompt).toBe("Summarise the issue");
+        expect(rows.find((row) => row.status === "filtered")?.prompt).toBeNull();
+    });
+
     it("accepts the bounds 1 and 100 and refuses 0, 101, fractions and non-finite limits", async () => {
         const triggerId = await seed(2);
 
@@ -1108,6 +1129,117 @@ describe("getTriggerExecutions", () => {
         for (const limit of [0, 101, -1, 1.5, NaN, Infinity]) {
             await expect(as().query(getTriggerExecutions as never, { limit, triggerId } as never)).rejects.toThrow();
         }
+    });
+});
+
+describe("run prompts", () => {
+    const as = () => harness.withIdentity({ userId: "user-a" } as never);
+
+    it("keeps the prompt of a run whose first settlement is a failure", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+        const executionId = await harness.run(async (ctx: any) => await ctx.db.insert("triggerExecutions", { startedAt: 7, status: "running", triggerId }));
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(updateExecution, { error: "The model failed", executionId, prompt: "Summarise the issue", status: "failed" }),
+        );
+
+        const rows = (await as().query(getTriggerExecutions as never, { limit: 5, triggerId } as never)) as { prompt: string | null; status: string }[];
+
+        expect(rows.find((row) => row.status === "failed")?.prompt).toBe("Summarise the issue");
+    });
+
+    it("clears a saved prompt once its expiry has passed, and keeps the run itself", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+        const [expired, active] = await harness.run(async (ctx: any) => [
+            await ctx.db.insert("triggerExecutions", { prompt: "old", promptExpiresAt: Date.now() - 1, startedAt: 1, status: "completed", triggerId }),
+            await ctx.db.insert("triggerExecutions", { prompt: "new", promptExpiresAt: Date.now() + 60_000, startedAt: 2, status: "completed", triggerId }),
+        ]);
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(pruneExpiredRunPrompts, {}));
+
+        const [cleared, kept] = await harness.run(async (ctx: any) => [
+            await ctx.db.get("triggerExecutions", expired),
+            await ctx.db.get("triggerExecutions", active),
+        ]);
+
+        expect(cleared).toMatchObject({ status: "completed" });
+        expect(cleared?.prompt).toBeUndefined();
+        expect(kept?.prompt).toBe("new");
+    });
+
+    it("clears an expired prompt even when a full batch of runs has no expiry", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+        const expired = await harness.run(async (ctx: any) => {
+            for (let n = 0; n < 17; n += 1) {
+                await ctx.db.insert("triggerExecutions", { startedAt: n, status: "completed", triggerId });
+            }
+
+            return await ctx.db.insert("triggerExecutions", { prompt: "old", promptExpiresAt: Date.now() - 1, startedAt: 99, status: "completed", triggerId });
+        });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(pruneExpiredRunPrompts, {}));
+
+        const cleared = (await harness.run(async (ctx: any) => await ctx.db.get("triggerExecutions", expired))) as { prompt?: string } | null;
+
+        expect(cleared?.prompt).toBeUndefined();
+    });
+
+    it("exports a trigger with the prompt and payload its settled run was given, and never its webhook secret", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("triggerExecutions", {
+                    payload: '{"ref":"main"}',
+                    prompt: "Summarise the issue",
+                    startedAt: 5,
+                    status: "completed",
+                    triggerId,
+                }),
+        );
+
+        const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(collectTriggersForExport, { userId: "user-a" }))) as {
+            triggers: { name: string; runs: { payload: string | null; prompt: string | null }[] }[];
+        };
+        const [trigger] = exported.triggers;
+
+        expect(trigger?.name).toBe("Hook");
+        expect(trigger?.runs[0]?.prompt).toBe("Summarise the issue");
+        expect(trigger?.runs[0]?.payload).toBe('{"ref":"main"}');
+        expect(trigger).not.toHaveProperty("webhookSecret");
+    });
+
+    it("exports every trigger across the export pages, with the settings a bot routine keeps", async () => {
+        for (let n = 0; n < 7; n += 1) {
+            await as().mutation(createTrigger as never, { model: "m", name: `Hook ${String(n)}`, type: "webhook" } as never);
+        }
+
+        const exported = (await harness.run(async (ctx: any) => {
+            const pages = await collectAllTriggers(
+                async (cursor) => await ctx.runQuery(collectTriggersForExport, { cursor, userId: "user-a" }),
+                Number.MAX_SAFE_INTEGER,
+            );
+
+            return pages.triggers as { botId: unknown; name: string; quietWhenEmpty: unknown; searchMode: unknown }[];
+        })) as { botId: unknown; name: string; quietWhenEmpty: unknown; searchMode: unknown }[];
+
+        expect(exported).toHaveLength(7);
+        expect(new Set(exported.map((trigger) => trigger.name)).size).toBe(7);
+        expect(exported[0]).toMatchObject({ botId: null, quietWhenEmpty: null, searchMode: null });
+    });
+
+    it("refuses a trigger history past the export limit, as the ACP history is", async () => {
+        const page = { cursor: "more", triggers: [{ name: "x".repeat(100) }] };
+
+        await expect(collectAllTriggers(async () => page, 50)).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+    });
+
+    it("counts a page by its UTF-8 bytes, so non-ASCII text cannot pass the limit by its character count", async () => {
+        // 40 two-byte characters: 53 characters of JSON, 93 bytes. The limit of 60 lies between the two.
+        const page = { triggers: [{ name: "é".repeat(40) }] };
+
+        await expect(collectAllTriggers(async () => page, 60)).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
     });
 });
 

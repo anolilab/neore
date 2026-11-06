@@ -1695,6 +1695,8 @@ export const triggerExecutions = sqliteTable("triggerExecutions", {
     firing: real("firing"),
     pausedTrigger: integer("pausedTrigger", { mode: "boolean" }),
     payload: text("payload"),
+    prompt: text("prompt"),
+    promptExpiresAt: real("promptExpiresAt"),
     startedAt: real("startedAt").notNull(),
     status: text("status", { mode: "json" }).$type<"running" | "completed" | "failed" | "filtered">().notNull(),
     threadId: text("threadId"),
@@ -1702,6 +1704,7 @@ export const triggerExecutions = sqliteTable("triggerExecutions", {
 }, (t) => ({
     by_triggerId_startedAt: index("by_triggerId_startedAt").on(t.triggerId, t.startedAt),
     by_triggerId_status: index("by_triggerId_status").on(t.triggerId, t.status),
+    by_promptExpiresAt: index("by_promptExpiresAt").on(t.promptExpiresAt),
 }));
 
 export const triggers = sqliteTable("triggers", {
