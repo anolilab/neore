@@ -52,3 +52,28 @@ describe("firstUserPromptText", () => {
         expect([...(text ?? "")].every((character) => character === "🙂")).toBe(true);
     });
 });
+
+describe("reading a long structured prompt for a title", () => {
+    it("stops reading its text parts once the title's limit is reached, instead of reading every part", () => {
+        let reads = 0;
+        const parts = Array.from({ length: 10_000 }, () => {return {
+            get text() {
+                reads += 1;
+
+                return "x".repeat(1000);
+            },
+            type: "text",
+        }});
+
+        const text = firstUserPromptText([{ message: { content: parts, role: "user" } }]);
+
+        expect(text).toHaveLength(2000);
+        expect(reads).toBeLessThan(100);
+    });
+
+    it("keeps the first characters of a prompt that starts with whitespace, and drops the whitespace before them", () => {
+        const text = firstUserPromptText([{ message: { content: `${" ".repeat(50)}Plan a trip`, role: "user" } }]);
+
+        expect(text).toBe("Plan a trip");
+    });
+});

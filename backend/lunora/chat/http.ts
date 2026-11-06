@@ -28,6 +28,7 @@ import { vGoalRunConfig } from "./goals/validators";
 import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
+import { capTitlePrompt } from "./lib/first-user-prompt";
 import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
 import { documentTextPart } from "./lib/attached-text";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
@@ -806,7 +807,8 @@ const runChatStartOnShard = async (
     // (`chat/lib/start-title-jobs.ts`).
     const titleJobs: (() => Promise<unknown>)[] = [];
     const scheduleTitleJobs = (titleThreadId: string, isNewThread: boolean): void => {
-        const prompt = body.prompt ?? " ";
+        // Capped where it is sent: the title is generated from the first characters of the prompt only.
+        const prompt = capTitlePrompt(body.prompt ?? " ");
 
         for (const job of startTitleJobs(contentType, isNewThread)) {
             if (job === "title") {

@@ -22,7 +22,10 @@ import {
     promptGone,
     refusedBeforeDispatch,
     releaseTitleCharge,
+    giveBackTitleCharge,
+    releaseRegenerateClaim,
     settleTitleWrite,
+    titleModelPrompt,
     regenerateThreadTitle,
     titleIneligibility,
     throwAfterCleanup,
@@ -633,5 +636,72 @@ describe("regenerating the title of a cloud thread", () => {
         await grant(cloud, "write");
 
         await expect(harness.withIdentity({ userId: GRANTEE }).action(regenerateThreadTitle as never, { threadId: cloud } as never)).rejects.toThrow();
+    });
+});
+
+describe("sending a title's prompt, and the errors around its give-back", () => {
+    /** A context whose release fails `failures` times (all of them, when `failures` is Infinity), recording the events it logs. */
+    const releasingContext = (failures: number) => {
+        const events: { fields: Record<string, unknown>; name: string }[] = [];
+        let calls = 0;
+
+        return {
+            calls: () => calls,
+            context: {
+                log: {
+                    event: (name: string, fields: Record<string, unknown>) => {
+                        events.push({ fields, name });
+                    },
+                },
+                runMutation: async () => {
+                    calls += 1;
+
+                    if (calls <= failures) {
+                        throw new Error("release failed");
+                    }
+
+                    return null;
+                },
+            } as never,
+            events,
+        };
+    };
+
+    it("sends a title model the prompt cut at the title's limit, not the whole of a long prompt", () => {
+        const prompt = titleModelPrompt("Instructions.", "a".repeat(100_000));
+
+        expect(prompt.length).toBeLessThan(2500);
+        expect(prompt).toContain("a".repeat(2000));
+        expect(prompt).not.toContain("a".repeat(2001));
+    });
+
+    it("logs a charge that could not be given back after a model error, and does not throw", async () => {
+        const { context, events } = releasingContext(Infinity);
+
+        await expect(giveBackTitleCharge(context as never, "thread-q:run", 1)).resolves.toBeUndefined();
+        expect(events).toEqual([expect.objectContaining({ fields: { skipped: "charge-release-failed" }, name: "chat.thread_title" })]);
+    });
+
+    it("retries a charge give-back that fails once, without logging it", async () => {
+        const { calls, context, events } = releasingContext(1);
+
+        await giveBackTitleCharge(context as never, "thread-q:run-2", 1);
+
+        expect(calls()).toBe(2);
+        expect(events).toEqual([]);
+    });
+
+    it("retries a regenerate claim's release, and logs one that never lands without throwing", async () => {
+        const failing = releasingContext(Infinity);
+
+        await expect(releaseRegenerateClaim(failing.context as never, "thread-r", 5)).resolves.toBeUndefined();
+        expect(failing.calls()).toBe(3);
+        expect(failing.events).toEqual([expect.objectContaining({ fields: { skipped: "release-failed" }, name: "chat.regenerate_title" })]);
+
+        const once = releasingContext(1);
+
+        await releaseRegenerateClaim(once.context as never, "thread-r", 5);
+        expect(once.calls()).toBe(2);
+        expect(once.events).toEqual([]);
     });
 });

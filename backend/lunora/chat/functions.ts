@@ -89,7 +89,7 @@ import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
 import getAgent from "./lib/get-agent";
 import { holdTtlFrom } from "../lib/claim-once";
 import { sha256Hex } from "../lib/crypto";
-import { firstUserPrompt } from "./lib/first-user-prompt";
+import { capTitlePrompt, firstUserPrompt } from "./lib/first-user-prompt";
 import { getMessageFileIds, loadNsfwStatuses, redactUIMessagesForPublicViewer } from "./lib/public-thread";
 import { buildReasoningProviderOptions } from "./lib/reasoning-options";
 import {
@@ -1652,6 +1652,23 @@ const TITLE_CHARGE_TTL_MS = 24 * 60 * 60 * 1000;
 export const admitTitleCharge = async (context: Pick<ActionContext, "runMutation">, chargeKey: string, userId: string | undefined): Promise<number | null> =>
     await context.runMutation(internal.lib.claim_once.claimKeyFenced, { key: chargeKey, scope: TITLE_CHARGE_SCOPE, ttlMs: TITLE_CHARGE_TTL_MS, userId });
 
+/**
+ * The model prompt for a title: the instructions and the prompt, the prompt capped at the title's own limit before it is sent, so a
+ * long prompt is not sent to the model in full.
+ */
+export const titleModelPrompt = (threadTitlePrompt: string, prompt: string): string =>
+    `${threadTitlePrompt}\nHere is the user's prompt:\n"${capTitlePrompt(prompt)}"\nGenerate a title that accurately represents what this conversation is about based on the prompt provided.`;
+
+/**
+ * Gives a charge back, retrying a failed release a few times. A release that still fails is logged, and never thrown: the caller's
+ * own error is the one that gets reported, and the log says the charge was not given back.
+ */
+export const giveBackTitleCharge = async (context: Pick<ActionContext, "log" | "runMutation">, chargeKey: string, claimedAt: number): Promise<void> => {
+    if (!(await tryTimes(3, () => releaseTitleCharge(context, chargeKey, claimedAt)))) {
+        context.log.event("chat.thread_title", { skipped: "charge-release-failed" });
+    }
+};
+
 /** Gives a charge back when its call threw before answering, so a later run for the same key may ask again. Fenced by `claimedAt`. */
 export const releaseTitleCharge = async (context: Pick<ActionContext, "runMutation">, chargeKey: string, claimedAt: number): Promise<void> => {
     await context.runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: chargeKey, scope: TITLE_CHARGE_SCOPE });
@@ -1700,6 +1717,20 @@ export const settleTitleWrite = async (
     }
 
     return await throwAfterCleanup(giveBack, lastError);
+};
+
+/**
+ * Releases a regenerate request's claim, retrying a failed release a few times. A release that still fails is logged and never thrown,
+ * so it cannot replace the error of the run it follows: the claim then lapses after its TTL, and the log says so.
+ */
+export const releaseRegenerateClaim = async (context: Pick<ActionContext, "log" | "runMutation">, threadId: string, claimedAt: number): Promise<void> => {
+    const released = await tryTimes(3, () =>
+        context.runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: threadId, scope: REGENERATE_TITLE_SCOPE }),
+    );
+
+    if (!released) {
+        context.log.event("chat.regenerate_title", { skipped: "release-failed" });
+    }
 };
 
 /** How many times a title's post-answer eligibility read and write are tried before its charge is given back. */
@@ -1841,7 +1872,7 @@ const writeGeneratedTitle = async (
     const textResult = await thread
         .generateText(
             {
-                prompt: `${threadTitlePrompt}\nHere is the user's prompt:\n"${arguments_.prompt}"\nGenerate a title that accurately represents what this conversation is about based on the prompt provided.`,
+                prompt: titleModelPrompt(threadTitlePrompt, arguments_.prompt),
             },
             {
                 // A regenerate sends the prompt alone: the thread's other messages are not the title's content.
@@ -1853,12 +1884,9 @@ const writeGeneratedTitle = async (
         )
         .catch(async (error: unknown) => {
             // The call threw before it answered: no title was generated, so the charge is given back and a retried run may ask again.
-            // A failed give-back does not replace the model error: that error is the one thrown.
+            // A failed give-back does not replace the model error: it is logged, and the model error is the one thrown.
             if (arguments_.chargeKey !== undefined && charge !== null) {
-                const key = arguments_.chargeKey;
-                const claimedAt = charge;
-
-                await throwAfterCleanup(() => releaseTitleCharge(context, key, claimedAt), error);
+                await giveBackTitleCharge(context, arguments_.chargeKey, charge);
             }
 
             throw error;
@@ -1880,12 +1908,7 @@ const writeGeneratedTitle = async (
             return;
         }
 
-        const key = arguments_.chargeKey;
-        const claimedAt = charge;
-
-        if (!(await tryTimes(3, () => releaseTitleCharge(context, key, claimedAt)))) {
-            context.log.event("chat.thread_title", { skipped: "charge-release-failed" });
-        }
+        await giveBackTitleCharge(context, arguments_.chargeKey, charge);
     };
 
     const written = await settleTitleWrite(async () => {
@@ -2153,17 +2176,22 @@ export const regenerateTitleChat = internalAction
             }
         }
 
+        let runFailure: { error: unknown } | undefined;
+
         try {
             await runRegenerateTitle(context, arguments_);
-        } finally {
-            // The request is over however it ended, so a later regenerate may ask again. A fence of a claim that has lapsed releases nothing.
-            if (arguments_.claimedAt !== undefined) {
-                await context.runMutation(internal.lib.claim_once.releaseKey, {
-                    claimedAt: arguments_.claimedAt,
-                    key: arguments_.threadId,
-                    scope: REGENERATE_TITLE_SCOPE,
-                });
-            }
+        } catch (error) {
+            runFailure = { error };
+        }
+
+        // The request is over however the run ended, so a later regenerate may ask again. A release that fails does not replace the run's
+        // own error (the run's error is the one rethrown below), and is retried and logged by the helper.
+        if (arguments_.claimedAt !== undefined) {
+            await releaseRegenerateClaim(context, arguments_.threadId, arguments_.claimedAt);
+        }
+
+        if (runFailure) {
+            throw runFailure.error;
         }
     });
 
@@ -2252,13 +2280,7 @@ export const regenerateThreadTitle = authAction
         } catch (error) {
             // The job did not start, so nothing will release the claim: give it back for the next request. A release that keeps failing
             // is retried a few times; if it still fails the claim lapses after its short TTL, and the scheduling error is what is reported.
-            const released = await tryTimes(3, () =>
-                context.runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: threadId, scope: REGENERATE_TITLE_SCOPE }),
-            );
-
-            if (!released) {
-                context.log.event("chat.regenerate_title", { skipped: "release-failed" });
-            }
+            await releaseRegenerateClaim(context, threadId, claimedAt);
 
             throw error;
         }
