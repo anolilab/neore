@@ -14,7 +14,7 @@ import { throwBadRequest } from "../lib/error-helpers";
 import { redact } from "../lib/audit-triggers";
 import { appendDocumentHistory } from "../lib/document-history";
 import { isSnoozeInRange } from "./lib/thread-state-logic";
-import { modeOfThread } from "./tool-permissions";
+import { isComparisonColumn, modeOfThread } from "./tool-permissions";
 
 /** Marks the thread's latest reply as seen. A no-op unless a reply is newer than the last view. */
 export const markThreadViewed = authMutation
@@ -104,6 +104,11 @@ export const setThreadPermissionMode = authMutation
 
         if (thread.runner === "host") {
             return throwBadRequest("A host thread has no permission mode");
+        }
+
+        // A column's runs take its comparison's mode, so a mode saved here would never apply: it is changed on the comparison instead.
+        if (await isComparisonColumn(context, thread._id)) {
+            return throwBadRequest("A comparison column takes its comparison's mode: change the mode on the comparison");
         }
 
         if (thread.permissionMode !== mode) {

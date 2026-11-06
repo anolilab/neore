@@ -15,6 +15,7 @@ const OWNER = "user-owner";
 const GRANTEE = "user-grantee";
 const STRANGER = "user-stranger";
 const NOT_FOUND_PATTERN = /Thread not found/;
+const COMPARISON_PATTERN = /comparison/;
 const DAY = 24 * 60 * 60 * 1000;
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -240,6 +241,28 @@ describe("setThreadPermissionMode", () => {
         });
         await expect(as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never)).rejects.toThrow();
         const row = await read();
+
+        expect(row.permissionMode).toBeUndefined();
+    });
+
+    it("refuses a comparison column, whose runs take the comparison's mode, and stores nothing on it", async () => {
+        const column: string = await harness.run(
+            async (context: any) => await context.db.insert("threads", { status: "active", title: "Column", updatedAt: 1, userId: OWNER }),
+        );
+
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadRelationships", {
+                branchType: "comparison",
+                createdAt: 1,
+                parentThreadId: threadId,
+                threadId: column,
+                userId: OWNER,
+            });
+        });
+
+        await expect(as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId: column } as never)).rejects.toThrow(COMPARISON_PATTERN);
+
+        const row = await harness.run(async (context: any) => await context.db.get("threads", column));
 
         expect(row.permissionMode).toBeUndefined();
     });
