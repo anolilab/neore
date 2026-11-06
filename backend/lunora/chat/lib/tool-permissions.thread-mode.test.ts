@@ -185,7 +185,9 @@ describe("modeOfThread", () => {
 
     it("fails closed when the link rows reach the read bound without showing a comparison", async () => {
         // 50 is the read bound (`MAX_LINKS_CHECKED`): a comparison link past it would be unseen, so the thread runs supervised.
-        const rows = Array.from({ length: 50 }, () => ({ branchType: "continuation", parentThreadId: "other", threadId: "child" }));
+        const rows = Array.from({ length: 50 }, () => {
+            return { branchType: "continuation", parentThreadId: "other", threadId: "child" };
+        });
 
         await expect(modeOfThread({ db: databaseWith(rows) } as never, threads.child as never, "u1")).resolves.toBe("supervised");
     });

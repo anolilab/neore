@@ -75,7 +75,9 @@ vi.mock("../lib/audit-triggers", async (importOriginal) => {
 });
 
 // Fails only the mode copy of a branch (`copyThreadPermissionMode` writes `permissionMode`), after the new thread exists.
-const failModeCopy = vi.hoisted(() => ({ on: false }));
+const failModeCopy = vi.hoisted(() => {
+    return { on: false };
+});
 
 vi.mock("../agent/table-writes", async (importOriginal) => {
     const original = await importOriginal<typeof import("../agent/table-writes")>();
@@ -562,7 +564,11 @@ describe("branching a chat under a permission mode", () => {
                 await context.db.insert("threads", { model: "gpt-4o", permissionMode: "supervised", status: "active", title: "Source", userId: OWNER }),
         );
         const ownedThreads = async () =>
-            await harness.run(async (context: any) => (await context.db.query("threads").collect()).filter((row: any) => row.userId === OWNER).length);
+            await harness.run(async (context: any) => {
+                const rows = await context.db.query("threads").collect();
+
+                return rows.filter((row: any) => row.userId === OWNER).length;
+            });
 
         const before = await ownedThreads();
 
