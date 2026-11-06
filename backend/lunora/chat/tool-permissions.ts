@@ -207,17 +207,23 @@ const modeFor = (thread: Doc<"threads"> | null, userId: string): ThreadPermissio
  * its own takes its comparison parent's. Child threads are created with none, so the parent's choice reaches the first send and every
  * follow-up alike.
  */
+/** Relationship rows read for one thread when its mode is resolved. */
+const MAX_LINKS_CHECKED = 50;
+
 export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null, userId: string): Promise<ThreadPermissionMode | null> => {
     if (!thread || thread.permissionMode !== undefined) {
         return modeFor(thread, userId);
     }
 
-    const link = await ctx.db
+    // Every link is read, not the first: a child with a comparison link and another link must still take its parent's mode, whichever
+    // is listed first. The rows per child are few; the bound only keeps a runaway row count from being read whole.
+    const links = await ctx.db
         .query("threadRelationships")
         .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
-        .first();
+        .take(MAX_LINKS_CHECKED);
+    const comparison = links.find((link) => link.branchType === "comparison");
 
-    const source = link?.branchType === "comparison" ? await ctx.db.get("threads", link.parentThreadId) : thread;
+    const source = comparison ? await ctx.db.get("threads", comparison.parentThreadId) : thread;
 
     return modeFor(source, userId);
 };

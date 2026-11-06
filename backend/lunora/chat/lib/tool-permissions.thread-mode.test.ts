@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { BUILTIN_TOOLS_FILE_EDIT, BUILTIN_TOOLS_READ_ONLY, isThreadPermissionMode } from "./thread-permission-mode";
 import type { ToolDescriptor } from "./tool-permissions";
 import { lowRiskIneligibleReason } from "./low-risk-approval";
+import { modeOfThread } from "../tool-permissions";
 import { resolveToolPermission, resolveToolPermissionWithGrant, toolPermissionKey } from "./tool-permissions";
 
 const builtin = (name: string): ToolDescriptor => {
@@ -122,5 +123,35 @@ describe("the quick check under the restrictive modes", () => {
     it("never stands in for a person's approval under supervised or auto-edit", () => {
         expect(lowRiskIneligibleReason(mcp(), false, { lowRiskTrusted: new Set(["srv"]), threadMode: "supervised" })).not.toBeNull();
         expect(lowRiskIneligibleReason(SHELL, false, { threadMode: "auto-edit" })).not.toBeNull();
+    });
+});
+
+describe("modeOfThread", () => {
+    const threads: Record<string, Record<string, unknown>> = {
+        child: { _id: "child", userId: "u1" },
+        parent: { _id: "parent", permissionMode: "supervised", userId: "u1" },
+    };
+    const databaseWith = (links: Record<string, unknown>[]) => {
+        return {
+            get: async (_table: string, id: string) => threads[id] ?? null,
+            query: () => {
+                return { withIndex: () => ({ take: async () => links }) };
+            },
+        };
+    };
+
+    it("takes the comparison parent's mode even when another link for the child is listed first", async () => {
+        const db = databaseWith([
+            { branchType: "continuation", parentThreadId: "other", threadId: "child" },
+            { branchType: "comparison", parentThreadId: "parent", threadId: "child" },
+        ]);
+
+        await expect(modeOfThread({ db } as never, threads.child as never, "u1")).resolves.toBe("supervised");
+    });
+
+    it("uses the thread's own mode, and no parent, when no link is a comparison", async () => {
+        const db = databaseWith([{ branchType: "continuation", parentThreadId: "parent", threadId: "child" }]);
+
+        await expect(modeOfThread({ db } as never, threads.child as never, "u1")).resolves.toBeNull();
     });
 });
