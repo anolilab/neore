@@ -49,6 +49,7 @@ import {
     eraseChatFileAccessForUser,
     eraseChatFileThreadsForUser,
     eraseStreamingMessagesForUser,
+    eraseThreadSummariesForUser,
     eraseWorkflowExecutionsForProject,
     eraseWorkflowExecutionsForUser,
 } from "../../agent/gdpr";
@@ -239,6 +240,15 @@ export const deleteUserEmbeddings = internalMutation
     .input({ userId: v.string() })
     .output(vBatchResult)
     .mutation(async ({ args: { userId }, ctx: context }): Promise<BatchResult> => await eraseEmbeddingsForUser(context, userId));
+
+/**
+ * Context summaries and compactions of the user's threads (`agent/gdpr.ts`). Runs after the threads are deleted, so a
+ * compaction that finished after the per-thread erase cannot leave its row behind.
+ */
+export const deleteUserThreadSummaries = internalMutation
+    .input({ userId: v.string() })
+    .output(vBatchResult)
+    .mutation(async ({ args: { userId }, ctx: context }): Promise<BatchResult> => await eraseThreadSummariesForUser(context, userId));
 
 /** Streaming-message rows outlive their thread when a stream is abandoned (`agent/gdpr.ts`). */
 export const deleteUserStreamingMessages = internalMutation

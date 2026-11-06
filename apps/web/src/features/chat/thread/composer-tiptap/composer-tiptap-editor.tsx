@@ -606,6 +606,7 @@ const ComposerTiptapEditor = ({
 
             {/* Slash command popup */}
             <SlashCommandPopup
+                currentThreadId={currentThreadId}
                 editorRect={editorRect}
                 favoriteModelIds={favoriteModelIds}
                 match={slashMatch}

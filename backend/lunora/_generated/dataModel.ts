@@ -1729,6 +1729,7 @@ export interface Doc_threadContextSummaries {
     coveredCount: number;
     coveredUpToMessageId: Id<"messages">;
     createdAt: number;
+    kind?: "compact";
     summary: string;
     taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">;
     threadId: Id<"threads">;
@@ -2061,6 +2062,7 @@ export interface Doc_userSettings {
     aboutMe?: string;
     accentColor?: string;
     autoArchiveAfterDays?: number;
+    autoCompactThreshold?: number;
     autoReadReplies?: boolean;
     backupModel?: string;
     capLongCodeBlocks?: boolean;
@@ -4725,6 +4727,7 @@ export interface Insert_threadContextSummaries {
     coveredCount: number;
     coveredUpToMessageId: Id<"messages">;
     createdAt: number;
+    kind?: "compact";
     summary: string;
     taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">;
     threadId: Id<"threads">;
@@ -5057,6 +5060,7 @@ export interface Insert_userSettings {
     aboutMe?: string;
     accentColor?: string;
     autoArchiveAfterDays?: number;
+    autoCompactThreshold?: number;
     autoReadReplies?: boolean;
     backupModel?: string;
     capLongCodeBlocks?: boolean;

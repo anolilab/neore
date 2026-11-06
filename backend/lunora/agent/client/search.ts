@@ -8,6 +8,7 @@ import { docsToModelMessages, toModelMessage } from "../mapping";
 import { DEFAULT_MESSAGE_RANGE, DEFAULT_RECENT_MESSAGES, extractText, getModelName, getProviderName, isTool, sorted } from "../shared";
 import type { MessageDoc as MessageDocument } from "../validators";
 import type { Message } from "../validators";
+import { type CompactionBoundary, dropCompactedRows } from "../thread-compaction-logic";
 import { summaryNotesBlock, SUMMARY_RECENT_ROWS } from "../thread-summary-logic";
 import { validateVectorDimension, type VectorDimension } from "../vector/tables";
 import { issuedStorageOrigins } from "../../lib/storage-ref";
@@ -601,7 +602,7 @@ export const fetchContextWithPrompt = async (
     }
 
     // If only a messageId is provided, this will add that message to the end.
-    const [{ recentMessages, searchMessages }, olderSummary] = await Promise.all([
+    const [{ recentMessages: windowMessages, searchMessages: foundMessages }, olderSummary] = await Promise.all([
         fetchRecentAndSearchMessages(context, component, {
             admittedRun: args.admittedRun,
             contextOptions: args.contextOptions ?? {},
@@ -628,6 +629,22 @@ export const fetchContextWithPrompt = async (
         // A context handler decides what the model reads (the group chats build their own history), so it gets no notes.
         args.contextHandler ? null : readOlderSummary(context, args),
     ]);
+
+    // A compaction REPLACES the turns up to its boundary: the notes stand in for them, so neither the window nor the
+    // search hits show them again. The thread's stored rows are untouched; this is only what the model is sent.
+    const boundary = olderSummary?.boundary;
+    const recentMessages = boundary ? filterOutOrphanedToolMessages(dropCompactedRows(windowMessages, boundary)) : windowMessages;
+    // The thread's own hits are on the prompt's path whenever that path is known (`fetchRecentAndSearchMessages` keeps only
+    // those): an unbranched thread always has its path, and a branched one has it when the prompt is named. Then a hit at
+    // or below the boundary is covered by the notes. Without a known path a sibling's hit at that order was never
+    // summarised, so it stays.
+    const pathKnown = olderSummary?.branched === false || args.promptMessageId !== undefined;
+    const searchMessages =
+        boundary && pathKnown
+            ? foundMessages.filter(
+                  (m) => m.threadId !== threadId || m.order > boundary.order || (m.order === boundary.order && m.stepOrder > boundary.stepOrder),
+              )
+            : foundMessages;
 
     const promptMessageIndex = args.promptMessageId ? recentMessages.findIndex((m) => m._id === args.promptMessageId) : -1;
     const promptMessage = promptMessageIndex === -1 ? undefined : recentMessages[promptMessageIndex];
@@ -665,6 +682,7 @@ export const fetchContextWithPrompt = async (
     // the newest ones above (`agent/agent-switch.ts`); a thread that starts inside the window needs no lookup. A
     // switch back whose model left above the window asks for what that model had seen.
     const oldest = prePromptDocs[0];
+    // The notes carry a compaction's summary, not a switch's handoff text, so the lookups run after a compaction too.
     const earlierHandoffs =
         threadId && oldest && oldest.order > 0 && needsEarlierHandoff(prePromptDocs)
             ? await context.runQuery(internal.agent.agent_switch.getHandoffAbove, { belowMessageId: oldest._id, threadId: threadId as Id<"threads"> })
@@ -744,7 +762,7 @@ export const fetchContextWithPrompt = async (
         messages: processedMessages,
         order: promptMessage?.order,
         stepOrder: promptMessage?.stepOrder,
-        ...(olderSummary && { threadNotes: summaryNotesBlock(olderSummary) }),
+        ...(olderSummary && { threadNotes: summaryNotesBlock(olderSummary.summary) }),
     };
 };
 
@@ -756,7 +774,7 @@ export const fetchContextWithPrompt = async (
 const readOlderSummary = async (
     context: ActionContext,
     args: { contextOptions?: ContextOptions; promptMessageId: string | undefined; statelessMode?: boolean; threadId: string | undefined },
-): Promise<string | null> => {
+): Promise<{ boundary?: CompactionBoundary; branched: boolean; summary: string } | null> => {
     // A smaller window would leave rows uncovered between the summary and itself.
     if (!args.threadId || args.statelessMode || (args.contextOptions?.recentMessages ?? DEFAULT_RECENT_MESSAGES) < SUMMARY_RECENT_ROWS) {
         return null;

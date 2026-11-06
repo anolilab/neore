@@ -33,6 +33,9 @@ const getBrowserTimezone = (): string => {
     return "America/New_York";
 };
 
+/** Off, then the presets; the server accepts any whole number from 50 to 95. */
+const AUTO_COMPACT_PERCENTS = [0, 60, 70, 80, 90] as const;
+
 const AccountSettings: FC = () => {
     const { i18n, t } = useLingui();
     const {
@@ -61,6 +64,7 @@ const AccountSettings: FC = () => {
 
     // Simple primitive derivation — no useMemo needed (rule: don't memo simple expressions)
     const locale = i18n.locale ?? "en";
+    const percentFormat = new Intl.NumberFormat(locale, { style: "percent" });
     const localeLanguageDefault = LOCALE_DEFAULTS[locale] ?? `${locale}-${locale.toUpperCase()}`;
 
     // Get current values from userSettings, falling back to the UI locale default
@@ -71,6 +75,8 @@ const AccountSettings: FC = () => {
     const isEnableFollowupSuggestions = userSettings?.enableFollowupSuggestions !== false;
     // OPT-IN: absent means off, matching the backend gate (`agent/thread-summaries.ts`).
     const isThreadSummariesEnabled = userSettings?.threadSummariesEnabled === true;
+    // Off (0) or a percentage of the model's context window; absent means off.
+    const autoCompactThreshold = userSettings?.autoCompactThreshold ?? 0;
     // Opt-in: absent means off.
     const isAutoReadReplies = userSettings?.autoReadReplies === true;
     const currentSpeechVoice = userSettings?.voiceModeVoice ?? DEFAULT_SPEECH_VOICE ?? null;
@@ -116,7 +122,23 @@ const AccountSettings: FC = () => {
     const browserTimezone = getBrowserTimezone();
 
     const handleUpdateSetting = useCallback(
-        (key: string, value: unknown, successMessage: string) => {
+        (key: string, value: unknown, successMessage: string, failFast = false) => {
+            // A fail-fast write goes through the same queue as every settings write, so edits land in order. It is sent at once
+            // and reports the failure while offline, instead of waiting for the connection.
+            if (failFast) {
+                void updateUserSettings
+                    .updateLatest(
+                        () => {
+                            return { [key]: value };
+                        },
+                        { failFast: true },
+                    )
+                    .then(() => toast.success(successMessage))
+                    .catch(() => toast.error(t`Failed to save settings`));
+
+                return;
+            }
+
             updateUserSettings.mutate(
                 { [key]: value },
                 {
@@ -353,6 +375,48 @@ const AccountSettings: FC = () => {
                                 );
                             }}
                         />
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="space-y-0.5">
+                            <Label className="text-base font-medium" htmlFor="auto-compact-threshold">
+                                {t`Compact full chats automatically`}
+                            </Label>
+                            <p className="text-muted-foreground text-sm" id="auto-compact-description">
+                                {t`Off by default. When a chat's context fills this much of the model's window, older messages are condensed for the model before it replies. Your chat itself is never changed. You can also type /compact at any time.`}
+                            </p>
+                        </div>
+                        <Select
+                            onValueChange={(value) => {
+                                const percent = Number(value);
+
+                                handleUpdateSetting(
+                                    "autoCompactThreshold",
+                                    percent,
+                                    percent === 0
+                                        ? t`Chats will not be compacted automatically`
+                                        : t`Chats will be compacted at ${percentFormat.format(percent / 100)} of the context window`,
+                                    true,
+                                );
+                            }}
+                            value={String(autoCompactThreshold)}
+                        >
+                            <SelectTrigger aria-describedby="auto-compact-description" className="w-28 shrink-0" id="auto-compact-threshold">
+                                <SelectValue>
+                                    {(value: string | null) => {
+                                        const percent = Number(value);
+
+                                        return percent === 0 ? t`Off` : percentFormat.format(percent / 100);
+                                    }}
+                                </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                                {AUTO_COMPACT_PERCENTS.map((percent) => (
+                                    <SelectItem key={percent} value={String(percent)}>
+                                        {percent === 0 ? t`Off` : percentFormat.format(percent / 100)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="flex items-center justify-between">
                         <div className="space-y-0.5">

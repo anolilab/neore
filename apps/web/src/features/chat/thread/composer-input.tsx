@@ -28,6 +28,8 @@ import type { ChangeEvent, DragEvent, FC } from "react";
 import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
+import { isCompactCommand } from "@/features/chat/compaction/compaction-logic";
+import useCompactThread from "@/features/chat/compaction/use-compact-thread";
 import ReferenceStrip from "@/features/chat/components/reference-picker/reference-strip";
 import type { AttachmentAdapter } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import {
@@ -480,6 +482,9 @@ const ComposerInput = ({
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     const { isNewThread, threadId } = useChatThread();
+    const { compact: compactThread } = useCompactThread(threadId);
+    // The thread a draft was last checked against, so the check below runs when the chat changes, not on every keystroke.
+    const draftThread = useRef<string | null | undefined>(undefined);
     // Invite-only: a guest's comparison send is held for sign-in (a plain send is held in `ChatProvider`).
     const { mustSignIn } = useInviteOnly();
     const { getChatKey, isMounted, trackToast } = usePasteGuard(threadId);
@@ -498,6 +503,19 @@ const ComposerInput = ({
 
     // Composer state from store
     const { addAttachment, attachments, clear, removeAttachment, setText, text, updateAttachment } = useComposerState();
+
+    // A `/compact` typed in one chat is not carried into the next: submitting it there would compact the chat that is open.
+    useEffect(() => {
+        if (draftThread.current === threadId) {
+            return;
+        }
+
+        draftThread.current = threadId;
+
+        if (isCompactCommand(useChatUIStore.getState().composerText)) {
+            clear();
+        }
+    }, [threadId, clear]);
 
     // The editor's key handler reads the send preference from the UI-state store at key time; the account
     // setting (server-backed) is mirrored there so a new device honours it too.
@@ -1004,12 +1022,22 @@ const ComposerInput = ({
             return;
         }
 
+        promptHistory.reset();
+
+        // `/compact` is a command, not a message: it condenses the thread's context and sends nothing. It runs before the
+        // size guard below, because a chat too large to send is the one that most needs compacting.
+        // A new chat has no thread yet: the command still runs, and answers that there is nothing to compact.
+        if ((isThreadComposer || !threadId) && draftAttachments.length === 0 && isCompactCommand(draftText)) {
+            clear();
+            void compactThread();
+
+            return;
+        }
+
         // Block submission if context is too large
         if (contextStats.totalChars >= CONTEXT_ERROR_THRESHOLD) {
             return;
         }
-
-        promptHistory.reset();
 
         // A turn is still running: queue instead of sending. The queue sends it
         // when the stream finishes (see ComposerPromptQueue).
@@ -1073,6 +1101,7 @@ const ComposerInput = ({
         isStreaming,
         isThreadComposer,
         threadId,
+        compactThread,
     ]);
 
     // "Send as a new chat" from outside the chat UI (the native shell's Quick

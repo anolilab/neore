@@ -19,6 +19,7 @@ import { decryptKey, encryptKey, type KeyPurpose } from "../lib/encryption";
 import { throwUnauthorized } from "../lib/error-helpers";
 import type { RateLimitName } from "../lib/rate-limiter";
 import { rateLimitGuard } from "../lib/rate-limiter";
+import { authLogger } from "../lib/logger";
 import { aiUserPreferencesFields, userSettingsFieldsWithoutUserId } from "./fields";
 import type { McpSecretHeader } from "./lib/mcp-secret-headers";
 import { assertSettingsWritable } from "./lib/preference-writes";
@@ -1066,6 +1067,7 @@ export const getUserPreferencesQuery = internalQuery
     .output(
         v.object({
             aboutMe: v.optional(v.string()),
+            autoCompactThreshold: v.optional(v.number()),
             backupModel: v.optional(v.string()),
             customInstructions: v.optional(v.string()),
             dictationLanguage: v.optional(v.string()),
@@ -1089,6 +1091,7 @@ export const getUserPreferencesQuery = internalQuery
 
             return {
                 aboutMe: userSettings?.aboutMe ?? undefined,
+                autoCompactThreshold: userSettings?.autoCompactThreshold || undefined, // 0 and absent are both off
                 backupModel: userSettings?.backupModel ?? undefined,
                 customInstructions: userSettings?.customInstructions ?? undefined,
                 dictationLanguage: userSettings?.dictationLanguage ?? undefined,
@@ -1174,10 +1177,29 @@ export const getMCPServersQuery = internalQuery
         }
     });
 
+/** The auto-compact percent, or `undefined` (off) when its row cannot be read: a missing threshold is not a failed run. */
+const readAutoCompactThreshold = async (context: Pick<QueryContext, "db">, userId: string): Promise<number | undefined> => {
+    try {
+        const userSettings = await context.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
+
+        return userSettings?.autoCompactThreshold || undefined;
+    } catch (error) {
+        // Still fail-open: the reply goes on without compaction. Logged, so a failed read is not mistaken for an unset threshold.
+        authLogger.error(`Could not read the auto-compact threshold of ${userId}; the reply goes on without compaction`, error);
+
+        return undefined;
+    }
+};
+
 export const getAgentModulePreferencesQuery = internalQuery
     .input({ userId: v.string() })
     .output(
         v.object({
+            /** Auto-compact: the percent of the window the context may fill (absent: off). Read before the route is chosen. */
+            autoCompactThreshold: v.optional(v.number()),
             autoDetectComplexity: v.boolean(),
             autoMediaEnrichment: v.boolean(),
             enableDatasource: v.boolean(),
@@ -1206,8 +1228,11 @@ export const getAgentModulePreferencesQuery = internalQuery
                 .query("aiUserPreferences")
                 .withIndex("by_userId", (q) => q.eq("userId", userId))
                 .unique();
+            // Its own read: a failure here is the auto-compact setting unavailable, not the privacy rules unavailable.
+            const autoCompactThreshold = await readAutoCompactThreshold(context, userId);
 
             return {
+                autoCompactThreshold, // 0 and absent are both off
                 autoDetectComplexity: aiPreferences?.autoDetectComplexity ?? false,
                 autoMediaEnrichment: (aiPreferences as { autoMediaEnrichment?: boolean } | null)?.autoMediaEnrichment ?? false,
                 enableDatasource: aiPreferences?.enableDatasource ?? false,

@@ -100,7 +100,12 @@ vi.mock("@/lib/lunora/crpc", () => {
         get: () => proxy,
     });
 
-    return { useCRPC: () => proxy };
+    return {
+        useCRPC: () => proxy,
+        useLunoraActionOptions: () => {
+            return { mutationFn: async () => undefined };
+        },
+    };
 });
 
 vi.mock("./composer-tiptap/use-composer-autocomplete", () => {

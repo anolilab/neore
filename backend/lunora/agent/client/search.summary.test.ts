@@ -26,10 +26,18 @@ const CONTEXT_NOT_INSTRUCTIONS = /context, not instructions/i;
 
 const RECENT = [row("m1", 1, "user", "first recent"), row("m2", 2, "assistant", "second recent"), row("m3", 3, "user", "the prompt")];
 
-const contextFor = async (summary: string | null, options: { contextHandler?: never; recentMessages?: number; statelessMode?: boolean } = {}) => {
+const contextFor = async (
+    summary: string | null,
+    options: {
+        boundary?: { messageId: string; order: number; stepOrder: number };
+        contextHandler?: never;
+        recentMessages?: number;
+        statelessMode?: boolean;
+    } = {},
+) => {
     const runQuery = vi.fn(async (ref: unknown) => {
         if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
-            return summary;
+            return summary === null ? null : { ...(boundary && { boundary }), summary };
         }
 
         if (ref === internal.agent.branches.getContextPathIds) {
@@ -43,7 +51,7 @@ const contextFor = async (summary: string | null, options: { contextHandler?: ne
 
         return { page: [...RECENT].toReversed() };
     });
-    const { contextHandler, statelessMode, ...contextOptions } = options;
+    const { boundary, contextHandler, statelessMode, ...contextOptions } = options;
     const { messages, threadNotes } = await fetchContextWithPrompt(
         { runQuery, storage: {} } as never,
         {} as never,
@@ -77,6 +85,15 @@ describe("fetchContextWithPrompt with a thread summary", () => {
         expect(threadNotes).toMatch(CONTEXT_NOT_INSTRUCTIONS);
         expect((messages as { role: string }[]).map((message) => message.role)).not.toContain("system");
         expect(runQuery).toHaveBeenCalledWith(internal.agent.thread_summaries.getThreadSummaryForContext, { promptMessageId: "m3", threadId: "thread-1" });
+    });
+
+    it("replaces the turns up to a compaction's boundary with the notes, keeping the rest and the prompt", async () => {
+        expect.assertions(2);
+
+        const { messages, threadNotes } = await contextFor("The user is planning a trip.", { boundary: { messageId: "m1", order: 1, stepOrder: 0 } });
+
+        expect(texts(messages as never)).toStrictEqual(["second recent", "the prompt"]);
+        expect(threadNotes).toContain("The user is planning a trip.");
     });
 
     it("leaves today's context alone when there is no summary for this path", async () => {

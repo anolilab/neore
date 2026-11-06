@@ -135,6 +135,22 @@ export const eraseThreadSuggestionsAndInvites = async (ctx: MutationCtx, threadI
     return full(suggestions) || full(summaries) || full(invites);
 };
 
+/**
+ * Every context summary and compaction the user owns, whichever thread holds it. The per-thread erase above runs before
+ * the threads are deleted, so a compaction that finished in between left a row behind. This runs after the threads are
+ * gone, when a write for them is refused (`finishThreadSummary` needs the thread), so nothing can be stored behind it.
+ */
+export const eraseThreadSummariesForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
+    const rows = await ctx.db
+        .query("threadContextSummaries")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .take(BATCH);
+
+    await Promise.all(rows.map(async (row) => await ctx.db.delete("threadContextSummaries", row._id)));
+
+    return { hasMore: full(rows) };
+};
+
 /** The user's projects (`.global()`, read through the ORM facade). */
 export const eraseProjectsForUser = async (ctx: MutationCtx, userId: string): Promise<void> => {
     const { page: projects } = await ctx.db.projects.findMany({ where: { userId } });

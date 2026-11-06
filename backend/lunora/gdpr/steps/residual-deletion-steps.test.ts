@@ -24,6 +24,7 @@ import {
     deleteUserIntegrations,
     deleteUserKnowledge,
     deleteUserStreamingMessages,
+    deleteUserThreadSummaries,
     deleteUserWorkflowData,
     minimiseGdprRecords,
     purgeUserDocumentHistory,
@@ -250,6 +251,45 @@ describe("residual account-deletion steps", () => {
         expect(requests.find((row) => row.userId === A)?.errorMessage ?? undefined).toBeUndefined();
         expect(requests.find((row) => row.userId === B)).toMatchObject({ userEmail: "b@example.com" });
         expect(audit.map((row) => JSON.parse(row.details))).toStrictEqual([{ requestId: "r1" }]);
+    });
+
+    it("erases every context summary the user owns, past one batch, and leaves another user's", async () => {
+        // A compaction that finishes after the per-thread erase lands in a thread the sweep no longer reaches through a
+        // cascade; the sweep reads the rows by owner, so the thread it sits on does not matter.
+        await harness.run(async (ctx: any) => {
+            for (const userId of [A, B]) {
+                const thread = await ctx.db.insert("threads", { title: "T", userId });
+                const message = await ctx.db.insert("messages", {
+                    message: { content: "m", role: "user" },
+                    order: 0,
+                    status: "success",
+                    stepOrder: 0,
+                    text: "m",
+                    threadId: thread,
+                    tool: false,
+                    userId,
+                });
+                const count = userId === A ? BATCH + 5 : 1;
+
+                for (let index = 0; index < count; index += 1) {
+                    await ctx.db.insert("threadContextSummaries", {
+                        coveredCount: index + 1,
+                        coveredUpToMessageId: message,
+                        createdAt: NOW,
+                        ...(index % 2 === 0 && { kind: "compact" as const }),
+                        summary: `summary ${String(index)}`,
+                        taintedBy: [],
+                        threadId: thread,
+                        userId,
+                    });
+                }
+            }
+        });
+
+        expect(await countFor("threadContextSummaries", A)).toBe(BATCH + 5);
+        expect(await drain(deleteUserThreadSummaries, { userId: A })).toBeGreaterThan(1);
+        expect(await countFor("threadContextSummaries", A)).toBe(0);
+        expect(await countFor("threadContextSummaries", B)).toBe(1);
     });
 });
 

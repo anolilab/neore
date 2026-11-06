@@ -3,7 +3,7 @@
  * value of its fields, so a save that was started first can never be the one that lands last.
  */
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -299,6 +299,33 @@ describe("useUpdateUserSettings.updateLatest", () => {
         expect(harness.sent).toHaveLength(1);
     });
 
+    it("puts back the value the person had before a failed save, not the unsaved one", async () => {
+        const { queryClient, result } = setup();
+
+        queryClient.setQueryData(QUERY_KEY, { threadTitleInstructions: "Before" });
+
+        let outcome: Promise<void> = Promise.resolve();
+
+        act(() => {
+            outcome = result.current.updateLatest(() => {
+                return { threadTitleInstructions: "Unsaved" };
+            });
+        });
+        await flush();
+        expect(queryClient.getQueryData(QUERY_KEY)).toEqual({ threadTitleInstructions: "Unsaved" });
+
+        const rejected = expect(outcome).rejects.toThrow("save failed");
+
+        await act(async () => {
+            harness.sent[0]?.fail();
+            await Promise.resolve();
+        });
+        await rejected;
+        await flush();
+
+        expect(queryClient.getQueryData(QUERY_KEY)).toEqual({ threadTitleInstructions: "Before" });
+    });
+
     it("leaves the new account's cache alone when a save of the previous account fails", async () => {
         const { queryClient, result } = setup();
 
@@ -327,5 +354,62 @@ describe("useUpdateUserSettings.updateLatest", () => {
         await rejected;
 
         expect(queryClient.getQueryData(QUERY_KEY)).toEqual({ threadTitleInstructions: "Member's", userId: "member" });
+    });
+});
+
+describe("useUpdateUserSettings.updateLatest with failFast", () => {
+    afterEach(async () => {
+        onlineManager.setOnline(true);
+
+        for (const request of harness.sent) {
+            request.release();
+        }
+
+        await flush();
+    });
+
+    it("sends the write at once while offline, instead of pausing it until the connection returns", async () => {
+        const { result } = setup();
+
+        onlineManager.setOnline(false);
+        act(() => {
+            void result.current.updateLatest(
+                () => {
+                    return { threadTitleInstructions: "Short titles" };
+                },
+                { failFast: true },
+            );
+        });
+        await flush();
+
+        expect(harness.sent.map((request) => request.value)).toEqual(["Short titles"]);
+    });
+
+    it("waits its turn behind a save already in flight, so two writes never run at once", async () => {
+        const { result } = setup();
+
+        act(() => {
+            void result.current.updateLatest(() => {
+                return { threadTitleInstructions: "First" };
+            });
+            void result.current.updateLatest(
+                () => {
+                    return { threadTitleInstructions: "Second" };
+                },
+                { failFast: true },
+            );
+        });
+        await flush();
+
+        // One request is out. A queued save sends the newest cached value when its turn comes, so the first one carries "Second".
+        expect(harness.sent).toHaveLength(1);
+
+        await act(async () => {
+            harness.sent[0]?.release();
+            await Promise.resolve();
+        });
+        await flush();
+
+        expect(harness.sent.map((request) => request.value)).toEqual(["Second", "Second"]);
     });
 });
