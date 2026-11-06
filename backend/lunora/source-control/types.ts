@@ -169,7 +169,7 @@ export interface PullRequestEdit {
 }
 
 /** A pull request the host just opened (a revert), in the repository it was opened in. */
-export interface CreatedPullRequest extends PullRequestRef {
+export interface RevertPullRequestResult extends PullRequestRef {
     url: string;
 }
 

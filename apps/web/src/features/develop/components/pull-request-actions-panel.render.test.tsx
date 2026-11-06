@@ -49,6 +49,22 @@ vi.mock("../lib/use-review-messages", () => {
     };
 });
 
+/** A press as a person makes it: the pointer goes down and up over the element, and the click lands. */
+const pressButton = (element: HTMLElement): void => {
+    fireEvent.pointerDown(element);
+    fireEvent.mouseDown(element);
+    fireEvent.pointerUp(element);
+    fireEvent.mouseUp(element);
+    fireEvent.click(element);
+};
+
+/** Typing as a person does: the field takes focus, its value changes, and it loses focus again. */
+const typeInto = (element: HTMLElement, value: string): void => {
+    fireEvent.focus(element);
+    fireEvent.change(element, { target: { value } });
+    fireEvent.blur(element);
+};
+
 const ADDRESS = { number: 7, repository: "octo/hello" } as const;
 
 const renderPanel = (state: "merged" | "open" = "open") =>
@@ -61,11 +77,11 @@ const renderPanel = (state: "merged" | "open" = "open") =>
 
 /** Opens the edit dialog and types a new title, so Save has a change to send. */
 const typeNewTitle = async () => {
-    fireEvent.click(screen.getByRole("button", { name: "Edit title and description" }));
+    pressButton(screen.getByRole("button", { name: "Edit title and description" }));
 
     const title = await screen.findByLabelText("Title");
 
-    fireEvent.change(title, { target: { value: "New title" } });
+    typeInto(title, "New title");
 };
 
 describe("PullRequestActionsPanel edit dialog", () => {
@@ -74,7 +90,7 @@ describe("PullRequestActionsPanel edit dialog", () => {
         renderPanel();
 
         await typeNewTitle();
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        pressButton(screen.getByRole("button", { name: "Save" }));
 
         // The reason shows in the dialog and on the panel, so the person sees it whichever they look at.
         expect(await screen.findAllByText("The host answered rejected")).not.toHaveLength(0);
@@ -86,7 +102,7 @@ describe("PullRequestActionsPanel edit dialog", () => {
         renderPanel();
 
         await typeNewTitle();
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        pressButton(screen.getByRole("button", { name: "Save" }));
 
         expect(await screen.findByText("Not confirmed")).toBeTruthy();
         await waitFor(() => {
@@ -99,7 +115,7 @@ describe("PullRequestActionsPanel edit dialog", () => {
         renderPanel();
 
         await typeNewTitle();
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        pressButton(screen.getByRole("button", { name: "Save" }));
 
         expect(await screen.findAllByText("Not changed")).not.toHaveLength(0);
         expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("New title");
@@ -110,7 +126,7 @@ describe("PullRequestActionsPanel edit dialog", () => {
         renderPanel();
 
         await typeNewTitle();
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        pressButton(screen.getByRole("button", { name: "Save" }));
 
         expect(await screen.findByText("Saved on GitHub.")).toBeTruthy();
         await waitFor(() => {
@@ -124,9 +140,9 @@ describe("PullRequestActionsPanel reviewer dialog", () => {
         requestReviewers.mockResolvedValueOnce({ reason: "Not a reviewer", status: "rejected" });
         renderPanel();
 
-        fireEvent.click(screen.getByRole("button", { name: "Request reviewers" }));
-        fireEvent.change(await screen.findByLabelText("Logins"), { target: { value: "alice" } });
-        fireEvent.click(screen.getByRole("button", { name: "Request" }));
+        pressButton(screen.getByRole("button", { name: "Request reviewers" }));
+        typeInto(await screen.findByLabelText("Logins"), "alice");
+        pressButton(screen.getByRole("button", { name: "Request" }));
 
         expect(await screen.findAllByText("The host answered rejected")).not.toHaveLength(0);
         expect((screen.getByLabelText("Logins") as HTMLInputElement).value).toBe("alice");
@@ -136,9 +152,9 @@ describe("PullRequestActionsPanel reviewer dialog", () => {
         requestReviewers.mockResolvedValueOnce({ status: "unconfirmed" });
         renderPanel();
 
-        fireEvent.click(screen.getByRole("button", { name: "Request reviewers" }));
-        fireEvent.change(await screen.findByLabelText("Logins"), { target: { value: "alice" } });
-        fireEvent.click(screen.getByRole("button", { name: "Request" }));
+        pressButton(screen.getByRole("button", { name: "Request reviewers" }));
+        typeInto(await screen.findByLabelText("Logins"), "alice");
+        pressButton(screen.getByRole("button", { name: "Request" }));
 
         expect(await screen.findByText("Not confirmed")).toBeTruthy();
         await waitFor(() => {
@@ -152,8 +168,8 @@ describe("PullRequestActionsPanel revert", () => {
         revert.mockResolvedValueOnce({ status: "ok", url: "https://github.com/octo/hello/pull/9" });
         renderPanel("merged");
 
-        fireEvent.click(screen.getByRole("button", { name: "Revert" }));
-        fireEvent.click(await screen.findByRole("button", { name: "Open revert" }));
+        pressButton(screen.getByRole("button", { name: "Revert" }));
+        pressButton(await screen.findByRole("button", { name: "Open revert" }));
 
         expect(await screen.findByText("Opened a revert pull request on GitHub.")).toBeTruthy();
         expect(screen.getByRole("link", { name: "Open the revert pull request on GitHub" }).getAttribute("href")).toBe("https://github.com/octo/hello/pull/9");
@@ -163,8 +179,8 @@ describe("PullRequestActionsPanel revert", () => {
         revert.mockRejectedValueOnce(Object.assign(new Error("slow down"), { code: "TOO_MANY_REQUESTS" }));
         renderPanel("merged");
 
-        fireEvent.click(screen.getByRole("button", { name: "Revert" }));
-        fireEvent.click(await screen.findByRole("button", { name: "Open revert" }));
+        pressButton(screen.getByRole("button", { name: "Revert" }));
+        pressButton(await screen.findByRole("button", { name: "Open revert" }));
 
         expect(await screen.findAllByText("Not changed")).not.toHaveLength(0);
     });
