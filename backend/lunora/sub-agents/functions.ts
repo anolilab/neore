@@ -1464,7 +1464,9 @@ export const markRunAwaiting = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
     }
 
     const now = Date.now();
-    const reapAt = now + PENDING_APPROVAL_TTL_MS;
+    // The wait ends when the first open request expires: a request created before admission must not hold a slot longer.
+    const earliest = Math.min(...pending.map((row) => row.createdAt));
+    const reapAt = earliest + PENDING_APPROVAL_TTL_MS;
 
     await patchById(ctx.db, "subAgentRuns", run._id, { reapAt, status: "awaiting", updatedAt: now });
     await scheduleReaperAt(ctx, run._id, reapAt, now);
@@ -1603,6 +1605,11 @@ export const listSubAgentApprovals = authQuery
         const { userId } = ctx.user;
         // A locked parent shows nothing without its unlock proof, as every read of the chat does.
         const parent = await requireOwnedThread(ctx, args.parentThreadId, userId, args.unlockProof);
+
+        // A conversation in the trash shows no approvals, as its own pages do.
+        if (parent.deleted === true) {
+            throw new LunoraError("NOT_FOUND", "Thread not found");
+        }
 
         const runs = await ctx.db
             .query("subAgentRuns")

@@ -186,9 +186,13 @@ describe("a child that stopped on a request", () => {
         expect(await run(async (context) => await markRunAwaiting(context, runId))).toBe(true);
 
         const row = await runRow();
+        const requests = await run(async (context) => await context.db.query("toolApprovalRuns").collect());
+        const request = requests[0];
 
         expect(row.status).toBe("awaiting");
-        expect(row.reapAt).toBeGreaterThanOrEqual(before + PENDING_APPROVAL_TTL_MS);
+        // Exactly the request's own expiry, not the admission time plus the TTL.
+        expect(request.createdAt).toBeLessThanOrEqual(before);
+        expect(row.reapAt).toBe(request.createdAt + PENDING_APPROVAL_TTL_MS);
         expect(row.completedAt).toBeUndefined();
     });
 
