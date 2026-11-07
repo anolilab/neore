@@ -115,13 +115,13 @@ export interface BuildAgentToolsResult {
      * without re-deriving it from the runtime name.
      */
     permissionKeys: Record<string, string>;
+    /** The runtime names of the tools a resume may call again after a worker died inside one (`repeatable-tools.ts`). */
+    repeatable: string[];
     /**
      * Runtime name -> a hash of the url of the MCP server the tool comes from (connectors and other tools have none).
      * Recorded in approval snapshots, so an approved call never reaches a server whose url changed meanwhile.
      */
     toolEndpoints: Record<string, string>;
-    /** The runtime names of the tools a resume may call again after a worker died inside one (`repeatable-tools.ts`). */
-    repeatable: string[];
     tools: ToolSet;
 }
 
@@ -345,8 +345,8 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         mcpServerNames: selectedServers.map((s) => s.name),
         mcpToolFingerprints,
         permissionKeys,
-        toolEndpoints,
         repeatable: Object.keys(tools).filter((name) => isSafeToRepeat(name, describe(name))),
+        toolEndpoints,
         tools,
     };
 };

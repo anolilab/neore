@@ -161,7 +161,7 @@ describe("a tool-approval continuation", () => {
         const rebuilt = { mcpToolFingerprints: { mcp_docs__search: "new" }, permissionKeys: { mcp_docs__search: "mcp:docs (work):search" } };
 
         vi.mocked(buildAgentTools).mockImplementationOnce(async () => {
-            return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], repeatable: [], tools: {}, ...rebuilt };
+            return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], repeatable: [], toolEndpoints: {}, tools: {}, ...rebuilt };
         });
 
         const { runMutation } = await resume(

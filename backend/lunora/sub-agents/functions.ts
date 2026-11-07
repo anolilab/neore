@@ -1196,6 +1196,16 @@ const stopHostTurnOf = async (ctx: MutationCtx, run: RunDoc, now: number): Promi
 
 export type SubAgentOutcome = { error: string; kind: "failed" } | { kind: "cancelled" } | { kind: "succeeded"; result: string };
 
+/** How often a result for a parent that waits on an approval checks again whether the wait is over. */
+const SUB_AGENT_AWAITING_POST_RETRY_MS = 5 * 60_000;
+
+/** Whether `threadId` is the child thread of a one-shot run that waits on an approval request. */
+const waitsOnApproval = async (ctx: Pick<QueryCtx, "db">, threadId: string): Promise<boolean> =>
+    (await ctx.db
+        .query("subAgentRuns")
+        .withIndex("by_childThreadId_and_status", (q) => q.eq("childThreadId", threadId).eq("status", "awaiting"))
+        .first()) !== null;
+
 /**
  * Posts an ended run's result to the parent thread, once, if the lead asked for it
  * ({@link postsBack}). While the parent is still streaming — typically the very run
@@ -1209,16 +1219,6 @@ export type SubAgentOutcome = { error: string; kind: "failed" } | { kind: "cance
  * no-longer-owned parent ends there at once. `failures` counts the tries. Returns whether
  * this call posted.
  */
-/** How often a result for a parent that waits on an approval checks again whether the wait is over. */
-const SUB_AGENT_AWAITING_POST_RETRY_MS = 5 * 60_000;
-
-/** Whether `threadId` is the child thread of a one-shot run that waits on an approval request. */
-const waitsOnApproval = async (ctx: Pick<QueryCtx, "db">, threadId: string): Promise<boolean> =>
-    (await ctx.db
-        .query("subAgentRuns")
-        .withIndex("by_childThreadId_and_status", (q) => q.eq("childThreadId", threadId).eq("status", "awaiting"))
-        .first()) !== null;
-
 export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, attempt: number, failures = 0): Promise<boolean> => {
     const run = await ctx.db.get("subAgentRuns", runId);
 

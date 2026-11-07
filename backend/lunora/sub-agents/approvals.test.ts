@@ -11,6 +11,7 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import { respondToToolApproval } from "../chat/tool-permissions";
 import { PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
+import { hashPasscode, mintUnlockProof, newPasscodeEpoch, THREAD_LOCKED_CODE } from "../lib/thread-lock";
 import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
 import { createStreamWithMessage } from "../chat/streaming/index";
@@ -480,6 +481,35 @@ describe("listSubAgentApprovals", () => {
         });
 
         expect(await as(OWNER).query(listSubAgentApprovals as never, { parentThreadId: parentId } as never)).toStrictEqual([]);
+    });
+
+    it("refuses a locked parent without its unlock proof, and lists the request with it", async () => {
+        const secret = "p".repeat(40);
+        const epoch = newPasscodeEpoch();
+        const hashed = await hashPasscode("correct horse battery", 1000);
+
+        process.env.STORAGE_SIGNING_SECRET = secret;
+        await run(async (context) => {
+            await context.db.patch("threads", parentId as Id<"threads">, { lockedAt: Date.now() });
+            await context.db.insert("threadPasscodes", {
+                createdAt: 1,
+                epoch,
+                failedAttempts: 0,
+                hash: hashed.hash,
+                iterations: hashed.iterations,
+                salt: hashed.salt,
+                threadId: parentId,
+                updatedAt: 1,
+                userId: OWNER,
+            });
+        });
+
+        const { proof } = await mintUnlockProof({ epoch, threadId: parentId, userId: OWNER }, secret, Date.now());
+
+        await expect(as(OWNER).query(listSubAgentApprovals as never, { parentThreadId: parentId } as never)).rejects.toMatchObject({
+            data: { code: THREAD_LOCKED_CODE },
+        });
+        expect(await as(OWNER).query(listSubAgentApprovals as never, { parentThreadId: parentId, unlockProof: proof } as never)).toHaveLength(1);
     });
 });
 
