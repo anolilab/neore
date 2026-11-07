@@ -11,7 +11,8 @@ import { describe, expect, it } from "vitest";
 
 const read = (name: string): string => readFileSync(join(import.meta.dirname, "..", ".github/workflows", name), "utf8");
 
-const COMMENT_LINE = /^\s*#/;
+// Lines that run nothing: comments and step labels (`name:`, `id:`), so prose or a renamed step never counts.
+const NOT_A_COMMAND = /^\s*(?:#|(?:- )?(?:name|id):)/;
 // Any command that deploys: `alchemy deploy`, a `deploy` script (`pnpm … deploy`), `lunora deploy`, …
 const DEPLOY_WORD = /\bdeploy\b/g;
 const STORYBOOK_DEPLOY = /\balchemy deploy alchemy-storybook\.run\.ts\b/;
@@ -21,10 +22,9 @@ const ALCHEMY_ARGS = /alchemy "\$\{args/;
 const APP_STACK = /\balchemy\.run\.ts\b/;
 
 const deploy = read("deploy.yml");
-// Comment lines dropped: only a step that runs counts, and prose about deploys must not match.
 const previewLines = read("preview.yml")
     .split("\n")
-    .filter((line) => !COMMENT_LINE.test(line));
+    .filter((line) => !NOT_A_COMMAND.test(line));
 
 describe("backend codegen before Alchemy", () => {
     const codegen = deploy.indexOf("pnpm --filter @neore/backend run codegen");
