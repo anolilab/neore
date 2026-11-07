@@ -108,12 +108,12 @@ export const transcribeClip = authAction
             try {
                 await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { count: extra, identifier: userId, key: dailyKey, reserve: true });
             } catch (error) {
-                ctx.log.event("voice.transcribe_post_charge_failed", { error: error instanceof Error ? error.message : String(error), extra, userId });
+                ctx.log.event("voice.transcribe_post_charge_failed", { error: error instanceof Error ? error.message : String(error), extra });
             }
         }
 
-        // Lengths only: neither the audio nor the words are logged.
-        ctx.log.event("voice.transcribe", { chars: typeof text === "string" ? text.length : 0, seconds, userId });
+        // Lengths only: neither the audio, the words nor who spoke them are logged.
+        ctx.log.event("voice.transcribe", { chars: typeof text === "string" ? text.length : 0, seconds });
 
         return { text: typeof text === "string" ? text.trim() : "" };
     });

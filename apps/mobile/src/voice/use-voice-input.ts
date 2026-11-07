@@ -28,6 +28,25 @@ const RECORDING_OPTIONS: RecordingOptions = {
     web: {},
 };
 
+/** The last teardown of any chat screen's recorder: a start waits for it, even one on a newly opened screen. */
+const teardown: { last: Promise<void> } = { last: Promise.resolve() };
+
+/**
+ * Takes the audio session out of recording. Every start waits for it, so a late teardown never lands on the next
+ * recording. A failure is dropped: there is nothing to do about it.
+ */
+const leaveRecordingMode = async (): Promise<void> => {
+    teardown.last = (async () => {
+        try {
+            await setAudioModeAsync({ allowsRecording: false });
+        } catch {
+            // See above.
+        }
+    })();
+
+    await teardown.last;
+};
+
 export type VoicePhase = "idle" | "recording" | "transcribing";
 
 /**
@@ -89,7 +108,7 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
         try {
             await recorder.stop();
         } finally {
-            settleQuietly(setAudioModeAsync({ allowsRecording: false }));
+            await leaveRecordingMode();
         }
 
         return clipUri.current ?? recorder.uri ?? undefined;
@@ -177,13 +196,14 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
                 return;
             }
 
+            await teardown.last;
             await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
             await recorder.prepareToRecordAsync();
             clipUri.current = recorder.uri ?? undefined;
 
             // Released while the recorder was starting (or while the first permission prompt was up): nothing to record.
             if (!isHeld.current || !isMounted.current) {
-                settleQuietly(setAudioModeAsync({ allowsRecording: false }));
+                await leaveRecordingMode();
                 isDiscarded(clipUri.current);
                 clipUri.current = undefined;
                 isBusy.current = false;
@@ -199,8 +219,8 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
             }, MAX_CLIP_MS);
         } catch (startError) {
             console.warn("Could not start the voice recording.", startError);
-            settleQuietly(setAudioModeAsync({ allowsRecording: false }));
             report(RECORDING_FAILED_MESSAGE);
+            await leaveRecordingMode();
             isDiscarded(clipUri.current);
             clipUri.current = undefined;
             isBusy.current = false;
