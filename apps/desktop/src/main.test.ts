@@ -36,11 +36,13 @@ interface FakeWindow {
 interface Fake {
     appHandlers: Map<string, (...args: unknown[]) => void>;
     ipc: Map<string, (event: unknown, payload?: unknown) => unknown>;
+    notificationFails: boolean;
     notifications: { body?: string; title: string }[];
     opened: string[];
     permissionCheck?: (wc: unknown, permission: string, requestingOrigin: string, details?: unknown) => boolean;
     permissionRequest?: (wc: unknown, permission: string, callback: (isAllowed: boolean) => void, details: { mediaTypes?: string[]; requestingUrl: string }) => void;
     shortcuts: Map<string, () => void>;
+    trayFails: boolean;
     trays: number;
     windows: FakeWindow[];
 }
@@ -49,9 +51,11 @@ vi.mock("electron", () => {
     const fakeElectron: Fake = {
         appHandlers: new Map(),
         ipc: new Map(),
+        notificationFails: false,
         notifications: [],
         opened: [],
         shortcuts: new Map(),
+        trayFails: false,
         trays: 0,
         windows: [],
     };
@@ -129,12 +133,20 @@ vi.mock("electron", () => {
     };
 
     const FakeTray = function FakeTray() {
+        if (fakeElectron.trayFails) {
+            throw new Error("no system tray is available");
+        }
+
         fakeElectron.trays += 1;
 
         return { on: () => {}, setContextMenu: () => {}, setToolTip: () => {} };
     };
 
     const FakeNotification = function FakeNotification(options: { body?: string; title: string }) {
+        if (fakeElectron.notificationFails) {
+            throw new Error("notifications are unavailable");
+        }
+
         fakeElectron.notifications.push(options);
 
         return { show: () => {} };
@@ -608,5 +620,51 @@ describe("browser sign-in", () => {
         fake().appHandlers.get("second-instance")?.({}, [`neore://auth/callback?code=${code}&state=${state}`]);
         expect(takeSignIn()).toMatchObject({ code });
         expect(takeSignIn()).toBeUndefined();
+    });
+});
+
+/**
+ * Starts the app again with the tray unable to be created, as `platform`, and returns the notice titles that start raised.
+ * Re-importing `main.js` gives a fresh start; the electron mock is the same object, so its handlers are the new ones.
+ */
+const startWithoutTray = async (platform: NodeJS.Platform, notificationsFail = false): Promise<string[]> => {
+    const before = fake().notifications.length;
+    const original = Object.getOwnPropertyDescriptor(process, "platform");
+
+    Object.defineProperty(process, "platform", { value: platform });
+    fake().trayFails = true;
+    fake().notificationFails = notificationsFail;
+
+    try {
+        vi.resetModules();
+        await import("./main.js");
+        fake().appHandlers.get("ready")?.();
+    } finally {
+        fake().trayFails = false;
+        fake().notificationFails = false;
+
+        if (original) {
+            Object.defineProperty(process, "platform", original);
+        }
+    }
+
+    return fake().notifications.slice(before).map((note) => note.title);
+};
+
+describe("tray failure", () => {
+    it("tells the user on Linux that closing the window will quit Neore", async () => {
+        expect(await startWithoutTray("linux")).toContain("Neore has no tray icon");
+    });
+
+    it("says nothing on macOS, where the window hides on close without a tray", async () => {
+        expect(await startWithoutTray("darwin")).not.toContain("Neore has no tray icon");
+    });
+
+    it("still finishes starting when the notice itself cannot be shown", async () => {
+        // The composer shortcut is registered after the tray, so a start that aborted at the tray leaves it unregistered.
+        fake().shortcuts.delete(COMPOSER_SHORTCUT);
+
+        await expect(startWithoutTray("linux", true)).resolves.toEqual([]);
+        expect(fake().shortcuts.has(COMPOSER_SHORTCUT)).toBe(true);
     });
 });
