@@ -11,18 +11,20 @@ import { describe, expect, it } from "vitest";
 
 const read = (name: string): string => readFileSync(join(import.meta.dirname, "..", ".github/workflows", name), "utf8");
 
-// A deploy of anything but the Storybook stack, i.e. of the app in `alchemy.run.ts`, directly or
-// through the root `deploy` script.
-const APP_DEPLOY = /alchemy (deploy(?! alchemy-storybook\.run\.ts)|"\$\{args)|pnpm (run )?deploy\b/;
-
 const COMMENT_LINE = /^\s*#/;
+// Any command that deploys: `alchemy deploy`, a `deploy` script (`pnpm … deploy`), `lunora deploy`, …
+const DEPLOY_WORD = /\bdeploy\b/g;
+const STORYBOOK_DEPLOY = /\balchemy deploy alchemy-storybook\.run\.ts\b/;
+const RUN_FILE = /\.run\.ts\b/;
+// The app's deploy in deploy.yml passes its arguments as an array.
+const ALCHEMY_ARGS = /alchemy "\$\{args/;
+const APP_STACK = /\balchemy\.run\.ts\b/;
 
 const deploy = read("deploy.yml");
 // Comment lines dropped: only a step that runs counts, and prose about deploys must not match.
-const preview = read("preview.yml")
+const previewLines = read("preview.yml")
     .split("\n")
-    .filter((line) => !COMMENT_LINE.test(line))
-    .join("\n");
+    .filter((line) => !COMMENT_LINE.test(line));
 
 describe("backend codegen before Alchemy", () => {
     const codegen = deploy.indexOf("pnpm --filter @neore/backend run codegen");
@@ -52,8 +54,17 @@ describe("backend codegen before Alchemy", () => {
         expect(codegen).toBeLessThan(branchEnd);
     });
 
-    it("leaves the preview out: it deploys Storybook alone, never the app", () => {
-        expect(preview).toContain("alchemy deploy alchemy-storybook.run.ts");
-        expect(preview).not.toMatch(APP_DEPLOY);
+    it("leaves the preview out: its one deploy is the Storybook stack, never the app", () => {
+        const deploys = previewLines.filter((line) => line.match(DEPLOY_WORD));
+
+        // One deploy in the whole file, so a second command chained on the same line counts too.
+        expect(previewLines.join("\n").match(DEPLOY_WORD)).toHaveLength(1);
+        expect(deploys).toHaveLength(1);
+        expect(deploys[0]).toMatch(STORYBOOK_DEPLOY);
+        // No second target on the same command, such as `alchemy.run.ts`.
+        expect(deploys[0]?.replace("alchemy-storybook.run.ts", "")).not.toMatch(RUN_FILE);
+        expect(previewLines.some((line) => ALCHEMY_ARGS.test(line))).toBe(false);
+        // The app stack is never named by a step, whatever runs it.
+        expect(previewLines.some((line) => APP_STACK.test(line))).toBe(false);
     });
 });
