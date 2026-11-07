@@ -65,6 +65,11 @@ export const groupByStatus = (tasks: ReadonlyArray<BoardTask>): Map<TaskStatus, 
 /** Who works the task: the chat agent (optionally a skill), or a coding agent on a repository. */
 export type TaskAssignee = "chat" | "claude_code" | "codex";
 
+/** Where a recurring task's run goes (`backend/lunora/tasks/AGENTS.md`). */
+export type TaskRunDestination = NonNullable<BoardTask["runDestination"]>;
+
+export const RUN_DESTINATIONS: ReadonlyArray<TaskRunDestination> = ["new_thread", "continue_thread", "fresh_context"];
+
 export interface TaskFormValues {
     assignee: TaskAssignee;
     /** Coding-agent assignee only: the branch to check out; empty for the default branch. */
@@ -78,8 +83,13 @@ export interface TaskFormValues {
     /** Coding-agent assignee only. */
     openPr: boolean;
     parentTaskId: Id<"tasks"> | "";
+    projectId: Id<"projects"> | "";
+    /** Chat agent only, on the chat's 0-100 scale; unset leaves it to the skill or the model. */
+    reasoningEffort: number | undefined;
     /** Coding-agent assignee only: https:// URL or GitHub owner/repo. */
     repoUrl: string;
+    /** Read only while the task repeats. */
+    runDestination: TaskRunDestination;
     skillId: Id<"skills"> | "";
     successCriteria: string;
     title: string;
@@ -97,7 +107,10 @@ export const getTaskFormDefaults = (task?: BoardTask | null, goalId?: Id<"goals"
         model: task?.model ?? undefined,
         openPr: task?.codingAgent?.openPr ?? false,
         parentTaskId: task?.parentTaskId ?? "",
+        projectId: task?.projectId ?? "",
+        reasoningEffort: task?.reasoningEffort ?? undefined,
         repoUrl: task?.codingAgent?.repoUrl ?? "",
+        runDestination: task?.runDestination ?? "new_thread",
         skillId: task?.skillId ?? "",
         successCriteria: task?.successCriteria ?? "",
         title: task?.title ?? "",
@@ -161,10 +174,23 @@ export const validateTaskForm = (values: TaskFormValues): Partial<Record<keyof T
 };
 
 /**
+ * Whether the form's effort is sent for `model`: only with a chosen model, and not for one the catalog says
+ * does not reason. A model the catalog does not list (not loaded yet, or hidden by the user's model rules) keeps
+ * the effort as saved, so saving an unrelated change never erases it.
+ */
+export const effortAppliesTo = (model: string | undefined, catalogEntry: { filterCapabilities?: ReadonlyArray<string> } | undefined): boolean => {
+    if (!model) {
+        return false;
+    }
+
+    return catalogEntry === undefined || (catalogEntry.filterCapabilities?.includes("reasoning") ?? false);
+};
+
+/**
  * The mutation payload: empty optionals become absent, which the backend reads as "unset".
  * A coding-agent assignee sends no skill or model — the backend refuses the combination.
  */
-export const toTaskPayload = (values: TaskFormValues) => {
+export const toTaskPayload = (values: TaskFormValues, { effortApplies = true }: { effortApplies?: boolean } = {}) => {
     const isCodingAgent = values.assignee !== "chat";
 
     return {
@@ -179,6 +205,12 @@ export const toTaskPayload = (values: TaskFormValues) => {
         maxRepairRounds: values.maxRepairRounds,
         model: isCodingAgent ? undefined : values.model || undefined,
         parentTaskId: values.parentTaskId || undefined,
+        // A coding agent works a repository, not a thread: it takes no project, effort or destination.
+        projectId: isCodingAgent ? undefined : values.projectId || undefined,
+        // Only for a model that reasons (`effortApplies`): an effort the form no longer shows is never sent.
+        reasoningEffort: isCodingAgent || !effortApplies ? undefined : values.reasoningEffort,
+        // The default is stored as unset, which the backend reads as a new thread each run.
+        runDestination: isCodingAgent || values.runDestination === "new_thread" ? undefined : values.runDestination,
         skillId: isCodingAgent ? undefined : values.skillId || undefined,
         successCriteria: values.successCriteria.trim() || undefined,
         title: values.title.trim(),

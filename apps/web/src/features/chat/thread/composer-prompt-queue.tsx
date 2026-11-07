@@ -19,17 +19,27 @@
  * that lands after the reply ended (nothing will observe the stream end for it)
  * is sent straight away, through the same path.
  *
+ * A chip moves up or down with its buttons (the keyboard path) or by dragging it
+ * to a new place; either way the store keeps the order and mirrors it to
+ * sessionStorage.
+ *
  * Transition rules: `core/utils/prompt-queue.ts`. Mount exactly once per thread
  * — two mounted runners would each drain an item per stream.
  */
 
+import type { DragEndEvent } from "@dnd-kit/core";
+import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { rectSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Plural, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
+import cn from "@neore/ui/utils/cn";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
-import { CornerDownRightIcon, ListOrderedIcon, PaperclipIcon, SendIcon, XIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronUpIcon, CornerDownRightIcon, GripVerticalIcon, ListOrderedIcon, PaperclipIcon, SendIcon, XIcon } from "lucide-react";
+import { useReducedMotion } from "motion/react";
 import type { FC, ReactNode } from "react";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useChatActions, useChatError, useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
@@ -245,17 +255,46 @@ const useQueueActions = () => {
     return { removePrompt, sendNextPrompt };
 };
 
-const QueueChip: FC<{ onRemove: (id: string) => void; position: number; prompt: QueuedChatPrompt }> = ({ onRemove, position, prompt }) => {
+const QueueChip: FC<{
+    /** A pending steer sits directly above or below: a move that way would pass over it, which the queue refuses. */
+    blockedDown: boolean;
+    blockedUp: boolean;
+    count: number;
+    onMove: (id: string, step: -1 | 1) => void;
+    onRemove: (id: string) => void;
+    position: number;
+    prompt: QueuedChatPrompt;
+}> = ({ blockedDown, blockedUp, count, onMove, onRemove, position, prompt }) => {
     const { t } = useLingui();
+    const pending = Boolean(prompt.steer?.pending);
+    // A steered message keeps its place in the order the reply reads it, so it cannot be dragged or moved.
+    const fixed = Boolean(prompt.steer);
+    const { isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ disabled: fixed, id: prompt.id });
+    // Reduced motion: the chip still moves, without the sliding transition.
+    const reduceMotion = useReducedMotion();
     const preview = prompt.text.trim() || t`(attachments only)`;
     const attachmentCount = prompt.attachments.length;
     const droppedCount = prompt.droppedAttachments ?? 0;
 
     return (
-        <li className="bg-muted/60 flex max-w-full min-w-0 items-center gap-1.5 rounded-full border py-0.5 pr-0.5 pl-2.5 text-xs">
+        <li
+            className={cn(
+                "bg-muted/60 flex max-w-full min-w-0 items-center gap-1.5 rounded-full border py-0.5 pr-0.5 pl-2.5 text-xs",
+                isDragging && "opacity-50",
+            )}
+            data-queue-chip-id={prompt.id}
+            ref={setNodeRef}
+            style={{ transform: CSS.Transform.toString(transform), transition: reduceMotion ? undefined : transition }}
+        >
             <span aria-hidden="true" className="text-muted-foreground tabular-nums">
                 {position}.
             </span>
+            {/* The only drag surface: `touch-none` keeps a touch drag from scrolling the page, and the buttons stay free for taps. */}
+            {!fixed && (
+                <span aria-hidden="true" className="text-muted-foreground flex cursor-grab touch-none items-center" ref={setActivatorNodeRef} {...listeners}>
+                    <GripVerticalIcon className="size-3" />
+                </span>
+            )}
             {prompt.steer && (
                 <span className="text-muted-foreground flex items-center">
                     <CornerDownRightIcon aria-hidden="true" className="size-3" />
@@ -278,9 +317,29 @@ const QueueChip: FC<{ onRemove: (id: string) => void; position: number; prompt: 
                 </span>
             )}
             <button
+                aria-label={t`Move queued message ${position} up`}
+                className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
+                data-move-up=""
+                disabled={fixed || position === 1 || blockedUp}
+                onClick={() => onMove(prompt.id, -1)}
+                type="button"
+            >
+                <ChevronUpIcon aria-hidden="true" className="size-3" />
+            </button>
+            <button
+                aria-label={t`Move queued message ${position} down`}
+                className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:opacity-40"
+                data-move-down=""
+                disabled={fixed || position === count || blockedDown}
+                onClick={() => onMove(prompt.id, 1)}
+                type="button"
+            >
+                <ChevronDownIcon aria-hidden="true" className="size-3" />
+            </button>
+            <button
                 aria-label={t`Remove queued message ${position}`}
                 className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground rounded-full p-0.5"
-                disabled={Boolean(prompt.steer?.pending)}
+                disabled={pending}
                 onClick={() => onRemove(prompt.id)}
                 type="button"
             >
@@ -399,6 +458,109 @@ const ComposerPromptQueue: FC = () => {
         [removePrompt, threadId],
     );
 
+    // The chip a keyboard move was made from, so its button can take focus again once React has moved the chip.
+    const pendingFocus = useRef<{ id: string; step: -1 | 1 } | null>(null);
+    // The announcement names the thread it was made in, so a move in one chat is never read out in another.
+    const [announcement, setAnnouncement] = useState<{ text: string; threadId: string | undefined }>({ text: "", threadId: undefined });
+
+    // The frame that would set the next announcement, so emptying the queue can cancel it.
+    const announceFrame = useRef<number | null>(null);
+
+    // Cleared first and set on the next frame, so the same text said twice in a row is announced again.
+    const announce = useCallback((text: string, announcedThreadId: string | undefined) => {
+        setAnnouncement({ text: "", threadId: announcedThreadId });
+
+        if (announceFrame.current !== null) {
+            globalThis.cancelAnimationFrame(announceFrame.current);
+        }
+
+        announceFrame.current = globalThis.requestAnimationFrame(() => {
+            announceFrame.current = null;
+            setAnnouncement({ text, threadId: announcedThreadId });
+        });
+    }, []);
+
+    // A move is read out once: it is dropped when the queue empties, when another thread is shown, and when the
+    // queue refills, so a later queue (or returning to this thread) does not repeat it.
+    const queueIsEmpty = queue.items.length === 0;
+
+    useEffect(() => {
+        if (announceFrame.current !== null) {
+            globalThis.cancelAnimationFrame(announceFrame.current);
+            announceFrame.current = null;
+        }
+
+        setAnnouncement({ text: "", threadId: undefined });
+    }, [queueIsEmpty, threadId]);
+
+    useEffect(() => {
+        const focus = pendingFocus.current;
+
+        if (!focus) {
+            return;
+        }
+
+        pendingFocus.current = null;
+
+        const chip = [...document.querySelectorAll<HTMLElement>("[data-queue-chip-id]")].find((element) => element.dataset.queueChipId === focus.id);
+        // The button in the direction of the move, or the other one when the chip reached an end.
+        const sameWay = chip?.querySelector<HTMLButtonElement>(focus.step < 0 ? "[data-move-up]" : "[data-move-down]");
+        const otherWay = chip?.querySelector<HTMLButtonElement>(focus.step < 0 ? "[data-move-down]" : "[data-move-up]");
+
+        if (sameWay && !sameWay.disabled) {
+            sameWay.focus();
+        } else if (otherWay && !otherWay.disabled) {
+            otherWay.focus();
+        }
+    });
+
+    const handleMove = useCallback(
+        (id: string, step: -1 | 1) => {
+            if (!threadId) {
+                return;
+            }
+
+            const from = (usePromptQueueStore.getState().queues[threadId]?.items ?? []).findIndex((item) => item.id === id);
+
+            usePromptQueueStore.getState().move(threadId, id, { step });
+
+            const to = (usePromptQueueStore.getState().queues[threadId]?.items ?? []).findIndex((item) => item.id === id);
+
+            if (from !== -1 && to !== from) {
+                announce(t`Moved to position ${to + 1}`, threadId);
+            }
+
+            if (document.activeElement?.closest("[data-queue-chip-id]")) {
+                pendingFocus.current = { id, step };
+            }
+        },
+        [announce, t, threadId],
+    );
+
+    // A small distance before a drag starts, so a click on a chip's buttons stays a click.
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+    const handleDragEnd = useCallback(
+        ({ active, over }: DragEndEvent) => {
+            const items = usePromptQueueStore.getState().queues[threadId ?? ""]?.items ?? [];
+            const toIndex = over ? items.findIndex((item) => item.id === over.id) : -1;
+
+            if (threadId && toIndex !== -1) {
+                const from = items.findIndex((item) => item.id === active.id);
+
+                usePromptQueueStore.getState().move(threadId, String(active.id), toIndex);
+
+                // The store may refuse the move (a steer on the way): announce the position it actually has.
+                const to = (usePromptQueueStore.getState().queues[threadId]?.items ?? []).findIndex((item) => item.id === active.id);
+
+                if (from !== -1 && to !== from) {
+                    announce(t`Moved to position ${to + 1}`, threadId);
+                }
+            }
+        },
+        [announce, t, threadId],
+    );
+
     const handleSendNext = useCallback(() => {
         if (!threadId) {
             return;
@@ -427,11 +589,27 @@ const ComposerPromptQueue: FC = () => {
                 <ListOrderedIcon aria-hidden="true" className="size-3.5" />
                 {statusText}
             </span>
-            <ol aria-label={t`Queued messages`} className="flex min-w-0 flex-wrap gap-1.5">
-                {queue.items.map((prompt, index) => (
-                    <QueueChip key={prompt.id} onRemove={handleRemove} position={index + 1} prompt={prompt} />
-                ))}
-            </ol>
+            <span aria-live="polite" className="sr-only" role="status">
+                {announcement.threadId === threadId ? announcement.text : ""}
+            </span>
+            <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd} sensors={sensors}>
+                <SortableContext items={queue.items.map((prompt) => prompt.id)} strategy={rectSortingStrategy}>
+                    <ol aria-label={t`Queued messages`} className="flex min-w-0 flex-wrap gap-1.5">
+                        {queue.items.map((prompt, index) => (
+                            <QueueChip
+                                blockedDown={queue.items[index + 1]?.steer !== undefined}
+                                blockedUp={index > 0 && queue.items[index - 1]?.steer !== undefined}
+                                count={count}
+                                key={prompt.id}
+                                onMove={handleMove}
+                                onRemove={handleRemove}
+                                position={index + 1}
+                                prompt={prompt}
+                            />
+                        ))}
+                    </ol>
+                </SortableContext>
+            </DndContext>
             {!isStreaming && (
                 <Button className="h-6 gap-1 px-2 text-xs" onClick={handleSendNext} size="sm" type="button" variant="outline">
                     <SendIcon aria-hidden="true" className="size-3" />

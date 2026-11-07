@@ -37,7 +37,7 @@ describe("sendHostMessage", () => {
     it("posts the prompt with the caller's bearer to the backend, and nowhere else", async () => {
         const fetcher = answering(200, { messageId: "m1", streamId: "s1", streamToken: "x" });
 
-        await expect(sendHostMessage(INPUT, { fetch: fetcher as never })).resolves.toEqual({ ok: true });
+        await expect(sendHostMessage(INPUT, { fetch: fetcher as never })).resolves.toEqual({ ok: true, streamId: "s1" });
 
         const [url, init] = fetcher.mock.calls[0] as unknown as [URL, RequestInit];
 
@@ -47,8 +47,13 @@ describe("sendHostMessage", () => {
         expect(JSON.parse(init.body as string)).toEqual(INPUT);
     });
 
-    it("treats a repeat of an earlier request as sent", async () => {
-        await expect(sendHostMessage(INPUT, { fetch: answering(200, { duplicate: true }) as never })).resolves.toEqual({ ok: true });
+    it("treats a repeat of an earlier request as sent, and says so with the turn that request started", async () => {
+        await expect(sendHostMessage(INPUT, { fetch: answering(200, { duplicate: true }) as never })).resolves.toEqual({ duplicate: true, ok: true });
+        await expect(sendHostMessage(INPUT, { fetch: answering(200, { duplicate: true, streamId: "s0" }) as never })).resolves.toEqual({
+            duplicate: true,
+            ok: true,
+            streamId: "s0",
+        });
     });
 
     it("names why the backend refused, and calls anything else unreachable", async () => {

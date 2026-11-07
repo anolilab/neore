@@ -16,6 +16,7 @@ import { useCRPC } from "@/lib/lunora/crpc";
 
 import type { BoardTask } from "../lib/task-board";
 import { NOTE_MAX, reviewReason } from "../lib/task-board";
+import TaskRunNotice from "./task-run-notice";
 import TaskSkippedSlot from "./task-skipped-slot";
 import { TaskStatusBadge } from "./task-status";
 
@@ -256,6 +257,7 @@ const TaskDetailDialog = ({ onClose, task }: TaskDetailDialogProps) => {
                                         <dd className="text-destructive">{task.lastError}</dd>
                                     </div>
                                 )}
+                                {task.lastRunNotice && <TaskRunNotice notice={task.lastRunNotice} />}
                                 {task.cronExpression && task.lastSkippedAt !== null && task.lastSkipReason && (
                                     <TaskSkippedSlot at={task.lastSkippedAt} reason={task.lastSkipReason} />
                                 )}

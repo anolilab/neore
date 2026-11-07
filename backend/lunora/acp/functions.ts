@@ -12,6 +12,7 @@ import { isLocalBrowserModel, loadCustomProviders } from "../chat/lib/local-turn
 import { authQuery } from "../lib/crpc";
 import { vCapabilityReport } from "../lib/capability-report";
 import { MAX_LENGTH } from "../lib/validators";
+import { newestHostStream } from "./lib/host-streams";
 import { isHostRunThread } from "./lib/host-thread";
 import { vAcpSessionStatus, vHostEndReason } from "./validators";
 
@@ -43,8 +44,14 @@ const vHostSessionDetail = v.object({
     createdAt: v.number(),
     deviceId: v.string(),
     folderLabel: v.string(),
+    // The reason and the stream of the newest turn that ended. Unlike `lastEndReason`, these stay set while a newer turn runs,
+    // so a client can still see how the turn before it ended.
+    lastEndedReason: v.optional(vHostEndReason),
     lastEndReason: v.optional(vHostEndReason),
+    lastEndStreamId: v.optional(v.string()),
     lastEventAt: v.optional(v.number()),
+    // The host turn running now, so a client can stop that turn and no other.
+    liveStreamId: v.optional(v.string()),
     status: vAcpSessionStatus,
     threadId: v.string(),
 });
@@ -127,8 +134,16 @@ export const getHostSession = authQuery
         }
 
         const last = await ctx.db.persistentStreams.findFirst({ orderBy: [{ _creationTime: "desc" }], where: { producer: "host", threadId } });
+        const ended = await newestHostStream(ctx, threadId, ["done", "error", "timeout"]);
+        const live = await newestHostStream(ctx, threadId, ["pending", "streaming"]);
 
-        return { ...toView(row), ...(last?.hostEndReason !== undefined && { lastEndReason: last.hostEndReason }) };
+        return {
+            ...toView(row),
+            ...(last?.hostEndReason !== undefined && { lastEndReason: last.hostEndReason }),
+            ...(ended && { lastEndStreamId: String(ended._id) }),
+            ...(ended?.hostEndReason !== undefined && { lastEndedReason: ended.hostEndReason }),
+            ...(live && { liveStreamId: String(live._id) }),
+        };
     });
 
 /**

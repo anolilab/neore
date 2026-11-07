@@ -1721,6 +1721,38 @@
                         "folderLabel": {
                           "type": "string"
                         },
+                        "lastEndedReason": {
+                          "anyOf": [
+                            {
+                              "const": "finished",
+                              "type": "string"
+                            },
+                            {
+                              "const": "cancelled",
+                              "type": "string"
+                            },
+                            {
+                              "const": "failed",
+                              "type": "string"
+                            },
+                            {
+                              "const": "interrupted",
+                              "type": "string"
+                            },
+                            {
+                              "const": "timeout",
+                              "type": "string"
+                            },
+                            {
+                              "const": "revoked",
+                              "type": "string"
+                            },
+                            {
+                              "const": "stopped",
+                              "type": "string"
+                            }
+                          ]
+                        },
                         "lastEndReason": {
                           "anyOf": [
                             {
@@ -1753,8 +1785,14 @@
                             }
                           ]
                         },
+                        "lastEndStreamId": {
+                          "type": "string"
+                        },
                         "lastEventAt": {
                           "type": "number"
+                        },
+                        "liveStreamId": {
+                          "type": "string"
                         },
                         "status": {
                           "anyOf": [
@@ -5287,6 +5325,11 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "streamId": {
+                        "description": "Id<\"persistentStreams\">",
+                        "type": "string",
+                        "x-lunora-table": "persistentStreams"
+                      },
                       "threadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",
@@ -5324,6 +5367,21 @@
                   "properties": {
                     "cancelled": {
                       "type": "boolean"
+                    },
+                    "delivered": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "anyOf": [
+                        {
+                          "const": "no_turn",
+                          "type": "string"
+                        },
+                        {
+                          "const": "other_turn",
+                          "type": "string"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -12063,6 +12121,9 @@
                         "type": "array"
                       },
                       "hidePersonalInfo": {
+                        "type": "boolean"
+                      },
+                      "hostFollowUpSteer": {
                         "type": "boolean"
                       },
                       "id": {
@@ -53678,6 +53739,30 @@
                         "type": "string",
                         "x-lunora-table": "tasks"
                       },
+                      "projectId": {
+                        "description": "Id<\"projects\">",
+                        "type": "string",
+                        "x-lunora-table": "projects"
+                      },
+                      "reasoningEffort": {
+                        "type": "number"
+                      },
+                      "runDestination": {
+                        "anyOf": [
+                          {
+                            "const": "new_thread",
+                            "type": "string"
+                          },
+                          {
+                            "const": "continue_thread",
+                            "type": "string"
+                          },
+                          {
+                            "const": "fresh_context",
+                            "type": "string"
+                          }
+                        ]
+                      },
                       "skillId": {
                         "description": "Id<\"skills\">",
                         "type": "string",
@@ -54346,6 +54431,30 @@
                         "description": "Id<\"tasks\">",
                         "type": "string",
                         "x-lunora-table": "tasks"
+                      },
+                      "projectId": {
+                        "description": "Id<\"projects\">",
+                        "type": "string",
+                        "x-lunora-table": "projects"
+                      },
+                      "reasoningEffort": {
+                        "type": "number"
+                      },
+                      "runDestination": {
+                        "anyOf": [
+                          {
+                            "const": "new_thread",
+                            "type": "string"
+                          },
+                          {
+                            "const": "continue_thread",
+                            "type": "string"
+                          },
+                          {
+                            "const": "fresh_context",
+                            "type": "string"
+                          }
+                        ]
                       },
                       "skillId": {
                         "description": "Id<\"skills\">",

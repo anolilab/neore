@@ -78,6 +78,11 @@ export interface HeadlessRunOptions {
     /** The bot the run is for: its memories are read and written in that bot's scope. Unset = the user's own. */
     botId?: string;
     /**
+     * Send the model none of the thread's earlier turns, only this run's prompt: a scheduled task that
+     * reuses one thread with a fresh context per run (`tasks/AGENTS.md`). The history stays in the thread.
+     */
+    freshContext?: boolean;
+    /**
      * Run until done: after the run, a short review decides whether `text` is met, and if not the run goes on
      * in the same thread with the reviewer's reason as the next instruction, up to `maxRounds` (default 5, at
      * most 10) and a cost cap. Each further round is charged to the user's daily limits. Unset, the run is one
@@ -108,6 +113,8 @@ export interface HeadlessRunOptions {
     personalization: "full" | "none";
     /** Omitted when continuing a thread: its latest message is the prompt. */
     prompt?: string;
+    /** Reasoning effort on the chat's 0-100 scale; wins over the skill's. Unset leaves it to the skill, then the model. */
+    reasoningEffort?: number;
     /**
      * Asked after each step: `true` ends the loop there. The step that just
      * finished was run and is saved and billed; the step cap stays in force
@@ -246,7 +253,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 backupModelId,
                 hasTools: Object.keys(runTools).length > 0,
                 model,
-                reasoningEffort: skill?.config?.reasoningEffort,
+                reasoningEffort: options.reasoningEffort ?? skill?.config?.reasoningEffort,
                 shouldAutoContinue: options.maxSteps === undefined,
             }),
             ...(prompt !== undefined && { prompt }),
@@ -291,7 +298,9 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
 
         // The goal's time budget is the invocation's, so it starts before the first generation.
         const startedAt = Date.now();
-        const result = await thread.generateText(generateArgs as never);
+        // A fresh context reads no recent rows; with none read, no thread summary is added either (`agent/client/search.ts`).
+        const callOptions = options.freshContext ? { contextOptions: { recentMessages: 0 } } : undefined;
+        const result = await thread.generateText(generateArgs as never, callOptions);
         const text = result.text ?? "";
 
         const finishedAt = Date.now();
@@ -356,6 +365,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             goal: { ...options.goal },
             review: async ({ round, transcript }) =>
                 await reviewRound({ gateway: gatewayFetch(ctx), goal: goalText, round, rules: modelFilterRules, threadId, transcript, userId }),
+            // A further round continues this run, so it reads the run's own turns: only the first generation starts fresh.
             runRound: async (instruction) => settle(await thread.generateText({ ...generateArgs, prompt: instruction } as never)),
             startedAt,
             stopped: options.shouldStop,

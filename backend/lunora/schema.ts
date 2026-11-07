@@ -58,7 +58,16 @@ import {
 } from "./source-control/validators";
 import { vSkillConfig } from "./skills/validators";
 import { vDispatchSource, vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus, vWorkerPolicy } from "./sub-agents/validators";
-import { vGoalStatus, vTaskRunOrigin, vTaskRunStatus, vTaskSkipReason, vTaskStatus, vVerdict } from "./tasks/validators";
+import {
+    vGoalStatus,
+    vTaskRunDestination,
+    vTaskRunNoticeReason,
+    vTaskRunOrigin,
+    vTaskRunStatus,
+    vTaskSkipReason,
+    vTaskStatus,
+    vVerdict,
+} from "./tasks/validators";
 import { vEventSource, vEventState, vWebhookSignatureScheme } from "./triggers/validators";
 
 /** Hoisted so `streamDeltasFields` is readable as a value, not just a type. */
@@ -2674,6 +2683,8 @@ export const schema = defineSchema({
         goalId: v.optional(v.id("goals")),
         instructions: v.string(),
         lastError: v.optional(v.string()),
+        // Why the last run did not go where the task says, and when (`vTaskRunNoticeReason`); cleared by a run that did.
+        lastRunNotice: v.optional(v.object({ at: v.number(), reason: vTaskRunNoticeReason })),
         lastRunThreadId: v.optional(v.string()),
         // The last recurrence slot the sweep let pass without a run, and why (`tasks/AGENTS.md`).
         lastSkippedAt: v.optional(v.number()),
@@ -2686,10 +2697,16 @@ export const schema = defineSchema({
         // shared with that organization, after re-checking membership.
         organizationId: v.optional(v.string()),
         parentTaskId: v.optional(v.id("tasks")),
+        // The project a run's new thread is filed in; a run continues a thread only while it is still in this project.
+        projectId: v.optional(v.id("projects")),
+        // 0-100, the chat's reasoning-effort scale; unset leaves it to the skill or the model.
+        reasoningEffort: v.optional(v.number()),
         // Denormalised `cronExpression !== undefined`, so the due scan has an equality prefix.
         recurring: v.boolean(),
         resultSummary: v.optional(v.string()),
         reviewNote: v.optional(v.string()),
+        // Where a recurring run goes; unset is a new thread each run.
+        runDestination: v.optional(vTaskRunDestination),
         skillId: v.optional(v.id("skills")),
         status: vTaskStatus,
         successCriteria: v.optional(v.string()),
@@ -3409,6 +3426,8 @@ export const schema = defineSchema({
         enableFollowupSuggestions: v.optional(v.boolean()),
         favoriteModels: v.optional(v.array(v.string())),
         hidePersonalInfo: v.optional(v.boolean()),
+        // A message sent during a coding agent's turn interrupts that turn and goes next, instead of queueing behind it. Absent = queue.
+        hostFollowUpSteer: v.optional(v.boolean()),
         isAdvancedUser: v.optional(v.boolean()),
         keyboardShortcuts: v.optional(v.any()),
         language: v.optional(v.string()),
