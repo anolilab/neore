@@ -113,7 +113,7 @@ describe("thread list cache hooks", () => {
         });
 
         act(() => {
-            globalThis.dispatchEvent(new StorageEvent("storage", { key: "neore-thread-list:v1:alice", newValue: null, oldValue: "{}" }));
+            globalThis.dispatchEvent(new StorageEvent("storage", { key: "neore-thread-list:v2:alice", newValue: null, oldValue: "{}" }));
         });
         rerender({ owner: "alice", title: "Later push" });
         act(() => {
@@ -141,13 +141,13 @@ describe("thread list cache hooks", () => {
         act(() => {
             vi.advanceTimersByTime(2000);
         });
-        expect(localStorage.getItem("neore-thread-list:v1:bob")).toBeNull();
+        expect(localStorage.getItem("neore-thread-list:v2:bob")).toBeNull();
 
         rerender({ data: { ...stale, threads: { page: [{ _id: "t2", title: "Bob chat" }] } } });
         act(() => {
             vi.advanceTimersByTime(2000);
         });
-        expect(localStorage.getItem("neore-thread-list:v1:bob")).toContain("Bob chat");
+        expect(localStorage.getItem("neore-thread-list:v2:bob")).toContain("Bob chat");
     });
 
     it("stores nothing for a push that arrives while a sign-out is under way, until the next sign-in", () => {
@@ -198,10 +198,10 @@ describe("thread list cache hooks", () => {
         });
 
         act(() => {
-            globalThis.dispatchEvent(new StorageEvent("storage", { key: "neore-thread-list:v1:alice", newValue: null, oldValue: "{}" }));
+            globalThis.dispatchEvent(new StorageEvent("storage", { key: "neore-thread-list:v2:alice", newValue: null, oldValue: "{}" }));
             // A full clear and another user's removal are not this user's sign-out.
             globalThis.dispatchEvent(new StorageEvent("storage", { key: null, newValue: null }));
-            globalThis.dispatchEvent(new StorageEvent("storage", { key: "neore-thread-list:v1:bob", newValue: null }));
+            globalThis.dispatchEvent(new StorageEvent("storage", { key: "neore-thread-list:v2:bob", newValue: null }));
         });
         // The session lives on: a refreshed token for the same user lifts the hold.
         setToken(jwtFor("alice"));
@@ -220,7 +220,7 @@ describe("thread list cache hooks", () => {
 
         act(() => {
             globalThis.dispatchEvent(new StorageEvent("storage", { key: "other", newValue: null }));
-            globalThis.dispatchEvent(new StorageEvent("storage", { key: "neore-thread-list:v1:alice", newValue: "{}" }));
+            globalThis.dispatchEvent(new StorageEvent("storage", { key: "neore-thread-list:v2:alice", newValue: "{}" }));
             vi.advanceTimersByTime(2000);
         });
         expect(localStorage).toHaveLength(1);

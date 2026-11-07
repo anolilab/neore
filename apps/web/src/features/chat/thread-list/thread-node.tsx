@@ -64,6 +64,7 @@ import { hasUnreadReply, isSnoozed } from "./lib/thread-state-rules";
 import MessageSearchMatches from "./message-search-matches";
 import SortableThreadItem from "./sortable-thread-item";
 import { selectSetShowManageTagsDialog, useThreadListUIStore } from "./stores/thread-list-ui-store";
+import ThreadOptionsMenu from "./thread-options-menu";
 import ThreadStatusIcon, { NEEDS_YOU_TEXT_CLASS } from "./thread-status-icon";
 import type { BranchNode, LoadingStates } from "./types";
 
@@ -619,6 +620,15 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 </Tooltip>
             )}
 
+            {/* A touch screen has no hover to reveal the action strip: the options menu shows there by itself, in the row's flow, so it
+                takes room from the title instead of covering it, and the rest of the strip stays hidden. */}
+            <ThreadOptionsMenu
+                className="hidden [@media(hover:none)]:contents"
+                isHostRun={node.runner === "host"}
+                isLocked={isLocked}
+                label={displayTitle}
+                threadId={node.threadId}
+            />
             <div className="bg-accent-foreground/80 absolute right-0 flex items-center gap-1 rounded-l-lg opacity-0 transition-opacity group-hover/action-item:opacity-100 focus-within:opacity-100">
                 {node.status !== "archived" && (
                     <Tooltip>
@@ -858,6 +868,13 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         </DropdownMenuContent>
                     </DropdownMenu>
                 )}
+                <ThreadOptionsMenu
+                    className="[@media(hover:none)]:hidden"
+                    isHostRun={node.runner === "host"}
+                    isLocked={isLocked}
+                    label={displayTitle}
+                    threadId={node.threadId}
+                />
                 <DropdownMenu>
                     <Tooltip>
                         <TooltipTrigger

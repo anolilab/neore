@@ -21,6 +21,7 @@ import { scheduleGranteeRedaction } from "../notifications/locked-redact";
 
 import { scheduleFileLinkBackfill } from "./file-link-backfill";
 import { deleteThreadSummaries } from "./thread-summaries";
+import { clearRecordedTitleAnswers, titleDispatchInFlight } from "./thread-title";
 import { passcodeHashOf, readPasscodeRow, type PasscodeRow, unlockSecret } from "./thread-passcode";
 import { requireOwnedThreadIgnoringLock } from "./thread-read-access";
 
@@ -96,6 +97,12 @@ export const enableThreadLock = authMutation
             throw new LunoraError("CONFLICT", "This chat is already locked.");
         }
 
+        // A title model request for this chat is being sent while it is still unlocked: the lock waits for it, so no prompt of a locked
+        // chat ever reaches a title model (`agent/thread-title.ts`). The request is answered within seconds.
+        if (await titleDispatchInFlight(context, threadId)) {
+            throw new LunoraError("CONFLICT", "A title is being generated for this chat. Try again in a moment.");
+        }
+
         if (thread.isPublic === true) {
             throw new LunoraError("BAD_REQUEST", "Stop sharing this chat before you lock it.");
         }
@@ -123,6 +130,8 @@ export const enableThreadLock = authMutation
         await patchRow(context.db, "threads", thread, { lockedAt: now, updatedAt: now });
         // Condensed copies of its content made before the lock are not kept (`thread-summaries.ts`).
         await deleteThreadSummaries(context, threadId);
+        // Nor are title answers recorded for a run whose write has not settled (`agent/thread-title.ts`).
+        await clearRecordedTitleAnswers(context, threadId);
         // Index the chat's attachments; until the walk stamps the row, the file gate scans its messages.
         await scheduleFileLinkBackfill(context, threadId, userId);
         // Former collaborators' notifications for this chat stop showing its title (`notifications/locked-redact.ts`).

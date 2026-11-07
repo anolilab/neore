@@ -685,6 +685,7 @@ export const idempotencyClaims = sqliteTable("idempotencyClaims", {
     key: text("key").notNull(),
     leaseExpiresAt: real("leaseExpiresAt"),
     onLapse: text("onLapse", { mode: "json" }).$type<{ args?: string; target: string }>(),
+    result: text("result"),
     scope: text("scope").notNull(),
     userId: text("userId"),
 }, (t) => ({

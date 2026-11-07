@@ -211,6 +211,9 @@ export const RATE_LIMIT_CONFIGS = {
     "chat/promptImprovement:free": Ratelimit.tokenBucket(10, MINUTE, 15),
     "chat/promptImprovement:premium": Ratelimit.tokenBucket(30, MINUTE, 50),
     "chat/promptImprovement:public": Ratelimit.fixedWindow(3, HOUR),
+    // Regenerating a thread title (`chat/functions.ts#regenerateThreadTitle`): one utility-model call per click.
+    "chat/regenerateTitle:free": Ratelimit.fixedWindow(10, MINUTE),
+    "chat/regenerateTitle:premium": Ratelimit.fixedWindow(30, MINUTE),
     // Steering a running reply (`chat/steering.ts`): a send and a withdraw per
     // message. A run holds at most a few queued at once, so a burst is small.
     "chat/steer:free": Ratelimit.tokenBucket(20, MINUTE, 30),

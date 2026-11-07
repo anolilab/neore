@@ -28,6 +28,10 @@
  * | `aside-add`        | `<userId>:<threadId>:<entryId>` | {@link ASIDE_ADD_CLAIM_TTL_MS} | `chat/aside.ts` ("Add to thread", one click, retried or doubled) |
  * | `thread-cut`        | `<threadId>:<covered row id>` | 30 min | `agent/thread-summaries.ts` (idle summary) and `agent/thread-compaction.ts` (compaction): one scope, so a cut is paid for once |
  * | `thread-fold`       | `<threadId>`             | 3 min, released when the call ends | `agent/thread-summaries.ts` (`claimCut`): one paid summarising call in flight per thread, so two runs planning different cuts of the same rows do not both pay |
+ * | `regenerate-title`  | `<threadId>`             | 5 min until the job starts, then held for 15 min from its start (`REGENERATE_TITLE_RUN_TTL_MS`); released when the job ends, or by `retryTitleWrite` once a handed-off write settles | `chat/functions.ts` (`regenerateThreadTitle`: one regenerate in flight per thread) |
+ * | `title-charge`      | `<threadId>:<claimedAt>` (a regenerate run); `<threadId>:auto-title:<jobId>` (an automatic title job, `autoTitleChargeKey`; `<threadId>:auto-title` for a job queued without an id) | 24 h; given back only when the model call threw | `agent/thread-title.ts` (`admitTitleRun`, `recordTitleAnswer`: one model call per title run) |
+ * | `title-answer`      | the run's `title-charge` key | 24 h; deleted when the run's write settles, is refused, or the chat is locked | `agent/thread-title.ts` (`recordTitleAnswer`: the model's answer, in `result`, for a write that has not landed yet) |
+ * | `title-dispatch`    | `<threadId>:<request id>` | 2 min, released once the request is answered | `agent/thread-title.ts` (`beginTitleDispatch`: a title model request being sent; `enableThreadLock` refuses while one is held) |
  * | `organization-policy-create` | `<organizationId>` | {@link ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS} | `auth/organization-policy.ts` (`setOrganizationPolicy`: one writer creates an organization's first policy row) |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
@@ -64,7 +68,7 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { internalMutation } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { patchRow } from "./patch";
 
 /**
@@ -223,6 +227,29 @@ export const claimedAtOf = async (ctx: Pick<QueryCtx, "db">, scope: string, key:
     return existing !== null && existing.expiresAt > Date.now() ? existing.claimedAt : null;
 };
 
+/** The unexpired claim for `(scope, key)`, or `null`: for a caller that reads what the claim's holder recorded on it (`result`). */
+export const claimRow = async (ctx: Pick<QueryCtx, "db">, scope: string, key: string) => {
+    const existing = await findClaim(ctx, scope, key);
+
+    return existing !== null && existing.expiresAt > Date.now() ? existing : null;
+};
+
+/**
+ * Records what the work a claim guards produced (`result`), on the claim `claimedAt` only, so a retry of that work can pick it up instead
+ * of doing it again. `false` when that claim no longer holds the key.
+ */
+export const recordClaimResult = async (ctx: ClaimCtx, scope: string, key: string, claimedAt: number, result: string): Promise<boolean> => {
+    const existing = await claimRow(ctx, scope, key);
+
+    if (existing?.claimedAt !== claimedAt) {
+        return false;
+    }
+
+    await patchRow(ctx.db, "idempotencyClaims", existing, { result });
+
+    return true;
+};
+
 /** `true` for the first claim of `(scope, key)` within `ttlMs`, `false` for every later one. */
 export const claimOnce = async (ctx: ClaimCtx, scope: string, key: string, ttlMs: number, userId?: string): Promise<boolean> =>
     await claim(ctx, scope, key, { ttlMs, userId });
@@ -267,6 +294,54 @@ const prefixEnd = (prefix: string): string => {
     const last = prefix.length - 1;
 
     return `${prefix.slice(0, last)}${String.fromCodePoint(prefix.codePointAt(last)! + 1)}`;
+};
+
+/** Claims read per page by {@link hasClaimWithPrefix} and {@link dropExpiredClaimsWithPrefix}. */
+const PREFIX_PROBE_BATCH = 50;
+
+/**
+ * `true` while an unexpired claim of `scope` whose key starts with `prefix` exists. Reads the range page by page until it finds one, so
+ * expired rows the purge has not reached yet cannot hide an unexpired claim behind them.
+ */
+export const hasClaimWithPrefix = async (ctx: Pick<QueryCtx, "db">, scope: string, prefix: string): Promise<boolean> => {
+    const now = Date.now();
+    const end = prefixEnd(prefix);
+    let after: string | undefined;
+
+    for (;;) {
+        const from = after;
+        const rows = await ctx.db
+            .query("idempotencyClaims")
+            .withIndex("by_scope_key", (q) =>
+                (from === undefined ? q.eq("scope", scope).gte("key", prefix) : q.eq("scope", scope).gt("key", from)).lt("key", end),
+            )
+            .take(PREFIX_PROBE_BATCH);
+
+        if (rows.some((row) => row.expiresAt > now)) {
+            return true;
+        }
+
+        if (rows.length < PREFIX_PROBE_BATCH) {
+            return false;
+        }
+
+        after = rows.at(-1)!.key;
+    }
+};
+
+/** Deletes up to one page of EXPIRED claims of `scope` whose key starts with `prefix`, so the range a {@link hasClaimWithPrefix} reads stays short. */
+export const dropExpiredClaimsWithPrefix = async (ctx: ClaimCtx, scope: string, prefix: string): Promise<void> => {
+    const now = Date.now();
+    const rows = await ctx.db
+        .query("idempotencyClaims")
+        .withIndex("by_scope_key", (q) => q.eq("scope", scope).gte("key", prefix).lt("key", prefixEnd(prefix)))
+        .take(PREFIX_PROBE_BATCH);
+
+    for (const row of rows) {
+        if (row.expiresAt <= now) {
+            await ctx.db.delete("idempotencyClaims", row._id);
+        }
+    }
 };
 
 /** Rows deleted per {@link releaseClaimsWithPrefix} call. */
@@ -384,6 +459,12 @@ export const retryReleaseKey = internalMutation
         return null;
     });
 
+/** {@link hasClaim} as a read, for a caller that wants to refuse before it does any work. Taking the claim is still the atomic step. */
+export const claimHeld = internalQuery
+    .input({ key: v.string(), scope: v.string() })
+    .output(v.boolean())
+    .query(async ({ args: { key, scope }, ctx }) => await hasClaim(ctx, scope, key));
+
 export const releaseKey = internalMutation
     .input({ claimedAt: v.optional(v.number()), key: v.string(), scope: v.string() })
     .output(v.null())
@@ -392,6 +473,21 @@ export const releaseKey = internalMutation
 
         return null;
     });
+
+/**
+ * The `ttlMs` that makes {@link holdClaim} keep a claim for `runMs` counted from `now`. `holdClaim` counts from the claim's `claimedAt`,
+ * which is earlier for a job that started late, so the time since the claim is added: the hold then runs from the start of the job.
+ */
+export const holdTtlFrom = (claimedAt: number, runMs: number, now: number = Date.now()): number => runMs + Math.max(0, now - claimedAt);
+
+/**
+ * {@link holdClaim} for a caller outside a transaction. `true` while the claim `claimedAt` still holds the key (it was stretched
+ * to `ttlMs`); `false` when another claim has taken the key, which the caller must then leave alone.
+ */
+export const holdKey = internalMutation
+    .input({ claimedAt: v.number(), key: v.string(), scope: v.string(), ttlMs: v.number(), userId: v.optional(v.string()) })
+    .output(v.boolean())
+    .mutation(async ({ args: { claimedAt, key, scope, ttlMs, userId }, ctx }) => await holdClaim(ctx, scope, key, claimedAt, ttlMs, userId));
 
 /** Lapsed leases handled per tick; the rest wait a minute. */
 export const LAPSE_REAP_BATCH = 50;

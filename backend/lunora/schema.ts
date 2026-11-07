@@ -1193,6 +1193,8 @@ export const schema = defineSchema({
         leaseExpiresAt: v.optional(v.number()),
         // Compensation for a lease that lapses uncompleted (`reapLapsedClaims`).
         onLapse: v.optional(v.object({ args: v.optional(v.string()), target: v.string() })),
+        // What the guarded work produced, for a retry to pick up instead of doing it again (a title run's model answer).
+        result: v.optional(v.string()),
         scope: v.string(),
         userId: v.optional(v.string()),
     })
