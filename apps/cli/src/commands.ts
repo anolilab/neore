@@ -138,8 +138,8 @@ export const THREAD_EXIT = { failed: 1, ok: 0, other: 2 } as const;
  */
 const UNFINISHED_STATUSES: ReadonlySet<string> = new Set(["interrupted", "relay_budget", "relay_timeout", "unknown", "waiting_on_person"]);
 
-/** Errors after which the run may have started: the send was lost, the server failed late, or a retry found it in progress or could not tell. */
-const MAYBE_RUNNING_CODES: ReadonlySet<string> = new Set(["idempotency_in_progress", "idempotency_outcome_unknown", "network_error", "service_unavailable"]);
+/** Error codes after which the run may have started, besides any 5xx: the send was lost, or a retry found it in progress or could not tell. */
+const MAYBE_RUNNING_CODES: ReadonlySet<string> = new Set(["idempotency_in_progress", "idempotency_outcome_unknown", "network_error"]);
 
 const readLaterHint = (threadId: string | undefined): string =>
     threadId
@@ -151,7 +151,7 @@ const withReadLaterHint = async <T>(threadId: string | undefined, request: Promi
     try {
         return await request;
     } catch (error) {
-        if (error instanceof ApiError && MAYBE_RUNNING_CODES.has(error.code)) {
+        if (error instanceof ApiError && (error.status >= 500 || MAYBE_RUNNING_CODES.has(error.code))) {
             // A new invocation sends a new idempotency key, so sending again could start and bill a second run.
             throw new ApiError({
                 code: error.code,
@@ -171,7 +171,10 @@ const postThread = async (context: Context, flags: Flags, threadId: string | und
     const body = { model: flags.model, prompt, ...(threadId && { threadId }) };
 
     if (!flags.wait) {
-        const started = await withReadLaterHint(threadId, client.request<ChatStarted>("POST", "/chat", { body: { ...body, stream: true } }));
+        const started = await withReadLaterHint(
+            threadId,
+            client.request<ChatStarted>("POST", "/chat", { body: { ...body, stream: true }, retryAmbiguous: false }),
+        );
 
         if (flags.json) {
             printJson(context.io, { messageId: started.messageId, threadId: started.threadId });
@@ -184,7 +187,7 @@ const postThread = async (context: Context, flags: Flags, threadId: string | und
 
     const result = await withReadLaterHint(
         threadId,
-        client.request<ChatCompleted>("POST", "/chat", { body: { ...body, stream: false }, timeoutMs: BLOCKING_TIMEOUT_MS }),
+        client.request<ChatCompleted>("POST", "/chat", { body: { ...body, stream: false }, retryAmbiguous: false, timeoutMs: BLOCKING_TIMEOUT_MS }),
     );
 
     if (flags.json) {

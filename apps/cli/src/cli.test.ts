@@ -2,7 +2,7 @@ import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { parseCommand, UsageError } from "./args";
 import { run } from "./cli";
@@ -398,43 +398,29 @@ describe("chat end to end against a fake API", () => {
             expect(await run(["thread", "start", "hi", "--wait"], context)).toBe(2);
         });
 
-        it("on a transport error keeps the network exit code and says where to read the run", async () => {
+        it("sends once after a lost send or a 5xx, which the server may have run, and says where to read the run", async () => {
             await writeConfig({ apiKey: "nk_1", apiUrl: "https://api.test" }, join(directory, "config.json"));
 
-            const context = contextWith((async () => {
+            let calls = 0;
+            const lost = contextWith((async () => {
+                calls += 1;
+
                 throw new TypeError("fetch failed");
             }) as unknown as typeof fetch);
 
-            // The client retries a lost send with backoff; skip the waits (config reads are real I/O, so yield to it).
-            vi.useFakeTimers({ toFake: ["setTimeout"] });
+            expect(await run(["thread", "send", "th1", "hi", "--wait"], lost)).toBe(EXIT.network);
+            expect(lost.io.stderr.text()).toContain("neore threads show th1");
+            expect(calls).toBe(1);
 
-            const settle = async (pending: Promise<number>): Promise<number> => {
-                let isDone = false;
+            const failed = contextWith((async () => {
+                calls += 1;
 
-                pending
-                    .finally(() => {
-                        isDone = true;
-                    })
-                    .catch(() => {});
+                return Response.json({ error: { code: "internal_error", message: "The chat could not be started." } }, { status: 500 });
+            }) as unknown as typeof fetch);
 
-                while (!isDone) {
-                    await new Promise((resolve) => {
-                        setImmediate(resolve);
-                    });
-                    await vi.advanceTimersByTimeAsync(60_000);
-                }
-
-                return await pending;
-            };
-
-            try {
-                expect(await settle(run(["thread", "send", "th1", "hi", "--wait"], context))).toBe(EXIT.network);
-                expect(context.io.stderr.text()).toContain("neore threads show th1");
-                expect(await settle(run(["thread", "start", "hi"], context))).toBe(EXIT.network);
-                expect(context.io.stderr.text()).toContain("neore threads ls");
-            } finally {
-                vi.useRealTimers();
-            }
+            expect(await run(["thread", "start", "hi"], failed)).toBe(2);
+            expect(failed.io.stderr.text()).toContain("neore threads ls");
+            expect(calls).toBe(2);
         });
     });
 

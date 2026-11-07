@@ -223,6 +223,12 @@ export interface RequestOptions {
     /** POSTs get one automatically so a retry cannot double-run. */
     idempotencyKey?: string;
     query?: Record<string, number | string | undefined>;
+
+    /**
+     * `false`: no retry after a transport failure or a 5xx. The server releases the key after
+     * those, so a retry runs the request again even if the first attempt already did its work.
+     */
+    retryAmbiguous?: boolean;
     signal?: AbortSignal;
     /** Overrides the client's deadline for this call (a blocking chat can take minutes). */
     timeoutMs?: number;
@@ -373,7 +379,8 @@ export class NeoreClient {
                 response = await this.raw(method, path, attemptOptions);
                 break;
             } catch (error) {
-                const delay = attempt < this.#retries ? retryDelayMs(error, attempt) : undefined;
+                const isAmbiguous = error instanceof ApiError && (error.code === "network_error" || error.status >= 500);
+                const delay = attempt < this.#retries && !(isAmbiguous && options.retryAmbiguous === false) ? retryDelayMs(error, attempt) : undefined;
 
                 if (delay === undefined) {
                     throw error;
