@@ -15,6 +15,7 @@ import { findRunningHostRun } from "../../sub-agents/host-runs";
 import type { SubAgentOutcome } from "../../sub-agents/functions";
 import { isWorkerThread } from "../../sub-agents/worker-thread";
 import type { HostChanges } from "./changes";
+import { newestHostStream } from "./host-streams";
 import {
     addMediaToTranscript,
     appendChildEvent,
@@ -248,7 +249,11 @@ export const endHostTurn = async (
     // A pull request's guide written by this turn is finished, or failed, by how the turn ended.
     await settleHostGuide(ctx, stream, end.reason);
 
-    if (end.idle) {
+    // Another host turn still live on the thread keeps the shared session busy: stopping one of two overlapping turns is not the
+    // session's end.
+    const another = await newestHostStream(ctx, stream.threadId as Id<"threads">, ["pending", "streaming"]);
+
+    if (end.idle && another === undefined) {
         const session = await sessionOfThread(ctx, stream.threadId as Id<"threads">);
 
         if (session) {
@@ -307,9 +312,10 @@ export const endLiveHostTurns = async (
  * worker's own messages queue there (`/hosts/send` refuses its thread), and ending the stopped turn signs the next one's
  * `acp_send` in the same transaction, which the computer may apply before this cancel.
  */
-export const sendHostCancel = async (ctx: MutationCtx, stream: Stream, now: number, keepQueue = false): Promise<void> => {
+export const sendHostCancel = async (ctx: MutationCtx, stream: Stream, now: number, keepQueue = false): Promise<boolean> => {
+    // Nothing runs on the computer for this stream, so there is nothing to cancel: that counts as delivered.
     if (!stream.hostTurnId) {
-        return;
+        return true;
     }
 
     const keep = keepQueue || (await isWorkerThread(ctx, stream.threadId));
@@ -317,7 +323,7 @@ export const sendHostCancel = async (ctx: MutationCtx, stream: Stream, now: numb
     const session = await sessionOfThread(ctx, stream.threadId as Id<"threads">);
 
     if (!session || session.status === "ended") {
-        return;
+        return true;
     }
 
     try {
@@ -338,17 +344,23 @@ export const sendHostCancel = async (ctx: MutationCtx, stream: Stream, now: numb
         // gone (`ineligible`). The stream ends all the same, and the host stops the turn when its own cap or restart does.
         if ("error" in result) {
             streamLogger.warn(`[acp] could not ask the host to cancel a turn: ${result.error}`);
+
+            return false;
         }
+
+        return true;
     } catch (error) {
         // Best effort, as above: the stream ends either way.
         streamLogger.warn("[acp] could not ask the host to cancel a turn", error);
+
+        return false;
     }
 };
 
 /** The sidebar's Stop for a host stream: keep what was written, end the stream, tell the host to cancel. */
-export const stopHostTurn = async (ctx: MutationCtx, stream: Stream, now: number, keepQueue = false): Promise<void> => {
+export const stopHostTurn = async (ctx: MutationCtx, stream: Stream, now: number, keepQueue = false): Promise<boolean> => {
     if (!isLiveStream(stream)) {
-        return;
+        return true;
     }
 
     // A prompt the computer has not acknowledged is withdrawn, so a Stop before the computer took it means it never runs.
@@ -358,8 +370,11 @@ export const stopHostTurn = async (ctx: MutationCtx, stream: Stream, now: number
 
     // The cancel is signed BEFORE the turn ends: ending it can start the worker's next queued message, whose send must
     // follow the cancel, not reach the computer while it is still running the turn that was stopped.
-    await sendHostCancel(ctx, stream, now, keepQueue);
+    const delivered = await sendHostCancel(ctx, stream, now, keepQueue);
+
     await finishHostTurn(ctx, stream, { reason: "stopped" }, now);
+
+    return delivered;
 };
 
 /**

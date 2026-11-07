@@ -2083,6 +2083,7 @@ export interface Doc_userSettings {
     enableFollowupSuggestions?: boolean;
     favoriteModels?: Array<string>;
     hidePersonalInfo?: boolean;
+    hostFollowUpSteer?: boolean;
     isAdvancedUser?: boolean;
     keyboardShortcuts?: unknown;
     language?: string;
@@ -5084,6 +5085,7 @@ export interface Insert_userSettings {
     enableFollowupSuggestions?: boolean;
     favoriteModels?: Array<string>;
     hidePersonalInfo?: boolean;
+    hostFollowUpSteer?: boolean;
     isAdvancedUser?: boolean;
     keyboardShortcuts?: unknown;
     language?: string;

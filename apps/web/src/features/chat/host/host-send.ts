@@ -25,7 +25,11 @@ export type HostSendError =
     | "unreachable"
     | "worker_thread";
 
-export type HostSendResult = { ok: true } | { error: HostSendError; ok: false };
+/**
+ * `streamId` is the turn the message started, or, for a repeat of an earlier request (`duplicate`), the turn that request
+ * started, which may have ended long ago. Either may be missing from an answer that could not be read.
+ */
+export type HostSendResult = { duplicate?: boolean; ok: true; streamId?: string } | { error: HostSendError; ok: false };
 
 const KNOWN: ReadonlySet<string> = new Set([
     "busy",
@@ -57,6 +61,21 @@ const errorOf = async (response: Response): Promise<HostSendError> => {
 
 const SEND_DEADLINE_MS = 30_000;
 
+/** A 200's body. The message is sent whatever the body says; what it names is only a hint for the composer. */
+const acceptedOf = async (response: Response): Promise<HostSendResult> => {
+    try {
+        const body = (await response.json()) as { duplicate?: unknown; streamId?: unknown };
+
+        return {
+            ok: true,
+            ...(body.duplicate === true && { duplicate: true }),
+            ...(typeof body.streamId === "string" && { streamId: body.streamId }),
+        };
+    } catch {
+        return { ok: true };
+    }
+};
+
 export const sendHostMessage = async (
     input: { requestId: string; text: string; threadId: string },
     options: { fetch?: typeof fetch; token?: () => Promise<string | null | undefined> } = {},
@@ -72,7 +91,7 @@ export const sendHostMessage = async (
             signal: AbortSignal.timeout(SEND_DEADLINE_MS),
         });
 
-        return response.ok ? { ok: true } : { error: await errorOf(response), ok: false };
+        return response.ok ? await acceptedOf(response) : { error: await errorOf(response), ok: false };
     } catch {
         return { error: "unreachable", ok: false };
     }
