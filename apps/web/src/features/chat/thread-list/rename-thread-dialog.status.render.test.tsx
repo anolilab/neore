@@ -101,7 +101,7 @@ describe("the rename's status", () => {
             throw new Error("header write refused");
         });
 
-        fireEvent.change(screen.getByDisplayValue("Old"), { target: { value: "New" } });
+        fireEvent.change(screen.getByLabelText("Title"), { target: { value: "New" } });
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
         await waitFor(() => expect(screen.getByTestId("closed").textContent).toBe("closed"));
@@ -128,7 +128,7 @@ describe("the rename's status", () => {
 
         renderHarness();
 
-        fireEvent.change(screen.getByDisplayValue("Old"), { target: { value: "New" } });
+        fireEvent.change(screen.getByLabelText("Title"), { target: { value: "New" } });
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
         await waitFor(() => expect(writes.rename).toHaveBeenCalledTimes(1));
 
@@ -141,7 +141,7 @@ describe("the rename's status", () => {
     it("moves focus into the title input when the dialog opens", async () => {
         renderHarness();
 
-        const input = screen.getByDisplayValue("Old");
+        const input = screen.getByLabelText("Title");
 
         // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
         await waitFor(() => expect(document.activeElement).toBe(input));

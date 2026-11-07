@@ -134,6 +134,6 @@ describe("RenameThreadDialog focus return", () => {
         });
 
         // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
-        expect(document.activeElement).toBe(screen.getByDisplayValue("Chat"));
+        expect(document.activeElement).toBe(screen.getByLabelText("Title"));
     });
 });
