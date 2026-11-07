@@ -9,6 +9,7 @@ export const MIN_CLIP_MS = 400;
 /** Recording stops here, as if the button were released. The server refuses longer clips. */
 export const MAX_CLIP_MS = 60_000;
 
+export const MIC_BUSY_MESSAGE = "Another chat is still recording. Release it there first, then try again.";
 export const MIC_DENIED_MESSAGE = "Voice input needs the microphone. Allow it in the system settings, or type your message.";
 export const TOO_SHORT_MESSAGE = "Hold the microphone button while you speak.";
 export const NOTHING_HEARD_MESSAGE = "No speech was heard in the recording.";

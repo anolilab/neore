@@ -8,6 +8,7 @@ import { settleQuietly } from "@/offline/quietly";
 
 import {
     MAX_CLIP_MS,
+    MIC_BUSY_MESSAGE,
     MIC_DENIED_MESSAGE,
     MIN_CLIP_MS,
     NOTHING_HEARD_MESSAGE,
@@ -265,8 +266,9 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
 
             await session.last;
 
-            // Another screen's press is recording (a chat opened over it during the hold): this one waits its turn.
+            // Another screen's press is still recording (a chat opened over it during the hold): this press is dropped.
             if (session.owner !== undefined) {
+                report(MIC_BUSY_MESSAGE);
                 isBusy.current = false;
 
                 return;
