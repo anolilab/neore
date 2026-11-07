@@ -95,6 +95,8 @@ export interface HostQueueState {
     sent: ReadonlyArray<string>;
     /** Streams the session itself has reported live: once it has, a session read without one means that stream ended. */
     sessionSeen: ReadonlyArray<string>;
+    /** Queued messages a send was made for. One whose answer was lost may be the turn running now, so Send now never stops a turn for it. */
+    tried: ReadonlyArray<string>;
 }
 
 export const INITIAL_HOST_QUEUE: HostQueueState = Object.freeze({
@@ -105,6 +107,7 @@ export const INITIAL_HOST_QUEUE: HostQueueState = Object.freeze({
     released: undefined,
     retired: [],
     sent: [],
+    tried: [],
     sessionSeen: [],
     liveSeen: [],
 }) as HostQueueState;
@@ -258,7 +261,13 @@ const onLive = (step: HostQueueStep, live: string | undefined): HostQueueStep =>
     // A turn that runs is awaited until it ends, whoever started it.
     const awaitsNothing = phase.kind === "idle" || (phase.kind === "awaiting-turn-end" && phase.streamId === undefined);
 
-    return { effects, state: awaitsNothing ? { ...next, phase: waitFor(live) } : next };
+    if (!awaitsNothing) {
+        return { effects, state: next };
+    }
+
+    // A turn this composer did not start shows up before a released message went: the release was made with no turn
+    // running, so how that turn ends decides again whether the message waits.
+    return { effects, state: { ...next, phase: waitFor(live), released: phase.kind === "idle" ? undefined : next.released } };
 };
 
 const onObserved = (state: HostQueueState, event: Extract<HostQueueEvent, { type: "observed" }>): HostQueueStep => {
@@ -435,6 +444,7 @@ export const stepHostQueue = (state: HostQueueState, event: HostQueueEvent): Hos
                 state: {
                     ...state,
                     phase: { endedDuring: false, itemId: event.itemId, kind: "sending", seenLive: [] },
+                    tried: remember(state.tried, event.itemId),
                     released: event.itemId !== undefined && event.itemId === state.released ? undefined : state.released,
                 },
             };
@@ -517,7 +527,8 @@ export const canEditQueued = (state: HostQueueState, itemId: string): boolean =>
 /**
  * What Send now does for a queued message: `interrupt` stops the running turn and sends it next (the Interrupt and send
  * path), `release` sends it next when no turn runs. `undefined` while a send or a stop is in flight, before the reads have
- * answered, while an accepted send's turn has not shown, or for a message the backend already took: it is sent once.
+ * answered, while an accepted send's turn has not shown, for a message the backend already took (it is sent once), and,
+ * while a turn runs, for a message a send was already tried for.
  */
 export const sendNowAction = (state: HostQueueState, gates: { itemId: string; running: boolean }): "interrupt" | "release" | undefined => {
     const { phase } = state;
@@ -532,5 +543,7 @@ export const sendNowAction = (state: HostQueueState, gates: { itemId: string; ru
 
     const turnKnown = phase.kind === "idle" || (phase.kind === "awaiting-turn-end" && phase.streamId !== undefined);
 
-    return turnKnown && gates.running && canInterruptAndSend() ? "interrupt" : undefined;
+    // A message tried before may be the very turn running (its answer was lost): stopping that turn and sending it again under
+    // its id would come back as a duplicate of the stopped turn, so it would never run. It goes after the turn ends instead.
+    return turnKnown && gates.running && !state.tried.includes(gates.itemId) && canInterruptAndSend() ? "interrupt" : undefined;
 };

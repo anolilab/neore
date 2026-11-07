@@ -593,7 +593,8 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     /**
      * Send now: the queued message moves to the head and goes next, through the same machine as everything else. With a turn
      * running it is Interrupt and send for that message; with none, it goes past a paused queue, which stays paused behind
-     * it. It keeps its id, so a send of it the backend already took comes back as a duplicate and starts nothing.
+     * it. It keeps its id, so a send of it the backend already took comes back as a duplicate and starts nothing; for the same
+     * reason, a message tried before never stops a turn (`sendNowAction`).
      */
     const sendNow = (itemId: string) => {
         const action = sendNowFor(itemId, machineRef.current);

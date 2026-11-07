@@ -582,6 +582,26 @@ describe("Send now", () => {
         expect(sendNowAction(stopping, { itemId: "b", running: true })).toBeUndefined();
     });
 
+    it("does not stop a turn for a message already tried, since that turn may be its own lost-answer send", () => {
+        const lost = run(
+            [{ itemId: "a", type: "send" }, { error: "unreachable", itemId: "a", live: undefined, type: "refused" }, observed("stream-a")],
+            IDLE,
+        ).state;
+
+        expect(sendNowAction(lost, { itemId: "a", running: true })).toBeUndefined();
+        expect(sendNowAction(lost, { itemId: "b", running: true })).toBe("interrupt");
+        // Once that turn has ended it goes under its own id, which the backend answers as a duplicate if it took it.
+        const ended = run([observed(undefined, ["stream-a", "finished"])], lost).state;
+
+        expect(sendNowAction(ended, { itemId: "a", running: false })).toBe("release");
+    });
+
+    it("holds a released message again when a turn from elsewhere starts before it went", () => {
+        const released = run([{ itemId: "b", type: "released" }], IDLE).state;
+
+        expect(run([observed("stream-other")], released).state.released).toBeUndefined();
+    });
+
     it("sends the message past a paused queue once, and keeps the rest paused", () => {
         const released = run([{ itemId: "b", type: "released" }], IDLE).state;
         const paused = { ...gates, headId: "b", paused: true };
