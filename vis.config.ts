@@ -139,7 +139,8 @@ export default defineConfig({
     // that debt is paid. Add it once `pnpm lint:eslint` is green.
     staged: {
         // Markdown is left out: CI does not check its formatting, so the hook would only churn tables.
-        "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,yml,yaml,css,html}": "prettier --config=.prettierrc.cjs --ignore-unknown --write",
+        "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,yml,yaml,css,html}":
+            "prettier --config=.prettierrc.cjs --ignore-path=.gitignore --ignore-path=.prettierignore --ignore-path=.prettierignore-hooks --ignore-unknown --write",
         // CI checks the key order of every package.json (`lint.yml`, "Types").
         "**/package.json": "sort-package-json",
     },

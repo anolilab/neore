@@ -57,11 +57,3 @@ apps/web/worker-configuration.d.ts
 # seven cases, and `lint:prettier:fix` would do it silently. They are generated
 # by `render()`, so their formatting is react-email's to choose, not ours.
 backend/lunora/email/templates/__fixtures__/
-
-# Projects without a `lint:prettier` task: CI never checks their formatting, and
-# their own ESLint style rules reject some of Prettier's output (apps/mobile). The
-# commit and push hooks run Prettier from the root, so they read this file.
-apps/desktop/
-apps/mobile/
-packages/client-runtime/
-packages/device-core-node/
