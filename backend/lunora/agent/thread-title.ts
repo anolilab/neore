@@ -50,6 +50,31 @@ const TITLE_WALK_LIMIT = 2 * TITLE_READ_WINDOW;
 
 const isSuccessful = (row: Doc<"messages">): boolean => row.status === "success";
 
+/**
+ * A model's answer as a title: trimmed, and cut at the stored title's limit without splitting a character, so an over-long answer is still written rather
+ * than failing validation on every try (which would give its charge back and pay for the same failing call on each retry).
+ */
+export const asTitle = (answer: string): string => {
+    const trimmed = answer.trim();
+
+    if (trimmed.length <= MAX_LENGTH.long) {
+        return trimmed;
+    }
+
+    // The limit counts UTF-16 units, as `length` does: whole code points are kept while they fit, so a surrogate pair is never split.
+    let cut = "";
+
+    for (const character of trimmed) {
+        if (cut.length + character.length > MAX_LENGTH.long) {
+            break;
+        }
+
+        cut += character;
+    }
+
+    return cut.trimEnd();
+};
+
 /** One admission per title run for billing (`idempotencyClaims`): a retried run finds it, so its model call is not billed twice. */
 export const TITLE_CHARGE_SCOPE = "title-charge";
 export const TITLE_CHARGE_TTL_MS = 24 * 60 * 60 * 1000;

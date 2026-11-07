@@ -49,7 +49,7 @@ import type { UIMessage } from "../agent/ui-messages";
 import { docsToModelMessages, listMessagesByThreadIdHandler, storeFile, toUIMessages } from "../agent/client";
 import { autoRepairJsonMiddleware } from "../agent/client/middleware";
 import { listActivePathPage, withBranchInfo } from "../agent/branches";
-import { dispatchStillHeld, TITLE_CHARGE_SCOPE, titleRequestDeadline } from "../agent/thread-title";
+import { asTitle, dispatchStillHeld, TITLE_CHARGE_SCOPE, titleRequestDeadline } from "../agent/thread-title";
 import { candidatesOnActivePath } from "../agent/branch-rows";
 import {
     redactThreadForPublicViewer,
@@ -1827,7 +1827,7 @@ const writeGeneratedTitle = async (
             throw error;
         }
 
-        title = textResult.text.trim();
+        title = asTitle(textResult.text);
         usage = textResult.usage;
 
         // A blank answer (a reply spent on reasoning, or filtered) is no title: the chat keeps the one it has, and nothing is recorded.

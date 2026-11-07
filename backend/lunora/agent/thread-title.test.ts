@@ -13,6 +13,7 @@ import schema from "../schema";
 import { BRANCH_ROOT } from "./branch-tree";
 import {
     admitTitleRun,
+    asTitle,
     beginTitleDispatch,
     clearRecordedTitleAnswers,
     readTitlePrompt,
@@ -636,5 +637,25 @@ describe("who a pending title answer belongs to", () => {
         }[];
 
         expect(claims.find((claim) => claim.scope === TITLE_ANSWER_SCOPE && claim.key === key)?.userId).toBe(OWNER);
+    });
+});
+
+describe("a model's answer as a title", () => {
+    it("is trimmed, and an over-long one is cut at the stored title's limit so it can still be written", () => {
+        expect(asTitle("  Lisbon trip \n")).toBe("Lisbon trip");
+        expect(asTitle(" ".repeat(3))).toBe("");
+
+        const long = asTitle("x".repeat(MAX_LENGTH.long + 500));
+
+        expect(long).toHaveLength(MAX_LENGTH.long);
+    });
+
+    it("never cuts a surrogate pair in half", () => {
+        const title = asTitle(`x${"😀".repeat(MAX_LENGTH.long)}`);
+
+        // Within the limit as `length` counts it, and the cut lands between two whole emoji.
+        expect(title.length).toBeLessThanOrEqual(MAX_LENGTH.long);
+        expect(title.length).toBeGreaterThan(MAX_LENGTH.long - 2);
+        expect(title.endsWith("😀")).toBe(true);
     });
 });
