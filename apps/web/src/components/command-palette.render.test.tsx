@@ -17,6 +17,8 @@ const harness = vi.hoisted(() => {
         navigate: vi.fn(),
         scrollToMessage: vi.fn(),
         searchArgs: [] as unknown[],
+        /** The thread rows the palette lists; a test may replace them. */
+        threads: [{ _id: "thread-1", status: "active", title: "Alpha plan" }] as Record<string, unknown>[],
     };
 });
 
@@ -105,7 +107,7 @@ vi.mock("@/features/chat/thread/message-list", () => {
 vi.mock("@/features/chat/core/hooks/use-all-threads-data", () => {
     return {
         default: () => {
-            return { lunora: [{ _id: "thread-1", status: "active", title: "Alpha plan" }] };
+            return { lunora: harness.threads };
         },
     };
 });
@@ -300,5 +302,56 @@ describe("command palette message search", () => {
         await waitFor(() => expect(harness.navigate).toHaveBeenCalledTimes(1));
         expect(harness.navigate).toHaveBeenCalledWith({ hash: "message-message-9", params: { threadId: "thread-2" }, search: {}, to: "/chat/$threadId" });
         expect(harness.scrollToMessage).toHaveBeenCalledWith("message-9", { position: { order: 3, stepOrder: 0 }, threadId: "thread-2" });
+    });
+});
+
+describe("command palette state tags", () => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const NOW = 1_800_000_000_000;
+
+    beforeEach(() => {
+        Element.prototype.getAnimations = () => [];
+        vi.stubGlobal(
+            "ResizeObserver",
+            class {
+                disconnect = vi.fn();
+
+                observe = vi.fn();
+
+                unobserve = vi.fn();
+            },
+        );
+    });
+
+    afterEach(() => {
+        act(() => {
+            useCommandDialogStore.getState().close();
+        });
+        harness.threads = [{ _id: "thread-1", status: "active", title: "Alpha plan" }];
+        vi.useRealTimers();
+    });
+
+    it("drops a thread from #snoozed once a snooze longer than one timer allows has ended, with the palette left open", () => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date", "setTimeout", "clearTimeout"] });
+        // Thirty days: past the longest delay one timer takes, so the palette needs a second timer to see the snooze end.
+        harness.threads = [{ _id: "thread-s", snoozedUntil: NOW + 30 * DAY_MS, status: "active", title: "Later plan" }];
+        renderPalette();
+
+        act(() => {
+            useCommandDialogStore.getState().openCommandPalette();
+        });
+
+        fireEvent.change(screen.getByRole("combobox"), { target: { value: "#snoozed" } });
+
+        expect(screen.getByText("Later plan")).toBeTruthy();
+
+        act(() => {
+            vi.advanceTimersByTime(25 * DAY_MS);
+        });
+        act(() => {
+            vi.advanceTimersByTime(6 * DAY_MS);
+        });
+
+        expect(screen.queryByText("Later plan")).toBeNull();
     });
 });

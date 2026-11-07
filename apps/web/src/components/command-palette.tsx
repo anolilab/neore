@@ -65,7 +65,7 @@ import { useCommandDialogActions, useCommandDialogState, useCommandDialogStore }
 const MESSAGE_SEARCH_MIN_CHARS = 2;
 const MESSAGE_SEARCH_DEBOUNCE_MS = 250;
 const MAX_MESSAGE_HITS = 8;
-/** The longest delay setTimeout accepts; a later wake re-arms when this one fires. */
+/** The longest delay setTimeout accepts; a timer capped by it re-arms when it fires (the effect reads `now`). */
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
 const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
@@ -226,7 +226,8 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         return () => {
             clearTimeout(timer);
         };
-    }, [isOpen, snoozeWake]);
+        // `now` too: a wake past the timer's cap fires early with the same next wake, and must arm the next timer.
+    }, [isOpen, now, snoozeWake]);
 
     const allThreads: ThreadItem[] = ((): ThreadItem[] => {
         const threads: ThreadItem[] = [];
