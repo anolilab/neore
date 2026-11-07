@@ -156,6 +156,24 @@ describe("a tool-approval continuation", () => {
 
         expect((recorded as unknown[] | undefined)?.[1]).toMatchObject({ config: { memory: CARRIED } });
     });
+
+    it("hands the next approval the permission keys and fingerprints of the tools IT offered, not the first run's", async () => {
+        const rebuilt = { mcpToolFingerprints: { mcp_docs__search: "new" }, permissionKeys: { mcp_docs__search: "mcp:docs (work):search" } };
+
+        vi.mocked(buildAgentTools).mockImplementationOnce(async () => {
+            return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], repeatable: [], tools: {}, ...rebuilt };
+        });
+
+        const { runMutation } = await resume(
+            { ...BASE_CONFIG, mcpToolFingerprints: { mcp_docs__search: "old" }, toolPermissionKeys: { mcp_docs__search: "mcp:docs:search" } },
+            [pausedAgain],
+        );
+        const recorded = runMutation.mock.calls.find((call) => (call as unknown[])[0] === internal.chat.tool_permissions.recordPendingToolApprovals);
+
+        expect((recorded as unknown[] | undefined)?.[1]).toMatchObject({
+            config: { mcpToolFingerprints: rebuilt.mcpToolFingerprints, toolPermissionKeys: rebuilt.permissionKeys },
+        });
+    });
 });
 
 const jobs0 = (run: { jobs: (ref: unknown) => unknown[] }) => run.jobs(internal.memory.extract.extractMemories);
