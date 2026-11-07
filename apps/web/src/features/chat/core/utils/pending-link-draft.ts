@@ -109,6 +109,23 @@ export const takePendingLinkDraft = (userId: string | null, now: number = Date.n
     }
 };
 
+/** The prompt kept for a visit, read without taking it: the scrubber must know it, because it sits in storage the error report copies. */
+export const peekPendingLinkDraftPrompt = (): string | undefined => {
+    try {
+        const raw = sessionStorage.getItem(KEY);
+
+        if (raw === null) {
+            return undefined;
+        }
+
+        const parsed: unknown = JSON.parse(raw);
+
+        return isStoredPendingLinkDraft(parsed) ? parsed.prompt : undefined;
+    } catch {
+        return undefined;
+    }
+};
+
 /** Removes the kept draft: the composer it came from has been sent or cleared, so it is no longer a draft to restore. */
 export const clearPendingLinkDraft = (): void => {
     remove();

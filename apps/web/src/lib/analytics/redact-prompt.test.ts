@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildPromptLink } from "@/features/chat/core/utils/prompt-link";
 
+import { rememberLinkedPrompt } from "./linked-prompts";
 import { redactPromptFromEvent, redactPromptFromUrl } from "./redact-prompt";
 
 const SECRET = "Summarise the confidential merger plan";
@@ -441,5 +442,46 @@ describe("a fragment too long to scan", () => {
 
         expect(() => redactPromptFromUrl(input)).not.toThrow();
         expect(redactPromptFromUrl(input)).not.toContain("secret");
+    });
+});
+
+describe("a linked draft's text in an error report", () => {
+    it("is scrubbed from an error's message, its stack and its context, and the page's address is kept", () => {
+        rememberLinkedPrompt("draft about the quarterly plan");
+
+        const event = {
+            event: "$exception",
+            properties: {
+                $current_url: "https://app.example.com/chat",
+                $exception_list: [
+                    {
+                        stacktrace: { frames: [{ context_line: "send('draft about the quarterly plan')", filename: "app.js" }] },
+                        type: "Error",
+                        value: "Could not send: draft about the quarterly plan",
+                    },
+                ],
+                context: { draft: "draft about the quarterly plan" },
+            },
+        };
+
+        const cleaned = redactPromptFromEvent(event);
+
+        expect(JSON.stringify(cleaned)).not.toContain("quarterly plan");
+        expect(cleaned?.properties.$current_url).toBe("https://app.example.com/chat");
+    });
+
+    it("is scrubbed from the stored JSON copy of a draft that has quotes in it, as the error boundary's storage snapshot holds it", () => {
+        rememberLinkedPrompt('say "hello" to the whole team');
+
+        const event = {
+            event: "$exception",
+            properties: {
+                sessionStorage: {
+                    "neore.pendingLinkDraft": JSON.stringify({ prompt: 'say "hello" to the whole team', savedAt: 1, userId: null }),
+                },
+            },
+        };
+
+        expect(JSON.stringify(redactPromptFromEvent(event))).not.toContain("hello");
     });
 });

@@ -21,6 +21,7 @@ import { savedPromptDraft } from "@/features/prompts/lib/prompt-draft";
 import validatePromptSettings from "@/features/prompts/lib/prompt-validation";
 import { useComposerModelEntries, useLinkWaitOver } from "@/hooks/use-composer-models";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
+import { rememberLinkedPrompt } from "@/lib/analytics/linked-prompts";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 // Module scope, so it outlives this component's mounts: a page load resumes once.
@@ -256,6 +257,7 @@ const ChatPage = () => {
 
         if (taken !== undefined && !otherDraftSource && !hasDraft) {
             setComposerText(promptFromLink(taken.prompt));
+            rememberLinkedPrompt(promptFromLink(taken.prompt));
         }
     }, [addressHasLink, isSessionPending, latestResolved, linkWaitOver, otherDraftSource, resumeLastChat, savedPromptPending, sessionUserId]);
 

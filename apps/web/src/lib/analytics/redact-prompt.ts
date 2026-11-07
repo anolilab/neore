@@ -9,6 +9,8 @@
  * for byte. An event that names no prompt is returned as the same object, so nothing is copied for it.
  */
 
+import { linkedPromptTexts } from "./linked-prompts";
+
 /** A prompt parameter's text, in decoded text: a `prompt=` that starts a query or a fragment, or follows `?`, `&` or `#`. */
 const PROMPT_PARAMETER = /(?:^|[?&#])prompt=/i;
 
@@ -178,10 +180,33 @@ export const redactPromptFromUrl = (value: string): string => {
 };
 
 /**
+ * A linked prompt's text. A long one is matched inside a string, and a short one only as the whole string, so a common word that is also
+ * a short prompt does not scrub every event it appears in. The JSON-escaped form is matched too: the text is copied into stored JSON.
+ */
+const MIN_SUBSTRING_PROMPT_CHARS = 12;
+
+/** What a linked prompt's text is replaced with, in a string that carries it. */
+const REDACTED_TEXT = "[redacted]";
+
+const namesLinkedPrompt = (value: string, prompts: ReadonlyArray<string>): boolean =>
+    prompts.some((prompt) => {
+        const escaped = JSON.stringify(prompt).slice(1, -1);
+
+        return value === prompt || (prompt.length >= MIN_SUBSTRING_PROMPT_CHARS && (value.includes(prompt) || value.includes(escaped)));
+    });
+
+/** One string, cleaned of its prompt parameters, and replaced whole when it still carries a linked prompt's text. */
+const redactText = (text: string, prompts: ReadonlyArray<string>): string => {
+    const cleaned = redactPromptFromUrl(text);
+
+    return namesLinkedPrompt(cleaned, prompts) ? REDACTED_TEXT : cleaned;
+};
+
+/**
  * Whether any string in an event names a prompt, as a value or as a property name, at any depth. Walks with an explicit stack, so depth is
  * not a limit and a deep event cannot overflow the call stack. A value seen once is not walked again.
  */
-const containsPrompt = (root: unknown): boolean => {
+const containsPrompt = (root: unknown, prompts: ReadonlyArray<string>): boolean => {
     const stack: unknown[] = [root];
     const seen = new Set<object>();
 
@@ -189,7 +214,7 @@ const containsPrompt = (root: unknown): boolean => {
         const value = stack.pop();
 
         if (typeof value === "string") {
-            if (mayNamePrompt(value) && PROMPT_ASSIGNMENT.test(decodeFully(value))) {
+            if ((mayNamePrompt(value) && PROMPT_ASSIGNMENT.test(decodeFully(value))) || namesLinkedPrompt(value, prompts)) {
                 return true;
             }
 
@@ -212,7 +237,7 @@ const containsPrompt = (root: unknown): boolean => {
 
         if (isPlainObject(value)) {
             for (const [key, item] of Object.entries(value)) {
-                if (mayNamePrompt(key) && PROMPT_ASSIGNMENT.test(decodeFully(key))) {
+                if ((mayNamePrompt(key) && PROMPT_ASSIGNMENT.test(decodeFully(key))) || namesLinkedPrompt(key, prompts)) {
                     return true;
                 }
 
@@ -228,22 +253,22 @@ const containsPrompt = (root: unknown): boolean => {
  * The event with its prompt text removed, and every other field kept. A subtree that names no prompt is returned as it is, so an event
  * without a prompt comes back unchanged, and nothing below a depth is dropped. Only the path to a prompt is rebuilt.
  */
-const redactDeep = (value: unknown): unknown => {
+const redactDeep = (value: unknown, prompts: ReadonlyArray<string>): unknown => {
     if (typeof value === "string") {
-        return redactPromptFromUrl(value);
+        return redactText(value, prompts);
     }
 
-    if (value === null || typeof value !== "object" || !containsPrompt(value)) {
+    if (value === null || typeof value !== "object" || !containsPrompt(value, prompts)) {
         return value;
     }
 
     if (Array.isArray(value)) {
-        return value.map((item) => redactDeep(item));
+        return value.map((item) => redactDeep(item, prompts));
     }
 
     if (isPlainObject(value)) {
         // A property name is text too: one built from a link carries its prompt, so the name is cleaned as a value is.
-        return Object.fromEntries(Object.entries(value).map(([key, item]) => [redactPromptFromUrl(key), redactDeep(item)]));
+        return Object.fromEntries(Object.entries(value).map(([key, item]) => [redactText(key, prompts), redactDeep(item, prompts)]));
     }
 
     return value;
@@ -254,14 +279,14 @@ const redactDeep = (value: unknown): unknown => {
  * prompt in them is not readable here. A snapshot is therefore dropped when its page URL names a prompt, or when any plain string
  * in it does (the page's own address, recorded in a plain meta event, is one of them).
  */
-const isPromptSnapshot = (event: unknown): boolean => {
+const isPromptSnapshot = (event: unknown, prompts: ReadonlyArray<string>): boolean => {
     if (!isPlainObject(event) || event.event !== "$snapshot") {
         return false;
     }
 
     const properties = isPlainObject(event.properties) ? event.properties : {};
 
-    return containsPrompt(properties.$current_url) || containsPrompt(properties.$snapshot_data);
+    return containsPrompt(properties.$current_url, prompts) || containsPrompt(properties.$snapshot_data, prompts);
 };
 
 /**
@@ -269,9 +294,12 @@ const isPromptSnapshot = (event: unknown): boolean => {
  * for an event that must not be sent at all (a recording snapshot of a prompt link's page), which PostHog then drops.
  */
 export const redactPromptFromEvent = <T>(event: T): T | null => {
-    if (isPromptSnapshot(event)) {
+    // Every linked prompt on the page, and the one kept for a visit: an error report that quotes a draft is scrubbed like a URL.
+    const prompts = linkedPromptTexts();
+
+    if (isPromptSnapshot(event, prompts)) {
         return null;
     }
 
-    return redactDeep(event) as T;
+    return redactDeep(event, prompts) as T;
 };

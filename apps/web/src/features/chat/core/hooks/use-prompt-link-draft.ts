@@ -3,6 +3,7 @@ import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 
+import { rememberLinkedPrompt } from "@/lib/analytics/linked-prompts";
 import { showWarning } from "@/lib/toast";
 
 import { useChatUIStore } from "../stores/chat-ui-store";
@@ -125,6 +126,7 @@ export const usePromptLinkDraft = ({
                 showWarning(t`Your draft is kept. The prompt from the link was not added.`);
             } else {
                 setComposerText(promptFromLink(prompt));
+                rememberLinkedPrompt(promptFromLink(prompt));
                 onApplied?.({ prompt });
             }
         }
