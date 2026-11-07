@@ -29,6 +29,11 @@ const isTextPart = (part: unknown): part is { text: string; type: "text" } =>
 
 /** Whether a text part is the placeholder sent for a file with no question ({@link fileOnlyPromptPart}), known by its tag, not its wording. */
 const isFileOnlyPlaceholder = (part: unknown): boolean => {
+    // A stored part may be anything, null included: only an object can carry the tag.
+    if (typeof part !== "object" || part === null) {
+        return false;
+    }
+
     const options = (part as { providerOptions?: { neore?: { fileOnlyPrompt?: unknown } } }).providerOptions;
 
     return options?.neore?.fileOnlyPrompt === true;

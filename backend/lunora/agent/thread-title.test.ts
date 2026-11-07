@@ -610,3 +610,31 @@ describe("failed rows and the window", () => {
         await expect(writeTitle(threadId, "Old", { promptId: prompt, requestedBy: OWNER })).resolves.toBe(true);
     }, 60_000);
 });
+
+describe("who a pending title answer belongs to", () => {
+    it("is the chat's owner, also for a regenerate an admin grantee asked for, so erasing the owner erases it", async () => {
+        const threadId = await threadWith();
+        const key = `${threadId}:run`;
+        const prompt = await rowIn(threadId)(1, { message: { content: "Plan a trip", role: "user" } });
+
+        await harness.run(
+            async (context: any) => await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "admin", threadId, userId: GRANTEE }),
+        );
+
+        // The run is charged to the owner (`userId`), whoever asked for it (`requestedBy`).
+        const { claimedAt } = await admit(threadId, key, { promptId: prompt, requestedBy: GRANTEE });
+
+        await harness.run(
+            async (context: any) =>
+                await context.runMutation(recordTitleAnswer as never, { chargeKey: key, claimedAt, promptId: prompt, title: "Lisbon trip" }),
+        );
+
+        const claims = (await harness.run(async (context: any) => await context.db.query("idempotencyClaims").collect())) as {
+            key: string;
+            scope: string;
+            userId?: string;
+        }[];
+
+        expect(claims.find((claim) => claim.scope === TITLE_ANSWER_SCOPE && claim.key === key)?.userId).toBe(OWNER);
+    });
+});

@@ -110,6 +110,12 @@ describe("a message with attached text and a question", () => {
         expect(firstUserPromptText([{ message: { content, role: "user" } }])).toBe("[Document: notes.pdf]\n\nQuarterly figures");
     });
 
+    it("reads past a part that is null or not an object, instead of throwing", () => {
+        const content = [null, 7, fileOnlyPromptPart(), { text: "What is the total?", type: "text" }];
+
+        expect(firstUserPromptText([{ message: { content, role: "user" } }])).toBe("What is the total?");
+    });
+
     it("takes the same words as the question when the person typed them", () => {
         const content = [documentTextPart("notes.pdf", "Quarterly figures"), { text: FILE_ONLY_PROMPT, type: "text" }];
 
