@@ -1,7 +1,15 @@
 import { createConfig } from "@anolilab/eslint-config";
 
 const config = await createConfig({
-    ignores: ["./src/acp/testing/fake-agent.mjs", "./dist/**", "./release/**", "./test-results/**", "./playwright-report/**", "./.eslint.cache.json", "./electron-builder.yml"],
+    ignores: [
+        "./src/acp/testing/fake-agent.mjs",
+        "./dist/**",
+        "./release/**",
+        "./test-results/**",
+        "./playwright-report/**",
+        "./.eslint.cache.json",
+        "./electron-builder.yml",
+    ],
     typescript: {
         ignoresTypeAware: ["*.json", "*.md"],
         isTypeAware: false,
@@ -40,6 +48,25 @@ export default [
             // Two rules that order class members in opposite ways (private first, public first); the TypeScript one
             // stays, and a class reads top-down from its public methods.
             "unicorn/consistent-class-member-order": "off",
+        },
+    },
+    {
+        /**
+         * Prettier owns formatting: the pre-push hook checks every changed file with it. These rules disagree with the
+         * output Prettier produces, so "fixing" one means writing code Prettier reformats back, as in `packages/chat-ui`.
+         * Found by formatting all of `src/` with Prettier and linting the result: these seven rules made every new
+         * finding.
+         */
+        files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+        name: "neore/desktop/prettier",
+        rules: {
+            "@stylistic/indent": "off",
+            "@stylistic/no-extra-parens": "off",
+            "@stylistic/operator-linebreak": "off",
+            "@stylistic/quotes": "off",
+            "antfu/consistent-chaining": "off",
+            "antfu/consistent-list-newline": "off",
+            "unicorn/number-literal-case": "off",
         },
     },
     {

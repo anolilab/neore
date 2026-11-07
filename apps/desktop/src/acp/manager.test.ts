@@ -24,22 +24,26 @@ let scratch: Scratch;
 let manager: AcpManager;
 const plans: { env: Record<string, string>; folder: string | null; key: string }[] = [];
 
-const make = (env: Record<string, string> = {}, options: { cancelGraceMs?: number; plan?: (key: string, folder: string | null) => SpawnPlan } = {}): AcpManager => new AcpManager({
-    appVersion: "9.9.9",
-    cancelGraceMs: options.cancelGraceMs ?? 400,
-    onChange: () => {},
-    plan:
-            options.plan
-            ?? ((key, folder) => {
+const make = (
+    env: Record<string, string> = {},
+    options: { cancelGraceMs?: number; plan?: (key: string, folder: string | null) => SpawnPlan } = {},
+): AcpManager =>
+    new AcpManager({
+        appVersion: "9.9.9",
+        cancelGraceMs: options.cancelGraceMs ?? 400,
+        onChange: () => {},
+        plan:
+            options.plan ??
+            ((key, folder) => {
                 const plan = scratch.plan(env, folder);
 
                 plans.push({ env: plan.env, folder, key });
 
                 return plan;
             }),
-    spawn: spawnAgent,
-    startupTimeoutMs: 8000,
-});
+        spawn: spawnAgent,
+        startupTimeoutMs: 8000,
+    });
 
 const start = (target: AcpManager = manager): Promise<string> => target.startSession("fake", "Fake", scratch.work);
 
@@ -71,6 +75,21 @@ afterEach(() => {
 });
 
 describe("a session", () => {
+    it("closes the session it still runs for a thread when the backend starts the next one in that thread", async () => {
+        const first = await manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-1", threadId: "thread-1" });
+
+        await idle(first);
+
+        const second = await manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-2", threadId: "thread-1" });
+        const other = await manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-3", threadId: "thread-2" });
+
+        await idle(second);
+        await idle(other);
+
+        expect(snapshot(first).status).toBe("ended");
+        expect(scratch.violations()).toEqual([]);
+    });
+
     it("answers a prompt", async () => {
         const id = await start();
 
@@ -82,7 +101,10 @@ describe("a session", () => {
         // The host advertises no file system and no terminal.
         const init = scratch.log().find((entry) => entry.received?.method === "initialize");
 
-        expect(init?.received?.params).toMatchObject({ clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false }, protocolVersion: 1 });
+        expect(init?.received?.params).toMatchObject({
+            clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+            protocolVersion: 1,
+        });
         expect(scratch.log().find((entry) => entry.sessionNew !== undefined)?.sessionNew).toEqual({ cwd: scratch.work, mcpServers: [] });
     });
 
@@ -96,7 +118,7 @@ describe("a session", () => {
         await idle(id);
 
         expect(snapshot(id).turns.map((turn) => turn.text)).toEqual(["working", "second", "third"]);
-        expect(scratch.log().flatMap((entry) => entry.prompt === undefined ? [] : [entry.prompt])).toEqual(["slow", "echo second", "echo third"]);
+        expect(scratch.log().flatMap((entry) => (entry.prompt === undefined ? [] : [entry.prompt]))).toEqual(["slow", "echo second", "echo third"]);
         expect(scratch.violations()).toEqual([]);
     });
 
@@ -134,7 +156,7 @@ describe("a session", () => {
         // The agent sent `in_progress` for the call after the cancel: it stays cancelled.
         expect(finished.turns[0].tools.map((tool) => tool.status)).toEqual(["cancelled"]);
         // Stop released nothing later.
-        expect(scratch.log().flatMap((entry) => entry.prompt === undefined ? [] : [entry.prompt])).toEqual(["tool"]);
+        expect(scratch.log().flatMap((entry) => (entry.prompt === undefined ? [] : [entry.prompt]))).toEqual(["tool"]);
         expect(scratch.log().filter((entry) => entry.cancel !== undefined)).toHaveLength(1);
         expect(scratch.violations()).toEqual([]);
         target.killAll();
@@ -207,8 +229,12 @@ describe("an agent that answers a prompt with an error", () => {
 describe("an approval that is taken away", () => {
     const view = (consents: { agentKey: string; folderPath: string }[], agents = ["fake"]) => {
         return {
-            agents: agents.map((key) => { return { args: [], command: "x", envNames: [], install: null, key, label: key }; }),
-            consents: consents.map((consent) => { return { ...consent, folderId: "f", folderLabel: "work" }; }),
+            agents: agents.map((key) => {
+                return { args: [], command: "x", envNames: [], install: null, key, label: key };
+            }),
+            consents: consents.map((consent) => {
+                return { ...consent, folderId: "f", folderLabel: "work" };
+            }),
         };
     };
 
@@ -342,9 +368,9 @@ describe("the environment", () => {
         await idle(id, target);
 
         // macOS adds this one to every process it starts; it is not the app's.
-        const names = Object.keys(JSON.parse(snapshot(id, target).turns[0].text) as Record<string, string>)
-            .filter((name) => name !== "__CF_USER_TEXT_ENCODING")
-            ;
+        const names = Object.keys(JSON.parse(snapshot(id, target).turns[0].text) as Record<string, string>).filter(
+            (name) => name !== "__CF_USER_TEXT_ENCODING",
+        );
 
         expect(new Set(names)).toEqual(new Set(["FAKE_AGENT_LOG", "ONLY_FOR_THIS_AGENT", "PATH"]));
         vi.unstubAllEnvs();
@@ -400,7 +426,7 @@ describe("an agent that echoes its environment in a reply", () => {
         const { text } = snapshot(id, target).turns[0];
 
         expect(text).not.toContain(SENTINEL);
-        expect(text).toContain("\"API_KEY\":\"***\"");
+        expect(text).toContain('"API_KEY":"***"');
         expect(text).toContain(JSON.stringify(scratch.logFile).slice(1, -1));
         target.killAll();
     });

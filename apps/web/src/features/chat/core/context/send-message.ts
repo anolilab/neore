@@ -22,7 +22,7 @@ import { useModelStore } from "../stores/model-store";
 import { newChatTemporaryFields } from "../utils/new-chat-temporary";
 import type { ReadinessGate } from "../utils/readiness-gate";
 import type { ChangedSettings, ChatActionBase } from "./chat-action-shared";
-import { localModelError, withoutMessage } from "./chat-action-shared";
+import { afterLastContextReset, localModelError, withoutMessage } from "./chat-action-shared";
 import type { ThreadData, ThreadRow } from "./chat-context-types";
 import type { GatewayErrorBody, GatewayInfo } from "./chat-gateway";
 import { CHAT_STREAM_URL, gatewayError, pendingGatewayInfo, validateGatewayUrl } from "./chat-gateway";
@@ -175,7 +175,7 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
         trackEvent("message_sent", { attachment_count: 0, has_attachments: false, model, thread_mode: "text" });
 
         await sendLocalTurn({
-            history: messagesRef.current.filter((m) => m.id !== optimisticId),
+            history: afterLastContextReset(messagesRef.current.filter((m) => m.id !== optimisticId)),
             language: isCreatingNewThread ? pendingSettings?.language || defaultLanguage : undefined,
             onNotSaved: restoreComposer,
             onSaved: ({ isNewThread: createdThread, message, threadId: savedThreadId }) => {

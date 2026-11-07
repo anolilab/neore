@@ -13,6 +13,7 @@
  */
 import { toStorageRef } from "../lib/storage-ref";
 import { agentSwitchOf } from "./agent-switch-logic";
+import { isContextResetRow } from "./context-reset-shape";
 import { storageRefsForUrls } from "../lib/storage-sign";
 import { convertBase64ToUint8Array, convertUint8ArrayToBase64, type ProviderOptions, type ReasoningPart, type ToolResultOutput } from "@ai-sdk/provider-utils";
 import type {
@@ -142,6 +143,8 @@ export const docsToModelMessages = (messages: MessageDoc[]): ModelMessage[] =>
     messages
         // A switch divider is for the transcript; no model is shown it.
         .filter((m) => agentSwitchOf(m) === undefined)
+        // Nor is a context reset: what comes before it is cut by the reader, not shown as text.
+        .filter((m) => !isContextResetRow(m))
         .map((m) => m.message)
         .filter((m) => !!m)
         .filter((m) => m.content.length > 0)
