@@ -267,6 +267,38 @@ describe("reviewGoalRound", () => {
         expect((await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId))).status).toBe("active");
     });
 
+    it("keeps a snooze the owner sets between a failed review's give-back and the end of the job", async () => {
+        const key = "chat_goals_internal:failGoalReview";
+        const original = registry.get(key);
+        const snoozedUntil = Date.now() + 60 * 60 * 1000;
+
+        // The owner snoozes the thread right after the give-back commits, in the gap a second thread write would land in.
+        registry.set(
+            key,
+            internalMutation
+                .input({ goalId: v.string(), reason: v.string(), round: v.number() })
+                .output(v.boolean())
+                .mutation(async ({ args, ctx }: any) => {
+                    const failed = await ctx.runMutation(original, args);
+                    const owned = await ctx.db.get("threadGoals", args.goalId);
+
+                    await ctx.db.patch("threads", owned.threadId, { snoozedUntil });
+
+                    return failed;
+                }),
+        );
+        modelState.failWith = new Error("gateway down");
+
+        try {
+            await review();
+        } finally {
+            registry.set(key, original);
+        }
+
+        expect(await goal()).toMatchObject({ status: "stopped", stopReason: "review_failed" });
+        expect(await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId))).toMatchObject({ snoozedUntil, status: "active" });
+    });
+
     it("leaves the thread alone when the goal was ended while the reviewer failed", async () => {
         const { internal } = await import("../../_generated/internal");
 
