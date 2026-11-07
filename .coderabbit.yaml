@@ -1,0 +1,28 @@
+# CodeRabbit review configuration
+# https://docs.coderabbit.ai/reference/configuration
+#
+# Reviews hold changed code to the same rules the agents follow, and skip
+# generated output.
+language: "en-US"
+reviews:
+    high_level_summary: false
+    request_changes_workflow: false
+    auto_review:
+        enabled: true
+    path_filters:
+        - "!backend/lunora/_generated/**"
+        - "!apps/web/src/locales/**"
+        - "!**/CHANGELOG.md"
+        - "!pnpm-lock.yaml"
+    path_instructions:
+        - path: "**/*.{ts,tsx}"
+          instructions: "Hold changed code to docs/agents/review-checklist.md and to the AGENTS.md next to it. Report concrete failures only."
+        - path: "**/*.test.{ts,tsx}"
+          instructions: "Hold changed tests to docs/agents/testing.md. Ask only for fewer or smaller tests, never for more coverage."
+knowledge_base:
+    code_guidelines:
+        enabled: true
+        filePatterns:
+            - "docs/agents/review-checklist.md"
+            - "docs/agents/testing.md"
+            - "**/AGENTS.md"

@@ -12,7 +12,8 @@
         "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
         "lint:prettier": "prettier --check . --ignore-path ../../.prettierignore",
         "lint:prettier:fix": "prettier --write . --ignore-path ../../.prettierignore",
-        "lint:types": "tsc --noEmit"
+        "lint:types": "tsc --noEmit",
+        "lint:types:fast": "tsrs --noEmit"
     },
     "dependencies": {
         "@hono/swagger-ui": "catalog:server",

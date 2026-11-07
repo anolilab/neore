@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { RUN_STALE_MS, RUN_WATCH_MS } from "../chat/lib/interrupted-run";
 import {
     applyToolAllowlist,
+    beatWatchDecision,
     buildResultMessage,
     resultContent,
     canNest,
@@ -372,5 +374,45 @@ describe(originOfRun, () => {
         expect(originOfRun("outside_agent")).toBe("outside_agent");
         expect(originOfRun("user")).toBe("lead");
         expect(originOfRun(undefined)).toBe("lead");
+    });
+});
+
+describe(beatWatchDecision, () => {
+    const startedAt = 1_000_000;
+
+    it("reads a running loop silent for the stale window as dead, counting from its claim before the first beat", () => {
+        expect(beatWatchDecision({ now: startedAt + RUN_STALE_MS, run: { startedAt, status: "running" } })).toStrictEqual({ kind: "dead" });
+        expect(beatWatchDecision({ now: startedAt + RUN_STALE_MS, run: { beatAt: startedAt + 60_000, startedAt, status: "running" } })).toStrictEqual({
+            delayMs: 60_000,
+            kind: "later",
+        });
+    });
+
+    it("reads a loop that still saves rows as alive, though its beats do not land", () => {
+        expect(beatWatchDecision({ lastActivityAt: startedAt + 60_000, now: startedAt + RUN_STALE_MS, run: { startedAt, status: "running" } })).toStrictEqual({
+            delayMs: 60_000,
+            kind: "later",
+        });
+    });
+
+    it("looks again when the beat would go stale, never sooner than a watch interval", () => {
+        expect(beatWatchDecision({ now: startedAt + 10_000, run: { beatAt: startedAt + 10_000, startedAt, status: "running" } })).toStrictEqual({
+            delayMs: RUN_STALE_MS,
+            kind: "later",
+        });
+        expect(beatWatchDecision({ now: startedAt + RUN_STALE_MS - 1, run: { startedAt, status: "running" } })).toStrictEqual({
+            delayMs: RUN_WATCH_MS,
+            kind: "later",
+        });
+    });
+
+    it("watches a stopped worker's loop until it exits, but not a stopped one-shot run's, an ended run or a queued one", () => {
+        const now = startedAt + RUN_STALE_MS;
+
+        expect(beatWatchDecision({ now, run: { mode: "worker", startedAt, status: "cancelled" } })).toStrictEqual({ kind: "dead" });
+        expect(beatWatchDecision({ now, run: { loopExitedAt: now, mode: "worker", startedAt, status: "cancelled" } })).toStrictEqual({ kind: "skip" });
+        expect(beatWatchDecision({ now, run: { startedAt, status: "cancelled" } })).toStrictEqual({ kind: "skip" });
+        expect(beatWatchDecision({ now, run: { startedAt, status: "succeeded" } })).toStrictEqual({ kind: "skip" });
+        expect(beatWatchDecision({ now, run: { status: "queued" } })).toStrictEqual({ kind: "skip" });
     });
 });

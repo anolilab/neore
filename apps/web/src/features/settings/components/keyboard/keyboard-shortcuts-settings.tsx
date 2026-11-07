@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import * as z from "zod";
 
 import { findEffortConflicts } from "@/features/keyboard/lib/recorded-shortcut-converter";
+import { SHORTCUT_ENTRIES } from "@/features/keyboard/lib/shortcut-sheet";
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 import { defaultKeyboardShortcuts, useUIStateStore } from "@/features/layout/stores/ui-state-store";
@@ -37,12 +38,20 @@ const shortcutIdentity = (value: string): string => {
     return [...[...modifiers].toSorted((a, b) => a.localeCompare(b)), key].join("+");
 };
 
+// The thread actions also run on a chord a fixed binding already answers to (audio recording, list navigation), so both would fire.
+// Only these two are checked: other defaults share a chord with a fixed binding (Escape) by design.
+const THREAD_ACTION_KEYS = ["archiveThread", "deleteThread"] as const;
+
+const CTRL_MODIFIER = /\bctrl\b/u;
+
 const keyboardShortcutSchema = z
     .strictObject({
+        archiveThread: shortcutValueSchema,
         askAside: shortcutValueSchema,
         commandPalette: shortcutValueSchema,
         copyLastCodeBlock: shortcutValueSchema,
         decreaseEffort: shortcutValueSchema,
+        deleteThread: shortcutValueSchema,
         escape: shortcutValueSchema,
         findInThread: shortcutValueSchema,
         focusSearch: shortcutValueSchema,
@@ -75,6 +84,28 @@ const keyboardShortcutSchema = z
         for (const key of conflicting) {
             context.issues.push({ code: "custom", input: context.value, message: DUPLICATE_SHORTCUT_MESSAGE, path: [key] });
         }
+
+        // Runtime bindings this page does not edit: audio recording and list navigation. Read from the store, since they can be rebound.
+        const runtime = useUIStateStore.getState().keyboardShortcuts;
+        // A fixed chord written with Ctrl answers to Cmd as well on a Mac (the list's select-all does), so both count as taken.
+        const fixedChords = new Set<string>(
+            [
+                runtime.audioRecord,
+                runtime.nextItem,
+                runtime.prevItem,
+                runtime.firstItem,
+                runtime.lastItem,
+                ...SHORTCUT_ENTRIES.flatMap((entry) => ("fixed" in entry ? [entry.fixed] : [])),
+            ].flatMap((value) => [shortcutIdentity(value), shortcutIdentity(value.replace(CTRL_MODIFIER, "meta"))]),
+        );
+
+        for (const key of THREAD_ACTION_KEYS) {
+            const value = context.value[key];
+
+            if (value && isValidShortcut(value) && fixedChords.has(shortcutIdentity(value))) {
+                context.issues.push({ code: "custom", input: context.value, message: DUPLICATE_SHORTCUT_MESSAGE, path: [key] });
+            }
+        }
     });
 
 type KeyboardShortcutForm = z.infer<typeof keyboardShortcutSchema>;
@@ -103,10 +134,12 @@ const KeyboardShortcutsSettings: FC = () => {
     const { t } = useLingui();
 
     const shortcutLabels: Record<keyof KeyboardShortcutForm, string> = {
+        archiveThread: t`Archive Open Thread`,
         askAside: t`Ask a Side Question`,
         commandPalette: t`Command Palette`,
         copyLastCodeBlock: t`Copy Last Code Block`,
         decreaseEffort: t`Decrease Reasoning Effort`,
+        deleteThread: t`Delete Open Thread`,
         escape: t`Escape`,
         findInThread: t`Find in Thread`,
         focusSearch: t`Focus Search`,
@@ -120,10 +153,12 @@ const KeyboardShortcutsSettings: FC = () => {
     };
 
     const shortcutDescriptions: Record<keyof KeyboardShortcutForm, string> = {
+        archiveThread: t`Archive the open thread, or restore it when it is archived (${defaultShortcut("archiveThread")})`,
         askAside: t`Open the side-question panel without interrupting a running reply (${defaultShortcut("askAside")})`,
         commandPalette: t`Open the command palette and global search (${defaultShortcut("commandPalette")})`,
         copyLastCodeBlock: t`Copy the last code block of the latest assistant reply (${defaultShortcut("copyLastCodeBlock")})`,
         decreaseEffort: t`Lower the composer's reasoning effort by one step. Not bound by default.`,
+        deleteThread: t`Delete the open thread after you confirm (${defaultShortcut("deleteThread")})`,
         escape: t`Close dialogs and menus`,
         findInThread: t`Search the open thread's messages and highlight the matches. Leave it unbound to keep the browser's find (${defaultShortcut("findInThread")})`,
         focusSearch: t`Open the thread list search and focus it (${defaultShortcut("focusSearch")})`,
@@ -291,7 +326,7 @@ const KeyboardShortcutsSettings: FC = () => {
                                                 <form.Subscribe selector={(state) => isDuplicate(state.fieldMeta[key]?.errors)}>
                                                     {(duplicate) =>
                                                         duplicate && (
-                                                            <p className="text-destructive text-xs" role="alert">
+                                                            <p className="text-destructive text-xs" id={`${key}-error`} role="alert">
                                                                 {t`Another action already uses this key combination. Change or clear one of them to save.`}
                                                             </p>
                                                         )
@@ -302,6 +337,9 @@ const KeyboardShortcutsSettings: FC = () => {
                                                 {(field) => (
                                                     <div className="flex items-center gap-2">
                                                         <Input
+                                                            // The field names its own error, so a person who comes back to it hears why it was refused.
+                                                            aria-describedby={isDuplicate(field.state.meta.errors) ? `${key}-error` : undefined}
+                                                            aria-invalid={isDuplicate(field.state.meta.errors) || undefined}
                                                             className="w-32"
                                                             id={key}
                                                             placeholder={t`Not set`}

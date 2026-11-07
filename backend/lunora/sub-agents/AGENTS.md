@@ -9,7 +9,12 @@
   queue runs `runHeadlessAgent` in a child thread linked by a
   `threadRelationships` row with `branchType: "subagent"`. `finishRun` is the
   only end of a run (frees the fan-out slot, notifies); a reaper fails a
-  silent run. The post-back is `postRunResult`, once per `resultPostedAt`, and
+  silent run. A cloud run's loop beats once a minute (`beatRun` → `beatAt`) and
+  `watchRunBeat`, scheduled at `claimRun`, fails a run silent for 3 min with
+  `INTERRUPTED_RUN_MESSAGE`: a dead worker's redelivery is refused by the claim,
+  so nothing else ends it before the reaper. It is not resumed (no tool marks
+  yet). The parent's delegate call returned at admission, so it never waits on
+  the child. The post-back is `postRunResult`, once per `resultPostedAt`, and
   WAITS while the parent thread has a pending/streaming `persistentStreams`
   row (backoff, posts anyway after ~36 min) — otherwise it lands between the
   delegating run's own steps. The delegate tool defaults to `ask`, and a

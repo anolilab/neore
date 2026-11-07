@@ -15,7 +15,9 @@ import { randomUUID } from "node:crypto";
 import type { CapabilityReport } from "@neore/ai/capabilities";
 import { capabilityOf, isAvailable } from "@neore/ai/capabilities";
 
-import { reportFromHandshake } from "./capabilities";
+import type { AgentOptions } from "./agent-options";
+import { applyOptionsUpdate, keepEarlyUpdate, optionsOf } from "./agent-options";
+import { reportFromHandshake, withOptionCapabilities } from "./capabilities";
 import { TurnChanges } from "./changes";
 import { childEventOf, childParentOf, completionText, contentText, isRecord, text, toolIdOf } from "./child-updates";
 import type { ChildEvent } from "./children";
@@ -26,7 +28,7 @@ import type { PermissionGate, PermissionOutcome } from "./permission";
 import { describePermission, offeredOptions } from "./permission";
 import type { AgentProcess } from "./process";
 import type { Handshake } from "./protocol";
-import { initialize, loadSession, METHOD, newSession, promptParams } from "./protocol";
+import { forkSession, initialize, loadSession, METHOD, newSession, promptParams } from "./protocol";
 import { INVALID_PARAMS, METHOD_NOT_FOUND, RpcError } from "./rpc-error";
 import { Turn } from "./turn";
 import type { SessionSnapshot, SessionStatus, SessionSummary, StopReason, ToolState, ToolStatus } from "./types";
@@ -83,11 +85,19 @@ export interface SessionOptions {
     appVersion: string;
     cancelGraceMs?: number;
     cancelSettleMs?: number;
+
     /** Says what this agent reports it can do. Defaults to the handshake's own (`capabilities.ts`); tests stand in for an agent that reports more. */
     capabilityReport?: (handshake: Handshake) => CapabilityReport;
     folder: string;
     /** The folder is on another machine: this computer's own files say nothing about what the agent changed there, so none are read. */
     folderIsRemote?: boolean;
+
+    /**
+     * The agent's own id of a session to fork into this one, when the backend started this session as a fork of a
+     * thread (`acp_start`). Forked only if the agent advertised it; otherwise, or when the fork fails, a new session opens
+     * and the backend is told why (`fork` on the session it hears opened). The source session is never written to.
+     */
+    forkSessionId?: string;
     gate: PermissionGate;
     /** What the backend shows for this session (labels only). With `observer`, opening the session makes its thread. */
     hostInfo?: HostSessionInfo;
@@ -159,8 +169,23 @@ export class AgentSession {
     /** What the agent reported at the handshake. Unset until it has. */
     private report: CapabilityReport | undefined;
 
+    /** The options the agent offers for this session (`agent-options.ts`); empty until it has said. */
+    private agentOptions: AgentOptions = {};
+
+    /**
+     * Option updates that came before the agent's answer naming its session was handled: the update can follow the answer in
+     * the same read from the agent, before the session id is known here. At most a few are kept.
+     */
+    private earlyOptionUpdates = new Map<string, Record<string, unknown>[]>();
+
+    /** What the backend was told when the session opened, kept so a change of the options can send it again. */
+    private opened: HostSessionInfo | undefined;
+
     /** What happened to the saved session the backend asked to load; unset when it asked for none. */
     private reattach: HostSessionInfo["reattach"];
+
+    /** What happened to the session the backend asked to fork; unset when it asked for none. */
+    private fork: HostSessionInfo["fork"];
 
     /** The agent's own children, by the tool call that spawned each (§4.7). */
     private readonly children: ChildLedger;
@@ -195,6 +220,7 @@ export class AgentSession {
             this.agent = await initialize(this.connection, this.options.appVersion, this.options.startupTimeoutMs);
             this.report = this.options.capabilityReport?.(this.agent) ?? reportFromHandshake(this.agent.capabilities, Date.now());
             this.agentSessionId = await this.openAgentSession();
+            this.report = withOptionCapabilities(this.report, this.agentOptions, Date.now());
 
             // The agent can exit while the last answer is on its way; that session is over, not ready.
             if (this.status === "ended") {
@@ -224,10 +250,13 @@ export class AgentSession {
             const opened = {
                 ...hostInfo,
                 nativeSessionId: this.agentSessionId,
-                ...this.report !== undefined && { capabilities: this.report },
-                ...this.reattach !== undefined && { reattach: this.reattach },
+                options: this.agentOptions,
+                ...(this.report !== undefined && { capabilities: this.report }),
+                ...(this.fork !== undefined && { fork: this.fork }),
+                ...(this.reattach !== undefined && { reattach: this.reattach }),
             };
 
+            this.opened = opened;
             this.observe((observer) => observer.sessionOpened(this.id, opened, this.options.threadId));
         }
     }
@@ -346,6 +375,11 @@ export class AgentSession {
         await this.stopping;
     }
 
+    /** The thread a session the backend started runs in; `undefined` for one started on this computer. */
+    public get threadId(): string | undefined {
+        return this.options.threadId;
+    }
+
     public summary(): SessionSummary {
         return {
             agentKey: this.options.agentKey,
@@ -373,20 +407,35 @@ export class AgentSession {
 
     /** The agent's session: the saved one when asked for and loadable, else a new one (`reattach` says which, and why not). */
     private async openAgentSession(): Promise<string> {
-        const { folder, resumeSessionId, startupTimeoutMs } = this.options;
+        const { folder, forkSessionId, resumeSessionId, startupTimeoutMs } = this.options;
+
+        if (forkSessionId !== undefined) {
+            return await this.forkAgentSession(forkSessionId);
+        }
 
         if (resumeSessionId === undefined) {
-            return await newSession(this.connection, folder, startupTimeoutMs);
+            return this.withEarlyUpdates(await newSession(this.connection, folder, startupTimeoutMs));
         }
 
         // No `session/load` frame goes to an agent that did not say it loads them.
         if (isAvailable(capabilityOf(this.report, "sessions.load"))) {
+            // Until the load is given up on: an answer that comes after its timeout must not touch the fallback session's updates.
+            let awaited = true;
+
             try {
-                await loadSession(this.connection, resumeSessionId, folder);
+                // What came before the answer is the replayed history, dropped as the answer is read: the answer holds the options
+                // as they are then. An update read after it, before the session's id is known here, is kept and applied.
+                const answer = await loadSession(this.connection, resumeSessionId, folder, undefined, () => {
+                    if (awaited) {
+                        this.earlyOptionUpdates.clear();
+                    }
+                });
+
                 this.reattach = { loaded: true };
 
-                return resumeSessionId;
+                return this.withEarlyUpdates({ answer, sessionId: resumeSessionId });
             } catch {
+                awaited = false;
                 // The agent's own error can quote its environment: the backend is told that it failed (a code), not its text.
                 this.reattach = { loaded: false, reason: "load_failed" };
             }
@@ -394,7 +443,55 @@ export class AgentSession {
             this.reattach = { loaded: false, reason: "load_unsupported" };
         }
 
-        return await newSession(this.connection, folder, startupTimeoutMs);
+        // A failed load's replay must not fill the room the new session's own early updates need.
+        this.earlyOptionUpdates.clear();
+
+        return this.withEarlyUpdates(await newSession(this.connection, folder, startupTimeoutMs));
+    }
+
+    /** A new or forked session's options: its answer's, then any update for it that came before the answer was handled. */
+    private withEarlyUpdates(opened: { answer: unknown; sessionId: string }): string {
+        const { scrub } = this.options.process;
+        let options = optionsOf(opened.answer, scrub);
+
+        const early = this.earlyOptionUpdates.get(opened.sessionId) ?? [];
+
+        for (const update of early) {
+            options = applyOptionsUpdate(options, update, scrub) ?? options;
+        }
+
+        this.agentOptions = options;
+        this.earlyOptionUpdates.clear();
+
+        return opened.sessionId;
+    }
+
+    /** A fork of the agent's session `source` when it said it forks them, else a new session (`fork` says which, and why not). */
+    private async forkAgentSession(source: string): Promise<string> {
+        const { folder, startupTimeoutMs } = this.options;
+
+        // No `session/fork` frame goes to an agent that did not say it forks them.
+        if (isAvailable(capabilityOf(this.report, "sessions.fork"))) {
+            try {
+                const forked = await forkSession(this.connection, source, folder);
+
+                // An answer naming the source is not a fork: prompting it would write into the session the fork must leave alone.
+                if (forked.sessionId === source) {
+                    throw new Error("the agent did not fork the session");
+                }
+
+                this.fork = { forked: true };
+
+                return this.withEarlyUpdates(forked);
+            } catch {
+                // The agent's own error can quote its environment: the backend is told that it failed (a code), not its text.
+                this.fork = { forked: false, reason: "fork_failed" };
+            }
+        } else {
+            this.fork = { forked: false, reason: "fork_unsupported" };
+        }
+
+        return this.withEarlyUpdates(await newSession(this.connection, folder, startupTimeoutMs));
     }
 
     /** Drops the prompts still waiting. The ones the backend queued are told their turn was cancelled, so no stream waits on them. */
@@ -614,6 +711,29 @@ export class AgentSession {
         this.options.onChange();
     }
 
+    /** The agent changed its options: kept, and once the backend knows the session, sent to it again with a newer report. */
+    private onOptionsUpdate(update: Record<string, unknown>): void {
+        const next = applyOptionsUpdate(this.agentOptions, update, this.options.process.scrub);
+
+        if (next === undefined) {
+            return;
+        }
+
+        this.agentOptions = next;
+
+        if (this.report === undefined || this.opened === undefined) {
+            return;
+        }
+
+        // Strictly newer than the report before it: the backend keeps a report only over an older one.
+        this.report = withOptionCapabilities(this.report, next, Math.max(Date.now(), this.report.reportedAt + 1));
+
+        const opened: HostSessionInfo = { ...this.opened, capabilities: this.report, options: next };
+
+        this.opened = opened;
+        this.observe((observer) => observer.sessionUpdated?.(this.id, opened));
+    }
+
     // ─── To the observer ───────────────────────────────────────────────────
 
     /** Persistence never changes what the session does: an observer that throws is ignored. */
@@ -655,7 +775,7 @@ export class AgentSession {
         const delta = scrubbed.slice(sent[field], end);
 
         sent[field] = end;
-        this.observe((observer) => field === "text" ? observer.text(this.id, turn.id, delta) : observer.thought(this.id, turn.id, delta));
+        this.observe((observer) => (field === "text" ? observer.text(this.id, turn.id, delta) : observer.thought(this.id, turn.id, delta)));
     }
 
     private observeTool(tool: ToolState): void {
@@ -737,16 +857,51 @@ export class AgentSession {
                 requestId,
                 tool: described.tool,
                 // The label the user chose for the folder, never its path.
-                ...this.options.hostInfo !== undefined && { folder: this.options.hostInfo.folderLabel },
-                ...described.command !== undefined && { command: described.command },
-                ...described.target !== undefined && { target: described.target },
+                ...(this.options.hostInfo !== undefined && { folder: this.options.hostInfo.folderLabel }),
+                ...(described.command !== undefined && { command: described.command }),
+                ...(described.target !== undefined && { target: described.target }),
             }),
         );
     }
 
     // ─── From the agent ────────────────────────────────────────────────────
 
+    /** An option update read before the session's id is known here (`withEarlyUpdates` applies it once the answer is handled). */
+    private keepEarly(sessionId: unknown, update: Record<string, unknown>): void {
+        const kind = update.sessionUpdate;
+
+        // Coalesced per session (`keepEarlyUpdate`), so nothing that matters is lost however many arrive. At most a few sessions
+        // are kept, the newest: a slow load's replay cannot crowd out a fallback session's own updates.
+        if (typeof sessionId === "string" && (kind === "config_option_update" || kind === "current_mode_update")) {
+            const before = this.earlyOptionUpdates.get(sessionId) ?? [];
+            const kept = keepEarlyUpdate(before, update, this.options.process.scrub);
+
+            // An update that changes nothing leaves the map alone: it must not push out a session that holds real updates.
+            if (kept === before) {
+                return;
+            }
+
+            this.earlyOptionUpdates.delete(sessionId);
+            this.earlyOptionUpdates.set(sessionId, kept);
+
+            // A map keeps insertion order, and deleting while iterating is safe: the oldest go first.
+            for (const key of this.earlyOptionUpdates.keys()) {
+                if (this.earlyOptionUpdates.size <= 4) {
+                    break;
+                }
+
+                this.earlyOptionUpdates.delete(key);
+            }
+        }
+    }
+
     private onNotification(method: string, params: unknown): void {
+        if (method === METHOD.sessionUpdate && this.agentSessionId === "" && isRecord(params) && isRecord(params.update)) {
+            this.keepEarly(params.sessionId, params.update);
+
+            return;
+        }
+
         if (method !== METHOD.sessionUpdate || !isRecord(params) || params.sessionId !== this.agentSessionId || !isRecord(params.update)) {
             return;
         }
@@ -772,6 +927,12 @@ export class AgentSession {
                 turn?.append("thought", contentText(update.content));
                 this.observeDelta(turn, "thought", false);
                 break;
+            }
+            case "config_option_update":
+            case "current_mode_update": {
+                this.onOptionsUpdate(update);
+
+                return;
             }
             case "tool_call":
             case "tool_call_update": {

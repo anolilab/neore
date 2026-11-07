@@ -9,6 +9,7 @@
         "ios": "expo run:ios",
         "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "lint:types": "tsc --noEmit",
+        "lint:types:fast": "tsrs --noEmit",
         "start": "expo start",
         "test": "vitest run",
         "test:coverage": "vitest run --coverage --coverage.reporter=lcov --coverage.reporter=text-summary"
@@ -21,6 +22,7 @@
         "@neore/chat-ui": "workspace:*",
         "@neore/client-runtime": "workspace:*",
         "expo": "58.0.14",
+        "expo-audio": "~58.0.11",
         "expo-auth-session": "~58.0.13",
         "expo-constants": "~58.0.12",
         "expo-crypto": "~58.0.7",
@@ -30,6 +32,7 @@
         "expo-network": "~58.0.4",
         "expo-router": "~58.0.23",
         "expo-secure-store": "~58.0.2",
+        "expo-speech-recognition": "58.0.1",
         "expo-splash-screen": "~58.0.10",
         "expo-sqlite": "~58.0.14",
         "expo-status-bar": "~58.0.3",

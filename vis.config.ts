@@ -138,7 +138,10 @@ export default defineConfig({
     // 11 projects), so wiring it to pre-commit would block every commit until
     // that debt is paid. Add it once `pnpm lint:eslint` is green.
     staged: {
-        "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,yml,yaml,md,css,html}": "prettier --config=.prettierrc.cjs --ignore-unknown --write",
+        // Markdown is left out: CI does not check its formatting, so the hook would only churn tables.
+        "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,yml,yaml,css,html}": "pnpm run --silent prettier:hooks --write",
+        // CI checks the key order of every package.json (`lint.yml`, "Types").
+        "**/package.json": "sort-package-json",
     },
 
     security: {
@@ -194,6 +197,21 @@ export default defineConfig({
             // Type-checking a consumer needs its dependencies' emitted .d.ts files.
             dependsOn: ["^build"],
             inputs: ["default", "^production"],
+            cache: true,
+        },
+        "lint:types:fast": {
+            // The pre-push check: `tsrs`, a Rust port of the compiler with TS 7.1
+            // semantics, about ten times faster than `lint:types`, which stays the
+            // CI gate. It depends on what it reads, not on `^build`, which would
+            // also build the backend Worker and the N-API addon: the two packages
+            // that export only a built `dist`, and the backend's generated API for
+            // the apps that import it. `^lint:types:fast` puts each workspace
+            // dependency's check (and so its source) into this task's cache key:
+            // vis does not hash `^production` files, so without it a change in
+            // `@neore/chat-ui` alone restored `@neore/web`'s old result.
+            dependsOn: [{ projects: ["@neore/ai", "@neore/service-sdk"], target: "build" }, "^codegen", "^lint:types:fast"],
+            // The lockfile pins the compiler: a `tsrs` bump must not reuse old results.
+            inputs: ["default", "^production", "{workspaceRoot}/pnpm-lock.yaml"],
             cache: true,
         },
         test: {

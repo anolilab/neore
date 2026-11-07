@@ -117,10 +117,11 @@ export const beatRun = internalMutation
  * A worker that dies with one open may
  * have paid for or changed something and leaves no row, so `inspectRun` refuses to resume it. A begin on a stream that is
  * no longer live is refused, so the tool does not run unmarked; so is any mark from a run a newer one replaced
- * (`RUN_REPLACED`), which would otherwise corrupt the newer run's count.
+ * (`RUN_REPLACED`), which would otherwise corrupt the newer run's count. A `repeatable` begin (a tool safe to repeat,
+ * `chat/lib/repeatable-tools.ts`) passes the same checks and is not counted: a death inside it does not stop a resume.
  */
 export const markToolRun = internalMutation
-    .input({ delta: v.number(), epoch: v.number(), setTo: v.optional(v.number()), streamId: v.id("persistentStreams") })
+    .input({ delta: v.number(), epoch: v.number(), repeatable: v.optional(v.boolean()), setTo: v.optional(v.number()), streamId: v.id("persistentStreams") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: args.streamId } });
@@ -138,6 +139,10 @@ export const markToolRun = internalMutation
         // A tool starts only on a run that holds the stream: never one that is paused or being resumed.
         if (args.delta > 0 && stream.pause !== undefined) {
             throw new LunoraError(RUN_REPLACED, "The run is paused or being resumed");
+        }
+
+        if (args.repeatable === true) {
+            return null;
         }
 
         const next = args.setTo === undefined ? Math.max(0, (stream.toolsInFlight ?? 0) + args.delta) : Math.max(0, args.setTo);

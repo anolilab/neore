@@ -9,6 +9,7 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { AgentSwitchPart } from "@neore/backend/agent/agent-switch-validators";
+import type { ContextResetPart } from "@neore/backend/agent/context-reset-shape";
 import type { Id } from "@neore/backend/dataModel";
 import { getVisibleUserText } from "@neore/chat-ui/utils/page-context";
 import { Message, MessageAction, MessageActions, MessageContent as MessageContentWrapper } from "@neore/ui/components/ai-elements/message";
@@ -589,10 +590,12 @@ const MessageItem: FC<MessageItemProps> = memo(
                 );
             }
 
-            if (message.parts.some((part) => part.type === "data-contextReset")) {
+            const contextReset = message.parts.find((part) => part.type === "data-contextReset");
+
+            if (contextReset) {
                 return (
                     <div {...containerProps}>
-                        <ContextResetDivider />
+                        <ContextResetDivider reason={"data" in contextReset ? (contextReset.data as ContextResetPart | undefined)?.reason : undefined} />
                     </div>
                 );
             }

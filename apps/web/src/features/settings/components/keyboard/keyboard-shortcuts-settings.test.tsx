@@ -87,10 +87,12 @@ describe("KeyboardShortcutsSettings", () => {
         expect(keyboardShortcuts.newChat).toBe("ctrl+j");
         // Only what the page edits is sent, and the backend accepts every value, defaults included.
         expect(Object.keys(keyboardShortcuts).toSorted((a, b) => a.localeCompare(b))).toEqual([
+            "archiveThread",
             "askAside",
             "commandPalette",
             "copyLastCodeBlock",
             "decreaseEffort",
+            "deleteThread",
             "escape",
             "findInThread",
             "focusSearch",
@@ -139,6 +141,64 @@ describe("KeyboardShortcutsSettings", () => {
             expect((screen.getByRole("button", { name: "Save Shortcuts" }) as HTMLButtonElement).disabled).toBe(true);
         });
         expect(screen.getAllByRole("alert")).toHaveLength(2);
+    });
+
+    it("refuses Save when an archive chord is the audio-recording chord, which would fire both", async () => {
+        act(() => {
+            useUIStateStore.setState({ keyboardShortcuts: { ...defaultKeyboardShortcuts, audioRecord: "ctrl+j" } });
+        });
+        renderSettings();
+
+        recordShortcut("Archive Open Thread", "j");
+
+        await waitFor(() => {
+            expect((screen.getByRole("button", { name: "Save Shortcuts" }) as HTMLButtonElement).disabled).toBe(true);
+        });
+        expect(screen.getAllByRole("alert")).toHaveLength(1);
+    });
+
+    it("refuses Save when an archive chord is a list-navigation chord the store has bound, which would fire both", async () => {
+        act(() => {
+            useUIStateStore.setState({ keyboardShortcuts: { ...defaultKeyboardShortcuts, nextItem: "ctrl+j" } });
+        });
+        renderSettings();
+
+        recordShortcut("Archive Open Thread", "j");
+
+        await waitFor(() => {
+            expect((screen.getByRole("button", { name: "Save Shortcuts" }) as HTMLButtonElement).disabled).toBe(true);
+        });
+        expect(screen.getAllByRole("alert")).toHaveLength(1);
+    });
+
+    it("ties a refused field to its error, so the field itself says why it was refused", async () => {
+        act(() => {
+            useUIStateStore.setState({ keyboardShortcuts: { ...defaultKeyboardShortcuts, audioRecord: "ctrl+j" } });
+        });
+        renderSettings();
+
+        recordShortcut("Archive Open Thread", "j");
+
+        const field = screen.getByLabelText("Archive Open Thread");
+
+        await waitFor(() => {
+            expect(field.getAttribute("aria-invalid")).toBe("true");
+        });
+        expect(field.getAttribute("aria-describedby")).toBe("archiveThread-error");
+        expect(screen.getByRole("alert").id).toBe("archiveThread-error");
+    });
+
+    it("refuses Save when an archive chord is Cmd+A on a Mac, which the list's select-all answers to as it does Ctrl+A", async () => {
+        renderSettings();
+
+        fireEvent.click(screen.getByRole("button", { name: "Record Archive Open Thread" }));
+        fireEvent.keyDown(document, { key: "a", metaKey: true });
+        fireEvent.keyUp(document, { key: "a", metaKey: true });
+
+        await waitFor(() => {
+            expect((screen.getByRole("button", { name: "Save Shortcuts" }) as HTMLButtonElement).disabled).toBe(true);
+        });
+        expect(screen.getAllByRole("alert")).toHaveLength(1);
     });
 
     it("saves the defaults to the server on reset", async () => {

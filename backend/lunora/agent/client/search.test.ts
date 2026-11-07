@@ -75,6 +75,10 @@ describe("fetchContextWithPrompt after a portable switch", () => {
                 return {};
             }
 
+            if (ref === internal.agent.context_reset_read.getContextReset) {
+                return null;
+            }
+
             if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
                 return null;
             }
@@ -150,6 +154,10 @@ describe("fetchContextWithPrompt after a switch back whose earlier divider has l
                 return {};
             }
 
+            if (ref === internal.agent.context_reset_read.getContextReset) {
+                return null;
+            }
+
             if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
                 return null;
             }
@@ -191,4 +199,89 @@ describe("fetchContextWithPrompt after a switch back whose earlier divider has l
 
         expect(messages.map((m) => m.content)).toStrictEqual([first, delta, "back on a", "reply", "and more"]);
     });
+});
+
+describe("fetchContextWithPrompt after a context reset (/clear)", () => {
+    const row = (id: string, order: number, stepOrder: number, role: "assistant" | "user", content: string) => {
+        return { _id: id, message: { content, role }, order, status: "success", stepOrder, threadId: "thread-1" };
+    };
+    // The reset row is an empty system row: nothing in the context, and the rows after it start the model's turns again.
+    const reset = { _id: "reset", message: { content: "", role: "system" }, order: 1, status: "success", stepOrder: 0, threadId: "thread-1" };
+    const rows = [row("u0", 0, 0, "user", "old question"), row("a0", 0, 1, "assistant", "old answer"), reset, row("u1", 2, 0, "user", "new question")];
+
+    it("sends the model no turn from before the reset, only the turns written after it", async () => {
+        const runQuery = vi.fn(async (ref: unknown) => {
+            if (ref === internal.agent.branches.getContextPathIds) {
+                return null;
+            }
+
+            if (ref === internal.agent.files.getStorageKeys || ref === internal.agent.files.getOwnedStorageKeys) {
+                return {};
+            }
+
+            if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
+                return null;
+            }
+
+            if (ref === internal.agent.context_reset_read.getContextReset) {
+                return { branched: false, order: reset.order };
+            }
+
+            return { page: rows.toReversed() };
+        });
+        const { messages } = await fetchContextWithPrompt(
+            { runQuery } as never,
+            {} as never,
+            { contextOptions: {}, messages: undefined, prompt: undefined, promptMessageId: "u1", threadId: "thread-1", userId: "user-1" } as never,
+        );
+
+        expect(messages).toHaveLength(1);
+        expect(messages[0]).toMatchObject({ content: "new question", role: "user" });
+    });
+
+    it.each([
+        [true, ["sibling answer", "new question", "find it"]],
+        [false, ["new question", "find it"]],
+    ])(
+        "keeps a same-thread hit from below the reset only when the thread is branched and the prompt is not named (branched: %s)",
+        async (branched, expected) => {
+            const sibling = row("s0", 0, 2, "assistant", "sibling answer");
+            const runQuery = vi.fn(async (ref: unknown) => {
+                if (ref === internal.agent.files.getStorageKeys || ref === internal.agent.files.getOwnedStorageKeys) {
+                    return {};
+                }
+
+                if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
+                    return null;
+                }
+
+                if (ref === internal.agent.context_reset_read.getContextReset) {
+                    return { branched, order: reset.order };
+                }
+
+                if (ref === internal.agent.agent_switch.getHandoffAbove) {
+                    return [];
+                }
+
+                return { page: rows.toReversed() };
+            });
+            const runAction = vi.fn(async () => [sibling]);
+            const { messages } = await fetchContextWithPrompt(
+                { runAction, runQuery } as never,
+                {} as never,
+                {
+                    contextOptions: { searchOptions: { limit: 5, textSearch: true } },
+                    messages: undefined,
+                    prompt: "find it",
+                    promptMessageId: undefined,
+                    threadId: "thread-1",
+                    userId: "user-1",
+                } as never,
+            );
+
+            expect(
+                (messages as { content: unknown }[]).map((entry) => (typeof entry.content === "string" ? entry.content : JSON.stringify(entry.content))),
+            ).toStrictEqual(expected);
+        },
+    );
 });

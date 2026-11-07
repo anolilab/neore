@@ -24,4 +24,10 @@ describe("ContextResetDivider", () => {
 
         expect(screen.getByRole("separator").getAttribute("aria-label")).toBe("New task run · earlier messages were not sent to the model");
     });
+
+    it("says a new context started where /clear left it", () => {
+        render(<ContextResetDivider reason="clear" />);
+
+        expect(screen.getByRole("separator").getAttribute("aria-label")).toBe("New context");
+    });
 });

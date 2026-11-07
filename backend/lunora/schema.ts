@@ -13,7 +13,7 @@ import { paymentExtension } from "@lunora/payment";
 import { MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH } from "@neore/ai/constants";
 import { defineSchema, defineTable, v } from "lunorash/server";
 
-import { vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
+import { vAcpSessionStatus, vAgentOptions, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
 import { vAgentRef } from "./agent/agent-switch-validators";
 import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict } from "./chat/goals/validators";
 import { vGroupChat } from "./chat/group/validators";
@@ -165,6 +165,11 @@ export const schema = defineSchema({
     acpSessions: defineTable({
         agentKey: v.string(),
         agentLabel: v.string(),
+        // The options the agent offers for the session (model, reasoning effort, mode ...), as its newest report said.
+        agentOptions: v.optional(vAgentOptions),
+        // The time the desktop gave the report the stored options came with, as it sent it (not capped to this clock): it rises
+        // strictly within one session, so it orders that session's reports whatever the two clocks say.
+        agentOptionsAt: v.optional(v.number()),
         capabilities: v.optional(vCapabilityReport),
         createdAt: v.number(),
         deviceId: v.id("devices"),
@@ -2578,6 +2583,9 @@ export const schema = defineSchema({
     // own child thread, whose answer is posted back to `parentThreadId`.
     // `depth` is 1 under a user's own thread, 2 under a sub-agent's.
     subAgentRuns: defineTable({
+        // The last heartbeat of a cloud run's loop (`sub-agents/execute.ts`): a running run whose beat goes stale died
+        // with its worker, and `watchRunBeat` ends it. Unset until the first beat; `startedAt` stands in for it.
+        beatAt: v.optional(v.number()),
         childThreadId: v.optional(v.string()),
         // Set on a run the user typed into a worker thread (`dispatchToWorker`); the dedupe key of that dispatch.
         clientId: v.optional(v.string()),
@@ -3001,6 +3009,9 @@ export const schema = defineSchema({
         // instructions are read live on each run (`chat/lib/agent-run.ts`).
         botId: v.optional(v.id("bots")),
         category: v.optional(v.string()),
+        // The newest context reset on the ACTIVE path, kept by `syncActiveAgent` and the clear writers so a reply reads it in
+        // one lookup (`agent/context-reset.ts#resetForTip`). "" = none on the path; unset = not known (walk the path).
+        contextResetMessageId: v.optional(v.string()),
         // Creation time in ms, the sidebar's sort key. `_creationTime` is system-set and
         // cannot carry an imported chat's source time; unset on rows from before this column.
         createdAt: v.optional(v.number()),
@@ -3014,6 +3025,9 @@ export const schema = defineSchema({
         // Multi-agent group chat: participants (skill ids) and who-speaks mode.
         // Written only by `chat/group/functions.ts`, which checks access.
         groupChat: v.optional(vGroupChat),
+        // Set once `/clear` writes a context reset on this thread (`chat/context-reset.ts`): unset, a reply never
+        // reads the thread's pointer (`agent/context-reset.ts#resetForTip`).
+        hasContextReset: v.optional(v.boolean()),
         // Set once a switch on this thread stores a handoff (`chat/agent-switch.ts`): unset, a reply never
         // walks the path looking for one (`agent/agent-switch.ts#handoffAboveOf`).
         hasHandoff: v.optional(v.boolean()),

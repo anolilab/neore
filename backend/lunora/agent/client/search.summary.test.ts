@@ -38,6 +38,10 @@ const contextFor = async (
     } = {},
 ) => {
     const runQuery = vi.fn(async (ref: unknown) => {
+        if (ref === internal.agent.context_reset_read.getContextReset) {
+            return null;
+        }
+
         if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
             return summary === null ? null : { ...(boundary && { boundary }), branched: branched ?? false, summary };
         }
@@ -143,6 +147,10 @@ describe("fetchContextWithPrompt with a thread summary", () => {
         expect.assertions(1);
 
         const runQuery = vi.fn(async (ref: unknown) => {
+            if (ref === internal.agent.context_reset_read.getContextReset) {
+                return null;
+            }
+
             if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
                 throw new Error("shard busy");
             }

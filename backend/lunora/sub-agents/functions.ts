@@ -56,6 +56,7 @@ import { claimOnce, releaseClaim, WORKER_DISPATCH_CLAIM_TTL_MS, WORKER_DISPATCH_
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { enqueueJob } from "../lib/job-queue";
 import { patchById } from "../lib/patch";
+import { runAfterWithRetry } from "../lib/shard-scheduler";
 import { systemDb } from "../lib/rls/scope";
 import { createRatelimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
@@ -66,10 +67,12 @@ import { findPendingRequestOnLatestTurn } from "../chat/lib/tool-approval-claim"
 import { PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
 import { admitOwnedThread, requireOwnedThread } from "../agent/thread-read-access";
 import { MAX_LENGTH } from "../lib/validators";
+import { RUN_STALE_MS, RUN_WATCH_RETRY } from "../chat/lib/interrupted-run";
 import { HOST_SESSION_BUSY_RETRY_MS, HOST_START_MAX_ATTEMPTS, hostRunActivity, hostStartRetryDelayMs, sendHostRunTurn } from "./host-runs";
 
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import {
+    beatWatchDecision,
     buildResultMessage,
     COMPLETION_MESSAGE_IDS_MAX,
     resultContent,
@@ -77,8 +80,10 @@ import {
     type DispatchSource,
     dispatchSourceProblem,
     distinctChildCount,
+    INTERRUPTED_RUN_MESSAGE,
     intersectWithLeadTools,
     isActiveSubAgentStatus,
+    isLoopLive,
     isWorkerLoopLive,
     nextQueuedWorkerRun,
     normalizeToolAllowlist,
@@ -1041,6 +1046,15 @@ export const claimRun = internalMutation
             return null;
         }
 
+        // The claim's own time, which the watch is tied to (`claimQueuedRun` returns the row as it was before).
+        const claimed = await ctx.db.get("subAgentRuns", run._id);
+        const claimedAt = claimed?.startedAt;
+
+        // This loop beats while it lives (`execute.ts`); the watch ends the run within minutes once it stops.
+        if (claimedAt !== undefined) {
+            await runAfterWithRetry(ctx.scheduler, RUN_STALE_MS, internal.sub_agents.functions.watchRunBeat, { claimedAt, runId: run._id }, RUN_WATCH_RETRY);
+        }
+
         const worker = run.mode === "worker" && run.childThreadId ? await ctx.db.get("threads", run.childThreadId as Id<"threads">) : null;
 
         return {
@@ -1155,7 +1169,7 @@ const startNextWorkerRun = async (ctx: MutationCtx, childThreadId: string): Prom
 /**
  * Moves a worker's line on after a run that was cancelled while running: its loop stops at the next
  * step boundary, and until then it still writes into the thread, so the worker counts as busy (a new
- * message queues) until the loop exits ({@link completeRun}) or, if it died, the reaper fires. A no-op
+ * message queues) until the loop exits ({@link completeRun}) or, if it died, its beat watch or the reaper fires. A no-op
  * for any other run, and for a stopped one already marked gone.
  */
 const resumeLineAfterStoppedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<void> => {
@@ -1779,6 +1793,9 @@ export const listSubAgentApprovals = authQuery
         return approvals;
     });
 
+/** How many of a thread's top rows {@link workerActivity} reads for the newest one saved. */
+const ACTIVITY_ROWS = 25;
+
 /**
  * When a worker run last showed progress. A headless run writes a message row per step (the pending row of the step
  * that follows), so its thread's newest row keeps this moving. A host run's thread shows nothing until the turn ends,
@@ -1789,9 +1806,20 @@ const workerActivity = async (ctx: QueryCtx, run: RunDoc, precision: "chunk" | "
         return await hostRunActivity(ctx, run, precision);
     }
 
-    const newest = run.childThreadId === undefined ? null : await getMaxMessage(ctx, run.childThreadId as Id<"threads">);
+    if (run.childThreadId === undefined) {
+        return { at: undefined, waitingOnPerson: false };
+    }
 
-    return { at: newest?._creationTime, waitingOnPerson: false };
+    // The newest SAVED row, not the highest in order: a nested run's post-back (one row each) can land mid-run above
+    // the order the loop keeps saving its steps under, so the newest of the top rows is read. A loop whose newest step
+    // is buried under more post-backs than this reads as quiet, and is failed only if its beats stopped landing too.
+    const top = await ctx.db
+        .query("messages")
+        .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", run.childThreadId as Id<"threads">))
+        .order("desc")
+        .take(ACTIVITY_ROWS);
+
+    return { at: top.length > 0 ? Math.max(...top.map((row) => row._creationTime)) : undefined, waitingOnPerson: false };
 };
 
 /**
@@ -1832,6 +1860,57 @@ export const reapSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
         await finishRunFromLoop(ctx, runId, { error: WORKER_STALE_MESSAGE, kind: "failed" });
     }
 };
+
+/** The loop's heartbeat, once a minute from `execute.ts`. Only a live loop beats; a beat after its end writes nothing. */
+export const beatSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, now: number): Promise<void> => {
+    const run = await ctx.db.get("subAgentRuns", runId);
+
+    if (run && isLoopLive(run)) {
+        await patchById(ctx.db, "subAgentRuns", run._id, { beatAt: now });
+    }
+};
+
+export const beatRun = internalMutation
+    .input({ runId: v.id("subAgentRuns") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await beatSubAgentRun(ctx, args.runId, ctx.now);
+
+        return null;
+    });
+
+/**
+ * Scheduled at a cloud run's claim ({@link claimRun}), and again while its loop beats: a loop that stopped beating died
+ * with its worker ({@link beatWatchDecision}). A running run then fails as interrupted, which frees its fan-out slot and
+ * tells the lead at once instead of at the reaper's deadline; a worker run stopped while running lets the worker's next
+ * message go. Tied to the claim, like the worker reaper.
+ */
+export const watchSubAgentRunBeat = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, claimedAt: number, now: number): Promise<void> => {
+    const run = await ctx.db.get("subAgentRuns", runId);
+
+    if (!run || run.startedAt !== claimedAt) {
+        return;
+    }
+
+    const activity = await workerActivity(ctx, run, "chunk");
+    const decision = beatWatchDecision({ lastActivityAt: activity.at, now, run });
+
+    if (decision.kind === "later") {
+        // A look that gave up would leave the run unwatched: nothing else restarts the chain.
+        await runAfterWithRetry(ctx.scheduler, decision.delayMs, internal.sub_agents.functions.watchRunBeat, { claimedAt, runId }, RUN_WATCH_RETRY);
+    } else if (decision.kind === "dead") {
+        await finishRunFromLoop(ctx, run._id, { error: INTERRUPTED_RUN_MESSAGE, kind: "failed" });
+    }
+};
+
+export const watchRunBeat = internalMutation
+    .input({ claimedAt: v.number(), runId: v.id("subAgentRuns") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await watchSubAgentRunBeat(ctx, args.runId, args.claimedAt, ctx.now);
+
+        return null;
+    });
 
 export const reapRun = internalMutation
     .input({ claimedAt: v.optional(v.number()), runId: v.id("subAgentRuns") })

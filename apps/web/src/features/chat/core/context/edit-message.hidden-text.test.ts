@@ -48,3 +48,24 @@ describe("runEditMessage hidden characters", () => {
         expect(sendLocalTurn).not.toHaveBeenCalled();
     });
 });
+
+describe("runEditMessage after a /clear", () => {
+    it("hands a local model only the messages after the last new-context divider", async () => {
+        const sendLocalTurn = vi.fn();
+        const env = {
+            ...localEnv(sendLocalTurn),
+            messagesRef: {
+                current: [
+                    { id: "old", parts: [{ text: "before the clear", type: "text" }], role: "user" },
+                    { id: "reset", parts: [{ data: { reason: "clear" }, type: "data-contextReset" }], role: "system" },
+                    { id: "after", parts: [{ text: "after the clear", type: "text" }], role: "user" },
+                    { id: "m1", parts: [{ text: "edit me", type: "text" }], role: "user" },
+                ],
+            },
+        } as unknown as EditMessageEnv;
+
+        await runEditMessage(env, "m1", "edited");
+
+        expect(sendLocalTurn.mock.calls[0]?.[0].history.map((message: { id: string }) => message.id)).toStrictEqual(["after"]);
+    });
+});

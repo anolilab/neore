@@ -31,6 +31,8 @@ import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { isCompactCommand } from "@/features/chat/compaction/compaction-logic";
 import useCompactThread from "@/features/chat/compaction/use-compact-thread";
 import ReferenceStrip from "@/features/chat/components/reference-picker/reference-strip";
+import { clearsDraftAfterReset, isClearCommand } from "@/features/chat/context-reset/context-reset-logic";
+import useClearContext from "@/features/chat/context-reset/use-clear-context";
 import type { AttachmentAdapter } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import {
     ATTACHMENT_ACCEPT,
@@ -240,7 +242,9 @@ const AttachmentPreviewInner: FC<{
 }> = ({ attachment, onEdit, onRemove, onRetry }) => {
     const { t } = useLingui();
     const isImage = attachment.type === "image";
-    const canEdit = attachment.file && isEditable(attachment.file);
+    // A queued attachment restored after a reload is an uploaded file id with an empty stand-in `File`: there are no bytes to preview or edit.
+    const hasBytes = attachment.restoredSize === undefined;
+    const canEdit = hasBytes && isEditable(attachment.file);
     const isText = canEdit;
     const isUploading = attachment.status === "uploading";
     const isError = attachment.status === "error";
@@ -253,7 +257,7 @@ const AttachmentPreviewInner: FC<{
     const attachmentName = attachment.name;
 
     // Only create a blob URL when file reference changes, not on every render.
-    const imageUrl = useMemo(() => (isImage && attachment.file ? URL.createObjectURL(attachment.file) : undefined), [isImage, attachment.file]);
+    const imageUrl = useMemo(() => (isImage && hasBytes ? URL.createObjectURL(attachment.file) : undefined), [isImage, hasBytes, attachment.file]);
 
     useEffect(
         () => () => {
@@ -444,7 +448,7 @@ const AttachmentItem = memo<{
     const handleRemove = useCallback(() => removeAttachment(attachment.id), [removeAttachment, attachment.id]);
     const handleEdit = useCallback(() => setEditingAttachmentId(attachment.id), [setEditingAttachmentId, attachment.id]);
     const handleRetry = useCallback(() => retryAttachment(attachment), [retryAttachment, attachment]);
-    const canEdit = attachment.file && isEditable(attachment.file);
+    const canEdit = attachment.restoredSize === undefined && isEditable(attachment.file);
 
     return <AttachmentPreview attachment={attachment} onEdit={canEdit ? handleEdit : undefined} onRemove={handleRemove} onRetry={handleRetry} />;
 });
@@ -483,6 +487,18 @@ const ComposerInput = ({
     const queryClient = useQueryClient();
     const { isNewThread, threadId } = useChatThread();
     const { compact: compactThread } = useCompactThread(threadId);
+    const { clear: clearThreadContext } = useClearContext(threadId);
+    // The chat this composer shows now, and whether it is still mounted: a `/clear` that finishes after the person moved to
+    // another chat must leave that chat's draft alone.
+    const composerStateRef = useRef({ mounted: true, threadId });
+
+    useEffect(() => {
+        composerStateRef.current = { mounted: true, threadId };
+
+        return () => {
+            composerStateRef.current = { ...composerStateRef.current, mounted: false };
+        };
+    }, [threadId]);
     // The thread a draft was last checked against, so the check below runs when the chat changes, not on every keystroke.
     const draftThread = useRef<string | null | undefined>(undefined);
     // Invite-only: a guest's comparison send is held for sign-in (a plain send is held in `ChatProvider`).
@@ -512,7 +528,9 @@ const ComposerInput = ({
 
         draftThread.current = threadId;
 
-        if (isCompactCommand(useChatUIStore.getState().composerText)) {
+        const draft = useChatUIStore.getState().composerText;
+
+        if (isCompactCommand(draft) || isClearCommand(draft)) {
             clear();
         }
     }, [threadId, clear]);
@@ -657,7 +675,12 @@ const ComposerInput = ({
         // A text attachment's bytes roughly are its characters. A binary one's
         // are not: a 3 MB PDF read as ~786k tokens and blocked sending, while
         // the model receives only its extracted text (or the media itself).
-        const attachmentChars = attachments.reduce((total, att) => total + (att.file ? attachmentTextChars(att.file) : 0), 0);
+        // A restored attachment's `File` is an empty stand-in: the uploaded file's size counts in its place.
+        const attachmentChars = attachments.reduce(
+            (total, att) =>
+                total + attachmentTextChars(att.restoredSize === undefined ? att.file : { name: att.name, size: att.restoredSize, type: att.file.type }),
+            0,
+        );
         const totalChars = textChars + attachmentChars;
         const estimatedTokens = Math.ceil(totalChars / 4);
 
@@ -1034,6 +1057,28 @@ const ComposerInput = ({
             return;
         }
 
+        // `/clear` starts a fresh context in this thread and sends nothing, as `/compact` does. A new chat has no thread: the
+        // command stays in the draft and the hook says why. The draft is cleared only once the reset is written.
+        if ((isThreadComposer || !threadId) && draftAttachments.length === 0 && isClearCommand(draftText)) {
+            const startedThreadId = threadId;
+            const finishClear = async () => {
+                if (!(await clearThreadContext())) {
+                    return;
+                }
+
+                const { mounted, threadId: currentThreadId } = composerStateRef.current;
+
+                // Only the command goes: an attachment or reference added while the reset was written stays.
+                if (clearsDraftAfterReset({ currentThreadId, draft: useChatUIStore.getState().composerText, mounted, startedThreadId })) {
+                    setText("");
+                }
+            };
+
+            void finishClear();
+
+            return;
+        }
+
         // Block submission if context is too large
         if (contextStats.totalChars >= CONTEXT_ERROR_THRESHOLD) {
             return;
@@ -1102,6 +1147,8 @@ const ComposerInput = ({
         isThreadComposer,
         threadId,
         compactThread,
+        clearThreadContext,
+        setText,
     ]);
 
     // "Send as a new chat" from outside the chat UI (the native shell's Quick

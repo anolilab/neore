@@ -693,10 +693,13 @@ export const vThreadDocFields = {
     awaitingInput: v.optional(v.union(v.literal("approval"), v.literal("question"))),
     // Written once by `chat/functions.ts#createThread`, which checks the bot belongs to the caller.
     botId: v.optional(v.string()),
+    contextResetMessageId: v.optional(v.string()),
     createdAt: v.optional(v.number()),
     // Written only by `chat/group/functions.ts`, which checks every participant
     // is a skill the owner may use — so it is deliberately not a create field.
     groupChat: v.optional(vGroupChat),
+    // Written only by `chat/context-reset.ts`, when `/clear` writes a context reset.
+    hasContextReset: v.optional(v.boolean()),
     // Written only by `chat/agent-switch.ts`, when a switch stores a handoff.
     hasHandoff: v.optional(v.boolean()),
     // Written with the status write that ends a successful run, never by a client.

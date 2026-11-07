@@ -71,6 +71,14 @@ export interface ManagerOptions {
     startupTimeoutMs?: number;
 }
 
+/** The agent session a backend start opens from: one to load again (`nativeSessionId`) or one to fork (`forkSessionId`). */
+const savedSessionFields = (remote: { forkSessionId?: string; nativeSessionId?: string }): { forkSessionId?: string; resumeSessionId?: string } => {
+    return {
+        ...(remote.forkSessionId !== undefined && { forkSessionId: remote.forkSessionId }),
+        ...(remote.nativeSessionId !== undefined && { resumeSessionId: remote.nativeSessionId }),
+    };
+};
+
 export class AcpManager {
     private changeTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -190,9 +198,23 @@ export class AcpManager {
         agentKey: string,
         agentLabel: string,
         folder: string,
-        remote?: { nativeSessionId?: string; sessionId: string; threadId: string },
+        remote?: { forkSessionId?: string; nativeSessionId?: string; sessionId: string; threadId: string },
     ): Promise<string> {
         requireSupported();
+
+        // The backend ends a thread's session when it starts the next one in that thread (an agent switch, `/clear`): the
+        // one this computer still runs for it is closed, or every switch or clear would leave an agent process behind.
+        if (remote !== undefined) {
+            const superseded: AgentSession[] = [];
+
+            for (const session of this.sessions.values()) {
+                if (session.threadId === remote.threadId && session.summary().status !== "ended") {
+                    superseded.push(session);
+                }
+            }
+
+            await Promise.all(superseded.map(async (session) => await session.close()));
+        }
 
         if (this.summaries().filter((session) => session.status !== "ended").length >= MAX_SESSIONS) {
             throw new Error(`at most ${String(MAX_SESSIONS)} agents at once; close one first`);
@@ -207,7 +229,7 @@ export class AcpManager {
         let runner: HookRunner | undefined;
         // The fields only a remote, a resumed or a host-run session has.
         const remoteFields = remote === undefined ? {} : { sessionId: remote.sessionId, threadId: remote.threadId };
-        const resumeFields = remote?.nativeSessionId === undefined ? {} : { resumeSessionId: remote.nativeSessionId };
+        const resumeFields = remote === undefined ? {} : savedSessionFields(remote);
         const { observer } = this.options;
         const hostFields = folderInfo === undefined || observer === undefined ? {} : { hostInfo: { agentKey, agentLabel, ...folderInfo }, observer };
         const session = new AgentSession({

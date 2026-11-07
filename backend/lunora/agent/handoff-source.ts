@@ -12,6 +12,7 @@ import { agentKeyOf, agentSwitchOf } from "./agent-switch-logic";
 import type { AgentSwitchPart } from "./agent-switch-validators";
 import { FILE_TOKEN_ESTIMATE_CHARS, IMAGE_TOKEN_ESTIMATE_CHARS } from "../chat/lib/auto-continue";
 import { walkPath } from "./branch-rows";
+import { isContextResetRow } from "./context-reset-shape";
 import { HANDOFF_BUDGET_TOKENS, HANDOFF_SUMMARY_INPUT_TOKENS, type HandoffTurn } from "./handoff";
 import { extractText } from "./shared";
 
@@ -90,11 +91,19 @@ export const collectHandoffSource = async (
     let characters = 0;
     let cursor: Row | null = leaf;
     let cutShort = false;
+    // The newest context reset (`/clear`) on the path ends what is handed over, whatever `stopAtId` says: nothing the
+    // person cleared reaches another agent or a computer. Stopping there is not leaving turns out.
+    let reachedReset = false;
 
-    while (cursor && cursor._id !== options.stopAtId && characters < limit) {
+    while (cursor && cursor._id !== options.stopAtId && characters < limit && !reachedReset) {
         const { next, rows } = await walkPath(context, threadId, cursor, { limit: PAGE_ROWS, stopAtId: options.stopAtId });
 
         for (const [index, row] of rows.entries()) {
+            if (isContextResetRow(row)) {
+                reachedReset = true;
+                break;
+            }
+
             const turn = turnOfRow(row);
 
             if (turn) {
@@ -113,13 +122,13 @@ export const collectHandoffSource = async (
             }
         }
 
-        cursor = next;
+        cursor = reachedReset ? null : next;
     }
 
     // The walk stops AT `stopAtId`, leaving it as `cursor`: not a row that was left unread.
     return {
         authorIds: [...authorIds],
-        omittedEarlier: cutShort || (cursor !== null && cursor._id !== options.stopAtId),
+        omittedEarlier: !reachedReset && (cutShort || (cursor !== null && cursor._id !== options.stopAtId)),
         turns: joinSameRole(turns),
     };
 };

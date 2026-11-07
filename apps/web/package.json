@@ -27,6 +27,7 @@
         "lint:prettier": "prettier --check . --ignore-path ../../.prettierignore --ignore-path .prettierignore",
         "lint:prettier:fix": "prettier --write . --ignore-path ../../.prettierignore --ignore-path .prettierignore",
         "lint:types": "tsc --noEmit",
+        "lint:types:fast": "tsrs --noEmit",
         "preview": "npm run build && vite preview",
         "start": "node dist/server/index.mjs",
         "test": "vitest run",

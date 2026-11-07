@@ -76,6 +76,11 @@ pub enum AcpCommand {
         folder_id: String,
         folder_label: String,
         folder_path: String,
+        /// The agent's own id of a session to fork into this new one (a fork of a host thread). The host forks it only
+        /// when the agent said it can, and the source session is left as it was. Like `native_session_id`, it is the
+        /// backend's record of this same agent, folder and computer, and never widens what the pair is approved for.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        fork_session_id: Option<String>,
         /// The agent's own id of a saved session to load instead of opening a new one (harness switch S4). The
         /// host loads it only when the agent said it can; it is the backend's record of this same agent, folder and
         /// computer, and it never widens what the pair is approved for.
@@ -109,6 +114,16 @@ struct Signer {
     device_id: String,
     host: Option<Host>,
     secret: String,
+}
+
+/// An agent's own session id under `key`: absent (or null) is `None`, anything but a string of 1 to
+/// [`NATIVE_ID_MAX`] bytes is an error.
+fn native_id_of(input: &Value, key: &str) -> Result<Option<String>, ()> {
+    match input.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(id)) if (1..=NATIVE_ID_MAX).contains(&id.len()) => Ok(Some(id.clone())),
+        Some(_) => Err(()),
+    }
 }
 
 fn id_of(input: &Value, key: &str) -> Option<String> {
@@ -285,11 +300,16 @@ impl DeviceState {
         ) else {
             return refusal("a start names a session, a thread, an agent and a folder");
         };
-        let native_session_id = match input.get("nativeSessionId") {
-            None | Some(Value::Null) => None,
-            Some(Value::String(id)) if (1..=NATIVE_ID_MAX).contains(&id.len()) => Some(id.clone()),
-            Some(_) => return refusal("a start's saved session id is not valid"),
+        let (Ok(native_session_id), Ok(fork_session_id)) = (
+            native_id_of(input, "nativeSessionId"),
+            native_id_of(input, "forkSessionId"),
+        ) else {
+            return refusal("a start's saved session id is not valid");
         };
+        // One session is opened: loading one and forking another at once names two.
+        if native_session_id.is_some() && fork_session_id.is_some() {
+            return refusal("a start loads a saved session or forks one, not both");
+        }
         let settings = self.settings();
         // A server's pairs are its own: an approval for this computer says nothing about a server, or the other way round.
         let (agents, consents) = match host {
@@ -312,6 +332,7 @@ impl DeviceState {
                 folder_id,
                 folder_label: consent.folder_label.clone(),
                 folder_path: consent.folder_path.clone(),
+                fork_session_id,
                 native_session_id,
                 session_id,
                 thread_id,
@@ -492,6 +513,7 @@ mod tests {
                 folder_id: "f1".into(),
                 folder_label: "neore".into(),
                 folder_path: "/home/me/neore".into(),
+                fork_session_id: None,
                 native_session_id: None,
                 session_id: "s1".into(),
                 thread_id: "t1".into(),
@@ -551,6 +573,60 @@ mod tests {
         let prepared = state.acp_prepare(&call("acp_start", input)).unwrap();
 
         assert!(prepared.command.is_none());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_start_may_name_a_session_to_fork_but_not_with_one_to_load() {
+        let (state, dir, _) = state("fork");
+        let mut input = start_input("claude", "f1");
+
+        input["forkSessionId"] = json!("sess_1");
+
+        let prepared = state.acp_prepare(&call("acp_start", input)).unwrap();
+
+        assert!(matches!(
+            prepared.command,
+            Some(AcpCommand::Start { fork_session_id: Some(ref id), native_session_id: None, .. }) if id == "sess_1"
+        ));
+
+        for bad in [json!(""), json!("x".repeat(257)), json!(7)] {
+            let mut input = start_input("claude", "f1");
+
+            input["forkSessionId"] = bad;
+
+            let prepared = state.acp_prepare(&call("acp_start", input)).unwrap();
+
+            assert_eq!(
+                prepared.refusal.as_deref(),
+                Some("a start's saved session id is not valid")
+            );
+        }
+
+        let mut input = start_input("claude", "f1");
+
+        input["forkSessionId"] = json!("sess_1");
+        input["nativeSessionId"] = json!("sess_2");
+
+        let prepared = state.acp_prepare(&call("acp_start", input)).unwrap();
+
+        assert!(prepared.command.is_none());
+        assert_eq!(
+            prepared.refusal.as_deref(),
+            Some("a start loads a saved session or forks one, not both")
+        );
+
+        // The pair is checked all the same: a session to fork opens nothing for an unapproved pair.
+        let mut input = start_input("claude", "elsewhere");
+
+        input["forkSessionId"] = json!("sess_1");
+
+        assert!(state
+            .acp_prepare(&call("acp_start", input))
+            .unwrap()
+            .command
+            .is_none());
 
         let _ = std::fs::remove_dir_all(&dir);
     }

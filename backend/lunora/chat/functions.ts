@@ -1,5 +1,6 @@
 import type { ImageModelV2, JSONValue, LanguageModelV3 } from "@ai-sdk/provider";
 import { isHostRunThread, refuseHostThread } from "../acp/lib/host-thread";
+import { rowsAfterContextReset } from "../agent/context-reset";
 import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { withoutSwitchIds } from "../agent/agent-switch-logic";
 import { signDocsForDisplay } from "../agent/display-media";
@@ -3657,6 +3658,11 @@ export const branchThread = authAction
                 if (parentThread.activeAgent) {
                     await context.runMutation(internal.agent.agent_switch.adoptForkAgent, { threadId: newThreadId as Id<"threads"> });
                 }
+
+                // The copy carries any context reset (`/clear`), so the fork's context is cut at it as the source's is.
+                if (parentThread.hasContextReset) {
+                    await context.runMutation(internal.chat.context_reset.markForkedContextReset, { threadId: newThreadId as Id<"threads"> });
+                }
             } catch (error) {
                 // If cloning fails, clean up the thread
                 chatLogger.error("Failed to clone messages for branch:", error);
@@ -4363,7 +4369,9 @@ export const getFollowupSuggestions = authAction
             unlockProof,
         });
 
-        const filteredMessageDocuments = (messagesResult.page || []).filter((messageDocument) => {
+        // A context reset (`/clear`) ends the context follow-ups are made from: rows before it are not read.
+        const contextReset = await context.runQuery(internal.agent.context_reset_read.getContextReset, { threadId: threadId as Id<"threads"> });
+        const filteredMessageDocuments = rowsAfterContextReset(messagesResult.page || [], contextReset).filter((messageDocument) => {
             const role = messageDocument.message?.role;
 
             return role === "user" || role === "assistant";
@@ -4450,7 +4458,9 @@ export const generateFollowupSuggestionsForThread = internalAction
                 threadId,
             });
 
-            const filteredMessageDocuments = (messagesResult.page || []).filter((messageDocument) => {
+            // A context reset (`/clear`) ends the context follow-ups are made from: rows before it are not read.
+            const contextReset = await context.runQuery(internal.agent.context_reset_read.getContextReset, { threadId: threadId as Id<"threads"> });
+            const filteredMessageDocuments = rowsAfterContextReset(messagesResult.page || [], contextReset).filter((messageDocument) => {
                 const role = messageDocument.message?.role;
 
                 return role === "user" || role === "assistant";

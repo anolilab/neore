@@ -17,6 +17,10 @@ const harness = vi.hoisted(() => {
         navigate: vi.fn(),
         scrollToMessage: vi.fn(),
         searchArgs: [] as unknown[],
+        /** The thread rows the palette lists; a test may replace them. */
+        threads: [{ _id: "thread-1", status: "active", title: "Alpha plan" }] as Record<string, unknown>[],
+        /** Whether the thread list has more pages than the palette loaded. */
+        hasMore: false,
     };
 });
 
@@ -105,7 +109,7 @@ vi.mock("@/features/chat/thread/message-list", () => {
 vi.mock("@/features/chat/core/hooks/use-all-threads-data", () => {
     return {
         default: () => {
-            return { lunora: [{ _id: "thread-1", status: "active", title: "Alpha plan" }] };
+            return { hasMore: harness.hasMore, lunora: harness.threads };
         },
     };
 });
@@ -143,6 +147,7 @@ vi.mock("@/features/layout/hooks/use-ui-state", () => {
 });
 
 const RESULT_TEXT = /alpha rollout date/;
+const LOADED_ONLY = /threads loaded here are filtered by state/;
 const BETA_TEXT = /beta cohort starts/;
 
 /** True when `later` comes after `earlier` in document order. */
@@ -154,6 +159,20 @@ const renderPalette = () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     return render(createElement(QueryClientProvider, { client: queryClient }, createElement(GlobalCommandPalette)));
+};
+
+/** The scroll area under the list needs a constructible observer; the setup's mock is an arrow function. */
+const stubResizeObserver = () => {
+    vi.stubGlobal(
+        "ResizeObserver",
+        class {
+            disconnect = vi.fn();
+
+            observe = vi.fn();
+
+            unobserve = vi.fn();
+        },
+    );
 };
 
 const openPalette = async () => {
@@ -169,16 +188,7 @@ describe("command palette message search", () => {
         // The scroll area under the list needs a constructible observer and jsdom lacks getAnimations; the setup's mock is an arrow function
         // and is re-installed before every test.
         Element.prototype.getAnimations = () => [];
-        vi.stubGlobal(
-            "ResizeObserver",
-            class {
-                disconnect = vi.fn();
-
-                observe = vi.fn();
-
-                unobserve = vi.fn();
-            },
-        );
+        stubResizeObserver();
         harness.searchArgs.length = 0;
         harness.navigate.mockClear();
         harness.scrollToMessage.mockClear();
@@ -300,5 +310,74 @@ describe("command palette message search", () => {
         await waitFor(() => expect(harness.navigate).toHaveBeenCalledTimes(1));
         expect(harness.navigate).toHaveBeenCalledWith({ hash: "message-message-9", params: { threadId: "thread-2" }, search: {}, to: "/chat/$threadId" });
         expect(harness.scrollToMessage).toHaveBeenCalledWith("message-9", { position: { order: 3, stepOrder: 0 }, threadId: "thread-2" });
+    });
+});
+
+describe("command palette state tags", () => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const NOW = 1_800_000_000_000;
+
+    beforeEach(() => {
+        Element.prototype.getAnimations = () => [];
+        stubResizeObserver();
+    });
+
+    afterEach(() => {
+        act(() => {
+            useCommandDialogStore.getState().close();
+        });
+        harness.threads = [{ _id: "thread-1", status: "active", title: "Alpha plan" }];
+        harness.hasMore = false;
+        vi.useRealTimers();
+    });
+
+    it("drops a thread from #snoozed once a snooze longer than one timer allows has ended, with the palette left open", () => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date", "setTimeout", "clearTimeout"] });
+        // Thirty days: past the longest delay one timer takes, so the palette needs a second timer to see the snooze end.
+        harness.threads = [{ _id: "thread-s", snoozedUntil: NOW + 30 * DAY_MS, status: "active", title: "Later plan" }];
+        renderPalette();
+
+        act(() => {
+            useCommandDialogStore.getState().openCommandPalette();
+        });
+
+        fireEvent.change(screen.getByRole("combobox"), { target: { value: "#snoozed" } });
+
+        expect(screen.getByText("Later plan")).toBeTruthy();
+
+        act(() => {
+            vi.advanceTimersByTime(25 * DAY_MS);
+        });
+        act(() => {
+            vi.advanceTimersByTime(6 * DAY_MS);
+        });
+
+        expect(screen.queryByText("Later plan")).toBeNull();
+    });
+
+    it("says a state tag covered only the loaded threads when the list has more, and says nothing when it has all", async () => {
+        harness.threads = [{ _id: "thread-w", status: "running", title: "Busy plan" }];
+        harness.hasMore = true;
+        const { unmount } = renderPalette();
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "#working" } });
+
+        expect(screen.getByText("Busy plan")).toBeTruthy();
+        expect(screen.getByText(LOADED_ONLY)).toBeTruthy();
+
+        // Without a tag, nothing is filtered by state, so there is nothing to qualify.
+        fireEvent.change(input, { target: { value: "Busy" } });
+        expect(screen.queryByText(LOADED_ONLY)).toBeNull();
+
+        unmount();
+        act(() => {
+            useCommandDialogStore.getState().close();
+        });
+        harness.hasMore = false;
+        renderPalette();
+        fireEvent.change(await openPalette(), { target: { value: "#working" } });
+
+        expect(screen.queryByText(LOADED_ONLY)).toBeNull();
     });
 });

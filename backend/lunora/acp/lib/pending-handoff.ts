@@ -2,6 +2,7 @@ import type { Doc } from "../../_generated/dataModel";
 import type { QueryCtx } from "../../_generated/server";
 import { leafRowOf } from "../../agent/agent-switch";
 import { agentSwitchOf } from "../../agent/agent-switch-logic";
+import { isContextResetRow } from "../../agent/context-reset-shape";
 import { walkPath } from "../../agent/branch-rows";
 import { sessionOfThread } from "./sessions";
 
@@ -35,6 +36,11 @@ export const pendingHandoffOf = async (ctx: QueryCtx, thread: Doc<"threads">): P
     const session = await sessionOfThread(ctx, thread._id);
 
     for (const row of rows) {
+        // A context reset (`/clear`) starts the conversation the agent is sent: nothing above it is owed to a new session.
+        if (isContextResetRow(row)) {
+            return undefined;
+        }
+
         const part = agentSwitchOf(row);
 
         // A `native` divider stores the handoff for a reattach that fails; until then the agent has its own session, and

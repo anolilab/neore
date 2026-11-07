@@ -30,6 +30,9 @@ import { useOffline, useWriteControl } from "@/offline/offline-context";
 import { settleQuietly } from "@/offline/quietly";
 import type { MessageRow } from "@/offline/types";
 import { requireOnline } from "@/offline/write-gate";
+import { useDictation } from "@/voice/use-dictation";
+import { VoiceButton, VoiceStatus } from "@/voice/voice-button";
+import { appendTranscript } from "@/voice/voice-input";
 
 /** A row on this screen; `finished` marks a local row whose send completed, which no server read has confirmed yet. */
 type Row = MessageRow & { finished?: boolean };
@@ -155,6 +158,8 @@ const Chat = () => {
     const [draft, setDraft] = useState("");
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // The words land in the draft, after anything typed meanwhile; they are never sent on their own.
+    const voice = useDictation({ onText: (text) => setDraft((current) => appendTranscript(current, text)) });
     const listRef = useRef<LegendListRef>(null);
     // Whether the list shows its last message: the jump button shows whenever it does not, and while a reply streams.
     const [isAtEnd, setIsAtEnd] = useState(true);
@@ -668,6 +673,7 @@ const Chat = () => {
                         style={{ borderColor: "#ccc", borderRadius: 10, borderWidth: 1, flex: 1, padding: 10 }}
                         value={draft}
                     />
+                    <VoiceButton disabledReason={composer.reason} isDisabled={composer.disabled} voice={voice} />
                     <Pressable
                         accessibilityHint={sendReason}
                         accessibilityRole="button"
@@ -679,6 +685,7 @@ const Chat = () => {
                         <Text style={{ fontWeight: "600" }}>Send</Text>
                     </Pressable>
                 </View>
+                <VoiceStatus error={voice.error} phase={voice.phase} />
                 {sendReason ? <Text style={{ fontSize: 12, paddingBottom: 8 + safeBottom, paddingHorizontal: 12 }}>{sendReason}</Text> : null}
             </KeyboardAvoidingView>
         </View>

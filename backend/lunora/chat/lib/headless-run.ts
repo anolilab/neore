@@ -231,10 +231,13 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
     ]);
     const extractMemory = options.memory && prefs.memoryEnabled;
 
+    // A run that continues a thread gets that thread's tools too (its linked pull requests); a new thread has none yet.
+    const continuedThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
     const toolResult =
         options.tools === "headless" && allowTools
             ? await buildAgentTools(ctx, {
                   headless: true,
+                  ...(continuedThreadId !== undefined && { threadId: continuedThreadId }),
                   ...(options.approvedTools && { headlessApproved: options.approvedTools }),
                   ...(options.pauseForApproval && { headlessCanAsk: true }),
                   model,

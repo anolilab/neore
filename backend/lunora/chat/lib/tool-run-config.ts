@@ -34,6 +34,11 @@ export const vToolRunConfig = v.object({
     instructions: v.optional(v.string()),
     mcpServerNames: v.array(v.string()),
     /**
+     * Runtime name -> fingerprint of each MCP tool the run offered (`mcp-tool-fingerprint.ts`). A continuation does not
+     * run an approved call whose tool's fingerprint changed or is gone. Absent on a snapshot that predates it: no check.
+     */
+    mcpToolFingerprints: v.optional(v.record(v.string(), v.string())),
+    /**
      * Set when the run that paused fed memory extraction (it extracted its own prompt
      * and steers at the pause). The continuation then extracts only what it adds: the
      * messages steered into it after the pause.

@@ -122,6 +122,86 @@
                         "agentLabel": {
                           "type": "string"
                         },
+                        "agentOptions": {
+                          "properties": {
+                            "configOptions": {
+                              "items": {
+                                "properties": {
+                                  "category": {
+                                    "type": "string"
+                                  },
+                                  "choices": {
+                                    "items": {
+                                      "properties": {
+                                        "name": {
+                                          "type": "string"
+                                        },
+                                        "value": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "value"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "currentValue": {
+                                    "type": "string"
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "choices",
+                                  "currentValue",
+                                  "id",
+                                  "name"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "modes": {
+                              "properties": {
+                                "available": {
+                                  "items": {
+                                    "properties": {
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "value": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "value"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "type": "array"
+                                },
+                                "current": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "available",
+                                "current"
+                              ],
+                              "type": "object"
+                            }
+                          },
+                          "required": [],
+                          "type": "object"
+                        },
                         "capabilities": {
                           "properties": {
                             "groups": {
@@ -743,6 +823,86 @@
                                 "sessions": {
                                   "properties": {
                                     "create": {
+                                      "anyOf": [
+                                        {
+                                          "properties": {
+                                            "degradation": {
+                                              "const": "none",
+                                              "type": "string"
+                                            },
+                                            "supported": {
+                                              "const": true
+                                            }
+                                          },
+                                          "required": [
+                                            "degradation",
+                                            "supported"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "properties": {
+                                            "degradation": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "restart",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "synthetic",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "divergent",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            },
+                                            "note": {
+                                              "type": "string"
+                                            },
+                                            "supported": {
+                                              "const": true
+                                            }
+                                          },
+                                          "required": [
+                                            "degradation",
+                                            "note",
+                                            "supported"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "properties": {
+                                            "reason": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "not_offered",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "not_enforced",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "unknown",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            },
+                                            "supported": {
+                                              "const": false
+                                            }
+                                          },
+                                          "required": [
+                                            "reason",
+                                            "supported"
+                                          ],
+                                          "type": "object"
+                                        }
+                                      ]
+                                    },
+                                    "fork": {
                                       "anyOf": [
                                         {
                                           "properties": {
@@ -2599,6 +2759,86 @@
                                     }
                                   ]
                                 },
+                                "fork": {
+                                  "anyOf": [
+                                    {
+                                      "properties": {
+                                        "degradation": {
+                                          "const": "none",
+                                          "type": "string"
+                                        },
+                                        "supported": {
+                                          "const": true
+                                        }
+                                      },
+                                      "required": [
+                                        "degradation",
+                                        "supported"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    {
+                                      "properties": {
+                                        "degradation": {
+                                          "anyOf": [
+                                            {
+                                              "const": "restart",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "synthetic",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "divergent",
+                                              "type": "string"
+                                            }
+                                          ]
+                                        },
+                                        "note": {
+                                          "type": "string"
+                                        },
+                                        "supported": {
+                                          "const": true
+                                        }
+                                      },
+                                      "required": [
+                                        "degradation",
+                                        "note",
+                                        "supported"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    {
+                                      "properties": {
+                                        "reason": {
+                                          "anyOf": [
+                                            {
+                                              "const": "not_offered",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "not_enforced",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "unknown",
+                                              "type": "string"
+                                            }
+                                          ]
+                                        },
+                                        "supported": {
+                                          "const": false
+                                        }
+                                      },
+                                      "required": [
+                                        "reason",
+                                        "supported"
+                                      ],
+                                      "type": "object"
+                                    }
+                                  ]
+                                },
                                 "listNative": {
                                   "anyOf": [
                                     {
@@ -4176,6 +4416,86 @@
                               "sessions": {
                                 "properties": {
                                   "create": {
+                                    "anyOf": [
+                                      {
+                                        "properties": {
+                                          "degradation": {
+                                            "const": "none",
+                                            "type": "string"
+                                          },
+                                          "supported": {
+                                            "const": true
+                                          }
+                                        },
+                                        "required": [
+                                          "degradation",
+                                          "supported"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      {
+                                        "properties": {
+                                          "degradation": {
+                                            "anyOf": [
+                                              {
+                                                "const": "restart",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "synthetic",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "divergent",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          "note": {
+                                            "type": "string"
+                                          },
+                                          "supported": {
+                                            "const": true
+                                          }
+                                        },
+                                        "required": [
+                                          "degradation",
+                                          "note",
+                                          "supported"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      {
+                                        "properties": {
+                                          "reason": {
+                                            "anyOf": [
+                                              {
+                                                "const": "not_offered",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "not_enforced",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "unknown",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          "supported": {
+                                            "const": false
+                                          }
+                                        },
+                                        "required": [
+                                          "reason",
+                                          "supported"
+                                        ],
+                                        "type": "object"
+                                      }
+                                    ]
+                                  },
+                                  "fork": {
                                     "anyOf": [
                                       {
                                         "properties": {
@@ -16109,6 +16429,88 @@
         "x-lunora-function-kind": "query"
       }
     },
+    "/_lunora/rpc#chat_context_reset:clearContext": {
+      "post": {
+        "description": "Invoke the `action` `chat_context_reset:clearContext` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_context_reset:clearContext",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "clientId": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "clientId",
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_context_reset:clearContext",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "hostSession": {
+                      "type": "boolean"
+                    },
+                    "messageId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "hostSession",
+                    "messageId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: chat_context_reset:clearContext",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#chat_custom_providers:deleteCustomProvider": {
       "post": {
         "description": "Invoke the `mutation` `chat_custom_providers:deleteCustomProvider` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -18242,6 +18644,9 @@
                       "botId": {
                         "type": "string"
                       },
+                      "contextResetMessageId": {
+                        "type": "string"
+                      },
                       "createdAt": {
                         "type": "number"
                       },
@@ -18304,6 +18709,9 @@
                           "participants"
                         ],
                         "type": "object"
+                      },
+                      "hasContextReset": {
+                        "type": "boolean"
                       },
                       "hasHandoff": {
                         "type": "boolean"
@@ -50926,6 +51334,9 @@
                               "canUnresolve": {
                                 "type": "boolean"
                               },
+                              "commentCount": {
+                                "type": "number"
+                              },
                               "comments": {
                                 "items": {
                                   "properties": {
@@ -50951,6 +51362,9 @@
                                   "type": "object"
                                 },
                                 "type": "array"
+                              },
+                              "commentsComplete": {
+                                "const": false
                               },
                               "id": {
                                 "type": "string"
@@ -56961,6 +57375,81 @@
         "x-lunora-function-kind": "action"
       }
     },
+    "/_lunora/rpc#voice_transcription:transcribeClip": {
+      "post": {
+        "description": "Invoke the `action` `voice_transcription:transcribeClip` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "voice_transcription:transcribeClip",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "audio": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "format": "password"
+                      },
+                      "durationMs": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "audio",
+                      "durationMs"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "voice_transcription:transcribeClip",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "text"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: voice_transcription:transcribeClip",
+        "tags": [
+          "voice"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#workflow_executor:executeWorkflow": {
       "post": {
         "description": "Invoke the `action` `workflow_executor:executeWorkflow` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -59728,7 +60217,7 @@
       "name": "vault"
     },
     {
-      "description": "Speech: text-to-speech and the paid realtime dictation token gate.",
+      "description": "Speech: text-to-speech, clip transcription for mobile voice input, and the paid realtime dictation token gate.",
       "name": "voice"
     },
     {

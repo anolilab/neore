@@ -22,13 +22,37 @@ The rules are summarized in `backend/lunora/chat/AGENTS.md`, which agents load a
   still resumes once). `from`, the reply rows and the step count are DERIVED from the
   saved rows, never from the dead run's memory (`settleSavedRows`); anything that is
   not a finished row or an empty placeholder, a trailing tool call without its result,
-  a delivered steer or an open tool mark fails the run visibly instead. At most 3
+  a delivered steer or an open tool mark fails the run visibly instead. A tool that
+  is safe to repeat (`lib/repeatable-tools.ts`) leaves no open mark: its start is
+  checked against the stream (live, held by this run) but not counted, so a death
+  inside it drops the unsaved step and the resume asks the model again, which calls
+  the tool anew. Repeating such a call may cost a second search or fetch, never a
+  second write. A tool says so explicitly or is unsafe: built-ins by name in
+  `BUILTIN_TOOLS_SAFE_TO_REPEAT`; MCP and connector tools when the server says
+  `readOnlyHint: true` and neither `destructiveHint` nor `openWorldHint` (the hints
+  the quick check also refuses on); device tools never. At most 3
   resumes per reply (`interruptions`), independent of the 3 rate-limit pauses; the
   4th interruption fails with an error line. Opt out with
   `userSettings.resumeInterruptedRuns === false` (absent = on): the stream then
   expires into `timeout` as before. An interrupted pause is not shown as a rate-limit
   wait and "Retry now" skips it. Not covered: tool-approval continuations, group
   turns and stateless runs register nothing, so they still time out.
+
+- **Pinned MCP tools** (`chat/lib/mcp-tool-fingerprint.ts`, `mcp-tools.ts`, `agent-run.ts#resumeApprovedRun`) — a
+  run that pauses for an approval records a fingerprint per MCP tool it offered (`mcpToolFingerprints`): a hash of the
+  server (name or connector slug, url, protocol), the tool name, the input JSON Schema (keys sorted; `required`, `enum`,
+  `type` and dependency name lists sorted as sets, data such as `const` left in order) and the behaviour hints (never the
+  display title or description). Only hashes are stored. The continuation re-lists the tools and compares: unchanged
+  runs; changed, removed, or still offered but unhashable this time (`unverified`) is answered as denied with a reason the
+  model reads, so a fresh call goes through the tool's permission again. A continuation that pauses again records the
+  fingerprints AND permission keys of the tools it offered. After a 401 the OAuth retry runs a relisted tool only if it
+  hashes the same as the first listing (`createAuthRetrySession`'s `sameTool`); a failed check refuses. A schema that
+  does not resolve within `FINGERPRINT_DEADLINE_MS` leaves the tool unpinned, and an OAuth retry on it is refused. The
+  pin covers the ONE approved call: an "Always allow" or timed grant is keyed by tool (`mcp:<server>:<tool>`, or
+  `connector:<slug>:<tool>`), like `auto`, so it covers a new call to the changed tool. The pin tells servers apart by
+  name (or connector slug) + url + protocol; low-risk trust and OAuth sign-ins use name + url, and permission keys the
+  name alone, so credentials never distinguish two saved entries. Interrupted and rate-limit resumes re-list the tools and replay no saved call; a repeatable tool that was
+  in flight is called afresh against the current list.
 
 - **Rate-limit pause** (`backend/lunora/chat/lib/rate-limit-pause.ts`, `chat/lib/pause-run.ts`, `persistent/library.ts#pauseRunForRateLimit`) —
   a provider 429 (or a 5xx that names a retry time) pauses the run instead of failing it. The GATEWAY reads the provider's

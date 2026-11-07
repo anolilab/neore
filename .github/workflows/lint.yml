@@ -44,6 +44,32 @@ jobs:
     # not assumed. Both are enforced locally (`pnpm lint:prettier`, `pnpm vis
     # secrets`, and the pre-commit hook), so before this job a PR could go green
     # having never had either run in CI.
+    # `dorny/paths-filter` reads the PR's file list through the REST API, so the
+    # job needs `pull-requests: read` (see test.yml).
+    files-changed:
+        name: "Detect what files changed"
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 3
+        permissions:
+            contents: "read"
+            pull-requests: "read"
+        outputs:
+            code: "${{ steps.changes.outputs.code }}"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
+              with:
+                  egress-policy: "audit"
+            - name: "Git checkout"
+              uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
+              with:
+                  persist-credentials: false
+            - name: "Check for file changes"
+              uses: "dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d" # v4.0.3
+              id: "changes"
+              with:
+                  token: "${{ github.token }}"
+                  filters: ".github/file-filters.yml"
     format-and-secrets:
         name: "Prettier and secret scan"
         runs-on: "ubuntu-latest"
@@ -92,6 +118,9 @@ jobs:
 
     types:
         name: "Types"
+        needs: "files-changed"
+        # Skipped (reported as success) when the change touches no code, e.g. docs only.
+        if: "github.event_name == 'merge_group' || needs.files-changed.outputs.code == 'true'"
         runs-on: "ubuntu-latest"
         timeout-minutes: 45
         permissions:
@@ -135,6 +164,9 @@ jobs:
 
     eslint:
         name: "ESLint"
+        needs: "files-changed"
+        # Skipped (reported as success) when the change touches no code, e.g. docs only.
+        if: "github.event_name == 'merge_group' || needs.files-changed.outputs.code == 'true'"
         runs-on: "ubuntu-24.04"
         timeout-minutes: 45
         permissions:
@@ -196,7 +228,7 @@ jobs:
     # `if:` reports success, so the gate must run when a need fails.
     lint-required-check:
         name: "Check Lint"
-        needs: ["lint", "format-and-secrets", "types", "eslint", "actionlint"]
+        needs: ["lint", "files-changed", "format-and-secrets", "types", "eslint", "actionlint"]
         if: "always()"
         runs-on: "ubuntu-latest"
         timeout-minutes: 5

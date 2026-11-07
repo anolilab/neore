@@ -274,7 +274,7 @@ const runSpeaker = async (
                   skillTools: speaker.config ? { additionalTools: speaker.config.additionalTools, disabledTools: speaker.config.disabledTools } : undefined,
                   userId: turn.userId,
               })
-            : { mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
+            : { mcpClients: [], mcpLabels: {}, mcpServerNames: [], mcpToolFingerprints: {}, permissionKeys: {}, repeatable: [], tools: {} };
 
         mcpClients = toolResult.mcpClients;
 
@@ -438,6 +438,7 @@ const runSpeaker = async (
             group: groupSnapshot(turn, speaker.skillId, position),
             instructions: system,
             mcpServerNames: toolResult.mcpServerNames,
+            mcpToolFingerprints: toolResult.mcpToolFingerprints,
             model,
             reasoningEffort,
             replyKey: turn.replyKey,

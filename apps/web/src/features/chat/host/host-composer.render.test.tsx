@@ -223,6 +223,11 @@ afterEach(() => {
     harness.data = {};
 });
 
+const CHOICES = [
+    { name: "Plan", value: "plan" },
+    { name: "Build", value: "build" },
+];
+
 describe("the coding-agent composer", () => {
     it("is a focus area for F6, as the cloud composer is, so F6 reaches it", async () => {
         mount(session());
@@ -242,6 +247,28 @@ describe("the coding-agent composer", () => {
         expect(focusNextArea(1)).toBe(true);
         // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
         expect(document.activeElement).toBe(box);
+    });
+
+    it.each([
+        [
+            "its options, with the name of each current value",
+            { configOptions: [{ category: "mode", choices: CHOICES, currentValue: "plan", id: "mode", name: "Mode" }] },
+            "Mode: Plan",
+        ],
+        ["its legacy mode list", { modes: { available: CHOICES, current: "build" } }, "Mode: Build"],
+    ])("shows %s as the agent reported them", async (_name, agentOptions, shown) => {
+        mount(session({ agentOptions }));
+
+        const list = await screen.findByRole("list", { name: "Agent options" });
+
+        expect(list.textContent).toBe(shown);
+    });
+
+    it("shows no options for an agent that reported none", async () => {
+        mount(session());
+        await screen.findByLabelText("Message to the coding agent");
+
+        expect(screen.queryByRole("list", { name: "Agent options" })).toBeNull();
     });
 
     it("sends the message under one request id and clears the box", async () => {
@@ -513,6 +540,118 @@ describe("the coding-agent composer", () => {
         const [first, second] = sendCalls().map(([, input]) => (input as { requestId: string }).requestId);
 
         expect(second).toBe(first);
+    });
+
+    it("sends a paused queue's first message alone on Send now, and keeps the rest paused", async () => {
+        usePromptQueueStore.getState().enqueue("thread-1", { attachments: [], text: "first" });
+        usePromptQueueStore.getState().enqueue("thread-1", { attachments: [], text: "second" });
+        usePromptQueueStore.getState().setPaused("thread-1", true);
+        mount(session());
+
+        const sendNow = await screen.findByRole("button", { name: "Send queued message 1 now" });
+
+        await waitFor(() => expect((sendNow as HTMLButtonElement).disabled).toBe(false));
+        fireEvent.click(sendNow);
+
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+        expect(sendCalls()[0]).toEqual(["send", { requestId: expect.any(String), text: "first", threadId: "thread-1" }]);
+        await endTurn();
+
+        expect(await screen.findByRole("button", { name: "Send next" })).toBeTruthy();
+        // Another round of reads after the end has been taken in: a drain of the second message would have posted by now.
+        await harness.client?.invalidateQueries();
+        await waitFor(() => expect(screen.queryByText("first")).toBeNull());
+        expect(sendCalls()).toHaveLength(1);
+    });
+
+    it("offers no Send now that would stop a turn a queued message's lost send may have started", async () => {
+        harness.sendResults = [{ error: "unreachable", ok: false }];
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        for (const text of ["lost answer", "behind it"]) {
+            fireEvent.change(box, { target: { value: text } });
+            fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+            await screen.findByText(text);
+        }
+
+        await endTurn();
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+
+        // The send's turn shows up after all: stopping it and sending again under the same id would never run the message. Send
+        // now on the message behind it would stop that same turn, so it is off too.
+        harness.data = { ...harness.data, "chat.streaming.getActiveStreamForThread": { streamId: "stream-2" } };
+        await harness.client?.invalidateQueries();
+
+        expect(((await screen.findByRole("button", { name: "Send queued message 1 now" })) as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: "Send queued message 2 now" }) as HTMLButtonElement).disabled).toBe(true);
+        // Interrupt and send from the box would stop it too: a message typed now queues instead.
+        expect(screen.queryByRole("button", { name: "Interrupt and send" })).toBeNull();
+    });
+
+    it("offers no Send now while a direct send whose answer was lost may be the turn running", async () => {
+        harness.sendResults = [{ error: "unreachable", ok: false }];
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "lost direct" } });
+        fireEvent.click(screen.getByRole("button", { name: "Send" }));
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+
+        // Its turn may be the one that shows up now: stopping it for a message queued behind would lose the first text.
+        harness.data = { ...harness.data, "chat.streaming.getActiveStreamForThread": { streamId: "stream-9" } };
+        await harness.client?.invalidateQueries();
+        fireEvent.change(box, { target: { value: "another" } });
+        fireEvent.click(await screen.findByRole("button", { name: "Queue" }));
+        await screen.findByText("another");
+
+        expect(((await screen.findByRole("button", { name: "Send queued message 1 now" })) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("keeps a lost send's mark through a refusal answered before the backend looks for repeats", async () => {
+        harness.sendResults = [
+            { error: "unreachable", ok: false },
+            { error: "not_authenticated", ok: false },
+        ];
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "lost answer" } });
+        fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+        await screen.findByText("lost answer");
+        await endTurn();
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+        fireEvent.click(await screen.findByRole("button", { name: "Send next" }));
+        await waitFor(() => expect(sendCalls()).toHaveLength(2));
+
+        // A sign-in refusal says nothing of the first try, whose turn may be this one.
+        harness.data = { ...harness.data, "chat.streaming.getActiveStreamForThread": { streamId: "stream-2" } };
+        await harness.client?.invalidateQueries();
+
+        expect(((await screen.findByRole("button", { name: "Send queued message 1 now" })) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("offers Send now for a queued message the backend refused outright, since its send started nothing", async () => {
+        harness.sendResults = [{ error: "busy", ok: false }];
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "refused" } });
+        fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+        await screen.findByText("refused");
+        await endTurn();
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+
+        harness.data = { ...harness.data, "chat.streaming.getActiveStreamForThread": { streamId: "stream-2" } };
+        await harness.client?.invalidateQueries();
+
+        const sendNow = await screen.findByRole("button", { name: "Send queued message 1 now" });
+
+        await waitFor(() => expect((sendNow as HTMLButtonElement).disabled).toBe(false));
     });
 
     it("keeps the interrupting text queued and paused when the reply did not stop", async () => {
@@ -797,6 +936,47 @@ describe("the coding-agent composer", () => {
 
         expect(queued[0]?.textContent).toContain("rewritten");
         expect(queued[1]?.textContent).toContain("second");
+
+        await endTurn();
+
+        // What goes out is the edited text, never the text it replaced.
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+        expect(sendCalls()[0]).toEqual(["send", { requestId: expect.any(String), text: "rewritten", threadId: "thread-1" }]);
+    });
+
+    it("sends a queued message next on Send now, by stopping the reply, and sends it once", async () => {
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        // Queued in this composer: a message queued before it mounted may have been sent already, so it never stops a turn.
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        for (const text of ["first", "urgent"]) {
+            fireEvent.change(box, { target: { value: text } });
+            fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+            await screen.findByText(text);
+        }
+
+        const sendNow = await screen.findByRole("button", { name: "Send queued message 2 now" });
+
+        // Off until the reads have answered, as every queue action is.
+        await waitFor(() => expect((sendNow as HTMLButtonElement).disabled).toBe(false));
+        fireEvent.click(sendNow);
+
+        await waitFor(() => expect(harness.calls).toContainEqual(["acp.remote.cancelHostTurn", { streamId: "stream-1", threadId: "thread-1" }]));
+        // It waits for the stopped turn's end, at the head.
+        expect(sendCalls()).toHaveLength(0);
+        expect(within(screen.getByRole("region", { name: "Queued messages" })).getAllByRole("listitem")[0]?.textContent).toContain("urgent");
+
+        await endTurn("stopped");
+
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+        expect(sendCalls()[0]).toEqual(["send", { requestId: expect.any(String), text: "urgent", threadId: "thread-1" }]);
+        await waitFor(() => expect(screen.queryByText("urgent")).toBeNull());
+
+        await endTurn();
+
+        await waitFor(() => expect(sendCalls()).toHaveLength(2));
+        expect(sendCalls().map(([, args]: [string, unknown]) => (args as { text: string }).text)).toEqual(["urgent", "first"]);
     });
 
     it("interrupts the turn on Enter when the person chose to send during a turn", async () => {

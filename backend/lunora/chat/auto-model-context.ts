@@ -10,6 +10,7 @@ import type { Id } from "../_generated/dataModel";
 import { internalQuery, type QueryCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 import { getThreadRow } from "../agent/branch-rows";
+import { resetForTip, rowsAfterContextReset } from "../agent/context-reset";
 import { estimateContext } from "../agent/thread-compaction";
 import { ownedBy, summariesOf } from "../agent/thread-summaries";
 import { replyWindowRows, rowCharacters } from "../agent/handoff-source";
@@ -78,18 +79,23 @@ export const autoRouteContextOf = async (
         throw new Error("The prompt of the run is not in the thread");
     }
 
-    // A stateless run sends the prompt alone; a stateful one sends the successful window, as model assembly reads it.
-    const window = args.stateless ? [prompt] : await replyWindowRows(ctx, args.threadId, prompt, PATH_ROWS);
+    // The thread's own load comes first: a context reset (`/clear`) decides which rows the reply reads.
+    const thread = ownedBy(await ctx.db.get("threads", args.threadId));
+    const contextReset = thread ? await resetForTip(ctx, thread, prompt) : null;
+
+    // A stateless run sends the prompt alone; a stateful one sends the successful window, as model assembly reads it, after any reset.
+    const window = args.stateless ? [prompt] : rowsAfterContextReset(await replyWindowRows(ctx, args.threadId, prompt, PATH_ROWS), contextReset);
     const docs = keptRows(window);
 
     // A compaction stands on this path: the request is its notes plus the rows after it. Sizing and attachments read only
     // the rows the request sends, so a file reference in a row it covers cannot fail the routing.
-    const thread = ownedBy(await ctx.db.get("threads", args.threadId));
     const summaries = thread ? await summariesOf(ctx, thread._id) : [];
     const hasCompaction = summaries.some((row) => row.kind === "compact");
     // The estimate walks the path, so it runs only when a compaction row stands: most threads have none. A stateless reply
     // sends the prompt alone, so the retained history and its summary do not size it.
-    const compacted = thread && hasCompaction && !args.stateless ? await estimateContext(ctx, thread, prompt) : undefined;
+    const estimated = thread && hasCompaction && !args.stateless ? await estimateContext(ctx, thread, prompt) : undefined;
+    // A compaction made before the reset describes turns the request no longer sends, so it is not used for the size.
+    const compacted = estimated?.covered !== undefined && (contextReset === null || estimated.covered.order > contextReset.order) ? estimated : undefined;
     const covered = compacted?.compactedAt === undefined ? undefined : compacted.covered;
     const sent =
         covered === undefined ? docs : docs.filter((row) => row.order > covered.order || (row.order === covered.order && row.stepOrder > covered.stepOrder));

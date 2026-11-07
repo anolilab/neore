@@ -10,6 +10,7 @@
     },
     "scripts": {
         "lint:types": "tsc --noEmit",
+        "lint:types:fast": "tsrs --noEmit",
         "test": "vitest run"
     },
     "dependencies": {

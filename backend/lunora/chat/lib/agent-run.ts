@@ -40,6 +40,7 @@ import { isRunReplaced } from "./run-epoch";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import { labelMcpToolCalls } from "./mcp-tool-labels";
 import { closeMCPClients } from "./mcp-tools";
+import { mcpToolDrift, mcpToolDriftReason } from "./mcp-tool-fingerprint";
 import { scheduleRepliesUsage } from "./pause-usage";
 import {
     asRefusedWrite,
@@ -1129,7 +1130,20 @@ export const resumeApprovedRun = async (
             throw new AgentRunError("stale-approval", "Approval is no longer pending on the latest turn");
         }
 
-        if (approved && pending.toolName !== null && !Object.hasOwn(toolResult.tools, pending.toolName)) {
+        // The approval was given for the MCP tool as the paused run offered it. One that changed or went away since is not
+        // run under it: the call is answered as denied with the reason, so the model can call the tool again, which asks again.
+        const drift =
+            approved && pending.toolName !== null
+                ? mcpToolDrift(config.mcpToolFingerprints, toolResult.mcpToolFingerprints, pending.toolName, Object.hasOwn(toolResult.tools, pending.toolName))
+                : "unchanged";
+        const runApproved = approved && drift === "unchanged";
+        const runDenyReason = drift === "unchanged" ? denyReason : mcpToolDriftReason(drift);
+
+        if (drift !== "unchanged") {
+            streamLogger.warn(`[ToolApproval] Approved MCP tool ${pending.toolName} is ${drift} since the pause; the call is not run`);
+        }
+
+        if (runApproved && pending.toolName !== null && !Object.hasOwn(toolResult.tools, pending.toolName)) {
             throw new AgentRunError("stale-approval", `Tool ${pending.toolName} is no longer available`);
         }
 
@@ -1151,7 +1165,7 @@ export const resumeApprovedRun = async (
 
         // An answered question: the approved call executes a copy of the tool
         // that returns the answer, so the answer is the call's tool result.
-        if (approved && pending.toolName === ASK_USER_TOOL_NAME) {
+        if (runApproved && pending.toolName === ASK_USER_TOOL_NAME) {
             if (answer === undefined && answers === undefined) {
                 throw new AgentRunError("stale-approval", "A question can only be resumed with an answer");
             }
@@ -1175,7 +1189,7 @@ export const resumeApprovedRun = async (
         }
 
         // An answered secret request: the call's result is the stored value's reference, never the value.
-        if (approved && pending.toolName === REQUEST_SECRET_TOOL_NAME) {
+        if (runApproved && pending.toolName === REQUEST_SECRET_TOOL_NAME) {
             if (answer === undefined) {
                 throw new AgentRunError("stale-approval", "A secret request can only be resumed with a reference");
             }
@@ -1264,11 +1278,11 @@ export const resumeApprovedRun = async (
 
         const steering = options.steerable === true ? createRunSteering(ctx, { streamId, threadId, userId }) : undefined;
         const runOptions = { saveStreamDeltas: false, ...(steering && { takeSteer: steering.takeSteer }) };
-        const result = approved
+        const result = runApproved
             ? await agent.approveToolCall(ctx, { threadId, userId }, { approvalId }, streamTextArgs as never, runOptions)
             : await agent.denyToolCall(
                   ctx,
-                  { approvalId, ...(denyReason !== undefined && { reason: denyReason }), threadId },
+                  { approvalId, ...(runDenyReason !== undefined && { reason: runDenyReason }), threadId },
                   streamTextArgs as never,
                   runOptions,
               );
@@ -1363,7 +1377,14 @@ export const resumeApprovedRun = async (
                 mcpLabels: toolResult.mcpLabels,
                 pending: piped.pending,
                 savedMessages: result.savedMessages,
-                snapshot,
+                // A further pause is checked against the tools THIS run offered, which may differ from the first run's: their
+                // fingerprints, endpoints, and the permission key each runtime name stands for now ("Always allow" writes that key).
+                snapshot: {
+                    ...snapshot,
+                    mcpToolFingerprints: toolResult.mcpToolFingerprints,
+                    toolEndpoints: toolResult.toolEndpoints,
+                    toolPermissionKeys: toolResult.permissionKeys,
+                },
                 streamId,
                 threadId,
                 unsaved: piped.unsaved,

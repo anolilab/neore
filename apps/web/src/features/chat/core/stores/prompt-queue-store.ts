@@ -4,9 +4,14 @@
  * Prompt queue store — per-thread queues of messages submitted while a turn was
  * streaming.
  *
- * Mirrored per thread into sessionStorage so a reload does not lose them, TEXT
- * ONLY: queued attachments hold `File` objects, which storage cannot keep, so a
- * restored prompt carries a count of what it lost instead. A restored queue is
+ * Mirrored per thread into sessionStorage so a reload does not lose them. A
+ * queued attachment is kept by its uploaded file id, never its bytes, and comes
+ * back as an uploaded attachment with an empty stand-in `File`, which the
+ * composer neither previews nor edits; one without an id is counted as lost
+ * instead. The queue lives in the tab's
+ * sessionStorage, not shared by every tab on the thread: each tab drains its own
+ * queue, so a shared one would send its head once per open tab. A duplicated tab
+ * starts with a copy, which is restored paused like any other. A restored queue is
  * always paused — it waits for "Send next" rather than auto-sending prompts the
  * user may no longer remember queuing. Storage can be unavailable (private
  * windows, blocked site data), so every access is guarded and failure just
@@ -17,7 +22,7 @@
 
 import { create } from "zustand";
 
-import type { PromptQueueState, QueuedPrompt } from "@/features/chat/core/utils/prompt-queue";
+import type { PromptQueueState, QueuedPrompt, StoredAttachment } from "@/features/chat/core/utils/prompt-queue";
 import {
     dequeuePrompt,
     editQueuedPrompt,
@@ -53,6 +58,8 @@ interface PromptQueueStore {
     setPaused: (threadId: string, paused: boolean) => void;
     /** `steerRun` answered: keeps the steer (`accepted`) or makes it an ordinary queued message (`refused`). */
     settleSteer: (threadId: string, steerId: string, outcome: "accepted" | "refused") => void;
+    /** Marks whether a send was made under a queued message's id whose answer may have been lost. */
+    setTried: (threadId: string, id: string, tried: boolean) => void;
     /** Removes and returns the oldest queued prompt. */
     shift: (threadId: string) => QueuedChatPrompt | undefined;
 }
@@ -60,6 +67,32 @@ interface PromptQueueStore {
 const STORAGE_KEY_PREFIX = "neore:prompt-queue:";
 
 const generatePromptId = () => `queued-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+/** Keeps an attachment by its uploaded file id; one still uploading or failed has none, so it is not kept. */
+export const toStoredAttachment = (attachment: PendingAttachment): StoredAttachment | undefined =>
+    attachment.status === "complete" && attachment.fileId
+        ? {
+              fileId: attachment.fileId,
+              kind: attachment.type,
+              mediaType: attachment.file.type,
+              name: attachment.name,
+              size: attachment.restoredSize ?? attachment.file.size,
+          }
+        : undefined;
+
+/** An uploaded attachment again: the send reads only its file id, so its `File` is an empty stand-in. */
+export const fromStoredAttachment = (stored: StoredAttachment, index: number): PendingAttachment => {
+    return {
+        file: new File([], stored.name, { type: stored.mediaType }),
+        fileId: stored.fileId,
+        // By position as well: the same uploaded file can be attached twice, and each chip is removed on its own.
+        id: `restored-${index}-${stored.fileId}`,
+        name: stored.name,
+        restoredSize: stored.size,
+        status: "complete",
+        type: stored.kind,
+    };
+};
 
 const readStoredQueue = (threadId: string): string | null => {
     try {
@@ -71,7 +104,7 @@ const readStoredQueue = (threadId: string): string | null => {
 
 const writeStoredQueue = (threadId: string, queue: ThreadQueue): void => {
     try {
-        const serialized = serializePromptQueue(queue);
+        const serialized = serializePromptQueue(queue, toStoredAttachment);
 
         if (serialized) {
             globalThis.sessionStorage?.setItem(STORAGE_KEY_PREFIX + threadId, serialized);
@@ -79,7 +112,13 @@ const writeStoredQueue = (threadId: string, queue: ThreadQueue): void => {
             globalThis.sessionStorage?.removeItem(STORAGE_KEY_PREFIX + threadId);
         }
     } catch {
-        // Quota or blocked storage: the queue still works for this page load.
+        // Quota or blocked storage: the queue still works for this page load. An older stored copy must not come back on a
+        // reload with messages already sent in it, so it goes (a removal needs no quota).
+        try {
+            globalThis.sessionStorage?.removeItem(STORAGE_KEY_PREFIX + threadId);
+        } catch {
+            // Storage is blocked altogether: there is nothing stored to come back.
+        }
     }
 };
 
@@ -122,7 +161,7 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
                 return;
             }
 
-            const restored = restorePromptQueue(readStoredQueue(threadId));
+            const restored = restorePromptQueue(readStoredQueue(threadId), fromStoredAttachment);
 
             if (restored) {
                 set((state) => {
@@ -135,6 +174,16 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
         queues: {},
         remove: (threadId, id) => update(threadId, (queue) => removeQueuedPrompt(queue, id)),
         setPaused: (threadId, paused) => update(threadId, (queue) => (queue.paused === paused ? queue : { ...queue, paused })),
+        setTried: (threadId, id, tried) =>
+            update(threadId, (queue) => {
+                const target = queue.items.find((item) => item.id === id);
+
+                if (!target || Boolean(target.tried) === tried) {
+                    return queue;
+                }
+
+                return { ...queue, items: queue.items.map((item) => (item === target ? { ...item, tried } : item)) };
+            }),
         settleSteer: (threadId, steerId, outcome) => update(threadId, (queue) => settleQueuedSteer(queue, steerId, outcome)),
         shift: (threadId) => {
             const { next, state } = dequeuePrompt(get().queues[threadId] ?? EMPTY_PROMPT_QUEUE);

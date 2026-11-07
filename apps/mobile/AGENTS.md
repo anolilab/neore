@@ -7,8 +7,8 @@
   row has `syncedAt`; every upsert is guarded in SQL (`updated_at`, then `synced_at`) and `mergeRows` keeps the newer
   copy and drops nothing, because a row absent from either side proves no deletion (eviction by the caps is not a
   delete either). There is deliberately no outbox table: offline, `write-gate.ts` disables the composer, send,
-  approve, cancel and start controls, and `reconnect.ts` only re-runs reads. Any Lunora `.mutation(`/`.action(` call
-  in the app must pass `onlineOnly: true`, or the client queues it and replays it on reconnect (`reconnect.test.ts`
+  approve, cancel and start controls, and `reconnect.ts` only re-runs reads. Any Lunora `.mutation(` call in the app
+  must pass `onlineOnly: true` (actions are never queued and take no such option), or the client queues it and replays it on reconnect (`reconnect.test.ts`
   scans for it). The cache is bound to one account (`bindOwner`; a different id empties it) and `clear()` runs on
   sign-out; a save from a screen of a signed-out account is refused. Sign-out empties the cache BEFORE it asks the
   server (`auth/sign-out.ts`), so a failing or hanging request leaves nothing behind. Locked threads are never cached,
@@ -26,3 +26,10 @@
   Android Auto Backup never copies the cache directory, so no backup rule is needed (the secure-store plugin owns the
   app's backup rules). `PRAGMA user_version` (`SCHEMA_VERSION` in `cache.ts`) drops and recreates the tables on a
   mismatch: bump it with any `SCHEMA` change. The screens are keyed by the signed-in account.
+- **Voice input paths** (`src/voice/`) — the cloud by default; "Transcribe on this device" (secure store, read on every
+  press by `createDictationRouter`) switches to the phone's recognizer. There is NO fallback between them: an on-device
+  press that cannot be served shows a message and records nothing, and a setting that cannot be read records nothing.
+  On-device means `requiresOnDeviceRecognition: true`, Android 13+ only (older Android merely prefers offline), and the
+  pnpm patch on `expo-speech-recognition` that makes iOS fail such a request instead of using the network. Re-check
+  that patch on every upgrade of the module. The recognizer is one per app (`createRecognizerLock`): an aborted
+  recognition holds it ("draining") until its `end`, heard by an app-wide listener, so a late end never closes a newer press.
