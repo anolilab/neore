@@ -207,7 +207,8 @@ export default defineConfig({
             // that export only a built `dist`, and the backend's generated API for
             // the apps that import it.
             dependsOn: [{ projects: ["@neore/ai", "@neore/service-sdk"], target: "build" }, "^codegen"],
-            inputs: ["default", "^production"],
+            // The lockfile pins the compiler: a `tsrs` bump must not reuse old results.
+            inputs: ["default", "^production", "{workspaceRoot}/pnpm-lock.yaml"],
             cache: true,
         },
         test: {
