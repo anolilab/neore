@@ -105,8 +105,12 @@ const runJob = async (afterMessageId: string) => await harness.action(async (ctx
 const summaries = async (): Promise<{ coveredUpToMessageId: string; summary: string; taintedBy: string[] }[]> =>
     await harness.run(async (ctx: any) => await ctx.db.query("threadContextSummaries").collect());
 
-const contextSummary = async (promptMessageId?: string) =>
+const contextRead = async (promptMessageId?: string) =>
     await harness.run(async (ctx: any) => await ctx.runQuery(getThreadSummaryForContext, { promptMessageId, threadId }));
+
+/** The notes text the agent reads, or `null` for none. */
+const contextSummary = async (promptMessageId?: string): Promise<string | null> =>
+    ((await contextRead(promptMessageId)) as { summary: string } | null)?.summary ?? null;
 
 const storeSummary = async (coveredIndex: number, summary: string, coveredCount = coveredIndex + 1, taintedBy: string[] = []) =>
     await harness.run(
@@ -244,6 +248,32 @@ describe("making a summary", () => {
 
         expect(generateText).toHaveBeenCalledTimes(2);
         expect(await summaries()).toHaveLength(1);
+    });
+
+    it("a second run of a cut that a run in flight already holds never calls the model", async () => {
+        let finish: (value: { text: string; usage: object }) => void = () => {};
+
+        // The engines range (Node 22.0) predates `Promise.withResolvers`, so the resolver is taken from the executor.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const answer = new Promise<{ text: string; usage: object }>((resolve) => {
+            finish = resolve;
+        });
+
+        generateText.mockImplementationOnce(async () => await answer);
+        await seedThread(ROWS);
+
+        const first = runJob(rowIds.at(-1)!);
+
+        await vi.waitFor(() => expect(generateText).toHaveBeenCalledTimes(1));
+        await runJob(rowIds.at(-1)!);
+
+        expect(generateText).toHaveBeenCalledTimes(1);
+
+        finish({ text: "The user is planning a trip.", usage: { inputTokens: 10, outputTokens: 5 } });
+        await first;
+
+        expect(await summaries()).toHaveLength(1);
+        expect(generateText).toHaveBeenCalledTimes(1);
     });
 
     it("moves the cover on when the model answers with nothing, instead of paying for the same rows again", async () => {

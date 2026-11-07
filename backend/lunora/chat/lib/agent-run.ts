@@ -463,6 +463,7 @@ export const loadRunContext = async (
         knowledgeSources: knowledgeContext?.sources ?? [],
         memoryEnabled: prefs.memoryEnabled,
         prefs: {
+            autoCompactThreshold: prefs.autoCompactThreshold,
             backupModel: prefs.backupModel,
             language: args.threadLanguage || prefs.language,
             location: prefs.location,

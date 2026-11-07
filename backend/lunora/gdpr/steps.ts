@@ -182,7 +182,7 @@ export const collectConversations = internalAction.input({ userId: v.string() })
     // wire shape.
     const conversations: {
         /** The condensed copies of the thread's older turns made while it sat idle (`agent/thread-summaries.ts`). */
-        contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; summary: string }[];
+        contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string }[];
         messages: {
             _id: string;
             createdAt: number;
