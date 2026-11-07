@@ -596,6 +596,14 @@ describe("Send now", () => {
         expect(sendNowAction(IDLE, { itemId: "a", running: false, tried: true })).toBe("release");
     });
 
+    it("holds a released message again when a turn from elsewhere starts and fails between two reads", () => {
+        const released = run([{ itemId: "b", type: "released" }], IDLE).state;
+        const step = run([observed(undefined, ["stream-other", "failed"])], released);
+
+        expect(types(step)).toEqual(["pause"]);
+        expect(step.state.released).toBeUndefined();
+    });
+
     it("holds a released message again when a turn from elsewhere starts before it went", () => {
         const released = run([{ itemId: "b", type: "released" }], IDLE).state;
 

@@ -237,8 +237,11 @@ const onEnd = (state: HostQueueState, end: HostTurnEnd): HostQueueStep => {
     }
 
     // Any other end: another tab's turn, an older turn, or one known to be over. Its reason still decides whether what is
-    // queued waits for the person.
-    return { effects: pauses ? [{ type: "pause" }] : [], state: next };
+    // queued waits for the person. A release was made with no turn running: a turn that ran and paused the queue since, and
+    // is not this composer's own stopped one, holds the released message too.
+    const held = pauses && !wasRetired && phase.kind === "idle" ? { ...next, released: undefined } : next;
+
+    return { effects: pauses ? [{ type: "pause" }] : [], state: held };
 };
 
 /** What a new observation does on top of any end it carried: a live turn is noted by a send, and awaited otherwise. */
