@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { schemaWithShardedTables } from "../lib/test-schema";
 import { pruneRetainedActivity, RETENTION_BATCH, SUB_AGENT_RUN_RETENTION_DAYS, usageDailyCutoffDate } from "./retention";
-import { collectActivityForExport } from "./steps";
+import { collectActivityForExport, exportUsageSplit } from "./steps";
 import { BATCH, deleteUserSubAgentRuns, deleteUserUsageDaily } from "./steps/residual-deletion-steps";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -109,5 +109,14 @@ describe("pruneRetainedActivity", () => {
         expect(await count("subAgentRuns", A)).toBe(2);
         expect(RETENTION_BATCH).toBeGreaterThan(0);
         expect(usageDailyCutoffDate(Date.UTC(2026, 0, 1))).toBe("2024-11-27");
+    });
+});
+
+describe("exportUsageSplit", () => {
+    it("gives day and skill rows every slot project and organization rows leave free, within one bound", () => {
+        expect(exportUsageSplit(5001, 0)).toStrictEqual({ attribution: 0, dayAndSkill: 5000 });
+        expect(exportUsageSplit(4800, 50)).toStrictEqual({ attribution: 50, dayAndSkill: 4800 });
+        expect(exportUsageSplit(5001, 5001)).toStrictEqual({ attribution: 1000, dayAndSkill: 4000 });
+        expect(exportUsageSplit(10, 5001)).toStrictEqual({ attribution: 4990, dayAndSkill: 10 });
     });
 });
