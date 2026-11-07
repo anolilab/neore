@@ -133,12 +133,17 @@ describe("the export of coding-agent sessions and events", () => {
             { name: "Build", value: "build" },
         ];
 
-        await insertSession(A, device, 0, { agentOptions: { configOptions: [{ category: "mode", choices, currentValue: "plan", id: "mode", name: "Mode" }] } });
+        await insertSession(A, device, 0, {
+            agentOptions: { configOptions: [{ category: "mode", choices, currentValue: "plan", id: "mode", name: "Mode" }] },
+            capabilities: { groups: { identity: { models: [{ id: "m", name: "M" }] } }, reportedAt: 1, version: 1 },
+        });
         await insertSession(A, device, 1, { agentOptions: { modes: { available: choices, current: "build" } } });
 
         const pages = await collectAll(A);
         const sessions = pages.flatMap((page) => page.sessions);
 
+        // The agent's list of models is its offer, not the person's data: it is left out of the export.
+        expect(sessions.some((session) => JSON.stringify(session).includes('"models"'))).toBe(false);
         // The rows come back in no set order.
         expect(sessions.map((session) => session.agentOptions)).toHaveLength(2);
         expect(sessions.map((session) => session.agentOptions)).toEqual(

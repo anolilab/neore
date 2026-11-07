@@ -15,8 +15,13 @@ export const MAX_CHOICES = 64;
 const MAX_ID_BYTES = 128;
 const MAX_NAME_CHARS = 120;
 const MAX_CATEGORY_CHARS = 64;
-/** What the options may take of a `session_open` post (the backend refuses one over 256 KiB): counts alone do not bound bytes. */
-const MAX_OPTIONS_BYTES = 48 * 1024;
+
+/**
+ * What the options may take as JSON: counts alone do not bound bytes. The post that carries them (the backend refuses one over
+ * 256 KiB, and a refused open leaves the session local) encodes them a second time, which at most doubles them, and the
+ * capability report repeats the model choices: at most four times this, well under the cap.
+ */
+const MAX_OPTIONS_BYTES = 32 * 1024;
 
 export interface AgentChoice {
     name: string;
@@ -75,7 +80,7 @@ const choicesOf = (entries: unknown, idKey: string, scrub: Scrub): AgentChoice[]
 };
 
 const optionOf = (entry: unknown, scrub: Scrub): AgentOption | undefined => {
-    if (!isRecord(entry) || (entry.type !== undefined && entry.type !== "select")) {
+    if (!isRecord(entry) || entry.type !== "select" || !Array.isArray(entry.options)) {
         return undefined;
     }
 
@@ -162,14 +167,21 @@ export const applyOptionsUpdate = (options: AgentOptions, update: Record<string,
         return undefined;
     }
 
+    const moves = (option: AgentOption): boolean =>
+        option.category === "mode" && option.currentValue !== id && option.choices.some((choice) => choice.value === id);
+    const movesLegacy = options.modes !== undefined && options.modes.current !== id && options.modes.available.some((mode) => mode.value === id);
+
+    // An unknown mode, or the one already current, changes nothing: no report is sent for it.
+    if (!movesLegacy && options.configOptions?.some((option) => moves(option)) !== true) {
+        return undefined;
+    }
+
     return {
         ...(options.configOptions !== undefined && {
-            configOptions: options.configOptions.map((option) =>
-                option.category === "mode" && option.choices.some((choice) => choice.value === id) ? { ...option, currentValue: id } : option,
-            ),
+            configOptions: options.configOptions.map((option) => (moves(option) ? { ...option, currentValue: id } : option)),
         }),
         ...(options.modes !== undefined && {
-            modes: { ...options.modes, current: options.modes.available.some((mode) => mode.value === id) ? id : options.modes.current },
+            modes: { ...options.modes, current: movesLegacy ? id : options.modes.current },
         }),
     };
 };

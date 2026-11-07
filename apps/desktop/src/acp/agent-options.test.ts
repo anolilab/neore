@@ -109,6 +109,9 @@ describe("optionsOf", () => {
         });
         const options = [
             { currentValue: true, id: "flag", name: "Flag", type: "boolean" },
+            // Not a list option: no type, or no list to choose from.
+            { currentValue: "a", id: "untyped", name: "Untyped", options: [{ name: "A", value: "a" }] },
+            { currentValue: "a", id: "listless", name: "Listless", type: "select" },
             { currentValue: "a", id: "SECRET", name: "Masked", options: [{ name: "A", value: "a" }], type: "select" },
             { currentValue: "a", id: "é".repeat(65), name: "Long", options: [{ name: "A", value: "a" }], type: "select" },
             { currentValue: "c0", id: "big", name: "Big", options: choices, type: "select" },
@@ -160,7 +163,11 @@ describe("applyOptionsUpdate", () => {
         expect(acpSchema("SessionUpdate").safeParse(update).success).toBe(true);
         expect(applyOptionsUpdate(start, update, keep)?.configOptions?.[0]?.currentValue).toBe("plan");
         expect(applyOptionsUpdate(legacy, { currentModeId: "code", sessionUpdate: "current_mode_update" }, keep)?.modes?.current).toBe("code");
-        expect(applyOptionsUpdate(legacy, { currentModeId: "other", sessionUpdate: "current_mode_update" }, keep)?.modes?.current).toBe("ask");
+        // An unknown mode, or the one already current, changes nothing, so nothing is sent again.
+        expect(applyOptionsUpdate(legacy, { currentModeId: "other", sessionUpdate: "current_mode_update" }, keep)).toBeUndefined();
+        expect(applyOptionsUpdate(legacy, { currentModeId: "ask", sessionUpdate: "current_mode_update" }, keep)).toBeUndefined();
+        expect(applyOptionsUpdate(start, { currentModeId: "build", sessionUpdate: "current_mode_update" }, keep)).toBeUndefined();
+        expect(applyOptionsUpdate({}, update, keep)).toBeUndefined();
     });
 
     it("ignores every other update", () => {

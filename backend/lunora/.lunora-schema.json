@@ -249,6 +249,12 @@
             }
           }
         },
+        "agentOptionsAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "capabilities": {
           "kind": "object",
           "nullable": false,

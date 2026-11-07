@@ -483,6 +483,16 @@ describe("capability reports", () => {
         await expect(optionsOf(threadId)).resolves.toEqual(mode("plan"));
         await expect(optionsOf(threadId, await insertUser())).resolves.toBeUndefined();
 
+        // A desktop clock ahead of this one: its reports are ordered by the time it gave them, not the capped one, so two
+        // quick changes do not tie and a late older one does not pass a newer one.
+        const ahead = Date.now() + 60_000;
+
+        await openWithOptions(ahead, mode("build"));
+        await openWithOptions(ahead + 1, mode("plan"));
+        await expect(optionsOf(threadId)).resolves.toEqual(mode("plan"));
+        await openWithOptions(ahead, mode("build"));
+        await expect(optionsOf(threadId)).resolves.toEqual(mode("plan"));
+
         // Options are a session-level event: never one of a turn, and never anything but the open's follower.
         await expect(ingest(device, { events: [{ kind: "session_options", options: mode("build") }] })).resolves.toMatchObject({ status: 403 });
     });

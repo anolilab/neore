@@ -48,6 +48,18 @@ const vExportSession = v.object({
     threadId: v.string(),
 });
 
+/**
+ * The report without the agent's list of models: it is the agent's offer, not the person's data, and up to 64 entries of a
+ * few hundred bytes would push a page past what a workflow step may keep. The model the session ran is in `agentOptions`.
+ */
+const withoutModelList = (report: Infer<typeof vCapabilityReport>): Infer<typeof vCapabilityReport> => {
+    if (report.groups.identity?.models === undefined) {
+        return report;
+    }
+
+    return { ...report, groups: { ...report.groups, identity: { ...report.groups.identity, models: undefined } } };
+};
+
 /** The current value of each option the agent offered; for an agent with only the legacy mode list, its mode. */
 const exportedOptions = (options: Infer<typeof vAgentOptions>): { id: string; name: string; value: string }[] => [
     ...(options.configOptions ?? []).map((option) => {
@@ -111,7 +123,7 @@ export const collectAcpSessionsForExport = internalQuery
                             folderLabel,
                             status,
                             threadId: threadId as string,
-                            ...(capabilities !== undefined && { capabilities }),
+                            ...(capabilities !== undefined && { capabilities: withoutModelList(capabilities) }),
                             ...(agentOptions !== undefined && { agentOptions: exportedOptions(agentOptions) }),
                             ...(importedTurns !== undefined && { importedTurns }),
                             ...(importState !== undefined && { importState }),

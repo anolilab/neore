@@ -107,11 +107,17 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         // can also report more once it has been used; the thread and session stay as they are. A delayed or
         // replayed open carries an older report and must not roll the stored one back: only a strictly newer one
         // replaces it (an equal time keeps what is stored), and a time ahead of this clock is taken as now, so one
-        // future-dated report cannot shut out every later one. The agent's options ride with the report and follow the same rule:
-        // the desktop sends the open again, with a newer report, whenever they change.
+        // future-dated report cannot shut out every later one. The agent's options are sent with a newer report whenever they
+        // change, and are ordered by that report's time as the desktop sent it: capped, two reports from a desktop clock ahead
+        // of this one would tie, or a late older one could pass a newer one.
         const reportedAt = open.capabilities ? Math.min(open.capabilities.reportedAt, now) : 0;
         const newerReport = open.capabilities !== undefined && reportedAt > (existing.capabilities?.reportedAt ?? 0);
         const opened = existing.status === "starting";
+        const optionsAt = open.capabilities?.reportedAt;
+        const newerOptions =
+            options !== undefined && optionsAt !== undefined && optionsAt > (existing.agentOptionsAt ?? -1)
+                ? { agentOptions: options, agentOptionsAt: optionsAt }
+                : undefined;
 
         // A session the backend started with a saved session id (`openHostSession` records it on the row) that the agent
         // did not end up in: the thread says so and hands the conversation over instead. An agent that cannot say it
@@ -139,11 +145,11 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
                 where: { producer: "host", status: { in: ["pending", "streaming"] }, threadId: existing.threadId },
             })) !== null;
 
-        if (existing.status !== "ended" && (opened || newerReport || learnedNativeId !== undefined)) {
+        if (existing.status !== "ended" && (opened || newerReport || newerOptions !== undefined || learnedNativeId !== undefined)) {
             await ctx.db.patch("acpSessions", existing._id, {
                 updatedAt: now,
                 ...(newerReport && open.capabilities && { capabilities: { ...open.capabilities, reportedAt } }),
-                ...(newerReport && options && { agentOptions: options }),
+                ...newerOptions,
                 ...(learnedNativeId !== undefined && { nativeSessionId: learnedNativeId }),
                 ...(opened && { lastEventAt: now, status: opening ? ("busy" as const) : ("idle" as const) }),
             });
@@ -178,7 +184,7 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         updatedAt: now,
         userId: device.userId,
         ...(open.capabilities && { capabilities: { ...open.capabilities, reportedAt: Math.min(open.capabilities.reportedAt, now) } }),
-        ...(options && { agentOptions: options }),
+        ...(options && open.capabilities && { agentOptions: options, agentOptionsAt: open.capabilities.reportedAt }),
         ...(open.nativeSessionId !== undefined && { nativeSessionId: open.nativeSessionId }),
     });
 
