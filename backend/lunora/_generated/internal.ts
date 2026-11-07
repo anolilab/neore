@@ -1167,7 +1167,7 @@ export interface InternalApiTypes {
             canRunForUser: FunctionReference<"query", { userId: string }, boolean>;
             checkDueTasks: FunctionReference<"mutation", {}, null>;
             claimRound: FunctionReference<"mutation", { cycle: string; origin: "manual" | "dependency" | "schedule" | "retry" | "repair"; round: number; taskId: Id<"tasks"> }, null | { codingAgent?: { agent: "claude_code" | "codex"; branch?: string; openPr?: boolean; repoUrl: string }; contextDivider?: boolean; continueThreadId?: string; freshContext?: boolean; goal?: { description?: string; successCriteria?: string; title: string }; instructions: string; keepLastThread?: boolean; model?: string; organizationId?: string; projectId?: Id<"projects">; reasoningEffort?: number; repair?: { previousAnswer?: string; reasons: Array<string>; repairInstructions?: string }; reviewNote?: string; runId: Id<"taskRuns">; skillId?: Id<"skills">; successCriteria?: string; title: string; userId: string }>;
-            completeRound: FunctionReference<"mutation", { keepLastThread?: boolean; outcome: { error: string; kind: "error" } | { finalAnswer: string; kind: "verified"; verdict: { pass: boolean; reasons: Array<string>; repairInstructions?: string } } | { finalAnswer: string; kind: "unverified" }; runId: Id<"taskRuns">; threadId?: string }, null | "done" | "repair" | "needs_review" | "failed" | "cancelled">;
+            completeRound: FunctionReference<"mutation", { keepLastThread?: boolean; outcome: { error: string; kind: "error"; stopsRecurrence?: true } | { finalAnswer: string; kind: "verified"; verdict: { pass: boolean; reasons: Array<string>; repairInstructions?: string } } | { finalAnswer: string; kind: "unverified" }; runId: Id<"taskRuns">; threadId?: string }, null | "done" | "repair" | "needs_review" | "failed" | "cancelled">;
             getTaskForVerification: FunctionReference<"query", { taskId: Id<"tasks"> }, { instructions: string; successCriteria?: string; title: string; userId: string } | null>;
             isRoundRunning: FunctionReference<"query", { runId: Id<"taskRuns"> }, boolean>;
             recordRunNotice: FunctionReference<"mutation", { cycle: string; reason: "project_unwritable" | "thread_locked" | "thread_busy" | "thread_shared" | "thread_unavailable"; taskId: Id<"tasks"> }, null>;
@@ -1200,7 +1200,7 @@ export interface InternalApiTypes {
             reserveQuietWindow: FunctionReference<"mutation", { expected?: number; triggerId: Id<"triggers">; windowStart: number }, boolean>;
             setTriggerEnabledInternal: FunctionReference<"mutation", { enabled: boolean; triggerId: Id<"triggers"> }, null>;
             switchOffConsumedMoment: FunctionReference<"mutation", { claimKey?: string; firing?: number; triggerId: Id<"triggers"> }, null>;
-            updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string; userFixable?: boolean }, null>;
+            updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; permanent?: boolean; status: string; threadId?: string; userFixable?: boolean }, null>;
             updateTriggerStats: FunctionReference<"mutation", { error?: string; lastTriggeredAt?: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }, null>;
         };
         quiet_inputs: {

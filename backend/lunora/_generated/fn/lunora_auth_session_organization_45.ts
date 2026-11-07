@@ -12,7 +12,7 @@ if (typeof source["sessionId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "sessionId": source["sessionId"], "userId": source["userId"] };
 });
-installCompiledValidatorMap(lunora_auth_session_organization_43.getSessionOrganizationForCap.args, (source) => {
+installCompiledValidatorMap(lunora_auth_session_organization_44.getSessionOrganizationForCap.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["sessionId"] !== "string") return DEFER;
