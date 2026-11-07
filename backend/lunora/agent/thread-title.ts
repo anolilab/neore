@@ -17,18 +17,18 @@
 import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
+import { internal } from "../_generated/internal";
 import { internalMutation, internalQuery, type MutationCtx as MutationContext, type QueryCtx as QueryContext } from "../_generated/server";
 import { type ContextRow, firstUserPrompt } from "../chat/lib/first-user-prompt";
 import { threadGateOutcome } from "../chat/lib/thread-gate";
 import {
     claimFence,
     claimRow,
-    clearClaimResult,
-    clearClaimResultsWithPrefix,
     dropExpiredClaimsWithPrefix,
     hasClaimWithPrefix,
     recordClaimResult,
     releaseClaim,
+    releaseClaimsWithPrefix,
 } from "../lib/claim-once";
 import { sha256Hex } from "../lib/crypto";
 import { isThreadLocked } from "../lib/thread-lock";
@@ -45,6 +45,24 @@ export const TITLE_READ_WINDOW = DEFAULT_RECENT_MESSAGES;
 /** One admission per title run for billing (`idempotencyClaims`): a retried run finds it, so its model call is not billed twice. */
 export const TITLE_CHARGE_SCOPE = "title-charge";
 export const TITLE_CHARGE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The model's answer for a title run whose write has not settled yet, keyed by the run's charge key (which starts with the thread id).
+ * A row exists only from the answer to the write: settling, refusing or locking deletes it, so a chat's rows stay few.
+ */
+export const TITLE_ANSWER_SCOPE = "title-answer";
+
+/** The answer recorded for a run, or `undefined` when none is pending. */
+const recordedAnswer = async (ctx: Reader, chargeKey: string): Promise<TitleAnswer | undefined> => {
+    const row = await claimRow(ctx, TITLE_ANSWER_SCOPE, chargeKey);
+
+    return parseAnswer(row?.result);
+};
+
+/** Drops the answer recorded for a run: its write has settled, or it can no longer be written. */
+const dropAnswer = async (ctx: Pick<MutationContext, "db">, chargeKey: string): Promise<void> => {
+    await releaseClaim(ctx, TITLE_ANSWER_SCOPE, chargeKey);
+};
 
 /**
  * A title model request being sent: `<threadId>:<request id>`, held from the last lock check until the request is answered. Its TTL only
@@ -237,13 +255,13 @@ export const admitTitleRun = internalMutation
     )
     .mutation(async ({ args, ctx }) => {
         const existing = await claimRow(ctx, TITLE_CHARGE_SCOPE, args.chargeKey);
-        const answer = parseAnswer(existing?.result);
+        const answer = existing ? await recordedAnswer(ctx, args.chargeKey) : undefined;
         const reason = await titleBlockedIn(ctx, { ...args, promptId: answer ? answer.promptId : args.promptId });
 
         if (reason !== undefined) {
             // A recorded answer that can no longer be written is not kept: a chat locked or deleted since keeps no copy of it.
             if (answer) {
-                await clearClaimResult(ctx, TITLE_CHARGE_SCOPE, args.chargeKey);
+                await dropAnswer(ctx, args.chargeKey);
             }
 
             return { outcome: "refused" as const, reason };
@@ -260,7 +278,31 @@ export const admitTitleRun = internalMutation
         return claimedAt === null ? { outcome: "in-flight" as const } : { claimedAt, outcome: "admitted" as const };
     });
 
-/** Stores the model's answer on the run's charge (fenced by `claimedAt`), so a retry after a failed write resumes from it. */
+/**
+ * Records a run's answer while the run still holds its charge (`claimedAt`), tagged with the charge's user so erasing the account
+ * erases it. `false` when the charge is no longer the run's.
+ */
+const recordAnswer = async (
+    ctx: Pick<MutationContext, "db">,
+    args: { chargeKey: string; claimedAt: number; promptId?: string; title: string },
+): Promise<boolean> => {
+    const charge = await claimRow(ctx, TITLE_CHARGE_SCOPE, args.chargeKey);
+
+    if (charge?.claimedAt !== args.claimedAt) {
+        return false;
+    }
+
+    await dropAnswer(ctx, args.chargeKey);
+
+    const recordedAt = await claimFence(ctx, TITLE_ANSWER_SCOPE, args.chargeKey, { ttlMs: TITLE_CHARGE_TTL_MS, userId: charge.userId });
+
+    return (
+        recordedAt !== null &&
+        (await recordClaimResult(ctx, TITLE_ANSWER_SCOPE, args.chargeKey, recordedAt, JSON.stringify({ promptId: args.promptId, title: args.title })))
+    );
+};
+
+/** Stores the model's answer for the run (fenced by `claimedAt`), so a write that fails resumes from it. */
 export const recordTitleAnswer = internalMutation
     .input({
         chargeKey: v.string().max(MAX_LENGTH.short),
@@ -269,10 +311,7 @@ export const recordTitleAnswer = internalMutation
         title: v.string().max(MAX_LENGTH.long),
     })
     .output(v.boolean())
-    .mutation(
-        async ({ args, ctx }) =>
-            await recordClaimResult(ctx, TITLE_CHARGE_SCOPE, args.chargeKey, args.claimedAt, JSON.stringify({ promptId: args.promptId, title: args.title })),
-    );
+    .mutation(async ({ args, ctx }) => await recordAnswer(ctx, args));
 
 /**
  * Writes a generated title while {@link titleBlockedIn} still lets it, all read in the same transaction as the patch. Answers whether the
@@ -320,7 +359,7 @@ export const setGeneratedTitle = internalMutation
         const written = await writeTitleIfUnchanged(ctx, check);
 
         if (chargeKey !== undefined) {
-            await clearClaimResult(ctx, TITLE_CHARGE_SCOPE, chargeKey);
+            await dropAnswer(ctx, chargeKey);
         }
 
         return written;
@@ -340,8 +379,7 @@ export const writeRecordedTitle = internalMutation
     })
     .output(v.union(v.literal("written"), v.literal("refused"), v.literal("none")))
     .mutation(async ({ args, ctx }) => {
-        const claim = await claimRow(ctx, TITLE_CHARGE_SCOPE, args.chargeKey);
-        const answer = parseAnswer(claim?.result);
+        const answer = await recordedAnswer(ctx, args.chargeKey);
 
         if (!answer) {
             return "none" as const;
@@ -355,7 +393,7 @@ export const writeRecordedTitle = internalMutation
             title: answer.title,
         });
 
-        await clearClaimResult(ctx, TITLE_CHARGE_SCOPE, args.chargeKey);
+        await dropAnswer(ctx, args.chargeKey);
 
         return written ? ("written" as const) : ("refused" as const);
     });
@@ -392,7 +430,15 @@ export const endTitleDispatch = internalMutation
         return null;
     });
 
-/** Drops every title answer recorded for this thread's runs: a chat being locked keeps no copy of a title made from its content. */
-export const clearRecordedTitleAnswers = async (ctx: Pick<MutationContext, "db">, threadId: Id<"threads">): Promise<void> => {
-    await clearClaimResultsWithPrefix(ctx, TITLE_CHARGE_SCOPE, `${threadId}:`);
+/**
+ * Drops every title answer still pending for this thread: a chat being locked keeps no copy of a title made from its content. Only runs
+ * whose write has not settled have a row, so the delete is short; past one batch, the rest is deleted by a scheduled purge, and nothing
+ * reads them meanwhile (every reader refuses a locked chat).
+ */
+export const clearRecordedTitleAnswers = async (ctx: Pick<MutationContext, "db" | "scheduler">, threadId: Id<"threads">): Promise<void> => {
+    const prefix = `${threadId}:`;
+
+    if (await releaseClaimsWithPrefix(ctx, TITLE_ANSWER_SCOPE, prefix)) {
+        await ctx.scheduler.runAfter(0, internal.lib.claim_once.purgeClaimsWithPrefix, { prefix, scope: TITLE_ANSWER_SCOPE });
+    }
 };

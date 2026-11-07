@@ -29,7 +29,8 @@
  * | `thread-cut`        | `<threadId>:<covered row id>` | 30 min | `agent/thread-summaries.ts` (idle summary) and `agent/thread-compaction.ts` (compaction): one scope, so a cut is paid for once |
  * | `thread-fold`       | `<threadId>`             | 3 min, released when the call ends | `agent/thread-summaries.ts` (`claimCut`): one paid summarising call in flight per thread, so two runs planning different cuts of the same rows do not both pay |
  * | `regenerate-title`  | `<threadId>`             | 5 min (released when the job ends) | `chat/functions.ts` (`regenerateThreadTitle`: one regenerate in flight per thread) |
- * | `title-charge`      | `<threadId>:<claimedAt>` (a regenerate run); `<threadId>:auto-title:<jobId>` (an automatic title job, `autoTitleChargeKey`; `<threadId>:auto-title` for a job queued without an id) | 24 h; given back only when the model call threw; holds the model's answer (`result`) so a retry writes it without a second call | `agent/thread-title.ts` (`admitTitleRun`, `recordTitleAnswer`: one model call per title run) |
+ * | `title-charge`      | `<threadId>:<claimedAt>` (a regenerate run); `<threadId>:auto-title:<jobId>` (an automatic title job, `autoTitleChargeKey`; `<threadId>:auto-title` for a job queued without an id) | 24 h; given back only when the model call threw | `agent/thread-title.ts` (`admitTitleRun`, `recordTitleAnswer`: one model call per title run) |
+ * | `title-answer`      | the run's `title-charge` key | 24 h; deleted when the run's write settles, is refused, or the chat is locked | `agent/thread-title.ts` (`recordTitleAnswer`: the model's answer, in `result`, for a write that has not landed yet) |
  * | `title-dispatch`    | `<threadId>:<request id>` | 2 min, released once the request is answered | `agent/thread-title.ts` (`beginTitleDispatch`: a title model request being sent; `enableThreadLock` refuses while one is held) |
  * | `organization-policy-create` | `<organizationId>` | {@link ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS} | `auth/organization-policy.ts` (`setOrganizationPolicy`: one writer creates an organization's first policy row) |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
@@ -249,15 +250,6 @@ export const recordClaimResult = async (ctx: ClaimCtx, scope: string, key: strin
     return true;
 };
 
-/** Drops what {@link recordClaimResult} stored on the claim for `(scope, key)`, keeping the claim itself. */
-export const clearClaimResult = async (ctx: ClaimCtx, scope: string, key: string): Promise<void> => {
-    const existing = await findClaim(ctx, scope, key);
-
-    if (existing?.result !== undefined) {
-        await patchRow(ctx.db, "idempotencyClaims", existing, { result: undefined });
-    }
-};
-
 /** `true` for the first claim of `(scope, key)` within `ttlMs`, `false` for every later one. */
 export const claimOnce = async (ctx: ClaimCtx, scope: string, key: string, ttlMs: number, userId?: string): Promise<boolean> =>
     await claim(ctx, scope, key, { ttlMs, userId });
@@ -349,37 +341,6 @@ export const dropExpiredClaimsWithPrefix = async (ctx: ClaimCtx, scope: string, 
         if (row.expiresAt <= now) {
             await ctx.db.delete("idempotencyClaims", row._id);
         }
-    }
-};
-
-/**
- * Drops the stored `result` of every claim of `scope` whose key starts with `prefix`, keeping the claims. Pages through the range, so a
- * result is never left behind expired rows.
- */
-export const clearClaimResultsWithPrefix = async (ctx: ClaimCtx, scope: string, prefix: string): Promise<void> => {
-    const end = prefixEnd(prefix);
-    let after: string | undefined;
-
-    for (;;) {
-        const from = after;
-        const rows = await ctx.db
-            .query("idempotencyClaims")
-            .withIndex("by_scope_key", (q) =>
-                (from === undefined ? q.eq("scope", scope).gte("key", prefix) : q.eq("scope", scope).gt("key", from)).lt("key", end),
-            )
-            .take(PREFIX_PROBE_BATCH);
-
-        for (const row of rows) {
-            if (row.result !== undefined) {
-                await patchRow(ctx.db, "idempotencyClaims", row, { result: undefined });
-            }
-        }
-
-        if (rows.length < PREFIX_PROBE_BATCH) {
-            return;
-        }
-
-        after = rows.at(-1)!.key;
     }
 };
 

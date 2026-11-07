@@ -19,6 +19,7 @@ import {
     recordTitleAnswer,
     setGeneratedTitle,
     dispatchStillHeld,
+    TITLE_ANSWER_SCOPE,
     TITLE_CHARGE_SCOPE,
     TITLE_DISPATCH_MARGIN_MS,
     TITLE_DISPATCH_SCOPE,
@@ -453,9 +454,13 @@ describe("a title request's dispatch claim", () => {
 
 describe("a recorded title answer", () => {
     const resultOf = async (key: string): Promise<string | undefined> => {
-        const claims = (await harness.run(async (context: any) => await context.db.query("idempotencyClaims").collect())) as { key: string; result?: string }[];
+        const claims = (await harness.run(async (context: any) => await context.db.query("idempotencyClaims").collect())) as {
+            key: string;
+            result?: string;
+            scope: string;
+        }[];
 
-        return claims.find((claim) => claim.key === key)?.result;
+        return claims.find((claim) => claim.scope === TITLE_ANSWER_SCOPE && claim.key === key)?.result;
     };
 
     const recorded = async (threadId: string, key: string, expectedTitle = "Old") => {
@@ -517,6 +522,8 @@ describe("a recorded title answer", () => {
         expect(await resultOf(`${locked}:auto-title:job`)).toBeUndefined();
         // Another chat's answer is not touched.
         expect(await resultOf(`${other}:run`)).toBeDefined();
+        // Locking deletes pending answers only: the chat's charges stay, so a retry is still not billed again.
+        expect(await chargeKeys()).toEqual(expect.arrayContaining([`${retried}:run`, `${locked}:auto-title:job`, `${other}:run`]));
     });
 });
 
