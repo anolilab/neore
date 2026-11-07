@@ -26,8 +26,8 @@ import { notificationRulesRouter } from "./routes/internal/notification-rules.js
 import { rerankRouter } from "./routes/internal/rerank.js";
 import { routeRouter } from "./routes/internal/route.js";
 import { speechRouter } from "./routes/internal/speech.js";
-import { transcriptionRouter } from "./routes/internal/transcription.js";
 import { streamRouter } from "./routes/internal/stream.js";
+import { transcriptionRouter } from "./routes/internal/transcription.js";
 import { webhooksRouter } from "./routes/internal/webhooks.js";
 import { cacheRouter } from "./routes/v1/cache.js";
 import { chatRouter } from "./routes/v1/chat.js";

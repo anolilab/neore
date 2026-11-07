@@ -63,7 +63,7 @@ describe("POST /internal/transcription", () => {
         const { ctx, response } = await post(CLIP);
 
         expect(response.status).toBe(200);
-        expect(await response.json()).toEqual({ costMicrodollars: transcriptionCostMicrodollars(4.2), text: "hello there" });
+        expect(await response.json()).toEqual({ costMicrodollars: transcriptionCostMicrodollars(4.2), seconds: 4.2, text: "hello there" });
 
         await ctx.flush();
 

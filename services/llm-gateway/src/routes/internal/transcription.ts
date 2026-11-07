@@ -39,7 +39,7 @@ const TRANSCRIPTION_TIMEOUT_MS = 45_000;
 
 const transcriptionRequestSchema = z.object({
     audio: z.string().min(1).max(MAX_TRANSCRIPTION_AUDIO_BASE64),
-    durationSeconds: z.number().positive().max(600),
+    durationSeconds: z.number().positive().max(120),
     orgId: z.string().max(200).optional(),
     providerApiKey: z.string().min(1).max(500).optional(),
     requestId: z.string().min(1).max(200),
@@ -63,7 +63,7 @@ transcriptionRouter.post("/internal/transcription", async (c) => {
     const body = parsed.data;
 
     if (isMockLlmEnabled(c.env)) {
-        return c.json({ costMicrodollars: 0, text: "Mock transcription" });
+        return c.json({ costMicrodollars: 0, seconds: body.durationSeconds, text: "Mock transcription" });
     }
 
     let apiKey: string;
@@ -127,7 +127,7 @@ transcriptionRouter.post("/internal/transcription", async (c) => {
             ]),
         );
 
-        return c.json({ costMicrodollars, text: result.text });
+        return c.json({ costMicrodollars, seconds, text: result.text });
     } catch (error) {
         if (error instanceof GatewayError) {
             return c.json(error.toJSON(), error.statusCode);

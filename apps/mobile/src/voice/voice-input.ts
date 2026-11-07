@@ -26,6 +26,8 @@ export const transcribeClip = async (client: VoiceClient, clip: { audio: string;
     return text;
 };
 
+const ENDS_IN_SPACE = /\s$/u;
+
 /** The transcript goes after what is already typed, separated by one space. */
 export const appendTranscript = (draft: string, text: string): string => {
     const words = text.trim();
@@ -34,7 +36,7 @@ export const appendTranscript = (draft: string, text: string): string => {
         return draft;
     }
 
-    return draft === "" || /\s$/u.test(draft) ? `${draft}${words}` : `${draft} ${words}`;
+    return draft === "" || ENDS_IN_SPACE.test(draft) ? `${draft}${words}` : `${draft} ${words}`;
 };
 
 /** What to tell the person when a clip could not be turned into text. Their draft is kept either way. */
@@ -46,7 +48,7 @@ export const voiceErrorMessage = (error: unknown): string => {
     const { code, message } = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; message?: unknown };
 
     // The server's refusals for guests and spent allowances are written to be shown.
-    if ((code === "FORBIDDEN" || code === "TOO_MANY_REQUESTS") && typeof message === "string" && message !== "") {
+    if (typeof message === "string" && message !== "" && (code === "FORBIDDEN" || code === "TOO_MANY_REQUESTS")) {
         return message;
     }
 

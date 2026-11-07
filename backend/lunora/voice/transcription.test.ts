@@ -115,7 +115,7 @@ beforeEach(() => {
     binding.fetch = async (input, init) => {
         gatewayCalls.push({ body: JSON.parse(String(init?.body)) as Record<string, unknown>, url: String(input) });
 
-        return Response.json({ costMicrodollars: 300, text: "  hello there  " });
+        return Response.json({ costMicrodollars: 300, seconds: 2.4, text: "  hello there  " });
     };
     vi.stubGlobal("fetch", async () => {
         throw new Error("transcribeClip called the global fetch instead of the gateway's service binding");
@@ -167,6 +167,21 @@ describe("transcribeClip", () => {
 
         await expect(transcribe(MEMBER, 5000)).rejects.toThrow(TRANSCRIPTION_DAILY_LIMIT_MESSAGE);
         expect(gatewayCalls).toHaveLength(0);
+    });
+
+    it("charges by the clip's size when the phone understates its length, and charges what the provider measured beyond that", async () => {
+        const before = await remainingSeconds(MEMBER);
+
+        // 40 000 base64 characters are 30 000 bytes: 8 s at the app's bitrate, whatever the phone says.
+        await harness.withIdentity({ userId: MEMBER } as never).action(transcribeClip as never, { audio: "A".repeat(40_000), durationMs: 1 } as never);
+
+        expect(gatewayCalls[0]?.body.durationSeconds).toBe(8);
+        expect(await remainingSeconds(MEMBER)).toBe(before - 8);
+
+        binding.fetch = async () => Response.json({ seconds: 12.2, text: "longer" });
+        await transcribe(MEMBER, 2000);
+
+        expect(await remainingSeconds(MEMBER)).toBe(before - 8 - 13);
     });
 
     it("refuses a clip longer than the cap", async () => {

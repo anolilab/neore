@@ -8,7 +8,9 @@
  * - guests are refused, as for spoken replies and realtime dictation;
  * - `voice/transcribe` per-minute calls (middleware);
  * - a per-clip cap on size (`MAX_CLIP_BASE64`) and stated length (`MAX_CLIP_SECONDS`);
- * - `voice/dailyTranscribeSeconds`, charged with the clip's stated seconds, before the call;
+ * - `voice/dailyTranscribeSeconds`, charged before the call with the clip's stated seconds or, when more, the
+ *   seconds its size implies at the app's bitrate (the phone's figure is not trusted alone); after the call, any
+ *   seconds the provider measured beyond that are charged too;
  * - the gateway reports the cost of the seconds the provider measured, which is
  *   deducted from the user's credits; on the user's own OpenAI key it is billed `byok`.
  */
@@ -24,8 +26,15 @@ import { gatewayFetch, SERVICE_ORIGIN } from "../lib/services";
 /** Longest clip one call takes. The app stops recording here. */
 export const MAX_CLIP_SECONDS = 60;
 
-/** A minute of the app's 32 kbit/s mono recording is about 320 KB as base64; this leaves room for a higher bitrate. */
-export const MAX_CLIP_BASE64 = 1_500_000;
+/** A minute of the app's 32 kbit/s mono recording is about 320 KB as base64; this leaves room for container overhead. */
+export const MAX_CLIP_BASE64 = 600_000;
+
+/** The app records at 32 kbit/s: a clip's size sets a floor on the seconds charged before the call. */
+const CLIP_BYTES_PER_SECOND = 4000;
+
+/** The seconds charged up front: the stated length, or what the size implies when that is more. */
+export const chargedSeconds = (audioBase64Length: number, durationMs: number): number =>
+    Math.max(Math.ceil(durationMs / 1000), Math.ceil((audioBase64Length * 3) / 4 / CLIP_BYTES_PER_SECOND));
 
 /** Above the gateway's own 45s provider deadline. */
 const TRANSCRIPTION_TIMEOUT_MS = 50_000;
@@ -45,7 +54,7 @@ export const transcribeClip = authAction
     .output(v.object({ text: v.string() }))
     .action(async ({ args, ctx }) => {
         const { userId } = ctx.user;
-        const seconds = Math.ceil(args.durationMs / 1000);
+        const seconds = chargedSeconds(args.audio.length, args.durationMs);
 
         // The identity does not carry `isAnonymous`; the user row does.
         const flags = await ctx.runQuery(internal.auth.functions.getUserAuthFlagsQuery, { userId });
@@ -54,13 +63,11 @@ export const transcribeClip = authAction
             throw new LunoraError("FORBIDDEN", TRANSCRIPTION_GUEST_MESSAGE);
         }
 
-        if (!isPlatformAdmin({ role: flags.role })) {
-            const tier = getUserTier({ plan: ctx.user.plan ?? null }) === "premium" ? "premium" : "free";
-            const charge = await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, {
-                count: seconds,
-                identifier: userId,
-                key: getRateLimitKey("voice/dailyTranscribeSeconds", tier),
-            });
+        const isMetered = !isPlatformAdmin({ role: flags.role });
+        const dailyKey = getRateLimitKey("voice/dailyTranscribeSeconds", getUserTier({ plan: ctx.user.plan ?? null }) === "premium" ? "premium" : "free");
+
+        if (isMetered) {
+            const charge = await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { count: seconds, identifier: userId, key: dailyKey });
 
             if (!charge.ok) {
                 throw new LunoraError("TOO_MANY_REQUESTS", TRANSCRIPTION_DAILY_LIMIT_MESSAGE, {
@@ -86,7 +93,14 @@ export const transcribeClip = authAction
 
         await assertOk(response, "Transcription gateway error");
 
-        const { text } = (await response.json()) as { text?: unknown };
+        const { seconds: measured, text } = (await response.json()) as { seconds?: unknown; text?: unknown };
+        const extra = typeof measured === "number" ? Math.ceil(measured) - seconds : 0;
+
+        // The provider heard more than was charged: charge the rest. Over the allowance, this call still answers and the
+        // next one is refused.
+        if (isMetered && extra > 0) {
+            await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { count: extra, identifier: userId, key: dailyKey });
+        }
 
         // Lengths only: neither the audio nor the words are logged.
         ctx.log.event("voice.transcribe", { chars: typeof text === "string" ? text.length : 0, seconds, userId });

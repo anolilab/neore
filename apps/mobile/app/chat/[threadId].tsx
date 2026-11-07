@@ -31,6 +31,7 @@ import { settleQuietly } from "@/offline/quietly";
 import type { MessageRow } from "@/offline/types";
 import { requireOnline } from "@/offline/write-gate";
 import { useVoiceInput } from "@/voice/use-voice-input";
+import { VoiceButton, VoiceStatus } from "@/voice/voice-button";
 import { appendTranscript } from "@/voice/voice-input";
 
 /** A row on this screen; `finished` marks a local row whose send completed, which no server read has confirmed yet. */
@@ -574,13 +575,6 @@ const Chat = () => {
     // The control and its hint say why sending waits, so it is not announced as available while a reply is held.
     const sendReason = sendControl.reason ?? (isAwaitingReply ? AWAIT_REPLY_MESSAGE : undefined);
     const isSendBlocked = sending || sendControl.disabled || isAwaitingReply;
-    // Recording stays possible while a reply streams; only a clip already being transcribed holds it.
-    const isVoiceBlocked = composer.disabled || voice.phase === "transcribing";
-    const voiceStatus = {
-        idle: undefined,
-        recording: "Recording. Release to add the words to your message.",
-        transcribing: "Turning your recording into text…",
-    }[voice.phase];
 
     return (
         <View onLayout={measureTopOffset} ref={rootRef} style={{ flex: 1 }}>
@@ -674,24 +668,7 @@ const Chat = () => {
                         style={{ borderColor: "#ccc", borderRadius: 10, borderWidth: 1, flex: 1, padding: 10 }}
                         value={draft}
                     />
-                    <Pressable
-                        accessibilityHint={composer.reason ?? "Hold to record, release to add the words to your message"}
-                        accessibilityLabel={voice.phase === "recording" ? "Recording" : "Voice input"}
-                        accessibilityRole="button"
-                        accessibilityState={{ busy: voice.phase === "transcribing", disabled: isVoiceBlocked }}
-                        disabled={isVoiceBlocked}
-                        onPressIn={() => {
-                            voice.start();
-                        }}
-                        onPressOut={() => {
-                            voice.finish();
-                        }}
-                        style={{ alignItems: "center", justifyContent: "center", minHeight: 44, minWidth: 44, opacity: isVoiceBlocked ? 0.5 : 1 }}
-                    >
-                        <Text style={{ color: voice.phase === "recording" ? "#b00020" : undefined, fontWeight: "600" }}>
-                            {voice.phase === "recording" ? "● Rec" : "Mic"}
-                        </Text>
-                    </Pressable>
+                    <VoiceButton disabledReason={composer.reason} isDisabled={composer.disabled} voice={voice} />
                     <Pressable
                         accessibilityHint={sendReason}
                         accessibilityRole="button"
@@ -703,11 +680,7 @@ const Chat = () => {
                         <Text style={{ fontWeight: "600" }}>Send</Text>
                     </Pressable>
                 </View>
-                {voiceStatus ? (
-                    <Text accessibilityLiveRegion="polite" style={{ fontSize: 12, paddingHorizontal: 12 }}>
-                        {voiceStatus}
-                    </Text>
-                ) : null}
+                <VoiceStatus phase={voice.phase} />
                 {sendReason ? <Text style={{ fontSize: 12, paddingBottom: 8 + safeBottom, paddingHorizontal: 12 }}>{sendReason}</Text> : null}
             </KeyboardAvoidingView>
         </View>
