@@ -8,11 +8,11 @@
 import z from "zod/v4";
 
 import type { HostCapabilityReport } from "../capabilities";
-import { excerptLog, isLogAddress, readTail } from "../check-log";
+import { excerptLog, excerptRead, isLogAddress, readTail } from "../check-log";
 import { requirementOf } from "../checks-logic";
 import type { CreatePullRequestInput, CreatedPullRequest, HostDriver } from "../driver";
 import { graphqlRequest } from "../graphql";
-import { fetchWithDeadline } from "../../lib/fetch-timeout";
+import { FETCH_TIMEOUT_LONG_MS, fetchWithDeadline } from "../../lib/fetch-timeout";
 import { HostApiError } from "../origin-fetch";
 import type { HostRequest } from "../origin-fetch";
 import { discard, parse, readJson } from "../response";
@@ -679,11 +679,51 @@ const REVIEW_STATES: Record<string, ReviewState> = {
     PENDING: "pending",
 };
 
+/** The page number a `Link` header names as `rel="last"`, or `undefined` when there is one page. Split, not matched by pattern. */
+export const lastPageOf = (link: string | null): number | undefined => {
+    const last = link?.split(",").find((part) => part.includes('rel="last"'));
+    const start = last?.indexOf("<") ?? -1;
+    const end = last?.indexOf(">") ?? -1;
+
+    if (last === undefined || start < 0 || end <= start) {
+        return undefined;
+    }
+
+    try {
+        const page = Number(new URL(last.slice(start + 1, end)).searchParams.get("page"));
+
+        return Number.isSafeInteger(page) && page > 0 ? page : undefined;
+    } catch {
+        return undefined;
+    }
+};
+
+/**
+ * The newest reviews, oldest first. The host lists reviews oldest first, so past one page the last page is read too,
+ * with the one before it when the last is short: the newest verdicts are what a reader acts on.
+ */
 const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<PullRequestReview[]> => {
-    const values = parse(
-        z.array(z.unknown()),
-        await readJson(await request(`${repoPath(ref)}/pulls/${ref.number}/reviews`, { query: { per_page: REVIEW_PAGE_SIZE } })),
-    );
+    const path = `${repoPath(ref)}/pulls/${ref.number}/reviews`;
+    const readPage = async (page: number): Promise<{ last: number | undefined; values: unknown[] }> => {
+        const response = await request(path, { query: { page, per_page: REVIEW_PAGE_SIZE } });
+        const last = lastPageOf(response.headers.get("link"));
+
+        return { last, values: parse(z.array(z.unknown()), await readJson(response)) };
+    };
+    const first = await readPage(1);
+    let { values } = first;
+
+    if (first.last !== undefined && first.last > 1) {
+        const last = await readPage(first.last);
+
+        values = last.values;
+
+        if (last.values.length < REVIEW_PAGE_SIZE) {
+            const before = first.last > 2 ? await readPage(first.last - 1) : first;
+
+            values = [...before.values, ...last.values];
+        }
+    }
 
     return values.flatMap((value) => {
         const review = submittedReviewSchema.safeParse(value);
@@ -1175,7 +1215,6 @@ const checkOutputSchema = z.object({
         .optional(),
 });
 
-/** A job log: the API answers with a redirect to a signed address on a storage origin, read there without the token. */
 /** The job's log answer: `undefined` when the host has none to give (expired, not written yet, gone). */
 const jobLogAnswer = async (request: HostRequest, ref: PullRequestRef, checkId: string): Promise<Response | undefined> => {
     try {
@@ -1190,6 +1229,7 @@ const jobLogAnswer = async (request: HostRequest, ref: PullRequestRef, checkId: 
     }
 };
 
+/** A job log: the API answers with a redirect to a signed address on a storage origin, read there without the token. */
 const jobLog = async (request: HostRequest, ref: PullRequestRef, checkId: string, maxChars: number): Promise<CheckLog | undefined> => {
     const answer = await jobLogAnswer(request, ref, checkId);
 
@@ -1201,9 +1241,7 @@ const jobLog = async (request: HostRequest, ref: PullRequestRef, checkId: string
 
     if (answer.status < 300 || answer.status >= 400) {
         // A host that answers the log in place: read it here, it came from the API's own origin.
-        const { partial, text } = await readTail(answer);
-
-        return excerptLog(text, maxChars, partial);
+        return excerptRead(await readTail(answer), maxChars);
     }
 
     if (location === null || !isLogAddress(location)) {
@@ -1211,7 +1249,8 @@ const jobLog = async (request: HostRequest, ref: PullRequestRef, checkId: string
     }
 
     // Not followed: the signed address is the log itself, and a redirect from it leads nowhere this reads.
-    const response = await fetchWithDeadline(location, { redirect: "manual" }).catch(() => {
+    // A log is a large download: the longer deadline, and what arrived before it fires is still read (`readTail`).
+    const response = await fetchWithDeadline(location, { redirect: "manual", timeoutMs: FETCH_TIMEOUT_LONG_MS }).catch(() => {
         throw new HostApiError("The log could not be fetched", 0);
     });
 
@@ -1222,11 +1261,11 @@ const jobLog = async (request: HostRequest, ref: PullRequestRef, checkId: string
         return undefined;
     }
 
-    const { partial, text } = await readTail(response).catch(() => {
+    const read = await readTail(response).catch(() => {
         throw new HostApiError("The log could not be read", 0);
     });
 
-    return excerptLog(text, maxChars, partial);
+    return excerptRead(read, maxChars);
 };
 
 const readCheckLog = async (request: HostRequest, ref: PullRequestRef, checkId: string, maxChars: number): Promise<CheckLog> => {

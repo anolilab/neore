@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { excerptLog, isLogAddress, LOG_EXCERPT_MAX_CHARS, readTail } from "./check-log";
+import { excerptLog, excerptRead, isLogAddress, LOG_EXCERPT_MAX_CHARS, readTail } from "./check-log";
 
 const stamp = (line: string): string => `2026-11-06T10:00:00.1234567Z ${line}`;
 
@@ -82,8 +82,27 @@ describe(readTail, () => {
         expect(text).not.toContain("c");
     });
 
+    it("keeps what it read when the body is cut off, and says the end was not reached", async () => {
+        const encoder = new TextEncoder();
+        const response = new Response(
+            new ReadableStream({
+                pull(controller) {
+                    controller.enqueue(encoder.encode("##[error]boom\n"));
+                    controller.error(new Error("deadline"));
+                },
+            }),
+        );
+
+        expect(await readTail(response)).toStrictEqual({ endReached: false, partial: true, text: "##[error]boom\n" });
+    });
+
+    it("marks an excerpt whose log was not read to its end", () => {
+        expect(excerptRead({ endReached: false, partial: true, text: "##[error]boom" }, 100)).toMatchObject({ endRead: false, excerpt: "##[error]boom" });
+        expect(excerptRead({ endReached: true, partial: false, text: "ok" }, 100)).not.toHaveProperty("endRead");
+    });
+
     it("answers a short body whole", async () => {
-        expect(await readTail(streamOf(["done"]))).toStrictEqual({ partial: false, text: "done" });
+        expect(await readTail(streamOf(["done"]))).toStrictEqual({ endReached: true, partial: false, text: "done" });
     });
 });
 

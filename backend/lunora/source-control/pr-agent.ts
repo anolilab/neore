@@ -8,7 +8,7 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internalQuery } from "../_generated/server";
 import { MAX_LENGTH } from "../lib/validators";
-import { partitionLinks } from "./pr-threads";
+import { linksFor, partitionLinks } from "./pr-threads";
 
 /** Link rows read for one thread: the thread list's own read bound (`pr-thread-attach.ts`). */
 const MAX_LINKS_READ = 100;
@@ -53,4 +53,28 @@ export const linkedPullRequestsOfThread = internalQuery
 
                 return [{ kind: row.kind, number: row.number, repository: row.repository }];
             });
+    });
+
+/**
+ * Whether one pull request is linked to the thread, read by its key (user, repository, number) rather than from the
+ * thread's capped list, so a thread with many links still finds each of them. The thread must be the user's and live.
+ */
+export const isPullRequestLinkedToThread = internalQuery
+    .input({
+        number: v.number(),
+        repository: v.string().max(MAX_LENGTH.key),
+        threadId: v.string().max(MAX_LENGTH.id),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.boolean())
+    .query(async ({ args, ctx }) => {
+        const thread = await ctx.db.get("threads", args.threadId as Id<"threads">);
+
+        if (!thread || thread.deleted === true || thread.userId !== args.userId) {
+            return false;
+        }
+
+        const links = await linksFor(ctx, args.userId, args.repository, args.number);
+
+        return links.some((link) => link.threadId === thread._id);
     });

@@ -125,22 +125,41 @@ export const excerptLog = (raw: string, maxChars: number = LOG_EXCERPT_MAX_CHARS
     return { excerpt: kept.join("\n...\n"), source: "job_log", truncated: partial || cut || !covered };
 };
 
-/** A body read to its end keeping only its last `keepBytes`, and at most `maxBytes` read. */
+/**
+ * A body read to its end keeping only its last `keepBytes`, and at most `maxBytes` read. `endReached` is `false` when
+ * the read stopped first (the cap, or a cut-off after some bytes): the text kept is then not the body's end.
+ */
 export const readTail = async (
     response: Response,
     keepBytes: number = LOG_TAIL_BYTES,
     maxBytes: number = LOG_READ_MAX_BYTES,
-): Promise<{ partial: boolean; text: string }> => {
+): Promise<{ endReached: boolean; partial: boolean; text: string }> => {
     const reader = response.body?.getReader();
     const chunks: Uint8Array[] = [];
     let kept = 0;
     let received = 0;
     let dropped = false;
+    let endReached = false;
 
     while (reader) {
-        const { done, value } = await reader.read();
+        let next: ReadableStreamReadResult<Uint8Array>;
+
+        try {
+            next = await reader.read();
+        } catch (error) {
+            // Cut off (the deadline, the connection): what was read is still the log's latest part. Nothing read is a failure.
+            if (received === 0) {
+                throw error;
+            }
+
+            dropped = true;
+            break;
+        }
+
+        const { done, value } = next;
 
         if (done) {
+            endReached = true;
             break;
         }
 
@@ -170,5 +189,12 @@ export const readTail = async (
 
     const start = Math.max(0, bytes.byteLength - keepBytes);
 
-    return { partial: dropped || start > 0, text: new TextDecoder().decode(bytes.subarray(start)) };
+    return { endReached, partial: dropped || start > 0, text: new TextDecoder().decode(bytes.subarray(start)) };
+};
+
+/** The excerpt of a log read with {@link readTail}, marked when the read did not reach the log's end. */
+export const excerptRead = (read: { endReached: boolean; partial: boolean; text: string }, maxChars: number): CheckLog => {
+    const log = excerptLog(read.text, maxChars, read.partial);
+
+    return read.endReached ? log : { ...log, endRead: false };
 };

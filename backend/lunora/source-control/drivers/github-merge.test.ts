@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { HostApiError } from "../origin-fetch";
 import type { HostRequest, HostRequestOptions } from "../origin-fetch";
 import { writeToHost } from "../write-host";
-import { githubDriver } from "./github";
+import { githubDriver, lastPageOf } from "./github";
 
 const REF = { number: 7, repository: "octo/hello" };
 const SHA = "a".repeat(40);
@@ -567,5 +567,17 @@ describe("what a person is told when the host's rules refuse", () => {
         );
 
         expect(outcome).toEqual({ status: "rate_limited" });
+    });
+});
+
+describe("the newest reviews", () => {
+    it("finds the last page a Link header names", () => {
+        expect(
+            lastPageOf(
+                '<https://api.github.com/repositories/1/pulls/7/reviews?page=2&per_page=100>; rel="next", <https://api.github.com/repositories/1/pulls/7/reviews?page=4&per_page=100>; rel="last"',
+            ),
+        ).toBe(4);
+        expect(lastPageOf(null)).toBeUndefined();
+        expect(lastPageOf('<https://api.github.com/x?page=2>; rel="next"')).toBeUndefined();
     });
 });

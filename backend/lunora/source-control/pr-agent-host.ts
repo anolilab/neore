@@ -18,7 +18,7 @@ import type { HostDriver } from "./driver";
 import { requireAddress } from "./pr-threads";
 import type { ReadFailure } from "./read-host";
 import { readFromHost } from "./read-host";
-import type { CheckLog, CheckRun, MergeMethod, PullRequestRef } from "./types";
+import type { CheckLog, CheckRun, MergeMethod, PullRequestRef, ReviewThread } from "./types";
 import { MERGE_METHODS } from "./types";
 import type { WriteOutcome } from "./write-host";
 import { writeToHost } from "./write-host";
@@ -31,6 +31,10 @@ export const AGENT_MAX_REVIEWS = 30;
 export const AGENT_MAX_CHECK_LOGS = 5;
 /** Checks one re-run call may name. */
 export const AGENT_MAX_RERUNS = 10;
+/** Comments of one review thread handed over: its first, then its latest. */
+export const AGENT_COMMENTS_PER_THREAD = 10;
+/** Characters of review comments one read hands over in all; the threads past it are counted, not sent. */
+export const AGENT_REVIEW_COMMENTS_BUDGET_CHARS = 40_000;
 /** Longest reply an agent may post. */
 export const AGENT_REPLY_MAX_CHARS = 10_000;
 
@@ -42,6 +46,8 @@ export interface LinkedPullRequest {
 
 export interface PullRequestAgentDependencies {
     driver: HostDriver;
+    /** Whether this one pull request is linked to the thread: a keyed read, so a thread with many links is not cut short. */
+    isLinked: (ref: PullRequestRef) => Promise<boolean>;
     linked: () => Promise<LinkedPullRequest[]>;
     token: () => Promise<GithubTokenOutcome>;
 }
@@ -50,6 +56,13 @@ export interface PullRequestAgentDependencies {
 export const agentDependenciesFor = (ctx: Pick<ActionCtx, "runMutation" | "runQuery">, userId: string, threadId: string): PullRequestAgentDependencies => {
     return {
         driver: DEVELOP_DRIVER,
+        isLinked: async (ref) =>
+            await ctx.runQuery(internal.source_control.pr_agent.isPullRequestLinkedToThread, {
+                number: ref.number,
+                repository: ref.repository,
+                threadId,
+                userId,
+            }),
         linked: async () => await ctx.runQuery(internal.source_control.pr_agent.linkedPullRequestsOfThread, { threadId, userId }),
         token: async () => await resolveGithubToken(ctx, userId),
     };
@@ -63,33 +76,46 @@ export interface WantedPullRequest {
 /** Why no pull request was picked: none is linked, the one named is not, or several are and none was named. */
 export type TargetRefusal = { linked: LinkedPullRequest[]; status: "choose" | "none_linked" | "not_linked" };
 
-/** The linked pull request the call names; with none named, the thread's only one. */
+/**
+ * The linked pull request the call names. With none named, the thread's only one; with only a number or only a
+ * repository, the one link that matches it. With both named, `target` asks for that one link by key.
+ */
 export const pickLinkedPullRequest = (linked: LinkedPullRequest[], wanted: WantedPullRequest): TargetRefusal | { ref: PullRequestRef; status: "ok" } => {
     if (linked.length === 0) {
         return { linked, status: "none_linked" };
     }
 
-    if (wanted.repository === undefined && wanted.number === undefined) {
-        const [only] = linked;
+    // The links are stored lower-cased (`requireAddress`), so a repository is compared the same way.
+    const repo = wanted.repository?.toLowerCase();
+    const matches = linked.filter((link) => (repo === undefined || link.repository === repo) && (wanted.number === undefined || link.number === wanted.number));
+    const [only] = matches;
 
-        return linked.length === 1 && only ? { ref: { number: only.number, repository: only.repository }, status: "ok" } : { linked, status: "choose" };
+    if (matches.length === 1 && only) {
+        return { ref: { number: only.number, repository: only.repository }, status: "ok" };
+    }
+
+    return { linked, status: matches.length === 0 ? "not_linked" : "choose" };
+};
+
+/** The pull request a call names, refused unless it is linked to the thread. */
+const target = async (
+    dependencies: PullRequestAgentDependencies,
+    wanted: WantedPullRequest,
+): Promise<TargetRefusal | { ref: PullRequestRef; status: "ok" }> => {
+    if (wanted.repository === undefined || wanted.number === undefined) {
+        return pickLinkedPullRequest(await dependencies.linked(), wanted);
     }
 
     let address: PullRequestRef;
 
     try {
-        // The links are stored lower-cased (`requireAddress`), so the name is compared the same way.
-        address = requireAddress(wanted.repository ?? "", wanted.number ?? 0);
+        address = requireAddress(wanted.repository, wanted.number);
     } catch {
-        return { linked, status: "not_linked" };
+        return { linked: [], status: "not_linked" };
     }
 
-    const isLinked = linked.some((link) => link.repository === address.repository && link.number === address.number);
-
-    return isLinked ? { ref: address, status: "ok" } : { linked, status: "not_linked" };
+    return (await dependencies.isLinked(address)) ? { ref: address, status: "ok" } : { linked: await dependencies.linked(), status: "not_linked" };
 };
-
-const target = async (dependencies: PullRequestAgentDependencies, wanted: WantedPullRequest) => pickLinkedPullRequest(await dependencies.linked(), wanted);
 
 const cap = (text: string, max: number): { text: string; truncated: boolean } =>
     text.length > max ? { text: text.slice(0, max), truncated: true } : { text, truncated: false };
@@ -136,17 +162,7 @@ export const readPullRequestForAgent = async (dependencies: PullRequestAgentDepe
                 title: detail.title,
                 url: detail.url,
             },
-            reviewComments: threads.items.map((thread) => {
-                return {
-                    comments: thread.comments.map((comment) => {
-                        return { authorLogin: comment.authorLogin, body: cap(comment.body, AGENT_COMMENT_MAX_CHARS).text, id: comment.id };
-                    }),
-                    isOutdated: thread.isOutdated,
-                    isResolved: thread.isResolved,
-                    line: thread.line,
-                    path: thread.path,
-                };
-            }),
+            ...reviewCommentsWithin(threads.items),
             reviews: reviews.slice(-AGENT_MAX_REVIEWS).map((review) => {
                 return { authorLogin: review.authorLogin, body: cap(review.body, AGENT_COMMENT_MAX_CHARS).text, state: review.state };
             }),
@@ -154,7 +170,42 @@ export const readPullRequestForAgent = async (dependencies: PullRequestAgentDepe
     });
 };
 
+/**
+ * The review threads one read hands over, inside a budget: each thread's first comment and its latest ones, each cut
+ * short, and no more threads once the characters are spent. The ones left out are counted, so the agent knows.
+ */
+export const reviewCommentsWithin = (threads: ReviewThread[]) => {
+    const reviewComments = [];
+    let spent = 0;
+
+    for (const thread of threads) {
+        const [first, ...rest] = thread.comments;
+        const kept = first === undefined ? [] : [first, ...rest.slice(-(AGENT_COMMENTS_PER_THREAD - 1))];
+        const comments = kept.map((comment) => {
+            return { authorLogin: comment.authorLogin, body: cap(comment.body, AGENT_COMMENT_MAX_CHARS).text, id: comment.id };
+        });
+        const size = comments.reduce((sum, comment) => sum + comment.body.length, 0);
+
+        if (spent + size > AGENT_REVIEW_COMMENTS_BUDGET_CHARS && reviewComments.length > 0) {
+            break;
+        }
+
+        spent += size;
+        reviewComments.push({
+            comments,
+            isOutdated: thread.isOutdated,
+            isResolved: thread.isResolved,
+            line: thread.line,
+            omittedComments: thread.comments.length - kept.length,
+            path: thread.path,
+        });
+    }
+
+    return { omittedReviewThreads: threads.length - reviewComments.length, reviewComments };
+};
+
 const FAILING: ReadonlySet<CheckRun["state"]> = new Set(["failure"]);
+/** States a check named by id may be re-run from; a call that names none re-runs the failed ones only. */
 const RERUNNABLE: ReadonlySet<CheckRun["state"]> = new Set(["cancelled", "failure"]);
 
 export interface FailingCheck {
@@ -162,9 +213,9 @@ export interface FailingCheck {
     log: CheckLog | null;
     /**
      * Why there is no log: `not_read` past the first few failing checks, or for a check the host cannot re-read (a
-     * commit status); `unavailable` when reading it failed, so the agent can tell a failure from a log not asked for.
+     * commit status); `unavailable` when reading it failed; `none` when the host has neither a log nor any output for it.
      */
-    logStatus: "not_read" | "ok" | "unavailable";
+    logStatus: "none" | "not_read" | "ok" | "unavailable";
     name: string;
     required: boolean | null;
     url: string | null;
@@ -193,8 +244,10 @@ export const readFailingChecksForAgent = async (dependencies: PullRequestAgentDe
             const log = read ? await driver.readCheckLog(request, ref, check.id!, LOG_EXCERPT_MAX_CHARS).catch(() => null) : null;
             let logStatus: FailingCheck["logStatus"] = "not_read";
 
-            if (read) {
-                logStatus = log === null ? "unavailable" : "ok";
+            if (read && log === null) {
+                logStatus = "unavailable";
+            } else if (read) {
+                logStatus = log?.source === "none" ? "none" : "ok";
             }
 
             checks.push({ id: check.id, log, logStatus, name: check.name, required: check.required, url: check.url });
@@ -257,7 +310,7 @@ export const rerunFailedForAgent = async (
     dependencies: PullRequestAgentDependencies,
     wanted: WantedPullRequest,
     checkIds: string[] | undefined,
-): Promise<AgentWriteOutcome<{ rerun: RerunResult[]; skipped: string[] }>> => {
+): Promise<AgentWriteOutcome<{ notRerun: string[]; rerun: RerunResult[]; skipped: string[] }>> => {
     const picked = await target(dependencies, wanted);
 
     if (picked.status !== "ok") {
@@ -281,9 +334,12 @@ export const rerunFailedForAgent = async (
         return listed;
     }
 
-    const failed = listed.checks.filter((check): check is CheckRun & { id: string } => check.id !== null && RERUNNABLE.has(check.state));
-    const chosen = checkIds === undefined ? failed : failed.filter((check) => checkIds.includes(check.id));
+    const rerunnable = listed.checks.filter((check): check is CheckRun & { id: string } => check.id !== null && RERUNNABLE.has(check.state));
+    // Unnamed, a call re-runs what failed; a cancelled check runs again only when it is named.
+    const chosen = checkIds === undefined ? rerunnable.filter((check) => FAILING.has(check.state)) : rerunnable.filter((check) => checkIds.includes(check.id));
     const skipped = checkIds === undefined ? [] : checkIds.filter((id) => chosen.every((check) => check.id !== id));
+    // Past the cap, a check is named back rather than dropped: the agent can ask for it in a second call.
+    const notRerun = chosen.slice(AGENT_MAX_RERUNS).map((check) => check.id);
     const rerun: RerunResult[] = [];
 
     for (const check of chosen.slice(0, AGENT_MAX_RERUNS)) {
@@ -296,7 +352,7 @@ export const rerunFailedForAgent = async (
         rerun.push({ id: check.id, name: check.name, status: outcome.status, ...(outcome.status === "rejected" && { reason: outcome.reason }) });
     }
 
-    return { rerun, skipped, status: "ok" };
+    return { notRerun, rerun, skipped, status: "ok" };
 };
 
 /** The method a merge uses: the one asked for when the repository allows it, else squash, else the first it allows. */

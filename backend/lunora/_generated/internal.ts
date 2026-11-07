@@ -1115,6 +1115,7 @@ export interface InternalApiTypes {
             runCloudGuide: FunctionReference<"action", { guideId: Id<"pullRequestGuides">; jobId?: string; userId: string }, null>;
         };
         pr_agent: {
+            isPullRequestLinkedToThread: FunctionReference<"query", { number: number; repository: string; threadId: string; userId: string }, boolean>;
             linkedPullRequestsOfThread: FunctionReference<"query", { threadId: string; userId: string }, Array<{ kind: "attached" | "linked" | "opened"; number: number; repository: string }>>;
         };
         pr_link_retry: {
@@ -2362,6 +2363,7 @@ export const internal: InternalApiTypes = {
             runCloudGuide: { __lunoraRef: "source_control_guide_job:runCloudGuide" },
         },
         pr_agent: {
+            isPullRequestLinkedToThread: { __lunoraRef: "source_control_pr_agent:isPullRequestLinkedToThread" },
             linkedPullRequestsOfThread: { __lunoraRef: "source_control_pr_agent:linkedPullRequestsOfThread" },
         },
         pr_link_retry: {

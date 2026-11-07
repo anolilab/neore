@@ -139,6 +139,8 @@ export interface CheckSummary {
 export type CheckLogSource = "check_output" | "job_log" | "none";
 
 export interface CheckLog {
+    /** `false` when the read stopped before the log's end (past the read cap, or cut off): its failure may be later than this. */
+    endRead?: false;
     /** Lines around the failure, cut to a cap; untrusted text. Empty when the host has none. */
     excerpt: string;
     source: CheckLogSource;

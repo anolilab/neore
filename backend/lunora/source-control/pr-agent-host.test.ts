@@ -8,7 +8,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { LOG_EXCERPT_MAX_CHARS } from "./check-log";
 import { githubDriver } from "./drivers/github";
 import type { LinkedPullRequest, PullRequestAgentDependencies } from "./pr-agent-host";
-import { mergeForAgent, pickLinkedPullRequest, readFailingChecksForAgent, readPullRequestForAgent, rerunFailedForAgent } from "./pr-agent-host";
+import {
+    AGENT_REVIEW_COMMENTS_BUDGET_CHARS,
+    mergeForAgent,
+    pickLinkedPullRequest,
+    readFailingChecksForAgent,
+    readPullRequestForAgent,
+    rerunFailedForAgent,
+    reviewCommentsWithin,
+} from "./pr-agent-host";
 
 const SHA = "b".repeat(40);
 const API = "https://api.github.com/repos/octo/hello";
@@ -65,6 +73,7 @@ const LINKED: LinkedPullRequest[] = [{ kind: "linked", number: 7, repository: "o
 const dependencies = (linked: LinkedPullRequest[] = LINKED): PullRequestAgentDependencies => {
     return {
         driver: githubDriver,
+        isLinked: async (ref) => linked.some((link) => link.repository === ref.repository && link.number === ref.number),
         linked: async () => linked,
         token: async () => {
             return {
@@ -207,7 +216,7 @@ describe("reading a linked pull request's review threads", () => {
         const after: (string | null)[] = [];
         const driver = {
             ...githubDriver,
-            getPullRequest: async () => ({ ...pull, baseBranch: "main", bodyTruncated: false, headBranch: "feat/sum", headSha: SHA } as never),
+            getPullRequest: async () => ({ ...pull, baseBranch: "main", bodyTruncated: false, headBranch: "feat/sum", headSha: SHA }) as never,
             listReviews: async () => [],
             listThreads: async (_request: unknown, _ref: unknown, cursor: string | null) => {
                 after.push(cursor);
@@ -255,6 +264,15 @@ describe(pickLinkedPullRequest, () => {
         });
     });
 
+    it("takes the one link a lone number or a lone repository matches, and asks to choose when several do", () => {
+        const across: LinkedPullRequest[] = [...LINKED, { kind: "linked", number: 3, repository: "octo/other" }];
+
+        expect(pickLinkedPullRequest(two, { number: 9 })).toStrictEqual({ ref: { number: 9, repository: "octo/hello" }, status: "ok" });
+        expect(pickLinkedPullRequest(across, { repository: "Octo/Other" })).toStrictEqual({ ref: { number: 3, repository: "octo/other" }, status: "ok" });
+        expect(pickLinkedPullRequest(two, { repository: "octo/hello" }).status).toBe("choose");
+        expect(pickLinkedPullRequest(two, { number: 8 }).status).toBe("not_linked");
+    });
+
     it("refuses an address that is not one", () => {
         expect(pickLinkedPullRequest(two, { number: 9, repository: "../etc" }).status).toBe("not_linked");
         expect(pickLinkedPullRequest(two, { number: -1, repository: "octo/hello" }).status).toBe("not_linked");
@@ -281,5 +299,81 @@ describe("merging a linked pull request", () => {
 
         expect(await mergeForAgent(dependencies(), {}, SHA, undefined)).toStrictEqual({ sha: "d".repeat(40), status: "ok" });
         expect(seen.filter((call) => call.method === "PUT")).toHaveLength(1);
+    });
+});
+
+describe("re-running checks of a linked pull request", () => {
+    const run = (id: number, conclusion: string) => {
+        return { app: { slug: "github-actions" }, conclusion, id, name: `job ${String(id)}`, status: "completed" };
+    };
+    const routes = (runs: ReturnType<typeof run>[]) => {
+        return {
+            [`GET ${API}/commits/${SHA}/check-runs`]: () => Response.json({ check_runs: runs, total_count: runs.length }),
+            [`GET ${API}/commits/${SHA}/status`]: () => Response.json({ statuses: [], total_count: 0 }),
+            [`GET ${API}/pulls/7`]: () => Response.json(pull),
+            ...Object.fromEntries(runs.map((entry) => [`GET ${API}/check-runs/${String(entry.id)}`, () => Response.json({ app: { slug: "github-actions" } })])),
+            ...Object.fromEntries(runs.map((entry) => [`POST ${API}/actions/jobs/${String(entry.id)}/rerun`, () => new Response(null, { status: 201 })])),
+        };
+    };
+
+    it("re-runs only the failed checks when none are named, and a cancelled one only when named", async () => {
+        stubHost(routes([run(1, "failure"), run(2, "cancelled"), run(3, "success")]));
+
+        const unnamed = await rerunFailedForAgent(dependencies(), {}, undefined);
+
+        expect(unnamed).toMatchObject({ notRerun: [], rerun: [{ id: "1", status: "ok" }], skipped: [], status: "ok" });
+
+        const named = await rerunFailedForAgent(dependencies(), {}, ["2", "3"]);
+
+        expect(named).toMatchObject({ rerun: [{ id: "2", status: "ok" }], skipped: ["3"], status: "ok" });
+    });
+
+    it("names back the failed checks past the cap instead of dropping them", async () => {
+        stubHost(routes(Array.from({ length: 12 }, (_, index) => run(index + 1, "failure"))));
+
+        const outcome = await rerunFailedForAgent(dependencies(), {}, undefined);
+
+        expect(outcome).toMatchObject({ notRerun: ["11", "12"], status: "ok" });
+        expect("rerun" in outcome && outcome.rerun).toHaveLength(10);
+    });
+});
+
+describe(reviewCommentsWithin, () => {
+    const comment = (id: number, size = 10) => {
+        return { authorLogin: "a", body: "x".repeat(size), createdAt: 0, id: String(id) };
+    };
+    const thread = (comments: ReturnType<typeof comment>[]) => {
+        return {
+            canResolve: true,
+            canUnresolve: false,
+            comments,
+            id: "t",
+            isOutdated: false,
+            isResolved: false,
+            line: 1,
+            path: "a.ts",
+            side: "new" as const,
+            startLine: null,
+        };
+    };
+
+    it("keeps a thread's first and latest comments and counts the rest", () => {
+        const { omittedReviewThreads, reviewComments } = reviewCommentsWithin([thread(Array.from({ length: 30 }, (_, index) => comment(index)))]);
+
+        expect(omittedReviewThreads).toBe(0);
+        expect(reviewComments[0]?.comments.map((entry) => entry.id)).toStrictEqual(["0", "21", "22", "23", "24", "25", "26", "27", "28", "29"]);
+        expect(reviewComments[0]?.omittedComments).toBe(20);
+    });
+
+    it("stops adding threads once the budget is spent, and says how many it left out", () => {
+        const big = thread([comment(1, 2000)]);
+        const threads = Array.from({ length: Math.ceil(AGENT_REVIEW_COMMENTS_BUDGET_CHARS / 2000) + 5 }, (_, index) => {
+            return { ...big, id: `t${String(index)}` };
+        });
+        const { omittedReviewThreads, reviewComments } = reviewCommentsWithin(threads);
+
+        expect(reviewComments.length * 2000).toBeLessThanOrEqual(AGENT_REVIEW_COMMENTS_BUDGET_CHARS);
+        expect(omittedReviewThreads).toBe(threads.length - reviewComments.length);
+        expect(omittedReviewThreads).toBeGreaterThan(0);
     });
 });
