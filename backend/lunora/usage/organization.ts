@@ -24,14 +24,7 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { throwForbidden } from "../lib/error-helpers";
 import { systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
-import type { OrganizationReply } from "./activity-logic";
-import { foldOrganizationUsage, isDayKey, remainderOf } from "./activity-logic";
-
-/** Organization rows one page reads. */
-export const ORGANIZATION_ROW_PAGE = 1000;
-
-/** Pages one read takes, at most; past it the result says it was cut, and covers only the newest whole days read. */
-export const MAX_ORGANIZATION_PAGES = 50;
+import { isDayKey, remainderOf, sumRows } from "./activity-logic";
 
 /** Project titles one lookup reads. */
 const TITLE_BATCH = 50;
@@ -63,33 +56,34 @@ export const isOrganizationAdmin = internalQuery
         return member !== null && isOrganizationAdminRole(member.role);
     });
 
-/** One page of the organization's rows from `fromDate` on. */
-export const organizationUsagePage = internalQuery
-    .input({
-        cursor: v.union(v.string().max(MAX_LENGTH.cursor), v.null()),
-        fromDate: v.string().max(10),
-        organizationId: v.string().max(MAX_LENGTH.id),
-    })
-    .output(
-        v.object({
-            cursor: v.union(v.string(), v.null()),
-            rows: v.array(v.object({ costMicrodollars: v.number(), date: v.string(), projectKey: v.optional(v.string()), tokens: v.number() })),
-        }),
-    )
-    .query(async ({ args: { cursor, fromDate, organizationId }, ctx }) => {
-        const page = await ctx.db.usageOrganizationReplies.findMany({
-            cursor,
-            limit: ORGANIZATION_ROW_PAGE,
-            orderBy: [{ date: "desc" }],
-            where: { date: { gte: fromDate }, organizationId },
-        });
+/**
+ * The organization's usage from `fromDate` on, summed by the database per project (`null`: no project the organization
+ * owns). Three grouped reads over the ledger's `by_org_date` index; each answers with a row per project, however many
+ * replies the period holds, so no read is ever cut short.
+ */
+export const organizationUsageSums = internalQuery
+    .input({ fromDate: v.string().max(10), organizationId: v.string().max(MAX_LENGTH.id) })
+    .output(v.array(v.object({ costMicrodollars: v.number(), projectKey: v.optional(v.string()), replies: v.number(), tokens: v.number() })))
+    .query(async ({ args: { fromDate, organizationId }, ctx }) => {
+        const where = { date: { gte: fromDate }, organizationId };
+        const [costs, tokens, replies] = await Promise.all([
+            ctx.db.usageOrganizationReplies.groupBy({ agg: { field: "costMicrodollars", op: "sum" }, by: ["projectKey"], where }),
+            ctx.db.usageOrganizationReplies.groupBy({ agg: { field: "tokens", op: "sum" }, by: ["projectKey"], where }),
+            ctx.db.usageOrganizationReplies.groupBy({ by: ["projectKey"], where }),
+        ]);
+        const keyOf = (entry: { key: { projectKey?: string | null } }): string => entry.key.projectKey ?? "";
+        const valueIn = (entries: typeof costs, key: string): number => entries.find((entry) => keyOf(entry) === key)?.value ?? 0;
 
-        return {
-            cursor: page.isDone ? null : page.continueCursor,
-            rows: page.page.map(({ costMicrodollars, date, projectKey, tokens }) => {
-                return { costMicrodollars, date, tokens, ...(projectKey !== undefined && { projectKey }) };
-            }),
-        };
+        return replies.map((entry) => {
+            const key = keyOf(entry);
+
+            return {
+                costMicrodollars: valueIn(costs, key),
+                replies: entry.value ?? 0,
+                tokens: valueIn(tokens, key),
+                ...(key !== "" && { projectKey: key }),
+            };
+        });
     });
 
 /** Titles of the projects among `projectIds` the organization owns now, and its projects to list at zero. */
@@ -126,17 +120,13 @@ export const getOrganizationProjectUsage = authAction
     .input({ fromDate: v.string().max(10), organizationId: v.optional(v.string().max(MAX_LENGTH.id)) })
     .output(
         v.object({
-            cursor: v.optional(v.string()),
-            result: v.optional(
-                v.object({
-                    noProject: v.object({ ...vTotals }),
-                    projects: v.array(v.object({ ...vTotals, projectKey: v.string(), title: v.string() })),
-                    // More of the organization's projects have no usage than the list shows; every project with usage is listed.
-                    projectsCut: v.boolean(),
-                    total: v.object({ ...vTotals }),
-                    truncated: v.boolean(),
-                }),
-            ),
+            result: v.object({
+                noProject: v.object({ ...vTotals }),
+                projects: v.array(v.object({ ...vTotals, projectKey: v.string(), title: v.string() })),
+                // More of the organization's projects have no usage than the list shows; every project with usage is listed.
+                projectsCut: v.boolean(),
+                total: v.object({ ...vTotals }),
+            }),
         }),
     )
     .action(async ({ args: { fromDate, organizationId: expected }, ctx }) => {
@@ -155,29 +145,9 @@ export const getOrganizationProjectUsage = authAction
             return throwForbidden(FORBIDDEN);
         }
 
-        const rows: OrganizationReply[] = [];
-        let cursor: string | null = null;
-        let truncated = true;
-
-        for (let page = 0; page < MAX_ORGANIZATION_PAGES; page += 1) {
-            const result: { cursor: string | null; rows: OrganizationReply[] } = await ctx.runQuery(internal.usage.organization.organizationUsagePage, {
-                cursor,
-                fromDate,
-                organizationId,
-            });
-
-            rows.push(...result.rows);
-            cursor = result.cursor;
-
-            if (cursor === null) {
-                truncated = false;
-                break;
-            }
-        }
-
-        // A read cut short may have read its oldest day only in part: that day is left out, so the totals cover whole days.
-        const oldest = truncated ? rows.at(-1)?.date : undefined;
-        const { projects, total } = foldOrganizationUsage(oldest === undefined ? rows : rows.filter((row) => row.date > oldest));
+        const sums = await ctx.runQuery(internal.usage.organization.organizationUsageSums, { fromDate, organizationId });
+        const projects = sums.flatMap(({ projectKey, ...totals }) => (projectKey === undefined ? [] : [{ ...totals, projectKey }]));
+        const total = sumRows(sums);
         const usage = new Map(projects.map((project) => [project.projectKey, project]));
         const titles = new Map<string, string>();
         const keys = [...usage.keys()];
@@ -204,7 +174,7 @@ export const getOrganizationProjectUsage = authAction
             return { costMicrodollars: totals.costMicrodollars, projectKey, replies: totals.replies, title, tokens: totals.tokens };
         });
 
-        ctx.log.event("usage.get_organization_project_usage", { projects: listed.length, rows: rows.length });
+        ctx.log.event("usage.get_organization_project_usage", { projects: listed.length });
 
         return {
             result: {
@@ -212,7 +182,6 @@ export const getOrganizationProjectUsage = authAction
                 projects: listed.toSorted((a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.title.localeCompare(b.title)),
                 projectsCut,
                 total,
-                truncated,
             },
         };
     });

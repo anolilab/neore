@@ -10,7 +10,6 @@ import {
     foldSkillTotals,
     HEATMAP_DAYS,
     isDayKey,
-    foldOrganizationUsage,
     organizationReply,
     PROJECT_SKILL_KEY,
     remainderOf,
@@ -254,19 +253,5 @@ describe("project rows", () => {
         // A member's own project in an organization thread: the total only, never the project.
         expect(organizationReply({ organizationId: "org", projectKey: "p_own" }, amounts)).toStrictEqual(amounts);
         expect(organizationReply({ projectKey: "p_own" }, amounts)).toBeUndefined();
-    });
-
-    it("folds an organization's rows into its total and its projects, costliest first", () => {
-        const reply = (costMicrodollars: number, projectKey?: string) => {
-            return { costMicrodollars, date: "2026-09-20", tokens: 1, ...(projectKey !== undefined && { projectKey }) };
-        };
-
-        expect(foldOrganizationUsage([reply(4), reply(10, "p_a"), reply(15, "p_b"), reply(5), reply(1, "p_a")])).toStrictEqual({
-            projects: [
-                { costMicrodollars: 15, projectKey: "p_b", replies: 1, tokens: 1 },
-                { costMicrodollars: 11, projectKey: "p_a", replies: 2, tokens: 2 },
-            ],
-            total: { costMicrodollars: 35, replies: 5, tokens: 5 },
-        });
     });
 });

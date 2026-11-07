@@ -57,8 +57,11 @@ const { registerModule } = await import("../../test/registered-api");
 const { default: schema } = await import("../schema");
 const { forwardReplyUsage, recordReplyUsage } = await import("./activity");
 const { DEFAULT_SKILL_KEY } = await import("./activity-logic");
-const { getOrganizationProjectUsage, isOrganizationAdminRole, MAX_PROJECTS, ORGANIZATION_ROW_PAGE, pruneOrganizationUsage } = await import("./organization");
-const { eraseOrganizationUsage } = await import("./organization-erase");
+const { getOrganizationProjectUsage, isOrganizationAdminRole, MAX_PROJECTS, pruneOrganizationUsage } = await import("./organization");
+
+/** More replies than any one page of rows would hold: the read sums them in the database. */
+const BUSY = 2500;
+const { eraseOrganizationUsage, sweepOrphanedOrganizationUsage } = await import("./organization-erase");
 const { collectOrganizationUsageForExport, collectOrganizationUsagePages, eraseUsageForUser, ORGANIZATION_EXPORT_PAGE } = await import("./gdpr");
 
 registerModule(registry, "usage_organization", await import("./organization"));
@@ -105,7 +108,6 @@ const read = async (args: Record<string, unknown> = {}) =>
             projects: { costMicrodollars: number; projectKey: string; title: string }[];
             projectsCut: boolean;
             total: { costMicrodollars: number; replies: number };
-            truncated: boolean;
         };
     };
 
@@ -199,9 +201,9 @@ describe("organization usage", () => {
         expect(result.noProject.costMicrodollars).toBe(100);
     });
 
-    it("reads every page of a busy organization's rows", async () => {
+    it("sums a busy organization's replies in one read, never cut short", async () => {
         await harness.run(async (ctx: any) => {
-            for (let index = 0; index <= ORGANIZATION_ROW_PAGE; index += 1) {
+            for (let index = 0; index < BUSY; index += 1) {
                 await ctx.db.insert("usageOrganizationReplies", {
                     costMicrodollars: 1,
                     date: "2026-09-20",
@@ -216,8 +218,8 @@ describe("organization usage", () => {
 
         const { result } = await read();
 
-        expect(result.total.replies).toBe(ORGANIZATION_ROW_PAGE + 1);
-        expect(result.truncated).toBe(false);
+        expect(result.total).toStrictEqual({ costMicrodollars: BUSY, replies: BUSY, tokens: BUSY });
+        expect(result.noProject).toMatchObject({ replies: BUSY });
     });
 
     it("refuses a page whose active organization has changed, and a caller who is not an admin or owner", async () => {
@@ -431,6 +433,37 @@ describe("organization usage rows", () => {
         expect(exported.find((row) => row.project === undefined)).toMatchObject({ replies: count - inProject });
     });
 
+    it("sweeps the usage of an organization deleted without its erasure job, and keeps an existing one's", async () => {
+        const kept = await insert("organization", { createdAt: 1, name: "Kept", slug: "kept" });
+        const gone = await insert("organization", { createdAt: 1, name: "Gone", slug: "gone" });
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.delete("organization", gone);
+
+            for (const [index, organizationId] of [kept, gone, gone].entries()) {
+                await ctx.db.insert("usageOrganizationReplies", {
+                    costMicrodollars: 1,
+                    date: "2026-09-20",
+                    organizationId,
+                    recordedAt: 0,
+                    replyKey: `swept-${String(index)}`,
+                    tokens: 1,
+                    userId: MEMBER,
+                });
+            }
+        });
+
+        expect(await harness.run(async (ctx: any) => await ctx.runMutation(sweepOrphanedOrganizationUsage, {}))).toBe(2);
+
+        const left = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.usageOrganizationReplies.findMany({ where: { userId: MEMBER } });
+
+            return page.map((row: { organizationId: string }) => row.organizationId);
+        });
+
+        expect(left).toStrictEqual([kept]);
+    });
+
     it("erases a deleted organization's usage", async () => {
         await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
         await record(MEMBER, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER }), 20);
@@ -452,7 +485,6 @@ describe("organization usage rows", () => {
         const { result } = await read();
 
         expect(result.projectsCut).toBe(true);
-        expect(result.truncated).toBe(false);
     });
 });
 

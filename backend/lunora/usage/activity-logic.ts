@@ -272,38 +272,6 @@ export const organizationReply = (
     return { ...amounts, ...(attribution.projectKey !== undefined && attribution.projectInOrganization === true && { projectKey: attribution.projectKey }) };
 };
 
-/**
- * An organization's replies folded: its total, and its projects' totals, costliest first. One row carries both a
- * reply's total and its project, so however many rows a read takes, the projects never add up to more than the total.
- */
-export const foldOrganizationUsage = (rows: ReadonlyArray<OrganizationReply>): { projects: ProjectTotal[]; total: UsageTotals } => {
-    const projects = new Map<string, ProjectTotal>();
-
-    for (const row of rows) {
-        if (row.projectKey === undefined) {
-            continue;
-        }
-
-        const current = projects.get(row.projectKey) ?? { costMicrodollars: 0, projectKey: row.projectKey, replies: 0, tokens: 0 };
-
-        current.costMicrodollars += row.costMicrodollars;
-        current.replies += 1;
-        current.tokens += row.tokens;
-        projects.set(row.projectKey, current);
-    }
-
-    return {
-        projects: [...projects.values()].toSorted(
-            (a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.projectKey.localeCompare(b.projectKey),
-        ),
-        total: sumRows(
-            rows.map((row) => {
-                return { costMicrodollars: row.costMicrodollars, replies: 1, tokens: row.tokens };
-            }),
-        ),
-    };
-};
-
 /** What some replies of one day and skill add to the rollup. */
 export interface RollupIncrement {
     costMicrodollars: number;

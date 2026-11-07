@@ -69,6 +69,7 @@ describe("the single cron trigger", () => {
             purgeActionCache: { everyMinutes: 60, kind: "interval" },
             purgeIdempotencyClaims: { everyMinutes: 60, kind: "interval" },
             sweepOrphanedOrganizationPolicies: { hourUTC: 4, kind: "daily", minuteUTC: 15 },
+            sweepOrphanedOrganizationUsage: { hourUTC: 4, kind: "daily", minuteUTC: 45 },
             vacuumDocumentHistory: { hourUTC: 3, kind: "daily", minuteUTC: 30 },
         });
     });

@@ -35,7 +35,8 @@
   checked on the `member` row; only current members file. The backfill never
   files history under an org (no record says which one a past reply ran in).
   The late live record marks `project:`/`organization:` keys whatever it filed,
-  so a redelivery after the thread moves files nothing elsewhere. A read cut
-  short drops its oldest (partly read) day. `pruneOrganizationUsage` (a
-  periodic job) applies retention; erasure and export go by `userId`
-  (`usage/gdpr.ts`), the data export reading `usageDaily` a page at a time.
+  so a redelivery after the thread moves files nothing elsewhere. The view
+  reads `groupBy` sums per project (`organizationUsageSums`), never rows, so it
+  is never cut short. `pruneOrganizationUsage` applies retention; a deleted
+  org's rows go by a queued job, with `sweepOrphanedOrganizationUsage` (daily)
+  as its backstop; erasure and export go by `userId` (`usage/gdpr.ts`).

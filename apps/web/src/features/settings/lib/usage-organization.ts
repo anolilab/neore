@@ -1,68 +1,20 @@
 /**
- * The usage page's organization view reads its members a page at a time
- * (`usage_organization.getOrganizationProjectUsage`): each call returns an
- * opaque cursor to continue with, and the last one the organization's totals.
- * This follows the cursor. Pinned by `usage-organization.test.ts`.
+ * The usage page's organization view (`usage_organization.getOrganizationProjectUsage`): one call, which sums the
+ * organization's usage ledger on the server. Pinned by `usage-organization.test.ts`.
  */
 
 import { TransportError } from "@lunora/client";
 import { getErrorCode, isForbiddenError } from "@lunora/react";
 
-export interface UsageTotalsLike {
-    costMicrodollars: number;
-    replies: number;
-    tokens: number;
-}
-
-export interface OrganizationUsage {
-    noProject: UsageTotalsLike;
-    projects: (UsageTotalsLike & { projectKey: string; title: string })[];
-    /** More of the organization's projects have no usage than the list shows. */
-    projectsCut: boolean;
-    total: UsageTotalsLike;
-    truncated: boolean;
-}
-
-export interface OrganizationUsageStep {
-    cursor?: string;
-    result?: OrganizationUsage;
-}
-
-/** Calls read at most before giving up: 40 × the server's page of members. */
-export const MAX_ORGANIZATION_PAGES = 40;
-
-export class OrganizationUsageTooLargeError extends Error {}
-
 /**
- * Whether a failed organization read is worth one more try: each read asks every member's shard, so only a failure
- * that may not repeat is retried — a network failure or a transport error such as a timeout (coded `INTERNAL`, but no
- * answer from the backend) — never an organization too large to read, a refusal, or any other answer from the backend.
+ * Whether a failed organization read is worth one more try: only a failure that may not repeat — a network failure or
+ * a transport error such as a timeout (coded `INTERNAL`, but no answer from the backend) — never a refusal or any other
+ * answer from the backend, which would only come back the same.
  */
 export const retryOrganizationRead = (failureCount: number, error: unknown): boolean => {
-    if (failureCount >= 1 || error instanceof OrganizationUsageTooLargeError || isForbiddenError(error)) {
+    if (failureCount >= 1 || isForbiddenError(error)) {
         return false;
     }
 
     return error instanceof TransportError || getErrorCode(error) === undefined;
-};
-
-/** Calls `fetchStep` with each cursor it hands back until it returns the organization's totals. */
-export const readOrganizationUsage = async (fetchStep: (cursor: string | undefined) => Promise<OrganizationUsageStep>): Promise<OrganizationUsage> => {
-    let cursor: string | undefined;
-
-    for (let call = 0; call < MAX_ORGANIZATION_PAGES; call += 1) {
-        const step = await fetchStep(cursor);
-
-        if (step.result) {
-            return step.result;
-        }
-
-        if (step.cursor === undefined) {
-            break;
-        }
-
-        cursor = step.cursor;
-    }
-
-    throw new OrganizationUsageTooLargeError("The organization is too large to read its usage in one go.");
 };

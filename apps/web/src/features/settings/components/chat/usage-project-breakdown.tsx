@@ -17,7 +17,7 @@ import { useAction, useCRPC } from "@/lib/lunora/crpc";
 import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill } from "../../hooks/use-usage-backfill";
 import { useUsageToday } from "../../hooks/use-usage-today";
 import { formatDayKey, formatUsd, periodStart } from "../../lib/usage-activity";
-import { readOrganizationUsage, retryOrganizationRead } from "../../lib/usage-organization";
+import { retryOrganizationRead } from "../../lib/usage-organization";
 
 /** The row key of what no project accounts for; never a project id. */
 const NO_PROJECT_KEY = "__no_project__";
@@ -80,15 +80,19 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
     const fetchOrganization = useAction(api.usage.organization.getOrganizationProjectUsage);
     const organization = useQuery({
         enabled: organizationEnabled,
-        queryFn: async () => await readOrganizationUsage(async () => await fetchOrganization({ fromDate, organizationId })),
+        queryFn: async () => {
+            const { result } = await fetchOrganization({ fromDate, organizationId });
+
+            return result;
+        },
         // Keyed by the signed-in user and the organization: switching either never shows the previous one's totals.
         queryKey: ["usage", "organization-projects", userId, organizationId, fromDate],
         retry: retryOrganizationRead,
         staleTime: 2 * 60_000,
     });
 
-    // Not polled while the walk runs (each read asks every member's shard), but read again once it is done — only when it
-    // is what the card shows: a manual refetch runs even for a disabled query.
+    // Not polled while the walk runs (each read sums the organization's whole ledger for the period), but read again once
+    // it is done — only when it is what the card shows: a manual refetch runs even for a disabled query.
     const refetchOrganization = organization.refetch;
 
     useRefetchAfterBackfill(backfilling, async () => (organizationEnabled ? await refetchOrganization() : undefined));
@@ -119,7 +123,8 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
     const unfiledFrom = mine.data?.unfiled ? formatDayKey(mine.data.unfiled.from, locale) : undefined;
     const unfiledTo = mine.data?.unfiled ? formatDayKey(mine.data.unfiled.to, locale) : undefined;
     const totalCost = rows.reduce((sum, row) => sum + row.costMicrodollars, 0);
-    const truncated = showing === "mine" ? mine.data?.truncated : organization.data?.truncated;
+    // The organization's read is summed by the database and never cut short.
+    const truncated = showing === "mine" && mine.data?.truncated === true;
 
     return (
         <Card>
