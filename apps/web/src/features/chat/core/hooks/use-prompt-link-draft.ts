@@ -58,9 +58,10 @@ export const usePromptLinkDraft = ({
 
     /**
      * The entries of the composer's picker list (`useComposerModelEntries`). A link selects a model only if it is in this list, so a
-     * model the person is not entitled to, or has blocked, is not selected by a link.
+     * model the person is not entitled to, or has blocked, is not selected by a link. `undefined` while the list has not loaded: the
+     * link then selects no model, and says nothing about a text model, since it does not yet know whether one exists.
      */
-    linkableModels: ReadonlyMap<string, LinkableModel>;
+    linkableModels: ReadonlyMap<string, LinkableModel> | undefined;
     model?: string;
     /** Called once the link can be decided (the caller's own ownership of the draft ends here, after this pass has read it). */
     onDecided?: () => void;
@@ -129,8 +130,12 @@ export const usePromptLinkDraft = ({
             state.setComparisonMode(false);
             state.setComposerMode("text", undefined, false);
 
+            // Until the list has loaded, it offers nothing: a link's model is refused (a blocked model must never be selected), and the
+            // chat is not told it has no text model, because that is not yet known.
+            const offered: ReadonlyMap<string, LinkableModel> = linkableModels ?? new Map();
+
             // A link's model travels only with its prompt (`readPromptLinkSearch` drops it otherwise).
-            const sendsLinkModel = model !== undefined && linkModelAppliesOnOpen({ isAnonymous, linkable: linkableModels, model });
+            const sendsLinkModel = model !== undefined && linkModelAppliesOnOpen({ isAnonymous, linkable: offered, model });
 
             if (model !== undefined && sendsLinkModel) {
                 state.setSelectedModel(model as ModelId, undefined);
@@ -148,13 +153,14 @@ export const usePromptLinkDraft = ({
 
                 // An image chat leaves an image model selected; a text chat must not send with one. The free model is the anonymous
                 // visitor's, whatever is stored.
-                const selected = linkableModels.get(state.selectedModel);
+                const selected = offered.get(state.selectedModel);
                 const selectedIsText = selected !== undefined && (selected.mode ?? "text") === "text" && selected.provider !== "external";
                 // A custom endpoint's model is a text model the picker does not list here: the chat keeps it (its id is `custom:…`, as in
                 // `custom-model-id.ts`, which is not imported here so the registry stays out of this module).
                 const selectedIsCustom = state.selectedModel.startsWith("custom:");
 
-                if (!isAnonymous && !selectedIsText && !selectedIsCustom) {
+                // With no list there is no fallback to pick, so the chat keeps the model it has until the list loads.
+                if (linkableModels !== undefined && !isAnonymous && !selectedIsText && !selectedIsCustom) {
                     // The default is taken only if the picker offers it: a default the owner has switched off is not a model the chat may open on.
                     const fallback = textModelFallback(linkableModels);
 

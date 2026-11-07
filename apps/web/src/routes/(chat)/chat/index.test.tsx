@@ -21,7 +21,9 @@ import { Route } from "./index";
 const harness = vi.hoisted(() => {
     return {
         assistantProps: undefined as { initialMessage?: string } | undefined,
+        composerListLoaded: true,
         composerModels: [] as { id: string }[],
+        linkWaitOver: false,
         savedPrompt: null as unknown,
         sessionPending: false,
         validation: (() => {
@@ -47,8 +49,13 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
                 useSearch: ({ select }: { select?: (search: Record<string, unknown>) => unknown } = {}) => (select ? select(harness.search) : harness.search),
             };
         },
+        // The router's own shape: `search` is the parsed object, and `searchStr` is the address as written.
         useLocation: () => {
-            return { search: harness.locationSearch, state: { __TSR_key: "navigation-1" } };
+            return {
+                search: actual.defaultParseSearch(harness.locationSearch),
+                searchStr: harness.locationSearch,
+                state: { __TSR_key: "navigation-1" },
+            };
         },
         useNavigate: () => harness.navigate,
         useRouteContext: () => {
@@ -84,8 +91,9 @@ vi.mock("@/components/error-boundaries/route-error-boundary", () => {
 // The picker's list for this user: by default every text model, so the link may select any of them; a test narrows it.
 vi.mock("@/hooks/use-composer-models", () => {
     return {
-        useComposerModelEntries: () => new Map(harness.composerModels.map((model) => [model.id, { id: model.id }])),
-        useLinkWaitOver: () => false,
+        // Undefined until the list has loaded, as the real hook answers while the catalog or the user's rules are still in flight.
+        useComposerModelEntries: () => (harness.composerListLoaded ? new Map(harness.composerModels.map((model) => [model.id, { id: model.id }])) : undefined),
+        useLinkWaitOver: () => harness.linkWaitOver,
     };
 });
 
@@ -223,6 +231,8 @@ describe("chat index route", () => {
         harness.latestThread = undefined;
         harness.sessionPending = false;
         harness.savedPrompt = null;
+        harness.composerListLoaded = true;
+        harness.linkWaitOver = false;
         harness.validation = () => {
             return { errors: {}, isValid: true };
         };
@@ -295,6 +305,56 @@ describe("chat index route", () => {
             mountPage();
 
             await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("1e3"));
+        });
+    });
+
+    describe("a prompt link's text, read back as the link was built", () => {
+        it.each([
+            ["a prompt with quotes in it", 'say "hi" to "them"'],
+            ["a prompt that is a quoted string", '"quoted"'],
+            ["a prompt that is a JSON object", '{"a":1}'],
+            ["a prompt that is a JSON array", "[1,2]"],
+            ["a prompt that is a JSON number", "42"],
+            ["a prompt that is a quoted number", '"42"'],
+        ])("opens %s with its text unchanged", async (_name, prompt) => {
+            openUrl(buildPromptLink("https://app.example.com", { prompt }));
+
+            mountPage();
+
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe(prompt));
+        });
+    });
+
+    describe("a slow model list", () => {
+        it("keeps the link waiting with no notice, and applies the link once the list has loaded", async () => {
+            harness.composerListLoaded = false;
+            openUrl(buildPromptLink("https://app.example.com", { model: textModel?.id, prompt: "from the link" }));
+
+            const rerender = mountPage();
+
+            expect(useChatUIStore.getState().composerText).toBe("");
+            expect(harness.showWarning).not.toHaveBeenCalled();
+
+            harness.composerListLoaded = true;
+            rerender();
+
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("from the link"));
+            expect(harness.showWarning).not.toHaveBeenCalled();
+        });
+
+        it("applies the link after the bounded wait when the list never loads, with no notice about a text model", async () => {
+            harness.composerListLoaded = false;
+            openUrl(buildPromptLink("https://app.example.com", { prompt: "from the link" }));
+
+            const rerender = mountPage();
+
+            expect(useChatUIStore.getState().composerText).toBe("");
+
+            harness.linkWaitOver = true;
+            rerender();
+
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("from the link"));
+            expect(harness.showWarning).not.toHaveBeenCalled();
         });
     });
 

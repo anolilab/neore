@@ -360,6 +360,48 @@ describe("usePromptLinkDraft", () => {
         expect(useChatUIStore.getState().composerText).toBe("hi");
     });
 
+    it("a model list still loading shows no notice: the link waits, and the notice appears only once the list has loaded with no text model", () => {
+        useModelStore.setState({ newThreadMode: "image", selectedModel: (imageModel?.id ?? "") as ModelId });
+
+        const { rerender } = renderLink({ linkableModels: undefined, prompt: "hi", ready: false });
+
+        expect(harness.showWarning).not.toHaveBeenCalled();
+        expect(useChatUIStore.getState().composerText).toBe("");
+
+        rerender({ linkableModels: new Map(), prompt: "hi", ready: true });
+
+        expect(harness.showWarning).toHaveBeenCalledTimes(1);
+        expect(harness.showWarning).toHaveBeenCalledWith(
+            "This chat has no text model available, so the link's draft has no model. Choose one in the model picker.",
+        );
+        expect(useChatUIStore.getState().composerText).toBe("hi");
+    });
+
+    it("a model list that loads after the link waits applies the link with its model and no notice", () => {
+        useModelStore.setState({ newThreadMode: "image", selectedModel: (imageModel?.id ?? "") as ModelId });
+
+        const { rerender } = renderLink({ linkableModels: undefined, model: gatedTextModel?.id, prompt: "hi", ready: false });
+
+        expect(harness.showWarning).not.toHaveBeenCalled();
+
+        rerender({ linkableModels: OFFERED_TEXT_MODELS, model: gatedTextModel?.id, prompt: "hi", ready: true });
+
+        expect(harness.showWarning).not.toHaveBeenCalled();
+        expect(selectedModel()).toBe(gatedTextModel?.id);
+        expect(useChatUIStore.getState().composerText).toBe("hi");
+    });
+
+    it("a model list that never loads applies the draft after the bounded wait: the link's model is refused, and no 'no text model' notice shows", () => {
+        useModelStore.setState({ newThreadMode: "image", selectedModel: (imageModel?.id ?? "") as ModelId });
+
+        renderLink({ linkableModels: undefined, model: gatedTextModel?.id, prompt: "hi", ready: true });
+
+        expect(useChatUIStore.getState().composerText).toBe("hi");
+        expect(harness.showWarning).toHaveBeenCalledTimes(1);
+        expect(harness.showWarning).toHaveBeenCalledWith(MODEL_NOTICE);
+        expect(harness.showWarning).not.toHaveBeenCalledWith(expect.stringContaining("no text model"));
+    });
+
     it("a link with no model opens a text chat after an image chat, on a text model, never on the image model left selected", () => {
         useModelStore.setState({ newThreadMode: "image", selectedModel: (imageModel?.id ?? "") as ModelId });
 

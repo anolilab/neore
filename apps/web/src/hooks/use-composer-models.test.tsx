@@ -144,7 +144,7 @@ const useLinkWithComposerList = (model: string | undefined) => {
     const entries = useComposerModelEntries();
     const linkWaitOver = useLinkWaitOver();
 
-    usePromptLinkDraft({ linkableModels: entries ?? new Map(), model, prompt: "hi", ready: entries !== undefined || linkWaitOver });
+    usePromptLinkDraft({ linkableModels: entries, model, prompt: "hi", ready: entries !== undefined || linkWaitOver });
 
     return { ids: entries ? [...entries.keys()] : [], settled: entries !== undefined };
 };

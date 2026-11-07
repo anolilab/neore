@@ -13,7 +13,6 @@ import Assistant from "@/features/chat/assistant";
 import { usePromptLinkDraft } from "@/features/chat/core/hooks/use-prompt-link-draft";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
-import type { LinkableModel } from "@/features/chat/core/utils/prompt-link-model";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
 import validatePromptSettings from "@/features/prompts/lib/prompt-validation";
@@ -26,9 +25,6 @@ import { useCRPC } from "@/lib/lunora/crpc";
 // `firstKey` is the navigation that first showed the chat index on this page load. Only
 // that visit may resume: a later New chat (a new navigation) must open a blank chat.
 const resumeState: { consumed: boolean; firstKey: string | undefined } = { consumed: false, firstKey: undefined };
-
-/** The picker's list before it is final: no model is linkable, so a link selects none. */
-const NO_LINKABLE_MODELS: ReadonlyMap<string, LinkableModel> = new Map();
 
 /** Whether a landing message is waiting in the session. Read without consuming it; false where session storage is unavailable. */
 const landingMessageWaiting = (): boolean => {
@@ -68,9 +64,10 @@ const ChatPage = () => {
     const parsedLinkPrompt = Route.useSearch({ select: ({ prompt }) => prompt });
     const parsedLinkModel = Route.useSearch({ select: ({ model }) => model });
     const location = useLocation();
-    // The router has already read the address: a prompt that looks like a number is a number there. The address's own text is what a
-    // link carries, so it is read when it is there, and the parsed value only when it is not.
-    const linkRead = readPromptLinkSearch({ model: parsedLinkModel, prompt: rawPromptText(location.search) ?? parsedLinkPrompt });
+    // The router has already read the address: a prompt that looks like a number is a number there, and a quoted one loses its quotes.
+    // The address's own text (`searchStr`, not the parsed `search` object) is what a link carries, so it is read once here, and the
+    // parsed value only when there is no text.
+    const linkRead = readPromptLinkSearch({ model: parsedLinkModel, prompt: rawPromptText(location.searchStr) ?? parsedLinkPrompt });
     const linkPrompt = linkRead.prompt;
     const linkModel = linkRead.model;
     // TanStack keys each history entry; a new navigation gets a new key.
@@ -123,7 +120,8 @@ const ChatPage = () => {
         validatePromptSettings(savedPrompt.data.model, savedPrompt.data.reasoningEffort, savedPrompt.data.enabledFeatures, pickerModels).isValid;
 
     usePromptLinkDraft({
-        linkableModels: linkableModels ?? NO_LINKABLE_MODELS,
+        // Undefined until the list has loaded: the link waits for it (within the bound), and a list that never loads chooses no model.
+        linkableModels,
         // The composer sends the free model to an anonymous visitor's text chat, so the link's model waits for the session.
         isAnonymous: sessionData?.user?.isAnonymous === true,
         model: linkModel,
