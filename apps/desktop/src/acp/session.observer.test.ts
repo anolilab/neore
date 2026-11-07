@@ -7,6 +7,7 @@ import type { PassThrough } from "node:stream";
 
 import { describe, expect, it } from "vitest";
 
+import { reportFromHandshake } from "./capabilities";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import type { PermissionGate } from "./permission";
 import { AgentSession } from "./session";
@@ -294,6 +295,45 @@ describe("the agent's options", () => {
         await started;
 
         expect((calls[0]?.[1] as HostSessionInfo).options?.configOptions?.[0]?.currentValue).toBe("plan");
+    });
+
+    it.each([
+        ["drop a switch the load replays before its answer", false, "build"],
+        ["keep a switch read after the answer, in the same read", true, "plan"],
+    ])("%s", async (_name, after, current) => {
+        const { calls, observer } = recorder();
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            capabilityReport: () => reportFromHandshake({ loadSession: true }, Date.now()),
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer,
+            onChange: () => {},
+            process: agent.process,
+            resumeSessionId: "sess_1",
+        });
+        const mode = { category: "mode", currentValue: "build", id: "mode", name: "Mode", options: [{ name: "Plan", value: "plan" }, { name: "Build", value: "build" }], type: "select" };
+        const update = (currentModeId: string) => {
+            return { jsonrpc: "2.0", method: "session/update", params: { sessionId: "sess_1", update: { currentModeId, sessionUpdate: "current_mode_update" } } };
+        };
+        const started = session.start();
+
+        await transcriptPlayer(agent).play(readTranscript("handshake-and-prompt").slice(0, 2));
+        await expect.poll(() => agent.written.at(-1)?.method).toBe("session/load");
+
+        // The replay (an old switch to Plan), then the answer (Build now) and, in one case, a switch to Plan after it: all in one read.
+        (agent.process.stdout as PassThrough).write(
+            [update("plan"), { id: agent.written.at(-1)?.id, jsonrpc: "2.0", result: { configOptions: [mode] } }, ...(after ? [update("plan")] : [])]
+                .map((frame) => `${JSON.stringify(frame)}\n`)
+                .join(""),
+        );
+        await started;
+
+        expect((calls[0]?.[1] as HostSessionInfo).options?.configOptions?.[0]?.currentValue).toBe(current);
     });
 });
 

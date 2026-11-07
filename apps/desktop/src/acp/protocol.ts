@@ -226,11 +226,17 @@ export const listSessions = async (connection: JsonRpcConnection, cwd: string, t
  * collects the notifications. Call only when the agent advertised `loadSession`. A replay is as long as the session, so
  * the deadline is generous.
  */
-export const loadSession = async (connection: JsonRpcConnection, sessionId: string, cwd: string, timeoutMs = LOAD_TIMEOUT_MS): Promise<unknown> => {
+export const loadSession = async (
+    connection: JsonRpcConnection,
+    sessionId: string,
+    cwd: string,
+    timeoutMs = LOAD_TIMEOUT_MS,
+    answered?: () => void,
+): Promise<unknown> => {
     const params: LoadSessionRequest = { cwd, mcpServers: [], sessionId };
 
     try {
-        return await withTimeout(connection.request(METHOD.loadSession, params), timeoutMs, "the agent did not finish loading the session");
+        return await withTimeout(connection.request(METHOD.loadSession, params, answered), timeoutMs, "the agent did not finish loading the session");
     } catch (error) {
         if (error instanceof RpcError && error.code === AUTH_REQUIRED) {
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment

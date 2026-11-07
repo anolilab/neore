@@ -408,7 +408,6 @@ export class AgentSession {
     /** The agent's session: the saved one when asked for and loadable, else a new one (`reattach` says which, and why not). */
     private async openAgentSession(): Promise<string> {
         const { folder, forkSessionId, resumeSessionId, startupTimeoutMs } = this.options;
-        const { scrub } = this.options.process;
 
         if (forkSessionId !== undefined) {
             return await this.forkAgentSession(forkSessionId);
@@ -420,14 +419,23 @@ export class AgentSession {
 
         // No `session/load` frame goes to an agent that did not say it loads them.
         if (isAvailable(capabilityOf(this.report, "sessions.load"))) {
+            // Until the load is given up on: an answer that comes after its timeout must not touch the fallback session's updates.
+            let awaited = true;
+
             try {
-                this.agentOptions = optionsOf(await loadSession(this.connection, resumeSessionId, folder), scrub);
-                // What came before the answer is the replayed history: the answer holds the options as they are now.
-                this.earlyOptionUpdates = [];
+                // What came before the answer is the replayed history, dropped as the answer is read: the answer holds the options
+                // as they are then. An update read after it, before the session's id is known here, is kept and applied.
+                const answer = await loadSession(this.connection, resumeSessionId, folder, undefined, () => {
+                    if (awaited) {
+                        this.earlyOptionUpdates = [];
+                    }
+                });
+
                 this.reattach = { loaded: true };
 
-                return resumeSessionId;
+                return this.withEarlyUpdates({ answer, sessionId: resumeSessionId });
             } catch {
+                awaited = false;
                 // The agent's own error can quote its environment: the backend is told that it failed (a code), not its text.
                 this.reattach = { loaded: false, reason: "load_failed" };
             }
@@ -862,8 +870,9 @@ export class AgentSession {
         if (method === METHOD.sessionUpdate && this.agentSessionId === "" && isRecord(params) && isRecord(params.update)) {
             const kind = params.update.sessionUpdate;
 
-            if ((kind === "config_option_update" || kind === "current_mode_update") && this.earlyOptionUpdates.length < 8) {
-                this.earlyOptionUpdates.push({ sessionId: params.sessionId, update: params.update });
+            // The newest few are kept: a slow load's replay, still arriving, must not crowd out a fallback session's own updates.
+            if (kind === "config_option_update" || kind === "current_mode_update") {
+                this.earlyOptionUpdates = [...this.earlyOptionUpdates, { sessionId: params.sessionId, update: params.update }].slice(-8);
             }
 
             return;
