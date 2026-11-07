@@ -42,6 +42,13 @@ describe("getSessionOrganizationForCap", () => {
         expect(await read(sessionId)).toStrictEqual({ organizationId: "org-a" });
     });
 
+    it("does not give an active organization the user is no longer a member of", async () => {
+        // The session still names the organization, but no membership row backs it (the user left or was removed).
+        const sessionId = await insertSession({ activeOrganizationId: "org-left", expiresAt: Date.now() + HOUR_MS });
+
+        expect(await read(sessionId)).toStrictEqual({ organizationId: null });
+    });
+
     it("cannot validate an expired session, another user's session or a missing one", async () => {
         const expired = await insertSession({ expiresAt: Date.now() - HOUR_MS });
         const someoneElses = await insertSession({ expiresAt: Date.now() + HOUR_MS, userId: "user-b" });
