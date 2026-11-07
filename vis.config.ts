@@ -138,7 +138,8 @@ export default defineConfig({
     // 11 projects), so wiring it to pre-commit would block every commit until
     // that debt is paid. Add it once `pnpm lint:eslint` is green.
     staged: {
-        "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,yml,yaml,md,css,html}": "prettier --config=.prettierrc.cjs --ignore-unknown --write",
+        // Markdown is left out: CI does not check its formatting, so the hook would only churn tables.
+        "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,yml,yaml,css,html}": "prettier --config=.prettierrc.cjs --ignore-unknown --write",
         // CI checks the key order of every package.json (`lint.yml`, "Types").
         "**/package.json": "sort-package-json",
     },

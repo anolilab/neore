@@ -53,8 +53,8 @@ DEPLOY_ENV=preview pnpm run deploy
 ## Git hooks
 
 `vis hook install` (run by `postinstall`) points `core.hooksPath` at `.vis/hooks/_`, which runs the scripts in
-`.vis/hooks/`. **pre-commit** runs the secret scan and `vis staged` (Prettier on staged files, `sort-package-json` on
+`.vis/hooks/`. **pre-commit** runs the secret scan and `vis staged` (Prettier on staged files except Markdown, `sort-package-json` on
 staged `package.json` files, from the `staged` map in `vis.config.ts`). **pre-push** runs the package.json order check
-and `vis affected lint:prettier` against the merge base with `main`. Type check and lint stay manual: on a change to a
+and Prettier on every file changed since the merge base with `main` (root files included, Markdown skipped as in CI). Type check and lint stay manual: on a change to a
 root config every project is affected and they take many minutes. A new
 worktree needs `pnpm install` before its first commit, or the hooks cannot find `vis`.

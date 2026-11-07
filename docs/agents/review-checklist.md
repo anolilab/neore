@@ -30,11 +30,12 @@ The most common gap is a change that works on the path you tested and is missing
 ## Access and privacy
 
 - **Locked threads.** A thread locked with a passcode never sends its title, prompts or messages anywhere new: not to a
-  model (titles, summaries, handoffs), not to a phone, not to an export, not to another participant. Check the lock at
+  model (titles, summaries, handoffs), not to a phone, not to another participant, not to anyone else's export. The
+  owner's own data export still includes it. Check the lock at
   the moment of use, not only when something is saved; a lock can arrive later.
 - **Deleted, archived or no-longer-shared threads** behave like locked ones for anything sent after the fact.
-- **Organizations.** Every organization query filters by the caller's organization taken from the session on the
-  server, never from client input. Totals include members who have left. An admin view shows organization projects
+- **Organizations.** Every query for organization data filters by the caller's organization taken from the session on
+  the server, never from client input. A person's own data outside any organization stays visible to them. Totals include members who have left. An admin view shows organization projects
   only, never a member's personal projects by name, and never narrows to one person.
 - **Group and shared runs.** A tool that reads private data (pull requests, connectors, secrets) checks at execution
   time that the run is the owner's own run, whatever path added the tool (skill, app, approval, extra tools).

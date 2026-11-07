@@ -5,4 +5,4 @@ pnpm exec vis secrets --staged --quiet || exit 1
 
 # Format and sort the staged files (the `staged` map in vis.config.ts), so a
 # commit never carries a Prettier or package.json-order failure to CI.
-pnpm exec vis staged || exit 1
+pnpm exec vis staged --revert || exit 1
