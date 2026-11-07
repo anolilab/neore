@@ -179,6 +179,7 @@ describe("the side panel's failures", () => {
         vi.unstubAllGlobals();
         vi.useRealTimers();
         vi.mocked(showError).mockClear();
+        createObjectUrl.mockClear();
     });
 
     it("reports a download that stops arriving, rather than leaving it pending", async () => {
@@ -199,6 +200,53 @@ describe("the side panel's failures", () => {
         });
 
         expect(screen.getByRole("alert").textContent).toBe("The PDF could not be downloaded.");
+    });
+
+    it("refuses a download past the chat PDF cap rather than holding it in memory", async () => {
+        // Chunks past the cap, as a body read from the network arrives.
+        const chunk = new Uint8Array(1024 * 1024);
+        let sent = 0;
+        const oversized = new ReadableStream<Uint8Array>({
+            pull: (controller) => {
+                sent += 1;
+
+                if (sent > 30) {
+                    controller.close();
+                } else {
+                    controller.enqueue(chunk);
+                }
+            },
+        });
+
+        vi.stubGlobal("fetch", async () => new Response(oversized, { status: 200 }));
+        render(panelFor(DOCUMENT_A));
+        clickDownload();
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("The PDF could not be downloaded.");
+        expect(createObjectUrl).not.toHaveBeenCalled();
+    });
+
+    it("lets the previous saved file go when the next download is saved", async () => {
+        const revoke = vi.fn();
+
+        // The first block restores the real object URL functions after it; this test stands them in again.
+        Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectUrl, writable: true });
+        Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revoke, writable: true });
+        vi.stubGlobal("fetch", async () => new Response("pdf", { status: 200 }));
+        render(panelFor(DOCUMENT_A));
+
+        clickDownload();
+        await waitFor(() => {
+            expect(createObjectUrl).toHaveBeenCalledTimes(1);
+        });
+        clickDownload();
+        await waitFor(() => {
+            expect(createObjectUrl).toHaveBeenCalledTimes(2);
+        });
+
+        expect(revoke).toHaveBeenCalledTimes(1);
     });
 
     it("keeps a viewer failure to its own file, without a toast, so the next PDF opens", async () => {

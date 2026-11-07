@@ -1,4 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
+import { chatAttachmentLimit } from "@neore/backend/document-limits";
 import { FetchableOriginsProvider } from "@neore/ui/components/file-renderers/fetchable-origins-provider";
 import { isFetchableUrl, originsOf } from "@neore/ui/hooks/use-fetchable-origins";
 import cn from "@neore/ui/utils/cn";
@@ -17,6 +18,9 @@ const PdfViewer = lazy(() => import("@neore/ui/components/file-renderers/pdf-vie
 // The backend serves the signed storage URLs, so its origin is the one the viewer and the download may fetch from.
 const PANEL_ORIGINS = originsOf(import.meta.env.VITE_LUNORA_URL as string | undefined);
 
+/** The most a chat PDF can weigh: the upload cap for its type. */
+const MAX_DOWNLOAD_BYTES = chatAttachmentLimit("application/pdf").maxBytes;
+
 /** How long a download may go without receiving any bytes before it is failed, as the viewer fails a stalled load. */
 const DOWNLOAD_STALL_MS = 30_000;
 
@@ -31,8 +35,18 @@ const readBody = async (response: Response, restartDeadline: () => void): Promis
 
     const chunks: BlobPart[] = [];
     const reader = response.body.getReader();
+    let received = 0;
 
     for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+        received += chunk.value.byteLength;
+
+        // A chat PDF is never larger than its upload cap; a body that keeps coming is not kept in memory.
+        if (received > MAX_DOWNLOAD_BYTES) {
+            await reader.cancel();
+
+            throw new Error("The PDF is larger than a chat attachment can be.");
+        }
+
         chunks.push(new Uint8Array(chunk.value));
         restartDeadline();
     }
@@ -91,6 +105,7 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
     // A download belongs to the document it started for. Showing another document, or closing the panel, abandons it: its fetch is
     // aborted, and a late answer saves nothing, so the reader never gets a PDF they have left.
     const pendingDownload = useRef<AbortController | null>(null);
+    const savedFile = useRef<{ release: () => void } | null>(null);
 
     useEffect(
         () => () => {
@@ -149,6 +164,10 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
                 return;
             }
 
+            // One saved file is held at a time: a new download lets the previous one's bytes go, so repeated clicks on a
+            // large PDF do not pile up copies for the minute each would otherwise be kept.
+            savedFile.current?.release();
+
             const objectUrl = URL.createObjectURL(blob);
             const link = globalThis.document.createElement("a");
 
@@ -159,9 +178,18 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
             document.body.appendChild(link);
             link.click();
             link.remove();
-            globalThis.setTimeout(() => {
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const release = () => {
+                globalThis.clearTimeout(timer);
                 URL.revokeObjectURL(objectUrl);
-            }, DOWNLOAD_URL_LIFETIME_MS);
+
+                if (savedFile.current?.release === release) {
+                    savedFile.current = null;
+                }
+            };
+
+            timer = globalThis.setTimeout(release, DOWNLOAD_URL_LIFETIME_MS);
+            savedFile.current = { release };
             setFailedUrl(undefined);
         } catch (error) {
             // Left for another file or a closed panel: nothing to report. A stalled download is a failure to report.
