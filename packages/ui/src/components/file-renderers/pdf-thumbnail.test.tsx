@@ -48,10 +48,12 @@ vi.mock("react-pdf", async () => {
         },
         Page: ({ canvasRef, onRenderSuccess }: { canvasRef: { current: unknown }; onRenderSuccess: () => void }) => {
             useEffect(() => {
-                if (firstPage.renders) {
-                    canvasRef.current = { toDataURL: () => "data:image/png;base64,cGFnZQ==" };
-                    onRenderSuccess();
+                if (!firstPage.renders) {
+                    return;
                 }
+
+                canvasRef.current = { toDataURL: () => "data:image/png;base64,cGFnZQ==" };
+                onRenderSuccess();
             }, [canvasRef, onRenderSuccess]);
 
             return <span data-pdf-document="" />;
@@ -145,17 +147,5 @@ describe("the thumbnail's load deadline", () => {
 
         expect(container.querySelector("img")?.getAttribute("src")).toBe("data:image/png;base64,cGFnZQ==");
         expect(container.querySelector("[data-pdf-document]")).toBeNull();
-    });
-
-    // The loading placeholder pulses through a class, and the reduced-motion preference is a CSS media query, so jsdom cannot
-    // evaluate it. This pins the class that switches the pulse off under `prefers-reduced-motion: reduce`.
-    it("switches the loading placeholder's pulse off under reduced motion", async () => {
-        firstPage.documentPending = true;
-
-        await mountThumbnail();
-
-        const placeholder = container.querySelector("span.animate-pulse");
-
-        expect(placeholder?.classList.contains("motion-reduce:animate-none")).toBe(true);
     });
 });

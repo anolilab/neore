@@ -63,6 +63,8 @@ const AssistantContent: FC<{
     const { isCanvasOpen, openPreviewFile, previewFile: openedPreview } = useCanvasState();
     // A PDF opened in another thread is not this thread's panel.
     const previewFile = openedPreview?.threadId === threadId ? openedPreview : null;
+    // Another thread's PDF is a closed panel here: the canvas does not stand in for it while that preview is cleared.
+    const isPanelOpen = isCanvasOpen && (openedPreview === null || previewFile !== null);
     const rightSidebarWidth = useUIStateStore((s) => s.rightSidebarWidth);
 
     // A chat PDF's thumbnail asks for the side panel; this takes the request (see `packages/ui/src/utils/pdf-preview-event.ts`).
@@ -109,11 +111,11 @@ const AssistantContent: FC<{
                 {/* The thread keeps its place in the group whether or not the side panel is open: moving it would remount it,
                     which scrolls it to the bottom and reloads every attachment preview in it. */}
                 <ResizablePanelGroup className="h-[calc(100%-40px)]">
-                    <ResizablePanel defaultSize={isCanvasOpen ? "50%" : "100%"} id="thread" minSize={isCanvasOpen ? "30%" : undefined}>
+                    <ResizablePanel defaultSize={isPanelOpen ? "50%" : "100%"} id="thread" minSize={isPanelOpen ? "30%" : undefined}>
                         <Thread className="h-full" initialMessage={initialMessage} />
                     </ResizablePanel>
-                    {isCanvasOpen && <ResizableHandle withHandle />}
-                    {isCanvasOpen && (
+                    {isPanelOpen && <ResizableHandle withHandle />}
+                    {isPanelOpen && (
                         <ResizablePanel aria-label={t`Canvas`} data-focus-area="canvas" defaultSize="50%" id="canvas" minSize="25%" role="region">
                             {previewFile ? <PdfPreviewPanel file={previewFile} /> : <CanvasPanel />}
                         </ResizablePanel>

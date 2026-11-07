@@ -41,12 +41,10 @@ export const rememberPdfUrl = (url: string): void => {
     latestUrls.delete(key);
     latestUrls.set(key, url);
 
-    if (latestUrls.size > MAX_REMEMBERED_FILES) {
-        const oldest = latestUrls.keys().next().value;
+    const oldest = latestUrls.size > MAX_REMEMBERED_FILES ? latestUrls.keys().next().value : undefined;
 
-        if (oldest !== undefined) {
-            latestUrls.delete(oldest);
-        }
+    if (oldest !== undefined) {
+        latestUrls.delete(oldest);
     }
 };
 

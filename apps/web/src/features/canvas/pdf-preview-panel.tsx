@@ -1,8 +1,8 @@
 import { useLingui } from "@lingui/react/macro";
 import { FetchableOriginsProvider } from "@neore/ui/components/file-renderers/fetchable-origins-provider";
 import { isFetchableUrl, originsOf } from "@neore/ui/hooks/use-fetchable-origins";
-import { latestPdfUrl } from "@neore/ui/utils/pdf-preview-event";
 import cn from "@neore/ui/utils/cn";
+import { latestPdfUrl } from "@neore/ui/utils/pdf-preview-event";
 import { Download, ExternalLink, X } from "lucide-react";
 import type { FC } from "react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
@@ -47,17 +47,23 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
         headingReference.current?.focus();
     }, [file.opener, file.url]);
 
-    // When the panel closes, focus goes back to the thumbnail that opened the file on screen, if it is still there.
-    useEffect(
-        () => () => {
-            const opener = openerReference.current;
+    // When the panel closes with focus in it, focus goes back to the thumbnail that opened the file on screen, if it is still
+    // there. Focus the reader moved elsewhere (a document card that replaced the PDF) stays where it is.
+    const rootReference = useRef<HTMLDivElement>(null);
 
-            if (opener?.isConnected) {
+    useEffect(() => {
+        const root = rootReference.current;
+
+        return () => {
+            const opener = openerReference.current;
+            const active = document.activeElement;
+            const focusLost = !active || active === document.body || !active.isConnected || root?.contains(active) === true;
+
+            if (focusLost && opener?.isConnected) {
                 opener.focus();
             }
-        },
-        [],
-    );
+        };
+    }, []);
 
     // A download belongs to the document it started for. Showing another document, or closing the panel, abandons it: its fetch is
     // aborted, and a late answer saves nothing, so the reader never gets a PDF they have left.
@@ -133,7 +139,7 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
     };
 
     return (
-        <div className={cn("flex h-full min-h-0 flex-col", className)}>
+        <div className={cn("flex h-full min-h-0 flex-col", className)} ref={rootReference}>
             <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
                 <h2 className="truncate text-sm font-medium" ref={headingReference} tabIndex={-1}>
                     {file.filename ?? t`PDF`}
@@ -150,7 +156,9 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
                             href={file.url}
                             // The newest signed URL, read at the click: the one the panel opened with may have expired.
                             onClick={(event) => {
-                                event.currentTarget.href = latestPdfUrl(file.url);
+                                const link = event.currentTarget;
+
+                                link.href = latestPdfUrl(file.url);
                             }}
                             rel="noopener noreferrer"
                             target="_blank"

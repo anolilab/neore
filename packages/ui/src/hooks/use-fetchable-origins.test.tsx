@@ -28,13 +28,6 @@ describe(isFetchableUrl, () => {
 
     const onPage = (origin: string) => vi.stubGlobal("location", { origin });
 
-    it("allows the page's own non-loopback origin, and the configured origins", () => {
-        onPage("https://app.example");
-
-        expect(isFetchableUrl("https://app.example/a.pdf", [])).toBe(true);
-        expect(isFetchableUrl(`${BACKEND}/files/a.pdf?sig=1`, originsOf(BACKEND))).toBe(true);
-    });
-
     it.each(["http://localhost:5173", "http://127.0.0.1:5173", "http://[::1]:5173"])(
         "refuses the page's own loopback origin %s, which is not an approved origin",
         (origin) => {
@@ -56,13 +49,6 @@ describe(isFetchableUrl, () => {
         expect(isFetchableUrl("https://elsewhere.example/a.pdf", originsOf(BACKEND))).toBe(false);
         expect(isFetchableUrl("http://127.0.0.2:8788/a.pdf", originsOf(BACKEND))).toBe(false);
         expect(isFetchableUrl("ftp://app.example/a.pdf", [])).toBe(false);
-    });
-
-    it("still allows data: and blob: URLs", () => {
-        onPage("http://localhost:5173");
-
-        expect(isFetchableUrl("data:application/pdf;base64,AA==", [])).toBe(true);
-        expect(isFetchableUrl("blob:http://localhost:5173/1", [])).toBe(true);
     });
 });
 

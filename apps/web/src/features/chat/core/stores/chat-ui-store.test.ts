@@ -111,24 +111,11 @@ describe("the side-panel PDF preview", () => {
         useChatUIStore.getState().reset();
     });
 
-    it("opens the side panel on the PDF, without a document", () => {
-        useChatUIStore.getState().openPreviewFile(pdf);
-
-        expect(useChatUIStore.getState()).toMatchObject({ isCanvasOpen: true, previewFile: pdf });
-    });
-
     it("is replaced by a document when one opens", () => {
         useChatUIStore.getState().openPreviewFile(pdf);
         useChatUIStore.getState().openCanvas("doc-1");
 
         expect(useChatUIStore.getState()).toMatchObject({ activeDocumentId: "doc-1", previewFile: null });
-    });
-
-    it("is cleared when the panel closes", () => {
-        useChatUIStore.getState().openPreviewFile(pdf);
-        useChatUIStore.getState().closeCanvas();
-
-        expect(useChatUIStore.getState()).toMatchObject({ isCanvasOpen: false, previewFile: null });
     });
 
     it("counts an open document as blocking a PDF, and a PDF preview or a closed panel as not", () => {

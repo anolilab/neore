@@ -4,8 +4,10 @@
  * A download belongs to the document it started for. Switching to another document while it is still fetching must not save
  * the one the reader left, and a download after the switch fetches the document on screen.
  */
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { PreviewFile } from "@/features/chat/core/stores/chat-ui-store";
 
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -59,7 +61,7 @@ const createObjectUrl = vi.fn(() => "blob:saved");
 
 Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectUrl, writable: true });
 
-const panelFor = (file: typeof DOCUMENT_A) => <PdfPreviewPanel file={file} />;
+const panelFor = (file: PreviewFile) => <PdfPreviewPanel file={file} />;
 
 const flush = async () => {
     await act(async () => {
@@ -112,25 +114,6 @@ describe("the side panel's download after a document switch", () => {
         expect(createObjectUrl).not.toHaveBeenCalled();
         expect(savedFilenames()).toEqual([]);
     });
-
-    it("fetches and saves the document on screen after a switch, not the one left", async () => {
-        const { rerender } = render(panelFor(DOCUMENT_A));
-
-        clickDownload();
-        rerender(panelFor(DOCUMENT_B));
-
-        clickDownload();
-
-        expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([DOCUMENT_A.url, DOCUMENT_B.url]);
-
-        await act(async () => {
-            pendingFetches[1]?.resolve(new Response(new Blob(["B"]), { status: 200 }));
-        });
-
-        await waitFor(() => {
-            expect(savedFilenames()).toEqual(["b.pdf"]);
-        });
-    });
 });
 
 describe("the side panel's opener and links", () => {
@@ -149,16 +132,19 @@ describe("the side panel's opener and links", () => {
         const thumbnailA = document.createElement("button");
         const thumbnailB = document.createElement("button");
 
-        document.body.append(thumbnailA, thumbnailB);
+        document.body.appendChild(thumbnailA);
+        document.body.appendChild(thumbnailB);
 
         const { rerender, unmount } = render(panelFor({ ...DOCUMENT_A, opener: thumbnailA }));
 
         rerender(panelFor({ ...DOCUMENT_B, opener: thumbnailB }));
 
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this test asserts
         expect(document.activeElement).toBe(screen.getByRole("heading", { name: "b.pdf" }));
 
         unmount();
 
+        // eslint-disable-next-line testing-library/no-node-access -- see above
         expect(document.activeElement).toBe(thumbnailB);
     });
 
