@@ -537,6 +537,64 @@ describe("a usage report the agent sends before its session answers", () => {
         expect(usage).toEqual({ cost, size: 200_000, used: 2000 });
     });
 
+    it("does not send the legacy model again once the agent has reported options and cleared them", async () => {
+        const reported: { configOptions?: unknown; models?: unknown }[] = [];
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: {
+                ...recorder().observer,
+                sessionState: (_id, patch) => {
+                    reported.push(patch);
+                },
+            },
+            onChange: () => {},
+            process: agent.process,
+        });
+        const started = session.start();
+
+        await expect.poll(() => agent.written.some((frame) => frame.method === "initialize")).toBe(true);
+        agent.say({ id: agent.written.find((frame) => frame.method === "initialize")?.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/new")).toBe(true);
+
+        const option = (current: string) => {
+            return {
+                category: "model",
+                currentValue: current,
+                id: "model",
+                name: "Model",
+                options: [
+                    { name: "Fast", value: "fast" },
+                    { name: "Deep", value: "deep" },
+                ],
+                type: "select",
+            };
+        };
+
+        // Both formats at the start: the legacy model is the one the agent had before it changed its model through an option.
+        agent.say({
+            id: agent.written.find((frame) => frame.method === "session/new")?.id,
+            result: {
+                configOptions: [option("fast")],
+                models: { availableModels: [{ modelId: "fast", name: "Fast" }], currentModelId: "fast" },
+                sessionId: "sess_1",
+            },
+        });
+        await started;
+
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { configOptions: [option("deep")], sessionUpdate: "config_option_update" } } });
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { configOptions: [], sessionUpdate: "config_option_update" } } });
+
+        await expect.poll(() => reported.at(-1)?.configOptions).toEqual([]);
+        // The legacy model is not sent again: what the agent has now is no options, not the model it had before its change.
+        expect(reported.at(-1)).not.toHaveProperty("models");
+    });
+
     it("keeps nothing of the updates a session sent before its answer when the session fails to open", async () => {
         const agent = memoryAgent();
         const session = new AgentSession({

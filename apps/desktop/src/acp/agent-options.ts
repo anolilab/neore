@@ -305,7 +305,9 @@ export const resolveOptions = (raw: RawOptions): SessionStatePatch => {
     return {
         ...raw.configOptions !== undefined && { configOptions: raw.configOptions },
         ...raw.modes !== undefined && { modes: raw.modes },
-        ...raw.models !== undefined && { models: raw.models },
+        // The legacy model is not refreshed by an option's change, so once the agent has reported options it is not sent again: after
+        // the options clear, it would name the model the agent had before it changed one.
+        ...(raw.configOptions === undefined && raw.models !== undefined && { models: raw.models }),
     };
 };
 

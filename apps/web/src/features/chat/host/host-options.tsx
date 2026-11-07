@@ -92,7 +92,8 @@ const rowsOf = (state: HostAgentState | undefined, labels: { mode: string; model
 
     const rows: Row[] = [];
 
-    if (state.models !== undefined) {
+    // The stored legacy model stands in only for an agent that has never reported options: an option's change does not refresh it.
+    if (state.models !== undefined && state.configOptions === undefined) {
         rows.push({
             changeable: false,
             choices: state.models.available.map((entry) => {

@@ -711,6 +711,18 @@ describe("the options the agent offers", () => {
         }
     });
 
+    it("does not fall back to the legacy model once the agent has reported options and cleared them", async () => {
+        // The legacy model is what the agent reported before its options changed: it is stored until the agent sends another, so the
+        // composer must not show it as the current model.
+        const client = mountWith({ agentState: { configOptions: [], models: { available: [{ id: "m1", name: "M1" }], current: "m1" } } });
+
+        // The session is read asynchronously: the assertions below run only once it has loaded, so they are not vacuous.
+        await waitFor(() => expect(client.getQueryState(["acp.functions.getHostSession", { threadId: "thread-1" }])?.status).toBe("success"));
+        await screen.findByLabelText("Message to the coding agent");
+        expect(screen.queryByRole("list", { name: "Agent options" })).toBeNull();
+        expect(screen.queryByText("M1")).toBeNull();
+    });
+
     it("renders no options row for an agent that reported none", async () => {
         mountWith({});
 
