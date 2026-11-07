@@ -71,6 +71,7 @@ packages: &packages
 # workflow itself. A change to docs or markdown alone skips both jobs.
 code:
     - "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"
+    - "**/*.jsonc"
     - "**/*.rs"
     - "**/Cargo.toml"
     - "Cargo.lock"

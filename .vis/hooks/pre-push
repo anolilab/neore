@@ -18,7 +18,7 @@ base=$(git merge-base HEAD origin/main 2>/dev/null) || {
 list=$(mktemp) || exit 1
 git diff -z --name-only --diff-filter=ACMR "$base" HEAD -- . ':!*.md' ':!*.mdx' >"$list" || { rm -f "$list"; exit 1; }
 if [ -s "$list" ]; then
-    xargs -0 pnpm exec prettier --config=.prettierrc.cjs --ignore-unknown --check <"$list"
+    xargs -0 pnpm exec prettier --config=.prettierrc.cjs --ignore-unknown --check -- <"$list"
     status=$?
 else
     status=0
