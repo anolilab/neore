@@ -1684,6 +1684,8 @@ const writeGeneratedTitle = async (
         force: boolean;
         prompt: string;
         promptId?: string;
+        /** A regenerate's one-at-a-time claim: when the write is handed to `retryTitleWrite`, that job releases it once the write settles. */
+        regenerateClaim?: { claimedAt: number; onHandOff: () => void };
         requestedBy?: string;
         stateless?: boolean;
         threadId: string;
@@ -1879,11 +1881,14 @@ const writeGeneratedTitle = async (
         await scheduleTitleWriteRetry(context, {
             chargeKey: arguments_.chargeKey,
             expectedTitleDigest,
+            regenerateClaimedAt: arguments_.regenerateClaim?.claimedAt,
             requestedBy: arguments_.requestedBy,
             threadId: arguments_.threadId,
         }).catch(() => {
             throw error;
         });
+        // The regenerate is not over until that write settles: its claim stays held, so a second click cannot race the pending write.
+        arguments_.regenerateClaim?.onHandOff();
         context.log.event("chat.thread_title", titleUsageEvent(model, usage, "write-retry-scheduled"));
 
         return;
@@ -1968,6 +1973,8 @@ const TITLE_WRITE_RETRY_DELAY_MS = 5000;
 interface TitleWriteRetry {
     chargeKey: string;
     expectedTitleDigest: string;
+    /** The regenerate claim the run handed over, released here once the write settles. */
+    regenerateClaimedAt?: number;
     requestedBy?: string;
     threadId: string;
 }
@@ -1981,13 +1988,19 @@ const scheduleTitleWriteRetry = async (context: Pick<ActionContext, "scheduler">
  * is thrown: the scheduler's own retry policy (five dispatches, with backoff) tries again, and dead-letters the job after the last, so
  * the failure is visible. Each dispatch makes one write, and no model call is made again.
  */
-export const runTitleWriteRetry = async (context: Pick<ActionContext, "log" | "runMutation">, retry: TitleWriteRetry): Promise<void> => {
+export const runTitleWriteRetry = async (context: Pick<ActionContext, "log" | "runMutation" | "scheduler">, retry: TitleWriteRetry): Promise<void> => {
     const outcome = await context.runMutation(internal.agent.thread_title.writeRecordedTitle, {
         chargeKey: retry.chargeKey,
         expectedTitleDigest: retry.expectedTitleDigest,
         requestedBy: retry.requestedBy,
         threadId: retry.threadId as Id<"threads">,
     });
+
+    // The write has settled, so the regenerate it finishes is over: a later one may ask. A write that keeps failing leaves the claim to
+    // lapse after its run TTL.
+    if (retry.regenerateClaimedAt !== undefined) {
+        await releaseRegenerateClaim(context, retry.threadId, retry.regenerateClaimedAt);
+    }
 
     context.log.event("chat.thread_title", { retried: true, ...(outcome !== "written" && { skipped: `${outcome}-on-retry` }) });
 };
@@ -1996,6 +2009,7 @@ export const retryTitleWrite = internalAction
     .input({
         chargeKey: v.string().max(MAX_LENGTH.short),
         expectedTitleDigest: v.string().max(MAX_LENGTH.short),
+        regenerateClaimedAt: v.optional(v.number()),
         requestedBy: v.optional(v.string().max(MAX_LENGTH.id)),
         threadId: v.string().max(MAX_LENGTH.id),
     })
@@ -2058,6 +2072,7 @@ const REGENERATE_TITLE_RUN_TTL_MS = 15 * 60 * 1000;
 const runRegenerateTitle = async (
     context: ActionContext,
     arguments_: { claimedAt: number; expectedTitleDigest?: string; threadId: string; userId: string },
+    onHandOff: () => void,
 ): Promise<void> => {
     // Refused before any message is read: a locked, host-run or deleted thread, or a requester who lost admin access since.
     const read = await context.runQuery(internal.agent.thread_title.readTitlePrompt, {
@@ -2079,6 +2094,7 @@ const runRegenerateTitle = async (
         force: true,
         prompt: read.text,
         promptId: read.id,
+        regenerateClaim: { claimedAt: arguments_.claimedAt, onHandOff },
         requestedBy: arguments_.userId,
         stateless: true,
         threadId: arguments_.threadId,
@@ -2111,16 +2127,22 @@ export const regenerateTitleChat = internalAction
         }
 
         let runFailure: { error: unknown } | undefined;
+        let handedOff = false;
 
         try {
-            await runRegenerateTitle(context, arguments_);
+            await runRegenerateTitle(context, arguments_, () => {
+                handedOff = true;
+            });
         } catch (error) {
             runFailure = { error };
         }
 
-        // The request is over however the run ended, so a later regenerate may ask again. A release that fails does not replace the run's
-        // own error (the run's error is the one rethrown below), and is retried and logged by the helper.
-        await releaseRegenerateClaim(context, arguments_.threadId, arguments_.claimedAt);
+        // The request is over however the run ended, so a later regenerate may ask again; unless its write was handed to a scheduled job,
+        // which releases the claim once the write settles. A release that fails does not replace the run's own error (the run's error is
+        // the one rethrown below), and is retried and logged by the helper.
+        if (!handedOff) {
+            await releaseRegenerateClaim(context, arguments_.threadId, arguments_.claimedAt);
+        }
 
         if (runFailure) {
             throw runFailure.error;

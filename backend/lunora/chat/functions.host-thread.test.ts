@@ -351,6 +351,7 @@ describe("a title answer that could be neither recorded nor written", () => {
 describe("a scheduled write of a recorded title answer", () => {
     const retryContext = (outcome: "fails" | "none" | "written") => {
         const events: Record<string, unknown>[] = [];
+        const mutations: Record<string, unknown>[] = [];
         let calls = 0;
 
         return {
@@ -361,17 +362,20 @@ describe("a scheduled write of a recorded title answer", () => {
                         events.push(fields);
                     },
                 },
-                runMutation: async () => {
+                runMutation: async (_reference: unknown, args: Record<string, unknown>) => {
                     calls += 1;
+                    mutations.push(args);
 
                     if (outcome === "fails") {
                         throw new Error("storage down");
                     }
 
-                    return outcome;
+                    return "key" in args ? null : outcome;
                 },
+                scheduler: { runAfter: async () => null },
             } as never,
             events,
+            mutations,
         };
     };
     const retry = { chargeKey: "thread-r:1", expectedTitleDigest: "digest", threadId: "thread-r" };
@@ -381,6 +385,17 @@ describe("a scheduled write of a recorded title answer", () => {
 
         await expect(runTitleWriteRetry(context, retry)).rejects.toThrow("storage down");
         expect(calls()).toBe(1);
+    });
+
+    it("releases the regenerate claim it was handed once the write settles, and keeps it while the write keeps failing", async () => {
+        const settled = retryContext("written");
+        const failing = retryContext("fails");
+
+        await runTitleWriteRetry(settled.context, { ...retry, regenerateClaimedAt: 7 });
+        await expect(runTitleWriteRetry(failing.context, { ...retry, regenerateClaimedAt: 7 })).rejects.toThrow("storage down");
+
+        expect(settled.mutations).toContainEqual({ claimedAt: 7, key: "thread-r", scope: "regenerate-title" });
+        expect(failing.mutations.some((args) => "key" in args)).toBe(false);
     });
 
     it("logs a landed write, and an answer already written or dropped", async () => {
