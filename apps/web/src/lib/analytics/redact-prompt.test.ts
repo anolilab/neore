@@ -19,4 +19,27 @@ describe(redactPromptFromEvent, () => {
         expect(JSON.stringify(event)).not.toContain("secret");
         expect(JSON.stringify(event)).toContain("model%3Dgpt");
     });
+
+    it("removes the text from heatmap data, which is filed under the page address", () => {
+        const event = redactPromptFromEvent({
+            event: "$$heatmap",
+            properties: { $heatmap_data: { "https://app.test/chat?prompt=first": [{ x: 1 }], "https://app.test/chat?prompt=second": [{ x: 2 }] } },
+            uuid: "event",
+        } as CaptureResult);
+
+        // Both pages' points are kept under the one redacted address.
+        expect(event?.properties.$heatmap_data).toStrictEqual({ "https://app.test/chat?prompt=redacted": [{ x: 1 }, { x: 2 }] });
+    });
+
+    it("ends the redaction at the quote around an autocaptured link, keeping the rest of the element chain", () => {
+        const event = redactPromptFromEvent(pageView({ $elements_chain: 'a:attr__href="/chat?prompt=hi"nth-child="1";div.card:nth-child="2"' }));
+
+        expect(event?.properties.$elements_chain).toBe('a:attr__href="/chat?prompt=redacted"nth-child="1";div.card:nth-child="2"');
+    });
+
+    it("redacts past an apostrophe or a space, which a link written in a message can hold raw", () => {
+        const event = redactPromptFromEvent(pageView({ $elements_chain: `a:attr__href="/chat?prompt=Don't share my salary"` }));
+
+        expect(event?.properties.$elements_chain).toBe('a:attr__href="/chat?prompt=redacted"');
+    });
 });

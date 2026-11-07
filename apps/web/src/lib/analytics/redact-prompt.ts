@@ -9,11 +9,15 @@ import type { CaptureResult } from "posthog-js";
 
 const REDACTED = "redacted";
 
-/** A `prompt` parameter in an address: its value runs to the next `&` or `#` (an `&` inside the text is encoded as `%26`). */
-const PLAIN_PROMPT = /([?&]prompt=)[^&#]*/gi;
+/**
+ * A `prompt` parameter in an address: its value runs to the next `&` or `#` (an `&` inside the text is encoded as `%26`), or to
+ * a double quote, where an autocaptured `href="…"` in `$elements_chain` ends. Not at an apostrophe or a space: a link written in
+ * a message can hold either raw, and stopping there would send the rest of the prompt.
+ */
+const PLAIN_PROMPT = /([?&]prompt=)[^&#"]*/gi;
 
 /** The same parameter in a link encoded once as another parameter's value: its value runs to the next encoded `&` or `#`. */
-const ENCODED_PROMPT = /((?:%3F|%26)prompt%3D)(?:[^%&#]|%(?!26|23))*/gi;
+const ENCODED_PROMPT = /((?:%3F|%26)prompt%3D)(?:[^%&#"]|%(?!26|23))*/gi;
 
 /** Each prompt parameter keeps its name; its value is replaced. */
 const redactString = (value: string): string =>
@@ -31,7 +35,10 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> => {
     return prototype === Object.prototype || prototype === null;
 };
 
-/** `value` with every string in it redacted; arrays and plain objects are copied, anything else is kept as it is. */
+/**
+ * `value` with every string in it redacted, keys included (heatmap data is filed under the page address); arrays and plain
+ * objects are copied, anything else is kept as it is.
+ */
 const redactValue = <T>(value: T): T => {
     if (typeof value === "string") {
         return redactString(value) as T;
@@ -42,7 +49,18 @@ const redactValue = <T>(value: T): T => {
     }
 
     if (isPlainObject(value)) {
-        return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, redactValue(entry)])) as T;
+        // Two keys that redact to the same one (heatmap data for two prompt links) are merged, not overwritten.
+        const result: Record<string, unknown> = {};
+
+        for (const [key, entry] of Object.entries(value)) {
+            const redactedKey = redactString(key);
+            const redactedEntry = redactValue(entry);
+            const earlier = result[redactedKey];
+
+            result[redactedKey] = Array.isArray(earlier) && Array.isArray(redactedEntry) ? [...earlier, ...redactedEntry] : redactedEntry;
+        }
+
+        return result as T;
     }
 
     return value;

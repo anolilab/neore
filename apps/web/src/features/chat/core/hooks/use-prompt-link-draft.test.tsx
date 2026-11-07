@@ -48,6 +48,8 @@ describe(usePromptLinkDraft, () => {
         renderHook(() => usePromptLinkDraft({ model: textModel?.id, otherDraftSource: false, prompt: "Draft me" }));
 
         expect(useChatUIStore.getState().composerText).toBe("Draft me");
+        // Replaced, not pushed: Back must not return to the link and apply it again.
+        expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ hash: true, replace: true }));
         expect(useModelStore.getState().selectedModel).toBe(textModel?.id);
         expect(showWarning).not.toHaveBeenCalled();
         expect(strippedSearch()).toStrictEqual({ model: undefined, prompt: undefined, promptId: "kept" });

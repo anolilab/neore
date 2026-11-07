@@ -44,17 +44,8 @@ const ChatPage = () => {
     const { data: sessionData, isPending: isSessionPending } = hooks.useSession();
     const activeTeamId = (sessionData?.session as { activeTeamId?: string | null } | undefined)?.activeTeamId ?? undefined;
     const resumeScopeReady = !isOrgPending && !isSessionPending;
-    // A prompt link's draft belongs to this page: resuming the last chat would navigate it away. Read at mount, since the link's
-    // parameters leave the address once applied, before the resume query answers.
-    const [openedWithLink] = useState(() => linkPrompt !== undefined);
     const resumeLastChat =
-        BOOTED_ON_CHAT_INDEX &&
-        userSettings?.resumeLastChat === true &&
-        !promptId &&
-        !redirectReason &&
-        !hasInitialMessage &&
-        !openedWithLink &&
-        resumeScopeReady;
+        BOOTED_ON_CHAT_INDEX && userSettings?.resumeLastChat === true && !promptId && !redirectReason && !hasInitialMessage && resumeScopeReady;
 
     usePromptLinkDraft({ model: linkModel, otherDraftSource: Boolean(promptId) || Boolean(hasInitialMessage), prompt: linkPrompt });
 
