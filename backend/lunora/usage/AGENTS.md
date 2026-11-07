@@ -22,12 +22,15 @@
   holds; later history stays "No project"); it skips keys the
   live path marked `projectFiled` and marks its own `project:<key>`, which the
   live path checks. Key pruning waits for both walks.
-- **Organization view** (`organization.ts`) — a reply in an organization's
-  thread or project is also filed under the organization (`__organization__`
-  row) and its project rows carry `organizationId`; the view sums exactly the
-  rows filed under the org, so projects plus "No project" equal its total. It
-  returns org-wide totals only: running sums travel in an encrypted cursor
-  (`usage-cursors` key) bound to org, caller and period; never return a
-  partial sum, a page size or a member-scoped figure. One call asks at most
-  `MEMBERS_PER_CALL` shards; each member read also starts that member's walks.
-  The admin role is checked on the `member` row on every call.
+- **Organization view** (`organization.ts`) — at record time a reply in an
+  organization's thread or project gets an `__organization__` row, and its
+  project row carries `organizationId` only when the organization OWNS the
+  project (a member's own project stays theirs). The view sums the rows filed
+  under the session's active org (never a client-given id), lists only projects
+  the org owns now, and puts everything else in an anonymous "No project".
+  The backfill never files history under an organization: no record says which
+  one a past reply ran in. Totals only: running sums ride in an encrypted
+  cursor (`usage-cursors`) bound to org, caller and period; never return a
+  partial sum, page size or member-scoped figure. The admin role is checked on
+  the `member` row on every call. Both walks date replies in the zone snapshot
+  taken when the first walk started (`usageBackfill.timeZone`).

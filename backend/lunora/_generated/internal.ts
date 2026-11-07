@@ -1228,7 +1228,8 @@ export interface InternalApiTypes {
             sweepUsageRollup: FunctionReference<"mutation", {}, { pruned: number; status: "idle" | "running" | "done" }>;
         };
         organization: {
-            memberOrganizationUsage: FunctionReference<"mutation", { fromDate: string; organizationId: string; userId: string }, { complete: boolean; projects: Array<{ costMicrodollars: number; replies: number; tokens: number; projectKey: string }>; total: { costMicrodollars: number; replies: number; tokens: number }; truncated: boolean }>;
+            memberOrganizationUsage: FunctionReference<"query", { fromDate: string; organizationId: string; userId: string }, { projects: Array<{ costMicrodollars: number; replies: number; tokens: number; projectKey: string }>; total: { costMicrodollars: number; replies: number; tokens: number }; truncated: boolean }>;
+            organizationProjectTitles: FunctionReference<"query", { organizationId: string; projectIds: Array<string> }, Array<{ projectId: string; title: string }>>;
             organizationUsageScope: FunctionReference<"query", { afterUserId?: string; organizationId: string; userId: string }, null | { memberIds: Array<string>; nextCursor?: string; projects: Array<{ projectId: string; title: string }> }>;
         };
     };
@@ -2491,6 +2492,7 @@ export const internal: InternalApiTypes = {
         },
         organization: {
             memberOrganizationUsage: { __lunoraRef: "usage_organization:memberOrganizationUsage" },
+            organizationProjectTitles: { __lunoraRef: "usage_organization:organizationProjectTitles" },
             organizationUsageScope: { __lunoraRef: "usage_organization:organizationUsageScope" },
         },
     },

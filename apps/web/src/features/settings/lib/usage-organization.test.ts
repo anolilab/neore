@@ -7,7 +7,6 @@ const totals = (costMicrodollars: number) => {
 };
 
 const RESULT = {
-    complete: true,
     members: 28,
     noProject: totals(7),
     projects: [{ ...totals(140), projectKey: "alpha", title: "Alpha" }],

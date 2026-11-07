@@ -1776,6 +1776,7 @@ export const usageBackfill = sqliteTable("usageBackfill", {
     status: text("status", { mode: "json" }).$type<"running" | "done">().notNull(),
     threadCursor: text("threadCursor"),
     threadId: text("threadId"),
+    timeZone: text("timeZone"),
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({

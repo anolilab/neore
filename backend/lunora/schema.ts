@@ -3321,6 +3321,8 @@ export const schema = defineSchema({
         // Pagination cursor for the thread AFTER `threadId`.
         threadCursor: v.optional(v.string()),
         threadId: v.optional(v.string()),
+        // The user's time zone when the first walk started: both walks date replies in it.
+        timeZone: v.optional(v.string()),
         updatedAt: v.number(),
         userId: v.string(),
     })

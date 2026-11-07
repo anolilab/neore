@@ -200,6 +200,8 @@ export const projectFiledKey = (replyKey: string): string => `project:${replyKey
 export interface Attribution {
     /** The organization of the thread's project, else of the thread itself. */
     organizationId?: string;
+    /** Set when the organization owns the project: only then is the project one of the organization's. */
+    projectInOrganization?: boolean;
     projectKey?: string;
 }
 
@@ -245,11 +247,18 @@ export const attributionRows = (increments: ReadonlyArray<AttributionIncrement>)
         }
     };
 
-    for (const { costMicrodollars, date, organizationId, projectKey, replies, tokens } of increments) {
+    for (const { costMicrodollars, date, organizationId, projectInOrganization, projectKey, replies, tokens } of increments) {
         const amounts = { costMicrodollars, date, replies, tokens };
 
+        // A member's own project in an organization's thread stays theirs: its row carries no organization, so the
+        // organization's view never lists it (the spend still counts in the organization's total, as "No project").
         if (projectKey !== undefined) {
-            add({ ...amounts, projectKey, skillKey: PROJECT_SKILL_KEY, ...(organizationId !== undefined && { organizationId }) });
+            add({
+                ...amounts,
+                projectKey,
+                skillKey: PROJECT_SKILL_KEY,
+                ...(organizationId !== undefined && projectInOrganization === true && { organizationId }),
+            });
         }
 
         if (organizationId !== undefined) {

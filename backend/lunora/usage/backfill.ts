@@ -48,7 +48,7 @@ import { patchRow } from "../lib/patch";
 import { currentUserShard } from "../lib/shard-context";
 import type { Attribution, AttributionIncrement, RollupIncrement } from "./activity-logic";
 import { projectFiledKey } from "./activity-logic";
-import { addToAttributionRollup, addToRollup, attributionOf, isReplyRecorded, markReplyRecorded } from "./activity";
+import { addToAttributionRollup, addToRollup, isReplyRecorded, markReplyRecorded } from "./activity";
 import type { BackfillRow, BackfillWindow, ReplyGroup } from "./backfill-logic";
 import { backfillIncrement, completeOrders, groupReplies } from "./backfill-logic";
 
@@ -116,6 +116,8 @@ export const ensureBackfill = async (ctx: MutationCtx, userId: string, now: numb
     if (state) {
         await ctx.db.patch("usageBackfill", state._id, { leaseUntil: now + BACKFILL_LEASE_MS, runId, updatedAt: now });
     } else {
+        const settings = await ctx.db.userSettings.findFirst({ where: { userId } });
+
         await ctx.db.insert("usageBackfill", {
             leaseUntil: now + BACKFILL_LEASE_MS,
             replies: 0,
@@ -124,6 +126,9 @@ export const ensureBackfill = async (ctx: MutationCtx, userId: string, now: numb
             status: "running",
             updatedAt: now,
             userId,
+            // Both walks date a reply in this zone, so a later change of zone cannot put a reply's project row and its
+            // total on different days.
+            ...(settings?.timezone && { timeZone: settings.timezone }),
         });
     }
 
@@ -205,7 +210,6 @@ interface StepResult<I> {
 }
 
 interface WalkedThread {
-    organizationId?: string;
     projectId?: string;
     threadCursor: string;
     threadId: string;
@@ -220,6 +224,13 @@ interface WalkPass<I> {
     /** Set by a walk that needs each thread's attribution (read once per thread); it may then pass a thread unread. */
     skipThread?: (thread: Attribution) => boolean;
 }
+
+/**
+ * What the project walk files a past reply under: its thread's project, and no organization. Nothing records which
+ * organization a thread or project was in when a past reply ran, and filing it under the one it is in now could show
+ * one organization's spend to another's admins; organization totals start with the live record.
+ */
+const projectOnly = (thread: { projectId?: string | null } | null): Attribution => (thread?.projectId ? { projectKey: thread.projectId } : {});
 
 /** The next thread to walk from `threadCursor`, and the cursor past it; undefined past the last one. */
 const nextThread = async (ctx: DbCtx, userId: string, threadCursor: string | undefined): Promise<WalkedThread | undefined> => {
@@ -242,7 +253,6 @@ const nextThread = async (ctx: DbCtx, userId: string, threadCursor: string | und
         threadCursor: threads.isDone || !threads.continueCursor ? THREADS_END : threads.continueCursor,
         threadId: next._id as string,
         ...(next.projectId && { projectId: next.projectId as string }),
-        ...(next.organizationId && { organizationId: next.organizationId }),
     };
 };
 
@@ -275,7 +285,7 @@ const walk = async <I>(ctx: DbCtx, userId: string, position: Position, pass: Wal
     let threadsStarted = 0;
 
     if (threadId !== undefined && pass.skipThread) {
-        thread = await attributionOf(ctx, await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } }));
+        thread = projectOnly(await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } }));
     }
 
     while (budget > 0) {
@@ -291,7 +301,7 @@ const walk = async <I>(ctx: DbCtx, userId: string, position: Position, pass: Wal
             }
 
             ({ threadCursor, threadId } = next);
-            thread = pass.skipThread ? await attributionOf(ctx, next) : {};
+            thread = pass.skipThread ? projectOnly(next) : {};
             lastOrder = undefined;
             threadsStarted += 1;
 
@@ -322,10 +332,15 @@ const walk = async <I>(ctx: DbCtx, userId: string, position: Position, pass: Wal
     return { done: false, increments, keys, position: { lastOrder, threadCursor, threadId } };
 };
 
-const windowFor = async (ctx: DbCtx, userId: string, cutoff: number, now: number): Promise<BackfillWindow> => {
-    const settings = await ctx.db.userSettings.findFirst({ where: { userId } });
+/**
+ * The window a walk step counts in. Days are reckoned in the zone the first walk started with, so both walks date a
+ * reply alike; a walk started before that snapshot existed falls back to the user's zone now.
+ */
+const windowFor = async (ctx: DbCtx, userId: string, cutoff: number, now: number, snapshot: string | undefined): Promise<BackfillWindow> => {
+    const settings = snapshot === undefined ? await ctx.db.userSettings.findFirst({ where: { userId } }) : null;
+    const timeZone = snapshot ?? settings?.timezone ?? undefined;
 
-    return { cutoff, oldestDate: usageDailyCutoffDate(now), userId, ...(settings?.timezone && { timeZone: settings.timezone }) };
+    return { cutoff, oldestDate: usageDailyCutoffDate(now), userId, ...(timeZone && { timeZone }) };
 };
 
 /** Whether the live path filed any of these rows' reply under its project itself. */
@@ -358,7 +373,7 @@ export const runUsageBackfillStep = internalMutation
         }
 
         const { now } = ctx;
-        const window = await windowFor(ctx, userId, state.startedAt, now);
+        const window = await windowFor(ctx, userId, state.startedAt, now, state.timeZone ?? undefined);
         const step = await walk<RollupIncrement>(
             ctx,
             userId,
@@ -419,7 +434,7 @@ export const runUsageProjectBackfillStep = internalMutation
         // Only replies from before the first walk's cutoff: that walk (or the live record) counted each of them in the
         // total. A later one is in the total only if its live record landed, which nothing durable says once its key
         // is pruned, so it stays under "No project" rather than risk projects adding up to more than the total.
-        const window = await windowFor(ctx, userId, Math.min(state.startedAt, position.startedAt), now);
+        const window = await windowFor(ctx, userId, Math.min(state.startedAt, position.startedAt), now, state.timeZone ?? undefined);
         const step = await walk<AttributionIncrement>(
             ctx,
             userId,
@@ -429,7 +444,7 @@ export const runUsageProjectBackfillStep = internalMutation
                     const increment = backfillIncrement(group, window);
                     const key = group.rows[0]?._id;
 
-                    if (!increment || key === undefined || (thread.projectKey === undefined && thread.organizationId === undefined)) {
+                    if (!increment || key === undefined || thread.projectKey === undefined) {
                         return undefined;
                     }
 
@@ -445,7 +460,7 @@ export const runUsageProjectBackfillStep = internalMutation
                         ...thread,
                     };
                 },
-                skipThread: (thread) => thread.projectKey === undefined && thread.organizationId === undefined,
+                skipThread: (thread) => thread.projectKey === undefined,
             },
         );
 

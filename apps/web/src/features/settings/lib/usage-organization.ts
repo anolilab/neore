@@ -12,10 +12,9 @@ export interface UsageTotalsLike {
 }
 
 export interface OrganizationUsage {
-    complete: boolean;
     members: number;
     noProject: UsageTotalsLike;
-    projects: (UsageTotalsLike & { projectKey: string; title?: string })[];
+    projects: (UsageTotalsLike & { projectKey: string; title: string })[];
     total: UsageTotalsLike;
     truncated: boolean;
 }

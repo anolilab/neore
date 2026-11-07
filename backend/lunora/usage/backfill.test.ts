@@ -725,29 +725,54 @@ describe("project backfill", () => {
         expect([total, projects, total - projects]).toStrictEqual([147, 140, 7]);
     });
 
-    it("files history of an organization's threads under it, and of its projects under both", async () => {
+    it("files history under projects only, never under an organization it may since have left", async () => {
         const orgProject = await harness.run(
             async (ctx: any) => await ctx.db.insert("projects", { createdAt: DAY_1, organizationId: "org_1", title: "Org", userId: USER }),
         );
 
         await insertThread(DAY_1, [[prompt(), reply(10, 100)]], "active", orgProject);
         await insertThread(DAY_1, [[prompt(), reply(1, 20)]], "active", undefined, "org_1");
-        await insertThread(DAY_1, [[prompt(), reply(1, 7)]]);
         vi.setSystemTime(STARTED);
         await start();
         await drain();
 
-        const rows = await harness.run(async (ctx: any) => {
-            const { page } = await ctx.db.usageDaily.findMany({ where: { organizationId: "org_1", userId: USER } });
+        const filed = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.usageDaily.findMany({ where: { userId: USER } });
 
-            return page
-                .map((row: any) => [row.skillKey, row.projectKey ?? null, row.costMicrodollars])
-                .toSorted((a: string[], b: string[]) => a[0]!.localeCompare(b[0]!));
+            return page.filter((row: any) => row.organizationId !== undefined && row.organizationId !== null);
         });
 
-        expect(rows).toStrictEqual([
-            ["__organization__", null, 120],
-            ["__project__", orgProject, 100],
-        ]);
+        expect(filed).toStrictEqual([]);
+        expect(await projectRows()).toMatchObject([{ costMicrodollars: 100, projectKey: orgProject }]);
+    });
+
+    it("dates a reply's project row in the zone its total was dated in, after the zone changes", async () => {
+        const alpha = await insertProject("Alpha");
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("userSettings", { timezone: "Pacific/Kiritimati", userId: USER });
+        });
+        // 11:00 UTC on 2026-09-20 is already 2026-09-21 in UTC+14.
+        await insertThread(Date.UTC(2026, 8, 20, 11), [[prompt(), reply(1, 10)]], "active", alpha);
+        vi.setSystemTime(STARTED);
+        await start();
+
+        for (let current = await state(); current.status !== "done"; current = await state()) {
+            await step(current.runId);
+        }
+
+        await harness.run(async (ctx: any) => {
+            const settings = await ctx.db.userSettings.findFirst({ where: { userId: USER } });
+
+            await ctx.db.patch("userSettings", settings._id, { timezone: "Pacific/Pago_Pago" });
+        });
+        await drain();
+
+        const rows = await rollup();
+        const totalDay = rows.find((row) => row.skillKey === TOTAL_SKILL_KEY)?.date;
+        const projectDay = rows.find((row) => row.skillKey === PROJECT_SKILL_KEY)?.date;
+
+        expect(totalDay).toBe("2026-09-21");
+        expect(projectDay).toBe(totalDay);
     });
 });

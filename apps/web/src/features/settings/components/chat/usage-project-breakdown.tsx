@@ -100,7 +100,7 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
 
     if (showing === "organization" && organization.data) {
         rows = organization.data.projects.map((project) => {
-            return { ...project, key: project.projectKey, label: project.title ?? t`Project no longer in this organization` };
+            return { ...project, key: project.projectKey, label: project.title };
         });
 
         if (organization.data.noProject.replies > 0 || organization.data.noProject.costMicrodollars > 0) {
@@ -204,8 +204,10 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                     </Table>
                 )}
                 {truncated && <p className="text-muted-foreground mt-2 text-xs">{t`Only part of this period is included.`}</p>}
-                {showing === "organization" && organization.data && !organization.data.complete && (
-                    <p className="text-muted-foreground mt-2 text-xs">{t`Some members' earlier usage is still being added.`}</p>
+                {showing === "organization" && (
+                    <p className="text-muted-foreground mt-2 text-xs">
+                        {t`Counts usage recorded since organization reporting started. Members' own projects count under No project.`}
+                    </p>
                 )}
             </CardContent>
         </Card>

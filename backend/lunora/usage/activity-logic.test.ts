@@ -233,15 +233,18 @@ describe("project rows", () => {
 
         expect(
             attributionRows([
-                { ...one, organizationId: "org", projectKey: "p_a" },
-                { ...one, organizationId: "org", projectKey: "p_a" },
+                { ...one, organizationId: "org", projectInOrganization: true, projectKey: "p_a" },
+                { ...one, organizationId: "org", projectInOrganization: true, projectKey: "p_a" },
                 { ...one, organizationId: "org" },
                 { ...one, projectKey: "p_b" },
+                // A member's own project in the organization's thread: the organization's total, never its project.
+                { ...one, organizationId: "org", projectKey: "p_own" },
             ]),
         ).toStrictEqual([
             { ...one, costMicrodollars: 2, organizationId: "org", projectKey: "p_a", replies: 2, skillKey: PROJECT_SKILL_KEY, tokens: 2 },
-            { ...one, costMicrodollars: 3, organizationId: "org", replies: 3, skillKey: ORGANIZATION_SKILL_KEY, tokens: 3 },
+            { ...one, costMicrodollars: 4, organizationId: "org", replies: 4, skillKey: ORGANIZATION_SKILL_KEY, tokens: 4 },
             { ...one, projectKey: "p_b", skillKey: PROJECT_SKILL_KEY },
+            { ...one, projectKey: "p_own", skillKey: PROJECT_SKILL_KEY },
         ]);
     });
 });

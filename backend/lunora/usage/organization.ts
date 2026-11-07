@@ -5,11 +5,14 @@
  *
  * Each member's usage lives in the rollup on their own shard (`activity.ts`):
  * a reply in an organization's thread or project is filed under that
- * organization (an `__organization__` row) and, in a project, under the project
- * with the organization on the row. The view adds up exactly those rows, so
- * every project counts and the projects plus "No project" equal the total.
- * Asking a member's shard also starts or resumes their backfill walks, so an
- * inactive member's history is filed too; `complete` says when it all is.
+ * organization when it is recorded (an `__organization__` row), and a reply in
+ * a project the organization owns is filed under that project with the
+ * organization on the row. The view adds up exactly those rows — every member,
+ * every project — and lists only projects the organization owns now; a
+ * member's personal project, or one that left the organization, counts under
+ * "No project" without its name. Past replies are never filed under an
+ * organization (nothing records which one they ran in), so the totals cover
+ * usage since organization reporting started.
  *
  * Totals only, never per member: one call asks at most
  * {@link MEMBERS_PER_CALL} shards (each a subrequest), and the running sums
@@ -20,9 +23,8 @@
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalQuery } from "../_generated/server";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
-import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { callOnShard } from "../lib/cross-shard";
 import { authAction, rateLimit } from "../lib/crpc";
 import { decryptKey, encryptKey } from "../lib/encryption";
@@ -31,7 +33,6 @@ import { systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
 import type { UsageTotals } from "./activity-logic";
 import { addProjectTotals, foldOrganizationRows, isDayKey, remainderOf } from "./activity-logic";
-import { ensureBackfill, ensureProjectBackfill } from "./backfill";
 
 /** Member shards one call asks, at most: well inside a Worker invocation's subrequest budget. */
 export const MEMBERS_PER_CALL = 20;
@@ -41,6 +42,9 @@ export const MAX_PROJECTS = 200;
 
 /** One member's rows of one organization one read takes: a project row per day and project, plus one per day. */
 export const MEMBER_ROW_LIMIT = 20_000;
+
+/** Project titles one lookup reads. */
+const TITLE_BATCH = 50;
 
 /** How long a cursor stays usable. */
 const CURSOR_TTL_MS = 10 * 60 * 1000;
@@ -99,45 +103,48 @@ export const organizationUsageScope = internalQuery
         };
     });
 
-/**
- * One member's usage filed under the organization from `fromDate` on, on the
- * member's shard. Starts or resumes their backfill walks first, so a member who
- * has not been active since still has their history filed.
- */
-export const memberOrganizationUsage = internalMutation
+/** One member's usage filed under the organization from `fromDate` on, read on the member's shard. */
+export const memberOrganizationUsage = internalQuery
     .input({ fromDate: v.string().max(10), organizationId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
     .output(
         v.object({
-            complete: v.boolean(),
             projects: v.array(v.object({ ...vTotals, projectKey: v.string() })),
             total: v.object({ ...vTotals }),
             truncated: v.boolean(),
         }),
     )
-    .mutation(async ({ args: { fromDate, organizationId, userId }, ctx }) => {
-        if (!isDayKey(fromDate) || (await isAccountDeletionUnderway(ctx, userId))) {
-            return { complete: true, projects: [], total: { costMicrodollars: 0, replies: 0, tokens: 0 }, truncated: false };
+    .query(async ({ args: { fromDate, organizationId, userId }, ctx }) => {
+        if (!isDayKey(fromDate)) {
+            return { projects: [], total: { costMicrodollars: 0, replies: 0, tokens: 0 }, truncated: false };
         }
 
-        const replies = await ensureBackfill(ctx, userId, ctx.now);
-        const projects = await ensureProjectBackfill(ctx, userId, ctx.now);
+        // Only rows filed under this organization: the id comes from the caller's session, never from the client.
         const { page } = await ctx.db.usageDaily.findMany({
             limit: MEMBER_ROW_LIMIT,
             orderBy: [{ date: "desc" }],
             where: { date: { gte: fromDate }, organizationId, userId },
         });
 
-        return {
-            complete: replies === "done" && projects === "done",
-            ...foldOrganizationRows(page, organizationId),
-            truncated: page.length >= MEMBER_ROW_LIMIT,
-        };
+        return { ...foldOrganizationRows(page, organizationId), truncated: page.length >= MEMBER_ROW_LIMIT };
+    });
+
+/** Titles of the projects among `projectIds` the organization owns now; any other id is left out. */
+export const organizationProjectTitles = internalQuery
+    .input({ organizationId: v.string().max(MAX_LENGTH.id), projectIds: v.array(v.string().max(MAX_LENGTH.id)) })
+    .output(v.array(v.object({ projectId: v.string(), title: v.string() })))
+    .query(async ({ args: { organizationId, projectIds }, ctx }) => {
+        const found = await Promise.all(
+            projectIds.slice(0, TITLE_BATCH).map(async (projectId) => await systemDb(ctx).projects.findFirst({ where: { _id: projectId as never } })),
+        );
+
+        return found.flatMap((project) =>
+            project && project.organizationId === organizationId ? [{ projectId: project._id as string, title: project.title }] : [],
+        );
     });
 
 /** The running sums between calls; only ever handed to the client encrypted. */
 interface CursorState {
     afterUserId: string;
-    complete: boolean;
     expiresAt: number;
     fromDate: string;
     members: number;
@@ -190,10 +197,9 @@ const mapLimited = async <T, R>(items: ReadonlyArray<T>, limit: number, map: (it
 };
 
 const vResult = v.object({
-    complete: v.boolean(),
     members: v.number(),
     noProject: v.object({ ...vTotals }),
-    projects: v.array(v.object({ ...vTotals, projectKey: v.string(), title: v.optional(v.string()) })),
+    projects: v.array(v.object({ ...vTotals, projectKey: v.string(), title: v.string() })),
     total: v.object({ ...vTotals }),
     truncated: v.boolean(),
 });
@@ -222,7 +228,6 @@ export const getOrganizationProjectUsage = authAction
             ? await openCursor(cursor, { fromDate, now, organizationId, requesterId })
             : {
                   afterUserId: "",
-                  complete: true,
                   expiresAt: now + CURSOR_TTL_MS,
                   fromDate,
                   members: 0,
@@ -262,7 +267,6 @@ export const getOrganizationProjectUsage = authAction
         const next: CursorState = {
             ...state,
             afterUserId: scope.nextCursor ?? "",
-            complete: state.complete && perMember.every((member) => member.complete),
             members: state.members + scope.memberIds.length,
             projects: [...projects],
             total,
@@ -273,26 +277,31 @@ export const getOrganizationProjectUsage = authAction
             return { cursor: await sealCursor(next) };
         }
 
+        // Listed: projects the organization owns now, looked up by id (so none past the first page is mislabelled), and
+        // its projects with no usage yet, at zero. Anything else — a member's personal project, one that left the
+        // organization — stays in "No project", without its name or id.
         const titles = new Map(scope.projects.map((project) => [project.projectId, project.title]));
+        const unknown = [...projects.keys()].filter((projectKey) => !titles.has(projectKey));
 
-        // The organization's projects with no usage yet are listed too, at zero.
-        for (const project of scope.projects) {
-            if (!projects.has(project.projectId)) {
-                projects.set(project.projectId, { costMicrodollars: 0, replies: 0, tokens: 0 });
+        for (let index = 0; index < unknown.length; index += TITLE_BATCH) {
+            const owned = await ctx.runQuery(internal.usage.organization.organizationProjectTitles, {
+                organizationId,
+                projectIds: unknown.slice(index, index + TITLE_BATCH),
+            });
+
+            for (const project of owned) {
+                titles.set(project.projectId, project.title);
             }
         }
 
-        const rows = [...projects].map(([projectKey, totals]) => {
-            const title = titles.get(projectKey);
-
-            return { ...totals, projectKey, ...(title !== undefined && { title }) };
+        const rows = [...titles].map(([projectKey, title]) => {
+            return { ...(projects.get(projectKey) ?? { costMicrodollars: 0, replies: 0, tokens: 0 }), projectKey, title };
         });
 
         ctx.log.event("usage.get_organization_project_usage", { members: next.members, projects: rows.length });
 
         return {
             result: {
-                complete: next.complete,
                 members: next.members,
                 noProject: remainderOf(total, rows),
                 projects: rows.toSorted((a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.projectKey.localeCompare(b.projectKey)),

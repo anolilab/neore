@@ -1999,6 +1999,7 @@ export interface Doc_usageBackfill {
     status: "running" | "done";
     threadCursor?: string;
     threadId?: string;
+    timeZone?: string;
     updatedAt: number;
     userId: string;
 }
@@ -5010,6 +5011,7 @@ export interface Insert_usageBackfill {
     status: "running" | "done";
     threadCursor?: string;
     threadId?: string;
+    timeZone?: string;
     updatedAt: number;
     userId: string;
 }

@@ -56202,9 +56202,6 @@
                     },
                     "result": {
                       "properties": {
-                        "complete": {
-                          "type": "boolean"
-                        },
                         "members": {
                           "type": "number"
                         },
@@ -56250,7 +56247,8 @@
                               "costMicrodollars",
                               "replies",
                               "tokens",
-                              "projectKey"
+                              "projectKey",
+                              "title"
                             ],
                             "type": "object"
                           },
@@ -56280,7 +56278,6 @@
                         }
                       },
                       "required": [
-                        "complete",
                         "members",
                         "noProject",
                         "projects",

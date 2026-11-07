@@ -72,9 +72,14 @@ export const attributionOf = async (ctx: DbCtx, thread: { organizationId?: strin
     }
 
     const projectKey = thread.projectId ?? undefined;
-    const organizationId = (projectKey === undefined ? undefined : await projectOrganizationOf(ctx, projectKey)) ?? thread.organizationId ?? undefined;
+    const projectOrganization = projectKey === undefined ? undefined : await projectOrganizationOf(ctx, projectKey);
+    const organizationId = projectOrganization ?? thread.organizationId ?? undefined;
 
-    return { ...(projectKey !== undefined && { projectKey }), ...(organizationId !== undefined && { organizationId }) };
+    return {
+        ...(projectKey !== undefined && { projectKey }),
+        ...(organizationId !== undefined && { organizationId }),
+        ...(projectOrganization !== undefined && { projectInOrganization: true }),
+    };
 };
 
 /** The attribution of the user's thread `threadId`, when it is on this shard. */

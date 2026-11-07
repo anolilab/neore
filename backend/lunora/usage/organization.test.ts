@@ -47,7 +47,7 @@ vi.mock("../lib/cross-shard", () => {
         callOnShard: async (_reference: unknown, args: Record<string, unknown>) => {
             const { memberOrganizationUsage } = await import("./organization");
 
-            return await harnessRef.current.run(async (ctx: any) => await ctx.runMutation(memberOrganizationUsage, args));
+            return await harnessRef.current.run(async (ctx: any) => await ctx.runQuery(memberOrganizationUsage, args));
         },
     };
 });
@@ -130,21 +130,55 @@ describe("organization usage", () => {
         expect(result.members).toBe(2);
     });
 
-    it("counts a member whose usage sits in a project another organization now owns as filed, not lost", async () => {
-        const project = await insert("projects", { createdAt: 0, organizationId: ORG, title: "Moved", userId: ADMIN });
+    it("shows an admin only their own organization's usage, never another's", async () => {
+        const ours = await insert("projects", { createdAt: 0, organizationId: ORG, title: "Ours", userId: ADMIN });
+        const theirs = await insert("projects", { createdAt: 0, organizationId: "org_2", title: "Theirs", userId: MEMBER });
 
         await insert("member", { createdAt: 0, organizationId: ORG, role: "admin", userId: ADMIN });
-        await usageOf(ADMIN, project, 100, 0, 0);
+        // MEMBER belongs to both organizations and works in each.
+        await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
+        await insert("member", { createdAt: 0, organizationId: "org_2", role: "admin", userId: MEMBER });
+        await record(MEMBER, await insert("threads", { organizationId: ORG, projectId: ours, status: "active", title: "T", userId: MEMBER }), 100);
+        await record(MEMBER, await insert("threads", { organizationId: "org_2", projectId: theirs, status: "active", title: "T", userId: MEMBER }), 900);
+        await record(MEMBER, await insert("threads", { organizationId: "org_2", status: "active", title: "T", userId: MEMBER }), 90);
+
+        const { result } = await read();
+
+        expect(result.total.costMicrodollars).toBe(100);
+        expect(result.projects.map((project: { title: string }) => project.title)).toStrictEqual(["Ours"]);
+        expect(JSON.stringify(result)).not.toContain(theirs);
+    });
+
+    it("counts a member's own project in an organization thread under No project, without its name or id", async () => {
+        const personal = await insert("projects", { createdAt: 0, title: "My diary", userId: MEMBER });
+
+        await insert("member", { createdAt: 0, organizationId: ORG, role: "admin", userId: ADMIN });
+        await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
+        await record(MEMBER, await insert("threads", { organizationId: ORG, projectId: personal, status: "active", title: "T", userId: MEMBER }), 50);
+
+        const { result } = await read();
+
+        expect(result.total.costMicrodollars).toBe(50);
+        expect(result.noProject.costMicrodollars).toBe(50);
+        expect(result.projects).toStrictEqual([]);
+        expect(JSON.stringify(result)).not.toContain(personal);
+        expect(JSON.stringify(result)).not.toContain("My diary");
+    });
+
+    it("moves a project that left the organization into No project, and names projects past the first page", async () => {
+        const moved = await insert("projects", { createdAt: 0, organizationId: ORG, title: "Moved", userId: ADMIN });
+
+        await insert("member", { createdAt: 0, organizationId: ORG, role: "admin", userId: ADMIN });
+        await usageOf(ADMIN, moved, 100, 0, 0);
         await harness.run(async (ctx: any) => {
-            await ctx.db.patch("projects", project, { organizationId: "org_other" });
+            await ctx.db.patch("projects", moved, { organizationId: "org_other" });
         });
 
         const { result } = await read();
 
-        // Filed under this organization when it was recorded: still counted here, under a project it no longer lists.
         expect(result.total.costMicrodollars).toBe(100);
-        expect(result.projects).toMatchObject([{ costMicrodollars: 100, projectKey: project }]);
-        expect(result.projects[0].title).toBeUndefined();
+        expect(result.projects).toStrictEqual([]);
+        expect(result.noProject.costMicrodollars).toBe(100);
     });
 
     it("never hands the client a partial sum, and refuses a cursor it did not issue to this caller", async () => {
@@ -180,14 +214,18 @@ describe("organization usage", () => {
         expect(await harness.run(async (ctx: any) => await ctx.runQuery(organizationUsageScope, { organizationId: ORG, userId: ADMIN }))).toBeNull();
     });
 
-    it("starts an inactive member's backfill when the organization reads them", async () => {
-        const result = await harness.run(
-            async (ctx: any) => await ctx.runMutation(memberOrganizationUsage, { fromDate: FROM, organizationId: ORG, userId: MEMBER }),
-        );
-        const state = await harness.run(async (ctx: any) => await ctx.db.usageBackfill.findFirst({ where: { userId: MEMBER } }));
+    it("reads a member who has not been active since, from the rows their replies recorded", async () => {
+        await record(MEMBER, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER }), 30);
 
-        expect(result.complete).toBe(false);
-        expect(state).toMatchObject({ projects: { status: "running" }, status: "running" });
+        const result = await harness.run(
+            async (ctx: any) => await ctx.runQuery(memberOrganizationUsage, { fromDate: FROM, organizationId: ORG, userId: MEMBER }),
+        );
+        const other = await harness.run(
+            async (ctx: any) => await ctx.runQuery(memberOrganizationUsage, { fromDate: FROM, organizationId: "org_2", userId: MEMBER }),
+        );
+
+        expect(result.total.costMicrodollars).toBe(30);
+        expect(other.total.costMicrodollars).toBe(0);
     });
 });
 
