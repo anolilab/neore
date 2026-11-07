@@ -422,7 +422,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const containerClassName = useMemo(
         () =>
             cn(
-                "cursor-pointer hover:bg-white/10 focus-visible:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none",
+                "cursor-pointer hover:bg-white/10 focus-visible:bg-white/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                 isActive && "bg-white/20",
                 isKeyboardSelected && "bg-white/10 ring-2 ring-white/50",
                 isSelectionMode && isSelected && "bg-white/15",
