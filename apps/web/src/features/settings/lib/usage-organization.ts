@@ -17,6 +17,8 @@ export interface UsageTotalsLike {
 export interface OrganizationUsage {
     noProject: UsageTotalsLike;
     projects: (UsageTotalsLike & { projectKey: string; title: string })[];
+    /** More of the organization's projects have no usage than the list shows. */
+    projectsCut: boolean;
     total: UsageTotalsLike;
     truncated: boolean;
 }

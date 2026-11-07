@@ -3351,9 +3351,11 @@ export const schema = defineSchema({
         // The retention sweep (`gdpr/retention.ts`), which serves a whole shard.
         .index("by_date", ["date"]),
 
-    // An organization's per-day usage, filed when each reply is recorded (`usage/organization.ts`): one row per day
-    // for the whole organization (`projectKey` = `__total__`) and one per day and project the organization owns.
-    // Keyed by organization, not member, so it outlives a member's membership; it holds no user: aggregates only.
+    // An organization's per-day usage, filed when each reply is recorded (`usage/organization.ts`): per member who
+    // wrote it, one row per day for the whole organization (`projectKey` = `__total__`) and one per day and project the
+    // organization owns. Read by organization, never by membership, so it outlives a member leaving; only ever summed
+    // into organization totals. `userId` is the row's one writer — that member's shard — so no two writers race on a
+    // row; it is erased, exported and merged with the member's own data (`usage/gdpr.ts`).
     usageOrganizationDaily: defineTable({
         costMicrodollars: v.number(),
         date: v.string(),
@@ -3362,10 +3364,12 @@ export const schema = defineSchema({
         replies: v.number(),
         tokens: v.number(),
         updatedAt: v.number(),
+        userId: v.string(),
     })
         .global()
         .index("by_org_date", ["organizationId", "date"])
-        .index("by_org_project_date", ["organizationId", "projectKey", "date"])
+        .index("by_org_project_user_date", ["organizationId", "projectKey", "userId", "date"])
+        .index("by_userId", ["userId"])
         // The retention sweep.
         .index("by_date", ["date"]),
 

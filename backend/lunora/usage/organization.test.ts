@@ -41,7 +41,9 @@ const { registerModule } = await import("../../test/registered-api");
 const { default: schema } = await import("../schema");
 const { recordReplyUsage } = await import("./activity");
 const { DEFAULT_SKILL_KEY, ORGANIZATION_TOTAL_KEY } = await import("./activity-logic");
-const { getOrganizationProjectUsage, isOrganizationAdminRole, ORGANIZATION_ROW_PAGE, pruneOrganizationUsage } = await import("./organization");
+const { getOrganizationProjectUsage, isOrganizationAdminRole, MAX_PROJECTS, ORGANIZATION_ROW_PAGE, pruneOrganizationUsage } = await import("./organization");
+const { eraseOrganizationUsage } = await import("./organization-erase");
+const { collectOrganizationUsageForExport, collectUsageDailyPages, eraseUsageForUser } = await import("./gdpr");
 
 registerModule(registry, "usage_organization", await import("./organization"));
 
@@ -85,6 +87,7 @@ const read = async (args: Record<string, unknown> = {}) =>
         result: {
             noProject: { costMicrodollars: number };
             projects: { costMicrodollars: number; projectKey: string; title: string }[];
+            projectsCut: boolean;
             total: { costMicrodollars: number; replies: number };
             truncated: boolean;
         };
@@ -188,6 +191,7 @@ describe("organization usage", () => {
                     replies: 1,
                     tokens: 1,
                     updatedAt: index,
+                    userId: `user-${String(index)}`,
                 });
             }
         });
@@ -209,17 +213,78 @@ describe("organization usage", () => {
     });
 
     it("prunes organization rows past the usage rollup's retention", async () => {
-        await insert("usageOrganizationDaily", {
-            costMicrodollars: 1,
-            date: "2000-01-01",
-            organizationId: ORG,
-            projectKey: ORGANIZATION_TOTAL_KEY,
-            replies: 1,
-            tokens: 1,
-            updatedAt: 0,
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 501; index += 1) {
+                await ctx.db.insert("usageOrganizationDaily", {
+                    costMicrodollars: 1,
+                    date: "2000-01-01",
+                    organizationId: ORG,
+                    projectKey: ORGANIZATION_TOTAL_KEY,
+                    replies: 1,
+                    tokens: 1,
+                    updatedAt: 0,
+                    userId: `user-${String(index)}`,
+                });
+            }
         });
 
+        // A full batch deletes 500 and schedules the next; the next takes the rest.
+        expect(await harness.run(async (ctx: any) => await ctx.runMutation(pruneOrganizationUsage, {}))).toBe(500);
         expect(await harness.run(async (ctx: any) => await ctx.runMutation(pruneOrganizationUsage, {}))).toBe(1);
+    });
+});
+
+describe("organization usage rows", () => {
+    it("keeps each member's share of a day on its own row, written only by that member", async () => {
+        await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
+        await record(ADMIN, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: ADMIN }), 10);
+        await record(MEMBER, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER }), 20);
+        await record(MEMBER, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER }), 5);
+
+        const rows = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.usageOrganizationDaily.findMany({ where: { organizationId: ORG } });
+
+            return page.map((row: any) => [row.userId, row.costMicrodollars]).toSorted((a: string[], b: string[]) => a[0]!.localeCompare(b[0]!));
+        });
+
+        expect(rows).toStrictEqual([
+            [ADMIN, 10],
+            [MEMBER, 25],
+        ]);
+        expect((await read()).result.total.costMicrodollars).toBe(35);
+    });
+
+    it("erases a member's share with their account, and exports it to them, a page at a time", async () => {
+        await record(MEMBER, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER }), 20);
+
+        const exported = await collectUsageDailyPages(
+            async (cursor) =>
+                (await harness.run(async (ctx: any) => await ctx.runQuery(collectOrganizationUsageForExport, { cursor, userId: MEMBER }))) as never,
+        );
+
+        expect(exported).toMatchObject([{ costMicrodollars: 20, organization: ORG }]);
+        await harness.run(async (ctx: any) => await eraseUsageForUser(ctx, MEMBER));
+        expect((await read()).result.total.costMicrodollars).toBe(0);
+    });
+
+    it("erases a deleted organization's usage", async () => {
+        await record(MEMBER, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER }), 20);
+
+        expect(await harness.run(async (ctx: any) => await ctx.runMutation(eraseOrganizationUsage, { organizationId: ORG }))).toBe(1);
+        expect((await read()).result.total.costMicrodollars).toBe(0);
+    });
+
+    it("says when projects with no usage are left out, without calling the period incomplete", async () => {
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index <= MAX_PROJECTS; index += 1) {
+                await ctx.db.insert("projects", { createdAt: 0, organizationId: ORG, title: `P${String(index)}`, userId: ADMIN });
+            }
+        });
+
+        const { result } = await read();
+
+        expect(result.projectsCut).toBe(true);
+        expect(result.truncated).toBe(false);
     });
 });
 

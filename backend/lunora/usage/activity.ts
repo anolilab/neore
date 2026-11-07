@@ -129,7 +129,7 @@ const fileAttribution = async (
     }
 
     if (attribution.organizationId !== undefined && !organizationFiled) {
-        await addToOrganizationRollup(ctx, attribution.organizationId, organizationRows(attribution, { ...amounts, date }), at);
+        await addToOrganizationRollup(ctx, userId, attribution.organizationId, organizationRows(attribution, { ...amounts, date }), at);
     }
 };
 
@@ -151,10 +151,13 @@ export const addToAttributionRollup = async (ctx: DbCtx, userId: string, increme
     }
 };
 
-/** Adds `rows` to the organization's per-day usage, shared by all its members and kept after any of them leaves. */
-const addToOrganizationRollup = async (ctx: DbCtx, organizationId: string, rows: ReadonlyArray<OrganizationRow>, at: number): Promise<void> => {
+/**
+ * Adds `rows` to the organization's per-day usage, kept after the member leaves. Each row belongs to this member, so
+ * only this member's shard ever writes it: no two members' records race on one row.
+ */
+const addToOrganizationRollup = async (ctx: DbCtx, userId: string, organizationId: string, rows: ReadonlyArray<OrganizationRow>, at: number): Promise<void> => {
     for (const { costMicrodollars, date, projectKey, replies, tokens } of rows) {
-        const existing = await ctx.db.usageOrganizationDaily.findFirst({ where: { date, organizationId, projectKey } });
+        const existing = await ctx.db.usageOrganizationDaily.findFirst({ where: { date, organizationId, projectKey, userId } });
 
         if (existing) {
             await ctx.db.patch("usageOrganizationDaily", existing._id, {
@@ -164,7 +167,7 @@ const addToOrganizationRollup = async (ctx: DbCtx, organizationId: string, rows:
                 updatedAt: at,
             });
         } else {
-            await ctx.db.insert("usageOrganizationDaily", { costMicrodollars, date, organizationId, projectKey, replies, tokens, updatedAt: at });
+            await ctx.db.insert("usageOrganizationDaily", { costMicrodollars, date, organizationId, projectKey, replies, tokens, updatedAt: at, userId });
         }
     }
 };
@@ -374,7 +377,7 @@ const totalSince = async (ctx: Pick<QueryCtx, "db">, userId: string, fromDate: s
     const truncated = page.length >= HEATMAP_DAYS * 2;
 
     // When the read stopped short, the total covers only from its oldest day on: whatever is summed beside it must too.
-    return { coveredFrom: truncated ? page.at(-1)?.date : undefined, total: sumRows(page), truncated };
+    return { coveredFrom: truncated ? page.at(-1)?.date : undefined, rows: page, total: sumRows(page), truncated };
 };
 
 /**
@@ -403,8 +406,15 @@ export const getProjectBreakdown = authQuery
                 where: { date: { gte: args.fromDate }, skillKey: PROJECT_SKILL_KEY, userId },
             }),
         ]);
-        // The projects cover exactly the days the total does, so they never add up to more than it.
-        const projects = foldProjectTotals(totals.coveredFrom === undefined ? rows.page : rows.page.filter((row) => row.date >= totals.coveredFrom!));
+        // When either read stopped short, both cover only the days the shorter one reached, so the projects and "No
+        // project" are taken over the same days as the total and add up to it.
+        const projectsFrom = rows.page.length >= PROJECT_ROW_LIMIT ? rows.page.at(-1)?.date : undefined;
+        const coveredFrom = [totals.coveredFrom, projectsFrom]
+            .filter((date) => date !== undefined)
+            .toSorted()
+            .at(-1);
+        const projects = foldProjectTotals(coveredFrom === undefined ? rows.page : rows.page.filter((row) => row.date >= coveredFrom));
+        const total = coveredFrom === undefined ? totals.total : sumRows(totals.rows.filter((row) => row.date >= coveredFrom));
         const titled: (ProjectTotal & { title?: string })[] = [];
 
         // A few lookups at a time: each is up to three reads, and a long history holds many projects.
@@ -421,9 +431,9 @@ export const getProjectBreakdown = authQuery
         }
 
         return {
-            noProject: remainderOf(totals.total, projects),
+            noProject: remainderOf(total, projects),
             projects: titled,
-            total: totals.total,
+            total,
             truncated: totals.truncated || rows.page.length >= PROJECT_ROW_LIMIT,
         };
     });

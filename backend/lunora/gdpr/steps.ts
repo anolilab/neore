@@ -551,6 +551,10 @@ export const generateExportFile = internalAction
                 (await collectUsageDailyPages(
                     async (cursor) => await context.runQuery(internal.usage.gdpr.collectUsageDailyForExport, { cursor, userId: args.userId }),
                 )),
+            // The user's share of organizations' usage: what they spent in each organization, per day and project.
+            usageOrganizations: await collectUsageDailyPages(
+                async (cursor) => await context.runQuery(internal.usage.gdpr.collectOrganizationUsageForExport, { cursor, userId: args.userId }),
+            ),
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };
 

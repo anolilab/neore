@@ -214,6 +214,9 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                     </Table>
                 )}
                 {truncated && <p className="text-muted-foreground mt-2 text-xs">{t`Only part of this period is included.`}</p>}
+                {showing === "organization" && organization.data?.projectsCut && (
+                    <p className="text-muted-foreground mt-2 text-xs">{t`Some of the organization's projects with no usage are not listed.`}</p>
+                )}
                 {showing === "organization" && (
                     <p className="text-muted-foreground mt-2 text-xs">
                         {t`Counts usage recorded since organization reporting started. Members' own projects count under No project.`}

@@ -131,6 +131,8 @@ export const getOrganizationProjectUsage = authAction
                 v.object({
                     noProject: v.object({ ...vTotals }),
                     projects: v.array(v.object({ ...vTotals, projectKey: v.string(), title: v.string() })),
+                    // More of the organization's projects have no usage than the list shows; every project with usage is listed.
+                    projectsCut: v.boolean(),
                     total: v.object({ ...vTotals }),
                     truncated: v.boolean(),
                 }),
@@ -177,6 +179,7 @@ export const getOrganizationProjectUsage = authAction
         const usage = new Map(projects.map((project) => [project.projectKey, project]));
         const titles = new Map<string, string>();
         const keys = [...usage.keys()];
+        let projectsCut = false;
 
         // Listed: projects the organization owns now, looked up by id, and its projects with no usage yet, at zero.
         // Anything else — a project that has left the organization — stays in "No project", without its name or id.
@@ -186,7 +189,7 @@ export const getOrganizationProjectUsage = authAction
                 projectIds: keys.slice(index, index + TITLE_BATCH),
             });
 
-            truncated ||= index === 0 && moreUnused;
+            projectsCut ||= moreUnused;
 
             for (const project of [...owned, ...(index === 0 ? unused : [])]) {
                 titles.set(project.projectId, project.title);
@@ -204,6 +207,7 @@ export const getOrganizationProjectUsage = authAction
         return {
             result: {
                 noProject: remainderOf(total, listed),
+                projectsCut,
                 projects: listed.toSorted((a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.title.localeCompare(b.title)),
                 total,
                 truncated,
@@ -211,7 +215,10 @@ export const getOrganizationProjectUsage = authAction
         };
     });
 
-/** Retention: one batch of organization rows dated before the usage rollup's cutoff (`gdpr/retention.ts`). */
+/**
+ * Retention: organization rows dated before the usage rollup's cutoff (`gdpr/retention.ts`), a batch at a time; a full
+ * batch schedules the next, so the sweep keeps up however many organizations there are.
+ */
 export const pruneOrganizationUsage = internalMutation
     .input({})
     .output(v.number())
@@ -224,6 +231,10 @@ export const pruneOrganizationUsage = internalMutation
 
         for (const row of page) {
             await ctx.db.delete("usageOrganizationDaily", row._id);
+        }
+
+        if (page.length >= RETENTION_BATCH) {
+            await ctx.scheduler.runAfter(0, internal.usage.organization.pruneOrganizationUsage, {});
         }
 
         return page.length;

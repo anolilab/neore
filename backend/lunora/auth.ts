@@ -30,6 +30,7 @@ import { clientGrantCookie } from "./auth/client-grant-cookie";
 import { guestConversion } from "./auth/guest-conversion";
 import { deletedOrganizationOf, queueOrganizationBillingCancel } from "./billing/gdpr";
 import { queueOrganizationPolicyErase } from "./auth/organization-policy-erase";
+import { queueOrganizationUsageErase } from "./usage/organization-erase";
 import { organizationOfMemberChange, queueSeatSync } from "./billing/seats";
 import { adminEmails } from "./auth/hooks";
 import { inviteOnly } from "@lunora/auth/plugins";
@@ -699,6 +700,7 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
                 if (deletedOrganizationId) {
                     await queueOrganizationBillingCancel(deletedOrganizationId);
                     await queueOrganizationPolicyErase(deletedOrganizationId);
+                    await queueOrganizationUsageErase(deletedOrganizationId);
                 } else if (organizationId) {
                     await queueSeatSync(organizationId);
                 }
