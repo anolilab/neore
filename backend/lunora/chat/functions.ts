@@ -1802,6 +1802,14 @@ const writeGeneratedTitle = async (
                 },
             );
         } catch (error) {
+            // A request cut off at its deadline had been sent, and the provider may have billed it: the charge is kept, so a retry of this
+            // run finds it and calls nothing. The title is then not generated, which is what a timed-out title costs.
+            if (gateway.timedOut()) {
+                context.log.event("chat.thread_title", { skipped: "timed-out" });
+
+                throw error;
+            }
+
             // The call threw before it answered: nothing was generated, so the charge is given back and a retried run may ask again.
             await giveBackTitleCharge(context, arguments_.chargeKey, claimedAt);
 
@@ -1839,7 +1847,7 @@ const writeGeneratedTitle = async (
 
     // The write checks everything again in its own transaction: a rename, a lock, a branch switch or a revoked grant committed while the
     // model ran keeps the thread as it is. A transient failure is tried again here. One that persists is handed to a scheduled write of the
-    // recorded answer (`retryTitleWrite`): the scheduler does not retry a job that throws, so nothing else would write it.
+    // recorded answer (`retryTitleWrite`), so the scheduler retries that one write under its own retry policy, not the whole run.
     let written: boolean;
 
     try {
@@ -1881,8 +1889,13 @@ const writeGeneratedTitle = async (
  * the lock commits first and the request is never sent (the call throws, and `refused` says so, to tell it from a model error), or the
  * request is sent first and the lock waits for it. A claim whose release fails lapses after its short TTL, and the log says so.
  */
-export const titleDispatchGateway = (context: ActionContext, threadId: string, inner: ServiceFetch): { fetch: ServiceFetch; refused: () => boolean } => {
+export const titleDispatchGateway = (
+    context: ActionContext,
+    threadId: string,
+    inner: ServiceFetch,
+): { fetch: ServiceFetch; refused: () => boolean; timedOut: () => boolean } => {
     let refused = false;
+    let timedOut = false;
 
     return {
         fetch: async (input, init) => {
@@ -1911,6 +1924,7 @@ export const titleDispatchGateway = (context: ActionContext, threadId: string, i
 
                 deadlineTimer = setTimeout(
                     () => {
+                        timedOut = true;
                         deadline.abort(new LunoraError("TIMEOUT", "The title request ran past its deadline."));
                     },
                     titleRequestDeadline(claimedAt) - Date.now(),
@@ -1926,6 +1940,7 @@ export const titleDispatchGateway = (context: ActionContext, threadId: string, i
             }
         },
         refused: () => refused,
+        timedOut: () => timedOut,
     };
 };
 

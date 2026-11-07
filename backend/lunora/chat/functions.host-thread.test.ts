@@ -215,6 +215,7 @@ describe("the gateway a title's model call is sent through", () => {
 
             await gateway.fetch("https://gateway/chat");
             expect(gateway.refused()).toBe(false);
+            expect(gateway.timedOut()).toBe(false);
         }
 
         expect(sent).toEqual(["https://gateway/chat"]);
@@ -312,6 +313,9 @@ describe("the gateway a title's model call is sent through", () => {
 
             await expect(pending).resolves.toMatchObject({ code: "TIMEOUT" });
             expect(signal?.aborted).toBe(true);
+            // Cut off after it was sent: the run keeps its charge rather than give it back for a second paid call.
+            expect(gateway.timedOut()).toBe(true);
+            expect(gateway.refused()).toBe(false);
         } finally {
             vi.useRealTimers();
         }
