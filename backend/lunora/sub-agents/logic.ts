@@ -8,6 +8,7 @@ import { CLOUD_HEADLESS_CAPABILITIES, followUpControl } from "@neore/ai/capabili
 import type { StopCondition, ToolSet } from "ai";
 
 import { HOST_TEXT_MARK } from "../acp/lib/reply";
+import { RUN_STALE_MS, RUN_WATCH_MS } from "../chat/lib/interrupted-run";
 
 /**
  * How deep delegation may nest. A user's own thread is depth 0; its sub-agent
@@ -288,6 +289,41 @@ export const workerReapDecision = (input: {
 
 /** The error a worker run quiet for the whole window ends with; it reaches the lead as a failed run. */
 export const WORKER_STALE_MESSAGE = `The worker made no progress for ${String(SUB_AGENT_STALE_MS / 60_000)} minutes and was stopped.`;
+
+type LoopState = { loopExitedAt?: number; mode?: "run" | "worker"; startedAt?: number; status: SubAgentStatus };
+
+/**
+ * Whether a run's cloud loop may still be going: it is running, or, for a worker, it was stopped while running and has
+ * not exited ({@link isWorkerLoopLive}). A one-shot run's loop after a stop is nobody's concern: no line waits on it.
+ */
+export const isLoopLive = (run: LoopState): boolean => run.status === "running" || (run.mode === "worker" && isWorkerLoopLive(run));
+
+/**
+ * What the beat watch (`functions.ts:watchRunBeat`) does with a cloud run's loop. The loop beats once a
+ * minute while it lives (`execute.ts`); one that has not beaten for {@link RUN_STALE_MS} died with its
+ * worker (a deploy, a crash, an evicted isolate), and a redelivery of its job is refused by the claim, so nothing
+ * else would end it before {@link SUB_AGENT_STALE_MS}. A loop that is not live (ended, or a queued run) is left alone.
+ */
+export const beatWatchDecision = (input: {
+    /** The newest row in the run's thread: a loop that still saves steps is alive, even if its beats do not land. */
+    lastActivityAt?: number;
+    now: number;
+    run: LoopState & { beatAt?: number };
+}): { kind: "dead" } | { delayMs: number; kind: "later" } | { kind: "skip" } => {
+    const { run } = input;
+
+    if (!isLoopLive(run) || run.startedAt === undefined) {
+        return { kind: "skip" };
+    }
+
+    const silentFor = input.now - Math.max(run.startedAt, run.beatAt ?? 0, input.lastActivityAt ?? 0);
+
+    return silentFor >= RUN_STALE_MS ? { kind: "dead" } : { delayMs: Math.max(RUN_STALE_MS - silentFor, RUN_WATCH_MS), kind: "later" };
+};
+
+/** The error a run whose loop died ends with; it reaches the lead as a failed run, with a link to the steps it saved. */
+export const INTERRUPTED_RUN_MESSAGE =
+    "The sub-agent was interrupted: the server running it stopped (a deploy or a crash) before it finished. The steps it completed are saved in its thread. Send the task again to retry.";
 
 /** The run a worker is on, from its runs newest first: the one going, else the next in line. A Stop in its thread means this one. */
 export const workerCurrentRun = <T extends { status: SubAgentStatus }>(newestFirst: ReadonlyArray<T>): T | undefined =>

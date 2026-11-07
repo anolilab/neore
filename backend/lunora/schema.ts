@@ -2578,6 +2578,9 @@ export const schema = defineSchema({
     // own child thread, whose answer is posted back to `parentThreadId`.
     // `depth` is 1 under a user's own thread, 2 under a sub-agent's.
     subAgentRuns: defineTable({
+        // The last heartbeat of a cloud run's loop (`sub-agents/execute.ts`): a running run whose beat goes stale died
+        // with its worker, and `watchRunBeat` ends it. Unset until the first beat; `startedAt` stands in for it.
+        beatAt: v.optional(v.number()),
         childThreadId: v.optional(v.string()),
         // Set on a run the user typed into a worker thread (`dispatchToWorker`); the dedupe key of that dispatch.
         clientId: v.optional(v.string()),

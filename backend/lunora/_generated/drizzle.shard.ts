@@ -1349,6 +1349,7 @@ export const streamingMessages = sqliteTable("streamingMessages", {
 export const subAgentRuns = sqliteTable("subAgentRuns", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    beatAt: real("beatAt"),
     childThreadId: text("childThreadId"),
     clientId: text("clientId"),
     completedAt: real("completedAt"),
