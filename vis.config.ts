@@ -139,6 +139,8 @@ export default defineConfig({
     // that debt is paid. Add it once `pnpm lint:eslint` is green.
     staged: {
         "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,yml,yaml,md,css,html}": "prettier --config=.prettierrc.cjs --ignore-unknown --write",
+        // CI checks the key order of every package.json (`lint.yml`, "Types").
+        "**/package.json": "sort-package-json",
     },
 
     security: {

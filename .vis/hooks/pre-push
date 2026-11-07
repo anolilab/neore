@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+
+# Fast checks only: the two CI failures that cost the most review rounds.
+# Type check and lint are heavier; run them before opening a pull request and
+# before each push that changes behaviour (docs/agents/review-checklist.md).
+pnpm exec sort-package-json --check packages/*/package.json apps/*/package.json backend/package.json services/*/package.json package.json || exit 1
+pnpm exec vis affected lint:prettier || exit 1
