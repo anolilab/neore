@@ -240,7 +240,9 @@ const AttachmentPreviewInner: FC<{
 }> = ({ attachment, onEdit, onRemove, onRetry }) => {
     const { t } = useLingui();
     const isImage = attachment.type === "image";
-    const canEdit = attachment.file && isEditable(attachment.file);
+    // A queued attachment restored after a reload is an uploaded file id with an empty stand-in `File`: there are no bytes to preview or edit.
+    const hasBytes = attachment.file.size > 0;
+    const canEdit = hasBytes && isEditable(attachment.file);
     const isText = canEdit;
     const isUploading = attachment.status === "uploading";
     const isError = attachment.status === "error";
@@ -253,7 +255,7 @@ const AttachmentPreviewInner: FC<{
     const attachmentName = attachment.name;
 
     // Only create a blob URL when file reference changes, not on every render.
-    const imageUrl = useMemo(() => (isImage && attachment.file ? URL.createObjectURL(attachment.file) : undefined), [isImage, attachment.file]);
+    const imageUrl = useMemo(() => (isImage && hasBytes ? URL.createObjectURL(attachment.file) : undefined), [isImage, hasBytes, attachment.file]);
 
     useEffect(
         () => () => {
@@ -444,7 +446,7 @@ const AttachmentItem = memo<{
     const handleRemove = useCallback(() => removeAttachment(attachment.id), [removeAttachment, attachment.id]);
     const handleEdit = useCallback(() => setEditingAttachmentId(attachment.id), [setEditingAttachmentId, attachment.id]);
     const handleRetry = useCallback(() => retryAttachment(attachment), [retryAttachment, attachment]);
-    const canEdit = attachment.file && isEditable(attachment.file);
+    const canEdit = attachment.file.size > 0 && isEditable(attachment.file);
 
     return <AttachmentPreview attachment={attachment} onEdit={canEdit ? handleEdit : undefined} onRemove={handleRemove} onRetry={handleRetry} />;
 });

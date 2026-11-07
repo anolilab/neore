@@ -6,10 +6,12 @@
  *
  * Mirrored per thread into sessionStorage so a reload does not lose them. A
  * queued attachment is kept by its uploaded file id, never its bytes, and comes
- * back as an uploaded attachment with an empty `File` (as a vault file does); one
- * without an id is counted as lost instead. The queue is per tab, not shared by
- * every tab on the thread: each tab drains its own queue, so a shared one would
- * send its head once per open tab. A restored queue is
+ * back as an uploaded attachment with an empty stand-in `File`, which the
+ * composer neither previews nor edits; one without an id is counted as lost
+ * instead. The queue lives in the tab's
+ * sessionStorage, not shared by every tab on the thread: each tab drains its own
+ * queue, so a shared one would send its head once per open tab. A duplicated tab
+ * starts with a copy, which is restored paused like any other. A restored queue is
  * always paused — it waits for "Send next" rather than auto-sending prompts the
  * user may no longer remember queuing. Storage can be unavailable (private
  * windows, blocked site data), so every access is guarded and failure just
