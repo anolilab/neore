@@ -29,11 +29,9 @@ const meta = {
         ),
     ],
     parameters: {
-        // Axe fails every state today, on the picker itself rather than the fixtures:
-        // - colour-contrast: secondary text is `text-muted-foreground/50`–`/60` (1.8–3.1:1, AA wants 4.5:1);
-        // - nested-interactive: the creator filter chips put a button inside a button;
-        // - label-content-name-mismatch: those chips' `aria-label` is the creator alone, not their visible text.
-        // `todo` reports them in the a11y panel without failing CI until the picker is fixed.
+        // Axe still fails the picker: the creator filter chips nest a button in a button and their `aria-label` is the
+        // creator alone (not the visible text), and the secondary text in the chat-ui copy and the creator rows still sets
+        // `text-muted-foreground/60`. `todo` reports them in the a11y panel without failing CI until the picker is fixed.
         a11y: { test: "todo" },
         msw: { handlers: { gateway: gatewayModelsHandler(), lunora: lunoraHandlers(...userFixtures()) } },
     },

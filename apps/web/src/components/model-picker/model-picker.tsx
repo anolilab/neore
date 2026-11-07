@@ -156,14 +156,14 @@ const ModelDetailPanel = memo<{ displayName: string; model: GatewayModel }>(({ d
                 <ProviderIcon className="size-8 shrink-0" provider={model.provider || model.displayProvider || ""} providerIcon={creatorSlug} />
                 <div className="min-w-0">
                     <p className="text-foreground truncate text-[13px] leading-snug font-semibold">{displayName}</p>
-                    <p className="text-muted-foreground/50 text-[11px]">{developerDisplay}</p>
+                    <p className="text-muted-foreground text-[11px]">{developerDisplay}</p>
                 </div>
             </div>
 
             {/* Description */}
             {model.desc ? (
                 <div className="border-border/40 border-t px-4 py-3">
-                    <p className="text-muted-foreground/40 mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
+                    <p className="text-muted-foreground mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
                         <Trans>Description</Trans>
                     </p>
                     <p className="text-muted-foreground text-[11.5px] leading-relaxed">
@@ -175,7 +175,7 @@ const ModelDetailPanel = memo<{ displayName: string; model: GatewayModel }>(({ d
             {/* Features */}
             {capabilities.length > 0 ? (
                 <div className="border-border/40 border-t px-4 py-3">
-                    <p className="text-muted-foreground/40 mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
+                    <p className="text-muted-foreground mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
                         <Trans>Features</Trans>
                     </p>
                     <div className="flex flex-wrap gap-1">
@@ -194,7 +194,7 @@ const ModelDetailPanel = memo<{ displayName: string; model: GatewayModel }>(({ d
             {/* Pricing — absent means unknown, not free */}
             {model.pricing ? (
                 <div className="border-border/40 border-t px-4 py-3">
-                    <p className="text-muted-foreground/40 mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
+                    <p className="text-muted-foreground mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
                         <Trans>Price per 1M tokens</Trans>
                     </p>
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11.5px]">
@@ -224,13 +224,13 @@ const ModelDetailPanel = memo<{ displayName: string; model: GatewayModel }>(({ d
             <div className="border-border/40 border-t px-4 py-3">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                     <div>
-                        <p className="text-muted-foreground/40 mb-0.5 text-[9px] font-semibold tracking-widest uppercase">
+                        <p className="text-muted-foreground mb-0.5 text-[9px] font-semibold tracking-widest uppercase">
                             <Trans>Provider</Trans>
                         </p>
                         <p className="text-foreground text-[11.5px] font-medium">{providerDisplay}</p>
                     </div>
                     <div>
-                        <p className="text-muted-foreground/40 mb-0.5 text-[9px] font-semibold tracking-widest uppercase">
+                        <p className="text-muted-foreground mb-0.5 text-[9px] font-semibold tracking-widest uppercase">
                             <Trans>Developer</Trans>
                         </p>
                         <p className="text-foreground text-[11.5px] font-medium">{developerDisplay}</p>
@@ -257,7 +257,7 @@ const ProviderSidebarButton = memo<{
             showBorder && "mb-0.5 border-b pb-2",
             isSelected
                 ? "text-foreground before:bg-primary-text before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full"
-                : "text-muted-foreground/70 hover:text-foreground",
+                : "text-muted-foreground hover:text-foreground",
         )}
         onClick={onClick}
         type="button"
@@ -317,7 +317,7 @@ const ModelItemContent = memo<{
                     ) : null}
                     {costMultiplier && model.pricing ? (
                         <span
-                            className="text-muted-foreground/40 shrink-0 text-[10px] tabular-nums"
+                            className="text-muted-foreground shrink-0 text-[10px] tabular-nums"
                             title={t`${formatPricePerMillion(model.pricing.input_per_million)} input, ${formatPricePerMillion(model.pricing.output_per_million)} output per 1M tokens`}
                         >
                             {costMultiplier}
@@ -330,7 +330,7 @@ const ModelItemContent = memo<{
                     ) : null}
                 </div>
                 {model.desc ? (
-                    <span className="text-muted-foreground/50 truncate text-[11px] leading-none">
+                    <span className="text-muted-foreground truncate text-[11px] leading-none">
                         {localizeModelDescription(model.desc, (descriptor) => i18n._(descriptor))}
                     </span>
                 ) : null}
@@ -342,7 +342,7 @@ const ModelItemContent = memo<{
                     aria-label={isFavorite ? t`Remove from starred` : t`Add to starred`}
                     className={cn(
                         "rounded p-1 transition-all duration-100",
-                        isFavorite ? "text-amber-400 opacity-100" : "text-muted-foreground/30 opacity-0 group-hover/row:opacity-100 hover:text-amber-400",
+                        isFavorite ? "text-amber-400 opacity-100" : "text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-amber-400",
                     )}
                     onClick={(e) => {
                         e.preventDefault();
@@ -357,7 +357,7 @@ const ModelItemContent = memo<{
                     <>
                         <button
                             aria-label={t`Move ${label} up in starred`}
-                            className="text-muted-foreground/50 hover:text-foreground rounded p-1 disabled:opacity-30"
+                            className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-30"
                             data-move-delta={-1}
                             data-move-id={model.id}
                             disabled={!canMoveUp}
@@ -372,7 +372,7 @@ const ModelItemContent = memo<{
                         </button>
                         <button
                             aria-label={t`Move ${label} down in starred`}
-                            className="text-muted-foreground/50 hover:text-foreground rounded p-1 disabled:opacity-30"
+                            className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-30"
                             data-move-delta={1}
                             data-move-id={model.id}
                             disabled={!canMoveDown}
@@ -391,9 +391,7 @@ const ModelItemContent = memo<{
                     aria-label={t`Model info`}
                     className={cn(
                         "rounded p-1 transition-all duration-100",
-                        isInfoActive
-                            ? "text-foreground opacity-100"
-                            : "text-muted-foreground/40 hover:text-foreground opacity-40 group-hover/row:opacity-70 hover:!opacity-100",
+                        isInfoActive ? "text-foreground opacity-100" : "text-muted-foreground hover:text-foreground hover:!opacity-100",
                     )}
                     onClick={(e) => {
                         e.preventDefault();
@@ -461,7 +459,7 @@ const ModelGroupRenderer = memo<{
         return (
             <CommandGroup items={group.items}>
                 {showGroupLabel ? (
-                    <CommandGroupLabel className="text-muted-foreground/40 px-3 pt-3 pb-0.5 text-[10px] font-semibold tracking-widest uppercase">
+                    <CommandGroupLabel className="text-muted-foreground px-3 pt-3 pb-0.5 text-[10px] font-semibold tracking-widest uppercase">
                         {group.value}
                     </CommandGroupLabel>
                 ) : null}
@@ -493,11 +491,11 @@ const ModelGroupRenderer = memo<{
                         let parallelIndicator: ReactNode;
 
                         if (isTypeMismatch) {
-                            parallelIndicator = <Lock className="text-muted-foreground/30 size-4" />;
+                            parallelIndicator = <Lock className="text-muted-foreground size-4" />;
                         } else if (isParallelSelected) {
                             parallelIndicator = <CheckSquare2 className="text-primary-text size-4" />;
                         } else {
-                            parallelIndicator = <Square className={cn("size-4", isDisabled ? "text-muted-foreground/20" : "text-muted-foreground/30")} />;
+                            parallelIndicator = <Square className={cn("size-4", isDisabled ? "text-muted-foreground/20" : "text-muted-foreground")} />;
                         }
 
                         return (
@@ -526,7 +524,7 @@ const ModelGroupRenderer = memo<{
                                 {/* Anonymous lock icon */}
                                 {isLockedForAnonymous ? (
                                     <span className="mr-2 flex shrink-0 items-center justify-center">
-                                        <Lock className="text-muted-foreground/30 size-4" />
+                                        <Lock className="text-muted-foreground size-4" />
                                     </span>
                                 ) : null}
 
@@ -1034,7 +1032,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                             "rounded-[5px] px-2.5 py-1 text-[11.5px] font-medium transition-all duration-150",
                                             selectionMode === "single"
                                                 ? "bg-background text-foreground shadow-sm"
-                                                : "text-muted-foreground/50 hover:text-muted-foreground",
+                                                : "text-muted-foreground hover:text-muted-foreground",
                                         )}
                                         onClick={() => handleSelectionModeChange("single")}
                                         type="button"
@@ -1046,7 +1044,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                             "rounded-[5px] px-2.5 py-1 text-[11.5px] font-medium transition-all duration-150",
                                             selectionMode === "parallel"
                                                 ? "bg-background text-foreground shadow-sm"
-                                                : "text-muted-foreground/50 hover:text-muted-foreground",
+                                                : "text-muted-foreground hover:text-muted-foreground",
                                         )}
                                         onClick={() => handleSelectionModeChange("parallel")}
                                         type="button"
@@ -1062,7 +1060,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                     <div className="flex items-center gap-1 border-t px-2 py-1.5">
                         {!hideModeFilter && (
                             <>
-                                <span className="text-muted-foreground/50 mr-1 text-[10px] font-medium tracking-wider uppercase">{t`Type`}</span>
+                                <span className="text-muted-foreground mr-1 text-[10px] font-medium tracking-wider uppercase">{t`Type`}</span>
                                 <button
                                     className={cn(
                                         "rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
@@ -1178,11 +1176,11 @@ const ModelPicker: FC<ModelPickerProps> = ({
                             {isStarredEmpty ? (
                                 <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
                                     <div className="border-border/30 flex size-10 items-center justify-center rounded-xl border">
-                                        <Star className="text-muted-foreground/30 size-4" />
+                                        <Star className="text-muted-foreground size-4" />
                                     </div>
                                     <div>
                                         <p className="text-foreground/80 text-sm font-medium">{t`No starred models`}</p>
-                                        <p className="text-muted-foreground/40 mt-1 text-[11.5px] leading-relaxed">
+                                        <p className="text-muted-foreground mt-1 text-[11.5px] leading-relaxed">
                                             {t`Click ★ on any model in All models to add it here.`}
                                         </p>
                                     </div>
@@ -1222,13 +1220,13 @@ const ModelPicker: FC<ModelPickerProps> = ({
                     {selectionMode === "parallel" ? (
                         <div className="border-border/40 flex items-center justify-between border-t px-3 py-2">
                             <div className="flex flex-col gap-0.5">
-                                <span className={cn("text-[11.5px]", isParallelMaxReached ? "text-amber-500 dark:text-amber-400" : "text-muted-foreground/50")}>
+                                <span className={cn("text-[11.5px]", isParallelMaxReached ? "text-amber-500 dark:text-amber-400" : "text-muted-foreground")}>
                                     {isParallelMaxReached
                                         ? t`Maximum ${MAX_PARALLEL} models reached`
                                         : t`${parallelSelectedIds.size} of ${MAX_PARALLEL} selected`}
                                 </span>
                                 {anchorMode ? (
-                                    <span className="text-muted-foreground/40 flex items-center gap-1 text-[10px]">
+                                    <span className="text-muted-foreground flex items-center gap-1 text-[10px]">
                                         <Lock className="size-2.5" />
                                         {t`Locked to ${getModelModeName(anchorMode)} models`}
                                     </span>
@@ -1239,7 +1237,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                     "rounded-md px-3 py-1 text-[12px] font-medium transition-colors duration-100",
                                     parallelSelectedIds.size > 0
                                         ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                                        : "text-muted-foreground/30 cursor-not-allowed",
+                                        : "text-muted-foreground cursor-not-allowed",
                                 )}
                                 disabled={parallelSelectedIds.size === 0}
                                 onClick={() => {

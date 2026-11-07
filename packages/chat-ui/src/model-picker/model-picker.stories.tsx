@@ -43,7 +43,7 @@ const meta = {
             </div>
         ),
     ],
-    // The same secondary-text contrast as the web picker (`text-muted-foreground/50`–`/60`); see its stories.
+    // The same unfinished picker as the web one (nested chips, label names, `text-muted-foreground/60` rows); see its stories.
     parameters: { a11y: { test: "todo" } },
     title: "Extension/Model picker",
 } satisfies Meta<typeof ModelPicker>;

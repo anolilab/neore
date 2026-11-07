@@ -1,7 +1,7 @@
 import { setupI18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import { LunoraClient } from "@lunora/client";
-import { createQueryClient } from "@neore/client-runtime";
+import { connectLiveQueries, createQueryClient } from "@neore/client-runtime";
 import { DirectionProvider } from "@neore/ui/components/direction";
 import { Toaster } from "@neore/ui/components/sonner";
 import { TooltipProvider } from "@neore/ui/components/tooltip";
@@ -173,13 +173,17 @@ export const AppProviders = ({ children, connection, direction, featureFlags, pe
         return { lunoraClient, queryClient };
     }, [connection, persona]);
 
-    // A replaced client must not keep reconnecting in the background: close it when the persona or connection changes.
-    useEffect(
-        () => () => {
+    // The app's live-query manager turns each `crpc` query into a subscription. The stories' socket never opens, so the
+    // client's polling fallback is what carries a stateful fixture's change to those queries. A replaced client is
+    // disconnected and closed (it must not keep reconnecting in the background) when the persona or connection changes.
+    useEffect(() => {
+        const disconnect = connectLiveQueries(clients.lunoraClient, clients.queryClient, async () => "storybook-ticket", { dev: false });
+
+        return () => {
+            disconnect();
             clients.lunoraClient.close();
-        },
-        [clients],
-    );
+        };
+    }, [clients]);
 
     const posthog = useMemo(() => fakePostHog(featureFlags), [featureFlags]);
 
