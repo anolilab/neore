@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { DictationEngine, DictationPath } from "./dictation";
 import { createDictationRouter, SETTING_UNREADABLE_MESSAGE } from "./dictation";
 import type { OnDeviceRecognizer } from "./on-device";
-import { createOnDeviceSession, createRecognizerLock, ON_DEVICE_UNAVAILABLE_MESSAGE } from "./on-device";
+import { createOnDeviceSession, createRecognizerLock, ON_DEVICE_UNAVAILABLE_MESSAGE, pickSpeechLocale } from "./on-device";
 
 const NOTHING_SENT = /Nothing was sent/u;
 
@@ -16,6 +16,9 @@ const fakeRecognizer = (hasOnDevice: boolean): OnDeviceRecognizer => {
         abort: vi.fn(),
         getMicrophonePermissionsAsync: async () => {
             return { granted: true };
+        },
+        getSupportedLocales: async () => {
+            return { installedLocales: [], locales: ["de-DE", "en-US"] };
         },
         requestMicrophonePermissionsAsync: async () => {
             return { granted: true };
@@ -132,5 +135,16 @@ describe(createDictationRouter, () => {
         expect(errors.at(-1)).toMatch(NOTHING_SENT);
         expect(onText).not.toHaveBeenCalled();
         expect(cloud.start).not.toHaveBeenCalled();
+    });
+});
+
+describe(pickSpeechLocale, () => {
+    it.each([
+        ["de-DE", ["de-DE", "en-US"], "de-DE"],
+        ["en-DE", ["de-DE", "en-GB", "en-US"], "en-GB"],
+        ["zh-Hans-CN", ["zh_CN", "zh_TW"], "zh_CN"],
+        ["fi-FI", ["de-DE"], "fi-FI"],
+    ])("picks a recognizer locale for %s", (wanted, available, expected) => {
+        expect(pickSpeechLocale(wanted, available)).toBe(expected);
     });
 });

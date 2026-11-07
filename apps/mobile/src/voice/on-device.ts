@@ -25,6 +25,7 @@ export const END_DEADLINE_MS = 10_000;
 export interface OnDeviceRecognizer {
     abort: () => void;
     getMicrophonePermissionsAsync: () => Promise<{ granted: boolean }>;
+    getSupportedLocales: (options: { androidRecognitionServicePackage?: string }) => Promise<{ installedLocales: string[]; locales: string[] }>;
     requestMicrophonePermissionsAsync: () => Promise<{ granted: boolean }>;
     start: (options: ExpoSpeechRecognitionOptions) => void;
     stop: () => void;
@@ -65,6 +66,30 @@ const ERROR_MESSAGES: Partial<Record<ExpoSpeechRecognitionErrorCode, string>> = 
 
 /** The phone's language as a BCP-47 tag without extensions, e.g. "de-DE". */
 export const speechLocale = (locale: string): string => locale.split("-u-", 1)[0] ?? locale;
+
+const normalized = (locale: string): string => locale.replaceAll("_", "-").toLowerCase();
+
+/**
+ * The recognizer's locale for the phone's language: the same tag, else the first one of the same language. The phone's
+ * tag mixes language and region ("en-DE"), which the recognizer may not list. With no match, the phone's tag is kept.
+ */
+export const pickSpeechLocale = (wanted: string, available: string[]): string => {
+    const tag = normalized(wanted);
+    const language = tag.split("-", 1)[0] ?? tag;
+
+    return available.find((locale) => normalized(locale) === tag) ?? available.find((locale) => normalized(locale).split("-", 1)[0] === language) ?? wanted;
+};
+
+/** The locales the on-device recognizer can use: the installed ones where the platform lists them apart. */
+const speechLocales = async (recognizer: OnDeviceRecognizer): Promise<string[]> => {
+    try {
+        const { installedLocales, locales } = await recognizer.getSupportedLocales({});
+
+        return installedLocales.length > 0 ? installedLocales : locales;
+    } catch {
+        return [];
+    }
+};
 
 /** Who is listening, on any screen: the recognizer is one per app, and its events reach every screen that listens. */
 export const createRecognizerLock = () => {
@@ -127,12 +152,30 @@ export const createOnDeviceSession = ({
 
     const isListening = (): boolean => lock.isHeldBy(token);
 
+    /** The recognition is over. The lock is let go only now, so its late events never reach a newer press. */
     const release = (): void => {
         clearTimeout(timer);
         lock.release(token);
         isBusy = false;
         isStopping = false;
-        onPhase("idle");
+
+        if (isAttached) {
+            onPhase("idle");
+        }
+    };
+
+    /** A recognition that never ends must not hold the recognizer: it is cut off, and the lock let go anyway. */
+    const giveUpAfterDeadline = (): void => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+            recognizer.abort();
+
+            if (isAttached) {
+                onError(failure ?? ON_DEVICE_FAILED_MESSAGE);
+            }
+
+            release();
+        }, END_DEADLINE_MS);
     };
 
     const finish = async (): Promise<void> => {
@@ -143,7 +186,6 @@ export const createOnDeviceSession = ({
         }
 
         isStopping = true;
-        clearTimeout(timer);
 
         if (now() - startedAt < MIN_CLIP_MS) {
             failure = TOO_SHORT_MESSAGE;
@@ -153,10 +195,7 @@ export const createOnDeviceSession = ({
             recognizer.stop();
         }
 
-        timer = setTimeout(() => {
-            onError(failure ?? ON_DEVICE_FAILED_MESSAGE);
-            release();
-        }, END_DEADLINE_MS);
+        giveUpAfterDeadline();
     };
 
     const start = async (): Promise<void> => {
@@ -181,6 +220,7 @@ export const createOnDeviceSession = ({
             const hadPermission = current.granted;
             const permission = hadPermission ? current : await recognizer.requestMicrophonePermissionsAsync();
             const isGranted = permission.granted;
+            const locale = isGranted ? pickSpeechLocale(lang, await speechLocales(recognizer)) : lang;
 
             if (!isGranted || !isHeld || !isAttached || lock.isTaken()) {
                 if (!isGranted) {
@@ -200,7 +240,7 @@ export const createOnDeviceSession = ({
             finals = [];
             failure = undefined;
             // Never `requiresOnDeviceRecognition: false`, and no service package: the system's on-device recognizer only.
-            recognizer.start({ addsPunctuation: true, continuous: true, interimResults: false, lang, requiresOnDeviceRecognition: true });
+            recognizer.start({ addsPunctuation: true, continuous: true, interimResults: false, lang: locale, requiresOnDeviceRecognition: true });
             startedAt = now();
             onPhase("recording");
             timer = setTimeout(() => {
@@ -238,7 +278,9 @@ export const createOnDeviceSession = ({
 
         const text = finals.join(" ");
 
-        if (failure !== undefined) {
+        if (!isAttached) {
+            // The screen is gone: nobody to tell.
+        } else if (failure !== undefined) {
             onError(failure);
         } else if (text === "") {
             onError(NOTHING_HEARD_MESSAGE);
@@ -259,13 +301,10 @@ export const createOnDeviceSession = ({
             isAttached = false;
 
             if (isListening()) {
+                isStopping = true;
                 recognizer.abort();
-                clearTimeout(timer);
-                lock.release(token);
+                giveUpAfterDeadline();
             }
-
-            isBusy = false;
-            isStopping = false;
         },
         finish,
         handle,
