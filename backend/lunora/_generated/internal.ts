@@ -849,7 +849,7 @@ export interface InternalApiTypes {
             runJobOnce: FunctionReference<"action", { args?: unknown; jobId: string; onLapse?: { args?: string; target: string }; target: string; userId?: string }, null>;
         };
         rate_limiter_mutations: {
-            applyRateLimit: FunctionReference<"mutation", { count?: number; identifier: string; key: string }, { ok: boolean; retryAfter: number | undefined; }>;
+            applyRateLimit: FunctionReference<"mutation", { count?: number; identifier: string; key: string; reserve?: boolean }, { ok: boolean; retryAfter: number | undefined; }>;
             resetRateLimit: FunctionReference<"mutation", { identifier: string; key: string }, void>;
         };
         shard_housekeeping: {

@@ -22,6 +22,7 @@
         "@neore/chat-ui": "workspace:*",
         "@neore/client-runtime": "workspace:*",
         "expo": "58.0.14",
+        "expo-audio": "~58.0.11",
         "expo-auth-session": "~58.0.13",
         "expo-constants": "~58.0.12",
         "expo-crypto": "~58.0.7",

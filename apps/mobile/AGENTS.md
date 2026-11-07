@@ -7,8 +7,8 @@
   row has `syncedAt`; every upsert is guarded in SQL (`updated_at`, then `synced_at`) and `mergeRows` keeps the newer
   copy and drops nothing, because a row absent from either side proves no deletion (eviction by the caps is not a
   delete either). There is deliberately no outbox table: offline, `write-gate.ts` disables the composer, send,
-  approve, cancel and start controls, and `reconnect.ts` only re-runs reads. Any Lunora `.mutation(`/`.action(` call
-  in the app must pass `onlineOnly: true`, or the client queues it and replays it on reconnect (`reconnect.test.ts`
+  approve, cancel and start controls, and `reconnect.ts` only re-runs reads. Any Lunora `.mutation(` call in the app
+  must pass `onlineOnly: true` (actions are never queued and take no such option), or the client queues it and replays it on reconnect (`reconnect.test.ts`
   scans for it). The cache is bound to one account (`bindOwner`; a different id empties it) and `clear()` runs on
   sign-out; a save from a screen of a signed-out account is refused. Sign-out empties the cache BEFORE it asks the
   server (`auth/sign-out.ts`), so a failing or hanging request leaves nothing behind. Locked threads are never cached,

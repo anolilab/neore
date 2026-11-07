@@ -56791,6 +56791,81 @@
         "x-lunora-function-kind": "action"
       }
     },
+    "/_lunora/rpc#voice_transcription:transcribeClip": {
+      "post": {
+        "description": "Invoke the `action` `voice_transcription:transcribeClip` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "voice_transcription:transcribeClip",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "audio": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "format": "password"
+                      },
+                      "durationMs": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "audio",
+                      "durationMs"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "voice_transcription:transcribeClip",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "text"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: voice_transcription:transcribeClip",
+        "tags": [
+          "voice"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#workflow_executor:executeWorkflow": {
       "post": {
         "description": "Invoke the `action` `workflow_executor:executeWorkflow` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -59558,7 +59633,7 @@
       "name": "vault"
     },
     {
-      "description": "Speech: text-to-speech and the paid realtime dictation token gate.",
+      "description": "Speech: text-to-speech, clip transcription for mobile voice input, and the paid realtime dictation token gate.",
       "name": "voice"
     },
     {
