@@ -549,6 +549,11 @@ export interface ApiTypes {
             markAllNotificationsRead: FunctionReference<"mutation", {}, { hasMore: boolean }>;
             markNotificationRead: FunctionReference<"mutation", { notificationId: Id<"notifications"> }, null>;
         };
+        native_push: {
+            getNativePushConfig: FunctionReference<"query", {}, { enabled: boolean }>;
+            registerPushDevice: FunctionReference<"mutation", { platform: "android" | "ios"; token: string }, { registered: boolean }>;
+            unregisterPushDevice: FunctionReference<"mutation", { token: string }, null>;
+        };
         push: {
             getPushConfig: FunctionReference<"query", {}, { publicKey?: string; subscriptionCount: number }>;
             getPushSubscriptionStatus: FunctionReference<"query", { endpoint: string }, { subscribed: boolean }>;
@@ -1427,6 +1432,11 @@ export const api: ApiTypes = {
             getNotificationInbox: { __lunoraRef: "notifications_functions:getNotificationInbox" },
             markAllNotificationsRead: { __lunoraRef: "notifications_functions:markAllNotificationsRead" },
             markNotificationRead: { __lunoraRef: "notifications_functions:markNotificationRead" },
+        },
+        native_push: {
+            getNativePushConfig: { __lunoraRef: "notifications_native_push:getNativePushConfig" },
+            registerPushDevice: { __lunoraRef: "notifications_native_push:registerPushDevice" },
+            unregisterPushDevice: { __lunoraRef: "notifications_native_push:unregisterPushDevice" },
         },
         push: {
             getPushConfig: { __lunoraRef: "notifications_push:getPushConfig" },
