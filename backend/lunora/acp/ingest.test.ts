@@ -1201,6 +1201,20 @@ describe("a host turn", () => {
 
         expect(await rowField(threadId, "awaitingInput")).toBe("approval");
     });
+
+    it("a session that closes while its turn waits on an approval clears the approval", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const askForTool = { kind: "permission_request", options: [{ kind: "allow_once", name: "Allow", optionId: "o1" }], requestId: "r1", tool: "Bash" };
+
+        await turn(device, threadId, "t1", 0, [START(), askForTool]);
+        expect(await rowField(threadId, "awaitingInput")).toBe("approval");
+
+        // The turn ends with the session, not with a `turn_end`: the same end clears the approval.
+        await close(device);
+
+        expect(await rowField(threadId, "awaitingInput")).toBeUndefined();
+    });
 });
 
 describe("ingest refusals", () => {

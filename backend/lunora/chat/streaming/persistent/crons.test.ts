@@ -173,6 +173,25 @@ describe("cleanupExpiredStreams", () => {
             expect(await snoozedUntilOf(thread.threadId)).toBeUndefined();
         });
 
+        it("wakes a snoozed thread when its stream times out with interrupted-run recovery turned off", async () => {
+            expect.assertions(2);
+
+            const thread = await seedThread();
+
+            await harness.run(async (context) => {
+                await context.db.insert("userSettings", { resumeInterruptedRuns: false, userId: OWNER });
+                await context.db.patch("threads", thread.threadId as never, { snoozedUntil: Date.now() + 24 * HOUR });
+            });
+
+            const expired = await insertStream(thread, "streaming", Date.now() - HOUR);
+
+            await sweep();
+
+            // The sweep does not read the recovery setting: a timeout is a failed run either way.
+            await expect(statusOf(expired)).resolves.toBe("timeout");
+            expect(await snoozedUntilOf(thread.threadId)).toBeUndefined();
+        });
+
         it("is left as it is when it is not running", async () => {
             expect.assertions(2);
 
