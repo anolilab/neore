@@ -153,10 +153,11 @@ vi.mock("./lib/agent-tools", () => {
                     }),
                     look: tool({
                         description: "Reads something, and never returns",
+                        // Never returns the first time (the death), and answers when the resume calls it again.
                         execute: async () => {
                             modelState.stuckCalls.push("look");
 
-                            return await new Promise<string>(() => {});
+                            return modelState.stuckCalls.filter((name) => name === "look").length > 1 ? "looked" : await new Promise<string>(() => {});
                         },
                         inputSchema: z.object({}),
                     }),
@@ -683,16 +684,16 @@ describe("a run whose worker dies inside a tool", () => {
         expect(await inspect()).toStrictEqual({ kind: "resumed" });
         expect(enqueued).toHaveLength(1);
 
-        // Nothing of the dead step was saved: the resume asks the model again from the prompt, and the model calls the tool anew.
+        // Nothing of the dead step was saved: the resume asks the model again from the prompt, and the model calls the tool again.
         const { pause, rows } = await readState();
 
         expect(pause?.from).toBe(ids.messageId);
         expect(rows.map((row) => row.id)).toStrictEqual([ids.messageId]);
 
-        modelState.model = scriptedModel([toolCallStep("echo", "call-again"), textStep("Found it.")]);
+        modelState.model = scriptedModel([toolCallStep("look", "call-again"), textStep("Found it.")]);
         await run({ resume: String(pause?.id) });
 
-        expect(modelState.toolCalls).toBe(1);
+        expect(modelState.stuckCalls).toStrictEqual(["look", "look"]);
         const { streamStatus } = await readState();
 
         expect(streamStatus).toBe("done");

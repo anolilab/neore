@@ -4,8 +4,9 @@
  * the call is made again. Anything else may have paid for or changed something, and is never repeated.
  *
  * Unsafe by default: a built-in counts only when it is named here, and a server's tool only when the server says it
- * reads (`readOnlyHint: true`) and does not also say it destroys or reaches the open world, the rule the quick check
- * reads too (`low-risk-approval.ts`). A device tool never counts.
+ * reads (`readOnlyHint: true`) and does not also say it destroys or reaches the open world (the hints the quick check
+ * refuses on, `low-risk-approval.ts`). Those hints are the server's word, as they are for running a tool unasked
+ * (`defaultToolPermission`). A device tool never counts.
  */
 import type { ToolDescriptor } from "./tool-permissions";
 

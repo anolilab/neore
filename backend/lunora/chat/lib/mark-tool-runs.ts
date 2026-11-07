@@ -10,9 +10,10 @@
  * error on a run that cannot be resumed (stateless, opted out, not registered): a death then ends the run for good, so
  * there is no second run for a tool to be repeated by, and the tool runs with the error logged.
  *
- * A tool that is safe to repeat (`repeatable-tools.ts`) is checked the same way before it starts (`repeatable`: the
- * stream must be live and held by this run) but is not counted: a death inside it leaves nothing open, so the run is
- * resumed from its last saved row and the model calls the tool again.
+ * A tool that is safe to repeat (`repeatable-tools.ts`) is checked before it starts (`repeatable`: the stream must be
+ * live and held by this run) but is not counted: a death inside it leaves nothing open, so the run is resumed from its
+ * last saved row and the model calls the tool again. A shard error on that check only logs: a read has nothing a
+ * resume could double, and a run that was replaced meanwhile still has every write fenced.
  */
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
