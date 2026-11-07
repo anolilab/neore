@@ -143,6 +143,11 @@ export interface HeadlessRunOptions {
     tools: "headless" | "none";
     /** The skill the usage page files this run under; absent = the plain assistant. */
     usageSkill?: ReplySkill;
+    /**
+     * The thread whose project the usage page files this run under, when it is not the run's own: a sub-agent's or a
+     * worker's child thread is in no project, and its spend belongs to the lead thread's.
+     */
+    usageThreadId?: string;
     userId: string;
 }
 
@@ -334,15 +339,14 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         // Usage heatmap + per-skill breakdown, keyed on the reply's first row so a
         // redelivered record counts once. Every round of a goal is a reply of its own.
         const settle = (round: typeof result): GoalRoundResult & { priced: number | undefined } => {
-            scheduleReplyUsage(
-                ctx.scheduler as never,
-                replyUsageArgs((round as { savedMessages?: ReadonlyArray<SavedRowLike> }).savedMessages ?? [], {
-                    at: Date.now(),
-                    userId,
-                    ...(options.usageSkill && { skill: options.usageSkill }),
-                    ...(prefs.timezone && { timeZone: prefs.timezone }),
-                }),
-            );
+            const usage = replyUsageArgs((round as { savedMessages?: ReadonlyArray<SavedRowLike> }).savedMessages ?? [], {
+                at: Date.now(),
+                userId,
+                ...(options.usageSkill && { skill: options.usageSkill }),
+                ...(prefs.timezone && { timeZone: prefs.timezone }),
+            });
+
+            scheduleReplyUsage(ctx.scheduler as never, usage && options.usageThreadId !== undefined ? { ...usage, threadId: options.usageThreadId } : usage);
 
             const cost = sumMessageCosts((round.steps ?? []).map((step: { providerMetadata?: unknown }) => step.providerMetadata));
 

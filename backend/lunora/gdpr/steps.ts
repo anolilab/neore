@@ -424,6 +424,8 @@ export const collectActivityForExport = internalQuery
                     replies: row.replies,
                     skill: row.skillName ?? row.skillKey,
                     tokens: row.tokens,
+                    // A project row (`__project__`) names its project; summing skills alone leaves these out.
+                    ...(row.projectKey !== undefined && { project: row.projectKey }),
                 };
             }),
         };

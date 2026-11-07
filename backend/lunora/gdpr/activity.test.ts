@@ -76,6 +76,7 @@ describe("collectActivityForExport", () => {
     it("exports the user's usage history, delegations with task and result, and collections — nobody else's", async () => {
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("usageDaily", usageRow(A, "2026-02-01"));
+            await ctx.db.insert("usageDaily", { ...usageRow(A, "2026-02-02"), projectKey: "p_alpha", skillKey: "__project__" });
             await ctx.db.insert("subAgentRuns", runRow(A, 1, "succeeded"));
             await ctx.db.insert("knowledgeCollections", { createdAt: 0, name: "Handbook", updatedAt: 0, userId: A });
             await ctx.db.insert("knowledgeCollections", { createdAt: 0, name: "Not mine", updatedAt: 0, userId: B });
@@ -83,7 +84,11 @@ describe("collectActivityForExport", () => {
 
         const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(collectActivityForExport, { userId: A }))) as any;
 
-        expect(exported.usageDaily).toEqual([expect.objectContaining({ date: "2026-02-01", tokens: 5 })]);
+        // A project row names its project, so it is not read as one more skill.
+        expect(exported.usageDaily).toEqual([
+            expect.objectContaining({ date: "2026-02-01", tokens: 5 }),
+            expect.objectContaining({ date: "2026-02-02", project: "p_alpha" }),
+        ]);
         expect(exported.subAgentRuns).toEqual([expect.objectContaining({ result: "answer", status: "succeeded", task: "task 0" })]);
         expect(exported.knowledgeCollections.map((collection: { name: string }) => collection.name)).toEqual(["Handbook"]);
     });

@@ -150,6 +150,8 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
                 skillRun?.invocation && {
                     usageSkill: { name: `/${claim.skillSlug}`, ...(skillRun.invocation.skillId && { id: skillRun.invocation.skillId }) },
                 }),
+            // The child thread is in no project: its spend is filed under the lead thread's.
+            usageThreadId: claim.parentThreadId,
             userId,
         });
 
