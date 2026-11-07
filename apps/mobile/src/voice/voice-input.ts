@@ -19,11 +19,26 @@ const TRANSCRIBE_FAILED_MESSAGE = "The recording could not be turned into text. 
 /** The slice of the client this uses, so tests can fake it. */
 export type VoiceClient = Pick<LunoraClient, "action">;
 
-/** Sends one clip to the server and returns its text. An action is never queued: offline, it fails at once. */
-export const transcribeClip = async (client: VoiceClient, clip: { audio: string; durationMs: number }): Promise<string> => {
-    const { text } = await client.action(api.voice.transcription.transcribeClip, clip);
+/** Above the server's own 50 s gateway deadline, so a call that stalls on the way still ends. */
+export const TRANSCRIBE_TIMEOUT_MS = 70_000;
 
-    return text;
+/**
+ * Sends one clip to the server and returns its text. An action is never queued: offline, it fails at once. Actions
+ * have no default timeout, so a stalled one is aborted here and reported as a failure.
+ */
+export const transcribeClip = async (client: VoiceClient, clip: { audio: string; durationMs: number }): Promise<string> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+        controller.abort();
+    }, TRANSCRIBE_TIMEOUT_MS);
+
+    try {
+        const { text } = await client.action(api.voice.transcription.transcribeClip, clip, { signal: controller.signal });
+
+        return text;
+    } finally {
+        clearTimeout(timer);
+    }
 };
 
 const ENDS_IN_SPACE = /\s$/u;
