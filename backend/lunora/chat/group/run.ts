@@ -274,7 +274,7 @@ const runSpeaker = async (
                   skillTools: speaker.config ? { additionalTools: speaker.config.additionalTools, disabledTools: speaker.config.disabledTools } : undefined,
                   userId: turn.userId,
               })
-            : { mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
+            : { mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, repeatable: [], tools: {} };
 
         mcpClients = toolResult.mcpClients;
 

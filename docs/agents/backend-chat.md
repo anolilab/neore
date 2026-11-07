@@ -22,7 +22,15 @@ The rules are summarized in `backend/lunora/chat/AGENTS.md`, which agents load a
   still resumes once). `from`, the reply rows and the step count are DERIVED from the
   saved rows, never from the dead run's memory (`settleSavedRows`); anything that is
   not a finished row or an empty placeholder, a trailing tool call without its result,
-  a delivered steer or an open tool mark fails the run visibly instead. At most 3
+  a delivered steer or an open tool mark fails the run visibly instead. A tool that
+  is safe to repeat (`lib/repeatable-tools.ts`) leaves no open mark: its start is
+  checked against the stream (live, held by this run) but not counted, so a death
+  inside it drops the unsaved step and the resume asks the model again, which calls
+  the tool anew. Repeating such a call may cost a second search or fetch, never a
+  second write. A tool says so explicitly or is unsafe: built-ins by name in
+  `BUILTIN_TOOLS_SAFE_TO_REPEAT`; MCP and connector tools when the server says
+  `readOnlyHint: true` and neither `destructiveHint` nor `openWorldHint` (the hints
+  the quick check also refuses on); device tools never. At most 3
   resumes per reply (`interruptions`), independent of the 3 rate-limit pauses; the
   4th interruption fails with an error line. Opt out with
   `userSettings.resumeInterruptedRuns === false` (absent = on): the stream then

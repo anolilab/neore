@@ -199,7 +199,8 @@ export const runStreamingAgent = internalAction
             const startBeat = () => {
                 beat ??= setInterval(beatOnce, RUN_BEAT_MS);
             };
-            // Every tool call is marked on the stream until its step is saved: a worker that dies inside one is not resumed.
+            // Every tool call is marked on the stream until its step is saved: a worker that dies inside one is not resumed,
+            // unless the tool is safe to repeat (`repeatable-tools.ts`).
             // Whether a worker death would be answered by a resume: only then must a tool refuse to run without a confirmed mark.
             // A resumed run is resumable by definition (its watchdog chain exists); a first run becomes so when it registers.
             let resumableRun = resume !== undefined;
@@ -510,13 +511,13 @@ export const runStreamingAgent = internalAction
                               untrustedContext: untrustedContext.catch(() => true),
                               userId,
                           })
-                        : { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} },
+                        : { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, repeatable: [], tools: {} },
                     runContextPromise,
                 ]);
 
                 mcpClients = toolResult.mcpClients;
 
-                const tools = toolRuns.wrap(toolResult.tools);
+                const tools = toolRuns.wrap(toolResult.tools, new Set(toolResult.repeatable));
                 const { contextParts, prefs, researchDepth: effectiveResearchDepth, threadSettings: appThread } = runContext;
 
                 setResearchDepth(ctx, effectiveResearchDepth);
