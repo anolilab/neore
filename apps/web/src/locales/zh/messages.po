@@ -42,10 +42,6 @@ msgstr "，未读"
 msgid "...and {0} more"
 msgstr "……还有 {0} 个"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx
-msgid "Moved to position {0}"
-msgstr "已移动到第 {0} 位"
-
 #. placeholder {0}: prompt.name
 #: src/features/prompts/components/variable-fill-dialog.tsx:128
 msgid "\"{0}\" has variables that need values."
@@ -97,7 +93,7 @@ msgstr "（{0}/{MAX_PARTICIPANTS}，至少 {MIN_PARTICIPANTS} 个）"
 msgid "({jobFailed} failed)"
 msgstr "（{jobFailed} 个失败）"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:250
+#: src/features/chat/thread/composer-prompt-queue.tsx:275
 msgid "(attachments only)"
 msgstr "（仅附件）"
 
@@ -801,7 +797,7 @@ msgstr "{count, plural, other {已选择 # 条消息}}"
 msgid "{count, plural, one {# of {maxReferenceImages} reference attached} other {# of {maxReferenceImages} references attached}}"
 msgstr "{count, plural, other {已附加 #/{maxReferenceImages} 张参考图}}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:421
+#: src/features/chat/thread/composer-prompt-queue.tsx:583
 msgid "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 msgstr ""
 
@@ -821,11 +817,11 @@ msgstr "{count, plural, other {使用了 # 个来源}}"
 msgid "{count} characters now."
 msgstr ""
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:418
+#: src/features/chat/thread/composer-prompt-queue.tsx:580
 msgid "{count} queued"
 msgstr "{count} 条排队中"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:418
+#: src/features/chat/thread/composer-prompt-queue.tsx:580
 msgid "{count} queued — sends when the current reply finishes"
 msgstr "{count} 条排队中——当前回复完成后发送"
 
@@ -847,7 +843,7 @@ msgstr ""
 msgid "{days}d ago"
 msgstr "{days} 天前"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:277
+#: src/features/chat/thread/composer-prompt-queue.tsx:316
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, other {重新加载时移除了 # 个附件}}"
 
@@ -3104,7 +3100,7 @@ msgstr ""
 msgid "Allow for today"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:139
+#: src/features/chat/host/host-composer.tsx:148
 msgid "Allow once"
 msgstr ""
 
@@ -3910,7 +3906,7 @@ msgstr "附件（已隐藏）"
 msgid "Attachment only"
 msgstr "仅附件"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:271
+#: src/features/chat/thread/composer-prompt-queue.tsx:310
 msgid "Attachments:"
 msgstr "附件："
 
@@ -5195,7 +5191,7 @@ msgstr "加拿大"
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
 #: src/features/chat/host/diff-comment-form.tsx:80
-#: src/features/chat/host/host-composer.tsx:744
+#: src/features/chat/host/host-composer.tsx:754
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
 #: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
 #: src/features/chat/pins/pin-item.tsx:282
@@ -5735,7 +5731,7 @@ msgstr ""
 msgid "Checking image safety..."
 msgstr "正在检查图片安全性..."
 
-#: src/features/chat/host/host-composer.tsx:888
+#: src/features/chat/host/host-composer.tsx:898
 msgid "Checking whether a message sent now interrupts the reply or waits behind it."
 msgstr "正在确认现在发送的消息是中断回复，还是排在其后等待。"
 
@@ -7388,7 +7384,7 @@ msgid "Context-aware generation"
 msgstr "上下文感知生成"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
-#: src/features/chat/host/host-composer.tsx:697
+#: src/features/chat/host/host-composer.tsx:707
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "继续"
@@ -7397,7 +7393,7 @@ msgstr "继续"
 msgid "Continue interrupted replies"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:691
+#: src/features/chat/host/host-composer.tsx:701
 msgid "Continue where you left off."
 msgstr ""
 
@@ -7822,7 +7818,7 @@ msgstr "无法附加该聊天"
 msgid "could not be saved"
 msgstr "无法保存"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:231
+#: src/features/chat/thread/composer-prompt-queue.tsx:241
 msgid "Could not cancel the message. It is still queued."
 msgstr ""
 
@@ -8104,7 +8100,7 @@ msgstr ""
 msgid "Could not send the message."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:649
+#: src/features/chat/host/host-composer.tsx:659
 msgid "Could not send your answer."
 msgstr ""
 
@@ -8147,7 +8143,7 @@ msgstr "无法停止对话"
 msgid "Could not stop the reply. Please try again."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:279
+#: src/features/chat/host/host-composer.tsx:288
 msgid "Could not stop the reply. Your message is queued; send it next when you are ready."
 msgstr "无法停止回复。你的消息已排队；准备好后再接着发送。"
 
@@ -8952,7 +8948,7 @@ msgstr ""
 msgid "Debug an error or review my code..."
 msgstr "调试错误或审查我的代码..."
 
-#: src/features/chat/host/host-composer.tsx:144
+#: src/features/chat/host/host-composer.tsx:153
 #: src/features/chat/thread/request-secret-prompt.tsx:495
 msgid "Decline"
 msgstr ""
@@ -10563,7 +10559,7 @@ msgstr "边缘引导生成"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:141
 #: src/features/canvas/canvas-panel.tsx:767
-#: src/features/chat/host/host-composer.tsx:774
+#: src/features/chat/host/host-composer.tsx:784
 #: src/features/chat/thread-list/group-header.tsx:145
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
 #: src/features/chat/thread/message-item.tsx:394
@@ -10683,12 +10679,12 @@ msgstr "编辑提示词"
 msgid "Edit Provider"
 msgstr "编辑提供商"
 
-#: src/features/chat/host/host-composer.tsx:712
+#: src/features/chat/host/host-composer.tsx:722
 msgid "Edit queued message"
 msgstr "编辑排队的消息"
 
 #. placeholder {0}: index + 1
-#: src/features/chat/host/host-composer.tsx:767
+#: src/features/chat/host/host-composer.tsx:777
 msgid "Edit queued message {0}"
 msgstr "编辑排队的消息 {0}"
 
@@ -15259,7 +15255,7 @@ msgstr "分享一些关于你的信息，帮助 AI 更好地了解你。这些�
 msgid "Here they are: planning, budget and next steps."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:852
+#: src/features/chat/host/host-composer.tsx:862
 msgid "Hidden characters were removed from your message."
 msgstr "已从你的消息中移除隐藏字符。"
 
@@ -16165,7 +16161,7 @@ msgid "in {0, plural, one {# file} other {# files}}"
 msgstr ""
 
 #. placeholder {0}: request.folder
-#: src/features/chat/host/host-composer.tsx:130
+#: src/features/chat/host/host-composer.tsx:139
 msgid "In {0}"
 msgstr ""
 
@@ -16474,8 +16470,8 @@ msgstr ""
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:587
-#: src/features/chat/host/host-composer.tsx:874
+#: src/features/chat/host/host-composer.tsx:597
+#: src/features/chat/host/host-composer.tsx:884
 msgid "Interrupt and send"
 msgstr "中断并发送"
 
@@ -18950,7 +18946,7 @@ msgstr "消息输入"
 msgid "Message selection"
 msgstr "消息选择"
 
-#: src/features/chat/host/host-composer.tsx:867
+#: src/features/chat/host/host-composer.tsx:877
 msgid "Message the agent on your computer"
 msgstr ""
 
@@ -18962,7 +18958,7 @@ msgstr ""
 msgid "Message the worker..."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:828
+#: src/features/chat/host/host-composer.tsx:838
 msgid "Message to the coding agent"
 msgstr ""
 
@@ -19662,11 +19658,11 @@ msgstr "向下移动一页"
 msgid "Move out one level"
 msgstr "上移一级"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:1
+#: src/features/chat/thread/composer-prompt-queue.tsx:330
 msgid "Move queued message {position} down"
 msgstr "下移队列中的消息 {position}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:1
+#: src/features/chat/thread/composer-prompt-queue.tsx:320
 msgid "Move queued message {position} up"
 msgstr "上移队列中的消息 {position}"
 
@@ -19731,6 +19727,12 @@ msgstr "向上移动一页"
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:33
 msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
 msgstr ""
+
+#. placeholder {0}: to + 1
+#: src/features/chat/thread/composer-prompt-queue.tsx:530
+#: src/features/chat/thread/composer-prompt-queue.tsx:557
+msgid "Moved to position {0}"
+msgstr "已移动到第 {0} 位"
 
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:113
 msgid "MP4/MOV video"
@@ -23218,7 +23220,7 @@ msgstr "永久删除你的账号及所有相关数据"
 msgid "Permission Level"
 msgstr "权限级别"
 
-#: src/features/chat/host/host-composer.tsx:662
+#: src/features/chat/host/host-composer.tsx:672
 msgid "Permission requests from the agent"
 msgstr ""
 
@@ -24619,7 +24621,7 @@ msgstr "查询用量分析和成本"
 msgid "Question"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:589
+#: src/features/chat/host/host-composer.tsx:599
 msgid "Queue"
 msgstr "队列"
 
@@ -24641,16 +24643,16 @@ msgstr "排队消息——当前回复完成后发送"
 msgid "Queued"
 msgstr "排队中"
 
-#: src/features/chat/host/host-composer.tsx:313
-#: src/features/chat/thread/composer-prompt-queue.tsx:430
+#: src/features/chat/host/host-composer.tsx:322
+#: src/features/chat/thread/composer-prompt-queue.tsx:597
 msgid "Queued messages"
 msgstr "排队中的消息"
 
-#: src/features/chat/host/host-composer.tsx:818
+#: src/features/chat/host/host-composer.tsx:828
 msgid "Queued messages go out in order once the reply ends."
 msgstr "回复结束后，排队的消息会按顺序发送。"
 
-#: src/features/chat/host/host-composer.tsx:316
+#: src/features/chat/host/host-composer.tsx:325
 msgid "Queued messages: {queuedTotal}"
 msgstr "排队中的消息：{queuedTotal}"
 
@@ -25495,7 +25497,7 @@ msgstr "记住我"
 
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:195
 #: ../../packages/ui/src/components/combobox.tsx:304
-#: src/features/chat/host/host-composer.tsx:792
+#: src/features/chat/host/host-composer.tsx:802
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
 #: src/features/chat/thread/composer-input.tsx:331
@@ -25682,11 +25684,11 @@ msgid "Remove provider?"
 msgstr "要移除提供商吗？"
 
 #. placeholder {0}: index + 1
-#: src/features/chat/host/host-composer.tsx:778
+#: src/features/chat/host/host-composer.tsx:788
 msgid "Remove queued message {0}"
 msgstr "移除排队的消息 {0}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:281
+#: src/features/chat/thread/composer-prompt-queue.tsx:340
 msgid "Remove queued message {position}"
 msgstr "移除排队消息 {position}"
 
@@ -26182,7 +26184,7 @@ msgstr "检索：命中 {0} · MRR {1} · 精确率 {2} · 召回率 {3}"
 msgid "retry"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:807
+#: src/features/chat/host/host-composer.tsx:817
 #: src/features/chat/thread/chat-error.tsx:56
 #: src/features/chat/thread/request-secret-prompt.tsx:476
 #: src/features/chat/translation/message-translation.tsx:88
@@ -26717,7 +26719,7 @@ msgstr "沙特阿拉伯"
 #: src/features/auth/components/settings/security/change-email-card.tsx:133
 #: src/features/auth/components/settings/security/change-password-card.tsx:244
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
-#: src/features/chat/host/host-composer.tsx:733
+#: src/features/chat/host/host-composer.tsx:743
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:165
@@ -27546,7 +27548,7 @@ msgstr "提示词遵循度高的半写实模型"
 msgid "Semi-realistic visual style"
 msgstr "半写实视觉风格"
 
-#: src/features/chat/host/host-composer.tsx:584
+#: src/features/chat/host/host-composer.tsx:594
 #: src/features/sub-agents/components/worker-composer.tsx:104
 msgid "Send"
 msgstr ""
@@ -27619,8 +27621,8 @@ msgstr "消息发送方式"
 msgid "Send messages to the AI bot via Telegram. Conversations appear as threads in your chat list."
 msgstr "通过 Telegram 向 AI 机器人发送消息。对话会显示在你的聊天列表中。"
 
-#: src/features/chat/host/host-composer.tsx:762
-#: src/features/chat/thread/composer-prompt-queue.tsx:438
+#: src/features/chat/host/host-composer.tsx:772
+#: src/features/chat/thread/composer-prompt-queue.tsx:616
 msgid "Send next"
 msgstr "发送下一条"
 
@@ -29270,7 +29272,7 @@ msgstr "正在开始导入..."
 msgid "Starting test drive…"
 msgstr "正在开始试运行…"
 
-#: src/features/chat/host/host-composer.tsx:677
+#: src/features/chat/host/host-composer.tsx:687
 msgid "Starting the agent on your computer. A message you send now goes out once it is up."
 msgstr ""
 
@@ -29342,7 +29344,7 @@ msgstr ""
 msgid "Steer the reply"
 msgstr ""
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:262
+#: src/features/chat/thread/composer-prompt-queue.tsx:301
 msgid "Steering:"
 msgstr ""
 
@@ -29390,7 +29392,7 @@ msgstr "股票"
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/chat/host/host-composer.tsx:878
+#: src/features/chat/host/host-composer.tsx:888
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:316
@@ -30830,7 +30832,7 @@ msgstr ""
 msgid "That passcode is not right."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:652
+#: src/features/chat/host/host-composer.tsx:662
 msgid "That request is no longer waiting."
 msgstr ""
 
@@ -30955,7 +30957,7 @@ msgstr "更改过大，无法完整显示。"
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "聊天智能体使用其工具处理任务，并可选择遵循某个技能。"
 
-#: src/features/chat/host/host-composer.tsx:805
+#: src/features/chat/host/host-composer.tsx:815
 msgid "The chat's state could not be read, so queued messages wait."
 msgstr "无法读取聊天状态，因此排队的消息等待中。"
 
@@ -31175,7 +31177,7 @@ msgstr "上次删除请求失败。你可以再次请求。"
 msgid "the last time"
 msgstr "登录"
 
-#: src/features/chat/host/host-composer.tsx:687
+#: src/features/chat/host/host-composer.tsx:697
 msgid "The last turn stopped before it finished."
 msgstr ""
 
@@ -31305,7 +31307,7 @@ msgstr "提示词将作为用例输入，此回答将作为预期答案。保存
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "这些请求由提供商直接向你计费。如果我们知道模型的价格，将以积分收取自有密钥的常规平台费用。"
 
-#: src/features/chat/host/host-composer.tsx:813
+#: src/features/chat/host/host-composer.tsx:823
 msgid "The queue is paused. Send next to go on with the queued messages."
 msgstr "队列已暂停。点击“发送下一条”以继续发送排队的消息。"
 
@@ -31329,7 +31331,7 @@ msgstr ""
 msgid "The reply is still running. Try again when it finishes."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:278
+#: src/features/chat/host/host-composer.tsx:287
 msgid "The reply stopped, but the stop did not reach the computer, so the agent may still be running. Send next once it has stopped."
 msgstr "回复已停止，但停止指令未能到达电脑，代理可能仍在运行。它停止后，请点击“发送下一条”。"
 
@@ -31936,7 +31938,7 @@ msgstr "这会从你的电脑中删除模型文件。你以后可以重新拉取
 msgid "This repository was not found."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:133
+#: src/features/chat/host/host-composer.tsx:142
 msgid "This request was too long to show whole. You can decline it here; to allow it, answer on your computer."
 msgstr ""
 
@@ -31968,7 +31970,7 @@ msgstr ""
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
 msgstr "此服务器的注册表条目要求填写以下值，它们将填入 URL 和请求头。"
 
-#: src/features/chat/host/host-composer.tsx:682
+#: src/features/chat/host/host-composer.tsx:692
 #: src/features/chat/host/host-send-errors.ts:19
 msgid "This session has ended. Start a new one from the desktop app."
 msgstr ""
@@ -32005,7 +32007,7 @@ msgstr "此子代理运行已不可用。"
 msgid "This task has not run yet."
 msgstr "此任务尚未运行。"
 
-#: src/features/chat/host/host-composer.tsx:722
+#: src/features/chat/host/host-composer.tsx:732
 msgid "This text is only hidden characters, so there is nothing to save."
 msgstr "此文本仅包含隐藏字符，因此没有可保存的内容。"
 

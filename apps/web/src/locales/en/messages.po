@@ -41,10 +41,6 @@ msgstr ", unread"
 msgid "...and {0} more"
 msgstr "...and {0} more"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx
-msgid "Moved to position {0}"
-msgstr "Moved to position {0}"
-
 #. placeholder {0}: prompt.name
 #: src/features/prompts/components/variable-fill-dialog.tsx:128
 msgid "\"{0}\" has variables that need values."
@@ -96,7 +92,7 @@ msgstr "({0} of {MAX_PARTICIPANTS}, at least {MIN_PARTICIPANTS})"
 msgid "({jobFailed} failed)"
 msgstr "({jobFailed} failed)"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:250
+#: src/features/chat/thread/composer-prompt-queue.tsx:275
 msgid "(attachments only)"
 msgstr "(attachments only)"
 
@@ -813,7 +809,7 @@ msgstr "{count, plural, one {# message selected} other {# messages selected}}"
 msgid "{count, plural, one {# of {maxReferenceImages} reference attached} other {# of {maxReferenceImages} references attached}}"
 msgstr "{count, plural, one {# of {maxReferenceImages} reference attached} other {# of {maxReferenceImages} references attached}}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:421
+#: src/features/chat/thread/composer-prompt-queue.tsx:583
 msgid "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 msgstr "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 
@@ -833,11 +829,11 @@ msgstr "{count, plural, one {Used # source} other {Used # sources}}"
 msgid "{count} characters now."
 msgstr "{count} characters now."
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:418
+#: src/features/chat/thread/composer-prompt-queue.tsx:580
 msgid "{count} queued"
 msgstr "{count} queued"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:418
+#: src/features/chat/thread/composer-prompt-queue.tsx:580
 msgid "{count} queued — sends when the current reply finishes"
 msgstr "{count} queued — sends when the current reply finishes"
 
@@ -859,7 +855,7 @@ msgstr "{days} days"
 msgid "{days}d ago"
 msgstr "{days}d ago"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:277
+#: src/features/chat/thread/composer-prompt-queue.tsx:316
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 
@@ -3132,7 +3128,7 @@ msgstr "Allow for 1 hour"
 msgid "Allow for today"
 msgstr "Allow for today"
 
-#: src/features/chat/host/host-composer.tsx:139
+#: src/features/chat/host/host-composer.tsx:148
 msgid "Allow once"
 msgstr "Allow once"
 
@@ -3938,7 +3934,7 @@ msgstr "Attachment (hidden)"
 msgid "Attachment only"
 msgstr "Attachment only"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:271
+#: src/features/chat/thread/composer-prompt-queue.tsx:310
 msgid "Attachments:"
 msgstr "Attachments:"
 
@@ -5223,7 +5219,7 @@ msgstr "Canada"
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
 #: src/features/chat/host/diff-comment-form.tsx:80
-#: src/features/chat/host/host-composer.tsx:744
+#: src/features/chat/host/host-composer.tsx:754
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
 #: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
 #: src/features/chat/pins/pin-item.tsx:282
@@ -5763,7 +5759,7 @@ msgstr "Checked: {0}"
 msgid "Checking image safety..."
 msgstr "Checking image safety..."
 
-#: src/features/chat/host/host-composer.tsx:888
+#: src/features/chat/host/host-composer.tsx:898
 msgid "Checking whether a message sent now interrupts the reply or waits behind it."
 msgstr "Checking whether a message sent now interrupts the reply or waits behind it."
 
@@ -7420,7 +7416,7 @@ msgid "Context-aware generation"
 msgstr "Context-aware generation"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
-#: src/features/chat/host/host-composer.tsx:697
+#: src/features/chat/host/host-composer.tsx:707
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "Continue"
@@ -7429,7 +7425,7 @@ msgstr "Continue"
 msgid "Continue interrupted replies"
 msgstr "Continue interrupted replies"
 
-#: src/features/chat/host/host-composer.tsx:691
+#: src/features/chat/host/host-composer.tsx:701
 msgid "Continue where you left off."
 msgstr "Continue where you left off."
 
@@ -7854,7 +7850,7 @@ msgstr "Could not attach the chat"
 msgid "could not be saved"
 msgstr "could not be saved"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:231
+#: src/features/chat/thread/composer-prompt-queue.tsx:241
 msgid "Could not cancel the message. It is still queued."
 msgstr "Could not cancel the message. It is still queued."
 
@@ -8136,7 +8132,7 @@ msgstr "Could not save this. Try again."
 msgid "Could not send the message."
 msgstr "Could not send the message."
 
-#: src/features/chat/host/host-composer.tsx:649
+#: src/features/chat/host/host-composer.tsx:659
 msgid "Could not send your answer."
 msgstr "Could not send your answer."
 
@@ -8179,7 +8175,7 @@ msgstr "Could not stop the conversation"
 msgid "Could not stop the reply. Please try again."
 msgstr "Could not stop the reply. Please try again."
 
-#: src/features/chat/host/host-composer.tsx:279
+#: src/features/chat/host/host-composer.tsx:288
 msgid "Could not stop the reply. Your message is queued; send it next when you are ready."
 msgstr "Could not stop the reply. Your message is queued; send it next when you are ready."
 
@@ -8988,7 +8984,7 @@ msgstr "Debates for {0} rounds."
 msgid "Debug an error or review my code..."
 msgstr "Debug an error or review my code..."
 
-#: src/features/chat/host/host-composer.tsx:144
+#: src/features/chat/host/host-composer.tsx:153
 #: src/features/chat/thread/request-secret-prompt.tsx:495
 msgid "Decline"
 msgstr "Decline"
@@ -10599,7 +10595,7 @@ msgstr "Edge-guided generation"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:141
 #: src/features/canvas/canvas-panel.tsx:767
-#: src/features/chat/host/host-composer.tsx:774
+#: src/features/chat/host/host-composer.tsx:784
 #: src/features/chat/thread-list/group-header.tsx:145
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
 #: src/features/chat/thread/message-item.tsx:394
@@ -10719,12 +10715,12 @@ msgstr "Edit Prompt"
 msgid "Edit Provider"
 msgstr "Edit Provider"
 
-#: src/features/chat/host/host-composer.tsx:712
+#: src/features/chat/host/host-composer.tsx:722
 msgid "Edit queued message"
 msgstr "Edit queued message"
 
 #. placeholder {0}: index + 1
-#: src/features/chat/host/host-composer.tsx:767
+#: src/features/chat/host/host-composer.tsx:777
 msgid "Edit queued message {0}"
 msgstr "Edit queued message {0}"
 
@@ -15295,7 +15291,7 @@ msgstr "Help the AI understand you better by sharing some information about your
 msgid "Here they are: planning, budget and next steps."
 msgstr "Here they are: planning, budget and next steps."
 
-#: src/features/chat/host/host-composer.tsx:852
+#: src/features/chat/host/host-composer.tsx:862
 msgid "Hidden characters were removed from your message."
 msgstr "Hidden characters were removed from your message."
 
@@ -16201,7 +16197,7 @@ msgid "in {0, plural, one {# file} other {# files}}"
 msgstr "in {0, plural, one {# file} other {# files}}"
 
 #. placeholder {0}: request.folder
-#: src/features/chat/host/host-composer.tsx:130
+#: src/features/chat/host/host-composer.tsx:139
 msgid "In {0}"
 msgstr "In {0}"
 
@@ -16515,8 +16511,8 @@ msgstr "Interrupt and restart"
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr "Interrupt and restart — stops the current reply and sends this"
 
-#: src/features/chat/host/host-composer.tsx:587
-#: src/features/chat/host/host-composer.tsx:874
+#: src/features/chat/host/host-composer.tsx:597
+#: src/features/chat/host/host-composer.tsx:884
 msgid "Interrupt and send"
 msgstr "Interrupt and send"
 
@@ -18997,7 +18993,7 @@ msgstr "Message input"
 msgid "Message selection"
 msgstr "Message selection"
 
-#: src/features/chat/host/host-composer.tsx:867
+#: src/features/chat/host/host-composer.tsx:877
 msgid "Message the agent on your computer"
 msgstr "Message the agent on your computer"
 
@@ -19009,7 +19005,7 @@ msgstr "Message the worker"
 msgid "Message the worker..."
 msgstr "Message the worker..."
 
-#: src/features/chat/host/host-composer.tsx:828
+#: src/features/chat/host/host-composer.tsx:838
 msgid "Message to the coding agent"
 msgstr "Message to the coding agent"
 
@@ -19709,11 +19705,11 @@ msgstr "Move down one page"
 msgid "Move out one level"
 msgstr "Move out one level"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:1
+#: src/features/chat/thread/composer-prompt-queue.tsx:330
 msgid "Move queued message {position} down"
 msgstr "Move queued message {position} down"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:1
+#: src/features/chat/thread/composer-prompt-queue.tsx:320
 msgid "Move queued message {position} up"
 msgstr "Move queued message {position} up"
 
@@ -19778,6 +19774,12 @@ msgstr "Move up one page"
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:33
 msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
 msgstr "Moved selected node {0}. New position, x: {x}, y: {y}"
+
+#. placeholder {0}: to + 1
+#: src/features/chat/thread/composer-prompt-queue.tsx:530
+#: src/features/chat/thread/composer-prompt-queue.tsx:557
+msgid "Moved to position {0}"
+msgstr "Moved to position {0}"
 
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:113
 msgid "MP4/MOV video"
@@ -23274,7 +23276,7 @@ msgstr "Permanently delete your account and all associated data"
 msgid "Permission Level"
 msgstr "Permission Level"
 
-#: src/features/chat/host/host-composer.tsx:662
+#: src/features/chat/host/host-composer.tsx:672
 msgid "Permission requests from the agent"
 msgstr "Permission requests from the agent"
 
@@ -24675,7 +24677,7 @@ msgstr "Query usage analytics and costs"
 msgid "Question"
 msgstr "Question"
 
-#: src/features/chat/host/host-composer.tsx:589
+#: src/features/chat/host/host-composer.tsx:599
 msgid "Queue"
 msgstr "Queue"
 
@@ -24697,16 +24699,16 @@ msgstr "Queue message — sends when the current reply finishes"
 msgid "Queued"
 msgstr "Queued"
 
-#: src/features/chat/host/host-composer.tsx:313
-#: src/features/chat/thread/composer-prompt-queue.tsx:430
+#: src/features/chat/host/host-composer.tsx:322
+#: src/features/chat/thread/composer-prompt-queue.tsx:597
 msgid "Queued messages"
 msgstr "Queued messages"
 
-#: src/features/chat/host/host-composer.tsx:818
+#: src/features/chat/host/host-composer.tsx:828
 msgid "Queued messages go out in order once the reply ends."
 msgstr "Queued messages go out in order once the reply ends."
 
-#: src/features/chat/host/host-composer.tsx:316
+#: src/features/chat/host/host-composer.tsx:325
 msgid "Queued messages: {queuedTotal}"
 msgstr "Queued messages: {queuedTotal}"
 
@@ -25555,7 +25557,7 @@ msgstr "Remember me"
 
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:195
 #: ../../packages/ui/src/components/combobox.tsx:304
-#: src/features/chat/host/host-composer.tsx:792
+#: src/features/chat/host/host-composer.tsx:802
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
 #: src/features/chat/thread/composer-input.tsx:331
@@ -25742,11 +25744,11 @@ msgid "Remove provider?"
 msgstr "Remove provider?"
 
 #. placeholder {0}: index + 1
-#: src/features/chat/host/host-composer.tsx:778
+#: src/features/chat/host/host-composer.tsx:788
 msgid "Remove queued message {0}"
 msgstr "Remove queued message {0}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:281
+#: src/features/chat/thread/composer-prompt-queue.tsx:340
 msgid "Remove queued message {position}"
 msgstr "Remove queued message {position}"
 
@@ -26242,7 +26244,7 @@ msgstr "Retrieval: hit {0} · MRR {1} · precision {2} · recall {3}"
 msgid "retry"
 msgstr "retry"
 
-#: src/features/chat/host/host-composer.tsx:807
+#: src/features/chat/host/host-composer.tsx:817
 #: src/features/chat/thread/chat-error.tsx:56
 #: src/features/chat/thread/request-secret-prompt.tsx:476
 #: src/features/chat/translation/message-translation.tsx:88
@@ -26777,7 +26779,7 @@ msgstr "Saudi Arabia"
 #: src/features/auth/components/settings/security/change-email-card.tsx:133
 #: src/features/auth/components/settings/security/change-password-card.tsx:244
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
-#: src/features/chat/host/host-composer.tsx:733
+#: src/features/chat/host/host-composer.tsx:743
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread/edit-composer.tsx:165
@@ -27611,7 +27613,7 @@ msgstr "Semi-realistic model with good prompt adherence"
 msgid "Semi-realistic visual style"
 msgstr "Semi-realistic visual style"
 
-#: src/features/chat/host/host-composer.tsx:584
+#: src/features/chat/host/host-composer.tsx:594
 #: src/features/sub-agents/components/worker-composer.tsx:104
 msgid "Send"
 msgstr "Send"
@@ -27688,8 +27690,8 @@ msgstr "Send Message Behavior"
 msgid "Send messages to the AI bot via Telegram. Conversations appear as threads in your chat list."
 msgstr "Send messages to the AI bot via Telegram. Conversations appear as threads in your chat list."
 
-#: src/features/chat/host/host-composer.tsx:762
-#: src/features/chat/thread/composer-prompt-queue.tsx:438
+#: src/features/chat/host/host-composer.tsx:772
+#: src/features/chat/thread/composer-prompt-queue.tsx:616
 msgid "Send next"
 msgstr "Send next"
 
@@ -29344,7 +29346,7 @@ msgstr "Starting import..."
 msgid "Starting test drive…"
 msgstr "Starting test drive…"
 
-#: src/features/chat/host/host-composer.tsx:677
+#: src/features/chat/host/host-composer.tsx:687
 msgid "Starting the agent on your computer. A message you send now goes out once it is up."
 msgstr "Starting the agent on your computer. A message you send now goes out once it is up."
 
@@ -29416,7 +29418,7 @@ msgstr "Steer — the current reply reads this at its next step"
 msgid "Steer the reply"
 msgstr "Steer the reply"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:262
+#: src/features/chat/thread/composer-prompt-queue.tsx:301
 msgid "Steering:"
 msgstr "Steering:"
 
@@ -29464,7 +29466,7 @@ msgstr "Stocks"
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/chat/host/host-composer.tsx:878
+#: src/features/chat/host/host-composer.tsx:888
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:316
@@ -30904,7 +30906,7 @@ msgstr "That message is too long to send from here."
 msgid "That passcode is not right."
 msgstr "That passcode is not right."
 
-#: src/features/chat/host/host-composer.tsx:652
+#: src/features/chat/host/host-composer.tsx:662
 msgid "That request is no longer waiting."
 msgstr "That request is no longer waiting."
 
@@ -31029,7 +31031,7 @@ msgstr "The change is too large to show in full."
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "The chat agent works the task with its tools, optionally following a skill."
 
-#: src/features/chat/host/host-composer.tsx:805
+#: src/features/chat/host/host-composer.tsx:815
 msgid "The chat's state could not be read, so queued messages wait."
 msgstr "The chat's state could not be read, so queued messages wait."
 
@@ -31257,7 +31259,7 @@ msgstr "The last deletion request failed. You can request it again."
 msgid "the last time"
 msgstr "the last time"
 
-#: src/features/chat/host/host-composer.tsx:687
+#: src/features/chat/host/host-composer.tsx:697
 msgid "The last turn stopped before it finished."
 msgstr "The last turn stopped before it finished."
 
@@ -31387,7 +31389,7 @@ msgstr "The prompt becomes the case input and this answer the expected answer. E
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 
-#: src/features/chat/host/host-composer.tsx:813
+#: src/features/chat/host/host-composer.tsx:823
 msgid "The queue is paused. Send next to go on with the queued messages."
 msgstr "The queue is paused. Send next to go on with the queued messages."
 
@@ -31411,7 +31413,7 @@ msgstr "The reply is still running. Add it when the reply finishes."
 msgid "The reply is still running. Try again when it finishes."
 msgstr "The reply is still running. Try again when it finishes."
 
-#: src/features/chat/host/host-composer.tsx:278
+#: src/features/chat/host/host-composer.tsx:287
 msgid "The reply stopped, but the stop did not reach the computer, so the agent may still be running. Send next once it has stopped."
 msgstr "The reply stopped, but the stop did not reach the computer, so the agent may still be running. Send next once it has stopped."
 
@@ -32060,7 +32062,7 @@ msgstr "This removes the model files from your computer. You can pull it again l
 msgid "This repository was not found."
 msgstr "This repository was not found."
 
-#: src/features/chat/host/host-composer.tsx:133
+#: src/features/chat/host/host-composer.tsx:142
 msgid "This request was too long to show whole. You can decline it here; to allow it, answer on your computer."
 msgstr "This request was too long to show whole. You can decline it here; to allow it, answer on your computer."
 
@@ -32092,7 +32094,7 @@ msgstr "This server's address changed. Check the address below and save again."
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
 msgstr "This server's registry entry asks for the values below. They fill in the URL and headers."
 
-#: src/features/chat/host/host-composer.tsx:682
+#: src/features/chat/host/host-composer.tsx:692
 #: src/features/chat/host/host-send-errors.ts:19
 msgid "This session has ended. Start a new one from the desktop app."
 msgstr "This session has ended. Start a new one from the desktop app."
@@ -32129,7 +32131,7 @@ msgstr "This sub-agent run is no longer available."
 msgid "This task has not run yet."
 msgstr "This task has not run yet."
 
-#: src/features/chat/host/host-composer.tsx:722
+#: src/features/chat/host/host-composer.tsx:732
 msgid "This text is only hidden characters, so there is nothing to save."
 msgstr "This text is only hidden characters, so there is nothing to save."
 
