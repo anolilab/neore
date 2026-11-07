@@ -802,7 +802,8 @@ const runChatStartOnShard = async (
 
     // The config every round of a goal runs with, checked against what `startGoal` accepts BEFORE the turn is charged
     // and saved: an ordinary send tolerates any `researchDepth` and longer lists, a goal does not.
-    const goalSkill = body.goal === undefined || !body.prompt ? null : parseSkillCommand(body.prompt);
+    // A held guest note never selects a skill: its goal rounds run without one, whatever prompt the client sent alongside it.
+    const goalSkill = body.goal === undefined || !body.prompt || guestNote ? null : parseSkillCommand(body.prompt);
     const goalConfig =
         body.goal === undefined
             ? undefined
