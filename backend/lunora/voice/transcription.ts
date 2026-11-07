@@ -20,6 +20,7 @@ import { internal } from "../_generated/internal";
 import { isPlatformAdmin } from "../chat/lib/daily-limit";
 import { authAction, rateLimit } from "../lib/crpc";
 import { assertOk, fetchWithDeadline } from "../lib/fetch-timeout";
+import { logger } from "../lib/logger";
 import { getRateLimitKey, getUserTier } from "../lib/rate-limiter";
 import { gatewayFetch, SERVICE_ORIGIN } from "../lib/services";
 
@@ -39,6 +40,8 @@ const CLIP_BYTES_PER_SECOND = 4000;
 /** The seconds charged up front: the stated length, or what the size implies when that is more. */
 export const chargedSeconds = (audioBase64Length: number, durationMs: number): number =>
     Math.max(Math.ceil(durationMs / 1000), Math.ceil((audioBase64Length * 3) / 4 / CLIP_BYTES_PER_SECOND));
+
+const voiceLogger = logger.scope("voice");
 
 /** Above the gateway's own 45s provider deadline. */
 const TRANSCRIPTION_TIMEOUT_MS = 50_000;
@@ -108,6 +111,8 @@ export const transcribeClip = authAction
             try {
                 await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { count: extra, identifier: userId, key: dailyKey, reserve: true });
             } catch (error) {
+                // The rate limiter's error: no audio, text or user id in it.
+                voiceLogger.error("Could not book the measured transcription seconds", { error, extra });
                 ctx.log.event("voice.transcribe_post_charge_failed", { error: error instanceof Error ? error.message : String(error), extra });
             }
         }
