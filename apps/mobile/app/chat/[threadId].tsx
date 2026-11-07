@@ -447,14 +447,14 @@ const Chat = () => {
             getClient().setAuthToken(jwt);
 
             // Nothing is held back for later: a send that finds the app offline is refused, not queued.
-            const started = await requireOnline({ isOffline: sendControl.disabled }, () =>
+            const sendChat = () =>
                 startChat({
                     body: { model: DEFAULT_CHAT_MODEL, prompt, threadId },
                     fetch,
                     gatewayUrl: config.gatewayUrl,
                     jwt,
-                }),
-            );
+                });
+            const started = await requireOnline({ isOffline: sendControl.disabled }, sendChat);
 
             setThreadId(started.threadId);
             // The prompt is complete once the server has accepted it, whether or not the screen's next read succeeds.
@@ -541,18 +541,17 @@ const Chat = () => {
         updateIsAtEnd();
     };
 
-    const olderHeader =
-        olderCursor === null ? undefined : (
-            <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ busy: isLoadingOlder, disabled: isLoadingOlder }}
-                disabled={isLoadingOlder}
-                onPress={loadOlder}
-                style={{ padding: 12 }}
-            >
-                <Text style={{ textAlign: "center" }}>{isLoadingOlder ? "Loading older messages..." : "Load older messages"}</Text>
-            </Pressable>
-        );
+    const olderHeader = olderCursor !== null && (
+        <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ busy: isLoadingOlder, disabled: isLoadingOlder }}
+            disabled={isLoadingOlder}
+            onPress={loadOlder}
+            style={{ padding: 12 }}
+        >
+            <Text style={{ textAlign: "center" }}>{isLoadingOlder ? "Loading older messages..." : "Load older messages"}</Text>
+        </Pressable>
+    );
 
     /** Opens the system share sheet. Cancelling resolves normally, so a rejection is a failure to open it. */
     const shareRow = async (text: string): Promise<void> => {
@@ -591,7 +590,7 @@ const Chat = () => {
                         data={rows}
                         estimatedItemSize={72}
                         keyExtractor={(row) => row.id}
-                        ListHeaderComponent={olderHeader}
+                        ListHeaderComponent={olderHeader || undefined}
                         onContentSizeChange={(_width, height) => {
                             metrics.current = { ...metrics.current, contentHeight: height };
                             updateIsAtEnd();
@@ -627,7 +626,7 @@ const Chat = () => {
                             );
                         }}
                     />
-                    {shouldShowScrollToLatest({ isScrolledToEnd: isAtEnd, isStreaming: sending }) ? (
+                    {Boolean(shouldShowScrollToLatest({ isScrolledToEnd: isAtEnd, isStreaming: sending })) && (
                         <Pressable
                             accessibilityLabel={scrollToLatestLabel(sending)}
                             accessibilityRole="button"
@@ -649,13 +648,13 @@ const Chat = () => {
                         >
                             <Text style={{ fontWeight: "600" }}>{scrollToLatestText(sending)}</Text>
                         </Pressable>
-                    ) : null}
+                    )}
                 </View>
-                {error ? (
+                {Boolean(error) && (
                     <Text accessibilityRole="alert" style={{ color: "#b00020", padding: 12 }}>
                         {error}
                     </Text>
-                ) : null}
+                )}
                 <View style={{ flexDirection: "row", gap: 8, padding: 12, paddingBottom: sendReason ? 12 : 12 + safeBottom }}>
                     <TextInput
                         accessibilityHint={composer.reason}
