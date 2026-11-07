@@ -1230,6 +1230,10 @@ export const createTemporaryThread = internalMutation
             await ctx.db.patch("threads", args.threadId, { isTemporary: true });
         }
 
+        // A temporary chat takes no guest posts: a link already given out would look live and refuse every post, so it is withdrawn
+        // with the notes on it, as archiving does.
+        await revokeGuestLinksForThread(ctx, args.threadId);
+
         return null;
     });
 
