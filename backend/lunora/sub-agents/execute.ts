@@ -6,8 +6,10 @@
  *
  * On the jobs queue (at-least-once): the run claims its row first
  * (`claimRun`), so only one delivery ever runs it, and reports once at the end
- * (`completeRun`), which posts once. A delivery killed mid-run leaves the row
- * `running` until the reaper fails it. A run the owner cancels is ended by
+ * (`completeRun`), which posts once. A delivery killed mid-run is refused on
+ * redelivery by the claim, so the loop beats once a minute while it lives
+ * (`beatRun`), and the watch (`watchRunBeat`) fails a run whose beat stopped as
+ * interrupted; the reaper bounds every run. A run the owner cancels is ended by
  * `cancelRun` at once; this loop sees it between steps (`shouldRunStop`) and
  * stops, and its own `completeRun` then finds the run already ended. Enqueued from the parent run's shard —
  * the owner's — so the child thread, its messages and the post-back all live
@@ -21,6 +23,7 @@ import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
+import { RUN_BEAT_MS } from "../chat/lib/interrupted-run";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
 import { isTaskModelAllowed } from "../tasks/logic";
 import {
@@ -47,6 +50,12 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
     }
 
     const { userId } = claim;
+    // A beat that does not land is not fatal (the next one may), but a loop that stops beating is read as dead.
+    const beat = setInterval(() => {
+        ctx.runMutation(internal.sub_agents.functions.beatRun, { runId }).catch((error: unknown) => {
+            console.warn(`[SubAgent] Run ${runId}: a heartbeat failed:`, error);
+        });
+    }, RUN_BEAT_MS);
 
     try {
         const skillRun = claim.skillSlug
@@ -142,5 +151,7 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
         const message = error instanceof SubAgentRunError ? error.message : toUserFacingError(error, { customEndpoint: false });
 
         await ctx.runMutation(internal.sub_agents.functions.completeRun, { outcome: { error: message, kind: "failed" }, runId });
+    } finally {
+        clearInterval(beat);
     }
 });

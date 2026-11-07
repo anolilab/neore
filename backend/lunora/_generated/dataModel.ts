@@ -1585,6 +1585,7 @@ export interface Doc_streamingMessages {
 export interface Doc_subAgentRuns {
     _id: Id<"subAgentRuns">;
     _creationTime: number;
+    beatAt?: number;
     childThreadId?: string;
     clientId?: string;
     completedAt?: number;
@@ -4589,6 +4590,7 @@ export interface Insert_streamingMessages {
 export interface Insert_subAgentRuns {
     _id?: Id<"subAgentRuns">;
     _creationTime?: number;
+    beatAt?: number;
     childThreadId?: string;
     clientId?: string;
     completedAt?: number;

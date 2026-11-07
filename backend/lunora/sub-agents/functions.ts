@@ -59,18 +59,22 @@ import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount } from "../tasks/acco
 import { isTaskModelAllowed } from "../tasks/logic";
 import { threadGateOutcome, throwUnlessGranted } from "../chat/lib/thread-gate";
 import { MAX_LENGTH } from "../lib/validators";
+import { RUN_STALE_MS } from "../chat/lib/interrupted-run";
 import { HOST_SESSION_BUSY_RETRY_MS, HOST_START_MAX_ATTEMPTS, hostRunActivity, hostStartRetryDelayMs, sendHostRunTurn } from "./host-runs";
 
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import {
+    beatWatchDecision,
     buildResultMessage,
     resultContent,
     DISPATCH_SOURCES,
     type DispatchSource,
     dispatchSourceProblem,
     distinctChildCount,
+    INTERRUPTED_RUN_MESSAGE,
     intersectWithLeadTools,
     isActiveSubAgentStatus,
+    isLoopLive,
     isWorkerLoopLive,
     nextQueuedWorkerRun,
     normalizeToolAllowlist,
@@ -1032,6 +1036,15 @@ export const claimRun = internalMutation
             return null;
         }
 
+        // The claim's own time, which the watch is tied to (`claimQueuedRun` returns the row as it was before).
+        const claimed = await ctx.db.get("subAgentRuns", run._id);
+        const claimedAt = claimed?.startedAt;
+
+        // This loop beats while it lives (`execute.ts`); the watch ends the run within minutes once it stops.
+        if (claimedAt !== undefined) {
+            await ctx.scheduler.runAfter(RUN_STALE_MS, internal.sub_agents.functions.watchRunBeat, { claimedAt, runId: run._id });
+        }
+
         const worker = run.mode === "worker" && run.childThreadId ? await ctx.db.get("threads", run.childThreadId as Id<"threads">) : null;
 
         return {
@@ -1394,6 +1407,55 @@ export const reapSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
         await finishRunFromLoop(ctx, runId, { error: WORKER_STALE_MESSAGE, kind: "failed" });
     }
 };
+
+/** The loop's heartbeat, once a minute from `execute.ts`. Only a live loop beats; a beat after its end writes nothing. */
+export const beatSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, now: number): Promise<void> => {
+    const run = await ctx.db.get("subAgentRuns", runId);
+
+    if (run && isLoopLive(run)) {
+        await patchById(ctx.db, "subAgentRuns", run._id, { beatAt: now });
+    }
+};
+
+export const beatRun = internalMutation
+    .input({ runId: v.id("subAgentRuns") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await beatSubAgentRun(ctx, args.runId, ctx.now);
+
+        return null;
+    });
+
+/**
+ * Scheduled at a cloud run's claim ({@link claimRun}), and again while its loop beats: a loop that stopped beating died
+ * with its worker ({@link beatWatchDecision}). A running run then fails as interrupted, which frees its fan-out slot and
+ * tells the lead at once instead of at the reaper's deadline; a worker run stopped while running lets the worker's next
+ * message go. Tied to the claim, like the worker reaper.
+ */
+export const watchSubAgentRunBeat = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, claimedAt: number, now: number): Promise<void> => {
+    const run = await ctx.db.get("subAgentRuns", runId);
+
+    if (!run || run.startedAt !== claimedAt) {
+        return;
+    }
+
+    const decision = beatWatchDecision({ now, run });
+
+    if (decision.kind === "later") {
+        await ctx.scheduler.runAfter(decision.delayMs, internal.sub_agents.functions.watchRunBeat, { claimedAt, runId });
+    } else if (decision.kind === "dead") {
+        await finishRunFromLoop(ctx, run._id, { error: INTERRUPTED_RUN_MESSAGE, kind: "failed" });
+    }
+};
+
+export const watchRunBeat = internalMutation
+    .input({ claimedAt: v.number(), runId: v.id("subAgentRuns") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await watchSubAgentRunBeat(ctx, args.runId, args.claimedAt, ctx.now);
+
+        return null;
+    });
 
 export const reapRun = internalMutation
     .input({ claimedAt: v.optional(v.number()), runId: v.id("subAgentRuns") })

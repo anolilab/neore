@@ -23099,6 +23099,12 @@
     "subAgentRuns": {
       "commitOrdered": false,
       "fields": {
+        "beatAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "childThreadId": {
           "kind": "string",
           "nullable": false,
