@@ -1068,8 +1068,9 @@ const ComposerInput = ({
 
                 const { mounted, threadId: currentThreadId } = composerStateRef.current;
 
+                // Only the command goes: an attachment or reference added while the reset was written stays.
                 if (clearsDraftAfterReset({ currentThreadId, draft: useChatUIStore.getState().composerText, mounted, startedThreadId })) {
-                    clear();
+                    setText("");
                 }
             };
 
@@ -1147,6 +1148,7 @@ const ComposerInput = ({
         threadId,
         compactThread,
         clearThreadContext,
+        setText,
     ]);
 
     // "Send as a new chat" from outside the chat UI (the native shell's Quick

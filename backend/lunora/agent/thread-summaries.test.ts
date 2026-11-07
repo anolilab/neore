@@ -147,6 +147,46 @@ afterEach(() => {
 });
 
 describe("making a summary", () => {
+    it("stores an idle summary of the turns after a /clear, though a compaction from before it covers the path", async () => {
+        expect.assertions(2);
+
+        await seedThread(ROWS);
+        // A compaction of the early turns, made before the clear.
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("threadContextSummaries", {
+                    coveredCount: 20,
+                    coveredUpToMessageId: rowIds[19],
+                    createdAt: Date.now(),
+                    kind: "compact",
+                    summary: "before the clear",
+                    taintedBy: [],
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+        await harness.run(async (ctx: any) => await clearContextRowHandler(ctx, { clientId: "clear-idle", threadId: threadId as never, userId: OWNER }));
+
+        const resetOrder = await harness.run(async (ctx: any) => {
+            const thread = await ctx.db.get("threads", threadId);
+            const reset = await ctx.db.get("messages", thread.contextResetMessageId);
+
+            return reset.order;
+        });
+        let last = "";
+
+        for (let index = 0; index < ROWS; index += 1) {
+            last = await insertRow(index, { order: resetOrder + 1 + Math.floor(index / 2) });
+        }
+
+        await runJob(last);
+
+        const stored = await summaries();
+
+        expect(generateText).toHaveBeenCalledOnce();
+        expect(stored.map((row) => row.summary)).toContain("The user is planning a trip.");
+    });
+
     it("summarises the rows falling out of the window once the thread has been idle, and stores one row", async () => {
         expect.assertions(5);
 

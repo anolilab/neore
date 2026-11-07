@@ -439,7 +439,10 @@ const compactionOnIdlePath = async (
     const tips = [await leafOf(ctx, thread, latest), await getThreadRow(ctx, thread._id, coveredId)];
 
     for (const tip of tips) {
-        const onPath = tip ? await summariesOnPath(ctx, thread._id, tip, compactions, SUMMARY_MAX_PATH_ROWS) : [];
+        // A compaction from before a context reset (`/clear`) is not read after it, so it cannot be outranked either: the
+        // idle summary made after the reset is stored, as the reader would read it.
+        const reset = tip ? await resetForTip(ctx, thread, tip) : null;
+        const onPath = tip ? await summariesOnPath(ctx, thread._id, tip, compactions, SUMMARY_MAX_PATH_ROWS, reset) : [];
 
         if (onPath.length > 0) {
             return true;
