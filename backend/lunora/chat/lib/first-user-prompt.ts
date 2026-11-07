@@ -28,6 +28,13 @@ const isTextPart = (part: unknown): part is { text: string; type: "text" } =>
     typeof part === "object" && part !== null && "type" in part && part.type === "text" && "text" in part && typeof part.text === "string";
 
 /** A browser page the extension attached carries its structural marker; the marker is what says it is not typed. */
+/** Whether a text part is the placeholder sent for a file with no question ({@link fileOnlyPromptPart}), known by its tag, not its wording. */
+const isFileOnlyPlaceholder = (part: unknown): boolean => {
+    const options = (part as { providerOptions?: { neore?: { fileOnlyPrompt?: unknown } } }).providerOptions;
+
+    return options?.neore?.fileOnlyPrompt === true;
+};
+
 const hasPageMarker = (part: unknown): boolean => {
     const options = (part as { providerOptions?: { neore?: { pageContext?: unknown } } }).providerOptions;
 
@@ -47,7 +54,8 @@ function* pieces(content: unknown): Generator<Piece> {
     }
 
     for (const part of content) {
-        if (isTextPart(part)) {
+        // The placeholder sent for a file with no question is neither typed nor attached text.
+        if (isTextPart(part) && !isFileOnlyPlaceholder(part)) {
             yield { text: part.text, whole: hasPageMarker(part) };
         }
     }
@@ -131,6 +139,17 @@ export const capTitlePrompt = (text: string): string => {
 export const FILE_ONLY_PROMPT = "Please analyze the uploaded file.";
 
 /**
+ * The text part a message carries when a file is sent with no question: {@link FILE_ONLY_PROMPT}, tagged so the title reader knows it
+ * for the placeholder it is. A person who types the same words gets an untagged part, read as their question.
+ */
+export const fileOnlyPromptPart = (): { providerOptions: { neore: { fileOnlyPrompt: true } }; text: string; type: "text" } => {
+    return { providerOptions: { neore: { fileOnlyPrompt: true } }, text: FILE_ONLY_PROMPT, type: "text" };
+};
+
+/** Whether a message's content holds the file-only placeholder. */
+const hasFileOnlyPlaceholder = (content: unknown): boolean => Array.isArray(content) && content.some((part) => isFileOnlyPlaceholder(part));
+
+/**
  * The first user message on a context window that has any text: its text, trimmed and capped, and the id of the message it came
  * from. The person's typed question is the title's subject; attached document or page text is used only when the message has no
  * question. Returns `undefined` when the window holds no user text (a thread that only has tool output, nothing yet, or whitespace).
@@ -141,9 +160,12 @@ export const firstUserPrompt = (rows: ReadonlyArray<ContextRow>): { id: string |
             continue;
         }
 
-        // The text sent for a file with no question is not a question: the attached text is the subject, when there is any.
-        const typed = textWanted(row.message.content, "typed");
-        const text = (typed === FILE_ONLY_PROMPT ? "" : typed) || textWanted(row.message.content, "attached") || typed;
+        // The placeholder sent for a file with no question is not a question: the attached text is the subject, and the placeholder is
+        // used only when the message has nothing else.
+        const text =
+            textWanted(row.message.content, "typed") ||
+            textWanted(row.message.content, "attached") ||
+            (hasFileOnlyPlaceholder(row.message.content) ? FILE_ONLY_PROMPT : "");
 
         if (text) {
             return { id: row._id, text: capTitlePrompt(text) };

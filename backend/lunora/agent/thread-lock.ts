@@ -98,7 +98,7 @@ export const enableThreadLock = authMutation
         }
 
         // A title model request for this chat is being sent while it is still unlocked: the lock waits for it, so no prompt of a locked
-        // chat ever reaches a model (`agent/thread-title.ts`). The request is answered within seconds.
+        // chat ever reaches a title model (`agent/thread-title.ts`). The request is answered within seconds.
         if (await titleDispatchInFlight(context, threadId)) {
             throw new LunoraError("CONFLICT", "A title is being generated for this chat. Try again in a moment.");
         }
