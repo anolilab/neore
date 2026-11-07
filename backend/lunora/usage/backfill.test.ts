@@ -794,6 +794,47 @@ describe("project backfill", () => {
         expect(await projectRows()).toStrictEqual(filedWhileMember);
     });
 
+    it("never files a thread under another project after access to its own was revoked mid-walk", async () => {
+        const orgProject = await harness.run(
+            async (ctx: any) => await ctx.db.insert("projects", { createdAt: DAY_1, organizationId: "org_1", title: "Org", userId: "teammate" }),
+        );
+        const own = await insertProject("Own");
+        const membership = await harness.run(
+            async (ctx: any) => await ctx.db.insert("member", { createdAt: 0, organizationId: "org_1", role: "member", userId: USER }),
+        );
+        // Three steps' worth of rows: the walk stops part-way through the thread twice.
+        const long = await insertThread(
+            DAY_1,
+            Array.from({ length: (BACKFILL_ROWS_PER_STEP * 3) / 2 }, () => [prompt(), reply(1, 10)]),
+            "active",
+            orgProject,
+        );
+
+        vi.setSystemTime(STARTED);
+        await start();
+
+        for (let current = await state(); current.status !== "done"; current = await state()) {
+            await step(current.runId);
+        }
+
+        const walking = await state();
+
+        await projectStep(walking.projects.runId);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.delete("member", membership);
+        });
+        await projectStep(walking.projects.runId);
+        // Moved into a project the user can open before the walk reaches the rest of it.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", long.threadId, { projectId: own });
+        });
+        await drain();
+
+        const rows = await projectRows();
+
+        expect(rows.filter((row) => row.projectKey === own)).toStrictEqual([]);
+    });
+
     it("starts the project walk only once the first walk is done, from the first walk's cutoff", async () => {
         const { alpha, beta } = await insertProjectFixture();
 

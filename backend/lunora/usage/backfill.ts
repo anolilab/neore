@@ -303,6 +303,9 @@ const readCompleteRows = async (
 /** One step of a walk from `position`: what it counts, and where the next step starts. */
 const walk = async <I>(ctx: MutationCtx, userId: string, position: Position, pass: WalkPass<I>): Promise<StepResult<I>> => {
     let { lastOrder, threadCursor, threadId } = position;
+    // The project the thread was in when the walk began it (kept with the position, so a thread moved mid-walk is not
+    // split), and `thread`: that project when the user can open it now, checked on every step.
+    let walkedProjectKey: string | undefined;
     let thread: Attribution = {};
     const increments: I[] = [];
     const keys: string[] = [];
@@ -310,14 +313,12 @@ const walk = async <I>(ctx: MutationCtx, userId: string, position: Position, pas
     let threadsStarted = 0;
 
     if (threadId !== undefined && pass.skipThread) {
-        // A position saved before the project was kept with it reads the thread's project now.
-        // A resumed thread keeps the project it was in when the walk began it, checked again: access revoked since
-        // files none of the rest.
-        thread = await readableAttribution(
-            ctx,
-            position.threadProjectKey === undefined ? await threadProject(ctx, threadId) : { projectKey: position.threadProjectKey },
-            userId,
-        );
+        // A resumed thread keeps the project it was in when the walk began it, checked again: access revoked since files
+        // none of the rest, and it is never filed under another project.
+        const resumed = position.threadProjectKey === undefined ? await threadProject(ctx, threadId) : { projectKey: position.threadProjectKey };
+
+        walkedProjectKey = resumed.projectKey;
+        thread = await readableAttribution(ctx, walkedProjectKey === undefined ? {} : { projectKey: walkedProjectKey }, userId);
     }
 
     while (budget > 0) {
@@ -334,7 +335,10 @@ const walk = async <I>(ctx: MutationCtx, userId: string, position: Position, pas
 
             ({ threadCursor, threadId } = next);
             // The project the user can open: the thread's own, or its lead's for a sub-agent's or worker's thread.
-            thread = pass.skipThread ? await readableAttribution(ctx, await threadProject(ctx, threadId, next), userId) : {};
+            const started = pass.skipThread ? await threadProject(ctx, threadId, next) : {};
+
+            walkedProjectKey = started.projectKey;
+            thread = walkedProjectKey === undefined ? {} : await readableAttribution(ctx, { projectKey: walkedProjectKey }, userId);
             lastOrder = undefined;
             threadsStarted += 1;
 
@@ -370,7 +374,7 @@ const walk = async <I>(ctx: MutationCtx, userId: string, position: Position, pas
             lastOrder,
             threadCursor,
             threadId,
-            ...(threadId !== undefined && thread.projectKey !== undefined && { threadProjectKey: thread.projectKey }),
+            ...(threadId !== undefined && walkedProjectKey !== undefined && { threadProjectKey: walkedProjectKey }),
         },
     };
 };
