@@ -19,6 +19,8 @@ const harness = vi.hoisted(() => {
         searchArgs: [] as unknown[],
         /** The thread rows the palette lists; a test may replace them. */
         threads: [{ _id: "thread-1", status: "active", title: "Alpha plan" }] as Record<string, unknown>[],
+        /** Whether the thread list has more pages than the palette loaded. */
+        hasMore: false,
     };
 });
 
@@ -107,7 +109,7 @@ vi.mock("@/features/chat/thread/message-list", () => {
 vi.mock("@/features/chat/core/hooks/use-all-threads-data", () => {
     return {
         default: () => {
-            return { lunora: harness.threads };
+            return { hasMore: harness.hasMore, lunora: harness.threads };
         },
     };
 });
@@ -145,6 +147,7 @@ vi.mock("@/features/layout/hooks/use-ui-state", () => {
 });
 
 const RESULT_TEXT = /alpha rollout date/;
+const LOADED_ONLY = /threads loaded here are filtered by state/;
 const BETA_TEXT = /beta cohort starts/;
 
 /** True when `later` comes after `earlier` in document order. */
@@ -324,6 +327,7 @@ describe("command palette state tags", () => {
             useCommandDialogStore.getState().close();
         });
         harness.threads = [{ _id: "thread-1", status: "active", title: "Alpha plan" }];
+        harness.hasMore = false;
         vi.useRealTimers();
     });
 
@@ -349,5 +353,31 @@ describe("command palette state tags", () => {
         });
 
         expect(screen.queryByText("Later plan")).toBeNull();
+    });
+
+    it("says a state tag covered only the loaded threads when the list has more, and says nothing when it has all", async () => {
+        harness.threads = [{ _id: "thread-w", status: "running", title: "Busy plan" }];
+        harness.hasMore = true;
+        const { unmount } = renderPalette();
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "#working" } });
+
+        expect(screen.getByText("Busy plan")).toBeTruthy();
+        expect(screen.getByText(LOADED_ONLY)).toBeTruthy();
+
+        // Without a tag, nothing is filtered by state, so there is nothing to qualify.
+        fireEvent.change(input, { target: { value: "Busy" } });
+        expect(screen.queryByText(LOADED_ONLY)).toBeNull();
+
+        unmount();
+        act(() => {
+            useCommandDialogStore.getState().close();
+        });
+        harness.hasMore = false;
+        renderPalette();
+        fireEvent.change(await openPalette(), { target: { value: "#working" } });
+
+        expect(screen.queryByText(LOADED_ONLY)).toBeNull();
     });
 });

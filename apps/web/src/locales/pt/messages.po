@@ -3645,7 +3645,7 @@ msgstr "Arquiva a conversa aberta, ou a desarquiva se já estiver arquivada ({0}
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
 #: src/components/command-palette.tsx:476
-#: src/components/command-palette.tsx:631
+#: src/components/command-palette.tsx:637
 #: src/features/chat/thread-list/thread-node.tsx:115
 msgid "Archive thread"
 msgstr "Arquivar conversa"
@@ -6036,8 +6036,8 @@ msgstr "Falha na limpeza"
 #: src/features/prompts/components/prompt-list.tsx:615
 #: src/features/settings/components/chat/api-keys-settings.tsx:401
 #: src/features/settings/components/chat/models-settings.tsx:477
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:376
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:370
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:379
 msgid "Clear"
 msgstr "Limpar"
 
@@ -6188,7 +6188,7 @@ msgstr ""
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
 #: ../../packages/ui/src/components/sheet.tsx:75
-#: src/components/command-palette.tsx:702
+#: src/components/command-palette.tsx:708
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:818
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
@@ -8638,7 +8638,7 @@ msgstr "Cuba"
 msgid "Currency Conversion"
 msgstr "Conversão de moeda"
 
-#: src/components/command-palette.tsx:627
+#: src/components/command-palette.tsx:633
 #: src/features/auth/components/settings/security/session-cell.tsx:80
 #: src/features/projects/components/move-to-project-dialog.tsx:84
 #: src/features/prompts/components/prompt-history-dialog.tsx:136
@@ -9475,7 +9475,7 @@ msgstr "Excluir este caso?"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
 #: src/components/command-palette.tsx:482
-#: src/components/command-palette.tsx:655
+#: src/components/command-palette.tsx:661
 #: src/features/chat/thread-list/thread-node.tsx:1019
 #: src/features/chat/thread-list/thread-node.tsx:1037
 #: src/features/pages/components/page-comments-panel.tsx:188
@@ -20083,7 +20083,7 @@ msgid "navigate"
 msgstr "navegar"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:110
-#: src/components/command-palette.tsx:688
+#: src/components/command-palette.tsx:694
 msgid "Navigate"
 msgstr "Navegar"
 
@@ -21066,7 +21066,7 @@ msgstr "Nenhum resultado encontrado"
 msgid "No results found for “{searchTerm}”"
 msgstr "Nenhum resultado encontrado para “{searchTerm}”"
 
-#: src/components/command-palette.tsx:610
+#: src/components/command-palette.tsx:616
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "No results found."
 msgstr "Nenhum resultado encontrado."
@@ -21403,8 +21403,8 @@ msgstr ""
 msgid "Not read yet."
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:342
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:347
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:345
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:350
 #: src/features/settings/components/privacy/data-access.tsx:36
 msgid "Not set"
 msgstr "Não definido"
@@ -21854,6 +21854,11 @@ msgstr ""
 msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "Só é possível comparar modelos do mesmo tipo. Limpe a seleção para trocar de tipo."
 
+#. placeholder {0}: allThreadsData.lunora.length
+#: src/components/command-palette.tsx:613
+msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
+msgstr "Apenas as {0} conversas carregadas aqui são filtradas por estado; as mais antigas não são incluídas."
+
 #: src/features/knowledge/hooks/use-knowledge-import.ts:156
 msgid "Only the first {MAX_DOCUMENTS_PER_IMPORT} documents were imported."
 msgstr "Apenas os primeiros {MAX_DOCUMENTS_PER_IMPORT} documentos foram importados."
@@ -21924,7 +21929,7 @@ msgid "Opacity"
 msgstr "Opacidade"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:679
-#: src/components/command-palette.tsx:694
+#: src/components/command-palette.tsx:700
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-view.tsx:73
 #: src/features/tasks/hooks/use-task-notifications.ts:30
@@ -23948,7 +23953,7 @@ msgstr "Pressione Enter para enviar, Shift+Enter para nova linha"
 msgid "Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default."
 msgstr "Pressione Escape para sair do modo de digitação e editar com h j k l, w b, 0 $, i a I A, o O, x, dd, D e u. Enter continua enviando. Desativado por padrão."
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:346
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:349
 msgid "Press keys..."
 msgstr "Pressione as teclas..."
 
@@ -25252,8 +25257,8 @@ msgstr "Reconectando ao servidor…"
 msgid "Reconnecting…"
 msgstr "Reconectando…"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:351
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:364
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:354
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
 msgid "Record"
 msgstr "Gravar"
 
@@ -26132,7 +26137,7 @@ msgid "Reset to defaults"
 msgstr "Restaurar padrões"
 
 #: src/features/settings/components/chat/models-settings.tsx:381
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:393
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:396
 msgid "Reset to Defaults"
 msgstr "Redefinir para o padrão"
 
@@ -26918,7 +26923,7 @@ msgstr "Salvar predefinição"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "Salve prompts de sistema reutilizáveis e vincule-os a modelos específicos. Use o botão Otimizar para refinar cada predefinição com o otimizador de prompts."
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:400
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:403
 msgid "Save Shortcuts"
 msgstr "Salvar atalhos"
 
@@ -26977,7 +26982,7 @@ msgstr "Salvo em \"{0}\""
 #: src/features/settings/components/chat/native-providers-settings.tsx:711
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:247
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:400
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:403
 #: src/features/slides/components/slide-editor-dialog.tsx:117
 msgid "Saving..."
 msgstr "Salvando..."
@@ -29531,8 +29536,8 @@ msgstr "Ações"
 #: src/features/chat/host/host-composer.tsx:890
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 #: src/features/develop/components/watched-repositories.tsx:86
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:351
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:364
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:354
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
 #: src/features/sub-agents/components/worker-stop-bar.tsx:56
 #: src/features/workflow/components/canvas/workflow-controls.tsx:618
@@ -33249,7 +33254,7 @@ msgid "unarchive"
 msgstr "desarquivar"
 
 #: src/components/command-palette.tsx:476
-#: src/components/command-palette.tsx:631
+#: src/components/command-palette.tsx:637
 #: src/features/chat/thread-list/thread-node.tsx:115
 msgid "Unarchive thread"
 msgstr "Desarquivar conversa"

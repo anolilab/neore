@@ -607,6 +607,12 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                 <Command filter={filterItem} items={groupedItems} onValueChange={setSearchInput}>
                     <CommandInput placeholder={t`Search threads, navigate, or perform actions...`} />
                     <CommandPanel>
+                        {/* A state tag filters the threads loaded here, one page of them: say so when there are more, so an empty or short list is not taken as complete. */}
+                        {stateFilter !== undefined && allThreadsData.hasMore && (
+                            <p className="text-muted-foreground px-3 pt-2 text-xs">
+                                {t`Only the ${allThreadsData.lunora.length} threads loaded here are filtered by state; older ones are not included.`}
+                            </p>
+                        )}
                         <CommandEmpty>{t`No results found.`}</CommandEmpty>
                         <CommandList>
                             {(group: Group, index: number) => (
