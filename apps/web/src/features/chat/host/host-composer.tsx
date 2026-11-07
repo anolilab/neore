@@ -404,7 +404,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
 
         const before = machineRef.current;
 
-        dispatch({ itemId: queuedId, type: "send" });
+        dispatch({ itemId: queuedId, requestId, type: "send" });
 
         // The machine refused it (another send is in flight, or the queue moved on since this send was decided): nothing is posted.
         if (machineRef.current === before) {

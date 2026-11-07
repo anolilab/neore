@@ -95,7 +95,11 @@ export interface HostQueueState {
     sent: ReadonlyArray<string>;
     /** Streams the session itself has reported live: once it has, a session read without one means that stream ended. */
     sessionSeen: ReadonlyArray<string>;
-    /** Queued messages a send was made for. One whose answer was lost may be the turn running now, so Send now never stops a turn for it. */
+
+    /**
+     * Send ids a send was made under, queued or direct. A queued message under one of them may be the turn running now (its
+     * answer was lost), so Send now never stops a turn for it.
+     */
     tried: ReadonlyArray<string>;
 }
 
@@ -131,7 +135,12 @@ export type HostQueueEvent =
      * `sessionLive` the session's own report of it, read in the same snapshot as `end`, the newest turn that ended.
      */
     | { end: HostTurnEnd | undefined; live: string | undefined; sessionLive?: string; starting: boolean; type: "observed" }
-    | { itemId: string | undefined; type: "send" }
+
+    /**
+     * `requestId` is the id the send goes under: a queued message's own id, or a direct send's, which a queued retry of its text
+     * takes over after a lost answer.
+     */
+    | { itemId: string | undefined; requestId?: string; type: "send" }
     /** `streamId` is the turn the send started (or, `duplicate`, the turn an earlier try of it started), when the answer names it. */
     | { duplicate?: boolean; itemId: string | undefined; streamId?: string; type: "accepted" }
     /** `live` is the turn the backend reports running after a fresh read, for a `turn_running` refusal. */
@@ -444,7 +453,7 @@ export const stepHostQueue = (state: HostQueueState, event: HostQueueEvent): Hos
                 state: {
                     ...state,
                     phase: { endedDuring: false, itemId: event.itemId, kind: "sending", seenLive: [] },
-                    tried: remember(state.tried, event.itemId),
+                    tried: remember(state.tried, event.requestId ?? event.itemId),
                     released: event.itemId !== undefined && event.itemId === state.released ? undefined : state.released,
                 },
             };

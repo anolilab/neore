@@ -596,6 +596,20 @@ describe("Send now", () => {
         expect(sendNowAction(ended, { itemId: "a", running: false })).toBe("release");
     });
 
+    it("does not stop a turn for a queued retry of a direct send whose answer was lost", () => {
+        // The retry is queued under the direct send's request id, which may be the turn running now.
+        const lost = run(
+            [
+                { itemId: undefined, requestId: "r1", type: "send" },
+                { error: "unreachable", itemId: undefined, live: undefined, type: "refused" },
+                observed("stream-r"),
+            ],
+            IDLE,
+        ).state;
+
+        expect(sendNowAction(lost, { itemId: "r1", running: true })).toBeUndefined();
+    });
+
     it("holds a released message again when a turn from elsewhere starts before it went", () => {
         const released = run([{ itemId: "b", type: "released" }], IDLE).state;
 
