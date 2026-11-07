@@ -196,7 +196,7 @@ export interface InternalApiTypes {
             endTitleDispatch: FunctionReference<"mutation", { claimedAt: number; requestId: string; threadId: Id<"threads"> }, null>;
             readTitlePrompt: FunctionReference<"query", { requestedBy: string; threadId: Id<"threads"> }, { outcome: "refused" } | { outcome: "none" } | { id?: string; outcome: "prompt"; text: string }>;
             recordTitleAnswer: FunctionReference<"mutation", { chargeKey: string; claimedAt: number; promptId?: string; title: string }, boolean>;
-            setGeneratedTitle: FunctionReference<"mutation", { expectedTitleDigest: string; promptId?: string; requestedBy?: string; threadId: Id<"threads">; title: string }, boolean>;
+            setGeneratedTitle: FunctionReference<"mutation", { chargeKey?: string; expectedTitleDigest: string; promptId?: string; requestedBy?: string; threadId: Id<"threads">; title: string }, boolean>;
         };
         threads: {
             _deletePageForThreadId: FunctionReference<"mutation", { cursor?: string; deltaCursor?: string; limit?: number; messagesDone?: boolean; streamOrder?: number; streamsDone?: boolean; threadId: Id<"threads"> }, {} & { cursor: string | null; isDone: boolean; }>;
