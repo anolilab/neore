@@ -122,8 +122,8 @@ const Composer = memo(
                                 "flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
                                 "focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:outline-none",
                                 shouldAutoContinue
-                                    ? "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
-                                    : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300",
+                                    ? "bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
+                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300",
                             )}
                             disabled={isDisabled}
                             onClick={() => onAutoContinueChange?.(!shouldAutoContinue)}
@@ -132,7 +132,7 @@ const Composer = memo(
                             <Zap aria-hidden="true" className={cn("size-3.5", shouldAutoContinue && "fill-current")} />
                             {t`Deep Work`}
                         </button>
-                        {shouldAutoContinue && <span className="text-[11px] text-amber-600 dark:text-amber-400/80">{t`Up to 25 iterations`}</span>}
+                        {shouldAutoContinue && <span className="text-[11px] text-amber-800 dark:text-amber-400">{t`Up to 25 iterations`}</span>}
                     </div>
                 )}
 
@@ -170,7 +170,7 @@ const Composer = memo(
                             "flex size-8 shrink-0 items-center justify-center rounded-xl transition-colors",
                             canSend
                                 ? "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800"
-                                : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-600",
+                                : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
                             "focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:outline-none",
                             "disabled:cursor-not-allowed",
                         )}
@@ -182,7 +182,7 @@ const Composer = memo(
                     </button>
                 </div>
 
-                <p className="mt-1.5 text-center text-[11px] text-gray-400 dark:text-gray-500">{t`Press Enter to send, Shift+Enter for new line`}</p>
+                <p className="mt-1.5 text-center text-[11px] text-gray-600 dark:text-gray-400">{t`Press Enter to send, Shift+Enter for new line`}</p>
             </div>
         );
     },

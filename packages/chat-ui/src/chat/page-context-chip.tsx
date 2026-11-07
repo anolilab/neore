@@ -50,9 +50,9 @@ const PageContextChip = ({ className, info, text }: PageContextChipProps) => {
     return (
         <div className={cn("w-full max-w-sm rounded-lg border border-gray-200 bg-white text-left text-xs dark:border-gray-700 dark:bg-gray-900", className)}>
             <div className="flex items-center gap-2 px-2.5 py-2">
-                <Globe aria-hidden="true" className="size-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                <Globe aria-hidden="true" className="size-4 shrink-0 text-gray-600 dark:text-gray-400" />
                 <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-1 text-[10px] font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
+                    <p className="flex items-center gap-1 text-[10px] font-medium tracking-wide text-gray-600 uppercase dark:text-gray-400">
                         {info.kind === "selection" && <TextQuote aria-hidden="true" className="size-3" />}
                         {label}
                     </p>
@@ -60,18 +60,18 @@ const PageContextChip = ({ className, info, text }: PageContextChipProps) => {
                         {info.title}
                     </p>
                     {href ? (
-                        <a className="block truncate text-gray-500 hover:underline dark:text-gray-400" href={href} rel="noopener noreferrer" target="_blank">
+                        <a className="block truncate text-gray-600 hover:underline dark:text-gray-400" href={href} rel="noopener noreferrer" target="_blank">
                             {hostOf(info.url)}
                         </a>
                     ) : (
-                        <p className="truncate text-gray-500 dark:text-gray-400">{info.url}</p>
+                        <p className="truncate text-gray-600 dark:text-gray-400">{info.url}</p>
                     )}
                 </div>
                 <button
                     aria-controls={panelId}
                     aria-expanded={isOpen}
                     aria-label={isOpen ? t`Hide attached content` : t`Show attached content`}
-                    className="flex size-6 shrink-0 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none dark:text-gray-400 dark:hover:bg-gray-800"
+                    className="flex size-6 shrink-0 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none dark:text-gray-400 dark:hover:bg-gray-800"
                     onClick={() => setIsOpen((open) => !open)}
                     type="button"
                 >
