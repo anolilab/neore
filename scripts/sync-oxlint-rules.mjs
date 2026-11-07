@@ -17,7 +17,7 @@
  * config picks its plugins from the current directory's package.json.
  */
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
@@ -161,10 +161,11 @@ const ignorePatterns = (linted) => {
         execFileSync("git", args, { cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28 })
             .split("\0")
             .filter(Boolean);
-    // Tracked symlinks too: oxlint follows them (into .agents/ from .claude/skills/), ESLint does not.
+    // Tracked symlinks to directories too: oxlint follows them (into .agents/ from .claude/skills/), ESLint does not.
     const symlinks = git("ls-files", "-z", "-s")
         .filter((entry) => entry.startsWith("120000 "))
-        .map((entry) => entry.slice(entry.indexOf("\t") + 1));
+        .map((entry) => entry.slice(entry.indexOf("\t") + 1))
+        .filter((path) => statSync(join(ROOT, path), { throwIfNoEntry: false })?.isDirectory());
     const tracked = [...git("ls-files", "-z", "--", ...LINTABLE), ...symlinks];
     const lintedDirs = new Set();
 
