@@ -19048,7 +19048,7 @@ msgstr "Message the agent on your computer"
 msgid "Message the worker"
 msgstr "Message the worker"
 
-#: src/features/sub-agents/components/worker-composer.tsx:101
+#: src/features/sub-agents/components/worker-composer.tsx:103
 msgid "Message the worker..."
 msgstr "Message the worker..."
 
@@ -27698,7 +27698,7 @@ msgid "Semi-realistic visual style"
 msgstr "Semi-realistic visual style"
 
 #: src/features/chat/host/host-composer.tsx:594
-#: src/features/sub-agents/components/worker-composer.tsx:104
+#: src/features/sub-agents/components/worker-composer.tsx:106
 msgid "Send"
 msgstr "Send"
 
