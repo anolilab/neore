@@ -17,7 +17,14 @@ __has1 = true;
 }
 if (typeof source["identifier"] !== "string") return DEFER;
 if (typeof source["key"] !== "string") return DEFER;
-return { ...(__has1 ? { "count": __val1 } : {}), "identifier": source["identifier"], "key": source["key"] };
+let __has2 = false;
+let __val2;
+if (source["reserve"] !== undefined) {
+if (typeof source["reserve"] !== "boolean") return DEFER;
+__val2 = source["reserve"];
+__has2 = true;
+}
+return { ...(__has1 ? { "count": __val1 } : {}), "identifier": source["identifier"], "key": source["key"], ...(__has2 ? { "reserve": __val2 } : {}) };
 });
 installCompiledValidatorMap(lunora_lib_rate_limiter_mutations_146.resetRateLimit.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;

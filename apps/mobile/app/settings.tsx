@@ -107,6 +107,14 @@ const SettingsScreen = () => {
 
     return (
         <ScrollView contentContainerStyle={{ gap: 12, padding: 16 }}>
+            <Text accessibilityRole="header" style={{ fontWeight: "600" }}>
+                Voice input
+            </Text>
+            <Text style={{ fontSize: 13 }}>
+                Hold the microphone button in a chat to speak your message. The recording leaves your phone: it is sent to the Neore servers and from there to a
+                speech-to-text provider, which turn it into text. The recording is not stored, and the text only goes into your draft. You decide whether to
+                send it.
+            </Text>
             <View style={{ alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" }}>
                 <Text style={{ flex: 1 }}>Reopen the last chat on launch</Text>
                 <Switch

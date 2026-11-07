@@ -835,6 +835,9 @@ export interface ApiTypes {
         speech: {
             synthesizeSpeech: FunctionReference<"action", { text: string; voice?: string }, { audio: string; mimeType: string }>;
         };
+        transcription: {
+            transcribeClip: FunctionReference<"action", { audio: string; durationMs: number }, { text: string }> & { readonly sensitive: true };
+        };
     };
     workflow: {
         executor: {
@@ -1707,6 +1710,9 @@ export const api: ApiTypes = {
         },
         speech: {
             synthesizeSpeech: { __lunoraRef: "voice_speech:synthesizeSpeech" },
+        },
+        transcription: {
+            transcribeClip: { __lunoraRef: "voice_transcription:transcribeClip", sensitive: true },
         },
     },
     workflow: {
