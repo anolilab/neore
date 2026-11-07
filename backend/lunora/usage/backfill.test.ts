@@ -65,11 +65,18 @@ const insertThread = async (
     orders: RowSpec[][],
     threadStatus = "active",
     projectId?: string,
+    organizationId?: string,
 ): Promise<{ rowIds: string[][]; threadId: string }> => {
     vi.setSystemTime(at);
 
     return await harness.run(async (ctx: any) => {
-        const threadId = await ctx.db.insert("threads", { status: threadStatus, title: "T", userId: USER, ...(projectId !== undefined && { projectId }) });
+        const threadId = await ctx.db.insert("threads", {
+            status: threadStatus,
+            title: "T",
+            userId: USER,
+            ...(projectId !== undefined && { projectId }),
+            ...(organizationId !== undefined && { organizationId }),
+        });
         const rowIds: string[][] = [];
 
         for (const [order, rows] of orders.entries()) {
@@ -716,5 +723,31 @@ describe("project backfill", () => {
 
         // 100 + 40 in projects, 7 in no project.
         expect([total, projects, total - projects]).toStrictEqual([147, 140, 7]);
+    });
+
+    it("files history of an organization's threads under it, and of its projects under both", async () => {
+        const orgProject = await harness.run(
+            async (ctx: any) => await ctx.db.insert("projects", { createdAt: DAY_1, organizationId: "org_1", title: "Org", userId: USER }),
+        );
+
+        await insertThread(DAY_1, [[prompt(), reply(10, 100)]], "active", orgProject);
+        await insertThread(DAY_1, [[prompt(), reply(1, 20)]], "active", undefined, "org_1");
+        await insertThread(DAY_1, [[prompt(), reply(1, 7)]]);
+        vi.setSystemTime(STARTED);
+        await start();
+        await drain();
+
+        const rows = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.usageDaily.findMany({ where: { organizationId: "org_1", userId: USER } });
+
+            return page
+                .map((row: any) => [row.skillKey, row.projectKey ?? null, row.costMicrodollars])
+                .toSorted((a: string[], b: string[]) => a[0]!.localeCompare(b[0]!));
+        });
+
+        expect(rows).toStrictEqual([
+            ["__organization__", null, 120],
+            ["__project__", orgProject, 100],
+        ]);
     });
 });

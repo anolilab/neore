@@ -56161,7 +56161,7 @@
                 "properties": {
                   "args": {
                     "properties": {
-                      "afterUserId": {
+                      "cursor": {
                         "type": "string"
                       },
                       "fromDate": {
@@ -56197,51 +56197,100 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "members": {
-                      "type": "number"
-                    },
-                    "nextCursor": {
+                    "cursor": {
                       "type": "string"
                     },
-                    "projects": {
-                      "items": {
-                        "properties": {
-                          "costMicrodollars": {
-                            "type": "number"
-                          },
-                          "replies": {
-                            "type": "number"
-                          },
-                          "tokens": {
-                            "type": "number"
-                          },
-                          "projectKey": {
-                            "type": "string"
-                          },
-                          "title": {
-                            "type": "string"
-                          }
+                    "result": {
+                      "properties": {
+                        "complete": {
+                          "type": "boolean"
                         },
-                        "required": [
-                          "costMicrodollars",
-                          "replies",
-                          "tokens",
-                          "projectKey",
-                          "title"
-                        ],
-                        "type": "object"
+                        "members": {
+                          "type": "number"
+                        },
+                        "noProject": {
+                          "properties": {
+                            "costMicrodollars": {
+                              "type": "number"
+                            },
+                            "replies": {
+                              "type": "number"
+                            },
+                            "tokens": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "costMicrodollars",
+                            "replies",
+                            "tokens"
+                          ],
+                          "type": "object"
+                        },
+                        "projects": {
+                          "items": {
+                            "properties": {
+                              "costMicrodollars": {
+                                "type": "number"
+                              },
+                              "replies": {
+                                "type": "number"
+                              },
+                              "tokens": {
+                                "type": "number"
+                              },
+                              "projectKey": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "costMicrodollars",
+                              "replies",
+                              "tokens",
+                              "projectKey"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "total": {
+                          "properties": {
+                            "costMicrodollars": {
+                              "type": "number"
+                            },
+                            "replies": {
+                              "type": "number"
+                            },
+                            "tokens": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "costMicrodollars",
+                            "replies",
+                            "tokens"
+                          ],
+                          "type": "object"
+                        },
+                        "truncated": {
+                          "type": "boolean"
+                        }
                       },
-                      "type": "array"
-                    },
-                    "truncated": {
-                      "type": "boolean"
+                      "required": [
+                        "complete",
+                        "members",
+                        "noProject",
+                        "projects",
+                        "total",
+                        "truncated"
+                      ],
+                      "type": "object"
                     }
                   },
-                  "required": [
-                    "members",
-                    "projects",
-                    "truncated"
-                  ],
+                  "required": [],
                   "type": "object"
                 }
               }

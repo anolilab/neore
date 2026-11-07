@@ -46,9 +46,9 @@ import { usageDailyCutoffDate } from "../gdpr/retention";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
 import { currentUserShard } from "../lib/shard-context";
-import type { ProjectIncrement, RollupIncrement } from "./activity-logic";
+import type { Attribution, AttributionIncrement, RollupIncrement } from "./activity-logic";
 import { projectFiledKey } from "./activity-logic";
-import { addToProjectRollup, addToRollup, isReplyRecorded, markReplyRecorded } from "./activity";
+import { addToAttributionRollup, addToRollup, attributionOf, isReplyRecorded, markReplyRecorded } from "./activity";
 import type { BackfillRow, BackfillWindow, ReplyGroup } from "./backfill-logic";
 import { backfillIncrement, completeOrders, groupReplies } from "./backfill-logic";
 
@@ -205,6 +205,7 @@ interface StepResult<I> {
 }
 
 interface WalkedThread {
+    organizationId?: string;
     projectId?: string;
     threadCursor: string;
     threadId: string;
@@ -215,8 +216,9 @@ interface WalkedThread {
  * undefined to leave it. `skipThread` lets a walk pass a thread without reading it.
  */
 interface WalkPass<I> {
-    count: (group: ReplyGroup, thread: { projectId?: string }) => Promise<I | undefined>;
-    skipThread?: (thread: { projectId?: string }) => boolean;
+    count: (group: ReplyGroup, thread: Attribution) => Promise<I | undefined>;
+    /** Set by a walk that needs each thread's attribution (read once per thread); it may then pass a thread unread. */
+    skipThread?: (thread: Attribution) => boolean;
 }
 
 /** The next thread to walk from `threadCursor`, and the cursor past it; undefined past the last one. */
@@ -240,14 +242,8 @@ const nextThread = async (ctx: DbCtx, userId: string, threadCursor: string | und
         threadCursor: threads.isDone || !threads.continueCursor ? THREADS_END : threads.continueCursor,
         threadId: next._id as string,
         ...(next.projectId && { projectId: next.projectId as string }),
+        ...(next.organizationId && { organizationId: next.organizationId }),
     };
-};
-
-/** The project of the thread a walk resumes in mid-way. */
-const projectOfThread = async (ctx: DbCtx, threadId: string): Promise<string | undefined> => {
-    const thread = await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } });
-
-    return thread?.projectId ?? undefined;
 };
 
 /** One read of a thread past `afterOrder`: the rows it can group now, the `order` it covers, and the rows it read. */
@@ -272,16 +268,14 @@ const readCompleteRows = async (
 /** One step of a walk from `position`: what it counts, and where the next step starts. */
 const walk = async <I>(ctx: DbCtx, userId: string, position: Position, pass: WalkPass<I>): Promise<StepResult<I>> => {
     let { lastOrder, threadCursor, threadId } = position;
-    let thread: { projectId?: string } = {};
+    let thread: Attribution = {};
     const increments: I[] = [];
     const keys: string[] = [];
     let budget = BACKFILL_ROWS_PER_STEP;
     let threadsStarted = 0;
 
     if (threadId !== undefined && pass.skipThread) {
-        const projectId = await projectOfThread(ctx, threadId);
-
-        thread = projectId === undefined ? {} : { projectId };
+        thread = await attributionOf(ctx, await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } }));
     }
 
     while (budget > 0) {
@@ -297,7 +291,7 @@ const walk = async <I>(ctx: DbCtx, userId: string, position: Position, pass: Wal
             }
 
             ({ threadCursor, threadId } = next);
-            thread = next.projectId === undefined ? {} : { projectId: next.projectId };
+            thread = pass.skipThread ? await attributionOf(ctx, next) : {};
             lastOrder = undefined;
             threadsStarted += 1;
 
@@ -426,7 +420,7 @@ export const runUsageProjectBackfillStep = internalMutation
         // total. A later one is in the total only if its live record landed, which nothing durable says once its key
         // is pruned, so it stays under "No project" rather than risk projects adding up to more than the total.
         const window = await windowFor(ctx, userId, Math.min(state.startedAt, position.startedAt), now);
-        const step = await walk<ProjectIncrement>(
+        const step = await walk<AttributionIncrement>(
             ctx,
             userId,
             { lastOrder: position.lastOrder, threadCursor: position.threadCursor, threadId: position.threadId },
@@ -435,7 +429,7 @@ export const runUsageProjectBackfillStep = internalMutation
                     const increment = backfillIncrement(group, window);
                     const key = group.rows[0]?._id;
 
-                    if (!increment || thread.projectId === undefined || key === undefined) {
+                    if (!increment || key === undefined || (thread.projectKey === undefined && thread.organizationId === undefined)) {
                         return undefined;
                     }
 
@@ -446,12 +440,12 @@ export const runUsageProjectBackfillStep = internalMutation
                     return {
                         costMicrodollars: increment.costMicrodollars,
                         date: increment.date,
-                        projectKey: thread.projectId,
                         replies: increment.replies,
                         tokens: increment.tokens,
+                        ...thread,
                     };
                 },
-                skipThread: (thread) => thread.projectId === undefined,
+                skipThread: (thread) => thread.projectKey === undefined && thread.organizationId === undefined,
             },
         );
 
@@ -459,7 +453,7 @@ export const runUsageProjectBackfillStep = internalMutation
             await markReplyRecorded(ctx, userId, projectFiledKey(key), now);
         }
 
-        await addToProjectRollup(ctx, userId, step.increments, now);
+        await addToAttributionRollup(ctx, userId, step.increments, now);
         await ctx.db.patch("usageBackfill", state._id, {
             projects: {
                 leaseUntil: now + BACKFILL_LEASE_MS,

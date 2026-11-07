@@ -8,7 +8,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import { getActivityHeatmap, getProjectBreakdown, getProjectUsage, getSkillBreakdown, recordReplyUsage } from "./activity";
 import { DEFAULT_SKILL_KEY } from "./activity-logic";
-import { isOrganizationAdminRole, memberProjectUsage } from "./organization";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -230,27 +229,5 @@ describe("usage by project", () => {
         const theirs = await projectBreakdown(OTHER, "2026-09-01");
 
         expect(theirs.projects).toStrictEqual([]);
-    });
-
-    it("gives the organization view one member's totals for the projects asked about", async () => {
-        const alpha = await insertThread(USER, "Alpha");
-        const beta = await insertThread(USER, "Beta");
-
-        await record({ costMicrodollars: 300, threadId: alpha.threadId });
-        await record({ costMicrodollars: 100, threadId: beta.threadId });
-
-        const result = await harness.run(
-            async (ctx: any) => await ctx.runQuery(memberProjectUsage, { fromDate: "2026-09-01", projectIds: [alpha.projectId], userId: USER }),
-        );
-
-        expect(result).toStrictEqual({ projects: [{ costMicrodollars: 300, projectKey: alpha.projectId, replies: 1, tokens: 10 }], truncated: false });
-    });
-});
-
-describe("isOrganizationAdminRole", () => {
-    it("reads each of a member's comma-separated roles", () => {
-        expect(isOrganizationAdminRole("admin,member")).toBe(true);
-        expect(isOrganizationAdminRole("member, owner")).toBe(true);
-        expect(isOrganizationAdminRole("member")).toBe(false);
     });
 });

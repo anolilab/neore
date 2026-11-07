@@ -1,59 +1,52 @@
 /**
  * The usage page's organization view reads its members a page at a time
- * (`usage_organization.getOrganizationProjectUsage`): each call sums one page of
- * members' shards. This adds the pages up. Pinned by `usage-organization.test.ts`.
+ * (`usage_organization.getOrganizationProjectUsage`): each call returns an
+ * opaque cursor to continue with, and the last one the organization's totals.
+ * This follows the cursor. Pinned by `usage-organization.test.ts`.
  */
 
-export interface OrganizationProjectTotal {
+export interface UsageTotalsLike {
     costMicrodollars: number;
-    projectKey: string;
     replies: number;
-    title: string;
     tokens: number;
 }
 
-export interface OrganizationUsagePage {
+export interface OrganizationUsage {
+    complete: boolean;
     members: number;
-    nextCursor?: string;
-    projects: OrganizationProjectTotal[];
+    noProject: UsageTotalsLike;
+    projects: (UsageTotalsLike & { projectKey: string; title?: string })[];
+    total: UsageTotalsLike;
     truncated: boolean;
 }
 
-/** Pages read at most: past it the result says `truncated`. */
+export interface OrganizationUsageStep {
+    cursor?: string;
+    result?: OrganizationUsage;
+}
+
+/** Calls read at most before giving up: 40 × the server's page of members. */
 export const MAX_ORGANIZATION_PAGES = 40;
 
-/** Every page from the first, summed per project, costliest first. */
-export const sumOrganizationUsage = async (fetchPage: (afterUserId: string | undefined) => Promise<OrganizationUsagePage>): Promise<OrganizationUsagePage> => {
-    const sums = new Map<string, OrganizationProjectTotal>();
-    let members = 0;
-    let truncated = false;
+export class OrganizationUsageTooLargeError extends Error {}
+
+/** Calls `fetchStep` with each cursor it hands back until it returns the organization's totals. */
+export const readOrganizationUsage = async (fetchStep: (cursor: string | undefined) => Promise<OrganizationUsageStep>): Promise<OrganizationUsage> => {
     let cursor: string | undefined;
 
-    for (let page = 0; page < MAX_ORGANIZATION_PAGES; page += 1) {
-        const result = await fetchPage(cursor);
+    for (let call = 0; call < MAX_ORGANIZATION_PAGES; call += 1) {
+        const step = await fetchStep(cursor);
 
-        members += result.members;
-        truncated ||= result.truncated;
-
-        for (const project of result.projects) {
-            const sum = sums.get(project.projectKey) ?? { ...project, costMicrodollars: 0, replies: 0, tokens: 0 };
-
-            sum.costMicrodollars += project.costMicrodollars;
-            sum.replies += project.replies;
-            sum.tokens += project.tokens;
-            sums.set(project.projectKey, sum);
+        if (step.result) {
+            return step.result;
         }
 
-        cursor = result.nextCursor;
-
-        if (cursor === undefined) {
+        if (step.cursor === undefined) {
             break;
         }
+
+        cursor = step.cursor;
     }
 
-    return {
-        members,
-        projects: [...sums.values()].toSorted((a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.title.localeCompare(b.title)),
-        truncated: truncated || cursor !== undefined,
-    };
+    throw new OrganizationUsageTooLargeError("The organization is too large to read its usage in one go.");
 };

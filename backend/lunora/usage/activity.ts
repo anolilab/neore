@@ -27,17 +27,18 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authQuery } from "../lib/crpc";
-import { readableProject } from "../projects/functions";
-import type { ProjectIncrement, ProjectTotal, RollupIncrement } from "./activity-logic";
+import { projectOrganizationOf, readableProject } from "../projects/functions";
+import type { Attribution, AttributionIncrement, ProjectTotal, RollupIncrement } from "./activity-logic";
 import {
     addDays,
     BREAKDOWN_ROW_LIMIT,
     foldDayTotals,
-    foldProjectIncrements,
     foldProjectTotals,
     foldSkillTotals,
     HEATMAP_DAYS,
     isDayKey,
+    attributionRows,
+    ORGANIZATION_SKILL_KEY,
     PROJECT_ROW_LIMIT,
     PROJECT_SKILL_KEY,
     projectFiledKey,
@@ -50,6 +51,9 @@ import {
 /** A `YYYY-MM-DD` argument, refused at the boundary when it is anything else. */
 const vDayKey = () => v.string().check(isDayKey, { message: "Expected a YYYY-MM-DD date", schema: { maxLength: 10, minLength: 10 } });
 
+/** `skillKey`s the rollup keeps for itself; a reply never records under one. */
+const RESERVED_SKILL_KEYS = new Set([ORGANIZATION_SKILL_KEY, PROJECT_SKILL_KEY, TOTAL_SKILL_KEY]);
+
 type DbCtx = Pick<MutationCtx, "db">;
 
 /** Whether the reply keyed `replyKey` is already in the user's rollup. */
@@ -61,21 +65,42 @@ export const markReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: st
     await ctx.db.insert("usageReplies", { recordedAt: at, replyKey, userId, ...(projectFiled && { projectFiled: true }) });
 };
 
-/** The project of the user's thread `threadId`, when it is on this shard and in one. */
-const projectOfThread = async (ctx: DbCtx, threadId: string | undefined): Promise<string | undefined> => {
-    if (threadId === undefined || threadId.length === 0) {
-        return undefined;
+/** Where a reply in `thread` is filed besides the total: its project, and the organization of that project or else of the thread. */
+export const attributionOf = async (ctx: DbCtx, thread: { organizationId?: string | null; projectId?: string | null } | null): Promise<Attribution> => {
+    if (!thread) {
+        return {};
     }
 
-    const thread = await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } });
+    const projectKey = thread.projectId ?? undefined;
+    const organizationId = (projectKey === undefined ? undefined : await projectOrganizationOf(ctx, projectKey)) ?? thread.organizationId ?? undefined;
 
-    return thread?.projectId ?? undefined;
+    return { ...(projectKey !== undefined && { projectKey }), ...(organizationId !== undefined && { organizationId }) };
 };
 
-/** Adds `increments` to the user's per-day project rows. */
-export const addToProjectRollup = async (ctx: DbCtx, userId: string, increments: ReadonlyArray<ProjectIncrement>, at: number): Promise<void> => {
-    for (const { costMicrodollars, date, projectKey, replies, tokens } of foldProjectIncrements(increments)) {
-        const existing = await ctx.db.usageDaily.findFirst({ where: { date, projectKey, skillKey: PROJECT_SKILL_KEY, userId } });
+/** The attribution of the user's thread `threadId`, when it is on this shard. */
+const attributionOfThread = async (ctx: DbCtx, threadId: string | undefined): Promise<Attribution> => {
+    if (threadId === undefined || threadId.length === 0) {
+        return {};
+    }
+
+    return await attributionOf(ctx, await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } }));
+};
+
+/** Whether an attribution files the reply anywhere. */
+const filesAnywhere = (attribution: Attribution): boolean => attribution.projectKey !== undefined || attribution.organizationId !== undefined;
+
+/** Adds `increments` to the user's per-day project and organization rows. */
+export const addToAttributionRollup = async (ctx: DbCtx, userId: string, increments: ReadonlyArray<AttributionIncrement>, at: number): Promise<void> => {
+    for (const row of attributionRows(increments)) {
+        const { costMicrodollars, date, organizationId, projectKey, replies, skillKey, tokens } = row;
+        // The organization is part of a row's key, and an absent one cannot be matched in a query: compare here.
+        const { page: candidates } = await ctx.db.usageDaily.findMany({
+            limit: 50,
+            where: { date, skillKey, userId, ...(projectKey !== undefined && { projectKey }), ...(organizationId !== undefined && { organizationId }) },
+        });
+        const existing = candidates.find(
+            (candidate) => (candidate.organizationId ?? undefined) === organizationId && (candidate.projectKey ?? undefined) === projectKey,
+        );
 
         if (existing) {
             await ctx.db.patch("usageDaily", existing._id, {
@@ -85,7 +110,17 @@ export const addToProjectRollup = async (ctx: DbCtx, userId: string, increments:
                 updatedAt: at,
             });
         } else {
-            await ctx.db.insert("usageDaily", { costMicrodollars, date, projectKey, replies, skillKey: PROJECT_SKILL_KEY, tokens, updatedAt: at, userId });
+            await ctx.db.insert("usageDaily", {
+                costMicrodollars,
+                date,
+                replies,
+                skillKey,
+                tokens,
+                updatedAt: at,
+                userId,
+                ...(projectKey !== undefined && { projectKey }),
+                ...(organizationId !== undefined && { organizationId }),
+            });
         }
     }
 };
@@ -143,7 +178,7 @@ export const recordReplyUsage = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        if (!isDayKey(args.date) || args.skillKey === TOTAL_SKILL_KEY || args.skillKey === PROJECT_SKILL_KEY || args.replyKey.length === 0) {
+        if (!isDayKey(args.date) || RESERVED_SKILL_KEYS.has(args.skillKey) || args.replyKey.length === 0) {
             return null;
         }
 
@@ -159,11 +194,11 @@ export const recordReplyUsage = internalMutation
         // A redelivered job, or a reply the backfill reached first. The first walk files no project: when the
         // project walk passed this reply while it was still running, its project is filed here, once.
         if (recorded) {
-            const projectKey = recorded.projectFiled ? undefined : await projectOfThread(ctx, args.threadId);
+            const attribution = recorded.projectFiled ? {} : await attributionOfThread(ctx, args.threadId);
 
-            if (projectKey !== undefined && !(await isReplyRecorded(ctx, args.userId, projectFiledKey(args.replyKey)))) {
+            if (filesAnywhere(attribution) && !(await isReplyRecorded(ctx, args.userId, projectFiledKey(args.replyKey)))) {
                 await markReplyRecorded(ctx, args.userId, projectFiledKey(args.replyKey), args.at);
-                await addToProjectRollup(ctx, args.userId, [{ costMicrodollars, date: args.date, projectKey, replies: 1, tokens }], args.at);
+                await addToAttributionRollup(ctx, args.userId, [{ costMicrodollars, date: args.date, replies: 1, tokens, ...attribution }], args.at);
             }
 
             return null;
@@ -187,11 +222,11 @@ export const recordReplyUsage = internalMutation
             true,
         );
 
-        const projectKey = await projectOfThread(ctx, args.threadId);
+        const attribution = await attributionOfThread(ctx, args.threadId);
 
         // The project walk got there first: a reply that finished before it passed the thread.
-        if (projectKey !== undefined && !(await isReplyRecorded(ctx, args.userId, projectFiledKey(args.replyKey)))) {
-            await addToProjectRollup(ctx, args.userId, [{ costMicrodollars, date: args.date, projectKey, replies: 1, tokens }], args.at);
+        if (filesAnywhere(attribution) && !(await isReplyRecorded(ctx, args.userId, projectFiledKey(args.replyKey)))) {
+            await addToAttributionRollup(ctx, args.userId, [{ costMicrodollars, date: args.date, replies: 1, tokens, ...attribution }], args.at);
         }
 
         return null;
@@ -254,7 +289,7 @@ export const getSkillBreakdown = authQuery
             limit: BREAKDOWN_ROW_LIMIT,
             orderBy: [{ date: "desc" }],
             // Project rows are another breakdown's; they must not use up this read's bound.
-            where: { date: { gte: args.fromDate }, skillKey: { ne: PROJECT_SKILL_KEY }, userId },
+            where: { date: { gte: args.fromDate }, skillKey: { notIn: [PROJECT_SKILL_KEY, ORGANIZATION_SKILL_KEY] }, userId },
         });
 
         return {

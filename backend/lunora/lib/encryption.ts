@@ -7,7 +7,7 @@
  * - AES-256-GCM with random 12-byte IV per encryption
  * - Backward-compatible: unversioned (v0) ciphertext decrypted with legacy single-key path
  *
- * Purposes: "provider-keys", "tool-keys", "messenger-keys", "custom-providers", "connector-tokens"
+ * Purposes: "provider-keys", "tool-keys", "messenger-keys", "custom-providers", "connector-tokens", "usage-cursors"
  */
 // Trimmed like `assertEnv()` and the deploy guard check it, so a key that passes
 // them always decodes here (`atob` rejects surrounding whitespace such as U+00A0).
@@ -54,7 +54,8 @@ const getLegacyCryptoKey = async (): Promise<CryptoKey> => {
 // ============================================================================
 
 /** Valid key purposes for HKDF derivation */
-export type KeyPurpose = "connector-tokens" | "custom-providers" | "device-secrets" | "mcp-headers" | "messenger-keys" | "provider-keys" | "tool-keys";
+export type KeyPurpose =
+    "connector-tokens" | "custom-providers" | "device-secrets" | "mcp-headers" | "messenger-keys" | "provider-keys" | "tool-keys" | "usage-cursors";
 
 // Import master key as HKDF base key material (once, cached)
 let hkdfBaseKey: CryptoKey | null = null;

@@ -2008,6 +2008,7 @@ export interface Doc_usageDaily {
     _creationTime: number;
     costMicrodollars: number;
     date: string;
+    organizationId?: string;
     projectKey?: string;
     replies: number;
     skillKey: string;
@@ -2555,7 +2556,7 @@ export interface IndexNamesByTable {
     triggers: "by_userId_organizationId" | "by_type_enabled" | "by_enabled_nextTriggerAt" | "by_userId_type_enabled" | "by_type_enabled_nextTriggerAt";
     twoFactor: "userId";
     usageBackfill: "by_userId";
-    usageDaily: "by_user_skill_date" | "by_user_date" | "by_user_project_date" | "by_date";
+    usageDaily: "by_user_skill_date" | "by_user_date" | "by_user_project_date" | "by_user_organization_date" | "by_date";
     usageReplies: "by_user_reply" | "by_recordedAt";
     user: "email_name" | "name" | "role" | "userId" | "by_isAnonymous";
     userConnectors: "by_user_and_definition" | "by_organization" | "by_status" | "by_connectorDefinitionId";
@@ -5018,6 +5019,7 @@ export interface Insert_usageDaily {
     _creationTime?: number;
     costMicrodollars: number;
     date: string;
+    organizationId?: string;
     projectKey?: string;
     replies: number;
     skillKey: string;

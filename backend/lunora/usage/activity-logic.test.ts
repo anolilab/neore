@@ -5,11 +5,12 @@ import {
     addDays,
     DEFAULT_SKILL_KEY,
     foldDayTotals,
-    foldProjectIncrements,
+    attributionRows,
     foldProjectTotals,
     foldSkillTotals,
     HEATMAP_DAYS,
     isDayKey,
+    ORGANIZATION_SKILL_KEY,
     PROJECT_SKILL_KEY,
     remainderOf,
     repliesByOrder,
@@ -227,12 +228,20 @@ describe("project rows", () => {
         expect(remainderOf({ costMicrodollars: 100, replies: 1, tokens: 10 }, projects)).toStrictEqual({ costMicrodollars: 0, replies: 0, tokens: 0 });
     });
 
-    it("folds increments into one per day and project", () => {
-        const one = { costMicrodollars: 1, date: "2026-09-20", projectKey: "p_a", replies: 1, tokens: 1 };
+    it("files a reply in an organization's project under both, and one outside a project under its organization only", () => {
+        const one = { costMicrodollars: 1, date: "2026-09-20", replies: 1, tokens: 1 };
 
-        expect(foldProjectIncrements([one, one, { ...one, projectKey: "p_b" }])).toStrictEqual([
-            { ...one, costMicrodollars: 2, replies: 2, tokens: 2 },
-            { ...one, projectKey: "p_b" },
+        expect(
+            attributionRows([
+                { ...one, organizationId: "org", projectKey: "p_a" },
+                { ...one, organizationId: "org", projectKey: "p_a" },
+                { ...one, organizationId: "org" },
+                { ...one, projectKey: "p_b" },
+            ]),
+        ).toStrictEqual([
+            { ...one, costMicrodollars: 2, organizationId: "org", projectKey: "p_a", replies: 2, skillKey: PROJECT_SKILL_KEY, tokens: 2 },
+            { ...one, costMicrodollars: 3, organizationId: "org", replies: 3, skillKey: ORGANIZATION_SKILL_KEY, tokens: 3 },
+            { ...one, projectKey: "p_b", skillKey: PROJECT_SKILL_KEY },
         ]);
     });
 });

@@ -3331,6 +3331,9 @@ export const schema = defineSchema({
         costMicrodollars: v.number(),
         // The user's calendar day (their time zone when the reply landed), YYYY-MM-DD.
         date: v.string(),
+        // The organization the reply was filed under: on `__organization__` rows, and on `__project__` rows of an
+        // organization's project.
+        organizationId: v.optional(v.string()),
         // The project the reply's thread was in when it was recorded; set only on `__project__` rows.
         projectKey: v.optional(v.string()),
         replies: v.number(),
@@ -3346,6 +3349,8 @@ export const schema = defineSchema({
         .index("by_user_date", ["userId", "date"])
         // One project's rows (the project settings' totals, and the project rows' upsert).
         .index("by_user_project_date", ["userId", "projectKey", "date"])
+        // One organization's rows of a member (the organization view).
+        .index("by_user_organization_date", ["userId", "organizationId", "date"])
         // The retention sweep (`gdpr/retention.ts`), which serves a whole shard.
         .index("by_date", ["date"]),
 

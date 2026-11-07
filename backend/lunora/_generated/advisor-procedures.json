@@ -32619,10 +32619,10 @@
       "usesRateLimit": false,
       "usesRls": false,
       "analyzableBody": true,
-      "exportName": "memberProjectUsage",
+      "exportName": "memberOrganizationUsage",
       "file": "usage/organization",
       "hasEmailArg": false,
-      "kind": "query",
+      "kind": "mutation",
       "visibility": "internal"
     },
     {

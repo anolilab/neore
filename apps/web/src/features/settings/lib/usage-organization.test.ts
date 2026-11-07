@@ -1,40 +1,34 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { MAX_ORGANIZATION_PAGES, sumOrganizationUsage } from "./usage-organization";
+import { MAX_ORGANIZATION_PAGES, OrganizationUsageTooLargeError, readOrganizationUsage } from "./usage-organization";
 
-const project = (projectKey: string, costMicrodollars: number) => {
-    return { costMicrodollars, projectKey, replies: 1, title: projectKey, tokens: 10 };
+const totals = (costMicrodollars: number) => {
+    return { costMicrodollars, replies: 1, tokens: 10 };
 };
 
-describe("sumOrganizationUsage", () => {
-    it("adds every page of members up per project, following the cursor", async () => {
-        const fetchPage = vi.fn(async (after: string | undefined) =>
-            after === undefined
-                ? { members: 25, nextCursor: "u25", projects: [project("alpha", 100), project("beta", 10)], truncated: false }
-                : { members: 3, projects: [project("alpha", 50), project("beta", 200)], truncated: false },
-        );
+const RESULT = {
+    complete: true,
+    members: 28,
+    noProject: totals(7),
+    projects: [{ ...totals(140), projectKey: "alpha", title: "Alpha" }],
+    total: totals(147),
+    truncated: false,
+};
 
-        const result = await sumOrganizationUsage(fetchPage);
+describe("readOrganizationUsage", () => {
+    it("follows the opaque cursor and returns only the final totals", async () => {
+        const fetchStep = vi.fn(async (cursor: string | undefined) => (cursor === undefined ? { cursor: "sealed-1" } : { result: RESULT }));
 
-        expect(fetchPage.mock.calls.map(([after]) => after)).toStrictEqual([undefined, "u25"]);
-        expect(result).toStrictEqual({
-            members: 28,
-            projects: [
-                { costMicrodollars: 210, projectKey: "beta", replies: 2, title: "beta", tokens: 20 },
-                { costMicrodollars: 150, projectKey: "alpha", replies: 2, title: "alpha", tokens: 20 },
-            ],
-            truncated: false,
-        });
+        expect(await readOrganizationUsage(fetchStep)).toStrictEqual(RESULT);
+        expect(fetchStep.mock.calls.map(([cursor]) => cursor)).toStrictEqual([undefined, "sealed-1"]);
     });
 
-    it("stops at the page cap and says the result is partial", async () => {
-        const fetchPage = vi.fn(async () => {
-            return { members: 1, nextCursor: "more", projects: [], truncated: false };
+    it("gives up past the call cap", async () => {
+        const fetchStep = vi.fn(async () => {
+            return { cursor: "more" };
         });
 
-        const result = await sumOrganizationUsage(fetchPage);
-
-        expect(fetchPage).toHaveBeenCalledTimes(MAX_ORGANIZATION_PAGES);
-        expect(result.truncated).toBe(true);
+        await expect(readOrganizationUsage(fetchStep)).rejects.toBeInstanceOf(OrganizationUsageTooLargeError);
+        expect(fetchStep).toHaveBeenCalledTimes(MAX_ORGANIZATION_PAGES);
     });
 });

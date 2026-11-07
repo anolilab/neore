@@ -22,6 +22,12 @@
   holds; later history stays "No project"); it skips keys the
   live path marked `projectFiled` and marks its own `project:<key>`, which the
   live path checks. Key pruning waits for both walks.
-- **Organization view** (`organization.ts`) fans out to each member's shard
-  with `callOnShard`; it is bounded (`MAX_MEMBERS`, `MAX_PROJECTS`) and checks
-  the admin role on the `member` row, not the session.
+- **Organization view** (`organization.ts`) — a reply in an organization's
+  thread or project is also filed under the organization (`__organization__`
+  row) and its project rows carry `organizationId`; the view sums exactly the
+  rows filed under the org, so projects plus "No project" equal its total. It
+  returns org-wide totals only: running sums travel in an encrypted cursor
+  (`usage-cursors` key) bound to org, caller and period; never return a
+  partial sum, a page size or a member-scoped figure. One call asks at most
+  `MEMBERS_PER_CALL` shards; each member read also starts that member's walks.
+  The admin role is checked on the `member` row on every call.

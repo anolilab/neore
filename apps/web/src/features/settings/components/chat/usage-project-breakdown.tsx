@@ -15,7 +15,7 @@ import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill } from "../../hooks/use-usage-backfill";
 import { formatUsd, localDayKey, periodStart } from "../../lib/usage-activity";
-import { sumOrganizationUsage } from "../../lib/usage-organization";
+import { readOrganizationUsage } from "../../lib/usage-organization";
 
 /** The row key of what no project accounts for; never a project id. */
 const NO_PROJECT_KEY = "__no_project__";
@@ -53,12 +53,13 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
     const locale = i18n.locale || "en";
     const fromDate = periodStart(today, days);
 
-    // Organization admins and owners can update it; members cannot.
+    // Organization admins and owners can update it; members cannot. The server checks the role again on every call.
     const { data: permission } = useHasPermission(authClient, { permissions: { organization: ["update"] } });
     const { data: activeOrganization } = useActiveOrganization(authClient);
     const organizationId: string | undefined = activeOrganization?.id;
     const isOrganizationAdmin = permission?.success === true && organizationId !== undefined;
     const showing: Scope = isOrganizationAdmin ? scope : "mine";
+    const organizationEnabled = showing === "organization";
 
     const mine = useQuery({
         ...crpc.usage.activity.getProjectBreakdown.queryOptions({ fromDate }, { live: false }),
@@ -70,16 +71,19 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
 
     const fetchOrganization = useAction(api.usage.organization.getOrganizationProjectUsage);
     const organization = useQuery({
-        enabled: showing === "organization" && organizationId !== undefined,
-        queryFn: async () => await sumOrganizationUsage(async (afterUserId) => await fetchOrganization({ afterUserId, fromDate })),
+        enabled: organizationEnabled,
+        queryFn: async () => await readOrganizationUsage(async (cursor) => await fetchOrganization({ cursor, fromDate })),
         // Keyed by the organization too: switching organizations must not show the last one's totals.
         queryKey: ["usage", "organization-projects", organizationId, fromDate],
         retry: 1,
         staleTime: 2 * 60_000,
     });
 
-    // Not polled while the walk runs (each read asks every member's shard), but read again once it is done.
-    useRefetchAfterBackfill(backfilling, organization.refetch);
+    // Not polled while the walk runs (each read asks every member's shard), but read again once it is done — only when it
+    // is what the card shows: a manual refetch runs even for a disabled query.
+    const refetchOrganization = organization.refetch;
+
+    useRefetchAfterBackfill(backfilling, async () => (organizationEnabled ? await refetchOrganization() : undefined));
 
     const active = showing === "mine" ? mine : organization;
     let rows: ProjectRow[] = [];
@@ -96,8 +100,12 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
 
     if (showing === "organization" && organization.data) {
         rows = organization.data.projects.map((project) => {
-            return { ...project, key: project.projectKey, label: project.title };
+            return { ...project, key: project.projectKey, label: project.title ?? t`Project no longer in this organization` };
         });
+
+        if (organization.data.noProject.replies > 0 || organization.data.noProject.costMicrodollars > 0) {
+            rows.push({ ...organization.data.noProject, key: NO_PROJECT_KEY, label: t`No project` });
+        }
     }
 
     const totalCost = rows.reduce((sum, row) => sum + row.costMicrodollars, 0);
@@ -196,6 +204,9 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                     </Table>
                 )}
                 {truncated && <p className="text-muted-foreground mt-2 text-xs">{t`Only part of this period is included.`}</p>}
+                {showing === "organization" && organization.data && !organization.data.complete && (
+                    <p className="text-muted-foreground mt-2 text-xs">{t`Some members' earlier usage is still being added.`}</p>
+                )}
             </CardContent>
         </Card>
     );

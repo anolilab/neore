@@ -1,36 +1,52 @@
 /**
  * The usage page's organization view: replies, tokens and cost per project of
- * the caller's active organization, summed over its members — for the
- * organization's admins and owners only.
+ * the caller's active organization, and the organization's total, summed over
+ * every member — for the organization's admins and owners only.
  *
- * Each member's usage lives in the rollup on their own shard (`activity.ts`),
- * so the action reads the organization's projects and one page of its members,
- * asks each of those members' shards for its rows of those projects, and adds
- * them up. One call asks at most {@link MEMBERS_PER_CALL} shards — each is a
- * subrequest, and a Worker invocation has few — and returns `nextCursor`; the
- * client sums the pages. At most {@link MAX_PROJECTS} projects, with `truncated`
- * set when the organization has more.
+ * Each member's usage lives in the rollup on their own shard (`activity.ts`):
+ * a reply in an organization's thread or project is filed under that
+ * organization (an `__organization__` row) and, in a project, under the project
+ * with the organization on the row. The view adds up exactly those rows, so
+ * every project counts and the projects plus "No project" equal the total.
+ * Asking a member's shard also starts or resumes their backfill walks, so an
+ * inactive member's history is filed too; `complete` says when it all is.
+ *
+ * Totals only, never per member: one call asks at most
+ * {@link MEMBERS_PER_CALL} shards (each a subrequest), and the running sums
+ * between calls travel in an encrypted cursor bound to the organization, the
+ * caller and the period. The client sees no partial sum and no page size, so
+ * no choice of cursor narrows the view to one member.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import { internalQuery } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
+import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { callOnShard } from "../lib/cross-shard";
 import { authAction, rateLimit } from "../lib/crpc";
+import { decryptKey, encryptKey } from "../lib/encryption";
 import { throwForbidden } from "../lib/error-helpers";
 import { systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
-import { foldProjectTotals, isDayKey, PROJECT_ROW_LIMIT, PROJECT_SKILL_KEY } from "./activity-logic";
+import type { UsageTotals } from "./activity-logic";
+import { addProjectTotals, foldOrganizationRows, isDayKey, remainderOf } from "./activity-logic";
+import { ensureBackfill, ensureProjectBackfill } from "./backfill";
 
 /** Member shards one call asks, at most: well inside a Worker invocation's subrequest budget. */
-export const MEMBERS_PER_CALL = 25;
+export const MEMBERS_PER_CALL = 20;
 
-/** Projects one read lists, at most. */
+/** Projects listed by name, at most; a project past it still counts, under its id. */
 export const MAX_PROJECTS = 200;
 
+/** One member's rows of one organization one read takes: a project row per day and project, plus one per day. */
+export const MEMBER_ROW_LIMIT = 20_000;
+
+/** How long a cursor stays usable. */
+const CURSOR_TTL_MS = 10 * 60 * 1000;
+
 /** Member shards asked at once. */
-const SHARD_CONCURRENCY = 8;
+const SHARD_CONCURRENCY = 5;
 
 const ADMIN_ROLES = new Set(["admin", "owner"]);
 
@@ -39,7 +55,7 @@ export const isOrganizationAdminRole = (role: string): boolean => role.split(","
 
 const vTotals = { costMicrodollars: v.number(), replies: v.number(), tokens: v.number() };
 
-/** The organization's projects and members, or `null` when `userId` is not one of its admins. */
+/** The organization's projects and one page of its members, or `null` when `userId` is not one of its admins. */
 export const organizationUsageScope = internalQuery
     .input({
         afterUserId: v.optional(v.string().max(MAX_LENGTH.id)),
@@ -53,7 +69,6 @@ export const organizationUsageScope = internalQuery
                 memberIds: v.array(v.string()),
                 nextCursor: v.optional(v.string()),
                 projects: v.array(v.object({ projectId: v.string(), title: v.string() })),
-                truncated: v.boolean(),
             }),
         ),
     )
@@ -71,41 +86,97 @@ export const organizationUsageScope = internalQuery
                 orderBy: [{ userId: "asc" }],
                 where: { organizationId, ...(afterUserId !== undefined && { userId: { gt: afterUserId } }) },
             }),
-            systemDb(ctx).projects.findMany({ limit: MAX_PROJECTS + 1, where: { organizationId } }),
+            systemDb(ctx).projects.findMany({ limit: MAX_PROJECTS, where: { organizationId } }),
         ]);
         const memberIds = members.page.slice(0, MEMBERS_PER_CALL).map((row) => row.userId);
 
         return {
             memberIds,
             ...(members.page.length > MEMBERS_PER_CALL && { nextCursor: memberIds.at(-1) }),
-            projects: projects.page.slice(0, MAX_PROJECTS).map((row) => {
+            projects: projects.page.map((row) => {
                 return { projectId: row._id as string, title: row.title };
             }),
-            truncated: projects.page.length > MAX_PROJECTS,
         };
     });
 
-/** One member's totals per project, for the projects named, from `fromDate` on; runs on the member's shard. */
-export const memberProjectUsage = internalQuery
-    .input({ fromDate: v.string().max(10), projectIds: v.array(v.string().max(MAX_LENGTH.id)), userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.object({ projects: v.array(v.object({ ...vTotals, projectKey: v.string() })), truncated: v.boolean() }))
-    .query(async ({ args: { fromDate, projectIds, userId }, ctx }) => {
-        if (!isDayKey(fromDate) || projectIds.length === 0) {
-            return { projects: [], truncated: false };
+/**
+ * One member's usage filed under the organization from `fromDate` on, on the
+ * member's shard. Starts or resumes their backfill walks first, so a member who
+ * has not been active since still has their history filed.
+ */
+export const memberOrganizationUsage = internalMutation
+    .input({ fromDate: v.string().max(10), organizationId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
+    .output(
+        v.object({
+            complete: v.boolean(),
+            projects: v.array(v.object({ ...vTotals, projectKey: v.string() })),
+            total: v.object({ ...vTotals }),
+            truncated: v.boolean(),
+        }),
+    )
+    .mutation(async ({ args: { fromDate, organizationId, userId }, ctx }) => {
+        if (!isDayKey(fromDate) || (await isAccountDeletionUnderway(ctx, userId))) {
+            return { complete: true, projects: [], total: { costMicrodollars: 0, replies: 0, tokens: 0 }, truncated: false };
         }
 
-        const wanted = new Set(projectIds);
+        const replies = await ensureBackfill(ctx, userId, ctx.now);
+        const projects = await ensureProjectBackfill(ctx, userId, ctx.now);
         const { page } = await ctx.db.usageDaily.findMany({
-            limit: PROJECT_ROW_LIMIT,
+            limit: MEMBER_ROW_LIMIT,
             orderBy: [{ date: "desc" }],
-            where: { date: { gte: fromDate }, skillKey: PROJECT_SKILL_KEY, userId },
+            where: { date: { gte: fromDate }, organizationId, userId },
         });
 
         return {
-            projects: foldProjectTotals(page).filter((project) => wanted.has(project.projectKey)),
-            truncated: page.length >= PROJECT_ROW_LIMIT,
+            complete: replies === "done" && projects === "done",
+            ...foldOrganizationRows(page, organizationId),
+            truncated: page.length >= MEMBER_ROW_LIMIT,
         };
     });
+
+/** The running sums between calls; only ever handed to the client encrypted. */
+interface CursorState {
+    afterUserId: string;
+    complete: boolean;
+    expiresAt: number;
+    fromDate: string;
+    members: number;
+    organizationId: string;
+    projects: [string, UsageTotals][];
+    requesterId: string;
+    total: UsageTotals;
+    truncated: boolean;
+}
+
+const CURSOR_REFUSED = "That usage read cannot be continued. Start it again.";
+
+const sealCursor = async (state: CursorState): Promise<string> => await encryptKey(JSON.stringify(state), "usage-cursors");
+
+/** The state a cursor carries, when it was issued for this organization, caller and period and has not expired. */
+export const openCursor = async (
+    cursor: string,
+    expected: { fromDate: string; now: number; organizationId: string; requesterId: string },
+): Promise<CursorState> => {
+    let state: CursorState;
+
+    try {
+        state = JSON.parse(await decryptKey(cursor, "usage-cursors")) as CursorState;
+    } catch {
+        throw new LunoraError("BAD_REQUEST", CURSOR_REFUSED);
+    }
+
+    const matches =
+        state.organizationId === expected.organizationId &&
+        state.requesterId === expected.requesterId &&
+        state.fromDate === expected.fromDate &&
+        state.expiresAt >= expected.now;
+
+    if (!matches) {
+        throw new LunoraError("BAD_REQUEST", CURSOR_REFUSED);
+    }
+
+    return state;
+};
 
 /** `items` mapped `limit` at a time. */
 const mapLimited = async <T, R>(items: ReadonlyArray<T>, limit: number, map: (item: T) => Promise<R>): Promise<R[]> => {
@@ -118,71 +189,115 @@ const mapLimited = async <T, R>(items: ReadonlyArray<T>, limit: number, map: (it
     return results;
 };
 
+const vResult = v.object({
+    complete: v.boolean(),
+    members: v.number(),
+    noProject: v.object({ ...vTotals }),
+    projects: v.array(v.object({ ...vTotals, projectKey: v.string(), title: v.optional(v.string()) })),
+    total: v.object({ ...vTotals }),
+    truncated: v.boolean(),
+});
+
 /**
- * Replies, tokens and cost per project of the caller's active organization from
- * `fromDate` on, summed over one page of its members (from `afterUserId`).
- * Admins and owners only; projects with no usage are listed with zeros. Call
- * again with `nextCursor` until it is absent, and add the pages up.
+ * The caller's active organization's usage from `fromDate` on: its total, per
+ * project, and what no project accounts for. Admins and owners only. Returns
+ * either `cursor` — call again with it — or, on the last call, `result`.
  */
 export const getOrganizationProjectUsage = authAction
     .use(rateLimit("library/read"))
-    .input({ afterUserId: v.optional(v.string().max(MAX_LENGTH.id)), fromDate: v.string().max(10) })
-    .output(
-        v.object({
-            members: v.number(),
-            nextCursor: v.optional(v.string()),
-            projects: v.array(v.object({ ...vTotals, projectKey: v.string(), title: v.string() })),
-            truncated: v.boolean(),
-        }),
-    )
-    .action(async ({ args: { afterUserId, fromDate }, ctx }) => {
+    .input({ cursor: v.optional(v.string().max(MAX_LENGTH.document)), fromDate: v.string().max(10) })
+    .output(v.object({ cursor: v.optional(v.string()), result: v.optional(vResult) }))
+    .action(async ({ args: { cursor, fromDate }, ctx }) => {
         const organizationId = ctx.user.activeOrganization?.id;
 
         if (!organizationId || !isDayKey(fromDate)) {
             return throwForbidden("Only organization admins can see the organization's usage.");
         }
 
+        const requesterId = ctx.user.userId;
+
+        const now = Date.now();
+
+        const state: CursorState = cursor
+            ? await openCursor(cursor, { fromDate, now, organizationId, requesterId })
+            : {
+                  afterUserId: "",
+                  complete: true,
+                  expiresAt: now + CURSOR_TTL_MS,
+                  fromDate,
+                  members: 0,
+                  organizationId,
+                  projects: [],
+                  requesterId,
+                  total: { costMicrodollars: 0, replies: 0, tokens: 0 },
+                  truncated: false,
+              };
+        // The role is checked on every call, so a cursor outlives no demotion.
         const scope = await ctx.runQuery(internal.usage.organization.organizationUsageScope, {
             organizationId,
-            userId: ctx.user.userId,
-            ...(afterUserId !== undefined && { afterUserId }),
+            userId: requesterId,
+            ...(state.afterUserId !== "" && { afterUserId: state.afterUserId }),
         });
 
         if (!scope) {
             return throwForbidden("Only organization admins can see the organization's usage.");
         }
 
-        const projectIds = scope.projects.map((project) => project.projectId);
-        const perMember = await mapLimited(scope.memberIds, SHARD_CONCURRENCY, async (userId) =>
-            projectIds.length === 0
-                ? { projects: [], truncated: false }
-                : await callOnShard(internal.usage.organization.memberProjectUsage, { fromDate, projectIds, userId }, { shardKey: userId }),
+        const perMember = await mapLimited(
+            scope.memberIds,
+            SHARD_CONCURRENCY,
+            async (userId) =>
+                await callOnShard(internal.usage.organization.memberOrganizationUsage, { fromDate, organizationId, userId }, { shardKey: userId }),
         );
-        const sums = new Map(
-            scope.projects.map((project) => [
-                project.projectId,
-                { costMicrodollars: 0, projectKey: project.projectId, replies: 0, title: project.title, tokens: 0 },
-            ]),
-        );
+        const projects = new Map(state.projects);
+        const total = { ...state.total };
 
         for (const member of perMember) {
-            for (const project of member.projects) {
-                const sum = sums.get(project.projectKey);
+            addProjectTotals(projects, member.projects);
+            total.costMicrodollars += member.total.costMicrodollars;
+            total.replies += member.total.replies;
+            total.tokens += member.total.tokens;
+        }
 
-                if (sum) {
-                    sum.costMicrodollars += project.costMicrodollars;
-                    sum.replies += project.replies;
-                    sum.tokens += project.tokens;
-                }
+        const next: CursorState = {
+            ...state,
+            afterUserId: scope.nextCursor ?? "",
+            complete: state.complete && perMember.every((member) => member.complete),
+            members: state.members + scope.memberIds.length,
+            projects: [...projects],
+            total,
+            truncated: state.truncated || perMember.some((member) => member.truncated),
+        };
+
+        if (scope.nextCursor !== undefined) {
+            return { cursor: await sealCursor(next) };
+        }
+
+        const titles = new Map(scope.projects.map((project) => [project.projectId, project.title]));
+
+        // The organization's projects with no usage yet are listed too, at zero.
+        for (const project of scope.projects) {
+            if (!projects.has(project.projectId)) {
+                projects.set(project.projectId, { costMicrodollars: 0, replies: 0, tokens: 0 });
             }
         }
 
-        ctx.log.event("usage.get_organization_project_usage", { members: scope.memberIds.length, projects: projectIds.length });
+        const rows = [...projects].map(([projectKey, totals]) => {
+            const title = titles.get(projectKey);
+
+            return { ...totals, projectKey, ...(title !== undefined && { title }) };
+        });
+
+        ctx.log.event("usage.get_organization_project_usage", { members: next.members, projects: rows.length });
 
         return {
-            members: scope.memberIds.length,
-            ...(scope.nextCursor !== undefined && { nextCursor: scope.nextCursor }),
-            projects: [...sums.values()].toSorted((a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.title.localeCompare(b.title)),
-            truncated: scope.truncated || perMember.some((member) => member.truncated),
+            result: {
+                complete: next.complete,
+                members: next.members,
+                noProject: remainderOf(total, rows),
+                projects: rows.toSorted((a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.projectKey.localeCompare(b.projectKey)),
+                total,
+                truncated: next.truncated,
+            },
         };
     });

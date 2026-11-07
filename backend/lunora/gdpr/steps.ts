@@ -413,6 +413,7 @@ export const collectActivityForExport = internalQuery
                     skill: row.skillName ?? row.skillKey,
                     tokens: row.tokens,
                     ...(row.projectKey !== undefined && row.projectKey !== null && { project: row.projectKey }),
+                    ...(row.organizationId !== undefined && row.organizationId !== null && { organization: row.organizationId }),
                 };
             }),
         };

@@ -27807,6 +27807,12 @@
           "optional": false,
           "unique": false
         },
+        "organizationId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "projectKey": {
           "kind": "string",
           "nullable": false,
@@ -27860,6 +27866,14 @@
         "by_user_date": {
           "fields": [
             "userId",
+            "date"
+          ],
+          "unique": false
+        },
+        "by_user_organization_date": {
+          "fields": [
+            "userId",
+            "organizationId",
             "date"
           ],
           "unique": false
