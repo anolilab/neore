@@ -48,6 +48,12 @@ import useHostSendErrorMessages from "./host-send-errors";
 const CONTINUABLE: ReadonlySet<string> = new Set(["interrupted", "timeout"]);
 
 /**
+ * Refusals the backend answers before it looks for an earlier send under the same id (`acp/send.ts`): they say nothing of
+ * whether an earlier try was taken. Every other refusal comes after that check, so the id was never taken.
+ */
+const BEFORE_REPEAT_CHECK: ReadonlySet<string> = new Set(["malformed", "not_authenticated", "not_configured", "not_found", "too_large"]);
+
+/**
  * How long the queue waits for an event that may never come: an accepted send's turn showing on the session, or the end of
  * a turn whose stop was confirmed. Past it the queue pauses for the person (or, for a confirmed stop, goes on), so a missing
  * event cannot hold the queue for good.
@@ -55,6 +61,10 @@ const CONTINUABLE: ReadonlySet<string> = new Set(["interrupted", "timeout"]);
 const WAIT_DEADLINE_MS = 5000;
 
 /** Whether a queued message is still waiting in its thread's queue, read from the store rather than from the render that sent it. */
+/** Whether a send under the queued message's id may have been taken (`QueuedPrompt.tried`). */
+const isTried = (threadId: string, id: string): boolean =>
+    usePromptQueueStore.getState().queues[threadId]?.items.some((item) => item.id === id && item.tried === true) === true;
+
 const stillQueued = (threadId: string, id: string): boolean => usePromptQueueStore.getState().queues[threadId]?.items.some((item) => item.id === id) ?? false;
 
 /**
@@ -413,6 +423,8 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         }
 
         // Until the answer is in, the backend may take this send: the message's own turn could then be the one running.
+        const triedBefore = queuedId === undefined ? attempt.current?.mayBeTaken === true : isTried(threadId, queuedId);
+
         if (queuedId !== undefined) {
             usePromptQueueStore.getState().setTried(threadId, queuedId, true);
         }
@@ -455,8 +467,9 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
             liveNow = freshSession.data?.liveStreamId ?? freshLive.data?.streamId ?? undefined;
         }
 
-        // The backend answers every refusal before it takes the id, so only a send whose answer never came may have been taken.
-        const taken = result.error === "unreachable";
+        // A send whose answer never came may have been taken. A refusal answered after the repeat check proves the id was never
+        // taken; one answered before it leaves an earlier try as it was.
+        const taken = result.error === "unreachable" || (triedBefore && BEFORE_REPEAT_CHECK.has(result.error));
 
         if (queuedId !== undefined) {
             usePromptQueueStore.getState().setTried(threadId, queuedId, taken);
@@ -603,7 +616,8 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     };
 
     const sendNowFor = (itemId: string, state: HostQueueState) => {
-        const tried = usePromptQueueStore.getState().queues[threadId]?.items.some((item) => item.id === itemId && item.tried === true) === true;
+        // The running turn may be any tried message's lost send, not only this one's: stopping it would lose that message.
+        const tried = usePromptQueueStore.getState().queues[threadId]?.items.some((item) => item.tried === true) === true;
 
         return cancel.isPending || blocked || starting ? undefined : sendNowAction(state, { itemId, running: isTurnLive(state, liveStreamId), tried });
     };

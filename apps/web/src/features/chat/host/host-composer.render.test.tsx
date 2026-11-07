@@ -543,19 +543,46 @@ describe("the coding-agent composer", () => {
 
         const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
 
+        for (const text of ["lost answer", "behind it"]) {
+            fireEvent.change(box, { target: { value: text } });
+            fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+            await screen.findByText(text);
+        }
+
+        await endTurn();
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+
+        // The send's turn shows up after all: stopping it and sending again under the same id would never run the message. Send
+        // now on the message behind it would stop that same turn, so it is off too.
+        harness.data = { ...harness.data, "chat.streaming.getActiveStreamForThread": { streamId: "stream-2" } };
+        await harness.client?.invalidateQueries();
+
+        expect(((await screen.findByRole("button", { name: "Send queued message 1 now" })) as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: "Send queued message 2 now" }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("keeps a lost send's mark through a refusal answered before the backend looks for repeats", async () => {
+        harness.sendResults = [
+            { error: "unreachable", ok: false },
+            { error: "not_authenticated", ok: false },
+        ];
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
         fireEvent.change(box, { target: { value: "lost answer" } });
         fireEvent.click(screen.getByRole("button", { name: "Queue" }));
         await screen.findByText("lost answer");
         await endTurn();
         await waitFor(() => expect(sendCalls()).toHaveLength(1));
+        fireEvent.click(await screen.findByRole("button", { name: "Send next" }));
+        await waitFor(() => expect(sendCalls()).toHaveLength(2));
 
-        // The send's turn shows up after all: stopping it and sending again under the same id would never run the message.
+        // A sign-in refusal says nothing of the first try, whose turn may be this one.
         harness.data = { ...harness.data, "chat.streaming.getActiveStreamForThread": { streamId: "stream-2" } };
         await harness.client?.invalidateQueries();
 
-        const sendNow = await screen.findByRole("button", { name: "Send queued message 1 now" });
-
-        expect((sendNow as HTMLButtonElement).disabled).toBe(true);
+        expect(((await screen.findByRole("button", { name: "Send queued message 1 now" })) as HTMLButtonElement).disabled).toBe(true);
     });
 
     it("offers Send now for a queued message the backend refused outright, since its send started nothing", async () => {
