@@ -434,6 +434,88 @@ describe("capability reports", () => {
         await expect(reportOf(threadId)).resolves.toMatchObject({ groups: REPORT.groups });
     });
 
+    it("stores the agent's options with a newer report only, and keeps them when an open's options do not validate", async () => {
+        const device = await pair(ownerId);
+        const mode = (current: string) => {
+            return {
+                configOptions: [
+                    {
+                        category: "mode",
+                        choices: [
+                            { name: "Plan", value: "plan" },
+                            { name: "Build", value: "build" },
+                        ],
+                        currentValue: current,
+                        id: "mode",
+                        name: "Mode",
+                    },
+                ],
+            };
+        };
+        const openWithOptions = async (reportedAt: number, options: unknown) => {
+            const result = await ingest(device, {
+                events: [
+                    { ...SESSION_OPEN, capabilities: { ...REPORT, reportedAt } },
+                    { kind: "session_options", options },
+                ],
+            });
+
+            expect(result.status).toBe(200);
+
+            return result.json.threadId as string;
+        };
+        const optionsOf = async (threadId: string, userId = ownerId) =>
+            ((await as(userId).query(getHostSession as never, { threadId } as never)) as { agentOptions?: unknown } | null)?.agentOptions;
+        const threadId = await openWithOptions(REPORT.reportedAt, mode("build"));
+
+        await expect(optionsOf(threadId)).resolves.toEqual(mode("build"));
+
+        // The agent switched to Plan: the desktop sends the open again with a newer report.
+        await openWithOptions(REPORT.reportedAt + 1, mode("plan"));
+        await expect(optionsOf(threadId)).resolves.toEqual(mode("plan"));
+
+        // A late or replayed open carries an older report and changes nothing.
+        await openWithOptions(REPORT.reportedAt, mode("build"));
+        await expect(optionsOf(threadId)).resolves.toEqual(mode("plan"));
+
+        // Options that do not validate are dropped, never the session's open.
+        await openWithOptions(REPORT.reportedAt + 2, { configOptions: [{ ...mode("x").configOptions[0], id: "i".repeat(200) }] });
+        await expect(optionsOf(threadId)).resolves.toEqual(mode("plan"));
+        await expect(optionsOf(threadId, await insertUser())).resolves.toBeUndefined();
+
+        // A desktop clock ahead of this one: its reports are ordered by the time it gave them, not the capped one, so two
+        // quick changes do not tie and a late older one does not pass a newer one.
+        const ahead = Date.now() + 60_000;
+
+        await openWithOptions(ahead, mode("build"));
+        await openWithOptions(ahead + 1, mode("plan"));
+        await expect(optionsOf(threadId)).resolves.toEqual(mode("plan"));
+        await openWithOptions(ahead, mode("build"));
+        await expect(optionsOf(threadId)).resolves.toEqual(mode("plan"));
+
+        // Nor is the report a late older open carries: it would no longer match the options stored.
+        await ingest(device, {
+            events: [
+                { ...SESSION_OPEN, capabilities: { ...CHANGED, reportedAt: ahead } },
+                { kind: "session_options", options: mode("build") },
+            ],
+        });
+        await expect(reportOf(threadId)).resolves.toMatchObject({ groups: REPORT.groups });
+
+        // Options are a session-level event: never one of a turn, and never anything but the open's follower.
+        await expect(ingest(device, { events: [{ kind: "session_options", options: mode("build") }] })).resolves.toMatchObject({ status: 403 });
+
+        // In a turn post, options are refused whether or not they validate: an invalid one is never quietly left out there.
+        await expect(turn(device, threadId, "t-opts", 0, [START(), { kind: "session_options", options: mode("build") }])).resolves.toMatchObject({
+            status: 403,
+        });
+        await expect(
+            turn(device, threadId, "t-bad", 0, [START(), { kind: "session_options", options: { configOptions: [{ id: 3 }] } }]),
+        ).resolves.toMatchObject({
+            status: 400,
+        });
+    });
+
     it("keeps a valid stored report when a later open's report is invalid, and lets the next valid one replace the fallback", async () => {
         const device = await pair(ownerId);
         const threadId = await openWith(device, REPORT);

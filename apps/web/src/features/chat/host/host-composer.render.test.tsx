@@ -223,6 +223,11 @@ afterEach(() => {
     harness.data = {};
 });
 
+const CHOICES = [
+    { name: "Plan", value: "plan" },
+    { name: "Build", value: "build" },
+];
+
 describe("the coding-agent composer", () => {
     it("is a focus area for F6, as the cloud composer is, so F6 reaches it", async () => {
         mount(session());
@@ -242,6 +247,28 @@ describe("the coding-agent composer", () => {
         expect(focusNextArea(1)).toBe(true);
         // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
         expect(document.activeElement).toBe(box);
+    });
+
+    it.each([
+        [
+            "its options, with the name of each current value",
+            { configOptions: [{ category: "mode", choices: CHOICES, currentValue: "plan", id: "mode", name: "Mode" }] },
+            "Mode: Plan",
+        ],
+        ["its legacy mode list", { modes: { available: CHOICES, current: "build" } }, "Mode: Build"],
+    ])("shows %s as the agent reported them", async (_name, agentOptions, shown) => {
+        mount(session({ agentOptions }));
+
+        const list = await screen.findByRole("list", { name: "Agent options" });
+
+        expect(list.textContent).toBe(shown);
+    });
+
+    it("shows no options for an agent that reported none", async () => {
+        mount(session());
+        await screen.findByLabelText("Message to the coding agent");
+
+        expect(screen.queryByRole("list", { name: "Agent options" })).toBeNull();
     });
 
     it("sends the message under one request id and clears the box", async () => {

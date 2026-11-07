@@ -154,6 +154,12 @@ export class HostPoster implements SessionObserver {
         link.open();
     }
 
+    /** The session's options changed: the backend is told with the session's open, sent again. */
+    public sessionUpdated(sessionId: string, info: HostSessionInfo): void {
+        this.infos.set(sessionId, info);
+        this.sessions.get(sessionId)?.update(capSessionInfo(info));
+    }
+
     /** This computer was paired: the sessions that stayed local while it was not now open on the backend. */
     public paired(): void {
         for (const link of this.sessions.values()) {
@@ -313,7 +319,7 @@ export class HostPoster implements SessionObserver {
      * message the replay took up again). Call once after the core is up, with what `readLeftovers` returned.
      */
     public async recover(leftovers?: RunningTurn[]): Promise<void> {
-        const left = leftovers ?? await this.readLeftovers();
+        const left = leftovers ?? (await this.readLeftovers());
 
         for (const turn of left) {
             if (this.channels.has(turn.turnId)) {
@@ -381,8 +387,8 @@ export class HostPoster implements SessionObserver {
                     {
                         ...media,
                         deviceId: this.options.deviceId,
-                        ...this.options.fetch && { fetch: this.options.fetch },
-                        ...this.options.log && { log: this.options.log },
+                        ...(this.options.fetch && { fetch: this.options.fetch }),
+                        ...(this.options.log && { log: this.options.log }),
                         now: () => this.now(),
                     },
                     info.agentKey,
@@ -498,8 +504,8 @@ export class HostPoster implements SessionObserver {
                 ended: fields.ended === true,
                 kind: "ok",
                 next: fields.next,
-                ...typeof fields.existing === "boolean" && { existing: fields.existing },
-                ...typeof fields.threadId === "string" && { threadId: fields.threadId },
+                ...(typeof fields.existing === "boolean" && { existing: fields.existing }),
+                ...(typeof fields.threadId === "string" && { threadId: fields.threadId }),
             };
         }
 
@@ -513,8 +519,8 @@ export class HostPoster implements SessionObserver {
         const now = this.now();
         // Retries come at most ~50 s apart (a request timeout plus the longest backoff), so a longer gap (the computer
         // slept, the network was down, a close gave up) ends the streak: only 401s that keep arriving count.
-        const streak
-            = this.unauthorized === undefined || now - this.unauthorized.last > REVOKED_AFTER_MS
+        const streak =
+            this.unauthorized === undefined || now - this.unauthorized.last > REVOKED_AFTER_MS
                 ? { count: 1, last: now, reported: false, since: now }
                 : { ...this.unauthorized, count: this.unauthorized.count + 1, last: now };
 

@@ -67,6 +67,10 @@
   and opens the next in the SAME thread, so `sessionOfThread` is the newest by creation and an older one stays as an `ended` row.
   The handoff for the new agent rides the first `acp_send` (`acp/lib/pending-handoff.ts`, derived from the path, no flag), never
   the saved message; a switch across the runner makes a new thread linked by a `continuation` relationship.
+  **The agent's own options** (model, reasoning effort, mode) ride a `session_options` event right after `session_open` in the
+  same post, sent again with a newer report whenever the agent changes them; they are stored (`acpSessions.agentOptions`) only
+  with a strictly newer report. They are their own union member on purpose: a new field on an existing `vHostEvent` member
+  changes the shape of the stored `persistentChunks.event` and the build's schema gate refuses it; a new member is additive.
 
 - **Coding agents on a paired computer** (`backend/lunora/acp/`, `apps/desktop/src/acp/`, acp-agent-host.md) —
   the web and the phone reach them only through signed `acp_*` device calls (`devices/lib/acp-call.ts`), and the
