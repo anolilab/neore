@@ -9,6 +9,7 @@
 const SHEET_ADD_LABEL = "Add sheet";
 const OPTIONS_LABEL = "Options";
 const VALUE_LABEL = "Value";
+const TOOLBAR_LABEL = "Spreadsheet toolbar";
 
 // Controls that a trigger must not contain: a button inside role="button" is nested-interactive.
 const INTERACTIVE_DESCENDANT = 'input, select, textarea, button, a[href], [tabindex]:not([tabindex="-1"])';
@@ -51,7 +52,7 @@ const repairControls = (root: HTMLElement): void => {
     // A header is a banner landmark. Univer's header is a toolbar, so it is a named group instead, and the page keeps one banner.
     for (const header of root.querySelectorAll<HTMLElement>('header[data-u-comp="headerbar"]')) {
         header.setAttribute("role", "group");
-        header.setAttribute("aria-label", "Spreadsheet toolbar");
+        header.setAttribute("aria-label", TOOLBAR_LABEL);
     }
 
     // The notification region is an unnamed live region; naming it clashes with other landmarks.
