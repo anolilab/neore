@@ -79,6 +79,9 @@ export const vHostEvent = v.union(
         capabilities: v.optional(vCapabilityReport),
         folderId: v.string().max(128),
         folderLabel: v.string().max(200),
+        // For a session started as a fork of another (`forkSessionId`): whether the agent forked it, and why not (`fork_failed`,
+        // or `fork_unsupported` for an agent that does not fork sessions).
+        fork: v.optional(v.object({ forked: v.boolean(), reason: v.optional(v.string().max(500)) })),
         kind: v.literal("session_open"),
         nativeSessionId: v.optional(v.string().max(256)),
         // For a session started with a saved session id (harness switch S4): whether the agent loaded it, and why not (`load_failed`, or

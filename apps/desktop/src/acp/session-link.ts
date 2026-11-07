@@ -170,33 +170,7 @@ export class SessionLink {
 
             this.posted = true;
 
-            const result = await this.poster.request(payload);
-
-            if ((result.kind === "refused" && !rebind) || (result.kind === "ok" && result.ended)) {
-                this.posted = false;
-            }
-
-            if (this.closed) {
-                return;
-            }
-
-            if (result.kind === "ok" && result.threadId !== undefined) {
-                // An ended session (its thread was deleted in the app) takes no more turns.
-                if (result.ended) {
-                    this.local();
-                } else {
-                    this.threadId = result.threadId;
-                    this.confirmed = true;
-                    this.poster.bound(this.sessionId, result.threadId);
-                }
-            } else if (result.kind === "refused") {
-                // A refused re-post leaves the session and its thread as they are: turns still post into it, and its close still goes out.
-                if (!rebind) {
-                    this.local();
-                }
-            } else {
-                this.retryLater();
-            }
+            this.answered(await this.poster.request(payload), rebind);
         } catch {
             this.retryLater();
         } finally {
@@ -210,6 +184,35 @@ export class SessionLink {
         if (again && !this.closed && this.timer === undefined && typeof this.threadId === "string") {
             this.open();
         }
+    }
+
+    /** What the backend said to an open. `rebind`: the backend had already opened this session, so this post only carried a change. */
+    private answered(result: PostResult, rebind: boolean): void {
+        const ended = result.kind === "ok" && result.ended;
+
+        if (ended || (!rebind && result.kind === "refused")) {
+            this.posted = false;
+        }
+
+        if (this.closed) {
+            return;
+        }
+
+        if (result.kind === "ok" && result.threadId !== undefined) {
+            // An ended session (its thread was deleted in the app) takes no more turns.
+            if (ended) {
+                this.local();
+            } else {
+                this.threadId = result.threadId;
+                this.confirmed = true;
+                this.poster.bound(this.sessionId, result.threadId);
+            }
+        } else if (result.kind !== "refused") {
+            this.retryLater();
+        } else if (!rebind) {
+            this.local();
+        }
+        // A refused re-post leaves the session and its thread as they are: turns still post into it, and its close still goes out.
     }
 
     private local(): void {

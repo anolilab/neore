@@ -19,7 +19,11 @@ const OPENED = {
         groups: {
             // The agent answered `session/new` with no options: no model list, no reasoning effort.
             identity: { models: [], reasoningEffort: { reason: "not_offered", supported: false } },
-            sessions: { listNative: { reason: "not_offered", supported: false }, load: { reason: "not_offered", supported: false } },
+            sessions: {
+                fork: { reason: "not_offered", supported: false },
+                listNative: { reason: "not_offered", supported: false },
+                load: { reason: "not_offered", supported: false },
+            },
         },
         reportedAt: expect.any(Number),
         version: 1,

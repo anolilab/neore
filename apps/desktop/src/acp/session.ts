@@ -28,7 +28,7 @@ import type { PermissionGate, PermissionOutcome } from "./permission";
 import { describePermission, offeredOptions } from "./permission";
 import type { AgentProcess } from "./process";
 import type { Handshake } from "./protocol";
-import { initialize, loadSession, METHOD, newSession, promptParams } from "./protocol";
+import { forkSession, initialize, loadSession, METHOD, newSession, promptParams } from "./protocol";
 import { INVALID_PARAMS, METHOD_NOT_FOUND, RpcError } from "./rpc-error";
 import { Turn } from "./turn";
 import type { SessionSnapshot, SessionStatus, SessionSummary, StopReason, ToolState, ToolStatus } from "./types";
@@ -85,11 +85,19 @@ export interface SessionOptions {
     appVersion: string;
     cancelGraceMs?: number;
     cancelSettleMs?: number;
+
     /** Says what this agent reports it can do. Defaults to the handshake's own (`capabilities.ts`); tests stand in for an agent that reports more. */
     capabilityReport?: (handshake: Handshake) => CapabilityReport;
     folder: string;
     /** The folder is on another machine: this computer's own files say nothing about what the agent changed there, so none are read. */
     folderIsRemote?: boolean;
+
+    /**
+     * The agent's own id of a session to fork into this one, when the backend started this session as a fork of a
+     * thread (`acp_start`). Forked only if the agent advertised it; otherwise, or when the fork fails, a new session opens
+     * and the backend is told why (`fork` on the session it hears opened). The source session is never written to.
+     */
+    forkSessionId?: string;
     gate: PermissionGate;
     /** What the backend shows for this session (labels only). With `observer`, opening the session makes its thread. */
     hostInfo?: HostSessionInfo;
@@ -170,6 +178,9 @@ export class AgentSession {
     /** What happened to the saved session the backend asked to load; unset when it asked for none. */
     private reattach: HostSessionInfo["reattach"];
 
+    /** What happened to the session the backend asked to fork; unset when it asked for none. */
+    private fork: HostSessionInfo["fork"];
+
     /** The agent's own children, by the tool call that spawned each (§4.7). */
     private readonly children: ChildLedger;
 
@@ -235,6 +246,7 @@ export class AgentSession {
                 nativeSessionId: this.agentSessionId,
                 options: this.agentOptions,
                 ...(this.report !== undefined && { capabilities: this.report }),
+                ...(this.fork !== undefined && { fork: this.fork }),
                 ...(this.reattach !== undefined && { reattach: this.reattach }),
             };
 
@@ -389,8 +401,12 @@ export class AgentSession {
 
     /** The agent's session: the saved one when asked for and loadable, else a new one (`reattach` says which, and why not). */
     private async openAgentSession(): Promise<string> {
-        const { folder, resumeSessionId, startupTimeoutMs } = this.options;
+        const { folder, forkSessionId, resumeSessionId, startupTimeoutMs } = this.options;
         const { scrub } = this.options.process;
+
+        if (forkSessionId !== undefined) {
+            return await this.forkAgentSession(forkSessionId);
+        }
 
         if (resumeSessionId === undefined) {
             const opened = await newSession(this.connection, folder, startupTimeoutMs);
@@ -418,6 +434,39 @@ export class AgentSession {
         const opened = await newSession(this.connection, folder, startupTimeoutMs);
 
         this.agentOptions = optionsOf(opened.answer, scrub);
+
+        return opened.sessionId;
+    }
+
+    /** A fork of the agent's session `source` when it said it forks them, else a new session (`fork` says which, and why not). */
+    private async forkAgentSession(source: string): Promise<string> {
+        const { folder, startupTimeoutMs } = this.options;
+
+        // No `session/fork` frame goes to an agent that did not say it forks them.
+        if (isAvailable(capabilityOf(this.report, "sessions.fork"))) {
+            try {
+                const forked = await forkSession(this.connection, source, folder);
+
+                // An answer naming the source is not a fork: prompting it would write into the session the fork must leave alone.
+                if (forked.sessionId === source) {
+                    throw new Error("the agent did not fork the session");
+                }
+
+                this.fork = { forked: true };
+                this.agentOptions = optionsOf(forked.answer, this.options.process.scrub);
+
+                return forked.sessionId;
+            } catch {
+                // The agent's own error can quote its environment: the backend is told that it failed (a code), not its text.
+                this.fork = { forked: false, reason: "fork_failed" };
+            }
+        } else {
+            this.fork = { forked: false, reason: "fork_unsupported" };
+        }
+
+        const opened = await newSession(this.connection, folder, startupTimeoutMs);
+
+        this.agentOptions = optionsOf(opened.answer, this.options.process.scrub);
 
         return opened.sessionId;
     }

@@ -17,7 +17,7 @@ const NATIVE = { degradation: "none", supported: true } as const;
 const NOT_OFFERED = { reason: "not_offered", supported: false } as const;
 
 /**
- * `loadSession` is a boolean; `sessionCapabilities.list` is "present means supported" (ACP: omitted or `null` is no
+ * `loadSession` is a boolean; `sessionCapabilities.list` and `.fork` are "present means supported" (ACP: omitted or `null` is no
  * support, `{}` is support). The agent answered the handshake, so what it left out is not offered, not unknown.
  */
 export const reportFromHandshake = (capabilities: AgentCapabilities, now: number): CapabilityReport => {
@@ -26,6 +26,7 @@ export const reportFromHandshake = (capabilities: AgentCapabilities, now: number
     return {
         groups: {
             sessions: {
+                fork: isRecord(sessionCapabilities.fork) ? NATIVE : NOT_OFFERED,
                 listNative: isRecord(sessionCapabilities.list) ? NATIVE : NOT_OFFERED,
                 load: capabilities.loadSession === true ? NATIVE : NOT_OFFERED,
             },

@@ -22,6 +22,7 @@ import type {
     NewSessionRequest,
     PromptRequest,
 } from "@agentclientprotocol/sdk";
+import type { ForkSessionRequest } from "@agentclientprotocol/sdk/unstable";
 
 import type { JsonRpcConnection } from "./jsonrpc";
 import { RpcError } from "./rpc-error";
@@ -31,6 +32,7 @@ export const PROTOCOL_VERSION = 1;
 
 export const METHOD = {
     cancel: "session/cancel",
+    forkSession: "session/fork",
     initialize: "initialize",
     listSessions: "session/list",
     loadSession: "session/load",
@@ -140,6 +142,26 @@ export const newSession = async (
 
         throw error;
     }
+};
+
+/**
+ * `session/fork` (unstable in ACP v1): a new session that starts with the history of `sessionId`, which stays as it was.
+ * Returns the new session's id. Call only when the agent advertised `sessionCapabilities.fork`.
+ */
+export const forkSession = async (
+    connection: JsonRpcConnection,
+    sessionId: string,
+    cwd: string,
+    timeoutMs = LOAD_TIMEOUT_MS,
+): Promise<{ answer: Record<string, unknown>; sessionId: string }> => {
+    const params: ForkSessionRequest = { cwd, mcpServers: [], sessionId };
+    const response = await withTimeout(connection.request(METHOD.forkSession, params), timeoutMs, "the agent did not fork the session");
+
+    if (!isRecord(response) || typeof response.sessionId !== "string" || response.sessionId === "") {
+        throw new Error("the agent did not return a session id");
+    }
+
+    return { answer: response, sessionId: response.sessionId };
 };
 
 export const promptParams = (sessionId: string, text: string): PromptRequest => {

@@ -80,7 +80,7 @@ const LOCAL_PAGE = path.join(WINDOW_DIR, "device.html");
 const LOCAL_PRELOAD = path.join(WINDOW_DIR, "preload.cjs");
 
 /** The folder with the `neore-host` binaries and checksums this build ships: in the app's resources once packaged. */
-const hostBundleDirectory = (): string | undefined => app.isPackaged ? path.join(process.resourcesPath, "neore-host") : process.env.NEORE_HOST_BUNDLE;
+const hostBundleDirectory = (): string | undefined => (app.isPackaged ? path.join(process.resourcesPath, "neore-host") : process.env.NEORE_HOST_BUNDLE);
 
 /**
  * Registers the device handlers. Returns whether the core loaded: the shell advertises `device` only then
@@ -191,12 +191,12 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const win = state.local;
 
         return (
-            win !== undefined
-            && !win.isDestroyed()
-            && event.sender === win.webContents
-            && event.senderFrame !== null
-            && event.senderFrame === win.webContents.mainFrame
-            && event.senderFrame.url === localUrl
+            win !== undefined &&
+            !win.isDestroyed() &&
+            event.sender === win.webContents &&
+            event.senderFrame !== null &&
+            event.senderFrame === win.webContents.mainFrame &&
+            event.senderFrame.url === localUrl
         );
     };
 
@@ -414,7 +414,10 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             log: (message) => console.error(message),
             onChange: () => send(state.local?.webContents, LOCAL_EVENT.acp),
             remote: state.remote,
-            servers: () => (JSON.parse(core.settingsGet()) as SettingsView).hosts.map((host) => { return { acpAgents: host.acpAgents, acpConsents: host.acpConsents, deviceId: host.deviceId, name: host.name }; }),
+            servers: () =>
+                (JSON.parse(core.settingsGet()) as SettingsView).hosts.map((host) => {
+                    return { acpAgents: host.acpAgents, acpConsents: host.acpConsents, deviceId: host.deviceId, name: host.name };
+                }),
             userData: app.getPath("userData"),
         });
 
@@ -436,7 +439,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     ): Promise<void> => {
         try {
             const sessionId = await (server?.acp ?? requireAcp()).startSession(command.agentKey, command.agentLabel, command.folderPath, {
-                ...command.nativeSessionId !== undefined && { nativeSessionId: command.nativeSessionId },
+                ...(command.forkSessionId !== undefined && { forkSessionId: command.forkSessionId }),
+                ...(command.nativeSessionId !== undefined && { nativeSessionId: command.nativeSessionId }),
                 sessionId: command.sessionId,
                 threadId: command.threadId,
             });
@@ -645,7 +649,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     // The file tree of a connected server. Local window only, and nothing here reaches the agent: what a server
     // lists or holds is its own word, shown as text.
     local(LOCAL_CHANNEL.hostFilesList, async (deviceId, folder, after) =>
-        requireTransport().hostFilesList(readDeviceId(deviceId), readServerPath(folder), readAfter(after)));
+        requireTransport().hostFilesList(readDeviceId(deviceId), readServerPath(folder), readAfter(after)),
+    );
 
     // The coding agents of a server and the folders each may work in: approved here, in the local window, and nowhere else.
     local(LOCAL_CHANNEL.hostAcpUpdate, async (deviceId, update) => {
@@ -708,7 +713,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const parent = liveLocal();
         const result = parent === undefined ? await dialog.showOpenDialog(dialogOptions) : await dialog.showOpenDialog(parent, dialogOptions);
 
-        return result.canceled ? null : result.filePaths[0] ?? null;
+        return result.canceled ? null : (result.filePaths[0] ?? null);
     });
 
     // A native dialog, so the page cannot draw a confirmation that looks like one.
@@ -796,7 +801,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     local(LOCAL_CHANNEL.acpImportList, (agentKey, folder) => requireImporter().list(readAgentKey(agentKey), readFolder(folder)));
 
     local(LOCAL_CHANNEL.acpImport, (agentKey, folder, nativeSessionId, title) =>
-        requireImporter().import(readAgentKey(agentKey), readFolder(folder), readNativeSessionId(nativeSessionId), readSessionTitle(title)));
+        requireImporter().import(readAgentKey(agentKey), readFolder(folder), readNativeSessionId(nativeSessionId), readSessionTitle(title)),
+    );
 
     local(LOCAL_CHANNEL.acpStart, async (agentKey, folder) => {
         const key = readAgentKey(agentKey);
@@ -859,7 +865,15 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     // The text goes to the clipboard only from this window, built from an allow-list (see diagnostics.ts).
     local(LOCAL_CHANNEL.copyDiagnostics, (deviceId) => {
         const view = requireTransport().settingsGet();
-        const context = { appVersion: app.getVersion(), arch: arch(), electronVersion: process.versions.electron, home: homedir(), now: new Date(), osRelease: release(), platform: platform() };
+        const context = {
+            appVersion: app.getVersion(),
+            arch: arch(),
+            electronVersion: process.versions.electron,
+            home: homedir(),
+            now: new Date(),
+            osRelease: release(),
+            platform: platform(),
+        };
         const text = deviceId === undefined ? deviceDiagnostics(view, context) : serverDiagnostics(view, readDeviceId(deviceId), context);
 
         if (text === null) {
@@ -879,8 +893,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const id = readDeviceId(deviceId);
         const host = requireTransport()
             .settingsGet()
-            .hosts
-            .find((candidate) => candidate.deviceId === id);
+            .hosts.find((candidate) => candidate.deviceId === id);
 
         if (host === undefined) {
             throw new Error("device: that server is not paired with this computer");

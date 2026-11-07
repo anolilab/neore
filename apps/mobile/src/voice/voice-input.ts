@@ -3,6 +3,8 @@ import { api } from "@neore/backend/api";
 
 import { isNetworkFailure } from "../offline/connectivity";
 
+export type VoicePhase = "idle" | "recording" | "transcribing";
+
 /** A press shorter than this is a tap, not a recording: nothing is sent. */
 export const MIN_CLIP_MS = 400;
 

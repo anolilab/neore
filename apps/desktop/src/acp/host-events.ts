@@ -74,6 +74,8 @@ export interface HostSessionInfo {
     capabilities?: CapabilityReport;
     folderId: string;
     folderLabel: string;
+    /** For a session the backend started as a fork of another (`forkSessionId`): whether the agent forked it, and why not. */
+    fork?: { forked: boolean; reason?: "fork_failed" | "fork_unsupported" };
     /** The agent's own id for the session, so an import finds it and a later reattach can use it. */
     nativeSessionId?: string;
     /** The options the agent offers for the session (`agent-options.ts`), already bounded. */
@@ -124,6 +126,7 @@ export const capSessionInfo = (info: HostSessionInfo): HostSessionInfo => {
         ...(info.nativeSessionId !== undefined &&
             info.nativeSessionId !== "" &&
             Buffer.byteLength(info.nativeSessionId) <= MAX_NATIVE_ID_BYTES && { nativeSessionId: info.nativeSessionId }),
+        ...(info.fork !== undefined && { fork: { forked: info.fork.forked, ...(info.fork.reason !== undefined && { reason: info.fork.reason }) } }),
         ...(info.reattach !== undefined && {
             reattach: { loaded: info.reattach.loaded, ...(info.reattach.reason !== undefined && { reason: info.reattach.reason }) },
         }),
