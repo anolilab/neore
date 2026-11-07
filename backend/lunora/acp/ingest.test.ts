@@ -2359,3 +2359,275 @@ describe("files a reply refers to", () => {
         expect(finalize).not.toHaveBeenCalled();
     });
 });
+
+describe("what the agent reports about itself", () => {
+    const usage = (used: number) => {
+        return { size: 200_000, used };
+    };
+    const report = (device: Paired, at: number, body: Record<string, unknown>, sessionId?: string) =>
+        ingest(device, { events: [{ at, kind: "session_state", ...body }], ...(sessionId !== undefined && { sessionId }) });
+    const rowOf = async (threadId: string) => await harness.run(async (ctx: any) => await ctx.db.acpSessions.findFirst({ where: { threadId } }));
+
+    it("stores the usage the host reports on the session row, and the owner reads it back with the session", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const result = await report(device, 1000, { usage: usage(10) });
+
+        expect(result.status).toBe(200);
+        expect(result.json).toEqual({ ended: false, next: 0 });
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(10) }, agentStateAt: 1000 });
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ agentState: { usage: usage(10) } });
+    });
+
+    it("keeps a field a later report leaves out, and replaces one it sends", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { usage: { cost: { amount: 0.5, currency: "USD" }, size: 200_000, used: 10 } });
+        await report(device, 2000, {});
+        await report(device, 3000, { usage: usage(20) });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(20) }, agentStateAt: 3000 });
+    });
+
+    it("drops a report older than the one applied, so a late post cannot roll the state back", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 3000, { usage: usage(30) });
+        const late = await report(device, 2000, { usage: usage(20) });
+
+        expect(late.status).toBe(200);
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(30) }, agentStateAt: 3000 });
+    });
+
+    it("moves the ordering time on a newer report that repeats the stored usage, so an older report cannot overwrite the newest", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { usage: usage(10) });
+        await report(device, 3000, { usage: usage(10) });
+        await report(device, 2000, { usage: usage(7) });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(10) }, agentStateAt: 3000 });
+    });
+
+    it("stores a report that arrives after the session closed: the final usage is not lost", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { usage: usage(10) });
+        await ingest(device, { close: true, events: [] } as Body);
+        const late = await report(device, 2000, { usage: usage(12) });
+
+        expect(late.status).toBe(200);
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(12) }, agentStateAt: 2000, status: "ended" });
+    });
+
+    it("keeps the cost reported before when a later usage report leaves it out", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const cost = { amount: 0.4, currency: "USD" };
+
+        await report(device, 1000, { usage: { ...usage(10), cost } });
+        await report(device, 2000, { usage: usage(12) });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: { cost, size: 200_000, used: 12 } } });
+    });
+
+    it("orders a report stamped ahead of the server clock at the server's time, so a current report is still applied", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, Number.MAX_SAFE_INTEGER - 1, { usage: usage(10) });
+        const current = await report(device, Date.now(), { usage: usage(11) });
+
+        expect(current.status).toBe(200);
+        const stored = await rowOf(threadId);
+
+        expect(stored?.agentStateAt).toBeLessThanOrEqual(Date.now() + 1000);
+        expect(stored).toMatchObject({ agentState: { usage: usage(11) } });
+    });
+
+    it("refuses a report for a session the device does not hold", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+        const result = await report(device, 1000, { usage: usage(10) }, "no-such-session");
+
+        // Refused as any unknown session is (403): not 401, which counts toward a device's revocation streak.
+        expect(result.status).toBe(403);
+    });
+
+    it("refuses a report with another event beside it", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+        const result = await ingest(device, { events: [{ at: 1000, kind: "session_state", usage: usage(10) }, SESSION_OPEN] });
+
+        expect(result.status).toBe(403);
+    });
+
+    it("refuses a report sent inside a turn, or beside other events of an import, so it is never stored as a turn chunk", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const state = { at: 1000, kind: "session_state", usage: usage(10) };
+
+        const inTurn = await ingest(device, { events: [{ kind: "turn_start", text: "hi" }, state], firstSeq: 0, threadId, turnId: "t9" });
+        const inImport = await ingest(device, { events: [{ kind: "import_end" }, state], firstSeq: 0, threadId, turnId: "t9" });
+
+        expect(inTurn.status).toBe(403);
+        expect(inImport.status).toBe(403);
+        expect(await rowOf(threadId)).not.toHaveProperty("agentStateAt");
+    });
+
+    it("keeps the state in the GDPR export and on every reader of the session row", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { usage: usage(10) });
+
+        const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(collectAcpSessionsForExport, { userId: ownerId }))) as {
+            sessions: Record<string, unknown>[];
+        };
+
+        expect(exported.sessions.find((session) => session.threadId === threadId)).toMatchObject({ agentState: { usage: usage(10) } });
+        await expect(as(ownerId).query(listHostSessions as never, {} as never)).resolves.toEqual(
+            expect.arrayContaining([expect.objectContaining({ threadId })]),
+        );
+        // A host thread that sent no capability report reads as all unknown, and the state never leaks into it.
+        await expect(as(ownerId).query(getThreadCapabilities as never, { threadId } as never)).resolves.toEqual({ groups: {}, reportedAt: 0, version: 1 });
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ agentState: { usage: usage(10) } });
+    });
+
+    it("refuses a report whose counts are not whole non-negative numbers", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+
+        for (const bad of [
+            { size: 10, used: 1.5 },
+            { size: 10, used: -1 },
+        ]) {
+            const result = await report(device, 1000, { usage: bad });
+
+            expect(result.status).toBe(400);
+        }
+    });
+});
+
+describe("what the agent reports about its options", () => {
+    const option = (current: string, extra: Record<string, unknown> = {}) => {
+        return {
+            category: "model",
+            choices: [
+                { name: "Fast", value: "fast" },
+                { name: "Deep", value: "deep" },
+            ],
+            currentValue: current,
+            id: "model",
+            name: "Model",
+            ...extra,
+        };
+    };
+    const report = (device: Paired, at: number, body: Record<string, unknown>) => ingest(device, { events: [{ at, kind: "session_state", ...body }] });
+    const rowOf = async (threadId: string) => await harness.run(async (ctx: any) => await ctx.db.acpSessions.findFirst({ where: { threadId } }));
+
+    it("stores the options, the legacy modes and the legacy models, and the owner reads them back", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const modes = { available: [{ id: "ask", name: "Ask" }], current: "ask" };
+        const models = { available: [{ id: "m1", name: "M1" }], current: "m1" };
+
+        const posted = await report(device, 1000, { configOptions: [option("fast")], models, modes });
+
+        expect(posted.status).toBe(200);
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { configOptions: [option("fast")], models, modes }, agentStateAt: 1000 });
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({
+            agentState: { configOptions: [option("fast")], models, modes },
+        });
+    });
+
+    it("replaces a field it carries and keeps the ones it leaves out", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { configOptions: [option("fast")], usage: { size: 100, used: 1 } });
+        await report(device, 2000, { configOptions: [option("deep")] });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { configOptions: [option("deep")], usage: { size: 100, used: 1 } }, agentStateAt: 2000 });
+    });
+
+    it("reports the models and the reasoning support of options whatever the case of their categories", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, {
+            configOptions: [
+                { ...option("fast"), category: "Model" },
+                { category: "Thought_Level", choices: [{ name: "Low", value: "low" }], currentValue: "low", id: "effort", name: "Effort" },
+            ],
+        });
+
+        await expect(as(ownerId).query(getThreadCapabilities as never, { threadId } as never)).resolves.toMatchObject({
+            groups: {
+                identity: {
+                    models: [
+                        { id: "fast", name: "Fast" },
+                        { id: "deep", name: "Deep" },
+                    ],
+                    reasoningEffort: { degradation: "none", supported: true },
+                },
+            },
+        });
+    });
+
+    it("writes nothing when the options repeat, whatever order the keys arrive in", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const reordered = {
+            category: "model",
+            choices: [
+                { name: "Fast", value: "fast" },
+                { name: "Deep", value: "deep" },
+            ],
+            currentValue: "fast",
+            id: "model",
+            name: "Model",
+        };
+
+        await report(device, 1000, { configOptions: [option("fast")] });
+        await report(device, 2000, { configOptions: [reordered] });
+
+        // The values are stored, so only the watermark moves.
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { configOptions: [option("fast")] }, agentStateAt: 2000 });
+
+        // A different choice list is a change, even with the same current value.
+        await report(device, 3000, { configOptions: [option("fast", { choices: [{ name: "Fast", value: "fast" }] })] });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentStateAt: 3000 });
+    });
+
+    it("refuses more than 20 options, more than 100 choices and text past the bounds", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+
+        const many = Array.from({ length: 21 }, (_unused, index) => option("fast", { id: `o${String(index)}` }));
+        const choices = Array.from({ length: 101 }, (_unused, index) => {
+            return { name: "C", value: `c${String(index)}` };
+        });
+
+        for (const body of [
+            { configOptions: many },
+            { configOptions: [option("fast", { choices })] },
+            { configOptions: [option("fast", { id: "x".repeat(129) })] },
+            { configOptions: [option("fast", { name: "x".repeat(201) })] },
+            { modes: { available: [], current: "x".repeat(129) } },
+        ]) {
+            const refused = await report(device, 1000, body);
+
+            expect(refused.status).toBe(400);
+        }
+    });
+});

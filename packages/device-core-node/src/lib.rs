@@ -672,7 +672,7 @@ impl DeviceCore {
         self.state.acp_permission_cancel_session(&session_id);
     }
 
-    /// Checks one relayed coding-agent command (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`)
+    /// Checks one relayed coding-agent command (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`, `acp_set_config`)
     /// without acting on it or spending its nonce (JSON `{ callId, expiresAt, command, refusal }`). The main process
     /// writes its receipt, acts on `command`, then asks for the result with `acp_sign`.
     #[napi]

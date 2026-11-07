@@ -287,6 +287,16 @@ export class AcpManager {
         return this.sessions.get(sessionId)?.cancelTurn(turnId, options) ?? false;
     }
 
+    /** A change asked for from the web or the phone (`AgentSession.setRemoteOption`). */
+    public async setRemoteOption(sessionId: string, optionId: string | undefined, valueId: string): Promise<void> {
+        await this.require(sessionId).setRemoteOption(optionId, valueId);
+    }
+
+    /** Changes an option the session's agent offers (`AgentSession.setOption`). Throws the reason it was not changed. */
+    public async setOption(sessionId: string, optionId: string | undefined, valueId: string): Promise<void> {
+        await this.require(sessionId).setOption(optionId, valueId);
+    }
+
     public async close(sessionId: string): Promise<void> {
         await this.require(sessionId).close();
     }

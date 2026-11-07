@@ -8,6 +8,8 @@
  *   reason, so no client keeps a "Sending" turn that nothing will carry out. A turn the host already acknowledged is
  *   its own to end, and is left alone.
  * - `acp_start` refused or never answered: the session never opened, so it ends.
+ * - `acp_set_config` ended either way: the session row records how the agent answered (`optionResult`), which the
+ *   options row beside the composer shows. A change that was not carried out leaves the options as they were.
  *
  * And the prompt is cleared. A device call keeps its text in `input` and in its signed `envelope`, and the audit
  * list previews `input` for 30 days; the thread keeps the text as the user's message, and the desktop has the
@@ -17,7 +19,7 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import type { MutationCtx } from "../../_generated/server";
 import { isForwardHostState, updateHostStream } from "../../chat/streaming/persistent/host";
-import { isAcpTool } from "../../devices/lib/state";
+import { isAcpTool, OPEN_CALL_PAGE, OPEN_CALL_STATUSES } from "../../devices/lib/state";
 import { START_GRACE_MS } from "./constants";
 import { finishHostTurn } from "./finish";
 import { markReattachFailed } from "./reattach";
@@ -83,6 +85,85 @@ export const endStartingSession = async (ctx: MutationCtx, deviceId: Id<"devices
 };
 
 /**
+ * The only reasons an option change shows: the fixed phrases the computer signs (`AgentSession.setOption`, the receipt log). What
+ * else a failed call carries (a relay's exception, a device's own message) can quote the environment, so it is never shown.
+ */
+const OPTION_REASONS: ReadonlySet<string> = new Set([
+    "a mode is changed on the computer, not from here",
+    "that session no longer exists",
+    "the agent did not accept the change",
+    "the agent did not answer",
+    "the agent did not apply the change",
+    "the agent does not offer that choice",
+    "the app restarted before the agent answered",
+    "the device was removed",
+    "this session is not open",
+]);
+
+const OTHER_REASON = "The host did not change the option.";
+
+/** Records how an `acp_set_config` call ended on its session, for the options row to show. */
+const recordOptionResult = async (ctx: MutationCtx, call: Call, input: Record<string, unknown>, end: AcpCallEnd, now: number): Promise<void> => {
+    if (typeof input.sessionId !== "string" || typeof input.valueId !== "string") {
+        return;
+    }
+
+    const session = await ctx.db.acpSessions.findFirst({ where: { deviceId: call.deviceId, hostSessionId: input.sessionId } });
+
+    if (!session || session.userId !== call.userId) {
+        return;
+    }
+
+    // A change asked for after this one, already answered, stands: an older change ending now (its window closed late) does not replace it.
+    const answered = session.optionResult === undefined ? null : await ctx.db.get("deviceCalls", session.optionResult.callId as Id<"deviceCalls">);
+
+    if (answered && answered.createdAt > call.createdAt) {
+        return;
+    }
+
+    const signed = (end.error ?? "").replace(REFUSAL_PREFIX, "").trim();
+    let reason = OPTION_REASONS.has(signed) ? signed : OTHER_REASON;
+
+    if (end.status === "expired") {
+        reason = "The host did not answer.";
+    }
+
+    await ctx.db.patch("acpSessions", session._id, {
+        optionResult: {
+            at: now,
+            callId: call._id as string,
+            outcome: end.status === "completed" ? "confirmed" : "refused",
+            ...(typeof input.optionId === "string" && { optionId: input.optionId }),
+            ...(end.status !== "completed" && { reason }),
+            valueId: input.valueId,
+        },
+    });
+};
+
+/**
+ * A device removed while its option changes are open: each of those calls ends without a reply, so the change gets its refusal
+ * here, as it would from the computer. Other calls keep the ending they always had.
+ */
+export const recordRemovedDeviceOptions = async (ctx: MutationCtx, deviceId: Id<"devices">, now: number): Promise<void> => {
+    // Every open call, page by page: a change beyond the first page would otherwise get no answer before its call expires.
+    for (const status of OPEN_CALL_STATUSES) {
+        let cursor: string | undefined;
+
+        do {
+            const page = await ctx.db.deviceCalls.findMany({ cursor, limit: OPEN_CALL_PAGE, where: { deviceId, status } });
+
+            for (const call of page.page) {
+                if (call.toolName === "acp_set_config") {
+                    await recordOptionResult(ctx, call, inputOf(call), { error: "the device was removed", status: "failed" }, now);
+                }
+            }
+
+            cursor = page.isDone ? undefined : (page.continueCursor ?? undefined);
+        } while (cursor);
+    }
+};
+
+/**
  * Run with the call as it was BEFORE its terminal write, since the effects read the prompt's ids from `input`.
  * Does nothing for a device tool.
  */
@@ -92,6 +173,12 @@ export const onAcpCallEnded = async (ctx: MutationCtx, call: Call, end: AcpCallE
     }
 
     const input = inputOf(call);
+
+    if (call.toolName === "acp_set_config") {
+        await recordOptionResult(ctx, call, input, end, now);
+
+        return;
+    }
 
     if (call.toolName === "acp_send" && typeof input.turnId === "string") {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { hostTurnId: input.turnId } });

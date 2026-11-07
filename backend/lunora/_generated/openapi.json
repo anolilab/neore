@@ -122,6 +122,146 @@
                         "agentLabel": {
                           "type": "string"
                         },
+                        "agentState": {
+                          "properties": {
+                            "configOptions": {
+                              "items": {
+                                "properties": {
+                                  "category": {
+                                    "type": "string"
+                                  },
+                                  "choices": {
+                                    "items": {
+                                      "properties": {
+                                        "name": {
+                                          "type": "string"
+                                        },
+                                        "value": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "value"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "currentValue": {
+                                    "type": "string"
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "choices",
+                                  "currentValue",
+                                  "id",
+                                  "name"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "models": {
+                              "properties": {
+                                "available": {
+                                  "items": {
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "name"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "type": "array"
+                                },
+                                "current": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "available",
+                                "current"
+                              ],
+                              "type": "object"
+                            },
+                            "modes": {
+                              "properties": {
+                                "available": {
+                                  "items": {
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "name"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "type": "array"
+                                },
+                                "current": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "available",
+                                "current"
+                              ],
+                              "type": "object"
+                            },
+                            "usage": {
+                              "properties": {
+                                "cost": {
+                                  "properties": {
+                                    "amount": {
+                                      "type": "number"
+                                    },
+                                    "currency": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "amount",
+                                    "currency"
+                                  ],
+                                  "type": "object"
+                                },
+                                "size": {
+                                  "type": "number"
+                                },
+                                "used": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "size",
+                                "used"
+                              ],
+                              "type": "object"
+                            }
+                          },
+                          "required": [],
+                          "type": "object"
+                        },
                         "capabilities": {
                           "properties": {
                             "groups": {
@@ -1793,6 +1933,44 @@
                         },
                         "liveStreamId": {
                           "type": "string"
+                        },
+                        "optionResult": {
+                          "properties": {
+                            "at": {
+                              "type": "number"
+                            },
+                            "callId": {
+                              "type": "string"
+                            },
+                            "optionId": {
+                              "type": "string"
+                            },
+                            "outcome": {
+                              "anyOf": [
+                                {
+                                  "const": "confirmed",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "refused",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "reason": {
+                              "type": "string"
+                            },
+                            "valueId": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "at",
+                            "callId",
+                            "outcome",
+                            "valueId"
+                          ],
+                          "type": "object"
                         },
                         "status": {
                           "anyOf": [
@@ -5515,6 +5693,111 @@
           "acp"
         ],
         "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#acp_remote:setHostOption": {
+      "post": {
+        "description": "Invoke the `mutation` `acp_remote:setHostOption` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "acp_remote:setHostOption",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "optionId": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "valueId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "threadId",
+                      "valueId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "acp_remote:setHostOption",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "callId": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "anyOf": [
+                        {
+                          "const": "busy",
+                          "type": "string"
+                        },
+                        {
+                          "const": "ended",
+                          "type": "string"
+                        },
+                        {
+                          "const": "offline",
+                          "type": "string"
+                        },
+                        {
+                          "const": "outdated",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unpaired",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "sent": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "sent"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: acp_remote:setHostOption",
+        "tags": [
+          "acp"
+        ],
+        "x-lunora-function-kind": "mutation"
       }
     },
     "/_lunora/rpc#acp_remote:startHostSession": {

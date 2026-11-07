@@ -14,7 +14,7 @@ import { vCapabilityReport } from "../lib/capability-report";
 import { MAX_LENGTH } from "../lib/validators";
 import { newestHostStream } from "./lib/host-streams";
 import { isHostRunThread } from "./lib/host-thread";
-import { vAcpSessionStatus, vHostEndReason } from "./validators";
+import { vAcpAgentState, vAcpOptionResult, vAcpSessionStatus, vHostEndReason } from "./validators";
 
 const MAX_LISTED_SESSIONS = 50;
 
@@ -40,6 +40,7 @@ const vHostSessionDetail = v.object({
     _id: v.string(),
     agentKey: v.string(),
     agentLabel: v.string(),
+    agentState: v.optional(vAcpAgentState),
     capabilities: v.optional(vCapabilityReport),
     createdAt: v.number(),
     deviceId: v.string(),
@@ -52,6 +53,7 @@ const vHostSessionDetail = v.object({
     lastEventAt: v.optional(v.number()),
     // The host turn running now, so a client can stop that turn and no other.
     liveStreamId: v.optional(v.string()),
+    optionResult: v.optional(vAcpOptionResult),
     status: vAcpSessionStatus,
     threadId: v.string(),
 });
@@ -139,12 +141,48 @@ export const getHostSession = authQuery
 
         return {
             ...toView(row),
+            ...(row.agentState !== undefined && { agentState: row.agentState }),
             ...(last?.hostEndReason !== undefined && { lastEndReason: last.hostEndReason }),
             ...(ended && { lastEndStreamId: String(ended._id) }),
             ...(ended?.hostEndReason !== undefined && { lastEndedReason: ended.hostEndReason }),
             ...(live && { liveStreamId: String(live._id) }),
+            ...(row.optionResult !== undefined && { optionResult: row.optionResult }),
         };
     });
+
+const NATIVE_REASONING = { degradation: "none", supported: true } as const;
+const NOT_OFFERED_REASONING = { reason: "not_offered", supported: false } as const;
+
+/**
+ * The report with the model choices and the reasoning option the agent offers now. The agent can change its options after it
+ * opens, and the report it opened with would describe choices it no longer offers. Without options in the stored state, the report stands.
+ */
+const withLiveOptions = (report: Infer<typeof vCapabilityReport>, state: Infer<typeof vAcpAgentState> | undefined): Infer<typeof vCapabilityReport> => {
+    const options = state?.configOptions;
+
+    if (options === undefined) {
+        return report;
+    }
+
+    // The categories are read without regard to case, as the desktop reads them: the agent's own casing is kept in the stored state.
+    const model = options.find((option) => option.category?.toLowerCase() === "model");
+    const hasReasoning = options.some((option) => option.category?.toLowerCase() === "thought_level");
+
+    return {
+        ...report,
+        groups: {
+            ...report.groups,
+            identity: {
+                ...report.groups.identity,
+                models:
+                    model?.choices.map((choice) => {
+                        return { id: choice.value, name: choice.name };
+                    }) ?? [],
+                reasoningEffort: hasReasoning ? NATIVE_REASONING : NOT_OFFERED_REASONING,
+            },
+        },
+    };
+};
 
 /**
  * What the runner of a thread can do (provider-capabilities.md §6): the report its host sent for a host
@@ -184,5 +222,5 @@ export const getThreadCapabilities = authQuery
             where: { threadId: access.thread._id, userId: ctx.user.userId },
         });
 
-        return session?.capabilities ?? unknownCapabilityReport(0);
+        return withLiveOptions(session?.capabilities ?? unknownCapabilityReport(0), session?.agentState);
     });

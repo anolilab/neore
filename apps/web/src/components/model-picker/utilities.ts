@@ -140,19 +140,25 @@ export const formatPricing = (value: number | undefined): string => {
 };
 
 /**
- * Format context window or token count to display format (e.g., 200K, 32K).
+ * Format context window or token count to display format (e.g., 200K, 32K). With a locale, the decimal mark is that locale's
+ * (1,5M in German); without one the mark is a period, as it always was.
  */
-export const formatTokenCount = (value: number | undefined): string => {
+export const formatTokenCount = (value: number | undefined, locale?: string): string => {
     if (value === undefined || value === 0) {
         return "0";
     }
 
+    const decimal = (scaled: number, digits: number): string =>
+        locale === undefined
+            ? scaled.toFixed(digits)
+            : new Intl.NumberFormat(locale, { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(scaled);
+
     if (value >= 1_000_000) {
-        return `${(value / 1_000_000).toFixed(1)}M`;
+        return `${decimal(value / 1_000_000, 1)}M`;
     }
 
     if (value >= 1000) {
-        return `${(value / 1000).toFixed(0)}K`;
+        return `${decimal(value / 1000, 0)}K`;
     }
 
     return value.toString();

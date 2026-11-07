@@ -1,0 +1,9 @@
+# Two changes to one option overlap: the agent answers the newer change first, then the older one. Hand-written from the ACP v1 spec, not recorded from a real agent.
+{"out":{"id":"$1","method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{"fs":{"readTextFile":false,"writeTextFile":false},"terminal":false},"clientInfo":{"name":"neore-desktop","title":"Neore","version":"9.9.9"}}}}
+{"in":{"id":"$1","result":{"protocolVersion":1,"agentCapabilities":{"loadSession":false,"promptCapabilities":{"image":false,"audio":false,"embeddedContext":false}},"agentInfo":{"name":"example-agent","version":"0.4.1"},"authMethods":[]}}}
+{"out":{"id":"$2","method":"session/new","params":{"cwd":"/work","mcpServers":[]}}}
+{"in":{"id":"$2","result":{"sessionId":"sess_1","configOptions":[{"id":"model","name":"Model","category":"model","type":"select","currentValue":"fast","options":[{"value":"fast","name":"Fast"},{"value":"deep","name":"Deep"},{"value":"mid","name":"Mid"}]}]}}}
+{"out":{"id":"$3","method":"session/set_config_option","params":{"sessionId":"sess_1","configId":"model","value":"deep"}}}
+{"out":{"id":"$4","method":"session/set_config_option","params":{"sessionId":"sess_1","configId":"model","value":"mid"}}}
+{"in":{"id":"$4","result":{"configOptions":[{"id":"model","name":"Model","category":"model","type":"select","currentValue":"mid","options":[{"value":"fast","name":"Fast"},{"value":"deep","name":"Deep"},{"value":"mid","name":"Mid"}]}]}}}
+{"in":{"id":"$3","result":{"configOptions":[{"id":"model","name":"Model","category":"model","type":"select","currentValue":"deep","options":[{"value":"fast","name":"Fast"},{"value":"deep","name":"Deep"},{"value":"mid","name":"Mid"}]}]}}}

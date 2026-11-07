@@ -24,7 +24,7 @@ import { isHostRunThread } from "./lib/host-thread";
 import { sessionOfThread } from "./lib/sessions";
 import { offerOf, startFailureMessage, webSessionId } from "./lib/start";
 import { openHostSession } from "./lib/start-session";
-import { vPendingPermission } from "./validators";
+import { fitsIdBytes, vPendingPermission } from "./validators";
 
 /** A double tap, or a retry after a lost answer, within this is the same start. */
 const START_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
@@ -230,6 +230,18 @@ export const getHostPendingPermissions = authQuery
         return stream ? await waitingRequests(ctx, stream) : [];
     });
 
+/**
+ * Whether the agent's reported state lists this value: for an option, one of its choices; with no option, a mode of the legacy
+ * mode state, which only stands in when the agent sent no options at all.
+ */
+const isOfferedValue = (state: Doc<"acpSessions">["agentState"], optionId: string | undefined, valueId: string): boolean => {
+    if (optionId !== undefined) {
+        return state?.configOptions?.find((option) => option.id === optionId)?.choices.some((choice) => choice.value === valueId) === true;
+    }
+
+    return (state?.configOptions?.length ?? 0) === 0 && state?.modes?.available.some((mode) => mode.id === valueId) === true;
+};
+
 /** The request an `acp_permission_answer` call answers, from its stored input (cleared once the call ends). */
 const requestOf = (input: string): string | undefined => {
     try {
@@ -323,4 +335,92 @@ export const answerHostPermission = authMutation
         ctx.log.event("acp.answer_host_permission", { sent: true });
 
         return { sent: true };
+    });
+
+/**
+ * Changes one of the agent's options (its model, reasoning effort, mode ...) from the web or the phone. The owner's
+ * alone, and only for a value the agent itself listed in the state it reported (`acpSessions.agentState`): the option
+ * and the value are read back from that state, so neither can be invented here. Queues `acp_set_config`; the computer
+ * asks the agent and the session row records the answer (`optionResult`, `acp/lib/calls.ts`). A mode is never changed from here:
+ * a call with no `optionId` (the legacy mode state) or naming a mode option is refused.
+ */
+export const setHostOption = authMutation
+    .use(rateLimit("hosts/answer"))
+    .input({
+        optionId: v.optional(v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" })),
+        threadId: v.id("threads"),
+        valueId: v.string().min(1).check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
+    })
+    .output(
+        v.object({
+            callId: v.optional(v.string()),
+            reason: v.optional(v.union(v.literal("busy"), v.literal("ended"), v.literal("offline"), v.literal("outdated"), v.literal("unpaired"))),
+            sent: v.boolean(),
+        }),
+    )
+    .mutation(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+
+        if (!(await ownHostThread(ctx, args.threadId, userId))) {
+            throw new LunoraError("NOT_FOUND", "Thread not found");
+        }
+
+        const session = await sessionOfThread(ctx, args.threadId);
+
+        if (!session || session.status === "ended") {
+            return { reason: "ended" as const, sent: false };
+        }
+
+        if (!isOfferedValue(session.agentState, args.optionId, args.valueId)) {
+            throw new LunoraError("BAD_REQUEST", "The agent did not offer that option.");
+        }
+
+        // A mode can grant standing permissions (edits, every tool, without asking), and a remote answer may only allow once or
+        // decline: so a mode is changed on the computer, where the person sees what it grants. Only other options change from here.
+        const option = args.optionId === undefined ? undefined : session.agentState?.configOptions?.find((entry) => entry.id === args.optionId);
+
+        if (args.optionId === undefined || option?.category?.toLowerCase() === "mode") {
+            throw new LunoraError("BAD_REQUEST", "A mode is changed on the computer, not from here.");
+        }
+
+        // One change at a time: a double tap, or the phone and the web at once, finds the first still on its way.
+        const queued = await countOpenCalls(
+            ctx,
+            session.deviceId,
+            (open) =>
+                open.toolName === "acp_set_config" &&
+                open.threadId === args.threadId &&
+                !(open.status === "pending" && open.claimedAt === undefined && ctx.now - open.createdAt > ACP_CLAIM_WINDOW_MS),
+            1,
+        );
+
+        if (queued > 0) {
+            return { reason: "busy" as const, sent: false };
+        }
+
+        const call = await createAcpCall(
+            ctx,
+            {
+                deviceId: session.deviceId,
+                input: { sessionId: session.hostSessionId, valueId: args.valueId, ...(args.optionId !== undefined && { optionId: args.optionId }) },
+                kind: "acp_set_config",
+                threadId: args.threadId,
+                userId,
+            },
+            ctx.now,
+        );
+
+        if ("error" in call) {
+            const { error } = call;
+
+            if (error === "offline" || error === "outdated") {
+                return { reason: error, sent: false };
+            }
+
+            return { reason: error === "ineligible" ? ("unpaired" as const) : ("busy" as const), sent: false };
+        }
+
+        ctx.log.event("acp.set_host_option", { sent: true });
+
+        return { callId: call.callId, sent: true };
     });

@@ -23,11 +23,13 @@ import { toast } from "sonner";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { cleanPromptText } from "@/features/chat/core/utils/prompt-queue";
+import ContextUsageMeter from "@/features/chat/thread/context-usage-meter";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import DiffCommentsDraft from "./diff-comments-draft";
 import { caretAfterRemoval } from "./host-caret";
 import { exceedsRawInputLimit } from "./host-input";
+import HostOptions from "./host-options";
 import type { HostQueueEffect, HostQueueEvent, HostQueueState } from "./host-queue";
 import {
     canInterruptAndSend,
@@ -41,6 +43,7 @@ import {
 } from "./host-queue";
 import { MAX_HOST_PROMPT_CHARS, sendHostMessage } from "./host-send";
 import useHostSendErrorMessages from "./host-send-errors";
+import { formatReportedCost } from "./reported-cost";
 
 /** How the last turn ended when the person should be offered a way on. */
 const CONTINUABLE: ReadonlySet<string> = new Set(["interrupted", "timeout"]);
@@ -159,7 +162,7 @@ const PermissionRequestCard: FC<{ busy: boolean; onAnswer: (optionId: string) =>
 };
 
 const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ className, threadId }) => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const id = threadId as Id<"threads">;
     const [text, setText] = useState("");
@@ -314,6 +317,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     const starting = status === "starting";
     const overLimit = trimmed.length > MAX_HOST_PROMPT_CHARS;
     const limitNote = overLimit || refusedPaste;
+    const usage = session?.agentState?.usage;
     const lastEnd = session?.lastEndReason;
     // With messages queued, Continue would wait behind them, so the queue's own Send next is the way on.
     const offerContinue = !running && !blocked && lastEnd !== undefined && CONTINUABLE.has(lastEnd) && queue.items.length === 0;
@@ -831,6 +835,23 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                     )}
                 </section>
             )}
+            {usage !== undefined && usage.size > 0 && (
+                <div className="flex justify-end">
+                    <ContextUsageMeter
+                        contextWindow={usage.size}
+                        detail={usage.cost === undefined ? undefined : t`Cost reported by the agent: ${formatReportedCost(usage.cost, i18n.locale)}`}
+                        usedTokens={usage.used}
+                    />
+                </div>
+            )}
+            {/* Keyed by the session too: a new session in the thread starts with no change of its own waiting. */}
+            <HostOptions
+                ended={blocked}
+                key={`${threadId}:${session?._id ?? ""}`}
+                optionResult={session?.optionResult}
+                state={session?.agentState}
+                threadId={threadId}
+            />
             <div className="flex items-end gap-2">
                 <textarea
                     aria-describedby={limitNote ? "host-composer-limit" : undefined}

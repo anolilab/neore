@@ -105,6 +105,113 @@ const collectAll = async (userId: string) => {
 };
 
 describe("the export of coding-agent sessions and events", () => {
+    it("cuts a page by bytes when the sessions carry heavy agent state, and loses none of them", async () => {
+        const device = await insertDevice(A);
+        // Multi-byte names: three bytes a character, so the byte budget is what cuts the pages.
+        const choices = Array.from({ length: 100 }, (_unused, index) => {
+            return { name: `choice ${String(index)} ${"漢".repeat(40)}`, value: `v${String(index)}` };
+        });
+        const agentState = { configOptions: [{ category: "model", choices, currentValue: "v0", id: "model", name: "Model" }] };
+
+        for (let index = 0; index < 100; index += 1) {
+            const threadId = await insertSession(A, device, index);
+
+            await harness.run(async (ctx: any) => {
+                const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+                await ctx.db.patch("acpSessions", row._id, { agentState });
+            });
+        }
+
+        const pages = await collectAll(A);
+        const sessions = pages.flatMap((page) => page.sessions);
+
+        expect(pages.length).toBeGreaterThan(1);
+        expect(sessions).toHaveLength(100);
+        expect(new Set(sessions.map((session) => session.threadId)).size).toBe(100);
+
+        // Each page holds the budget plus at most one more row, so no page nears the step's limit.
+        for (const page of pages) {
+            expect(new TextEncoder().encode(JSON.stringify(page.sessions)).length).toBeLessThan(400_000 + 20_000);
+        }
+    });
+
+    it("keeps every session exactly once when one a page already exported is deleted before the next page", async () => {
+        const device = await insertDevice(A);
+        const choices = Array.from({ length: 100 }, (_unused, index) => {
+            return { name: `choice ${String(index)} ${"漢".repeat(40)}`, value: `v${String(index)}` };
+        });
+        const agentState = { configOptions: [{ category: "model", choices, currentValue: "v0", id: "model", name: "Model" }] };
+        const threads: string[] = [];
+
+        for (let index = 0; index < 100; index += 1) {
+            const threadId = await insertSession(A, device, index);
+
+            threads.push(threadId);
+            await harness.run(async (ctx: any) => {
+                const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+                await ctx.db.patch("acpSessions", row._id, { agentState });
+            });
+        }
+
+        const first = await collectPage(A);
+        const sessions = [...first.sessions];
+
+        expect(first.next).toBeDefined();
+
+        // A session the first page already exported goes away while the export is still paging.
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId: threads[0] } });
+
+            await ctx.db.delete("acpSessions", row._id);
+        });
+
+        for (let cursor = first.next; cursor !== undefined;) {
+            const page: Page = await collectPage(A, cursor);
+
+            sessions.push(...page.sessions);
+            cursor = page.next;
+        }
+
+        const exported = sessions.map((session) => session.threadId);
+
+        expect(new Set(exported).size).toBe(exported.length);
+        expect(exported).toEqual(expect.arrayContaining(threads.slice(1)));
+    });
+
+    it("includes the last option change the person made on a session", async () => {
+        const device = await insertDevice(A);
+        const threadId = await insertSession(A, device, 0);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+            await ctx.db.patch("acpSessions", row._id, { optionResult: { at: 5, callId: "c1", optionId: "model", outcome: "confirmed", valueId: "deep" } });
+        });
+
+        const pages = await collectAll(A);
+        const [first] = pages.flatMap((page) => page.sessions);
+
+        expect(first).toMatchObject({ optionResult: { outcome: "confirmed", valueId: "deep" } });
+    });
+
+    it("includes the agent's usage report with the time it was observed, which dates its values", async () => {
+        const device = await insertDevice(A);
+        const threadId = await insertSession(A, device, 0);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+            await ctx.db.patch("acpSessions", row._id, { agentState: { usage: { size: 200_000, used: 12_345 } }, agentStateAt: 1_700_000_000_000 });
+        });
+
+        const pages = await collectAll(A);
+        const [first] = pages.flatMap((page) => page.sessions);
+
+        expect(first).toMatchObject({ agentState: { usage: { size: 200_000, used: 12_345 } }, agentStateAt: 1_700_000_000_000 });
+    });
+
     it("is complete past one page of sessions, and carries no other user's", async () => {
         const device = await insertDevice(A);
         const other = await insertDevice(B);

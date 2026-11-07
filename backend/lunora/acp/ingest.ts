@@ -36,6 +36,7 @@ import { patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
+import { mergeAgentState, sameOptionFields } from "./lib/agent-state";
 import { MAX_EVENTS_PER_POST } from "./lib/constants";
 import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
@@ -44,9 +45,11 @@ import { reapExpiredHostStreams } from "./lib/reap";
 import { markReattachFailed, nativeIdFits, reattachFailureOf } from "./lib/reattach";
 import { sessionOfThread, touchSession } from "./lib/sessions";
 import { verifyDeviceRequest } from "./lib/verify-device";
+import type { vAgentUsage } from "./validators";
 import { vHostEvent } from "./validators";
 
 type Event = Infer<typeof vHostEvent>;
+type Usage = Infer<typeof vAgentUsage>;
 
 /** Who owns the device whose signed post this is, or null: unknown or revoked device, bad signature, stale post. */
 export const verifyHostPost = internalQuery
@@ -177,6 +180,62 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
     });
 
     return { ended: false, next: 0, outcome: "applied", threadId: threadId as string };
+};
+
+/** A usage report with the cost it kept from before, when it did not restate one (never an `undefined` value: the store refuses it). */
+const withKeptCost = (usage: Usage, stored: Usage | undefined): Usage => {
+    const cost = usage.cost ?? stored?.cost;
+
+    return { size: usage.size, used: usage.used, ...(cost !== undefined && { cost }) };
+};
+
+/** The same reported usage, field by field: stored values come back in whatever order the store keeps them. */
+const sameUsage = (a: Usage | undefined, b: Usage | undefined): boolean =>
+    a?.used === b?.used && a?.size === b?.size && a?.cost?.amount === b?.cost?.amount && a?.cost?.currency === b?.cost?.currency;
+
+/**
+ * A `session_state` report: each field present replaces the stored one, an absent field keeps it. A report older than the
+ * one applied is dropped, and one whose values are already stored writes nothing. Answered "applied" either way, so the
+ * desktop does not resend it. Not claim-once: writing the same values twice changes nothing.
+ */
+const applySessionState = async (
+    ctx: MutationCtx,
+    device: Doc<"devices">,
+    hostSessionId: string,
+    event: Extract<Event, { kind: "session_state" }>,
+    now: number,
+): Promise<ApplyResult> => {
+    const session = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
+
+    if (!session || session.userId !== device.userId) {
+        return REFUSED;
+    }
+
+    // A desktop clock running ahead cannot park the ordering watermark in the future: a report stamped later than the server
+    // clock is ordered at the server's time. The ordering time is the observation time, so a report still arriving after
+    // the session closed is stored too: a debounced report can outlive its close, and its usage is the final one.
+    const at = Math.min(event.at, now);
+
+    if (session.agentStateAt !== undefined && at < session.agentStateAt) {
+        return { ended: false, next: 0, outcome: "applied" };
+    }
+
+    // A usage report that leaves the cost out keeps the cost reported before: the agent's cost is cumulative.
+    const usage = event.usage === undefined ? undefined : withKeptCost(event.usage, session.agentState?.usage);
+    const usageChanged = usage !== undefined && !sameUsage(usage, session.agentState?.usage);
+
+    if (usageChanged || !sameOptionFields(session.agentState, event)) {
+        await ctx.db.patch("acpSessions", session._id, {
+            agentState: mergeAgentState(session.agentState, { ...event, ...(usage !== undefined && { usage }) }),
+            agentStateAt: at,
+        });
+    } else if (session.agentStateAt === undefined || at > session.agentStateAt) {
+        // A newer report that repeats the stored values (or leaves them out) still moves the watermark, so an older report that
+        // arrives later cannot overwrite the newest observation.
+        await ctx.db.patch("acpSessions", session._id, { agentStateAt: at });
+    }
+
+    return { ended: false, next: 0, outcome: "applied" };
 };
 
 /**
@@ -439,6 +498,19 @@ export const applyHostEvents = internalMutation
 
         if (args.close === true) {
             return args.threadId === undefined && args.events.length === 0 ? await closeSession(ctx, device, args.sessionId, now) : REFUSED;
+        }
+
+        // A state report is one event, posted turn-less on its own. Anywhere else (in a turn, an import, or beside a session
+        // open) it is refused, so it can never be stored as a chunk or move a turn to `running`.
+        const [first] = args.events;
+        const isStateReport = args.threadId === undefined && args.events.length === 1 && first?.kind === "session_state";
+
+        if (args.events.some((event) => event.kind === "session_state") && !isStateReport) {
+            return REFUSED;
+        }
+
+        if (isStateReport && first?.kind === "session_state") {
+            return await applySessionState(ctx, device, args.sessionId, first, now);
         }
 
         if (args.threadId === undefined) {

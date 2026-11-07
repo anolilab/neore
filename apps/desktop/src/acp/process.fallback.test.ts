@@ -42,11 +42,13 @@ describe.skipIf(process.platform === "win32")("an agent on a machine that denies
         agent = spawnAgent(plan(), "claude");
 
         expect(agent.pid).toBeDefined();
-        // Not wrapped in `nice` or `sh`: the process is the command itself.
+        // Not wrapped in `nice` or `sh`: the process is the command itself, once it has exec'd (a moment after the spawn).
         const { execFileSync } = await import("node:child_process");
-        const command = execFileSync("ps", ["-o", "comm=", "-p", String(agent.pid)], { encoding: "utf8" }).trim();
+        const pid = String(agent.pid);
 
-        expect(command).toMatch(SLEEP);
+        await vi.waitFor(() => {
+            expect(execFileSync("ps", ["-o", "comm=", "-p", pid], { encoding: "utf8" }).trim()).toMatch(SLEEP);
+        });
         expect(warn.mock.calls.length).toBeLessThanOrEqual(1);
     });
 });
