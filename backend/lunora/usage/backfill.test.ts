@@ -734,6 +734,29 @@ describe("project backfill", () => {
         ]);
     });
 
+    it("caps a day's projects at all of that day's total rows, when a merge left it two", async () => {
+        const { alpha, beta } = await insertProjectFixture();
+
+        vi.setSystemTime(STARTED);
+        await start();
+
+        for (let current = await state(); current.status !== "done"; current = await state()) {
+            await step(current.runId);
+        }
+
+        // A guest-to-account merge leaves the day's 147 total in two rows.
+        await harness.run(async (ctx: any) => {
+            const total = await ctx.db.usageDaily.findFirst({ where: { date: "2026-09-20", skillKey: TOTAL_SKILL_KEY, userId: USER } });
+
+            await ctx.db.patch("usageDaily", total._id, { costMicrodollars: 47, replies: 1, tokens: 5 });
+            await ctx.db.insert("usageDaily", { ...total, _creationTime: undefined, _id: undefined, costMicrodollars: 100, replies: 2, tokens: 10 });
+        });
+        await drain();
+
+        // 100 + 40 fit in the day's 147, whichever total row is read first.
+        expect(await projectRows()).toStrictEqual(EXPECTED_PROJECTS(alpha, beta));
+    });
+
     it("starts the project walk only once the first walk is done, from the first walk's cutoff", async () => {
         const { alpha, beta } = await insertProjectFixture();
 

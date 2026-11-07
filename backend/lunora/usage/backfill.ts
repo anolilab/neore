@@ -467,14 +467,27 @@ const clampToDayTotals = async (ctx: DbCtx, userId: string, increments: Readonly
         let left = room.get(increment.date);
 
         if (!left) {
-            const { page } = await ctx.db.usageDaily.findMany({ where: { date: increment.date, userId } });
-            const total = page.find((row) => row.skillKey === TOTAL_SKILL_KEY);
-            const filed = page.filter((row) => row.skillKey === PROJECT_SKILL_KEY);
+            // Every row of each kind, not the first: a guest-to-account merge can leave a day with two total rows. An
+            // unlimited `findMany` returns all matching rows (`backend/AGENTS.md`).
+            const sumOf = async (skillKey: string) => {
+                const { page } = await ctx.db.usageDaily.findMany({ where: { date: increment.date, skillKey, userId } });
+                const sum = { costMicrodollars: 0, replies: 0, tokens: 0 };
+
+                for (const row of page) {
+                    sum.costMicrodollars += row.costMicrodollars;
+                    sum.replies += row.replies;
+                    sum.tokens += row.tokens;
+                }
+
+                return sum;
+            };
+            const total = await sumOf(TOTAL_SKILL_KEY);
+            const filed = await sumOf(PROJECT_SKILL_KEY);
 
             left = {
-                costMicrodollars: (total?.costMicrodollars ?? 0) - filed.reduce((sum, row) => sum + row.costMicrodollars, 0),
-                replies: (total?.replies ?? 0) - filed.reduce((sum, row) => sum + row.replies, 0),
-                tokens: (total?.tokens ?? 0) - filed.reduce((sum, row) => sum + row.tokens, 0),
+                costMicrodollars: total.costMicrodollars - filed.costMicrodollars,
+                replies: total.replies - filed.replies,
+                tokens: total.tokens - filed.tokens,
             };
             room.set(increment.date, left);
         }
