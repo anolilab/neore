@@ -57,6 +57,7 @@ import { showError } from "@/lib/toast";
 
 import AgentSwitchDivider from "./agent-switch-divider";
 import ContextResetDivider from "./context-reset-divider";
+import CopyPromptLinkAction from "./copy-prompt-link-action";
 import ForkBranchDialog from "./fork-branch-dialog";
 import formatMessageTime from "./format-message-time";
 import GenerationModelMenu from "./generation-model-menu";
@@ -398,6 +399,7 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
                 )}
 
                 {isUser && <RestoreToInputAction message={message} />}
+                {isUser && <CopyPromptLinkAction message={message} />}
 
                 {(isAssistant || isUser) && isTextModel && <SelectMessagesAction messageId={message.id} />}
 

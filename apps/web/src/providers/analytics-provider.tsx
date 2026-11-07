@@ -4,6 +4,8 @@ import type { FC, PropsWithChildren } from "react";
 import { useEffect } from "react";
 
 import { reportFirstNativeLaunch } from "@/lib/analytics/first-native-launch";
+import { redactPromptFromEvent } from "@/lib/analytics/redact-prompt";
+import { REPLAY_MASK_SELECTOR } from "@/lib/analytics/replay-mask";
 
 /**
  * Apply a consent decision to PostHog.
@@ -65,6 +67,11 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
                           isIdentifiedID: false,
                       }
                     : undefined,
+            // Every event, page views and error reports included, goes through the redaction: a prompt link's text never leaves
+            // the browser in a URL (`lib/analytics/redact-prompt.ts`).
+            before_send: redactPromptFromEvent,
+            // The composer draft (a prompt link's text included) is masked in replay: the attribute is set on the editor.
+            session_recording: { maskTextSelector: REPLAY_MASK_SELECTOR },
             capture_pageview: true,
             // PostHog will not set any cookies until the user has given consent
             cookieless_mode: "on_reject",

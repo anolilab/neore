@@ -4,9 +4,11 @@
  * are handed a match, so no match means no account request. The popups are stood in for to record what they are
  * handed; the editor, its extensions and the match logic are the real ones.
  */
-import { act, render, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { createRef } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { REPLAY_MASK_SELECTOR } from "@/lib/analytics/replay-mask";
 
 import type { ComposerTiptapEditorRef } from "./composer-tiptap-editor";
 
@@ -172,5 +174,16 @@ describe("ComposerTiptapEditor suggestions", () => {
         });
 
         expect(opened(handed.slash) || opened(handed.file) || opened(handed.variable)).toBe(false);
+    });
+
+    it("renders the editor inside the element session replay masks, so the draft is not recorded as text", async () => {
+        render(<ComposerTiptapEditor onChange={() => {}} onSubmit={() => {}} value="Summarise this" />);
+
+        // The masked element is the one holding the editor's text: replay records that element's text as masked.
+        // eslint-disable-next-line testing-library/no-node-access -- the assertion is about the attribute replay masks by
+        const masked = document.querySelector(REPLAY_MASK_SELECTOR);
+
+        expect(masked).not.toBeNull();
+        expect(masked?.contains(await screen.findByText("Summarise this"))).toBe(true);
     });
 });

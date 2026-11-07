@@ -148,3 +148,20 @@ describe("SignedOutChat header", () => {
         expect(screen.getAllByRole("button", { name: "Toggle Sidebar" })).toHaveLength(1);
     });
 });
+
+describe("SignedOutChat prompt link", () => {
+    afterEach(() => {
+        globalThis.history.replaceState(null, "", "/");
+        useChatUIStore.getState().setComposerText("");
+    });
+
+    it("keeps a link opened signed out in the address, for the signed-in chat to apply after sign-in", () => {
+        globalThis.history.replaceState(null, "", "/chat?prompt=hello&model=cf-kimi-k2.5");
+
+        render(<SignedOutChat />);
+
+        // Nothing is applied or stripped before sign-in: the composer stays empty and the link is still in the address.
+        expect(useChatUIStore.getState().composerText).toBe("");
+        expect(globalThis.location.search).toBe("?prompt=hello&model=cf-kimi-k2.5");
+    });
+});

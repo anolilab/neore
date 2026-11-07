@@ -30,6 +30,7 @@ import useFavoriteModels from "@/features/chat/core/hooks/use-favorite-models";
 import type { PromptHistoryDirection } from "@/features/chat/core/utils/prompt-history";
 import type { PromptVariable } from "@/features/prompts/lib/prompt-variables";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
+import { REPLAY_MASKED_PROPS } from "@/lib/analytics/replay-mask";
 
 import type { ChatReference } from "../chat-reference";
 import { cleanEditorText } from "./clean-editor-text";
@@ -575,7 +576,7 @@ const ComposerTiptapEditor = ({
     const maxHeight = lineHeight * maxRows;
 
     return (
-        <div className="relative w-full" onPaste={onPaste} ref={editorContainerRef}>
+        <div className="relative w-full" onPaste={onPaste} ref={editorContainerRef} {...REPLAY_MASKED_PROPS}>
             <div className="w-full overflow-y-auto" style={{ maxHeight: `${maxHeight}px` }}>
                 <EditorContent
                     className={clsx(

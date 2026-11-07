@@ -12,6 +12,7 @@ import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 
+import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import type {
     ChatActionsContextValue,
     ChatMessagesContextValue,
@@ -66,14 +67,18 @@ const LandingChatProvider = ({ children }: LandingChatProviderProps) => {
     // Model - use selected model from store or default
     const model: ModelId = selectedModel ?? DEFAULT_CHAT_MODEL;
 
+    const { isAnonymous } = useIsAnonymous();
+
     const threadValue = useMemo((): ChatThreadContextValue => {
         return {
+            composerModelEntries: undefined,
+            isAnonymous,
             isNewThread: true,
             model,
             thread: null,
             threadId: undefined,
         };
-    }, [model]);
+    }, [isAnonymous, model]);
 
     const actionsValue = useMemo((): ChatActionsContextValue => {
         return {

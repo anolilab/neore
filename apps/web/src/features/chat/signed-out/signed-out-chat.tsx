@@ -51,6 +51,9 @@ import { chatDefaultOpen, chatSidebarNames, chatSidebarStyle } from "../shell-la
  * that would need an account opens the sign-in prompt instead. Sending holds
  * the message for after sign-in (`pending-send.ts`).
  *
+ * A prompt link opened here is left in the address on purpose: sign-in returns to this same URL (the sign-in prompt's
+ * `openedFrom`), and the signed-in chat applies the link once then (`core/hooks/use-prompt-link-draft.ts`).
+ *
  * Classes are copied from the components they stand in for (`SidebarShortcut`,
  * `ThreadListHeader`, `ChatSiteHeader`, `Composer`), which read the session,
  * settings or the model catalog; keep them in step.

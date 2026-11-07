@@ -1,17 +1,27 @@
 import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useLocation, useNavigate, useRouteContext } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import Assistant from "@/features/chat/assistant";
+import { usePromptLinkDraft } from "@/features/chat/core/hooks/use-prompt-link-draft";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import type { PendingLinkDraft } from "@/features/chat/core/utils/pending-link-draft";
+import { prunePendingLinkDraft, savePendingLinkDraft, takePendingLinkDraft } from "@/features/chat/core/utils/pending-link-draft";
+import { promptFromLink, readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
+import { savedPromptDraft } from "@/features/prompts/lib/prompt-draft";
+import validatePromptSettings from "@/features/prompts/lib/prompt-validation";
+import { useComposerModelEntries, useLinkWaitOver } from "@/hooks/use-composer-models";
+import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
+import { rememberLinkedPrompt } from "@/lib/analytics/linked-prompts";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 // Module scope, so it outlives this component's mounts: a page load resumes once.
@@ -20,13 +30,53 @@ import { useCRPC } from "@/lib/lunora/crpc";
 // that visit may resume: a later New chat (a new navigation) must open a blank chat.
 const resumeState: { consumed: boolean; firstKey: string | undefined } = { consumed: false, firstKey: undefined };
 
+/** Whether a landing message is waiting in the session. Read without consuming it; false where session storage is unavailable. */
+const landingMessageWaiting = (): boolean => {
+    try {
+        return Boolean(sessionStorage.getItem(LANDING_MESSAGE_KEY));
+    } catch {
+        return false;
+    }
+};
+
+/**
+ * The prompt as the address spells it. A link is built with its text JSON-quoted (`prompt.ts`), so a quoted value is read as that string;
+ * any other value is its own text, as a hand-written `1e3` or `true` is.
+ */
+const rawPromptText = (search: string): string | undefined => {
+    const raw = new URLSearchParams(search).get("prompt");
+
+    if (raw === null) {
+        return undefined;
+    }
+
+    try {
+        const parsed: unknown = JSON.parse(raw);
+
+        return typeof parsed === "string" ? parsed : raw;
+    } catch {
+        return raw;
+    }
+};
+
 const ChatPage = () => {
     const route = "/(chat)/chat/";
     const context = useRouteContext({ from: route });
     const promptId = Route.useSearch({ select: ({ promptId: selected }) => selected });
     const redirectReason = Route.useSearch({ select: ({ redirectReason: selected }) => selected });
     const hasInitialMessage = Route.useSearch({ select: ({ initialMessage }) => initialMessage });
+    const parsedLinkPrompt = Route.useSearch({ select: ({ prompt }) => prompt });
+    const parsedLinkModel = Route.useSearch({ select: ({ model }) => model });
     const location = useLocation();
+    // The router has already read the address: a prompt that looks like a number is a number there, and a quoted one loses its quotes.
+    // The address's own text (`searchStr`, not the parsed `search` object) is what a link carries, so it is read once here, and the
+    // parsed value only when there is no text.
+    const linkRead = readPromptLinkSearch({ model: parsedLinkModel, prompt: rawPromptText(location.searchStr) ?? parsedLinkPrompt });
+    const addressHasLink = linkRead.prompt !== undefined || linkRead.model !== undefined;
+    // The link's values are the address's own. A draft kept for this account (`pending-link-draft.ts`) is restored separately, as text only.
+    const restoreChecked = useRef(false);
+    const linkPrompt = linkRead.prompt;
+    const linkModel = linkRead.model;
     // TanStack keys each history entry; a new navigation gets a new key.
     const navigationKey = location.state.__TSR_key;
     const { t } = useLingui();
@@ -40,8 +90,83 @@ const ChatPage = () => {
     const { data: sessionData, isPending: isSessionPending } = hooks.useSession();
     const activeTeamId = (sessionData?.session as { activeTeamId?: string | null } | undefined)?.activeTeamId ?? undefined;
     const resumeScopeReady = !isOrgPending && !isSessionPending;
+    // A prompt link is a draft on this page: resuming the last chat would navigate it away before it is applied.
     const resumeLastChat =
-        BOOTED_ON_CHAT_INDEX && userSettings?.resumeLastChat === true && !promptId && !redirectReason && !hasInitialMessage && resumeScopeReady;
+        BOOTED_ON_CHAT_INDEX &&
+        userSettings?.resumeLastChat === true &&
+        !promptId &&
+        !redirectReason &&
+        !hasInitialMessage &&
+        linkPrompt === undefined &&
+        linkModel === undefined &&
+        resumeScopeReady;
+
+    // The handoff owns the draft from mount, when its message is waiting, until the link hook has decided once: the consume effect below
+    // takes the message before the session and catalog answer, so ownership cannot end when the message is taken. After that, a later
+    // link applies even while the address still says `initialMessage`. A handoff URL with nothing in storage never owned the draft.
+    const [handoffWaiting, setHandoffWaiting] = useState(landingMessageWaiting);
+    const endHandoffOwnership = useCallback(() => {
+        setHandoffWaiting(false);
+    }, []);
+    const sessionUserId = sessionData?.user?.id ?? null;
+    const signedInAccount = sessionData?.user !== undefined && sessionData.user.isAnonymous !== true;
+
+    // A kept draft that has expired or cannot be read is removed as the chat page mounts, whether or not a restore reads it.
+    useEffect(() => {
+        prunePendingLinkDraft();
+    }, []);
+
+    // A link applied while no signed-in account is on the page is kept for the sign-in return.
+    const keepForSignIn = useCallback(
+        (applied: PendingLinkDraft) => {
+            if (!signedInAccount) {
+                savePendingLinkDraft(applied, sessionUserId);
+            }
+        },
+        [sessionUserId, signedInAccount],
+    );
+
+    // A link may select only a model the composer's picker offers this user. The link waits until the catalog and the user's rules
+    // have answered, so the list is final; if the rules fail to load the list is empty, the link's model is refused and its prompt applies.
+    const linkableModels = useComposerModelEntries();
+
+    // A saved prompt (`promptId`) owns the draft only if it will apply: it loads, and its settings are valid, as `usePromptLoader` requires.
+    // A missing or invalid one applies nothing, so the link keeps the draft, and the link waits until the prompt has answered.
+    const pickerModels = useFeatureFlaggedModels();
+    const savedPrompt = useQuery(crpc.prompts.functions.getPrompt.queryOptions(promptId ? { promptId: promptId as Id<"prompts"> } : skipToken));
+    // The link waits for the saved prompt, the session and the model decision, each bounded: past `LINK_WAIT_MS` it applies (`useLinkWaitOver`).
+    const linkWaitOver = useLinkWaitOver();
+    const savedPromptPending = Boolean(promptId) && savedPrompt.isPending && !linkWaitOver;
+    // A saved prompt that is blank writes no text (the loader keeps the draft), so it does not own the draft either: the link's text applies.
+    const savedPromptApplies =
+        Boolean(promptId) &&
+        savedPrompt.data !== undefined &&
+        savedPrompt.data !== null &&
+        savedPromptDraft(savedPrompt.data, {
+            email: sessionData?.user?.email,
+            name: sessionData?.user?.name,
+            organization: activeOrganization?.name,
+        }).trim() !== "" &&
+        validatePromptSettings(savedPrompt.data.model, savedPrompt.data.reasoningEffort, savedPrompt.data.enabledFeatures, pickerModels).isValid;
+
+    // A handoff or a saved prompt already supplies this chat's draft: a link does not replace it.
+    const otherDraftSource = savedPromptApplies || (Boolean(hasInitialMessage) && (handoffWaiting || landingMessageWaiting()));
+
+    usePromptLinkDraft({
+        // Undefined until the list has loaded: the link waits for it (within the bound), and a list that never loads chooses no model.
+        linkableModels,
+        // The composer sends the free model to an anonymous visitor's text chat, so the link's model waits for the session.
+        isAnonymous: sessionData?.user?.isAnonymous === true,
+        model: linkModel,
+        // A handoff owns the draft while it is pending: its flag is in the address and its message is either waiting in storage now (one
+        // written after this page mounted, as a new handoff is) or was waiting at mount and not yet decided. Read now, so the link sees it.
+        otherDraftSource,
+        prompt: linkPrompt,
+        onApplied: keepForSignIn,
+        onDecided: endHandoffOwnership,
+        ready: (!isSessionPending || linkWaitOver) && (linkableModels !== undefined || linkWaitOver) && !savedPromptPending,
+    });
+
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.
         crpc.chat.resume.latestResumableThread.queryOptions(
@@ -106,6 +231,36 @@ const ChatPage = () => {
         }
     }, [latestResolved, latestThreadId, navigationKey, navigate, resumeLastChat]);
 
+    // A draft kept for this account is put back once, when the session and any saved prompt have answered. Only its text is set: no model,
+    // mode or comparison, no navigation, and resumption does not wait for it. A draft already in the composer is kept, and a draft kept for
+    // another account is never applied (`takePendingLinkDraft` removes it).
+    useEffect(() => {
+        if (isSessionPending || savedPromptPending || restoreChecked.current) {
+            return;
+        }
+
+        // Resumption decides first (its effect is below this one in the same commit, and a draft already in the composer stops it), so
+        // the restore waits for that answer, bounded by the link wait. It never decides the resumption itself.
+        if (resumeLastChat && !latestResolved && !linkWaitOver) {
+            return;
+        }
+
+        restoreChecked.current = true;
+
+        if (addressHasLink) {
+            return;
+        }
+
+        const taken = takePendingLinkDraft(sessionUserId);
+        const { attachedReferences, composerAttachments, composerText, setComposerText } = useChatUIStore.getState();
+        const hasDraft = composerText.trim() !== "" || composerAttachments.length > 0 || attachedReferences.length > 0;
+
+        if (taken !== undefined && !otherDraftSource && !hasDraft) {
+            setComposerText(promptFromLink(taken.prompt));
+            rememberLinkedPrompt(promptFromLink(taken.prompt));
+        }
+    }, [addressHasLink, isSessionPending, latestResolved, linkWaitOver, otherDraftSource, resumeLastChat, savedPromptPending, sessionUserId]);
+
     useEffect(() => {
         if (!redirectReason || shownNotificationRef.current === redirectReason) {
             return;
@@ -138,7 +293,7 @@ const ChatPage = () => {
     useEffect(() => {
         // Include initialMessage as allowed (though unused) to prevent warnings during navigation
         // TanStack Router may briefly carry over search params when navigating between routes
-        const supportedParams = new Set(["initialMessage", "promptId", "redirectReason", "settings", "settingsTab"]);
+        const supportedParams = new Set(["initialMessage", "model", "prompt", "promptId", "redirectReason", "settings", "settingsTab"]);
         const searchParams = new URLSearchParams(location.search);
         const unsupportedParams: string[] = [];
 
@@ -164,8 +319,14 @@ const ChatPage = () => {
 
 export const Route = createFileRoute("/(chat)/chat/")({
     validateSearch: (search: Record<string, unknown>) => {
+        // A prompt link's draft and model, read by the same parser the link is built and tested with (`core/utils/prompt-link.ts`).
+        // Applied once, never sent (`core/hooks/use-prompt-link-draft.ts`).
+        const link = readPromptLinkSearch(search);
+
         return {
+            model: link.model,
             promptId: search.promptId as string | undefined,
+            prompt: link.prompt,
             redirectReason: search.redirectReason as string | undefined,
             // `|| undefined`, not `false`: a default written into the search is put into the URL, and the
             // router then redirects a bare `/chat` to `/chat?initialMessage=false` before it renders.

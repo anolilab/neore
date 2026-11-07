@@ -40,15 +40,26 @@ async function fetchGatewayModels(): Promise<GatewayModelsResponse> {
  * regions, and all capabilities. No transformation needed.
  * Refetches every 5 minutes; the gateway caches for 1 hour.
  */
+const GATEWAY_MODELS_QUERY = {
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    queryFn: fetchGatewayModels,
+    queryKey: ["gateway-models"],
+    refetchOnWindowFocus: false,
+    retry: 1,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+};
+
+/**
+ * Whether the catalog has answered, loaded or failed. Until it has, the list is empty, so a decision that needs the list waits.
+ */
+export function useGatewayModelsSettled(): boolean {
+    const { isError, isSuccess } = useQuery(GATEWAY_MODELS_QUERY);
+
+    return isSuccess || isError;
+}
+
 export function useGatewayModels(): GatewayModel[] {
-    const { data } = useQuery({
-        gcTime: 30 * 60 * 1000, // 30 minutes
-        queryFn: fetchGatewayModels,
-        queryKey: ["gateway-models"],
-        refetchOnWindowFocus: false,
-        retry: 1,
-        staleTime: 5 * 60 * 1000, // 5 minutes
-    });
+    const { data } = useQuery(GATEWAY_MODELS_QUERY);
 
     if (!data?.data) {
         return EMPTY_MODELS;

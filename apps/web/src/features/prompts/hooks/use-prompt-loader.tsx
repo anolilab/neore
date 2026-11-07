@@ -12,8 +12,8 @@ import { useModelStore } from "@/features/chat/core/stores/model-store";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import { savedPromptDraft } from "../lib/prompt-draft";
 import validatePromptSettings from "../lib/prompt-validation";
-import { getAutoPopulatedVariables, replaceVariables } from "../lib/prompt-variables";
 
 /**
  * Hook to load a prompt by ID and apply its settings to the chat
@@ -68,30 +68,19 @@ const usePromptLoader = (promptId: string | undefined) => {
             });
         }
 
-        // Build variable values with auto-populated ones
-        const autoVariables = getAutoPopulatedVariables({
+        // The same text the route decides ownership from (`savedPromptDraft`). A blank prompt writes nothing: the draft already in the
+        // composer, a link's text when the link applies, is kept, never replaced by an empty one.
+        const content = savedPromptDraft(prompt, {
             email: sessionData?.user?.email,
             name: sessionData?.user?.name,
             organization: activeOrganization?.name,
         });
 
-        // Merge with prompt variable defaults
-        const values = { ...autoVariables };
-
-        if (prompt.variables) {
-            for (const v of prompt.variables) {
-                if (!Object.hasOwn(values, v.name) && v.defaultValue) {
-                    values[v.name] = v.defaultValue;
-                }
-            }
+        if (content.trim() !== "") {
+            setComposerText(content);
+            toast.success(t`Prompt loaded`);
         }
 
-        // Replace variables in prompt content
-        const content = replaceVariables(prompt.content, values, { keepUnmatched: true });
-
-        // Set the composer text with the prompt content
-        setComposerText(content);
-        toast.success(t`Prompt loaded`);
         hasAppliedPrompt.current = true;
     }, [promptId, prompt, models, setComposerText, setSelectedModel, setPendingSettings, sessionData, activeOrganization, t]);
 

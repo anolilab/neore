@@ -28,6 +28,7 @@ import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { openLoginPrompt } from "@/features/auth/stores/login-prompt-store";
 import { holdForSignIn } from "@/features/chat/core/hooks/use-pending-send";
 import useLocalModelTurn from "@/features/local-models/hooks/use-local-model-turn";
+import { useComposerModelEntries } from "@/hooks/use-composer-models";
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
 import type { AppError } from "@/lib/errors";
@@ -916,14 +917,21 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
 
     // --- Split context values with individual useMemo ---
 
+    // Anonymity rides the thread context so a message row can read it without an auth provider of its own (the copy action).
+    const isAnonymous = sessionData?.user?.isAnonymous === true;
+    // The list a prompt link's model is checked against: the copy and the open of a link must agree on it.
+    const composerModelEntries = useComposerModelEntries();
+
     const threadContextValue = useMemo((): ChatThreadContextValue => {
         return {
+            composerModelEntries,
+            isAnonymous,
             isNewThread,
             model,
             thread,
             threadId,
         };
-    }, [threadId, thread, isNewThread, model]);
+    }, [threadId, thread, isNewThread, model, isAnonymous, composerModelEntries]);
 
     const messagesContextValue = useMemo((): ChatMessagesContextValue => {
         return {
