@@ -110,11 +110,21 @@ describe("prompt queue persistence", () => {
             items: [{ attachments: [], id: "a", steer, text: "go left" }],
             paused: true,
         });
-        expect(restorePromptQueue(JSON.stringify({ items: [{ id: "a", steer: { id: 1 }, text: "go left" }] }))?.items[0]).toStrictEqual({
+        expect(restorePromptQueue(JSON.stringify({ format: 2, items: [{ id: "a", steer: { id: 1 }, text: "go left" }] }))?.items[0]).toStrictEqual({
             attachments: [],
             id: "a",
             text: "go left",
         });
+    });
+
+    it("keeps whether a send may have been taken across a reload, and an edit, a new message, drops it", () => {
+        const tried: PromptQueueState<never> = { items: [{ attachments: [], id: "a", text: "go", tried: true }], paused: false };
+
+        expect(restorePromptQueue(serializePromptQueue(tried))?.items[0]?.tried).toBe(true);
+        // A queue stored before this was kept says nothing of its sends, so every message counts as tried.
+        expect(restorePromptQueue(JSON.stringify({ items: [{ id: "a", text: "go" }] }))?.items[0]?.tried).toBe(true);
+        expect(restorePromptQueue(JSON.stringify({ format: 2, items: [{ id: "a", text: "go" }] }))?.items[0]?.tried).toBeUndefined();
+        expect(editQueuedPrompt(tried, "a", "go further", "b").items[0]).toStrictEqual({ attachments: [], id: "b", text: "go further" });
     });
 
     it("leaves out a prompt with no text and no kept attachment, and stores nothing for an empty queue", () => {
