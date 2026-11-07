@@ -586,3 +586,27 @@ describe("the window a regenerate's prompt must still be in", () => {
         await expect(writeTitle(threadId, "Generated", { promptId: prompt, requestedBy: OWNER, title: "Stale" })).resolves.toBe(false);
     }, 60_000);
 });
+
+describe("failed rows and the window", () => {
+    it("does not count failed rows against the window, as the model's context does not", async () => {
+        const threadId = await threadWith();
+        const row = rowIn(threadId);
+        const prompt = await row(0, { message: { content: "Plan a trip", role: "user" } });
+
+        // WINDOW - 1 successful rows after the prompt keep it the window's last row; failed rows between them do not push it out.
+        let order = 1;
+
+        for (let index = 1; index < TITLE_READ_WINDOW; index += 1) {
+            await row(order, { message: { content: `Step ${index}`, role: "assistant" } });
+            order += 1;
+
+            if (index % 10 === 0) {
+                await row(order, { message: { content: `Failed ${index}`, role: "assistant" }, status: "failed" });
+                order += 1;
+            }
+        }
+
+        await expect(promptOf(threadId)).resolves.toEqual({ id: prompt, text: "Plan a trip" });
+        await expect(writeTitle(threadId, "Old", { promptId: prompt, requestedBy: OWNER })).resolves.toBe(true);
+    }, 60_000);
+});

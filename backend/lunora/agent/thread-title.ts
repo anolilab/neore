@@ -39,8 +39,16 @@ import { DEFAULT_RECENT_MESSAGES } from "./shared";
 
 type Reader = Pick<QueryContext, "db">;
 
-/** The rows a title is read from and checked against: the tail of the active path, as many as the model's context holds. */
+/**
+ * The rows a title is read from and checked against: the tail of the active path, as many SUCCESSFUL rows as the model's context holds
+ * (failed rows are not in the model's context, so they do not use up the window).
+ */
 export const TITLE_READ_WINDOW = DEFAULT_RECENT_MESSAGES;
+
+/** How many stored rows a title read or check walks to find its window: room for failed rows among the window's successful ones. */
+const TITLE_WALK_LIMIT = 2 * TITLE_READ_WINDOW;
+
+const isSuccessful = (row: Doc<"messages">): boolean => row.status === "success";
 
 /** One admission per title run for billing (`idempotencyClaims`): a retried run finds it, so its model call is not billed twice. */
 export const TITLE_CHARGE_SCOPE = "title-charge";
@@ -101,10 +109,11 @@ export const titlePromptIn = async (context: Reader, thread: Doc<"threads">): Pr
         return undefined;
     }
 
-    const { rows } = await walkPath(context, thread._id, leaf, { limit: TITLE_READ_WINDOW });
+    const { rows } = await walkPath(context, thread._id, leaf, { limit: TITLE_WALK_LIMIT });
+    const window = rows.filter((row) => isSuccessful(row)).slice(0, TITLE_READ_WINDOW);
 
     // A stored row's `message` is untyped; the prompt reader takes it as the user/assistant message it is.
-    return firstUserPrompt(rows.toReversed().filter((row) => row.status === "success") as ContextRow[]);
+    return firstUserPrompt(window.toReversed() as ContextRow[]);
 };
 
 /**
@@ -133,11 +142,11 @@ export const promptInView = async (context: Reader, thread: Doc<"threads">, prom
         return true;
     }
 
-    // The leaf is the window's first row, so at most WINDOW - 1 rows lie above it before the window ends: a walk of that many stops on
-    // the prompt only when the prompt is the window's last row or nearer, and `next` is then the prompt itself.
-    const { next } = await walkPath(context, thread._id, leaf, { limit: TITLE_READ_WINDOW - 1, stopAtId: promptId });
+    // The walk stops on the prompt (`next`); the successful rows passed on the way are the window's rows before it, so the prompt is in
+    // the window when there are at most WINDOW - 1 of them.
+    const { next, rows } = await walkPath(context, thread._id, leaf, { limit: TITLE_WALK_LIMIT, stopAtId: promptId });
 
-    return next?._id === promptId;
+    return next?._id === promptId && rows.filter((row) => isSuccessful(row)).length <= TITLE_READ_WINDOW - 1;
 };
 
 interface TitleCheck {

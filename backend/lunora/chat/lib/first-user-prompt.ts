@@ -27,7 +27,6 @@ interface Piece {
 const isTextPart = (part: unknown): part is { text: string; type: "text" } =>
     typeof part === "object" && part !== null && "type" in part && part.type === "text" && "text" in part && typeof part.text === "string";
 
-/** A browser page the extension attached carries its structural marker; the marker is what says it is not typed. */
 /** Whether a text part is the placeholder sent for a file with no question ({@link fileOnlyPromptPart}), known by its tag, not its wording. */
 const isFileOnlyPlaceholder = (part: unknown): boolean => {
     const options = (part as { providerOptions?: { neore?: { fileOnlyPrompt?: unknown } } }).providerOptions;
@@ -35,6 +34,7 @@ const isFileOnlyPlaceholder = (part: unknown): boolean => {
     return options?.neore?.fileOnlyPrompt === true;
 };
 
+/** A browser page the extension attached carries its structural marker; the marker is what says it is not typed. */
 const hasPageMarker = (part: unknown): boolean => {
     const options = (part as { providerOptions?: { neore?: { pageContext?: unknown } } }).providerOptions;
 
