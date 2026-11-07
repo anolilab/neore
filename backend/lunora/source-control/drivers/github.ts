@@ -1176,8 +1176,27 @@ const checkOutputSchema = z.object({
 });
 
 /** A job log: the API answers with a redirect to a signed address on a storage origin, read there without the token. */
+/** The job's log answer: `undefined` when the host has none to give (expired, not written yet, gone). */
+const jobLogAnswer = async (request: HostRequest, ref: PullRequestRef, checkId: string): Promise<Response | undefined> => {
+    try {
+        // An Actions job has the id of its check run, so the check's id names the job.
+        return await request(`${repoPath(ref)}/actions/jobs/${checkId}/logs`, { redirect: "return" });
+    } catch (error) {
+        if (error instanceof HostApiError && !error.rateLimited && (error.status === 404 || error.status === 410)) {
+            return undefined;
+        }
+
+        throw error;
+    }
+};
+
 const jobLog = async (request: HostRequest, ref: PullRequestRef, checkId: string, maxChars: number): Promise<CheckLog | undefined> => {
-    const answer = await request(`${repoPath(ref)}/actions/jobs/${checkId}/logs`, { redirect: "return" });
+    const answer = await jobLogAnswer(request, ref, checkId);
+
+    if (answer === undefined) {
+        return undefined;
+    }
+
     const location = answer.headers.get("location");
 
     if (answer.status < 300 || answer.status >= 400) {
@@ -1191,7 +1210,8 @@ const jobLog = async (request: HostRequest, ref: PullRequestRef, checkId: string
         return undefined;
     }
 
-    const response = await fetchWithDeadline(location, { redirect: "error" }).catch(() => {
+    // Not followed: the signed address is the log itself, and a redirect from it leads nowhere this reads.
+    const response = await fetchWithDeadline(location, { redirect: "manual" }).catch(() => {
         throw new HostApiError("The log could not be fetched", 0);
     });
 

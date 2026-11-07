@@ -70,21 +70,33 @@ const wantedOf = (input: Target): Target => {
     return { ...(input.number !== undefined && { number: input.number }), ...(input.repository !== undefined && { repository: input.repository }) };
 };
 
-export const readPullRequestTool = createTool<Target, object, ToolContext>({
+export const readPullRequestTool = createTool<Target & { reviewCursor?: string }, object, ToolContext>({
     description: `Read a pull request linked to this thread: title, description, state, branches, head commit, the submitted reviews, and the review comments by file and line (with each comment's id, for a reply).
+Review comments come a page at a time: when nextReviewCursor is set, call again with it as reviewCursor for the next page.
 ${UNTRUSTED}`,
     execute: async (context, input) => {
         const dependencies = dependenciesOf(context);
 
-        return dependencies ? explain(await readPullRequestForAgent(dependencies, wantedOf(input))) : signedOut;
+        return dependencies ? explain(await readPullRequestForAgent(dependencies, wantedOf(input), input.reviewCursor)) : signedOut;
     },
-    inputSchema: z.object(target).strict(),
+    inputSchema: z
+        .object({
+            ...target,
+            reviewCursor: z
+                .string()
+                .min(1)
+                .max(500)
+                .optional()
+                .meta({ description: "nextReviewCursor from an earlier read, for the next page of review comments" }),
+        })
+        .strict(),
     title: "Read Pull Request",
     toModelOutput: (_context, { output }) => toonEncodeOutput(output),
 });
 
 export const readFailingChecksTool = createTool<Target, object, ToolContext>({
     description: `Read the failing checks on a linked pull request's head commit: each check's name, id, and an excerpt of its log around the failure (the first few checks; an excerpt is capped).
+logStatus says why a check has no log: "not_read" (past the first few, or a status that has none) or "unavailable" (reading it failed). complete is false when the host listed only part of the checks.
 ${UNTRUSTED}`,
     execute: async (context, input) => {
         const dependencies = dependenciesOf(context);

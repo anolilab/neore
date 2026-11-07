@@ -96,7 +96,11 @@ const cap = (text: string, max: number): { text: string; truncated: boolean } =>
 
 // ─── Read ───────────────────────────────────────────────────────────────────
 
-export const readPullRequestForAgent = async (dependencies: PullRequestAgentDependencies, wanted: WantedPullRequest) => {
+/**
+ * The pull request, its reviews, and one page of its review threads. `reviewCursor` is the `nextReviewCursor` an
+ * earlier read returned: the next page of threads.
+ */
+export const readPullRequestForAgent = async (dependencies: PullRequestAgentDependencies, wanted: WantedPullRequest, reviewCursor?: string) => {
     const picked = await target(dependencies, wanted);
 
     if (picked.status !== "ok") {
@@ -110,12 +114,14 @@ export const readPullRequestForAgent = async (dependencies: PullRequestAgentDepe
         const [detail, reviews, threads] = await Promise.all([
             driver.getPullRequest(request, ref),
             driver.listReviews(request, ref),
-            driver.listThreads(request, ref, null),
+            driver.listThreads(request, ref, reviewCursor ?? null),
         ]);
         const body = cap(detail.body, AGENT_PR_BODY_MAX_CHARS);
 
         return {
             moreReviewComments: threads.hasMore,
+            // Hand back as `reviewCursor` for the next page of review threads.
+            nextReviewCursor: threads.hasMore ? threads.endCursor : null,
             pullRequest: {
                 authorLogin: detail.authorLogin,
                 baseBranch: detail.baseBranch,
@@ -154,6 +160,11 @@ const RERUNNABLE: ReadonlySet<CheckRun["state"]> = new Set(["cancelled", "failur
 export interface FailingCheck {
     id: string | null;
     log: CheckLog | null;
+    /**
+     * Why there is no log: `not_read` past the first few failing checks, or for a check the host cannot re-read (a
+     * commit status); `unavailable` when reading it failed, so the agent can tell a failure from a log not asked for.
+     */
+    logStatus: "not_read" | "ok" | "unavailable";
     name: string;
     required: boolean | null;
     url: string | null;
@@ -178,16 +189,21 @@ export const readFailingChecksForAgent = async (dependencies: PullRequestAgentDe
 
         // One log at a time: a log read is the heavy call, and the first few failures are what the agent needs.
         for (const [index, check] of failing.entries()) {
-            const log =
-                check.id !== null && index < AGENT_MAX_CHECK_LOGS
-                    ? await driver.readCheckLog(request, ref, check.id, LOG_EXCERPT_MAX_CHARS).catch(() => null)
-                    : null;
+            const read = check.id !== null && index < AGENT_MAX_CHECK_LOGS;
+            const log = read ? await driver.readCheckLog(request, ref, check.id!, LOG_EXCERPT_MAX_CHARS).catch(() => null) : null;
+            let logStatus: FailingCheck["logStatus"] = "not_read";
 
-            checks.push({ id: check.id, log, name: check.name, required: check.required, url: check.url });
+            if (read) {
+                logStatus = log === null ? "unavailable" : "ok";
+            }
+
+            checks.push({ id: check.id, log, logStatus, name: check.name, required: check.required, url: check.url });
         }
 
         return {
             checks,
+            // The host lists one bounded page of checks: past it, a failure may be missing from `checks`.
+            complete: summary.checks.length >= summary.total,
             headSha: detail.headSha,
             passing: summary.checks.filter((check) => check.state === "success").length,
             pending: summary.checks.filter((check) => check.state === "pending").length,

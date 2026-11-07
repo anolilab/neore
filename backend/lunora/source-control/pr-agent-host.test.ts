@@ -168,6 +168,64 @@ describe("reading the failing checks of a linked pull request", () => {
     });
 });
 
+describe("when a check's log cannot be had", () => {
+    const failingRoutes = {
+        [`GET ${API}/commits/${SHA}/check-runs`]: () =>
+            Response.json({
+                check_runs: [{ app: { slug: "github-actions" }, conclusion: "failure", id: 11, name: "test", status: "completed" }],
+                total_count: 3,
+            }),
+        [`GET ${API}/commits/${SHA}/status`]: () => Response.json({ statuses: [], total_count: 0 }),
+        [`GET ${API}/pulls/7`]: () => Response.json(pull),
+    };
+
+    it("falls back to the check's own output when the job has no log", async () => {
+        stubHost({
+            ...failingRoutes,
+            [`GET ${API}/check-runs/11`]: () =>
+                Response.json({ app: { slug: "github-actions" }, id: 11, name: "test", output: { summary: "2 failed", text: null, title: "Tests" } }),
+        });
+
+        const outcome = await readFailingChecksForAgent(dependencies(), {});
+        const [check] = outcome.status === "ok" && "checks" in outcome ? outcome.checks : [];
+
+        expect(check?.logStatus).toBe("ok");
+        expect(check?.log).toStrictEqual({ excerpt: "Tests\n\n2 failed", source: "check_output", truncated: false });
+    });
+
+    it("says the log was unavailable when reading it failed, and that the list is partial", async () => {
+        stubHost({ ...failingRoutes, [`GET ${API}/check-runs/11`]: () => Response.json({ message: "boom" }, { status: 500 }) });
+
+        const outcome = await readFailingChecksForAgent(dependencies(), {});
+
+        expect(outcome).toMatchObject({ checks: [{ log: null, logStatus: "unavailable", name: "test" }], complete: false, status: "ok" });
+    });
+});
+
+describe("reading a linked pull request's review threads", () => {
+    it("hands back a cursor for the next page and reads that page when given it", async () => {
+        const after: (string | null)[] = [];
+        const driver = {
+            ...githubDriver,
+            getPullRequest: async () => ({ ...pull, baseBranch: "main", bodyTruncated: false, headBranch: "feat/sum", headSha: SHA } as never),
+            listReviews: async () => [],
+            listThreads: async (_request: unknown, _ref: unknown, cursor: string | null) => {
+                after.push(cursor);
+
+                return { endCursor: "page-2", hasMore: cursor === null, items: [] };
+            },
+        };
+        const first = await readPullRequestForAgent({ ...dependencies(), driver }, {});
+
+        expect(first).toMatchObject({ moreReviewComments: true, nextReviewCursor: "page-2" });
+
+        const second = await readPullRequestForAgent({ ...dependencies(), driver }, {}, "page-2");
+
+        expect(second).toMatchObject({ moreReviewComments: false, nextReviewCursor: null });
+        expect(after).toStrictEqual([null, "page-2"]);
+    });
+});
+
 describe("a pull request that is not linked to the thread", () => {
     it("is refused before the host is asked anything, for reads and writes alike", async () => {
         const seen = stubHost({});
