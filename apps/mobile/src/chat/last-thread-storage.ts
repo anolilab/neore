@@ -58,10 +58,13 @@ export const createLastThreadStore = (store: KeyValueStore): LastThreadStore => 
 
         lastChatToReopen: async (userId: string): Promise<string | undefined> => {
             try {
-                const isOn = isReopenOn(await store.getItem(REOPEN_KEY));
-                const last = parseLastThread(await store.getItem(LAST_THREAD_KEY));
+                // Read in turn, after any save or clear asked before it: a sign-out still deleting must not be read around.
+                return await inOrder(async () => {
+                    const isOn = isReopenOn(await store.getItem(REOPEN_KEY));
+                    const last = parseLastThread(await store.getItem(LAST_THREAD_KEY));
 
-                return threadToReopen({ isOn, last, userId });
+                    return threadToReopen({ isOn, last, userId });
+                });
             } catch {
                 return undefined;
             }

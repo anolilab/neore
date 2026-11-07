@@ -101,6 +101,31 @@ describe("last thread storage", () => {
         await expect(lastThread.lastChatToReopen("u-1")).resolves.toBeUndefined();
     });
 
+    it("does not reopen a chat whose sign-out delete is still running when the account signs in again", async () => {
+        const values = new Map<string, string>();
+        const lastThread = signedIn({
+            deleteItem: async (key) => {
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 20);
+                });
+                values.delete(key);
+            },
+            getItem: async (key) => values.get(key) ?? null,
+            setItem: async (key, value) => {
+                values.set(key, value);
+            },
+        });
+
+        await lastThread.rememberLastThread({ threadId: "t-1", userId: "u-1" });
+
+        const clearing = lastThread.clearLastThread();
+
+        lastThread.bindOwner("u-1");
+
+        await expect(lastThread.lastChatToReopen("u-1")).resolves.toBeUndefined();
+        await clearing;
+    });
+
     it("drops a save from a read that outlives the session, so the cleared chat is not written back", async () => {
         const { store, values } = memoryStore();
         const lastThread = signedIn(store);
