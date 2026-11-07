@@ -219,6 +219,20 @@ describe("usage by project", () => {
         expect(skills.skills.reduce((total, skill) => total + skill.costMicrodollars, 0)).toBe(610);
     });
 
+    it("keeps a moved thread's past usage with the project it was recorded under", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+        const beta = await insertThread(USER, "Beta");
+
+        await record({ costMicrodollars: 100, replyKey: "before-move", threadId: alpha.threadId, tokens: 10 });
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", alpha.threadId, { projectId: beta.projectId });
+        });
+        await record({ costMicrodollars: 40, replyKey: "after-move", threadId: alpha.threadId, tokens: 4 });
+
+        expect(await projectUsage(USER, alpha.projectId!, "2026-09-01")).toStrictEqual({ costMicrodollars: 100, replies: 1, tokens: 10 });
+        expect(await projectUsage(USER, beta.projectId!, "2026-09-01")).toStrictEqual({ costMicrodollars: 40, replies: 1, tokens: 4 });
+    });
+
     it("files a redelivered record under its project once", async () => {
         const alpha = await insertThread(USER, "Alpha");
 
@@ -302,6 +316,31 @@ describe("usage by project", () => {
         expect(result.truncated).toBe(true);
         expect(result.projects[0]!.costMicrodollars).toBe(result.total.costMicrodollars);
         expect(result.noProject.costMicrodollars).toBe(0);
+    });
+
+    it("leaves out a day the project read reached only in part, so No project never takes that day's project spend", async () => {
+        const projectKeys = ["p1", "p2", "p3", "p4", "p5", "p6"];
+        // Six project rows a day: the read stops two rows into its oldest day.
+        const days = Math.ceil((4000 + 1) / projectKeys.length);
+
+        await harness.run(async (ctx: any) => {
+            for (let day = 0; day < days; day += 1) {
+                const date = new Date(Date.UTC(2025, 0, 1) + day * 86_400_000).toISOString().slice(0, 10);
+                const row = { date, replies: 1, tokens: 1, updatedAt: 1, userId: USER };
+
+                await ctx.db.insert("usageDaily", { ...row, costMicrodollars: projectKeys.length, replies: projectKeys.length, skillKey: "__total__" });
+
+                for (const projectKey of projectKeys) {
+                    await ctx.db.insert("usageDaily", { ...row, costMicrodollars: 1, projectKey, skillKey: "__project__" });
+                }
+            }
+        });
+
+        const result = await projectBreakdown(USER, "2025-01-01");
+
+        expect(result.truncated).toBe(true);
+        expect(result.noProject).toStrictEqual({ costMicrodollars: 0, replies: 0, tokens: 0 });
+        expect(result.total.costMicrodollars).toBe((days - 1) * projectKeys.length);
     });
 
     it("says which days were recorded before usage was filed by project", async () => {

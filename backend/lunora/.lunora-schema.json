@@ -27712,6 +27712,12 @@
               "nullable": false,
               "optional": true,
               "unique": false
+            },
+            "threadProjectKey": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
             }
           }
         },
@@ -27891,7 +27897,7 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
-    "usageOrganizationDaily": {
+    "usageOrganizationReplies": {
       "commitOrdered": false,
       "fields": {
         "costMicrodollars": {
@@ -27915,22 +27921,22 @@
         "projectKey": {
           "kind": "string",
           "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "recordedAt": {
+          "kind": "number",
+          "nullable": false,
           "optional": false,
           "unique": false
         },
-        "replies": {
-          "kind": "number",
+        "replyKey": {
+          "kind": "string",
           "nullable": false,
           "optional": false,
           "unique": false
         },
         "tokens": {
-          "kind": "number",
-          "nullable": false,
-          "optional": false,
-          "unique": false
-        },
-        "updatedAt": {
           "kind": "number",
           "nullable": false,
           "optional": false,
@@ -27957,18 +27963,10 @@
           ],
           "unique": false
         },
-        "by_org_project_user_date": {
+        "by_user_reply": {
           "fields": [
-            "organizationId",
-            "projectKey",
             "userId",
-            "date"
-          ],
-          "unique": false
-        },
-        "by_userId": {
-          "fields": [
-            "userId"
+            "replyKey"
           ],
           "unique": false
         }

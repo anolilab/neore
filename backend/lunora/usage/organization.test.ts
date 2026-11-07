@@ -56,10 +56,10 @@ const harnessRef = vi.hoisted(() => {
 const { registerModule } = await import("../../test/registered-api");
 const { default: schema } = await import("../schema");
 const { forwardReplyUsage, recordReplyUsage } = await import("./activity");
-const { DEFAULT_SKILL_KEY, ORGANIZATION_TOTAL_KEY } = await import("./activity-logic");
+const { DEFAULT_SKILL_KEY } = await import("./activity-logic");
 const { getOrganizationProjectUsage, isOrganizationAdminRole, MAX_PROJECTS, ORGANIZATION_ROW_PAGE, pruneOrganizationUsage } = await import("./organization");
 const { eraseOrganizationUsage } = await import("./organization-erase");
-const { collectOrganizationUsageForExport, collectUsageDailyPages, eraseUsageForUser } = await import("./gdpr");
+const { collectOrganizationUsageForExport, collectOrganizationUsagePages, eraseUsageForUser, ORGANIZATION_EXPORT_PAGE } = await import("./gdpr");
 
 registerModule(registry, "usage_organization", await import("./organization"));
 
@@ -202,14 +202,13 @@ describe("organization usage", () => {
     it("reads every page of a busy organization's rows", async () => {
         await harness.run(async (ctx: any) => {
             for (let index = 0; index <= ORGANIZATION_ROW_PAGE; index += 1) {
-                await ctx.db.insert("usageOrganizationDaily", {
+                await ctx.db.insert("usageOrganizationReplies", {
                     costMicrodollars: 1,
                     date: "2026-09-20",
                     organizationId: ORG,
-                    projectKey: ORGANIZATION_TOTAL_KEY,
-                    replies: 1,
+                    recordedAt: 0,
+                    replyKey: `reply-${String(index)}`,
                     tokens: 1,
-                    updatedAt: index,
                     userId: `user-${String(index)}`,
                 });
             }
@@ -234,14 +233,13 @@ describe("organization usage", () => {
     it("prunes organization rows past the usage rollup's retention", async () => {
         await harness.run(async (ctx: any) => {
             for (let index = 0; index < 501; index += 1) {
-                await ctx.db.insert("usageOrganizationDaily", {
+                await ctx.db.insert("usageOrganizationReplies", {
                     costMicrodollars: 1,
                     date: "2000-01-01",
                     organizationId: ORG,
-                    projectKey: ORGANIZATION_TOTAL_KEY,
-                    replies: 1,
+                    recordedAt: 0,
+                    replyKey: `reply-${String(index)}`,
                     tokens: 1,
-                    updatedAt: 0,
                     userId: `user-${String(index)}`,
                 });
             }
@@ -254,42 +252,181 @@ describe("organization usage", () => {
 });
 
 describe("organization usage rows", () => {
-    it("keeps each member's share of a day on its own row, written only by that member", async () => {
+    it("keeps one row per reply, with the member it belongs to", async () => {
         await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
         await record(ADMIN, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: ADMIN }), 10);
         await record(MEMBER, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER }), 20);
         await record(MEMBER, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER }), 5);
 
         const rows = await harness.run(async (ctx: any) => {
-            const { page } = await ctx.db.usageOrganizationDaily.findMany({ where: { organizationId: ORG } });
+            const { page } = await ctx.db.usageOrganizationReplies.findMany({ where: { organizationId: ORG } });
 
-            return page.map((row: any) => [row.userId, row.costMicrodollars]).toSorted((a: string[], b: string[]) => a[0]!.localeCompare(b[0]!));
+            return page
+                .map((row: any) => [row.userId, row.costMicrodollars])
+                .toSorted((a: [string, number], b: [string, number]) => a[0].localeCompare(b[0]) || a[1] - b[1]);
         });
 
         expect(rows).toStrictEqual([
             [ADMIN, 10],
-            [MEMBER, 25],
+            [MEMBER, 5],
+            [MEMBER, 20],
         ]);
         const { result } = await read();
 
         expect(result.total.costMicrodollars).toBe(35);
     });
 
+    it("files a re-delivered reply once", async () => {
+        const thread = await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: ADMIN });
+        const args = {
+            at: 1,
+            costMicrodollars: 30,
+            date: "2026-09-20",
+            replyKey: "redelivered-reply",
+            skillKey: DEFAULT_SKILL_KEY,
+            threadId: thread,
+            tokens: 1,
+            userId: ADMIN,
+        };
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(recordReplyUsage, args));
+        await harness.run(async (ctx: any) => await ctx.runMutation(recordReplyUsage, args));
+
+        const { result } = await read();
+
+        expect(result.total).toMatchObject({ costMicrodollars: 30, replies: 1 });
+    });
+
+    it("files a reply once when its record is retried after the organization's row was written", async () => {
+        const thread = await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: ADMIN });
+        const recordOnce = async () =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(recordReplyUsage, {
+                        at: 1,
+                        costMicrodollars: 30,
+                        date: "2026-09-20",
+                        replyKey: "retried-reply",
+                        skillKey: DEFAULT_SKILL_KEY,
+                        threadId: thread,
+                        tokens: 1,
+                        userId: ADMIN,
+                    }),
+            );
+
+        await recordOnce();
+        // The member's own writes did not hold (their shard's transaction failed after the organization's row landed).
+        await harness.run(async (ctx: any) => {
+            for (const table of ["usageReplies", "usageDaily"]) {
+                const { page } = await ctx.db[table].findMany({ where: { userId: ADMIN } });
+
+                for (const row of page) {
+                    await ctx.db.delete(table, row._id);
+                }
+            }
+        });
+        await recordOnce();
+
+        const { result } = await read();
+
+        expect(result.total).toMatchObject({ costMicrodollars: 30, replies: 1 });
+    });
+
     it("erases a member's share with their account, and exports it to them, a page at a time", async () => {
         await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
         await record(MEMBER, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER }), 20);
 
-        const exported = await collectUsageDailyPages(
+        const exported = await collectOrganizationUsagePages(
             async (cursor) =>
                 (await harness.run(async (ctx: any) => await ctx.runQuery(collectOrganizationUsageForExport, { cursor, userId: MEMBER }))) as never,
         );
 
-        expect(exported).toMatchObject([{ costMicrodollars: 20, organization: ORG }]);
+        expect(exported).toMatchObject([{ costMicrodollars: 20, organization: ORG, replies: 1 }]);
         await harness.run(async (ctx: any) => await eraseUsageForUser(ctx, MEMBER));
 
         const { result } = await read();
 
         expect(result.total.costMicrodollars).toBe(0);
+    });
+
+    it("finishes erasing a member's usage on the retry after a delete fails part-way, and never reports done early", async () => {
+        await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
+        await record(MEMBER, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER }), 20);
+        await record(MEMBER, await insert("threads", { status: "active", title: "T", userId: MEMBER }), 5);
+
+        const remaining = async () =>
+            await harness.run(async (ctx: any) => {
+                const counts: Record<string, number> = {};
+
+                for (const table of ["usageDaily", "usageReplies", "usageOrganizationReplies"]) {
+                    counts[table] = (await ctx.db[table].findMany({ where: { userId: MEMBER } })).page.length;
+                }
+
+                return counts;
+            });
+
+        expect(await remaining()).toMatchObject({ usageDaily: expect.any(Number), usageOrganizationReplies: 1 });
+
+        // The first round fails on one of the member's own rows.
+        await expect(
+            harness.run(async (ctx: any) => {
+                const failing = new Proxy(ctx.db, {
+                    get: (target, key) =>
+                        key === "delete"
+                            ? async (table: string, id: string) => {
+                                  if (table === "usageDaily") {
+                                      throw new Error("delete failed");
+                                  }
+
+                                  return await target.delete(table, id);
+                              }
+                            : Reflect.get(target, key),
+                });
+
+                return await eraseUsageForUser({ ...ctx, db: failing }, MEMBER);
+            }),
+        ).rejects.toThrow("delete failed");
+
+        // The step's retry takes what is left, round after round, until it says there is nothing more.
+        for (let round = 0; ; round += 1) {
+            const { hasMore } = await harness.run(async (ctx: any) => await eraseUsageForUser(ctx, MEMBER));
+
+            if (!hasMore || round > 5) {
+                break;
+            }
+        }
+
+        expect(await remaining()).toStrictEqual({ usageDaily: 0, usageOrganizationReplies: 0, usageReplies: 0 });
+    });
+
+    it("exports a busy member's organization usage summed per day and project, across every page", async () => {
+        const project = await insert("projects", { createdAt: 0, organizationId: ORG, title: "Org project", userId: ADMIN });
+        const count = ORGANIZATION_EXPORT_PAGE + 5;
+
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < count; index += 1) {
+                await ctx.db.insert("usageOrganizationReplies", {
+                    costMicrodollars: 2,
+                    date: "2026-09-20",
+                    organizationId: ORG,
+                    recordedAt: 0,
+                    replyKey: `busy-${String(index)}`,
+                    tokens: 1,
+                    userId: MEMBER,
+                    ...(index % 2 === 0 && { projectKey: project }),
+                });
+            }
+        });
+
+        const exported = await collectOrganizationUsagePages(
+            async (cursor) =>
+                (await harness.run(async (ctx: any) => await ctx.runQuery(collectOrganizationUsageForExport, { cursor, userId: MEMBER }))) as never,
+        );
+        const inProject = Math.ceil(count / 2);
+
+        expect(exported).toHaveLength(2);
+        expect(exported.find((row) => row.project === project)).toMatchObject({ costMicrodollars: 2 * inProject, replies: inProject, tokens: inProject });
+        expect(exported.find((row) => row.project === undefined)).toMatchObject({ replies: count - inProject });
     });
 
     it("erases a deleted organization's usage", async () => {

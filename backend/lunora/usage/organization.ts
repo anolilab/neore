@@ -3,16 +3,16 @@
  * the caller's active organization, and the organization's total — for the
  * organization's admins and owners only.
  *
- * It reads `usageOrganizationDaily`, which each reply adds to when it is
- * recorded (`activity.ts`): one row per day for the whole organization, and
- * one per day and project the organization owns. The rollup is keyed by
- * organization, not by member, so a member who leaves keeps counting, and it
- * holds no user, so it can only ever give the organization's totals. A
- * member's own project in an organization thread adds to the total only, and
- * counts under "No project" without its name. The view lists only projects
- * the organization owns now; past replies are never filed under an
- * organization (nothing records which one they ran in), so the totals cover
- * usage since organization reporting started.
+ * It reads `usageOrganizationReplies`, the organization's ledger: one row per
+ * reply, filed when the reply is recorded (`activity.ts`), with its day,
+ * spend, the member it belongs to, and its project when the organization owns
+ * it. Rows are read by organization, never by membership, so a member who
+ * leaves keeps counting; the view only ever sums them, so no member's spend is
+ * shown on its own. A member's own project in an organization thread adds to
+ * the total only, and counts under "No project" without its name. The view
+ * lists only projects the organization owns now; past replies are never filed
+ * under an organization (nothing records which one they ran in), so the totals
+ * cover usage since organization reporting started.
  */
 import { LunoraError, v } from "lunorash/server";
 
@@ -24,13 +24,13 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { throwForbidden } from "../lib/error-helpers";
 import { systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
-import type { OrganizationRow } from "./activity-logic";
+import type { OrganizationReply } from "./activity-logic";
 import { foldOrganizationUsage, isDayKey, remainderOf } from "./activity-logic";
 
 /** Organization rows one page reads. */
 export const ORGANIZATION_ROW_PAGE = 1000;
 
-/** Pages one read takes, at most: a total row per day and a row per day and project, for a year of a busy organization. */
+/** Pages one read takes, at most; past it the result says it was cut, and covers only the newest whole days read. */
 export const MAX_ORGANIZATION_PAGES = 50;
 
 /** Project titles one lookup reads. */
@@ -73,11 +73,11 @@ export const organizationUsagePage = internalQuery
     .output(
         v.object({
             cursor: v.union(v.string(), v.null()),
-            rows: v.array(v.object({ ...vTotals, date: v.string(), projectKey: v.string() })),
+            rows: v.array(v.object({ costMicrodollars: v.number(), date: v.string(), projectKey: v.optional(v.string()), tokens: v.number() })),
         }),
     )
     .query(async ({ args: { cursor, fromDate, organizationId }, ctx }) => {
-        const page = await ctx.db.usageOrganizationDaily.findMany({
+        const page = await ctx.db.usageOrganizationReplies.findMany({
             cursor,
             limit: ORGANIZATION_ROW_PAGE,
             orderBy: [{ date: "desc" }],
@@ -86,8 +86,8 @@ export const organizationUsagePage = internalQuery
 
         return {
             cursor: page.isDone ? null : page.continueCursor,
-            rows: page.page.map(({ costMicrodollars, date, projectKey, replies, tokens }) => {
-                return { costMicrodollars, date, projectKey, replies, tokens };
+            rows: page.page.map(({ costMicrodollars, date, projectKey, tokens }) => {
+                return { costMicrodollars, date, tokens, ...(projectKey !== undefined && { projectKey }) };
             }),
         };
     });
@@ -155,12 +155,12 @@ export const getOrganizationProjectUsage = authAction
             return throwForbidden(FORBIDDEN);
         }
 
-        const rows: OrganizationRow[] = [];
+        const rows: OrganizationReply[] = [];
         let cursor: string | null = null;
         let truncated = true;
 
         for (let page = 0; page < MAX_ORGANIZATION_PAGES; page += 1) {
-            const result: { cursor: string | null; rows: OrganizationRow[] } = await ctx.runQuery(internal.usage.organization.organizationUsagePage, {
+            const result: { cursor: string | null; rows: OrganizationReply[] } = await ctx.runQuery(internal.usage.organization.organizationUsagePage, {
                 cursor,
                 fromDate,
                 organizationId,
@@ -175,7 +175,9 @@ export const getOrganizationProjectUsage = authAction
             }
         }
 
-        const { projects, total } = foldOrganizationUsage(rows);
+        // A read cut short may have read its oldest day only in part: that day is left out, so the totals cover whole days.
+        const oldest = truncated ? rows.at(-1)?.date : undefined;
+        const { projects, total } = foldOrganizationUsage(oldest === undefined ? rows : rows.filter((row) => row.date > oldest));
         const usage = new Map(projects.map((project) => [project.projectKey, project]));
         const titles = new Map<string, string>();
         const keys = [...usage.keys()];
@@ -223,14 +225,14 @@ export const pruneOrganizationUsage = internalMutation
     .input({})
     .output(v.number())
     .mutation(async ({ ctx }) => {
-        const { page } = await ctx.db.usageOrganizationDaily.findMany({
+        const { page } = await ctx.db.usageOrganizationReplies.findMany({
             limit: RETENTION_BATCH,
             orderBy: [{ date: "asc" }],
             where: { date: { lt: usageDailyCutoffDate(ctx.now) } },
         });
 
         for (const row of page) {
-            await ctx.db.delete("usageOrganizationDaily", row._id);
+            await ctx.db.delete("usageOrganizationReplies", row._id);
         }
 
         if (page.length >= RETENTION_BATCH) {

@@ -198,6 +198,8 @@ interface Position {
     lastOrder?: number;
     threadCursor?: string;
     threadId?: string;
+    /** The project `threadId` was in when the walk began it: a thread moved mid-walk is filed under one project. */
+    threadProjectKey?: string;
 }
 
 interface StepResult<I> {
@@ -284,7 +286,11 @@ const walk = async <I>(ctx: DbCtx, userId: string, position: Position, pass: Wal
     let threadsStarted = 0;
 
     if (threadId !== undefined && pass.skipThread) {
-        thread = projectOnly(await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } }));
+        // A position saved before the project was kept with it reads the thread's project now.
+        thread =
+            position.threadProjectKey === undefined
+                ? projectOnly(await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } }))
+                : { projectKey: position.threadProjectKey };
     }
 
     while (budget > 0) {
@@ -328,7 +334,17 @@ const walk = async <I>(ctx: DbCtx, userId: string, position: Position, pass: Wal
         threadId = pageFull ? threadId : undefined;
     }
 
-    return { done: false, increments, keys, position: { lastOrder, threadCursor, threadId } };
+    return {
+        done: false,
+        increments,
+        keys,
+        position: {
+            lastOrder,
+            threadCursor,
+            threadId,
+            ...(threadId !== undefined && thread.projectKey !== undefined && { threadProjectKey: thread.projectKey }),
+        },
+    };
 };
 
 /**
@@ -447,7 +463,12 @@ export const runUsageProjectBackfillStep = internalMutation
         const step = await walk<AttributionIncrement>(
             ctx,
             userId,
-            { lastOrder: position.lastOrder, threadCursor: position.threadCursor, threadId: position.threadId },
+            {
+                lastOrder: position.lastOrder,
+                threadCursor: position.threadCursor,
+                threadId: position.threadId,
+                threadProjectKey: position.threadProjectKey,
+            },
             {
                 count: async (group, thread) => {
                     const increment = backfillIncrement(group, window);
@@ -498,6 +519,7 @@ export const runUsageProjectBackfillStep = internalMutation
                 ...(step.position.lastOrder !== undefined && { lastOrder: step.position.lastOrder }),
                 ...(step.position.threadCursor !== undefined && { threadCursor: step.position.threadCursor }),
                 ...(step.position.threadId !== undefined && { threadId: step.position.threadId }),
+                ...(step.position.threadProjectKey !== undefined && { threadProjectKey: step.position.threadProjectKey }),
                 ...(step.done && { finishedAt: now }),
             },
             updatedAt: now,

@@ -3309,6 +3309,8 @@ export const schema = defineSchema({
                 status: v.union(v.literal("running"), v.literal("done")),
                 threadCursor: v.optional(v.string()),
                 threadId: v.optional(v.string()),
+                // The project `threadId` was in when the walk began it, kept so a thread moved mid-walk is not split.
+                threadProjectKey: v.optional(v.string()),
             }),
         ),
         // Replies the walk added to the rollup.
@@ -3351,25 +3353,24 @@ export const schema = defineSchema({
         // The retention sweep (`gdpr/retention.ts`), which serves a whole shard.
         .index("by_date", ["date"]),
 
-    // An organization's per-day usage, filed when each reply is recorded (`usage/organization.ts`): per member who
-    // wrote it, one row per day for the whole organization (`projectKey` = `__total__`) and one per day and project the
-    // organization owns. Read by organization, never by membership, so it outlives a member leaving; only ever summed
-    // into organization totals. `userId` is the row's one writer — that member's shard — so no two writers race on a
-    // row; it is erased, exported and merged with the member's own data (`usage/gdpr.ts`).
-    usageOrganizationDaily: defineTable({
+    // An organization's usage, one row per reply, filed when the reply is recorded (`usage/organization.ts`): its day,
+    // spend, and the project when the organization owns it. A row is inserted only if the member's reply has none, so a
+    // retried record never counts twice, and the view sums rows, so no two members' records ever write one row. Read
+    // by organization, never by membership, so it outlives a member leaving; only ever summed into organization totals.
+    // `userId` is the member it belongs to: erased, exported and merged with their own data (`usage/gdpr.ts`).
+    usageOrganizationReplies: defineTable({
         costMicrodollars: v.number(),
         date: v.string(),
         organizationId: v.string(),
-        projectKey: v.string(),
-        replies: v.number(),
+        projectKey: v.optional(v.string()),
+        recordedAt: v.number(),
+        replyKey: v.string(),
         tokens: v.number(),
-        updatedAt: v.number(),
         userId: v.string(),
     })
         .global()
         .index("by_org_date", ["organizationId", "date"])
-        .index("by_org_project_user_date", ["organizationId", "projectKey", "userId", "date"])
-        .index("by_userId", ["userId"])
+        .index("by_user_reply", ["userId", "replyKey"])
         // The retention sweep.
         .index("by_date", ["date"]),
 

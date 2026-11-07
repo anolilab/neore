@@ -11,8 +11,7 @@ import {
     HEATMAP_DAYS,
     isDayKey,
     foldOrganizationUsage,
-    ORGANIZATION_TOTAL_KEY,
-    organizationRows,
+    organizationReply,
     PROJECT_SKILL_KEY,
     remainderOf,
     repliesByOrder,
@@ -248,36 +247,26 @@ describe("project rows", () => {
     it("files a reply under its organization's total, and under the project only when the organization owns it", () => {
         const amounts = { costMicrodollars: 5, date: "2026-09-20", tokens: 1 };
 
-        expect(organizationRows({ organizationId: "org", projectInOrganization: true, projectKey: "p_org" }, amounts)).toStrictEqual([
-            { ...amounts, projectKey: ORGANIZATION_TOTAL_KEY, replies: 1 },
-            { ...amounts, projectKey: "p_org", replies: 1 },
-        ]);
+        expect(organizationReply({ organizationId: "org", projectInOrganization: true, projectKey: "p_org" }, amounts)).toStrictEqual({
+            ...amounts,
+            projectKey: "p_org",
+        });
         // A member's own project in an organization thread: the total only, never the project.
-        expect(organizationRows({ organizationId: "org", projectKey: "p_own" }, amounts)).toStrictEqual([
-            { ...amounts, projectKey: ORGANIZATION_TOTAL_KEY, replies: 1 },
-        ]);
-        expect(organizationRows({ projectKey: "p_own" }, amounts)).toStrictEqual([]);
+        expect(organizationReply({ organizationId: "org", projectKey: "p_own" }, amounts)).toStrictEqual(amounts);
+        expect(organizationReply({ projectKey: "p_own" }, amounts)).toBeUndefined();
     });
 
     it("folds an organization's rows into its total and its projects, costliest first", () => {
-        const organizationRow = (projectKey: string, costMicrodollars: number) => {
-            return { costMicrodollars, date: "2026-09-20", projectKey, replies: 1, tokens: 1 };
+        const reply = (costMicrodollars: number, projectKey?: string) => {
+            return { costMicrodollars, date: "2026-09-20", tokens: 1, ...(projectKey !== undefined && { projectKey }) };
         };
 
-        expect(
-            foldOrganizationUsage([
-                organizationRow(ORGANIZATION_TOTAL_KEY, 30),
-                organizationRow("p_a", 10),
-                organizationRow("p_b", 15),
-                organizationRow(ORGANIZATION_TOTAL_KEY, 5),
-                organizationRow("p_a", 1),
-            ]),
-        ).toStrictEqual({
+        expect(foldOrganizationUsage([reply(4), reply(10, "p_a"), reply(15, "p_b"), reply(5), reply(1, "p_a")])).toStrictEqual({
             projects: [
                 { costMicrodollars: 15, projectKey: "p_b", replies: 1, tokens: 1 },
                 { costMicrodollars: 11, projectKey: "p_a", replies: 2, tokens: 2 },
             ],
-            total: { costMicrodollars: 35, replies: 2, tokens: 2 },
+            total: { costMicrodollars: 35, replies: 5, tokens: 5 },
         });
     });
 });

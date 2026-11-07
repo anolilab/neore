@@ -1,7 +1,7 @@
 import { LunoraError, v } from "lunorash/server";
 
 import { collectAcpSessionPages } from "../acp/gdpr";
-import { collectUsageDailyPages } from "../usage/gdpr";
+import { collectOrganizationUsagePages, collectUsageDailyPages } from "../usage/gdpr";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalQuery } from "../_generated/server";
@@ -550,7 +550,7 @@ export const generateExportFile = internalAction
                 async (cursor) => await context.runQuery(internal.usage.gdpr.collectUsageDailyForExport, { cursor, userId: args.userId }),
             ),
             // The user's share of organizations' usage: what they spent in each organization, per day and project.
-            usageOrganizations: await collectUsageDailyPages(
+            usageOrganizations: await collectOrganizationUsagePages(
                 async (cursor) => await context.runQuery(internal.usage.gdpr.collectOrganizationUsageForExport, { cursor, userId: args.userId }),
             ),
             watchedRepositories: args.watchedRepositories ?? { watched: [] },

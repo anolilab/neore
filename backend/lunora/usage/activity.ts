@@ -31,7 +31,7 @@ import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authQuery } from "../lib/crpc";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { projectOrganizationOf, readableProject } from "../projects/functions";
-import type { Attribution, AttributionIncrement, OrganizationRow, ProjectTotal, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
+import type { Attribution, AttributionIncrement, OrganizationReply, ProjectTotal, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
 import {
     addDays,
     BREAKDOWN_ROW_LIMIT,
@@ -43,7 +43,7 @@ import {
     attributionRows,
     PROJECT_ROW_LIMIT,
     organizationFiledKey,
-    organizationRows,
+    organizationReply,
     PROJECT_SKILL_KEY,
     projectFiledKey,
     remainderOf,
@@ -103,7 +103,8 @@ const attributionOfThread = async (ctx: DbCtx, threadId: string | undefined): Pr
  * redelivery. A late record (`finalize`) marks both parts whatever it filed, so a later delivery, after the thread has
  * moved, cannot file the reply again somewhere else.
  *
- * The organization's rollup is a `.global()` table, written last: nothing in this transaction can fail after it.
+ * The organization's ledger is a `.global()` table outside this transaction: its row is keyed by the reply, so a retry
+ * after a failure on either side files it once.
  */
 const fileAttribution = async (
     ctx: DbCtx,
@@ -132,8 +133,15 @@ const fileAttribution = async (
     }
 
     // Only a current member's spend is the organization's: a former member replying in an old thread files none.
-    if (attribution.organizationId !== undefined && !organizationFiled && (await isOrganizationMember(ctx, attribution.organizationId, userId))) {
-        await addToOrganizationRollup(ctx, userId, attribution.organizationId, organizationRows(attribution, { ...amounts, date }), at);
+    const organizationReplyRow = organizationReply(attribution, { ...amounts, date });
+
+    if (
+        organizationReplyRow !== undefined &&
+        attribution.organizationId !== undefined &&
+        !organizationFiled &&
+        (await isOrganizationMember(ctx, attribution.organizationId, userId))
+    ) {
+        await addToOrganizationLedger(ctx, userId, attribution.organizationId, replyKey, organizationReplyRow, at);
     }
 };
 
@@ -160,24 +168,22 @@ export const addToAttributionRollup = async (ctx: DbCtx, userId: string, increme
 };
 
 /**
- * Adds `rows` to the organization's per-day usage, kept after the member leaves. Each row belongs to this member, so
- * only this member's shard ever writes it: no two members' records race on one row.
+ * Files one reply in the organization's ledger, unless the member's reply already has a row there: a retry after a
+ * partial failure, or a redelivery, finds it and writes nothing. Kept after the member leaves.
  */
-const addToOrganizationRollup = async (ctx: DbCtx, userId: string, organizationId: string, rows: ReadonlyArray<OrganizationRow>, at: number): Promise<void> => {
-    for (const { costMicrodollars, date, projectKey, replies, tokens } of rows) {
-        const existing = await ctx.db.usageOrganizationDaily.findFirst({ where: { date, organizationId, projectKey, userId } });
-
-        if (existing) {
-            await ctx.db.patch("usageOrganizationDaily", existing._id, {
-                costMicrodollars: existing.costMicrodollars + costMicrodollars,
-                replies: existing.replies + replies,
-                tokens: existing.tokens + tokens,
-                updatedAt: at,
-            });
-        } else {
-            await ctx.db.insert("usageOrganizationDaily", { costMicrodollars, date, organizationId, projectKey, replies, tokens, updatedAt: at, userId });
-        }
+const addToOrganizationLedger = async (
+    ctx: DbCtx,
+    userId: string,
+    organizationId: string,
+    replyKey: string,
+    reply: OrganizationReply,
+    at: number,
+): Promise<void> => {
+    if (await ctx.db.usageOrganizationReplies.findFirst({ where: { replyKey, userId } })) {
+        return;
     }
+
+    await ctx.db.insert("usageOrganizationReplies", { ...reply, organizationId, recordedAt: at, replyKey, userId });
 };
 
 /**
@@ -476,15 +482,16 @@ export const getProjectBreakdown = authQuery
                 where: { date: { gte: args.fromDate }, skillKey: PROJECT_SKILL_KEY, userId },
             }),
         ]);
-        // When either read stopped short, both cover only the days the shorter one reached, so the projects and "No
-        // project" are taken over the same days as the total and add up to it.
+        // When either read stopped short, both cover only the days after the oldest day the shorter one reached — that
+        // day may be read only in part — so the projects and "No project" are taken over the same whole days as the
+        // total and add up to it.
         const projectsFrom = rows.page.length >= PROJECT_ROW_LIMIT ? rows.page.at(-1)?.date : undefined;
         const coveredFrom = [totals.coveredFrom, projectsFrom]
             .filter((date) => date !== undefined)
             .toSorted((a, b) => a!.localeCompare(b!))
             .at(-1);
-        const projects = foldProjectTotals(coveredFrom === undefined ? rows.page : rows.page.filter((row) => row.date >= coveredFrom));
-        const total = coveredFrom === undefined ? totals.total : sumRows(totals.rows.filter((row) => row.date >= coveredFrom));
+        const projects = foldProjectTotals(coveredFrom === undefined ? rows.page : rows.page.filter((row) => row.date > coveredFrom));
+        const total = coveredFrom === undefined ? totals.total : sumRows(totals.rows.filter((row) => row.date > coveredFrom));
         const titled: (ProjectTotal & { title?: string })[] = [];
 
         // A few lookups at a time: each is up to three reads, and a long history holds many projects.

@@ -608,6 +608,43 @@ describe("project backfill", () => {
         expect(await projectRows()).toStrictEqual(EXPECTED_PROJECTS(alpha, beta));
     });
 
+    it("files a thread moved to another project between steps under the project it was in when the walk began it", async () => {
+        const alpha = await insertProject("Alpha");
+        const beta = await insertProject("Beta");
+        // Twice what one step reads: the walk stops part-way through the thread.
+        const long = await insertThread(
+            DAY_1,
+            Array.from({ length: BACKFILL_ROWS_PER_STEP }, () => [prompt(), reply(1, 10)]),
+            "active",
+            alpha,
+        );
+
+        vi.setSystemTime(STARTED);
+        await start();
+
+        for (let current = await state(); current.status !== "done"; current = await state()) {
+            await step(current.runId);
+        }
+
+        await projectStep((await state()).projects.runId);
+        expect((await state()).projects.threadId).toBe(long.threadId);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", long.threadId, { projectId: beta });
+        });
+        await drain();
+
+        expect(await projectRows()).toStrictEqual([
+            {
+                costMicrodollars: 10 * BACKFILL_ROWS_PER_STEP,
+                date: "2026-09-20",
+                projectKey: alpha,
+                replies: BACKFILL_ROWS_PER_STEP,
+                skillKey: PROJECT_SKILL_KEY,
+                tokens: BACKFILL_ROWS_PER_STEP,
+            },
+        ]);
+    });
+
     it("starts for a user whose first walk finished before projects were filed", async () => {
         const { alpha, beta } = await insertProjectFixture();
 
@@ -863,7 +900,7 @@ describe("project backfill", () => {
 
         const filed = await harness.run(async (ctx: any) => {
             const { page: filedProjects } = await ctx.db.usageDaily.findMany({ where: { skillKey: PROJECT_SKILL_KEY, userId: USER } });
-            const { page: organizationRows } = await ctx.db.usageOrganizationDaily.findMany({ where: { organizationId: "org_1" } });
+            const { page: organizationRows } = await ctx.db.usageOrganizationReplies.findMany({ where: { organizationId: "org_1" } });
 
             return {
                 organization: organizationRows.map((row: any) => [row.projectKey === orgProject ? "project" : row.projectKey, row.costMicrodollars]),
@@ -871,12 +908,9 @@ describe("project backfill", () => {
             };
         });
 
-        // The walk filed the project; the late record, delivered twice, files the organization's total and project once.
+        // The walk filed the project; the late record, delivered twice, files the reply under the organization once.
         expect(filed.project).toStrictEqual([100]);
-        expect(filed.organization.toSorted((a: unknown[], b: unknown[]) => String(a[0]).localeCompare(String(b[0])))).toStrictEqual([
-            ["__total__", 100],
-            ["project", 100],
-        ]);
+        expect(filed.organization).toStrictEqual([["project", 100]]);
     });
 
     it("records UTC as the first walk's zone when the user has none, so setting one later moves no reply", async () => {

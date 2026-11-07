@@ -3,28 +3,14 @@
  * `usageBackfill`), owned by the usage module.
  *
  * Plain functions over the caller's `ctx`, so each write stays in the caller's
- * transaction. Typed ids only: an `Id<TableName>` would read as a write to
- * every table.
+ * transaction.
  */
 import { v } from "lunorash/server";
 
-import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { MAX_LENGTH } from "../lib/validators";
 import { BATCH, full, type BatchResult } from "../gdpr/batch";
-import { gdprLogger } from "../lib/logger";
-
-/** Deletes a usage row that may already be gone (a retried round, or a dangling id). */
-const deleteQuietly = async (
-    ctx: MutationCtx,
-    id: Id<"usageDaily"> | Id<"usageReplies"> | Id<"usageBackfill">,
-    what: "usageBackfill" | "usageDaily" | "usageReplies",
-): Promise<void> => {
-    await ctx.db.delete(what, id as Id<"usageDaily">).catch((error: unknown) => {
-        gdprLogger.error(`Failed to delete ${what} ${id}:`, error);
-    });
-};
 
 /**
  * One batch of the user's per-day rollup (`usageDaily`), the keys of the replies
@@ -49,19 +35,20 @@ export const eraseUsageForUser = async (ctx: MutationCtx, userId: string): Promi
     ]);
 
     // The member's share of organizations' usage goes with them (`.global()`: read through the table facade).
-    const { page: organizationRows } = await ctx.db.usageOrganizationDaily.findMany({ limit: BATCH, where: { userId } });
+    const { page: organizationRows } = await ctx.db.usageOrganizationReplies.findMany({ limit: BATCH, where: { userId } });
+
+    // A failed delete throws, as in every module's erasure: the step fails and is retried, and the retry reads what is
+    // left, so it never reports done with a row still held. The organization's rows are deleted first: they sit outside
+    // this transaction, and a retry after a failure among the user's rows finds them gone already.
+    for (const row of organizationRows) {
+        await ctx.db.delete("usageOrganizationReplies", row._id);
+    }
 
     await Promise.all([
-        ...days.map(async (row) => await deleteQuietly(ctx, row._id, "usageDaily")),
-        ...keys.map(async (row) => await deleteQuietly(ctx, row._id, "usageReplies")),
-        ...backfills.map(async (row) => await deleteQuietly(ctx, row._id, "usageBackfill")),
+        ...days.map(async (row) => await ctx.db.delete("usageDaily", row._id)),
+        ...keys.map(async (row) => await ctx.db.delete("usageReplies", row._id)),
+        ...backfills.map(async (row) => await ctx.db.delete("usageBackfill", row._id)),
     ]);
-
-    for (const row of organizationRows) {
-        await ctx.db.delete("usageOrganizationDaily", row._id).catch((error: unknown) => {
-            gdprLogger.error(`Failed to delete usageOrganizationDaily ${row._id}:`, error);
-        });
-    }
 
     return { hasMore: full(days) || full(keys) || full(backfills) || organizationRows.length >= BATCH };
 };
@@ -156,17 +143,60 @@ export const collectUsageDailyPages = async <R = ExportedUsageRow>(
     throw new Error("The usage history is too long to export in one file");
 };
 
-/** One exported row of the member's share of an organization's usage. */
-export interface ExportedOrganizationUsageRow {
+/** One reply of the member's share of an organization's usage, as one export page reads it. */
+export interface OrganizationUsageReply {
     costMicrodollars: number;
     date: string;
     organization: string;
     project?: string;
-    replies: number;
     tokens: number;
 }
 
-/** One page of the member's share of organizations' usage for the data export; `cursor` is `null` after the last page. */
+/** One exported row of the member's share of an organization's usage: a day's replies in one organization and project. */
+export interface ExportedOrganizationUsageRow extends OrganizationUsageReply {
+    replies: number;
+}
+
+/** Ledger rows one organization export page reads. */
+export const ORGANIZATION_EXPORT_PAGE = 2000;
+
+/** Pages the organization export reads at most: a million replies, far past what a member makes within the retention. */
+const MAX_ORGANIZATION_EXPORT_PAGES = 500;
+
+/**
+ * The member's share of organizations' usage for the data export: every ledger row, a page at a time, summed per
+ * organization, day and project as it is read, so the file holds a row per day rather than one per reply.
+ */
+export const collectOrganizationUsagePages = async (
+    readPage: (cursor: string | null) => Promise<{ cursor: string | null; rows: OrganizationUsageReply[] }>,
+): Promise<ExportedOrganizationUsageRow[]> => {
+    const summed = new Map<string, ExportedOrganizationUsageRow>();
+    let cursor: string | null = null;
+
+    for (let page = 0; page < MAX_ORGANIZATION_EXPORT_PAGES; page += 1) {
+        const result = await readPage(cursor);
+
+        for (const row of result.rows) {
+            const key = JSON.stringify([row.organization, row.date, row.project ?? null]);
+            const current = summed.get(key) ?? { ...row, costMicrodollars: 0, replies: 0, tokens: 0 };
+
+            current.costMicrodollars += row.costMicrodollars;
+            current.replies += 1;
+            current.tokens += row.tokens;
+            summed.set(key, current);
+        }
+
+        if (result.cursor === null) {
+            return [...summed.values()].toSorted((a, b) => a.date.localeCompare(b.date) || a.organization.localeCompare(b.organization));
+        }
+
+        cursor = result.cursor;
+    }
+
+    throw new Error("The organization usage history is too long to export in one file");
+};
+
+/** One page of the member's organization ledger rows for the data export; `cursor` is `null` after the last page. */
 export const collectOrganizationUsageForExport = internalQuery
     .input({ cursor: v.union(v.string().max(MAX_LENGTH.cursor), v.null()), userId: v.string().max(MAX_LENGTH.id) })
     .output(
@@ -178,25 +208,23 @@ export const collectOrganizationUsageForExport = internalQuery
                     date: v.string(),
                     organization: v.string(),
                     project: v.optional(v.string()),
-                    replies: v.number(),
                     tokens: v.number(),
                 }),
             ),
         }),
     )
     .query(async ({ args: { cursor, userId }, ctx }) => {
-        const page = await ctx.db.usageOrganizationDaily.findMany({ cursor, limit: USAGE_EXPORT_PAGE, where: { userId } });
+        const page = await ctx.db.usageOrganizationReplies.findMany({ cursor, limit: ORGANIZATION_EXPORT_PAGE, where: { userId } });
 
         return {
             cursor: page.isDone ? null : page.continueCursor,
-            rows: page.page.map((row): ExportedOrganizationUsageRow => {
+            rows: page.page.map((row): OrganizationUsageReply => {
                 return {
                     costMicrodollars: row.costMicrodollars,
                     date: row.date,
                     organization: row.organizationId,
-                    replies: row.replies,
                     tokens: row.tokens,
-                    ...(row.projectKey !== "__total__" && { project: row.projectKey }),
+                    ...(row.projectKey !== undefined && { project: row.projectKey }),
                 };
             }),
         };

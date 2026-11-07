@@ -26,14 +26,16 @@
   rows after the first walk began) only once its live record's key is held.
   Key pruning waits for both walks.
 - **Organization view** (`organization.ts`) — reads the `.global()`
-  `usageOrganizationDaily` rollup, keyed by organization (never by member, no
-  user column): each recorded reply adds to its org's `__total__` row and, when
-  the org OWNS the project, to that project's row (`organizationRows`). So a
-  member who leaves keeps counting and the view can only give org totals. The
-  org comes from the session, never the client; the admin role is checked on
-  the `member` row. The backfill never files history under an org (no record
-  says which one a past reply ran in). The late live record marks
-  `project:`/`organization:` keys whatever it filed, so a redelivery after the
-  thread moves files nothing elsewhere. `pruneOrganizationUsage` (a periodic
-  job) applies the rollup's retention. The data export reads `usageDaily` a
-  page at a time inside `generateExportFile` (`usage/gdpr.ts`).
+  `usageOrganizationReplies` ledger: ONE row per reply (org, day, cost, tokens,
+  member, and the project only when the org OWNS it — `organizationReply`),
+  inserted only if `(userId, replyKey)` has none, so a retry after a failure on
+  either side of the shard/D1 split files it once. Read by organization, never
+  by membership, so a member who leaves keeps counting; the view only ever sums
+  rows. The org comes from the session, never the client; the admin role is
+  checked on the `member` row; only current members file. The backfill never
+  files history under an org (no record says which one a past reply ran in).
+  The late live record marks `project:`/`organization:` keys whatever it filed,
+  so a redelivery after the thread moves files nothing elsewhere. A read cut
+  short drops its oldest (partly read) day. `pruneOrganizationUsage` (a
+  periodic job) applies retention; erasure and export go by `userId`
+  (`usage/gdpr.ts`), the data export reading `usageDaily` a page at a time.

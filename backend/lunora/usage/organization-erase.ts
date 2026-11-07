@@ -1,5 +1,5 @@
 /**
- * Erasure of a deleted organization's usage (`usageOrganizationDaily`), queued by the organization's deletion
+ * Erasure of a deleted organization's usage (`usageOrganizationReplies`), queued by the organization's deletion
  * (`auth.ts`). Apart from `organization.ts` so the auth wiring can queue it without loading the procedures.
  */
 import { v } from "lunorash/server";
@@ -21,10 +21,10 @@ export const eraseOrganizationUsage = internalMutation
     .input({ organizationId: v.string().max(MAX_LENGTH.id) })
     .output(v.number())
     .mutation(async ({ args: { organizationId }, ctx }) => {
-        const { page } = await ctx.db.usageOrganizationDaily.findMany({ limit: ERASE_BATCH, where: { organizationId } });
+        const { page } = await ctx.db.usageOrganizationReplies.findMany({ limit: ERASE_BATCH, where: { organizationId } });
 
         for (const row of page) {
-            await ctx.db.delete("usageOrganizationDaily", row._id);
+            await ctx.db.delete("usageOrganizationReplies", row._id);
         }
 
         if (page.length >= ERASE_BATCH) {
