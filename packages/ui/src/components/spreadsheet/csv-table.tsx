@@ -66,7 +66,11 @@ const CsvTable = ({ className, data, headers, labels, onClearSearch, onSort, sea
             return <ArrowUpDownIcon className="text-muted-foreground size-3" />;
         }
 
-        return sortConfig.direction === "asc" ? <ChevronUpIcon className="text-primary-text size-3" /> : <ChevronDownIcon className="text-primary-text size-3" />;
+        return sortConfig.direction === "asc" ? (
+            <ChevronUpIcon className="text-primary-text size-3" />
+        ) : (
+            <ChevronDownIcon className="text-primary-text size-3" />
+        );
     };
 
     return (

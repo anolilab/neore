@@ -42,7 +42,7 @@ from the root (the vis target `test:storybook`); CI runs it, and the preview dep
 
 - `pages/*.stories.tsx`, not next to the route: the router generator would read a story in `src/routes` as a route.
 - `StoryPage` (`page.tsx`) mounts the REAL routes as a chain of levels at a URL: `{ path: "chat/$threadId", route:
-  ThreadRoute }`, `{ id: "(chat)", route: ChatLayoutRoute }` for a pathless group. Their component, search validation
+ThreadRoute }`, `{ id: "(chat)", route: ChatLayoutRoute }` for a pathless group. Their component, search validation
   and loader run, with the story's clients in the router context; `beforeLoad` guards do not.
 
 ## A11Y

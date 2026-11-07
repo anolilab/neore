@@ -64,7 +64,8 @@ const ComposerGoal: FC<ComposerGoalProps> = ({ disabled }) => {
                             aria-pressed={enabled}
                             className={clsx(
                                 "bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 text-foreground h-7 gap-1 px-2 dark:text-white",
-                                enabled && "bg-primary/10 text-primary-text border-primary/30 dark:text-primary-text hover:bg-primary/20 hover:border-primary/40",
+                                enabled &&
+                                    "bg-primary/10 text-primary-text border-primary/30 dark:text-primary-text hover:bg-primary/20 hover:border-primary/40",
                             )}
                             disabled={disabled}
                             onClick={() => setEnabled(!enabled)}

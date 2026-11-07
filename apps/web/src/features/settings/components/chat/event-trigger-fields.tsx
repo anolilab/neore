@@ -191,7 +191,9 @@ const EventTriggerFields: FC<EventTriggerFieldsProps> = ({ event, onChange }) =>
                     <button
                         aria-pressed={event.kind === kind}
                         className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                            event.kind === kind ? "border-primary bg-primary/5 text-primary-text" : "border-border text-muted-foreground hover:border-primary/50"
+                            event.kind === kind
+                                ? "border-primary bg-primary/5 text-primary-text"
+                                : "border-border text-muted-foreground hover:border-primary/50"
                         }`}
                         key={kind}
                         onClick={() => set({ kind })}

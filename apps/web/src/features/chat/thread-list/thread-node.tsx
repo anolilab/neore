@@ -540,18 +540,21 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             {isComparisonParent && <GitCompareArrows aria-label={t`Model comparison`} className="text-muted-foreground h-3 w-3 shrink-0" />}
                             {isLocked && <Lock aria-hidden="true" className="text-muted-foreground h-3 w-3 shrink-0" />}
                             {isSelectionMode ? (
-                <span className={cn("truncate", isUnread && "font-medium")}>{displayTitle}</span>
-            ) : (
-                // The title is the row's keyboard target: the row itself holds no role, so the link is what Tab reaches.
-                <Link
-                    className={cn("truncate rounded-sm focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none", isUnread && "font-medium")}
-                    params={{ threadId: node.threadId }}
-                    search={{}}
-                    to="/chat/$threadId"
-                >
-                    {displayTitle}
-                </Link>
-            )}
+                                <span className={cn("truncate", isUnread && "font-medium")}>{displayTitle}</span>
+                            ) : (
+                                // The title is the row's keyboard target: the row itself holds no role, so the link is what Tab reaches.
+                                <Link
+                                    className={cn(
+                                        "truncate rounded-sm focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none",
+                                        isUnread && "font-medium",
+                                    )}
+                                    params={{ threadId: node.threadId }}
+                                    search={{}}
+                                    to="/chat/$threadId"
+                                >
+                                    {displayTitle}
+                                </Link>
+                            )}
                             {needsYou !== undefined && (
                                 <span className={cn("shrink-0 text-xs", NEEDS_YOU_TEXT_CLASS)}>{needsYou === "approval" ? t`Approval` : t`Question`}</span>
                             )}
