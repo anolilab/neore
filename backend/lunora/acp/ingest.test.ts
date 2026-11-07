@@ -1164,6 +1164,43 @@ describe("a host turn", () => {
         await turn(device, threadId, "t1", 2, [{ kind: "permission_resolved", outcome: "allowed", requestId: "r1" }]);
         expect(await rowField(threadId, "awaitingInput")).toBeUndefined();
     });
+    it("a host turn that ends clears the approval it was waiting on", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const askForTool = { kind: "permission_request", options: [{ kind: "allow_once", name: "Allow", optionId: "o1" }], requestId: "r1", tool: "Bash" };
+
+        await turn(device, threadId, "t1", 0, [START(), askForTool]);
+        expect(await rowField(threadId, "awaitingInput")).toBe("approval");
+
+        await turn(device, threadId, "t1", 2, [{ kind: "turn_end", reason: "finished" }]);
+
+        expect(await rowField(threadId, "awaitingInput")).toBeUndefined();
+    });
+
+    it("a host turn that ends keeps the approval another live run on the thread still owns", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const askForTool = { kind: "permission_request", options: [{ kind: "allow_once", name: "Allow", optionId: "o1" }], requestId: "r1", tool: "Bash" };
+
+        // A cloud run on the same thread, still streaming: it is a live run of its own, not the host's turn.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("persistentStreams", {
+                expiresAt: Date.now() + 3_600_000,
+                messageId: "cloud-message",
+                status: "streaming",
+                streamingConfig: { contentType: "text", model: "cloud" },
+                threadId,
+                userId: ownerId,
+            });
+        });
+
+        await turn(device, threadId, "t1", 0, [START(), askForTool]);
+        expect(await rowField(threadId, "awaitingInput")).toBe("approval");
+
+        await turn(device, threadId, "t1", 2, [{ kind: "turn_end", reason: "finished" }]);
+
+        expect(await rowField(threadId, "awaitingInput")).toBe("approval");
+    });
 });
 
 describe("ingest refusals", () => {

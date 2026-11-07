@@ -7,7 +7,7 @@
 import { HOST_STREAM_IDLE_MS, HOST_TURN_MAX_MS } from "../../../acp/lib/constants";
 import type { Doc, Id } from "../../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../../_generated/server";
-import { patchThread } from "../../../agent/table-writes";
+import { clearAwaitingInput, patchThread } from "../../../agent/table-writes";
 import { patchRow, withoutUndefined } from "../../../lib/patch";
 import { noteShardDue } from "../../../lib/shard-housekeeping";
 
@@ -185,12 +185,26 @@ export const endHostStream = async (
         return false;
     }
 
+    const askedPermission = (stream.hostPendingPermissions?.length ?? 0) > 0;
+
     await patchRow(ctx.db, "persistentStreams", stream, {
         hostEndReason: end.reason,
         hostState: "ended",
         status: end.status,
         ...(stream.hostPendingPermissions !== undefined && { hostPendingPermissions: undefined }),
     });
+
+    // The approval the turn was waiting on ends with the turn, so the thread stops waiting for the owner. Another live run on the
+    // thread may own the approval now; then the thread keeps it.
+    if (askedPermission) {
+        const threadId = stream.threadId as Id<"threads">;
+        const otherRun = await ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId } });
+
+        if (!otherRun) {
+            await clearAwaitingInput(ctx.db, threadId);
+        }
+    }
+
     // A stop or a finished turn keeps a snooze; an error or a timeout wakes the thread, as a failed run does.
     await releaseThread(ctx, stream.threadId as Id<"threads">, now, { failed: end.status !== "done" });
 
