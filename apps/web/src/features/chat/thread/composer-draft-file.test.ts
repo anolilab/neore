@@ -229,8 +229,19 @@ describe("undoLongPaste", () => {
 });
 
 describe(pasteHasText, () => {
-    it("lets the editor insert the text of a paste that also carries a picture of it, and takes a paste of files alone", () => {
-        expect(pasteHasText({ types: ["Files", "text/plain", "text/html"] })).toBe(true);
-        expect(pasteHasText({ types: ["Files"] })).toBe(false);
+    const clipboard = (plain: string) => {
+        return { getData: (type: string) => (type === "text/plain" ? plain : "") };
+    };
+    const picture = [{ name: "image.png" }];
+
+    it.each([
+        ["text from an Office app, with a picture of it", "Q3 revenue\nup 12%", picture, true],
+        ["files alone", "", picture, false],
+        ["a file manager's copy, whose text is the files' names", "report.pdf\nnotes.txt", [{ name: "report.pdf" }, { name: "notes.txt" }], false],
+        ["a copy that names the files by path", "/Users/me/report.pdf", [{ name: "report.pdf" }], false],
+        ["a file manager's copy as file URIs", "file:///home/me/My%20Report.pdf", [{ name: "My Report.pdf" }], false],
+        ["a browser's image copy, whose text is the image's URL", "https://cdn.example.com/p/photo.jpg?w=800", picture, false],
+    ])("%s: %s", (_label, plain, files, expected) => {
+        expect(pasteHasText(clipboard(plain), files)).toBe(expected);
     });
 });

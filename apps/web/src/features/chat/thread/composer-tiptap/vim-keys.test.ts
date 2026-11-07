@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/max-nested-calls -- the assertions read best as `expect(offsetOf(press(...).state))` */
 import { history } from "@tiptap/pm/history";
 import { Schema } from "@tiptap/pm/model";
-import { EditorState, TextSelection } from "@tiptap/pm/state";
+import { EditorState, NodeSelection, TextSelection } from "@tiptap/pm/state";
 import { describe, expect, it } from "vitest";
 
 import type { VimKey, VimState } from "./vim-keys";
@@ -177,6 +177,20 @@ describe("motions", () => {
     it("passes over a quote chip with k and after dd, staying on a line it can act on", () => {
         expect(press(aroundChip(), ["k"]).state.selection.$head.parent.textContent).toBe("first");
         expect(press(aroundChip(), ["d", "d"]).state.selection.$head.parent.isTextblock).toBe(true);
+    });
+
+    it("acts on a selected quote chip with x, a and i, and types nothing over it", () => {
+        const start = aroundChip();
+        const chipSelected = start.apply(start.tr.setSelection(NodeSelection.create(start.doc, 7)));
+
+        expect(press(chipSelected, ["j"]).handled).toBe(true);
+        expect(press(chipSelected, ["j"]).state.doc.childCount).toBe(3);
+        expect(press(chipSelected, ["x"]).state.doc.childCount).toBe(2);
+
+        const after = press(chipSelected, ["a"]);
+
+        expect(after.vim.mode).toBe("insert");
+        expect(after.state.selection.$head.parent.textContent).toBe("last");
     });
 });
 

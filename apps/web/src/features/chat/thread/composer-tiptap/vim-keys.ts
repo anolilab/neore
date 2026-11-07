@@ -12,7 +12,7 @@
 import { undo } from "@tiptap/pm/history";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
-import { TextSelection } from "@tiptap/pm/state";
+import { Selection, TextSelection } from "@tiptap/pm/state";
 
 export type VimMode = "insert" | "normal";
 
@@ -292,11 +292,35 @@ const runUndo = (state: EditorState, vim: VimState): VimResult => {
     return handledAt(vim, tr);
 };
 
+/** The insert keys that start typing before a selected chip, and those that start after it. */
+const INSERT_BEFORE: ReadonlySet<string> = new Set(["i", "I", "O"]);
+const INSERT_AFTER: ReadonlySet<string> = new Set(["a", "A", "o"]);
+
+/** Keys pressed while a block without text (a quote chip) is selected instead of a cursor. */
+const chipKey = (state: EditorState, vim: VimState, key: string): VimResult => {
+    const { from, to } = state.selection;
+
+    if (key === "x") {
+        return handledAt(vim, state.tr.deleteSelection());
+    }
+
+    if (INSERT_BEFORE.has(key) || INSERT_AFTER.has(key)) {
+        const before = INSERT_BEFORE.has(key);
+        const target = Selection.near(state.doc.resolve(before ? from : to), before ? -1 : 1);
+
+        return handledAt(vim, state.tr.setSelection(target), { mode: "insert" });
+    }
+
+    return { handled: key.length === 1, state: { ...vim, pending: "" } };
+};
+
 const normalKey = (state: EditorState, vim: VimState, key: string): VimResult => {
     const cursor = cursorOf(state);
 
+    // Not in a paragraph (a quote chip is selected): `x` deletes the chip, the insert keys start typing next to it, and any
+    // other letter or symbol is not typed into the draft, where it would replace the chip. Enter, Tab and arrows keep their meaning.
     if (!cursor) {
-        return { handled: false, state: vim };
+        return chipKey(state, vim, key);
     }
 
     const { line, offset } = cursor;

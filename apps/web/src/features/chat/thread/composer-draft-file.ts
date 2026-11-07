@@ -19,8 +19,26 @@ interface MoveDraftToFileOptions {
     onFailure: (error: string) => void;
 }
 
-/** Whether a paste carries text as well as any files: that text is the editor's to insert, or a file when it is long. */
-export const pasteHasText = (data: Pick<DataTransfer, "types">): boolean => data.types.includes("text/plain") || data.types.includes("text/html");
+const LINE_BREAK = /\r?\n/u;
+const PATH_SEPARATOR = /[/\\]/u;
+/** A line that is one URL or file URI: what a file manager or a browser's "Copy Image" puts next to the files it copies. */
+const LINK_LINE = /^(?:file|https?):\/\/\S+$/iu;
+
+/**
+ * Whether a paste carries text of its own as well as its files: that text is the editor's to insert, or a file when it is
+ * long. Office apps add a picture of the copied text; a file manager's copy carries only the files' names, paths or file
+ * URIs as text, and a browser's image copy only the image's URL or an `<img>` as HTML, so none of those counts.
+ */
+export const pasteHasText = (data: Pick<DataTransfer, "getData">, files: ReadonlyArray<Pick<File, "name">>): boolean => {
+    const names = new Set(files.map((file) => file.name));
+    const lines = data
+        .getData("text/plain")
+        .split(LINE_BREAK)
+        .map((line) => line.trim())
+        .filter((line) => line !== "");
+
+    return lines.some((line) => !LINK_LINE.test(line) && !names.has(line.split(PATH_SEPARATOR).at(-1) ?? line));
+};
 
 /** The characters a text attachment of `draft` adds to the context: its UTF-8 bytes, as `attachmentTextChars` counts them. */
 export const draftFileChars = (draft: string): number => new TextEncoder().encode(draft).length;
