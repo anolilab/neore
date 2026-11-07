@@ -16,7 +16,13 @@ const HOST_INFO: HostSessionInfo = { agentKey: "example", agentLabel: "Example",
 const OPENED = {
     ...HOST_INFO,
     capabilities: {
-        groups: { sessions: { listNative: { reason: "not_offered", supported: false }, load: { reason: "not_offered", supported: false } } },
+        groups: {
+            sessions: {
+                fork: { reason: "not_offered", supported: false },
+                listNative: { reason: "not_offered", supported: false },
+                load: { reason: "not_offered", supported: false },
+            },
+        },
         reportedAt: expect.any(Number),
         version: 1,
     },
@@ -25,11 +31,11 @@ const OPENED = {
 
 const recorder = () => {
     const calls: unknown[][] = [];
-    const record
-        = (name: string) =>
-            (...args: unknown[]): void => {
-                calls.push([name, ...args.slice(1)]);
-            };
+    const record =
+        (name: string) =>
+        (...args: unknown[]): void => {
+            calls.push([name, ...args.slice(1)]);
+        };
     const observer: SessionObserver = {
         permissionRequested: record("permissionRequested"),
         permissionResolved: record("permissionResolved"),
@@ -170,9 +176,15 @@ describe("a session's observer", () => {
 
         session.send("say hi");
         await player.play(steps.slice(4, 5));
-        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { content: { text: "token hunt", type: "text" }, sessionUpdate: "agent_message_chunk" } } });
+        agent.say({
+            method: "session/update",
+            params: { sessionId: "sess_1", update: { content: { text: "token hunt", type: "text" }, sessionUpdate: "agent_message_chunk" } },
+        });
         await expect.poll(() => session.snapshot().turns[0]?.text).toBe("token hunt");
-        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { content: { text: "er22 done", type: "text" }, sessionUpdate: "agent_message_chunk" } } });
+        agent.say({
+            method: "session/update",
+            params: { sessionId: "sess_1", update: { content: { text: "er22 done", type: "text" }, sessionUpdate: "agent_message_chunk" } },
+        });
         await expect.poll(() => session.snapshot().turns[0]?.text).toBe("token *** done");
         await player.play(steps.slice(-1));
         await expect.poll(() => session.snapshot().status).toBe("idle");

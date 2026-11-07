@@ -43,11 +43,22 @@ const MAX_RECEIPTS = 1000;
  */
 const UNREADABLE_LOG_WAIT_MS = 5 * 60_000 + KEEP_AFTER_EXPIRY_MS;
 
-export type AcpCommand
-    = | { keepQueue?: boolean; kind: "cancel"; sessionId: string; turnId: string }
-        | { kind: "permissionAnswer"; optionId: string; requestId: string; sessionId: string }
-        | { kind: "send"; sessionId: string; text: string; turnId: string }
-        | { agentKey: string; agentLabel: string; folderId: string; folderLabel: string; folderPath: string; kind: "start"; nativeSessionId?: string; sessionId: string; threadId: string };
+export type AcpCommand =
+    | { keepQueue?: boolean; kind: "cancel"; sessionId: string; turnId: string }
+    | { kind: "permissionAnswer"; optionId: string; requestId: string; sessionId: string }
+    | { kind: "send"; sessionId: string; text: string; turnId: string }
+    | {
+          agentKey: string;
+          agentLabel: string;
+          folderId: string;
+          folderLabel: string;
+          folderPath: string;
+          forkSessionId?: string;
+          kind: "start";
+          nativeSessionId?: string;
+          sessionId: string;
+          threadId: string;
+      };
 
 interface Prepared {
     callId: string;
@@ -179,7 +190,7 @@ const threadOf = (envelope: string): string | undefined => {
 const appliedOf = (prepared: Prepared, envelope: string): AppliedCall => {
     return {
         callId: prepared.callId,
-        ...prepared.server != null && prepared.deviceId !== undefined && { deviceId: prepared.deviceId, server: prepared.server },
+        ...(prepared.server != null && prepared.deviceId !== undefined && { deviceId: prepared.deviceId, server: prepared.server }),
         expiresAt: prepared.expiresAt,
         threadId: threadOf(envelope),
     };
@@ -198,7 +209,7 @@ const sendOf = (envelope: string): LapsedSend | undefined => {
     const fields = isRecord(input) ? input : {};
 
     return tool === "acp_send" && typeof threadId === "string" && typeof fields.sessionId === "string" && typeof fields.turnId === "string"
-        ? { ...typeof deviceId === "string" && { deviceId }, sessionId: fields.sessionId, threadId, turnId: fields.turnId }
+        ? { ...(typeof deviceId === "string" && { deviceId }), sessionId: fields.sessionId, threadId, turnId: fields.turnId }
         : undefined;
 };
 
@@ -313,7 +324,7 @@ export class HostCommands {
      */
     private async receive(command: AcpCommand, call: AppliedCall, signed: { envelope: string; signature: string }): Promise<string> {
         const { callId } = call;
-        const receipt: Receipt = { expiresAt: call.expiresAt, ...isReplayable(command) && { held: signed } };
+        const receipt: Receipt = { expiresAt: call.expiresAt, ...(isReplayable(command) && { held: signed }) };
 
         this.receipts.set(callId, receipt);
 
@@ -377,13 +388,13 @@ export class HostCommands {
         // A session must exist before the message waiting for it is held against it.
         pending.sort(
             ([, first], [, second]) =>
-                Number(parsedEnvelope(second.held?.envelope ?? "").tool === "acp_start")
-                - Number(parsedEnvelope(first.held?.envelope ?? "").tool === "acp_start"),
+                Number(parsedEnvelope(second.held?.envelope ?? "").tool === "acp_start") -
+                Number(parsedEnvelope(first.held?.envelope ?? "").tool === "acp_start"),
         );
 
         // The sessions a replayed start will open. A held message for any other session is for one that died with the
         // process or whose start has not come back yet: it may already have run, so its turn is interrupted.
-        const opening = new Set(pending.flatMap(([, receipt]) => receipt.expiresAt > this.now() ? [startedSessionOf(receipt.held?.envelope ?? "")] : []));
+        const opening = new Set(pending.flatMap(([, receipt]) => (receipt.expiresAt > this.now() ? [startedSessionOf(receipt.held?.envelope ?? "")] : [])));
         // A start the core refuses on this run opens nothing: the messages held for it fail with its reason.
         const refusedStarts = new Map<string, string>();
 
@@ -563,8 +574,8 @@ export class HostCommands {
             if (Array.isArray(entry) && typeof entry[0] === "string" && typeof entry[1] === "number") {
                 this.receipts.set(entry[0], {
                     expiresAt: entry[1],
-                    ...typeof entry[2] === "string" && { refusal: entry[2] },
-                    ...typeof entry[3] === "string" && typeof entry[4] === "string" && { held: { envelope: entry[3], signature: entry[4] } },
+                    ...(typeof entry[2] === "string" && { refusal: entry[2] }),
+                    ...(typeof entry[3] === "string" && typeof entry[4] === "string" && { held: { envelope: entry[3], signature: entry[4] } }),
                 });
             }
         }
