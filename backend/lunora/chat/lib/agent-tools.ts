@@ -170,7 +170,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
             ? []
             : ctx
                   .runQuery(internal.source_control.pr_agent.linkedPullRequestsOfThread, { threadId: linkThreadId, userId })
-                  .then((linked) => (Array.isArray(linked) && linked.length > 0 ? PULL_REQUEST_TOOLS : []))
+                  .then((linked) => (linked && linked.links.length > 0 ? PULL_REQUEST_TOOLS : []))
                   .catch((error: unknown) => {
                       toolsLogger.warn("[TOOLS] Pull request links unavailable:", error);
 

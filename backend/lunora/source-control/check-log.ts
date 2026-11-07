@@ -223,8 +223,15 @@ export const readTail = async (
         const taken = value.byteLength > room ? value.subarray(0, room) : value;
 
         received += taken.byteLength;
-        chunks.push(taken);
-        kept += taken.byteLength;
+        // A chunk larger than what is kept is copied down to its tail: neither it nor its buffer stays whole.
+        const tail = taken.byteLength > keepBytes ? taken.slice(taken.byteLength - keepBytes) : taken;
+
+        if (tail !== taken) {
+            dropped = true;
+        }
+
+        chunks.push(tail);
+        kept += tail.byteLength;
 
         while (chunks.length > 1 && kept - (chunks[0]?.byteLength ?? 0) >= keepBytes) {
             kept -= chunks.shift()?.byteLength ?? 0;
@@ -257,9 +264,12 @@ export const excerptRead = (read: { endReached: boolean; partial: boolean; text:
         return excerptLog(read.text, maxChars, read.partial);
     }
 
-    // The log goes on past what was read: said at the end, where its failure may still be.
+    // The log goes on past what was read: said at the end, where its failure may still be. Inside the cap all told.
     const ending = "\n[truncated, the log goes on past what was read]";
     const log = excerptLog(read.text, maxChars - ending.length, read.partial);
 
-    return { ...log, endRead: false, excerpt: `${log.excerpt}${ending}`, truncated: true };
+    const excerpt = `${log.excerpt}${ending}`;
+
+    // A budget smaller than the ending keeps the ending's own last characters: never more than the cap.
+    return { ...log, endRead: false, excerpt: maxChars <= 0 ? "" : excerpt.slice(-maxChars), truncated: true };
 };

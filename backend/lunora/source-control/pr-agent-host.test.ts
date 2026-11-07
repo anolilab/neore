@@ -9,6 +9,7 @@ import { LOG_EXCERPT_MAX_CHARS } from "./check-log";
 import { githubDriver } from "./drivers/github";
 import type { LinkedPullRequest, PullRequestAgentDependencies } from "./pr-agent-host";
 import {
+    AGENT_LOG_READ_BUDGET_MS,
     AGENT_MAX_THREAD_PAGES,
     AGENT_REVIEW_COMMENTS_BUDGET_CHARS,
     mergeForAgent,
@@ -79,7 +80,9 @@ const dependencies = (linked: LinkedPullRequest[] = LINKED): PullRequestAgentDep
         allowed: async () => true,
         driver: githubDriver,
         isLinked: async (ref) => linked.some((link) => link.repository === ref.repository && link.number === ref.number),
-        linked: async () => linked,
+        linked: async () => {
+            return { complete: true, links: linked };
+        },
         token: async () => {
             return {
                 accessToken: TOKEN,
@@ -223,6 +226,53 @@ describe("when a check's log cannot be had", () => {
         expect(check?.log).toMatchObject({ excerpt: "Tests\n\n3 failed", source: "check_output" });
     });
 
+    it("calls a log refused to the account unavailable when the check has no output either", async () => {
+        stubHost({
+            ...failingRoutes,
+            [`GET ${API}/actions/jobs/11/logs`]: () => Response.json({ message: "Must have admin rights" }, { status: 403 }),
+            [`GET ${API}/check-runs/11`]: () => Response.json({ app: { slug: "github-actions" }, id: 11, name: "test", output: null }),
+        });
+
+        const outcome = await readFailingChecksForAgent(dependencies(), {});
+        const [check] = outcome.status === "ok" && "checks" in outcome ? outcome.checks.items : [];
+
+        expect(check?.logStatus).toBe("unavailable");
+    });
+
+    it("starts no further log once the read's time budget is spent, and names those checks not read", async () => {
+        stubHost({
+            ...failingRoutes,
+            [`GET ${API}/check-runs/11`]: () => Response.json({ app: { slug: "other-app" }, id: 11, name: "test", output: { summary: "1 failed", title: "A" } }),
+            [`GET ${API}/check-runs/12`]: () => Response.json({ app: { slug: "other-app" }, id: 12, name: "lint", output: { summary: "2 failed", title: "B" } }),
+            [`GET ${API}/commits/${SHA}/check-runs`]: () =>
+                Response.json({
+                    check_runs: [
+                        { app: { slug: "other-app" }, conclusion: "failure", id: 11, name: "test", status: "completed" },
+                        { app: { slug: "other-app" }, conclusion: "failure", id: 12, name: "lint", status: "completed" },
+                    ],
+                    total_count: 2,
+                }),
+        });
+
+        // The budget starts at 0; the first log starts at once, and by the second the whole budget is gone.
+        const now = vi.spyOn(Date, "now");
+
+        now.mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValue(AGENT_LOG_READ_BUDGET_MS + 1);
+
+        const outcome = await readFailingChecksForAgent(dependencies(), {});
+
+        now.mockRestore();
+
+        expect(outcome).toMatchObject({
+            checks: {
+                items: [
+                    { logStatus: "ok", name: "test" },
+                    { log: null, logStatus: "not_read", name: "lint" },
+                ],
+            },
+        });
+    });
+
     it("says the log was unavailable when reading it failed, and that the list is partial", async () => {
         stubHost({ ...failingRoutes, [`GET ${API}/check-runs/11`]: () => Response.json({ message: "boom" }, { status: 500 }) });
 
@@ -278,6 +328,17 @@ describe(readThreadsWithin, () => {
             startLine: null,
         };
     };
+
+    it("says when a thread is longer than the comments read", async () => {
+        const read = await readThreadsWithin(
+            async () => {
+                return { endCursor: null, hasMore: false, items: [{ ...thread("t", [comment(1), comment(2)]), commentCount: 500 }], total: 1 };
+            },
+            { page: null, skip: 0 },
+        );
+
+        expect(read.items[0]?.comments).toMatchObject({ latestUnread: true, truncated: "truncated, 498 more" });
+    });
 
     it("shows a thread's first and latest comments, and marks the rest", async () => {
         const read = await readThreadsWithin(
@@ -384,6 +445,11 @@ describe(pickLinkedPullRequest, () => {
         expect(pickLinkedPullRequest(two, { number: 8 }).status).toBe("not_linked");
     });
 
+    it("asks for repository and number when the list of links is only a part", () => {
+        expect(pickLinkedPullRequest(two, { number: 9 }, false).status).toBe("choose");
+        expect(pickLinkedPullRequest([], { number: 9 }, false).status).toBe("choose");
+    });
+
     it("refuses an address that is not one", () => {
         expect(pickLinkedPullRequest(two, { number: 9, repository: "../etc" }).status).toBe("not_linked");
         expect(pickLinkedPullRequest(two, { number: -1, repository: "octo/hello" }).status).toBe("not_linked");
@@ -485,6 +551,15 @@ describe("re-running checks of a linked pull request", () => {
         });
 
         await expect(rerunFailedForAgent(dependencies(), {}, ["999"])).resolves.toMatchObject({ rerun: [], skipped: [], unlisted: ["999"] });
+    });
+
+    it("says when the host has checks the read did not list, even when none were named", async () => {
+        stubHost({
+            ...routes([run(1, "failure")]),
+            [`GET ${API}/commits/${SHA}/check-runs`]: () => Response.json({ check_runs: [run(1, "failure")], total_count: 2 }),
+        });
+
+        await expect(rerunFailedForAgent(dependencies(), {}, undefined)).resolves.toMatchObject({ unlistedChecks: { truncated: "truncated, 1 more" } });
     });
 
     it("names back the failed checks past the cap instead of dropping them", async () => {

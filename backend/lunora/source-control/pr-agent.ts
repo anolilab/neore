@@ -28,17 +28,19 @@ const vLinkedPullRequest = v.object({
  */
 export const linkedPullRequestsOfThread = internalQuery
     .input({ threadId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.array(vLinkedPullRequest))
+    .output(v.object({ complete: v.boolean(), links: v.array(vLinkedPullRequest) }))
     .query(async ({ args, ctx }) => {
         // Only a thread the tools may run in has links an agent can see (`pullRequestToolsAllowed`).
         const thread = await loadEligibleThread(ctx, args.threadId as Id<"threads">, args.userId);
 
         if (!thread) {
-            return [];
+            return { complete: true, links: [] };
         }
 
         const rows: Doc<"pullRequestThreads">[] = [];
         let cursor: string | null = null;
+        // Past the page bound the list is a part: said so, and a lookup then asks for repository and number (keyed).
+        let complete = false;
 
         for (let page = 0; page < MAX_LINK_PAGES; page += 1) {
             const read = await ctx.db
@@ -49,6 +51,7 @@ export const linkedPullRequestsOfThread = internalQuery
             rows.push(...read.page);
 
             if (read.isDone) {
+                complete = true;
                 break;
             }
 
@@ -58,7 +61,7 @@ export const linkedPullRequestsOfThread = internalQuery
         const { live } = await partitionLinks(ctx, rows);
         const seen = new Set<string>();
 
-        return live
+        const links = live
             .toSorted((left, right) => right.createdAt - left.createdAt || right._id.localeCompare(left._id))
             .flatMap((row) => {
                 const key = `${row.repository}#${String(row.number)}`;
@@ -71,6 +74,8 @@ export const linkedPullRequestsOfThread = internalQuery
 
                 return [{ kind: row.kind, number: row.number, repository: row.repository }];
             });
+
+        return { complete, links };
     });
 
 /**

@@ -143,6 +143,8 @@ export interface CheckLog {
     endRead?: false;
     /** Lines around the failure, cut to a cap; untrusted text. Empty when the host has none. */
     excerpt: string;
+    /** Set when the log was refused to the account and the check had no output either: unavailable, not absent. */
+    refused?: true;
     source: CheckLogSource;
     /** Whether the excerpt leaves part of the log out. */
     truncated: boolean;

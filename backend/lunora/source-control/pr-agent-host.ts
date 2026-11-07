@@ -41,6 +41,10 @@ export const AGENT_MAX_THREAD_PAGES = 4;
 export const AGENT_MAX_CHECK_PAGES = 10;
 /** Failing checks one read names; past them, the marker counts the rest. */
 export const AGENT_MAX_FAILING_CHECKS = 30;
+/** Time one failing-checks read spends on logs in all: shared by the logs it reads, one after another. */
+export const AGENT_LOG_READ_BUDGET_MS = 60_000;
+/** Time left below which no further log is started: it could not be read in time anyway. */
+export const AGENT_MIN_LOG_READ_MS = 2000;
 /** Longest reply an agent may post. */
 export const AGENT_REPLY_MAX_CHARS = 10_000;
 
@@ -56,7 +60,8 @@ export interface PullRequestAgentDependencies {
     driver: HostDriver;
     /** Whether this one pull request is linked to the thread: a keyed read, so a thread with many links is not cut short. */
     isLinked: (ref: PullRequestRef) => Promise<boolean>;
-    linked: () => Promise<LinkedPullRequest[]>;
+    /** The thread's links, as far as the read goes: `complete` is `false` past its bound. */
+    linked: () => Promise<{ complete: boolean; links: LinkedPullRequest[] }>;
     token: () => Promise<GithubTokenOutcome>;
 }
 
@@ -92,8 +97,12 @@ export type TargetRefusal = { linked: LinkedPullRequest[]; status: "choose" | "n
  * The linked pull request the call names. With none named, the thread's only one; with only a number or only a
  * repository, the one link that matches it. With both named, `target` asks for that one link by key.
  */
-export const pickLinkedPullRequest = (linked: LinkedPullRequest[], wanted: WantedPullRequest): TargetRefusal | { ref: PullRequestRef; status: "ok" } => {
-    if (linked.length === 0) {
+export const pickLinkedPullRequest = (
+    linked: LinkedPullRequest[],
+    wanted: WantedPullRequest,
+    complete = true,
+): TargetRefusal | { ref: PullRequestRef; status: "ok" } => {
+    if (linked.length === 0 && complete) {
         return { linked, status: "none_linked" };
     }
 
@@ -101,6 +110,12 @@ export const pickLinkedPullRequest = (linked: LinkedPullRequest[], wanted: Wante
     const repo = wanted.repository?.toLowerCase();
     const matches = linked.filter((link) => (repo === undefined || link.repository === repo) && (wanted.number === undefined || link.number === wanted.number));
     const [only] = matches;
+
+    // Past the read's bound, a lone match may not be the only one and no match is not proof: ask for both fields,
+    // which `target` checks by key.
+    if (!complete) {
+        return { linked, status: "choose" };
+    }
 
     if (matches.length === 1 && only) {
         return { ref: { number: only.number, repository: only.repository }, status: "ok" };
@@ -120,7 +135,9 @@ const target = async (
     }
 
     if (wanted.repository === undefined || wanted.number === undefined) {
-        return pickLinkedPullRequest(await dependencies.linked(), wanted);
+        const { complete, links } = await dependencies.linked();
+
+        return pickLinkedPullRequest(links, wanted, complete);
     }
 
     let address: PullRequestRef;
@@ -131,7 +148,13 @@ const target = async (
         return { linked: [], status: "not_linked" };
     }
 
-    return (await dependencies.isLinked(address)) ? { ref: address, status: "ok" } : { linked: await dependencies.linked(), status: "not_linked" };
+    if (await dependencies.isLinked(address)) {
+        return { ref: address, status: "ok" };
+    }
+
+    const { links } = await dependencies.linked();
+
+    return { linked: links, status: "not_linked" };
 };
 
 const cap = (text: string, max: number): { text: string; truncated: boolean } =>
@@ -214,6 +237,8 @@ const threadForAgent = (thread: ReviewThread) => {
             }),
             // Counted against the thread's own total: comments past the pages read are left out too.
             ...truncatedMarker((thread.commentCount ?? thread.comments.length) - kept.length),
+            // Longer than the pages read: the comments shown are the latest READ, and the thread's very latest are not among them.
+            ...((thread.commentCount ?? 0) > thread.comments.length && { latestUnread: true }),
         },
         isOutdated: thread.isOutdated,
         isResolved: thread.isResolved,
@@ -317,7 +342,23 @@ export interface FailingCheck {
     url: string | null;
 }
 
-/** The failing checks on the pull request's head, each with a capped excerpt of its log (the first few only). */
+/** Why a check has, or has not, a log in the answer (see {@link FailingCheck.logStatus}). */
+const logStatusOf = (read: boolean, log: CheckLog | null): FailingCheck["logStatus"] => {
+    if (!read) {
+        return "not_read";
+    }
+
+    if (log === null || (log.source === "none" && log.refused === true)) {
+        return "unavailable";
+    }
+
+    return log.source === "none" ? "none" : "ok";
+};
+
+/**
+ * The failing checks on the pull request's head, each with a capped excerpt of its log: the first few only, and only
+ * while the read's one time budget lasts ({@link AGENT_LOG_READ_BUDGET_MS}), so a call never waits on slow logs for long.
+ */
 export const readFailingChecksForAgent = async (dependencies: PullRequestAgentDependencies, wanted: WantedPullRequest) => {
     const picked = await target(dependencies, wanted);
 
@@ -333,20 +374,16 @@ export const readFailingChecksForAgent = async (dependencies: PullRequestAgentDe
         const summary = await driver.listChecks(request, ref, detail.headSha, AGENT_MAX_CHECK_PAGES);
         const failing = summary.checks.filter((check) => FAILING.has(check.state));
         const checks: FailingCheck[] = [];
+        const deadline = Date.now() + AGENT_LOG_READ_BUDGET_MS;
 
         // One log at a time: a log read is the heavy call, and the first few failures are what the agent needs.
         for (const [index, check] of failing.slice(0, AGENT_MAX_FAILING_CHECKS).entries()) {
-            const read = check.id !== null && index < AGENT_MAX_CHECK_LOGS;
-            const log = read ? await driver.readCheckLog(request, ref, check.id!, LOG_EXCERPT_MAX_CHARS).catch(() => null) : null;
-            let logStatus: FailingCheck["logStatus"] = "not_read";
+            // Each log gets what is left of the read's one time budget; past it, the rest are named without one.
+            const left = deadline - Date.now();
+            const read = check.id !== null && index < AGENT_MAX_CHECK_LOGS && left >= AGENT_MIN_LOG_READ_MS;
+            const log = read ? await driver.readCheckLog(request, ref, check.id!, LOG_EXCERPT_MAX_CHARS, left).catch(() => null) : null;
 
-            if (read && log === null) {
-                logStatus = "unavailable";
-            } else if (read) {
-                logStatus = log?.source === "none" ? "none" : "ok";
-            }
-
-            checks.push({ id: check.id, log, logStatus, name: check.name, required: check.required, url: check.url });
+            checks.push({ id: check.id, log, logStatus: logStatusOf(read, log), name: check.name, required: check.required, url: check.url });
         }
 
         return {
@@ -406,7 +443,10 @@ export const rerunFailedForAgent = async (
     dependencies: PullRequestAgentDependencies,
     wanted: WantedPullRequest,
     checkIds: string[] | undefined,
-): Promise<AgentWriteOutcome<{ notRerun: string[]; rerun: RerunResult[]; skipped: string[]; unlisted: string[] }> | { status: "head_moved" }> => {
+): Promise<
+    | AgentWriteOutcome<{ notRerun: string[]; rerun: RerunResult[]; skipped: string[]; unlisted: string[]; unlistedChecks: { truncated?: string } }>
+    | { status: "head_moved" }
+> => {
     const picked = await target(dependencies, wanted);
 
     if (picked.status !== "ok") {
@@ -465,7 +505,8 @@ export const rerunFailedForAgent = async (
         rerun.push({ id: check.id, name: check.name, status: outcome.status, ...(outcome.status === "rejected" && { reason: outcome.reason }) });
     }
 
-    return { notRerun, rerun, skipped, status: "ok", unlisted };
+    // The host has more checks than the pages read: an unnamed re-run may have missed failed ones among them.
+    return { notRerun, rerun, skipped, status: "ok", unlisted, unlistedChecks: { ...truncatedMarker(listed.total - listed.checks.length) } };
 };
 
 /** The method a merge uses: the one asked for when the repository allows it, else squash, else the first it allows. */

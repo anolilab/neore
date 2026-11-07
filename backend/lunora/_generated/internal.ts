@@ -1116,7 +1116,7 @@ export interface InternalApiTypes {
         };
         pr_agent: {
             isPullRequestLinkedToThread: FunctionReference<"query", { number: number; repository: string; threadId: string; userId: string }, boolean>;
-            linkedPullRequestsOfThread: FunctionReference<"query", { threadId: string; userId: string }, Array<{ kind: "attached" | "linked" | "opened"; number: number; repository: string }>>;
+            linkedPullRequestsOfThread: FunctionReference<"query", { threadId: string; userId: string }, { complete: boolean; links: Array<{ kind: "attached" | "linked" | "opened"; number: number; repository: string }> }>;
             pullRequestToolsAllowed: FunctionReference<"query", { threadId: string; userId: string }, boolean>;
         };
         pr_link_retry: {

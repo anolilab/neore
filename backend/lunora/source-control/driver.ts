@@ -91,7 +91,7 @@ export interface HostDriver {
      */
     pollReviewRequests: (request: HostRequest, repo: string, known: { etag: string | null; login: string | null }) => Promise<RepoPoll>;
     /** The part of one check's log that says why it failed, cut to `maxChars`. The caller picks the check from `listChecks` of the head it read. */
-    readCheckLog: (request: HostRequest, ref: PullRequestRef, checkId: string, maxChars: number) => Promise<CheckLog>;
+    readCheckLog: (request: HostRequest, ref: PullRequestRef, checkId: string, maxChars: number, timeoutMs?: number) => Promise<CheckLog>;
     /** Posts a reply to the thread `commentId` belongs to, at once. */
     replyToThread: (request: HostRequest, ref: PullRequestRef, commentId: string, body: string) => Promise<{ id: string }>;
     /** Re-runs the narrowest scope the host offers for one check: a single job, not its whole workflow. */

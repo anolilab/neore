@@ -64,6 +64,12 @@ describe(excerptLog, () => {
         }
     });
 
+    it("keeps an unfinished log's excerpt inside a cap smaller than its ending", () => {
+        for (const cap of [0, 10, 40]) {
+            expect(excerptRead({ endReached: false, partial: true, text: "##[error]boom" }, cap).excerpt.length).toBeLessThanOrEqual(cap);
+        }
+    });
+
     it("keeps a short log whole", () => {
         expect(excerptLog("one\ntwo\n")).toStrictEqual({ excerpt: "one\ntwo", source: "job_log", truncated: false });
     });
@@ -129,6 +135,13 @@ describe(readTail, () => {
 
         expect(endReached).toBe(false);
         expect(text).toBe(`${"a".repeat(100)}${"b".repeat(50)}`);
+    });
+
+    it("keeps only the tail of one chunk larger than what is kept", async () => {
+        const { partial, text } = await readTail(streamOf([`${"a".repeat(100)}${"b".repeat(20)}`]), 20);
+
+        expect(partial).toBe(true);
+        expect(text).toBe("b".repeat(20));
     });
 
     it("answers a short body whole", async () => {

@@ -111,7 +111,7 @@ ${UNTRUSTED}`,
 
 export const readFailingChecksTool = createTool<Target, object, ToolContext>({
     description: `Read the failing checks on a linked pull request's head commit: each check's name, id, and an excerpt of its log around the failure (the first few checks; an excerpt is capped).
-logStatus says why a check has no log: "not_read" (past the first few, or a status that has none), "unavailable" (reading it failed) or "none" (the host has no log or output for it). A log with endRead false was cut before its end, so its failure may come later. A list cut short says "truncated, N more": checks past the ones named, and unlisted checks the host did not list at all.
+logStatus says why a check has no log: "not_read" (past the first few, past the read's time budget, or a status that has none), "unavailable" (reading it failed) or "none" (the host has no log or output for it). A log with endRead false was cut before its end, so its failure may come later. A list cut short says "truncated, N more": checks past the ones named, and unlisted checks the host did not list at all.
 ${UNTRUSTED}`,
     execute: async (context, input) => {
         const dependencies = dependenciesOf(context);

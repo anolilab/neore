@@ -257,7 +257,7 @@ describe("buildAgentTools quick-check trust", () => {
             .mockResolvedValueOnce({})
             .mockResolvedValueOnce(true)
             // No pull request is linked to the thread.
-            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce({ complete: true, links: [] })
             .mockResolvedValueOnce(trusted);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
@@ -302,7 +302,7 @@ describe("buildAgentTools quick-check trust", () => {
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
             .mockResolvedValueOnce(true)
-            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce({ complete: true, links: [] })
             .mockResolvedValueOnce([mcpTrustId("files", second)]);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
@@ -327,7 +327,7 @@ describe("buildAgentTools pull request tools", () => {
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
             .mockResolvedValueOnce(false)
-            .mockResolvedValueOnce(linked);
+            .mockResolvedValueOnce({ complete: true, links: linked });
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
             model: "test-model",
@@ -349,7 +349,12 @@ describe("buildAgentTools pull request tools", () => {
     it("cannot be added by a skill to a thread without a linked pull request", async () => {
         const runQuery = vi.fn();
 
-        runQuery.mockResolvedValueOnce([]).mockResolvedValueOnce(overrides).mockResolvedValueOnce({}).mockResolvedValueOnce(false).mockResolvedValueOnce([]);
+        runQuery
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce(overrides)
+            .mockResolvedValueOnce({})
+            .mockResolvedValueOnce(false)
+            .mockResolvedValueOnce({ complete: true, links: [] });
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
             model: "test-model",

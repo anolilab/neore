@@ -1255,15 +1255,19 @@ const checkOutputSchema = z.object({
         .optional(),
 });
 
-/** The job's log answer: `undefined` when the host has none to give (expired, not written yet, gone). */
-const jobLogAnswer = async (request: HostRequest, ref: PullRequestRef, checkId: string): Promise<Response | undefined> => {
+/** The job's log answer: `undefined` when the host has none to give (expired, not written yet, gone), `refused` on a 403. */
+const jobLogAnswer = async (request: HostRequest, ref: PullRequestRef, checkId: string): Promise<Response | "refused" | undefined> => {
     try {
         // An Actions job has the id of its check run, so the check's id names the job.
         return await request(`${repoPath(ref)}/actions/jobs/${checkId}/logs`, { redirect: "return" });
     } catch (error) {
         // Gone, never written, or refused to this account (403 that is not a rate limit): the check's own output is next.
-        if (error instanceof HostApiError && !error.rateLimited && [403, 404, 410].includes(error.status)) {
+        if (error instanceof HostApiError && !error.rateLimited && [404, 410].includes(error.status)) {
             return undefined;
+        }
+
+        if (error instanceof HostApiError && !error.rateLimited && error.status === 403) {
+            return "refused";
         }
 
         throw error;
@@ -1271,11 +1275,17 @@ const jobLogAnswer = async (request: HostRequest, ref: PullRequestRef, checkId: 
 };
 
 /** A job log: the API answers with a redirect to a signed address on a storage origin, read there without the token. */
-const jobLog = async (request: HostRequest, ref: PullRequestRef, checkId: string, maxChars: number): Promise<CheckLog | undefined> => {
+const jobLog = async (
+    request: HostRequest,
+    ref: PullRequestRef,
+    checkId: string,
+    maxChars: number,
+    timeoutMs: number,
+): Promise<CheckLog | "refused" | undefined> => {
     const answer = await jobLogAnswer(request, ref, checkId);
 
-    if (answer === undefined) {
-        return undefined;
+    if (answer === undefined || answer === "refused") {
+        return answer;
     }
 
     const location = answer.headers.get("location");
@@ -1291,7 +1301,7 @@ const jobLog = async (request: HostRequest, ref: PullRequestRef, checkId: string
 
     // Not followed: the signed address is the log itself, and a redirect from it leads nowhere this reads.
     // A log is a large download: the longer deadline, and what arrived before it fires is still read (`readTail`).
-    const response = await fetchWithDeadline(location, { redirect: "manual", timeoutMs: FETCH_TIMEOUT_LONG_MS }).catch(() => {
+    const response = await fetchWithDeadline(location, { redirect: "manual", timeoutMs }).catch(() => {
         throw new HostApiError("The log could not be fetched", 0);
     });
 
@@ -1309,19 +1319,23 @@ const jobLog = async (request: HostRequest, ref: PullRequestRef, checkId: string
     return excerptRead(read, maxChars);
 };
 
-const readCheckLog = async (request: HostRequest, ref: PullRequestRef, checkId: string, maxChars: number): Promise<CheckLog> => {
+const readCheckLog = async (
+    request: HostRequest,
+    ref: PullRequestRef,
+    checkId: string,
+    maxChars: number,
+    timeoutMs: number = FETCH_TIMEOUT_LONG_MS,
+): Promise<CheckLog> => {
     if (!COMMENT_ID.test(checkId)) {
         throw new HostApiError("Not a check id", 404);
     }
 
     const run = parse(checkOutputSchema, await readJson(await request(`${repoPath(ref)}/check-runs/${checkId}`)));
 
-    if (run.app?.slug === ACTIONS_APP) {
-        const log = await jobLog(request, ref, checkId, maxChars);
+    const log = run.app?.slug === ACTIONS_APP ? await jobLog(request, ref, checkId, maxChars, timeoutMs) : undefined;
 
-        if (log && log.excerpt !== "") {
-            return log;
-        }
+    if (log !== undefined && log !== "refused" && log.excerpt !== "") {
+        return log;
     }
 
     // Any other app reports what failed in the check's own output.
@@ -1330,7 +1344,8 @@ const readCheckLog = async (request: HostRequest, ref: PullRequestRef, checkId: 
         .join("\n\n");
 
     if (output === "") {
-        return { excerpt: "", source: "none", truncated: false };
+        // A log refused to the account is one that may exist: unavailable, not absent.
+        return { excerpt: "", source: "none", truncated: false, ...(log === "refused" && { refused: true as const }) };
     }
 
     return { ...excerptLog(output, maxChars), source: "check_output" };

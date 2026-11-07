@@ -89,7 +89,7 @@ const GROUP = { groupChat: { mode: "round-robin", participants: [{ addedAt: 1, s
 const allowed = async (threadId: string): Promise<boolean> =>
     await harness.run(async (ctx: any) => await ctx.runQuery(pullRequestToolsAllowed as never, { threadId, userId: OWNER } as never));
 
-const linked = async (threadId: string): Promise<unknown[]> =>
+const linked = async (threadId: string): Promise<unknown> =>
     await harness.run(async (ctx: any) => await ctx.runQuery(linkedPullRequestsOfThread as never, { threadId, userId: OWNER } as never));
 
 describe("where the pull request tools may run", () => {
@@ -97,7 +97,7 @@ describe("where the pull request tools may run", () => {
         const threadId = await threadWith();
 
         expect(await allowed(threadId)).toBe(true);
-        expect(await linked(threadId)).toHaveLength(1);
+        expect(await linked(threadId)).toMatchObject({ complete: true, links: [{ number: 7, repository: "octo/hello" }] });
     });
 
     it("refuses a group thread, a public one and an outside chat, and shows none of their links", async () => {
@@ -105,7 +105,7 @@ describe("where the pull request tools may run", () => {
             const threadId = await threadWith(extra);
 
             expect(await allowed(threadId)).toBe(false);
-            expect(await linked(threadId)).toStrictEqual([]);
+            expect(await linked(threadId)).toStrictEqual({ complete: true, links: [] });
         }
     });
 
