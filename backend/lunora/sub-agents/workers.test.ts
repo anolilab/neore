@@ -213,6 +213,20 @@ describe("dispatching to a worker", () => {
         expect(await rateLimitKeys()).toHaveLength(0);
     });
 
+    it("fails a queued worker run, uncharged, when its owner left the organization while it waited", async () => {
+        const memberId = await joinOrganization(userId, "org-wait");
+        const { run } = await create({ organizationId: "org-wait", toolCallId: "call-wait" });
+        const keysBefore = await rateLimitKeys();
+
+        await harness.run(async (ctx: any) => await ctx.db.delete("member", memberId));
+
+        expect(await claim(run._id)).toBeNull();
+        const allRuns = await runs();
+
+        expect(allRuns.find((row) => row._id === run._id)).toMatchObject({ error: expect.stringMatching(LEFT_ORGANIZATION), status: "failed" });
+        expect(await rateLimitKeys()).toStrictEqual(keysBefore);
+    });
+
     it("refuses a sub-agent whose owner left its organization, charging nothing", async () => {
         const result = await harness.run(
             async (ctx: any) =>

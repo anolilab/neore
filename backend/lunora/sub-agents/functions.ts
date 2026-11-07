@@ -1045,6 +1045,16 @@ export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">
 
         // The agent on a computer bills its own account: no round of ours is spent on its runs.
         if (run.runner?.kind !== "host") {
+            // The owner may have left the run's organization while it waited: the run would be refused when it starts, so it
+            // fails here, uncharged, and the queue moves on.
+            const leftOrganization = await membershipRefusal(ctx, run.organizationId, run.userId);
+
+            if (leftOrganization) {
+                await finishRun(ctx, run._id, { error: leftOrganization, kind: "failed" });
+
+                return null;
+            }
+
             const account = await loadTaskAccount(ctx, run.userId);
 
             if (!account || !(await chargeRound(ctx, run.userId, account))) {
