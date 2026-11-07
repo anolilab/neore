@@ -102,8 +102,8 @@ describe("CreateOrganizationDialog", () => {
         await user.type(screen.getByPlaceholderText("Enter organization name"), "Beta Co");
         await user.type(screen.getByPlaceholderText("Enter organization slug"), "beta-co");
 
-        // The slug check is debounced, then the create button stays disabled until the slug reports available.
-        await screen.findByText("This slug is available", {}, { timeout: 3000 });
+        // The slug check is debounced (500 ms), then the create button stays disabled until the slug reports available.
+        await screen.findByText("This slug is available");
         await user.click(screen.getByRole("button", { name: "Create Organization" }));
 
         await waitFor(() => {

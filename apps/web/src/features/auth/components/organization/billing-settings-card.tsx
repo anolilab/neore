@@ -49,11 +49,16 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
     // not enough: admins hold it too.
     // One-shot (`live: false`): a live subscription answers from its last value, so after an organization switch it would keep the
     // previous organization's plan and an invalidation would refetch that same value. A plain read follows the session's active organization.
+    // With no subscription nothing pushes a plan change (the Creem webhook, a platform admin), so the read is stale at once: it refetches
+    // on mount and when the window regains focus, which is how a return from checkout picks up the new plan.
     const {
         data: billingInfo,
         isError: isBillingError,
         isPending: isBillingPending,
-    } = useQuery(crpc.auth.billing.getBillingInfo.queryOptions({}, { live: false }));
+    } = useQuery({
+        ...crpc.auth.billing.getBillingInfo.queryOptions({}, { live: false }),
+        staleTime: 0,
+    });
 
     const isOwner = billingInfo?.isOwner === true;
 
@@ -133,7 +138,7 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
 
     // A failed read is "unknown", not the Free plan: show the error instead of fallback values or plan buttons. This holds even when
     // an earlier read is still cached (a failed refetch after an organization switch), and when the read returned nothing.
-    if ((isBillingError || billingInfo === null) && !isPending) {
+    if (!isPending && (isBillingError || billingInfo === null)) {
         return (
             <SettingsCard
                 className={className}
