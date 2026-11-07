@@ -123,26 +123,33 @@ describe("releasePhonePush", () => {
 
 describe("createPendingWork", () => {
     it("lets sign-out wait for a registration already on its way, failed or not", async () => {
-        const work = createPendingWork();
-        const order: string[] = [];
-        const registering = work.run(async () => {
-            // Still on its way when sign-out starts waiting.
-            await new Promise<void>((resolve) => {
-                setTimeout(resolve, 20);
+        vi.useFakeTimers();
+
+        try {
+            const work = createPendingWork();
+            const order: string[] = [];
+            const registering = work.run(async () => {
+                // Still on its way when sign-out starts waiting.
+                await new Promise<void>((resolve) => {
+                    setTimeout(resolve, 20);
+                });
+                order.push("registered");
             });
-            order.push("registered");
-        });
-        const failing = work.run(async () => {
-            throw new Error("offline");
-        });
-        const settling = (async () => {
-            await work.settle();
-            order.push("settled");
-        })();
+            const failing = work.run(async () => {
+                throw new Error("offline");
+            });
+            const settling = (async () => {
+                await work.settle();
+                order.push("settled");
+            })();
 
-        await Promise.allSettled([registering, failing, settling]);
+            await vi.advanceTimersByTimeAsync(20);
+            await Promise.allSettled([registering, failing, settling]);
 
-        expect(order).toEqual(["registered", "settled"]);
+            expect(order).toEqual(["registered", "settled"]);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
 
@@ -217,15 +224,22 @@ describe("createRegistrationRetry", () => {
             // ...while the token rotated meanwhile and the newer attempt failed.
             .mockResolvedValueOnce(false)
             .mockResolvedValue(true);
-        const registration = createRegistrationRetry(attempt);
 
-        const older = registration.run();
+        vi.useFakeTimers();
 
-        await registration.run();
-        await older;
-        await registration.retry();
+        try {
+            const registration = createRegistrationRetry(attempt);
+            const older = registration.run();
 
-        expect(attempt).toHaveBeenCalledTimes(3);
+            await registration.run();
+            await vi.advanceTimersByTimeAsync(20);
+            await older;
+            await registration.retry();
+
+            expect(attempt).toHaveBeenCalledTimes(3);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
 
