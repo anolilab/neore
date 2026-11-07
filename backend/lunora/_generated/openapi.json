@@ -50922,6 +50922,12 @@
                               "canUnresolve": {
                                 "type": "boolean"
                               },
+                              "commentCount": {
+                                "type": "number"
+                              },
+                              "commentsComplete": {
+                                "const": false
+                              },
                               "comments": {
                                 "items": {
                                   "properties": {
