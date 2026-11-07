@@ -21,6 +21,7 @@ import { scheduleGranteeRedaction } from "../notifications/locked-redact";
 
 import { scheduleFileLinkBackfill } from "./file-link-backfill";
 import { deleteThreadSummaries } from "./thread-summaries";
+import { titleDispatchInFlight } from "./thread-title";
 import { passcodeHashOf, readPasscodeRow, type PasscodeRow, unlockSecret } from "./thread-passcode";
 import { requireOwnedThreadIgnoringLock } from "./thread-read-access";
 
@@ -94,6 +95,12 @@ export const enableThreadLock = authMutation
 
         if (isThreadLocked(thread)) {
             throw new LunoraError("CONFLICT", "This chat is already locked.");
+        }
+
+        // A title model request for this chat is being sent while it is still unlocked: the lock waits for it, so no prompt of a locked
+        // chat ever reaches a model (`agent/thread-title.ts`). The request is answered within seconds.
+        if (await titleDispatchInFlight(context, threadId)) {
+            throw new LunoraError("CONFLICT", "A title is being generated for this chat. Try again in a moment.");
         }
 
         if (thread.isPublic === true) {

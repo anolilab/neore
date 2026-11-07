@@ -8,7 +8,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 
-import { TITLE_CHARGE_SCOPE, TITLE_READ_WINDOW } from "../agent/thread-title";
+import { enableThreadLock } from "../agent/thread-lock";
+import { TITLE_CHARGE_SCOPE, TITLE_READ_WINDOW, titleDispatchInFlight } from "../agent/thread-title";
 import { claimFence } from "../lib/claim-once";
 import { MAX_LENGTH } from "../lib/validators";
 import schema from "../schema";
@@ -19,11 +20,11 @@ import {
     getFollowupSuggestions,
     autoTitleChargeKey,
     firstResultOf,
-    lockGuardedGateway,
     refusedBeforeDispatch,
     releaseTitleCharge,
     giveBackTitleCharge,
     releaseRegenerateClaim,
+    titleDispatchGateway,
     titleModelPrompt,
     regenerateThreadTitle,
     titleUsageEvent,
@@ -80,6 +81,7 @@ beforeAll(async () => {
     registerModule(registry, "agent_branches", await import("../agent/branches"));
     registerModule(registry, "agent_messages", await import("../agent/messages"));
     registerModule(registry, "agent_thread_title", await import("../agent/thread-title"));
+    registerModule(registry, "agent_thread_lock", await import("../agent/thread-lock"));
 }, 30_000);
 
 beforeEach(async () => {
@@ -163,31 +165,98 @@ describe("the last check before a background model call", () => {
 });
 
 describe("the gateway a title's model call is sent through", () => {
-    it("sends no request once the chat is locked after the call was admitted, and says it refused", async () => {
-        const cloud = (await harness.run(
+    const PASSCODE = "correct horse battery";
+
+    // Locking a chat mints an unlock proof, which needs the signing secret.
+    let previousSecret: string | undefined;
+
+    beforeEach(() => {
+        previousSecret = process.env.STORAGE_SIGNING_SECRET;
+        process.env.STORAGE_SIGNING_SECRET = "test-unlock-secret";
+    });
+
+    afterEach(() => {
+        if (previousSecret === undefined) {
+            delete process.env.STORAGE_SIGNING_SECRET;
+        } else {
+            process.env.STORAGE_SIGNING_SECRET = previousSecret;
+        }
+    });
+
+    const insertCloud = async () =>
+        (await harness.run(
             async (context: any) => await context.db.insert("threads", { model: "gpt-4o", status: "active", title: "Cloud", userId: OWNER }),
         )) as string;
+
+    /** An action's context for the gateway: each mutation is its own transaction, so a lock attempted during a send runs beside it. */
+    const actionContext = () =>
+        ({
+            log: { event: () => undefined },
+            runMutation: async (reference: unknown, args: unknown) => await harness.run(async (context: any) => await context.runMutation(reference, args)),
+        }) as never;
+
+    const lock = async (cloud: string) =>
+        await harness.withIdentity({ userId: OWNER }).mutation(enableThreadLock as never, { passcode: PASSCODE, threadId: cloud } as never);
+
+    it("makes a lock attempted while a request is being sent wait, and lets it through once the request is answered", async () => {
+        const cloud = await insertCloud();
         const sent: string[] = [];
-        const inner = async (input: Request | string | URL) => {
-            sent.push(String(input));
+        let lockDuringSend: unknown;
 
-            return new Response("{}");
-        };
+        {
+            const gateway = titleDispatchGateway(actionContext(), cloud, async (input) => {
+                // The owner locks the chat after the last lock check, while the request is on its way: the lock is refused.
+                lockDuringSend = await lock(cloud).catch((error: unknown) => error);
+                sent.push(String(input));
 
-        await harness.run(async (context: any) => {
-            const gateway = lockGuardedGateway(context, cloud, inner);
+                return new Response("{}");
+            });
 
-            // Open: the request goes out.
             await gateway.fetch("https://gateway/chat");
             expect(gateway.refused()).toBe(false);
-
-            // The lock commits after the admission, while the agent prepares the request: the request does not leave.
-            await context.db.patch("threads", cloud, { lockedAt: 1000 });
-            await expect(gateway.fetch("https://gateway/chat")).rejects.toMatchObject({ code: "CONFLICT" });
-            expect(gateway.refused()).toBe(true);
-        });
+        }
 
         expect(sent).toEqual(["https://gateway/chat"]);
+        expect(lockDuringSend).toMatchObject({ code: "CONFLICT", message: expect.stringContaining("Try again in a moment") });
+        await expect(harness.run(async (context: any) => await titleDispatchInFlight(context, cloud as never))).resolves.toBe(false);
+
+        // The request has been answered: the lock goes through now.
+        await expect(lock(cloud)).resolves.toMatchObject({ ok: true });
+    });
+
+    it("sends no request once the chat is locked, and says it refused", async () => {
+        const cloud = await insertCloud();
+        const sent: string[] = [];
+
+        await lock(cloud);
+
+        {
+            const gateway = titleDispatchGateway(actionContext(), cloud, async (input) => {
+                sent.push(String(input));
+
+                return new Response("{}");
+            });
+
+            await expect(gateway.fetch("https://gateway/chat")).rejects.toMatchObject({ code: "CONFLICT" });
+            expect(gateway.refused()).toBe(true);
+        }
+
+        expect(sent).toEqual([]);
+    });
+
+    it("releases its dispatch when the request fails, so the chat can still be locked", async () => {
+        const cloud = await insertCloud();
+
+        {
+            const gateway = titleDispatchGateway(actionContext(), cloud, async () => {
+                throw new Error("gateway answered 503");
+            });
+
+            await expect(gateway.fetch("https://gateway/chat")).rejects.toThrow("503");
+            expect(gateway.refused()).toBe(false);
+        }
+
+        await expect(lock(cloud)).resolves.toMatchObject({ ok: true });
     });
 });
 

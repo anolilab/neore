@@ -1736,9 +1736,9 @@ const writeGeneratedTitle = async (
     }
 
     const { billedUserId, model, modelFilterRules } = background;
-    // The lock is checked once more as each model request leaves (`lockGuardedGateway`): the agent still reads its context after the
+    // Each model request is coordinated with locking as it leaves (`titleDispatchGateway`): the agent still reads its context after the
     // admission below, and a lock committed meanwhile must stop the prompt before it is sent.
-    const gateway = lockGuardedGateway(context, arguments_.threadId, gatewayFetch(context));
+    const gateway = titleDispatchGateway(context, arguments_.threadId, gatewayFetch(context));
     const agent = await getAgent(model, { gateway: gateway.fetch, modelFilterRules, userId: billedUserId });
 
     const { thread } = await agent.continueThread(context, {
@@ -1843,22 +1843,32 @@ const writeGeneratedTitle = async (
 };
 
 /**
- * The gateway for one thread's background model call, checking the thread again as each request leaves: a locked or deleted thread
- * (`refusedBeforeDispatch`) gets no request sent, and the call throws instead. `refused` says whether that happened, so the caller can
- * tell it from a model error. This is the last check before the request: what remains is the request already in flight.
+ * The gateway for one title run's model requests. Each request takes a dispatch claim in the same transaction that checks the thread is
+ * not locked (`beginTitleDispatch`), and holds it until the request is answered; locking the chat refuses while one is held. So either
+ * the lock commits first and the request is never sent (the call throws, and `refused` says so, to tell it from a model error), or the
+ * request is sent first and the lock waits for it. A claim whose release fails lapses after its short TTL, and the log says so.
  */
-export const lockGuardedGateway = (context: ActionContext, threadId: string, inner: ServiceFetch): { fetch: ServiceFetch; refused: () => boolean } => {
+export const titleDispatchGateway = (context: ActionContext, threadId: string, inner: ServiceFetch): { fetch: ServiceFetch; refused: () => boolean } => {
     let refused = false;
 
     return {
         fetch: async (input, init) => {
-            if (await refusedBeforeDispatch(context, threadId)) {
+            const dispatch = { requestId: crypto.randomUUID(), threadId: threadId as Id<"threads"> };
+            const claimedAt = await context.runMutation(internal.agent.thread_title.beginTitleDispatch, dispatch);
+
+            if (claimedAt === null) {
                 refused = true;
 
-                throw new LunoraError("CONFLICT", "The chat was locked before its background model request was sent.");
+                throw new LunoraError("CONFLICT", "The chat was locked before its title request was sent.");
             }
 
-            return await inner(input, init);
+            try {
+                return await inner(input, init);
+            } finally {
+                if (!(await tryTimes(3, () => context.runMutation(internal.agent.thread_title.endTitleDispatch, { ...dispatch, claimedAt })))) {
+                    context.log.event("chat.thread_title", { skipped: "dispatch-release-failed" });
+                }
+            }
         },
         refused: () => refused,
     };

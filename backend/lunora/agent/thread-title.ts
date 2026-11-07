@@ -7,8 +7,12 @@
  *
  * A title run reads its prompt when it runs (`readTitlePrompt`), not when it was asked for: a branch switched since is the one it titles.
  * Its last step before the model is {@link admitTitleRun}, which checks the thread (lock, deletion, host-run, rename, the prompt still in
- * view, the requester's access) and takes the run's charge in ONE transaction. Nothing is awaited between that and the model call, so a
- * locked thread's prompt is never sent: a lock committed before the admission refuses it.
+ * view, the requester's access) and takes the run's charge in ONE transaction.
+ *
+ * A locked thread's prompt is never sent. Each model request a title run makes takes a dispatch claim ({@link beginTitleDispatch}) in the
+ * same transaction that checks the thread is not locked, and holds it until the request has been answered; locking a chat
+ * (`enableThreadLock`) refuses while one is held ({@link titleDispatchInFlight}). Either the lock commits first and no request is sent, or
+ * the request goes out first, while the chat was still unlocked, and the lock waits for it.
  */
 import { v } from "lunorash/server";
 
@@ -16,7 +20,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx as MutationContext, type QueryCtx as QueryContext } from "../_generated/server";
 import { type ContextRow, firstUserPrompt } from "../chat/lib/first-user-prompt";
 import { threadGateOutcome } from "../chat/lib/thread-gate";
-import { claimFence, claimRow, recordClaimResult } from "../lib/claim-once";
+import { claimFence, claimRow, hasClaimWithPrefix, recordClaimResult, releaseClaim } from "../lib/claim-once";
 import { sha256Hex } from "../lib/crypto";
 import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
@@ -32,6 +36,13 @@ export const TITLE_READ_WINDOW = DEFAULT_RECENT_MESSAGES;
 /** One admission per title run for billing (`idempotencyClaims`): a retried run finds it, so its model call is not billed twice. */
 export const TITLE_CHARGE_SCOPE = "title-charge";
 export const TITLE_CHARGE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A title model request being sent: `<threadId>:<request id>`, held from the last lock check until the request is answered. Its TTL only
+ * matters when the run dies mid-request: locking the chat is refused until it lapses.
+ */
+export const TITLE_DISPATCH_SCOPE = "title-dispatch";
+export const TITLE_DISPATCH_TTL_MS = 2 * 60 * 1000;
 
 /** The row the thread view ends at: the stored leaf (or the path it falls back to when that row is gone), else the latest row. */
 const leafOf = async (context: Reader, thread: Doc<"threads">): Promise<Doc<"messages"> | null> =>
@@ -58,15 +69,19 @@ export const titlePromptIn = async (context: Reader, thread: Doc<"threads">): Pr
 };
 
 /**
- * Whether `promptId` may still be a title's source: a user prompt of this thread that did not fail, within the last
- * {@link TITLE_READ_WINDOW} rows of the active path. A deleted prompt, one left on another branch, and one the chat has moved past
- * are all refused. The walk stops at the prompt, so it reads only the rows after it.
+ * Whether `promptId` may still be a title's source: a user prompt of this thread that did not fail and, when `inWindow` is set, within
+ * the last {@link TITLE_READ_WINDOW} rows of the active path. A deleted prompt is always refused; with `inWindow`, so are one left on
+ * another branch and one the chat has moved past. The walk stops at the prompt, so it reads only the rows after it.
  */
-export const promptInView = async (context: Reader, thread: Doc<"threads">, promptId: string): Promise<boolean> => {
+export const promptInView = async (context: Reader, thread: Doc<"threads">, promptId: string, inWindow = true): Promise<boolean> => {
     const prompt = await context.db.get("messages", promptId as Id<"messages">);
 
     if (!prompt || prompt.threadId !== thread._id || (prompt.message as { role?: string } | undefined)?.role !== "user" || prompt.status === "failed") {
         return false;
+    }
+
+    if (!inWindow) {
+        return true;
     }
 
     const leaf = await leafOf(context, thread);
@@ -87,7 +102,10 @@ export const promptInView = async (context: Reader, thread: Doc<"threads">, prom
 interface TitleCheck {
     /** The digest of the title the run read: another title by now means the owner renamed the thread meanwhile, and the rename stays. */
     expectedTitleDigest: string;
-    /** The prompt the title comes from, which must still be in view ({@link promptInView}). */
+    /**
+     * The prompt the title comes from ({@link promptInView}). A regenerate's (one with a `requestedBy`) must still be in the window; an
+     * automatic title's need only still be there: its job may start after a long first reply has pushed the prompt out of the window.
+     */
     promptId?: string;
     /** The user who asked for a regenerate, who must still hold admin access. */
     requestedBy?: string;
@@ -106,7 +124,7 @@ export const titleBlockedIn = async (context: Reader, check: TitleCheck): Promis
         return "renamed-meanwhile";
     }
 
-    if (check.promptId !== undefined && !(await promptInView(context, thread, check.promptId))) {
+    if (check.promptId !== undefined && !(await promptInView(context, thread, check.promptId, check.requestedBy !== undefined))) {
         return "prompt-moved";
     }
 
@@ -264,3 +282,32 @@ export const setGeneratedTitle = internalMutation
     })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => await writeTitleIfUnchanged(ctx, args));
+
+/** Whether a title model request for this thread is being sent: locking the chat waits until none is. */
+export const titleDispatchInFlight = async (context: Reader, threadId: Id<"threads">): Promise<boolean> =>
+    await hasClaimWithPrefix(context, TITLE_DISPATCH_SCOPE, `${threadId}:`);
+
+/**
+ * Lets one title model request leave: checks that the thread is not closed to titles and takes the request's dispatch claim, in one
+ * transaction. The claim's `claimedAt`, or `null` when the request must not be sent.
+ */
+export const beginTitleDispatch = internalMutation
+    .input({ requestId: v.string().max(MAX_LENGTH.id), threadId: v.id("threads") })
+    .output(v.union(v.null(), v.number()))
+    .mutation(async ({ args, ctx }) => {
+        if (closedToTitles(await ctx.db.get("threads", args.threadId))) {
+            return null;
+        }
+
+        return await claimFence(ctx, TITLE_DISPATCH_SCOPE, `${args.threadId}:${args.requestId}`, { ttlMs: TITLE_DISPATCH_TTL_MS });
+    });
+
+/** The request has been answered: its dispatch claim goes, and the chat may be locked again. */
+export const endTitleDispatch = internalMutation
+    .input({ claimedAt: v.number(), requestId: v.string().max(MAX_LENGTH.id), threadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await releaseClaim(ctx, TITLE_DISPATCH_SCOPE, `${args.threadId}:${args.requestId}`, args.claimedAt);
+
+        return null;
+    });

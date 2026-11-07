@@ -30,6 +30,7 @@
  * | `thread-fold`       | `<threadId>`             | 3 min, released when the call ends | `agent/thread-summaries.ts` (`claimCut`): one paid summarising call in flight per thread, so two runs planning different cuts of the same rows do not both pay |
  * | `regenerate-title`  | `<threadId>`             | 5 min (released when the job ends) | `chat/functions.ts` (`regenerateThreadTitle`: one regenerate in flight per thread) |
  * | `title-charge`      | `<threadId>:<claimedAt>` (a regenerate run); `<threadId>:auto-title:<jobId>` (an automatic title job, `autoTitleChargeKey`; `<threadId>:auto-title` for a job queued without an id) | 24 h; given back only when the model call threw; holds the model's answer (`result`) so a retry writes it without a second call | `agent/thread-title.ts` (`admitTitleRun`, `recordTitleAnswer`: one model call per title run) |
+ * | `title-dispatch`    | `<threadId>:<request id>` | 2 min, released once the request is answered | `agent/thread-title.ts` (`beginTitleDispatch`: a title model request being sent; `enableThreadLock` refuses while one is held) |
  * | `organization-policy-create` | `<organizationId>` | {@link ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS} | `auth/organization-policy.ts` (`setOrganizationPolicy`: one writer creates an organization's first policy row) |
  * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
@@ -292,6 +293,20 @@ const prefixEnd = (prefix: string): string => {
     const last = prefix.length - 1;
 
     return `${prefix.slice(0, last)}${String.fromCodePoint(prefix.codePointAt(last)! + 1)}`;
+};
+
+/** Claims read per {@link hasClaimWithPrefix} call: expired rows the purge has not reached yet are skipped, up to this many. */
+const PREFIX_PROBE_BATCH = 50;
+
+/** `true` while an unexpired claim of `scope` whose key starts with `prefix` exists. */
+export const hasClaimWithPrefix = async (ctx: Pick<QueryCtx, "db">, scope: string, prefix: string): Promise<boolean> => {
+    const now = Date.now();
+    const rows = await ctx.db
+        .query("idempotencyClaims")
+        .withIndex("by_scope_key", (q) => q.eq("scope", scope).gte("key", prefix).lt("key", prefixEnd(prefix)))
+        .take(PREFIX_PROBE_BATCH);
+
+    return rows.some((row) => row.expiresAt > now);
 };
 
 /** Rows deleted per {@link releaseClaimsWithPrefix} call. */

@@ -11,7 +11,16 @@ import { MAX_LENGTH } from "../lib/validators";
 import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
 import { BRANCH_ROOT } from "./branch-tree";
-import { admitTitleRun, readTitlePrompt, recordTitleAnswer, TITLE_CHARGE_SCOPE, TITLE_READ_WINDOW, titlePromptIn, writeTitleIfUnchanged } from "./thread-title";
+import {
+    admitTitleRun,
+    beginTitleDispatch,
+    readTitlePrompt,
+    recordTitleAnswer,
+    TITLE_CHARGE_SCOPE,
+    TITLE_READ_WINDOW,
+    titlePromptIn,
+    writeTitleIfUnchanged,
+} from "./thread-title";
 
 const OWNER = "user-owner";
 const GRANTEE = "user-grantee";
@@ -251,12 +260,12 @@ describe("the prompt a title is written from, at the time of the write", () => {
         const reply = await row(2, { message: { content: "Sure", role: "assistant" }, parentMessageId: prompt });
 
         await setLeaf(threadId, reply);
-        await expect(writeTitle(threadId, "Old", { promptId: prompt })).resolves.toBe(true);
+        await expect(writeTitle(threadId, "Old", { promptId: prompt, requestedBy: OWNER })).resolves.toBe(true);
 
         const edited = await row(3, { message: { content: "Plan a trip to Porto", role: "user" }, parentMessageId: BRANCH_ROOT });
 
         await setLeaf(threadId, edited);
-        await expect(writeTitle(threadId, "Generated", { promptId: prompt, title: "Stale" })).resolves.toBe(false);
+        await expect(writeTitle(threadId, "Generated", { promptId: prompt, requestedBy: OWNER, title: "Stale" })).resolves.toBe(false);
         await expect(titleOf(threadId)).resolves.toBe("Generated");
     });
 
@@ -305,7 +314,7 @@ describe("admitting a title's model call", () => {
         const edited = await rowIn(threadId)(2, { message: { content: "Plan a trip to Porto", role: "user" }, parentMessageId: BRANCH_ROOT });
 
         await setLeaf(threadId, edited);
-        await expect(admit(threadId, `${threadId}:b`, { promptId: prompt })).resolves.toMatchObject({ reason: "prompt-moved" });
+        await expect(admit(threadId, `${threadId}:b`, { promptId: prompt, requestedBy: OWNER })).resolves.toMatchObject({ reason: "prompt-moved" });
         expect(await chargeKeys()).toEqual([]);
     });
 
@@ -347,5 +356,34 @@ describe("admitting a title's model call", () => {
                 async (context: any) => await context.runMutation(recordTitleAnswer as never, { chargeKey: key, claimedAt: claimedAt! - 1, title: "Stale" }),
             ),
         ).resolves.toBe(false);
+    });
+});
+
+describe("the prompt an automatic title is written from", () => {
+    it("is still accepted once a long first reply has pushed it out of the window, while a regenerate's is not", async () => {
+        const threadId = await threadWith();
+        const row = rowIn(threadId);
+        const prompt = await row(0, { message: { content: "Plan a trip", role: "user" } });
+
+        // A tool-heavy first reply saved more rows than the window before the title job started.
+        for (let order = 1; order <= TITLE_READ_WINDOW + 5; order += 1) {
+            await row(order, { message: { content: `Step ${order}`, role: "assistant" } });
+        }
+
+        await expect(writeTitle(threadId, "Old", { promptId: prompt, requestedBy: OWNER })).resolves.toBe(false);
+        await expect(writeTitle(threadId, "Old", { promptId: prompt })).resolves.toBe(true);
+        await expect(titleOf(threadId)).resolves.toBe("Generated");
+    }, 60_000);
+});
+
+describe("letting a title's model request leave", () => {
+    it("refuses a locked chat, and takes no dispatch claim for it", async () => {
+        const locked = await threadWith({ lockedAt: 1000 });
+        const open = await threadWith();
+        const begin = async (threadId: string) =>
+            await harness.run(async (context: any) => await context.runMutation(beginTitleDispatch as never, { requestId: "r1", threadId }));
+
+        await expect(begin(locked)).resolves.toBeNull();
+        await expect(begin(open)).resolves.toEqual(expect.any(Number));
     });
 });
