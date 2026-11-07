@@ -51,6 +51,7 @@ import {
     stampSavedToolCalls,
 } from "./lib/agent-run";
 import { buildAgentTools } from "./lib/agent-tools";
+import { messageCarriesGuestText } from "./lib/attached-text";
 import { getMaxSteps } from "./lib/auto-continue";
 import { RUN_BEAT_MS } from "./lib/interrupted-run";
 import { createToolRunMarker } from "./lib/mark-tool-runs";
@@ -767,8 +768,13 @@ export const runStreamingAgent = internalAction
                 // Record the approval snapshot (if the run paused) and flush. The
                 // snapshot is what the continuation rebuilds this exact run from.
                 // A locked chat's content is never mined into memory, and neither is a goal round's instruction: it is the
-                // goal plus a reviewer's note drawn from tool output, not something the user said.
-                const extractMemory = runContext.memoryEnabled && !isThreadLocked(thread) && sseMessages?.[0]?.agentName !== GOAL_CONTINUATION_AGENT;
+                // goal plus a reviewer's note drawn from tool output, not something the user said. A guest's note the owner
+                // sent on is not the owner's words either, so it is never mined.
+                const extractMemory =
+                    runContext.memoryEnabled &&
+                    !isThreadLocked(thread) &&
+                    !messageCarriesGuestText(message?.message as Parameters<typeof messageCarriesGuestText>[0]) &&
+                    sseMessages?.[0]?.agentName !== GOAL_CONTINUATION_AGENT;
 
                 let finished: Awaited<ReturnType<typeof finishRun>>;
 
