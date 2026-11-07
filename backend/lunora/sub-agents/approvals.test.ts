@@ -23,6 +23,7 @@ import {
     endApprovalWaitForMessage,
     listSubAgentApprovals,
     markRunAwaiting,
+    postRunResult,
     reapSubAgentRun,
     resumeAwaitingRun,
 } from "./functions";
@@ -753,6 +754,52 @@ describe("the continuation's end", () => {
         await internalCall(completeResumedRun, { messageIds: [elsewhere], outcome: { kind: "succeeded" }, runId });
 
         expect(await runRow()).toMatchObject({ result: "" });
+    });
+});
+
+describe("a nested result for a child that waits on a request", () => {
+    it("is held back while the child waits, so its request stays on the latest turn, and posted once the wait is over", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+
+        const now = Date.now();
+        const nestedId = await run(
+            async (context) =>
+                await context.db.insert("subAgentRuns", {
+                    completedAt: now,
+                    createdAt: now,
+                    depth: 2,
+                    parentThreadId: childId,
+                    result: "Nested answer.",
+                    startedAt: now,
+                    status: "succeeded",
+                    task: "Look deeper",
+                    toolCallId: "call-nested",
+                    updatedAt: now,
+                    userId: OWNER,
+                }),
+        );
+        const nestedPosts = async () => {
+            const rows = await run(
+                async (context) =>
+                    await context.db
+                        .query("messages")
+                        .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", childId))
+                        .collect(),
+            );
+
+            return rows.filter((row: { agentName?: string }) => row.agentName === SUB_AGENT_NAME);
+        };
+
+        expect(await run(async (context) => await postRunResult(context, nestedId, 0))).toBe(false);
+        expect(await nestedPosts()).toHaveLength(0);
+        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: { attempt: 0, failures: 0, runId: nestedId } }));
+        // The request is still the child's latest turn: the owner can answer it.
+        expect(await as(OWNER).query(listSubAgentApprovals as never, { parentThreadId: parentId } as never)).toHaveLength(1);
+
+        await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER));
+
+        expect(await run(async (context) => await postRunResult(context, nestedId, 0))).toBe(true);
+        expect(await nestedPosts()).toHaveLength(1);
     });
 });
 

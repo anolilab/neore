@@ -11,6 +11,7 @@ import { threadForViewer } from "../../agent/threads";
 import { vThreadDoc } from "../../agent/validators";
 import { endActiveGoals } from "../goals/rows";
 import { optionalAuthQuery } from "../../lib/crpc";
+import { streamLogger } from "../../lib/logger";
 import { MAX_LENGTH } from "../../lib/validators";
 import { throwThreadLocked } from "../../lib/thread-lock";
 import { deliveredSteerIds, type SteerEntry } from "../lib/steer-queue";
@@ -160,7 +161,10 @@ export const createStreamWithMessage = internalMutation
         const { hasSubAgentApprovalOpen } = await import("../../sub-agents/functions");
 
         if (await hasSubAgentApprovalOpen(context, threadId)) {
-            await context.scheduler.runAfter(0, internal.sub_agents.functions.endApprovalWaitForMessage, { threadId });
+            // A failed schedule must not fail the send either: the run's request expires on its own.
+            await context.scheduler.runAfter(0, internal.sub_agents.functions.endApprovalWaitForMessage, { threadId }).catch((error: unknown) => {
+                streamLogger.error("[chat] Could not schedule the end of a sub-agent's approval wait", error);
+            });
         }
 
         const streamId = await persistentTextStreaming.createStream(context, {

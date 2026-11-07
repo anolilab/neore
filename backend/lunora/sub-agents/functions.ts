@@ -64,7 +64,7 @@ import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount } from "../tasks/acco
 import { isTaskModelAllowed } from "../tasks/logic";
 import { threadGateOutcome, throwUnlessGranted } from "../chat/lib/thread-gate";
 import { findPendingRequestOnLatestTurn } from "../chat/lib/tool-approval-claim";
-import { PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
+import { denyToolApprovalRun, PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
 import { admitOwnedThread, requireOwnedThread } from "../agent/thread-read-access";
 import { MAX_LENGTH } from "../lib/validators";
 import { RUN_STALE_MS, RUN_WATCH_RETRY } from "../chat/lib/interrupted-run";
@@ -1209,6 +1209,16 @@ export type SubAgentOutcome = { error: string; kind: "failed" } | { kind: "cance
  * no-longer-owned parent ends there at once. `failures` counts the tries. Returns whether
  * this call posted.
  */
+/** How often a result for a parent that waits on an approval checks again whether the wait is over. */
+const SUB_AGENT_AWAITING_POST_RETRY_MS = 5 * 60_000;
+
+/** Whether `threadId` is the child thread of a one-shot run that waits on an approval request. */
+const waitsOnApproval = async (ctx: Pick<QueryCtx, "db">, threadId: string): Promise<boolean> =>
+    (await ctx.db
+        .query("subAgentRuns")
+        .withIndex("by_childThreadId_and_status", (q) => q.eq("childThreadId", threadId).eq("status", "awaiting"))
+        .first()) !== null;
+
 export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, attempt: number, failures = 0): Promise<boolean> => {
     const run = await ctx.db.get("subAgentRuns", runId);
 
@@ -1219,6 +1229,14 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
     // A parent that is gone cannot take the post, whatever stream it left behind.
     if (isGoneParent(await ctx.db.get("threads", run.parentThreadId as Id<"threads">), run)) {
         await patchById(ctx.db, "subAgentRuns", run._id, { postFailed: GONE_PARENT_REASON });
+
+        return false;
+    }
+
+    // A parent that is itself a sub-agent waiting on an approval: a post now would be a newer turn than its request, which then
+    // could no longer be answered. The post waits for the wait to end (an answer, a stop, or the request's expiry).
+    if (await waitsOnApproval(ctx, run.parentThreadId)) {
+        await ctx.scheduler.runAfter(SUB_AGENT_AWAITING_POST_RETRY_MS, internal.sub_agents.functions.postResult, { attempt, failures, runId });
 
         return false;
     }
@@ -1462,7 +1480,7 @@ const closeChildApprovals = async (ctx: MutationCtx, childThreadId: string, runI
 
     for (const row of open) {
         if (row.config.subAgentRunId === runId) {
-            await patchById(ctx.db, "toolApprovalRuns", row._id, { resolvedAt: now, resolvedBy: "run-ended", status: "denied" });
+            await denyToolApprovalRun(ctx, row._id, { now, resolvedBy: "run-ended" });
         } else {
             othersOpen = true;
         }
