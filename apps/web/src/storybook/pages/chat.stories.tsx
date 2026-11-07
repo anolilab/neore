@@ -100,6 +100,9 @@ export const RateLimitPaused: Story = {
 
 /** The last reply failed. */
 export const FailedReply: Story = {
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByText("The model provider returned an error. Try again.", undefined, STATE_WAIT)).toBeInTheDocument();
+    },
     parameters: {
         msw: {
             handlers: {
