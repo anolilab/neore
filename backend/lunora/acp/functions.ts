@@ -51,9 +51,9 @@ const vHostSessionDetail = v.object({
     lastEndReason: v.optional(vHostEndReason),
     lastEndStreamId: v.optional(v.string()),
     lastEventAt: v.optional(v.number()),
-    optionResult: v.optional(vAcpOptionResult),
     // The host turn running now, so a client can stop that turn and no other.
     liveStreamId: v.optional(v.string()),
+    optionResult: v.optional(vAcpOptionResult),
     status: vAcpSessionStatus,
     threadId: v.string(),
 });
