@@ -1,6 +1,6 @@
 /**
  * Exercises the main process through its real handlers, with `electron` mocked.
- * The real-binary suite (`e2e/`) covers the same paths against Electron 44; these
+ * The real-binary suite (`e2e/`) covers the same paths against Electron 45; these
  * cases pin the security decisions and the handoffs. Mocking `electron` is the
  * only way to reach IPC handlers without launching it.
  */
