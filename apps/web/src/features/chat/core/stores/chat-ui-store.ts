@@ -546,6 +546,18 @@ export const useScrollState = () => {
  */
 export const isDocumentOpen = (state: Pick<ChatUIStore, "isCanvasOpen" | "previewFile">): boolean => state.isCanvasOpen && state.previewFile === null;
 
+/**
+ * The side panel across an account switch: a PDF preview (a signed link, nothing unsaved) closes as the switch starts; a
+ * document, whose editor may hold unsaved edits, closes only once the switch has gone through, so a failed switch keeps it.
+ */
+export const closeSidePanelForSessionSwitch = (phase: "after" | "before"): void => {
+    const { closeCanvas, isCanvasOpen, previewFile } = useChatUIStore.getState();
+
+    if (isCanvasOpen && (phase === "after" || previewFile !== null)) {
+        closeCanvas();
+    }
+};
+
 export const useCanvasState = () => {
     const activeDocumentId = useChatUIStore((state) => state.activeDocumentId);
     const isCanvasOpen = useChatUIStore((state) => state.isCanvasOpen);

@@ -10,11 +10,14 @@ const AuthUIProviderTanstack = ({
     hooks: hooksProperty,
     mutators: mutatorsProperty,
     onSessionChange: onSessionChangeProperty,
-    onSessionChangeStart,
+    onSessionSwitch,
     ...properties
 }: AuthUIProviderProps & {
-    /** Runs at once when the session changes, before the session is read again: for state that must not outlive the old account. */
-    onSessionChangeStart?: () => void;
+    /**
+     * For state that must not outlive the old account: called with "before" as an account switch starts (it may still fail),
+     * and with "after" once the session has changed, before the new one is read.
+     */
+    onSessionSwitch?: (phase: "after" | "before") => void;
 }) => {
     const { hooks: contextHooks, mutators: contextMutators, onSessionChange, optimistic } = useTanstackOptions({ authClient });
 
@@ -30,18 +33,22 @@ const AuthUIProviderTanstack = ({
         return {
             ...merged,
             setActiveSession: async (...parameters: Parameters<typeof setActiveSession>) => {
-                onSessionChangeStart?.();
+                onSessionSwitch?.("before");
 
-                return await setActiveSession(...parameters);
+                const result = await setActiveSession(...parameters);
+
+                onSessionSwitch?.("after");
+
+                return result;
             },
         };
-    }, [contextMutators, mutatorsProperty, onSessionChangeStart]);
+    }, [contextMutators, mutatorsProperty, onSessionSwitch]);
 
     const onSessionChangeCallback = useCallback(async () => {
-        onSessionChangeStart?.();
+        onSessionSwitch?.("after");
         await onSessionChange();
         await onSessionChangeProperty?.();
-    }, [onSessionChangeProperty, onSessionChange, onSessionChangeStart]);
+    }, [onSessionChangeProperty, onSessionChange, onSessionSwitch]);
 
     return (
         <AuthUIProvider

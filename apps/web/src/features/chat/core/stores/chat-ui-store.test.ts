@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
 
 import type { PendingAttachment } from "./chat-ui-store";
-import { isDocumentOpen, useChatUIStore } from "./chat-ui-store";
+import { closeSidePanelForSessionSwitch, isDocumentOpen, useChatUIStore } from "./chat-ui-store";
 
 const attachment = { fileId: "file-1", id: "a1", status: "complete" } as PendingAttachment;
 const reference = { id: "r1", url: "https://example.com/r1.png" } as ReferenceSelection;
@@ -116,6 +116,22 @@ describe("the side-panel PDF preview", () => {
         useChatUIStore.getState().openCanvas("doc-1");
 
         expect(useChatUIStore.getState()).toMatchObject({ activeDocumentId: "doc-1", previewFile: null });
+    });
+
+    it.each([
+        ["closes a PDF as an account switch starts", "pdf", "before", false],
+        ["keeps a document with its edits until the switch has gone through", "document", "before", true],
+        ["closes a document once the switch has gone through", "document", "after", false],
+    ] as const)("%s", (_label, open, phase, staysOpen) => {
+        if (open === "pdf") {
+            useChatUIStore.getState().openPreviewFile(pdf);
+        } else {
+            useChatUIStore.getState().openCanvas("doc-1");
+        }
+
+        closeSidePanelForSessionSwitch(phase);
+
+        expect(useChatUIStore.getState().isCanvasOpen).toBe(staysOpen);
     });
 
     it("counts an open document as blocking a PDF, and a PDF preview or a closed panel as not", () => {

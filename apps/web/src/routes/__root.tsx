@@ -29,7 +29,7 @@ import { CHAT_TEXT_SIZE_BOOT_SCRIPT } from "@/features/appearance/lib/chat-text-
 import LoginPromptHost from "@/features/auth/components/auth/login-prompt-host";
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
-import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { closeSidePanelForSessionSwitch } from "@/features/chat/core/stores/chat-ui-store";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
 import OfflineScreen from "@/features/connection/components/offline-screen";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
@@ -405,10 +405,10 @@ const RootComponent = () => {
         [router],
     );
 
-    // The side panel may show the previous account's document or PDF, with its signed link: it closes the moment the session
-    // changes, before the new session is read.
-    const closeSidePanel = useCallback(() => {
-        useChatUIStore.getState().closeCanvas();
+    // The side panel may show the previous account's document or PDF. A PDF (a signed link, nothing unsaved) closes as a switch
+    // starts; a document, whose editor may hold unsaved edits, only once the switch has gone through, so a failed one keeps them.
+    const closeSidePanel = useCallback((phase: "after" | "before") => {
+        closeSidePanelForSessionSwitch(phase);
     }, []);
 
     const handleSessionChange = useCallback(async () => {
@@ -449,7 +449,7 @@ const RootComponent = () => {
                                             captcha={CAPTCHA_CONFIG}
                                             navigate={handleNavigate}
                                             onSessionChange={handleSessionChange}
-                                            onSessionChangeStart={closeSidePanel}
+                                            onSessionSwitch={closeSidePanel}
                                             persistClient={false}
                                             replace={handleReplace}
                                             twoFactor={TWO_FACTOR_METHODS}
