@@ -50925,9 +50925,6 @@
                               "commentCount": {
                                 "type": "number"
                               },
-                              "commentsComplete": {
-                                "const": false
-                              },
                               "comments": {
                                 "items": {
                                   "properties": {
@@ -50953,6 +50950,9 @@
                                   "type": "object"
                                 },
                                 "type": "array"
+                              },
+                              "commentsComplete": {
+                                "const": false
                               },
                               "id": {
                                 "type": "string"
