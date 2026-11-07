@@ -1837,6 +1837,7 @@ export interface Doc_threads {
     awaitingInput?: "approval" | "question";
     botId?: Id<"bots">;
     category?: string;
+    contextResetMessageId?: string;
     createdAt?: number;
     createdBy?: string;
     customSystemPrompt?: string;
@@ -1846,6 +1847,7 @@ export interface Doc_threads {
     enabledFeatures?: Array<string>;
     externalThreadId?: string;
     groupChat?: { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ addedAt: number; skillId: string }>; stopRequestedAt?: number; synthesizerSkillId?: string };
+    hasContextReset?: boolean;
     hasHandoff?: boolean;
     isPublic?: boolean;
     isTemporary?: boolean;
@@ -4842,6 +4844,7 @@ export interface Insert_threads {
     awaitingInput?: "approval" | "question";
     botId?: Id<"bots">;
     category?: string;
+    contextResetMessageId?: string;
     createdAt?: number;
     createdBy?: string;
     customSystemPrompt?: string;
@@ -4851,6 +4854,7 @@ export interface Insert_threads {
     enabledFeatures?: Array<string>;
     externalThreadId?: string;
     groupChat?: { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ addedAt: number; skillId: string }>; stopRequestedAt?: number; synthesizerSkillId?: string };
+    hasContextReset?: boolean;
     hasHandoff?: boolean;
     isPublic?: boolean;
     isTemporary?: boolean;

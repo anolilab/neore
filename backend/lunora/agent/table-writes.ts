@@ -23,6 +23,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { agentSwitchRowContent } from "./agent-switch-logic";
+import { contextResetRowContent } from "./context-reset-shape";
 import type { AgentSwitchPart } from "./agent-switch-validators";
 import { findVectorTable, type VectorTableName } from "./vector/tables";
 
@@ -38,6 +39,8 @@ export type ThreadPatch = Partial<
         | "autoModel"
         | "awaitingInput"
         | "groupChat"
+        | "contextResetMessageId"
+        | "hasContextReset"
         | "hasHandoff"
         | "lastCompressionStartedAt"
         | "lastReplyAt"
@@ -150,6 +153,26 @@ export const insertAgentSwitchRow = async (
         providerMetadata,
         status: "success",
         stepOrder: row.stepOrder ?? 0,
+        threadId: row.threadId,
+        tool: false,
+        userId: row.userId,
+    });
+};
+
+/** The row `/clear` writes: where the model\'s context starts again (`agent/context-reset.ts`). */
+export const insertContextResetRow = async (
+    db: Database,
+    row: { order: number; parentMessageId?: string; threadId: Id<"threads">; userId: string },
+): Promise<Id<"messages">> => {
+    const { message, providerMetadata } = contextResetRowContent();
+
+    return await insertMessageRow(db, {
+        message,
+        order: row.order,
+        parentMessageId: row.parentMessageId,
+        providerMetadata,
+        status: "success",
+        stepOrder: 0,
         threadId: row.threadId,
         tool: false,
         userId: row.userId,

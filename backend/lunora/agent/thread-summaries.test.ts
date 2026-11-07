@@ -6,6 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { clearContextRowHandler } from "../chat/context-reset";
 import { documentTextPart } from "../chat/lib/attached-text";
 import { formatPageContextPart } from "../chat/lib/page-context";
 import schema from "../schema";
@@ -750,6 +751,38 @@ describe("the cost of a thread too long to read from the top", () => {
         expect(generateText).not.toHaveBeenCalled();
     });
 
+    it("counts only the turns since a /clear, and the clear lifts an earlier mark", async () => {
+        expect.assertions(2);
+
+        limits.maxPathRows = 50;
+        await seedThread(ROWS);
+        await runJob(rowIds.at(-1)!);
+        await harness.run(async (ctx: any) => await clearContextRowHandler(ctx, { clientId: "clear-long", threadId: threadId as never, userId: OWNER }));
+
+        const cleared = await threadRow();
+
+        expect(cleared.summaryPathTooLongAt).toBe(0);
+
+        // A few turns after the clear, at orders far past the cap: the path read from the reset is short.
+        const reset = await harness.run(async (ctx: any) => {
+            const thread = await ctx.db.get("threads", threadId);
+            const row = await ctx.db.get("messages", thread.contextResetMessageId);
+
+            return row.order;
+        });
+        let last = "";
+
+        for (let index = 0; index < 6; index += 1) {
+            last = await insertRow(index, { order: reset + 1 + Math.floor(index / 2) });
+        }
+
+        await runJob(last);
+
+        const after = await threadRow();
+
+        expect(after.summaryPathTooLongAt).toBe(0);
+    });
+
     it("marks the thread when the walk itself reaches the cap", async () => {
         expect.assertions(2);
 
@@ -911,5 +944,28 @@ describe("turning the setting off", () => {
         const left = await summaries();
 
         expect(left.map((row) => row.summary)).toStrictEqual(["after the re-enable"]);
+    });
+});
+
+describe("a context reset (/clear) ends the notes about the turns before it", () => {
+    beforeEach(async () => {
+        await seedThread(20);
+    });
+
+    it("sends no summary of the turns before the reset, and one of the turns after it", async () => {
+        await storeSummary(10, "notes about the turns before the clear");
+
+        expect(await contextSummary()).toBe("notes about the turns before the clear");
+
+        await harness.run(async (ctx: any) => await clearContextRowHandler(ctx, { clientId: crypto.randomUUID(), threadId: threadId as never, userId: OWNER }));
+
+        expect(await contextSummary()).toBeNull();
+
+        // Rows written after the reset, with a summary covering them: that one is what the model is told.
+        rowIds.push(await insertRow(20, { order: 11, stepOrder: 0 }), await insertRow(21, { order: 11, stepOrder: 1 }));
+        // Covering the row before the tip: a summary that covers the tip itself is never read (`summariesOnPath`).
+        await storeSummary(20, "notes about the turns after the clear");
+
+        expect(await contextSummary()).toBe("notes about the turns after the clear");
     });
 });

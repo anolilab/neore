@@ -2,17 +2,28 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
+<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_workflow_fork_227.ts
+import * as lunora_workflow_fork_227 from "../../workflow/fork.js";
+
+/** Install the precompiled argument parsers before the module is dispatched. */
+installCompiledValidatorMap(lunora_workflow_fork_227.getAuthorVaultRows.args, (source) => {
+========
 import * as lunora_workflow_fork_228 from "../../workflow/fork.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
 installCompiledValidatorMap(lunora_workflow_fork_228.getAuthorVaultRows.args, (source) => {
+>>>>>>>> bef023ac (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_workflow_fork_228.ts
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["authorId"] !== "string") return DEFER;
 if (typeof source["sourceProjectId"] !== "string") return DEFER;
 return { "authorId": source["authorId"], "sourceProjectId": source["sourceProjectId"] };
 });
+<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_workflow_fork_227.ts
+installCompiledValidatorMap(lunora_workflow_fork_227.getForkSource.args, (source) => {
+========
 installCompiledValidatorMap(lunora_workflow_fork_228.getForkSource.args, (source) => {
+>>>>>>>> bef023ac (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_workflow_fork_228.ts
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["sourceProjectId"] !== "string") return DEFER;

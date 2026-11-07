@@ -71,6 +71,21 @@ afterEach(() => {
 });
 
 describe("a session", () => {
+    it("closes the session it still runs for a thread when the backend starts the next one in that thread", async () => {
+        const first = await manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-1", threadId: "thread-1" });
+
+        await idle(first);
+
+        const second = await manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-2", threadId: "thread-1" });
+        const other = await manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-3", threadId: "thread-2" });
+
+        await idle(second);
+        await idle(other);
+
+        expect(snapshot(first).status).toBe("ended");
+        expect(scratch.violations()).toEqual([]);
+    });
+
     it("answers a prompt", async () => {
         const id = await start();
 

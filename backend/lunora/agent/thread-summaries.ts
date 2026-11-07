@@ -71,6 +71,7 @@ import { isThreadLocked } from "../lib/thread-lock";
 import { getUtilityModel } from "../lib/utility-model";
 import { MAX_LENGTH } from "../lib/validators";
 import { getThreadRow, resolveLeafRow, walkPath } from "./branch-rows";
+import { resetForTip } from "./context-reset";
 import { THREAD_CUT_CLAIM_SCOPE, THREAD_FOLD_CLAIM_SCOPE, THREAD_FOLD_CLAIM_TTL_MS, type CompactionBoundary } from "./thread-compaction-logic";
 import {
     buildSummaryPrompt,
@@ -212,6 +213,8 @@ export const summariesOf = async (ctx: Reader, threadId: Id<"threads">): Promise
  * The summaries of `threadId` whose last covered row is an ancestor of `tip`
  * within `reach` rows (`tip` itself does not count), each with that row, the one
  * covering the most first. A covered row that is gone (deleted) disqualifies its summary.
+ * With `after` (the context reset on that path, `/clear`), a summary ending at or before it is left out: it describes
+ * turns the model is no longer sent, and its larger count would otherwise outrank one made after the reset.
  */
 export const summariesOnPath = async (
     ctx: Reader,
@@ -219,13 +222,16 @@ export const summariesOnPath = async (
     tip: Row,
     summaries: ReadonlyArray<Doc<"threadContextSummaries">>,
     reach: number,
+    after?: { order: number } | null,
 ): Promise<{ covered: Row; summary: Doc<"threadContextSummaries"> }[]> => {
     const loaded = await Promise.all(
         summaries.map(async (summary) => {
             return { covered: await getThreadRow(ctx, threadId, summary.coveredUpToMessageId), summary };
         }),
     );
-    const present = loaded.filter((entry): entry is { covered: Row; summary: Doc<"threadContextSummaries"> } => entry.covered !== null);
+    const present = loaded.filter(
+        (entry): entry is { covered: Row; summary: Doc<"threadContextSummaries"> } => entry.covered !== null && (!after || entry.covered.order > after.order),
+    );
     const onPath = await ancestorIds(
         ctx,
         threadId,
@@ -322,12 +328,16 @@ export const prepareThreadSummary = internalMutation
             return null;
         }
 
-        // Every turn adds at least one row to the path, so this many turns is too long without reading a row.
-        if (leaf.order >= SUMMARY_MAX_PATH_ROWS) {
+        // A context reset (`/clear`) starts a new context: a summary of the turns before it is not extended, and the walk stops at it.
+        const reset = await resetForTip(ctx, thread, leaf);
+
+        // Every turn adds at least one row to the path, so this many turns is too long without reading a row. After a
+        // reset only the turns since it are read.
+        if (leaf.order - (reset ? reset.order + 1 : 0) >= SUMMARY_MAX_PATH_ROWS) {
             return await markPathTooLong(ctx, thread);
         }
 
-        const onPath = await summariesOnPath(ctx, thread._id, leaf, await summariesOf(ctx, thread._id), SUMMARY_MAX_PATH_ROWS);
+        const onPath = await summariesOnPath(ctx, thread._id, leaf, await summariesOf(ctx, thread._id), SUMMARY_MAX_PATH_ROWS, reset);
         const [base] = onPath;
         const compaction = base?.summary.kind === "compact" ? base : undefined;
 
@@ -346,6 +356,7 @@ export const prepareThreadSummary = internalMutation
         const { next, rows } = await walkPath(ctx, thread._id, leaf, {
             limit: SUMMARY_MAX_PATH_ROWS,
             ...(base && { stopAtId: base.covered._id as string, stopBelowOrder: base.covered.order }),
+            ...(!base && reset && { stopBelowOrder: reset.order + 1 }),
         });
 
         // Too long to read from the top: keep today's behaviour, and do not walk it again.
@@ -713,7 +724,10 @@ export const getThreadSummaryForContext = internalQuery
             return null;
         }
 
-        const onPath = await summariesOnPath(ctx, args.threadId, tip, usable, SUMMARY_READ_REACH_ROWS);
+        // A context reset (`/clear`) ends what the model is told about the older turns: a summary of the turns before it is
+        // not sent, and one made after it is, however much more the older one covers.
+        const reset = await resetForTip(ctx, thread, tip);
+        const onPath = await summariesOnPath(ctx, args.threadId, tip, usable, SUMMARY_READ_REACH_ROWS, reset);
         const [best] = onPath;
 
         if (!best) {
@@ -722,7 +736,8 @@ export const getThreadSummaryForContext = internalQuery
 
         if (best.summary.kind === "compact") {
             const boundary: CompactionBoundary = { messageId: best.covered._id, order: best.covered.order, stepOrder: best.covered.stepOrder };
-            // The turns above the compaction's start stay in the notes while the owner keeps idle summaries on.
+            // The turns above the compaction's start stay in the notes while the owner keeps idle summaries on (only those
+            // after a reset are on the list).
             const older = idleSummaryAbove(onPath, best)?.summary.summary;
 
             return {

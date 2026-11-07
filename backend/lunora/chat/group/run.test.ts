@@ -210,6 +210,7 @@ const fakeProcedures = () => {
 beforeAll(async () => {
     const modules: Record<string, Record<string, unknown>> = {
         agent_branches: await import("../../agent/branches"),
+        agent_context_reset_read: await import("../../agent/context-reset-read"),
         agent_messages: await import("../../agent/messages"),
         agent_streams: await import("../../agent/streams"),
         agent_threads: await import("../../agent/threads"),

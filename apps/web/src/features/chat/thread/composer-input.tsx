@@ -31,6 +31,8 @@ import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { isCompactCommand } from "@/features/chat/compaction/compaction-logic";
 import useCompactThread from "@/features/chat/compaction/use-compact-thread";
 import ReferenceStrip from "@/features/chat/components/reference-picker/reference-strip";
+import { clearsDraftAfterReset, isClearCommand } from "@/features/chat/context-reset/context-reset-logic";
+import useClearContext from "@/features/chat/context-reset/use-clear-context";
 import type { AttachmentAdapter } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import {
     ATTACHMENT_ACCEPT,
@@ -485,6 +487,18 @@ const ComposerInput = ({
     const queryClient = useQueryClient();
     const { isNewThread, threadId } = useChatThread();
     const { compact: compactThread } = useCompactThread(threadId);
+    const { clear: clearThreadContext } = useClearContext(threadId);
+    // The chat this composer shows now, and whether it is still mounted: a `/clear` that finishes after the person moved to
+    // another chat must leave that chat's draft alone.
+    const composerStateRef = useRef({ mounted: true, threadId });
+
+    useEffect(() => {
+        composerStateRef.current = { mounted: true, threadId };
+
+        return () => {
+            composerStateRef.current = { ...composerStateRef.current, mounted: false };
+        };
+    }, [threadId]);
     // The thread a draft was last checked against, so the check below runs when the chat changes, not on every keystroke.
     const draftThread = useRef<string | null | undefined>(undefined);
     // Invite-only: a guest's comparison send is held for sign-in (a plain send is held in `ChatProvider`).
@@ -514,7 +528,9 @@ const ComposerInput = ({
 
         draftThread.current = threadId;
 
-        if (isCompactCommand(useChatUIStore.getState().composerText)) {
+        const draft = useChatUIStore.getState().composerText;
+
+        if (isCompactCommand(draft) || isClearCommand(draft)) {
             clear();
         }
     }, [threadId, clear]);
@@ -1041,6 +1057,27 @@ const ComposerInput = ({
             return;
         }
 
+        // `/clear` starts a fresh context in this thread and sends nothing, as `/compact` does. A new chat has no thread: the
+        // command stays in the draft and the hook says why. The draft is cleared only once the reset is written.
+        if ((isThreadComposer || !threadId) && draftAttachments.length === 0 && isClearCommand(draftText)) {
+            const startedThreadId = threadId;
+            const finishClear = async () => {
+                if (!(await clearThreadContext())) {
+                    return;
+                }
+
+                const { mounted, threadId: currentThreadId } = composerStateRef.current;
+
+                if (clearsDraftAfterReset({ currentThreadId, draft: useChatUIStore.getState().composerText, mounted, startedThreadId })) {
+                    clear();
+                }
+            };
+
+            void finishClear();
+
+            return;
+        }
+
         // Block submission if context is too large
         if (contextStats.totalChars >= CONTEXT_ERROR_THRESHOLD) {
             return;
@@ -1109,6 +1146,7 @@ const ComposerInput = ({
         isThreadComposer,
         threadId,
         compactThread,
+        clearThreadContext,
     ]);
 
     // "Send as a new chat" from outside the chat UI (the native shell's Quick

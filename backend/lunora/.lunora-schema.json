@@ -25788,6 +25788,12 @@
           "optional": true,
           "unique": false
         },
+        "contextResetMessageId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "createdAt": {
           "kind": "number",
           "nullable": false,
@@ -25936,6 +25942,12 @@
               "unique": false
             }
           }
+        },
+        "hasContextReset": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         },
         "hasHandoff": {
           "kind": "boolean",

@@ -84,7 +84,9 @@ beforeAll(async () => {
 });
 
 // eslint-disable-next-line import/first -- the mocks above must be hoisted before these load
-import { addMessagesHandler } from "../agent/messages";
+import { contextResetRowContent } from "../agent/context-reset-shape";
+// eslint-disable-next-line import/first
+import { addMessagesHandler, getMaxMessage } from "../agent/messages";
 // eslint-disable-next-line import/first
 import { createRatelimit } from "../lib/rate-limiter";
 // eslint-disable-next-line import/first
@@ -249,6 +251,35 @@ describe("askAside", () => {
         expect(call.prompt).toContain("Working on the importer now.");
         expect(call.prompt).toContain("What does idempotent mean?");
         expect(call).not.toHaveProperty("tools");
+    });
+
+    it("sends no turn from before a /clear, only the turns after it", async () => {
+        await harness.run(async (ctx: any) => {
+            const last = await getMaxMessage(ctx, threadId as never);
+
+            await ctx.db.insert("messages", {
+                ...contextResetRowContent(),
+                order: (last?.order ?? 0) + 1,
+                status: "success",
+                stepOrder: 0,
+                threadId,
+                tool: false,
+                userId: OWNER,
+            });
+        });
+        await harness.run(
+            async (ctx: any) =>
+                await addMessagesHandler(ctx, {
+                    messages: [{ message: { content: "a fresh start", role: "user" } }],
+                    threadId,
+                    userId: OWNER,
+                } as never),
+        );
+
+        await ask();
+
+        expect(promptOfCall()).toContain("a fresh start");
+        expect(promptOfCall()).not.toContain("refactor the importer");
     });
 
     it("asks the model the question without tag or bidi characters, and refuses one that was only those", async () => {

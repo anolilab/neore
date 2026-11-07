@@ -346,6 +346,11 @@ export class AgentSession {
         await this.stopping;
     }
 
+    /** The thread a session the backend started runs in; `undefined` for one started on this computer. */
+    public get threadId(): string | undefined {
+        return this.options.threadId;
+    }
+
     public summary(): SessionSummary {
         return {
             agentKey: this.options.agentKey,
