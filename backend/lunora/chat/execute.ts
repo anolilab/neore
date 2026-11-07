@@ -511,7 +511,16 @@ export const runStreamingAgent = internalAction
                               untrustedContext: untrustedContext.catch(() => true),
                               userId,
                           })
-                        : { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], mcpToolFingerprints: {}, permissionKeys: {}, repeatable: [], tools: {} },
+                        : {
+                              autoApprovals: {},
+                              mcpClients: [],
+                              mcpLabels: {},
+                              mcpServerNames: [],
+                              mcpToolFingerprints: {},
+                              permissionKeys: {},
+                              repeatable: [],
+                              tools: {},
+                          },
                     runContextPromise,
                 ]);
 

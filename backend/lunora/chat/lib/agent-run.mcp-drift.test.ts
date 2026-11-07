@@ -40,6 +40,7 @@ const rebuiltWith = (fingerprint: string | undefined) => {
         mcpServerNames: ["Docs"],
         mcpToolFingerprints: fingerprint === undefined ? {} : { [TOOL]: fingerprint },
         permissionKeys: {},
+        repeatable: [],
         tools: fingerprint === undefined ? {} : { [TOOL]: { execute: vi.fn() } as never },
     });
 };
