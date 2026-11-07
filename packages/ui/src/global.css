@@ -57,7 +57,8 @@
     /* Red. At L 0.5 the text is 4.8:1 even on its own 10% tint (AA is 4.5:1); the earlier 0.55 was 4.1:1 there. */
     --destructive: oklch(0.5 0.22 25);
     --border: var(--brand-silver);
-    --input: var(--brand-silver);
+    /* 3:1 on white for the switch track and input borders (WCAG 1.4.11); the Steel Mist this was is 1.7:1. */
+    --input: #8c8c8c;
     --ring: var(--brand-graphite);
     --chart-1: oklch(0.871 0.15 154.449);
     --chart-2: oklch(0.723 0.219 149.579);
@@ -106,7 +107,7 @@
     /* Red for dark mode. At L 0.78 it is about 5:1 on its 10% tint (the earlier 0.65 was 3.5:1). */
     --destructive: oklch(0.78 0.17 25);
     --border: oklch(1 0 0 / 6%);
-    --input: oklch(1 0 0 / 12%);
+    --input: oklch(1 0 0 / 30%);
     --ring: #8c8c8c; /* 4.8:1 on --brand-charcoal; graphite was 2.7:1, under WCAG 1.4.11's 3:1. Mirrored in apps/web accent-presets.ts */
     --chart-1: oklch(0.871 0.15 154.449);
     --chart-2: oklch(0.723 0.219 149.579);

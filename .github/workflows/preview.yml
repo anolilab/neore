@@ -2,14 +2,12 @@
 
 name: "Preview"
 
-# A pull request carrying the `preview` label gets its own copy of the whole stack
-# (stage `pr-<number>`) in the preview Cloudflare account, redeployed on every push and
-# destroyed when the pull request closes or loses the label. Nothing else deploys it.
+# Every open pull request gets its own copy of the whole stack (stage `pr-<number>`) in the
+# preview Cloudflare account, redeployed on every push and destroyed when the pull request
+# closes. Each preview is a set of billed resources, so this is a deliberate cost decision.
 #
 # Same-repository pull requests only: the deploy job holds the preview environment's
-# Cloudflare token and runs the pull request's code, which a fork must never do. The
-# label is the opt-in, because a full deploy is slow and every preview is a set of
-# billed resources.
+# Cloudflare token and runs the pull request's code, which a fork must never do.
 on: # yamllint disable-line rule:truthy
     pull_request:
         types:
@@ -32,15 +30,54 @@ env:
     STAGE: "pr-${{ github.event.pull_request.number }}"
 
 jobs:
-    deploy:
-        name: "Deploy the preview"
+    # Only a pull request that changes a component or Storybook gets a preview: the
+    # components and the stories are what a preview is for, and a preview is billed.
+    changes:
+        name: "Did the pull request change a component or Storybook?"
         if: >-
             github.repository == 'anolilab/neore'
             && github.event.pull_request.head.repo.full_name == github.repository
             && github.event.action != 'closed'
-            && github.event.action != 'unlabeled'
-            && contains(github.event.pull_request.labels.*.name, 'preview')
-            && (github.event.action != 'labeled' || github.event.label.name == 'preview')
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 5
+        permissions:
+            contents: "read"
+        outputs:
+            components: ${{ steps.filter.outputs.components }}
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - id: "filter"
+              name: "Match the changed files"
+              shell: "bash"
+              env:
+                  BASE: "${{ github.event.pull_request.base.sha }}"
+                  HEAD: "${{ github.event.pull_request.head.sha }}"
+              run: |
+                  changed="$(git diff --name-only "$BASE" "$HEAD")"
+                  if printf '%s\n' "$changed" | grep -Eq '^(packages/ui/src/components/|packages/chat-ui/src/|apps/web/src/components/|apps/web/src/storybook/|apps/web/\.storybook/)|\.stories\.tsx?$'; then
+                      echo "components=true" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "components=false" >> "$GITHUB_OUTPUT"
+                  fi
+
+    deploy:
+        name: "Deploy the preview"
+        needs: "changes"
+        if: >-
+            github.repository == 'anolilab/neore'
+            && github.event.pull_request.head.repo.full_name == github.repository
+            && github.event.action != 'closed'
+            && needs.changes.outputs.components == 'true'
         permissions:
             contents: "read"
             deployments: "write"
@@ -100,8 +137,7 @@ jobs:
         if: >-
             github.repository == 'anolilab/neore'
             && github.event.pull_request.head.repo.full_name == github.repository
-            && (github.event.action == 'closed'
-            || (github.event.action == 'unlabeled' && github.event.label.name == 'preview'))
+            && github.event.action == 'closed'
         runs-on: "ubuntu-24.04"
         timeout-minutes: 30
         environment: "preview"

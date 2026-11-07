@@ -100,9 +100,7 @@ export const SaveFails: Story = {
 };
 
 export const ToggleZeroDataRetention: Story = {
-    // The unchecked switch track is 1.7:1 against the right-to-left story surface (non-text contrast, 3:1 needed). The
-    // track colour is the shared switch's token; `todo` until that token is changed.
-    parameters: { a11y: { test: "todo" } },
+    // The unchecked switch track meets 3:1 (non-text contrast) in every mode since the `--input` token was darkened.
     play: async ({ canvas }) => {
         const toggle = await canvas.findByRole("switch", { name: /zero data retention/i });
 

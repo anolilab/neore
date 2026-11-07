@@ -187,7 +187,7 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
                     />
                 )}
                 {/* The placeholder is muted in full: the button variant's faded text fails contrast on it. */}
-                <span className={cn("truncate", !model && "text-muted-foreground")}>{singleLabel}</span>
+                <span className={cn("truncate", !model && "text-neutral-600 dark:text-neutral-400")}>{singleLabel}</span>
             </div>
             <ChevronsUpDown aria-hidden="true" className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>

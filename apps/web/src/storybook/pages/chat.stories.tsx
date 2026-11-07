@@ -28,9 +28,9 @@ const meta = {
     },
     component: StoryPage,
     parameters: {
-        // Axe passes the thread, sidebar, code blocks and status text in every mode. It still fails the faded labels of the
-        // composer's empty state (New Chat in light and mobile) and of the mobile read-only view (about 4.3:1 to 1.7:1).
-        // Until those labels are fixed, the page is `todo`.
+        // Axe passes the chat in light, dark-violet and RTL, and the composer's empty state in mobile. It still fails on
+        // mobile, in a thread message's code text (the Streamdown token colour, about 1.1:1 on the page background).
+        // Until that is fixed, the page is `todo`.
         a11y: { test: "todo" },
         layout: "fullscreen",
         msw: { handlers: { gateway: gatewayModelsHandler(), lunora: lunoraHandlers(...userFixtures(), ...shellFixtures(), ...chatFixtures()) } },
