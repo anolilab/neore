@@ -736,9 +736,10 @@ export const createRatelimit = (
 
             return { remaining: Math.max(0, value), reset: ts + remainingConfig.period };
         },
-        limit: async (identifier: string, args?: { count?: number }) => {
+        /** `reserve`: book the units even past what is left (the window goes into debt, so later calls are refused). */
+        limit: async (identifier: string, args?: { count?: number; reserve?: boolean }) => {
             try {
-                const status = await limiter.limit(name, { count: args?.count, key: `neore:${name}:${identifier}` });
+                const status = await limiter.limit(name, { count: args?.count, key: `neore:${name}:${identifier}`, reserve: args?.reserve });
 
                 // The earlier implementation reported an absolute `reset` timestamp; Lunora reports a
                 // relative `retryAfter`. Callers want the timestamp, so convert.

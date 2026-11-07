@@ -26,7 +26,11 @@ import { gatewayFetch, SERVICE_ORIGIN } from "../lib/services";
 /** Longest clip one call takes. The app stops recording here. */
 export const MAX_CLIP_SECONDS = 60;
 
-/** A minute of the app's 32 kbit/s mono recording is about 320 KB as base64; this leaves room for container overhead. */
+/**
+ * A minute of the app's 32 kbit/s mono recording is about 320 KB as base64; this leaves room for container overhead.
+ * The clip rides in the RPC body rather than the upload route on purpose: an upload is staged in storage, and the audio
+ * must not be stored. This cap keeps it well under the 1 MiB RPC body limit.
+ */
 export const MAX_CLIP_BASE64 = 600_000;
 
 /** The app records at 32 kbit/s: a clip's size sets a floor on the seconds charged before the call. */
@@ -96,10 +100,14 @@ export const transcribeClip = authAction
         const { seconds: measured, text } = (await response.json()) as { seconds?: unknown; text?: unknown };
         const extra = typeof measured === "number" ? Math.ceil(measured) - seconds : 0;
 
-        // The provider heard more than was charged: charge the rest. Over the allowance, this call still answers and the
-        // next one is refused.
+        // The provider heard more than was charged (a clip at a lower bitrate than the app's): book the rest as debt, so
+        // this call still answers and the next ones are refused. It never fails the call: the provider is already paid.
         if (isMetered && extra > 0) {
-            await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { count: extra, identifier: userId, key: dailyKey });
+            try {
+                await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { count: extra, identifier: userId, key: dailyKey, reserve: true });
+            } catch (error) {
+                ctx.log.event("voice.transcribe_post_charge_failed", { error: error instanceof Error ? error.message : String(error), extra, userId });
+            }
         }
 
         // Lengths only: neither the audio nor the words are logged.

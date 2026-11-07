@@ -184,6 +184,19 @@ describe("transcribeClip", () => {
         expect(await remainingSeconds(MEMBER)).toBe(before - 8 - 13);
     });
 
+    it("books provider-measured seconds past the allowance as debt, so the next clip is refused", async () => {
+        await harness.run(async (ctx: any) => {
+            const limiter = createRatelimit("voice/dailyTranscribeSeconds:free", ctx.db as never);
+            const { remaining } = await limiter.getRemaining(MEMBER);
+
+            await limiter.limit(MEMBER, { count: remaining - 5 });
+        });
+        binding.fetch = async () => Response.json({ seconds: 400, text: "a long one" });
+
+        await expect(transcribe(MEMBER, 2000)).resolves.toEqual({ text: "a long one" });
+        await expect(transcribe(MEMBER, 1000)).rejects.toThrow(TRANSCRIPTION_DAILY_LIMIT_MESSAGE);
+    });
+
     it("refuses a clip longer than the cap", async () => {
         await expect(transcribe(MEMBER, (MAX_CLIP_SECONDS + 5) * 1000)).rejects.toThrow("too long");
         expect(gatewayCalls).toHaveLength(0);
