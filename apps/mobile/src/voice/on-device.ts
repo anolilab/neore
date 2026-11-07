@@ -300,10 +300,10 @@ export const createOnDeviceSession = ({
         detach: (): void => {
             isAttached = false;
 
+            // Let go at once: this screen no longer hears the recognizer's end, and the abort runs before any later start.
             if (isListening()) {
-                isStopping = true;
                 recognizer.abort();
-                giveUpAfterDeadline();
+                release();
             }
         },
         finish,
