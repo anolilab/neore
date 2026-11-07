@@ -138,7 +138,7 @@ export const createExtensionPairing = internalMutation
         const code = generatePairingCode();
         const { now } = ctx;
         const insertedId = await ctx.db.insert("browserExtensions", {
-            extensionId: `ext_${now}_${crypto.randomUUID().slice(0, 8)}`,
+            extensionId: `ext_${now}_${ctx.newId()}`,
             pairingCode: code,
             status: "pending",
             userId,

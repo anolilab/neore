@@ -12,13 +12,15 @@ import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 
 export interface SlashCommandMatch {
-    command: "model" | "prompt" | "skill" | undefined;
+    command: "compact" | "model" | "prompt" | "skill" | undefined;
     /** Range in ProseMirror doc positions for the full slash text */
     from: number;
     query: string;
     /** Character offset in the text where the slash starts */
     startOffset: number;
     to: number;
+    /** Whether the whole draft is this slash text: `/compact` only counts as the command when it is the entire message. */
+    wholeDraft: boolean;
 }
 
 export interface SlashCommandOptions {
@@ -26,9 +28,16 @@ export interface SlashCommandOptions {
     onStateChange: (match: SlashCommandMatch | null) => void;
 }
 
+/**
+ * Whether `match` is a bare `/compact`, the only form the menu runs. The command takes no argument: with text after it,
+ * the composer sends that text as a message, as submitting it directly does.
+ */
+export const isBareCompact = (match: Pick<SlashCommandMatch, "command" | "query" | "wholeDraft">): boolean =>
+    match.command === "compact" && match.query === "" && match.wholeDraft;
+
 const slashCommandPluginKey = new PluginKey("slashCommand");
 
-const KNOWN_COMMANDS = ["model", "prompt", "skill"] as const;
+const KNOWN_COMMANDS = ["compact", "model", "prompt", "skill"] as const;
 
 // Hoisted RegExp to avoid re-creation on every keystroke (js-hoist-regexp)
 const WHITESPACE_RE = /\s/;
@@ -213,6 +222,7 @@ const SlashCommand = Extension.create<SlashCommandOptions>({
                                 const newMatch: SlashCommandMatch = {
                                     command: parsed.command,
                                     from,
+                                    wholeDraft: parsed.slashStartOffset === 0 && fullText.trim() === "/compact",
                                     query: parsed.query,
                                     startOffset: parsed.slashStartOffset,
                                     to,

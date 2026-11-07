@@ -60,7 +60,13 @@ export const proposePageEdit = authAction
     .use(rateLimit("pages/agent"))
     .input({ instruction: v.string().max(MAX_LENGTH.text), pageId: v.id("pages") })
     .output(v.object({ proposedMarkdown: v.string() }))
-    .action(async ({ args, ctx }) => await proposePageEditHandler(ctx, args));
+    .action(async ({ args, ctx }) => {
+        const result = await proposePageEditHandler(ctx, args);
+
+        ctx.log.event("pages.propose_page_edit", { pageId: args.pageId, proposed: true });
+
+        return result;
+    });
 
 /** The action's body. Exported so a test can drive it without the gateway. */
 export const proposePageEditHandler = async (

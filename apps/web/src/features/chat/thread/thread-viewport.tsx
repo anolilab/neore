@@ -273,6 +273,7 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
                     "focus-visible:ring-ring focus-visible:ring-offset-background rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
                     className,
                 )}
+                data-focus-target=""
                 data-slot="scroll-area-viewport"
                 ref={viewportRef}
             >

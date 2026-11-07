@@ -41,6 +41,8 @@ export interface ThreadData extends ThreadOwnerState {
     customSystemPrompt?: string;
     enabledFeatures?: string[];
     language?: string;
+    /** Set while the chat has a passcode (`thread-lock.ts`); a locked chat takes no file attachments. */
+    lockedAt?: number | null;
     mode?: "text" | "image" | "video";
     model: string;
     multiChat?: boolean;
@@ -81,6 +83,12 @@ export interface ChatStreamingContextValue {
     /** The running turn is the browser's own `local-browser` stream (not the picked model's). */
     isLocalStreaming: boolean;
     isStreaming: boolean;
+
+    /**
+     * A reply runs in THIS thread. `isStreaming` also counts the browser's own local stream wherever it was sent, which
+     * holds the composer; this one is for what belongs to the displayed thread alone.
+     */
+    isThreadStreaming: boolean;
     /** The run is waiting out a provider's rate limit and resumes by itself (`getActiveStreamForThread`). */
     pause?: RateLimitPause | null;
 

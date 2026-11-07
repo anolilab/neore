@@ -119,6 +119,24 @@ describe("thread list cache", () => {
             expect(readThreadListCache("alice")).toBeDefined();
             expect(() => clearThreadListCacheFor("bob", undefined)).not.toThrow();
         });
+
+        it("removes a previous version's copy of the named user's list too", () => {
+            localStorage.setItem("neore-thread-list:v1:bob", JSON.stringify({ data: listFor("bob"), userId: "bob", v: 1 }));
+            writeThreadListCache("alice", listFor("alice"));
+
+            clearThreadListCacheFor("bob");
+
+            expect(localStorage.getItem("neore-thread-list:v1:bob")).toBeNull();
+            expect(readThreadListCache("alice")).toBeDefined();
+        });
+
+        it("drops a previous version's copy when the user's list is read", () => {
+            localStorage.setItem("neore-thread-list:v1:alice", JSON.stringify({ data: listFor("alice"), userId: "alice", v: 1 }));
+            writeThreadListCache("alice", listFor("alice"));
+
+            expect(readThreadListCache("alice")).toBeDefined();
+            expect(localStorage.getItem("neore-thread-list:v1:alice")).toBeNull();
+        });
     });
 
     describe("write hold", () => {

@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("../chat/lib/gateway-embedding-model", () => {
-    return { createGatewayEmbeddingModel: mocks.createGatewayEmbeddingModel };
+    return { createGatewayEmbeddingModel: mocks.createGatewayEmbeddingModel, embeddingModelAllowed: () => true };
 });
 vi.mock("../agent/client/search", () => {
     return { embedMany: mocks.embedMany };
@@ -75,7 +75,10 @@ describe(searchKnowledgeBase, () => {
 
         expect(mocks.embedMany).toHaveBeenCalledOnce();
         // Over the action's gateway binding (`gatewayFetch(ctx)`), billed to the requester.
-        expect(mocks.createGatewayEmbeddingModel).toHaveBeenCalledExactlyOnceWith(expect.any(Function), { userId: REQUESTER });
+        expect(mocks.createGatewayEmbeddingModel).toHaveBeenCalledExactlyOnceWith(expect.any(Function), {
+            modelFilterRules: expect.any(Object),
+            userId: REQUESTER,
+        });
         expect(mocks.callOnShard).toHaveBeenCalledTimes(2);
 
         for (const [, callArgs] of mocks.callOnShard.mock.calls as unknown as [unknown, { queryVector: number[]; requesterId: string }][]) {

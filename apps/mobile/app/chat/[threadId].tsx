@@ -1,33 +1,65 @@
+import type { LegendListRef } from "@legendapp/list/react-native";
 import { LegendList } from "@legendapp/list/react-native";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import type { ComponentRef } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Pressable, Text, TextInput, View } from "react-native";
+import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Pressable, Share, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/auth/auth-state";
 import { fetchAccessToken } from "@/auth/grant";
 import { secureGrantStore } from "@/auth/secure-store";
 import { ChatError, startChat } from "@/chat/chat-api";
+import { forgetLastThread, rememberLastThread } from "@/chat/last-thread-store";
+import { displayTextOf, shareTextOf } from "@/chat/message-parts";
+import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
+import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import { relayReply } from "@/chat/stream";
+import { useReplyConfirmation } from "@/chat/use-reply-confirmation";
 import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
 import { getClient } from "@/lib/lunora";
 import { streamingFetch } from "@/lib/streaming-fetch";
+import { isOldestFreshRowOnScreen, withFreshRows } from "@/offline/fresh-rows";
 import { mergeRows } from "@/offline/merge";
 import { createMessageReadGate, readOlderMessages, readThreadMessages } from "@/offline/message-read";
 import { OfflineBanner } from "@/offline/offline-banner";
 import { useOffline, useWriteControl } from "@/offline/offline-context";
+import { settleQuietly } from "@/offline/quietly";
 import type { MessageRow } from "@/offline/types";
 import { requireOnline } from "@/offline/write-gate";
 
-type Row = MessageRow;
+/** A row on this screen; `finished` marks a local row whose send completed, which no server read has confirmed yet. */
+type Row = MessageRow & { finished?: boolean };
 
 const NEW_THREAD = "new";
 const MAX_HISTORY_PAGES = 10;
 const REFUSED_MESSAGE = "This chat is locked or no longer available.";
+const SHARE_FAILED_MESSAGE = "The message could not be shared. Try again.";
+const AWAIT_REPLY_MESSAGE = "Wait for the last reply to finish before sending another.";
+
+/** A failed share fills an empty error slot; an error already on screen is not replaced by it. */
+const withShareFailure = (current: string | null): string | null => current ?? SHARE_FAILED_MESSAGE;
+
+/** A share that works clears the share failure on screen; any other error on screen is not the share's to clear. */
+const withoutShareFailure = (current: string | null): string | null => {
+    if (current === SHARE_FAILED_MESSAGE) {
+        return null;
+    }
+
+    return current;
+};
+
+/** A confirmation that ends clears the wait message; any other message on screen is not the confirmation's to clear. */
+const withoutAwaitReply = (current: string | null): string | null => {
+    if (current === AWAIT_REPLY_MESSAGE) {
+        return null;
+    }
+
+    return current;
+};
 
 /** A chat that reads again is no longer refused; any other message on screen is not this read's to clear. */
 const withoutRefusal = (current: string | null): string | null => {
@@ -38,26 +70,16 @@ const withoutRefusal = (current: string | null): string | null => {
     return current;
 };
 
-/** What one stored message part shows: its text, or a label for an attachment (the preview is not in this slice yet). */
-const partText = (part: unknown): string => {
-    const kind = typeof part === "object" && part !== null ? (part as { type?: unknown }).type : undefined;
-
-    if (kind === "text") {
-        return String((part as { text?: unknown }).text ?? "");
-    }
-
-    return kind === "image" || kind === "file" ? "[Attachment]" : "";
-};
-
 /* eslint-disable no-underscore-dangle -- `_creationTime` is the Lunora document field, not a private one */
 const toRow = (message: { _creationTime: number; id: string; parts: unknown[]; role: string; status: string }, threadId: string, syncedAt: number): Row => {
     return {
         createdAt: message._creationTime,
         id: message.id,
         role: message.role,
+        shareText: shareTextOf(message.parts),
         status: message.status,
         syncedAt,
-        text: message.parts.map((part) => partText(part)).join(""),
+        text: displayTextOf(message.parts),
         threadId,
         updatedAt: message._creationTime,
     };
@@ -68,10 +90,20 @@ const toRow = (message: { _creationTime: number; id: string; parts: unknown[]; r
 const localRow = (id: string, role: string, threadId: string, text: string): Row => {
     const now = Date.now();
 
-    return { createdAt: now, id, role, status: "local", syncedAt: now, text, threadId, updatedAt: now };
+    return { createdAt: now, id, role, shareText: text, status: "local", syncedAt: now, text, threadId, updatedAt: now };
 };
 
 const byCreation = (rows: Row[]): Row[] => rows.toSorted((a, b) => a.createdAt - b.createdAt);
+
+/** Marks a row on this screen as finished, so it can be shared before the server's copy replaces it. */
+const finishRow = (rows: Row[], id: string): Row[] =>
+    rows.map((row) => {
+        if (row.id !== id) {
+            return row;
+        }
+
+        return { ...row, finished: true };
+    });
 
 /** Adds `text` to the end of the row with `id`, leaving every other row as it is. */
 const appendToRow = (rows: Row[], id: string, text: string): Row[] =>
@@ -80,7 +112,7 @@ const appendToRow = (rows: Row[], id: string, text: string): Row[] =>
             return row;
         }
 
-        return { ...row, text: row.text + text };
+        return { ...row, shareText: row.shareText + text, text: row.text + text };
     });
 
 const fetchMessagePage = (threadId: string, cursor: string | null) =>
@@ -92,7 +124,8 @@ const fetchMessagePage = (threadId: string, cursor: string | null) =>
 const Chat = () => {
     const { threadId: routeThreadId } = useLocalSearchParams<{ threadId: string }>();
     const router = useRouter();
-    const { hasToken, status } = useAuth();
+    const { hasToken, status, user } = useAuth();
+    const accountId = user?.id;
     const { cache, refreshTick, reportRead } = useOffline();
     const composer = useWriteControl("composer");
     const sendControl = useWriteControl("send");
@@ -100,15 +133,31 @@ const Chat = () => {
     const hasLiveRows = useRef(false);
     // Set when the server refused this chat (locked, gone): a late read of the cache must not paint it again.
     const isRefused = useRef(false);
+    // Whether "Load older messages" has added pages here: only then does the cursor on screen continue a loaded run.
+    const hasLoadedOlder = useRef(false);
     const readGate = useRef(createMessageReadGate());
+    // Whether this chat is the one on screen: a read that lands after another chat was pushed over it must not save it.
+    const isFocusedRef = useRef(false);
     const [threadId, setThreadId] = useState<string | undefined>(routeThreadId === NEW_THREAD ? undefined : routeThreadId);
     const [rows, setRows] = useState<Row[]>([]);
+    // The rows as the last write left them. Every write goes through `writeRows`, so a read can decide against the rows on
+    // screen when it lands, not against the rows of the render it was started in.
+    const rowsRef = useRef<Row[]>([]);
+    const writeRows = useCallback((update: Row[] | ((current: Row[]) => Row[])) => {
+        const next = typeof update === "function" ? update(rowsRef.current) : update;
+
+        rowsRef.current = next;
+        setRows(next);
+    }, []);
     // Where the next older page starts; null once the whole history is loaded.
     const [olderCursor, setOlderCursor] = useState<string | null>(null);
     const [isLoadingOlder, setIsLoadingOlder] = useState(false);
     const [draft, setDraft] = useState("");
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const listRef = useRef<LegendListRef>(null);
+    // Whether the list shows its last message: the jump button shows whenever it does not, and while a reply streams.
+    const [isAtEnd, setIsAtEnd] = useState(true);
     const insets = useSafeAreaInsets();
     const [keyboardShown, setKeyboardShown] = useState(false);
     // The header sits above this view, so the keyboard offset is the view's distance from the window top.
@@ -133,13 +182,19 @@ const Chat = () => {
     useEffect(() => () => sendAbort.current?.abort(), []);
 
     // Locked, gone or no longer shared: the saved copy is dropped, and nothing of it stays on screen.
-    const showRefused = useCallback(() => {
-        isRefused.current = true;
-        hasLiveRows.current = false;
-        setRows([]);
-        setOlderCursor(null);
-        setError(REFUSED_MESSAGE);
-    }, []);
+    const showRefused = useCallback(
+        (refusedThreadId: string) => {
+            isRefused.current = true;
+            hasLiveRows.current = false;
+            hasLoadedOlder.current = false;
+            writeRows([]);
+            setOlderCursor(null);
+            setError(REFUSED_MESSAGE);
+            // A chat the server refuses is not reopened on launch, and only this account's record of it is forgotten.
+            settleQuietly(accountId ? forgetLastThread({ threadId: refusedThreadId, userId: accountId }) : undefined);
+        },
+        [accountId, writeRows],
+    );
 
     // The newest pages load when a chat opens; "Load older messages" fetches the rest one page at a time.
     const loadMessages = useCallback(
@@ -155,8 +210,9 @@ const Chat = () => {
                         // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
                         const page = await fetchMessagePage(id, cursor);
 
-                        // The server returns each page newest first; the rows are shown oldest first.
-                        pages.unshift(page.page.map((message) => toRow(message, id, startedAt)).toReversed());
+                        // Pages come newest first, and each page is oldest first inside (`toUIMessages` sorts it ascending).
+                        // Each older page goes in front, so the rows read oldest first.
+                        pages.unshift(page.page.map((message) => toRow(message, id, startedAt)));
                         isDone = page.isDone;
                         cursor = page.continueCursor;
                     }
@@ -173,16 +229,30 @@ const Chat = () => {
                     break;
                 }
                 case "refused": {
-                    showRefused();
+                    showRefused(id);
                     reportRead("succeeded");
                     break;
                 }
                 case "rows": {
                     isRefused.current = false;
                     hasLiveRows.current = true;
-                    setRows(result.rows);
-                    setOlderCursor(result.olderCursor);
+                    // The older rows stay only when the read reaches them; otherwise the read's own cursor takes over.
+                    const isOlderKept = hasLoadedOlder.current && isOldestFreshRowOnScreen(rowsRef.current, result.rows);
+
+                    writeRows(withFreshRows(rowsRef.current, result.rows, isOlderKept));
+
+                    if (!isOlderKept) {
+                        hasLoadedOlder.current = false;
+                        setOlderCursor(result.olderCursor);
+                    }
+
                     setError(withoutRefusal);
+
+                    // Only a chat the server has just let this account read is saved as the one to reopen.
+                    if (accountId && isFocusedRef.current) {
+                        settleQuietly(rememberLastThread({ threadId: id, userId: accountId }));
+                    }
+
                     reportRead("succeeded");
                     break;
                 }
@@ -197,7 +267,7 @@ const Chat = () => {
                 }
             }
         },
-        [cache, reportRead, showRefused],
+        [accountId, cache, reportRead, showRefused, writeRows],
     );
 
     const loadOlder = async () => {
@@ -216,7 +286,7 @@ const Chat = () => {
 
                     return {
                         olderCursor: page.isDone ? null : page.continueCursor,
-                        rows: page.page.map((message) => toRow(message, threadId, syncedAt)).toReversed(),
+                        rows: page.page.map((message) => toRow(message, threadId, syncedAt)),
                     };
                 },
                 gate: readGate.current,
@@ -229,12 +299,17 @@ const Chat = () => {
                     break;
                 }
                 case "page": {
-                    setRows((current) => [...result.rows, ...current]);
+                    hasLoadedOlder.current = true;
+                    writeRows((current) => {
+                        const onScreen = new Set(current.map((row) => row.id));
+
+                        return [...result.rows.filter((row) => !onScreen.has(row.id)), ...current];
+                    });
                     setOlderCursor(result.olderCursor);
                     break;
                 }
                 case "refused": {
-                    showRefused();
+                    showRefused(threadId);
                     break;
                 }
                 case "unreachable": {
@@ -264,7 +339,7 @@ const Chat = () => {
                 const cached = await cache.loadMessages(threadId);
 
                 if (!isCancelled && !hasLiveRows.current && !isRefused.current && cached.length > 0) {
-                    setRows((current) => byCreation(mergeRows(current, cached)));
+                    writeRows((current) => byCreation(mergeRows(current, cached)));
                 }
             } catch {
                 // An unreadable cache is an empty one.
@@ -276,7 +351,7 @@ const Chat = () => {
         return () => {
             isCancelled = true;
         };
-    }, [cache, status, threadId]);
+    }, [cache, status, threadId, writeRows]);
 
     useEffect(() => {
         const gate = readGate.current;
@@ -285,17 +360,55 @@ const Chat = () => {
         return () => gate.invalidate();
     }, [threadId]);
 
+    useFocusEffect(
+        useCallback(() => {
+            isFocusedRef.current = true;
+
+            return () => {
+                isFocusedRef.current = false;
+            };
+        }, []),
+    );
+
+    // The reply checks run in a hook; the screen decides what a refusal or a settled check means for the chat.
+    const onConfirmationRefused = useCallback(
+        (refusedThreadId: string) => {
+            // A chat the reader can no longer open is cleared now, not by a read that may not run. A send still streaming
+            // into it is stopped, so no row is written into the chat after the refusal.
+            sendAbort.current?.abort();
+            readGate.current.invalidate();
+            showRefused(refusedThreadId);
+            settleQuietly(cache?.forgetThreads([refusedThreadId]));
+        },
+        [cache, showRefused],
+    );
+    const onConfirmationEnded = useCallback(() => {
+        setError(withoutAwaitReply);
+    }, []);
+    const { addConfirmation, confirmTick, isAwaitingReply } = useReplyConfirmation({
+        fetchPage: fetchMessagePage,
+        onEnded: onConfirmationEnded,
+        onRefused: onConfirmationRefused,
+        threadId,
+    });
+
     useEffect(() => {
         // Without a token (a launch with no network) the saved messages are all there is; the read waits for one.
         if (status === "signed-in" && hasToken && threadId && !sending) {
             loadMessages(threadId);
         }
-    }, [hasToken, loadMessages, refreshTick, sending, status, threadId]);
+    }, [confirmTick, hasToken, loadMessages, refreshTick, sending, status, threadId]);
 
     const send = async () => {
         const prompt = draft.trim();
 
         if (!prompt || sending || sendControl.disabled) {
+            return;
+        }
+
+        if (isAwaitingReply) {
+            setError(AWAIT_REPLY_MESSAGE);
+
             return;
         }
 
@@ -308,11 +421,13 @@ const Chat = () => {
         AccessibilityInfo.announceForAccessibility("Assistant is replying");
         setDraft("");
         const stamp = Date.now();
+        const userId = `user-${stamp}`;
         const assistantId = `pending-${stamp}`;
 
-        setRows((current) => [
+        readGate.current.invalidate();
+        writeRows((current) => [
             ...current,
-            localRow(`user-${stamp}`, "user", threadId ?? NEW_THREAD, prompt),
+            localRow(userId, "user", threadId ?? NEW_THREAD, prompt),
             localRow(assistantId, "assistant", threadId ?? NEW_THREAD, ""),
         ]);
 
@@ -336,29 +451,88 @@ const Chat = () => {
                 }));
 
             setThreadId(started.threadId);
+            // The prompt is complete once the server has accepted it, whether or not the screen's next read succeeds.
+            writeRows((current) => finishRow(current, userId));
 
             if (routeThreadId === NEW_THREAD) {
                 router.setParams({ threadId: started.threadId });
             }
 
+            let isSteered = false;
+            // The row the text goes into. A steer starts a new row, so the text before it stays on screen; the server
+            // saves that text as a message of its own.
+            let activeId = assistantId;
+            let steerCount = 0;
             const outcome = await relayReply({
                 fetch: streamingFetch,
                 gatewayUrl: config.gatewayUrl,
-                onDelta: ({ text }) => setRows((current) => appendToRow(current, assistantId, text)),
+                onDelta: ({ restart, text }) => {
+                    // A send that was stopped, by a refusal of its chat or by leaving the screen, writes nothing more.
+                    if (controller.signal.aborted) {
+                        return;
+                    }
+
+                    if (restart) {
+                        isSteered = true;
+                        const previousId = activeId;
+
+                        steerCount += 1;
+                        activeId = `${assistantId}-${steerCount}`;
+                        writeRows((current) => {
+                            // A row that has no text yet is not part of the reply; the steered text takes its place.
+                            const kept = current.filter((row) => row.id !== previousId || row.text !== "");
+
+                            return [...kept, localRow(activeId, "assistant", threadId ?? NEW_THREAD, text)];
+                        });
+
+                        return;
+                    }
+
+                    writeRows((current) => appendToRow(current, activeId, text));
+                },
                 signal: controller.signal,
                 streamToken: started.streamToken,
             });
+
+            // A send stopped on purpose has its notice on screen already, and gets no confirmation.
+            if (controller.signal.aborted) {
+                return;
+            }
 
             if (outcome === "failed") {
                 throw new ChatError("The reply did not finish. Try again.");
             }
 
+            // Only a reply relayed through its end marker is complete here. A steered reply is not: its text is only part of it
+            // until the server's copy is read. Either way the server's copy is re-read until it is final.
+            if (outcome === "finished" && !isSteered) {
+                writeRows((current) => finishRow(current, assistantId));
+            }
+
+            addConfirmation({ holdsSend: outcome === "unconfirmed", messageId: started.messageId, steers: steerCount, threadId: started.threadId });
+
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
-            setError(error_ instanceof Error ? error_.message : "Could not send.");
+            // The abort error of a send stopped on purpose is not shown: its notice is.
+            if (!controller.signal.aborted) {
+                setError(error_ instanceof Error ? error_.message : "Could not send.");
+            }
         } finally {
             setSending(false);
         }
+    };
+
+    // The last known geometry of the list. The end is recomputed whenever any of it changes, not only on a scroll.
+    const metrics = useRef({ contentHeight: 0, layoutHeight: 0, offsetY: 0 });
+    const updateIsAtEnd = () => {
+        setIsAtEnd(isScrolledToEnd(metrics.current));
+    };
+
+    const onListScroll = (event: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }) => {
+        const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+
+        metrics.current = { contentHeight: contentSize.height, layoutHeight: layoutMeasurement.height, offsetY: contentOffset.y };
+        updateIsAtEnd();
     };
 
     const olderHeader
@@ -376,26 +550,105 @@ const Chat = () => {
             </Pressable>
             );
 
+    /** Opens the system share sheet. Cancelling resolves normally, so a rejection is a failure to open it. */
+    const shareRow = async (text: string): Promise<void> => {
+        try {
+            await Share.share({ message: text });
+            setError(withoutShareFailure);
+        } catch (shareError) {
+            console.warn("Could not open the share sheet.", shareError);
+            setError(withShareFailure);
+            // The message on screen can be out of view when the sheet fails: a screen reader needs the announcement.
+            AccessibilityInfo.announceForAccessibility(SHARE_FAILED_MESSAGE);
+        }
+    };
+
     // The home indicator's inset, which the open keyboard already covers.
     const safeBottom = keyboardShown ? 0 : insets.bottom;
-    const syncedTimes = rows.filter((row) => row.status !== "local").map((row) => row.syncedAt);
+    const syncedTimes = rows.filter((row) => row.status !== "local" && row.finished !== true).map((row) => row.syncedAt);
     const syncedAt = syncedTimes.length === 0 ? undefined : Math.max(...syncedTimes);
+
+    // The control and its hint say why sending waits, so it is not announced as available while a reply is held.
+    const sendReason = sendControl.reason ?? (isAwaitingReply ? AWAIT_REPLY_MESSAGE : undefined);
+    const isSendBlocked = sending || sendControl.disabled || isAwaitingReply;
 
     return (
         <View onLayout={measureTopOffset} ref={rootRef} style={{ flex: 1 }}>
             <OfflineBanner syncedAt={syncedAt} />
             <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={topOffset} style={{ flex: 1 }}>
-                <LegendList
-                    data={rows}
-                    estimatedItemSize={72}
-                    keyExtractor={(row) => row.id}
-                    ListHeaderComponent={olderHeader}
-                    renderItem={({ item }) => (
-                        <View style={{ alignSelf: item.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", padding: 12 }}>
-                            <Text selectable>{item.text || (item.role === "assistant" ? "..." : "")}</Text>
-                        </View>
-                    )}
-                />
+                <View
+                    onLayout={(event) => {
+                        metrics.current = { ...metrics.current, layoutHeight: event.nativeEvent.layout.height };
+                        updateIsAtEnd();
+                    }}
+                    style={{ flex: 1 }}
+                >
+                    <LegendList
+                        data={rows}
+                        estimatedItemSize={72}
+                        keyExtractor={(row) => row.id}
+                        ListHeaderComponent={olderHeader}
+                        onContentSizeChange={(_width, height) => {
+                            metrics.current = { ...metrics.current, contentHeight: height };
+                            updateIsAtEnd();
+                        }}
+                        onScroll={onListScroll}
+                        ref={listRef}
+                        renderItem={({ item }) => {
+                            // Only a finished message can be shared: one still streaming, or one that failed, is not the whole text.
+                            const isFinished = item.status === "success" || item.finished === true;
+                            const shareText = isFinished ? shareableMessageText({ text: item.shareText }) : undefined;
+
+                            return (
+                                <View style={{ alignSelf: item.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", padding: 12 }}>
+                                    <Text selectable>{item.text || (item.role === "assistant" ? "..." : "")}</Text>
+                                    {shareText !== undefined && (
+                                        <Pressable
+                                            accessibilityLabel={shareLabel({ role: item.role, text: shareText })}
+                                            accessibilityRole="button"
+                                            onPress={() => shareRow(shareText)}
+                                            style={{
+                                                alignItems: "center",
+                                                alignSelf: "flex-start",
+                                                justifyContent: "center",
+                                                minHeight: 44,
+                                                minWidth: 44,
+                                                paddingHorizontal: 12,
+                                            }}
+                                        >
+                                            <Text style={{ fontSize: 12 }}>Share</Text>
+                                        </Pressable>
+                                    )}
+                                </View>
+                            );
+                        }}
+                    />
+                    {shouldShowScrollToLatest({ isScrolledToEnd: isAtEnd, isStreaming: sending })
+                        ? (
+                        <Pressable
+                            accessibilityLabel={scrollToLatestLabel(sending)}
+                            accessibilityRole="button"
+                            onPress={() => settleQuietly(listRef.current?.scrollToEnd({ animated: true }))}
+                            style={{
+                                alignItems: "center",
+                                alignSelf: "center",
+                                backgroundColor: "#fff",
+                                borderColor: "#ccc",
+                                borderRadius: 22,
+                                borderWidth: 1,
+                                bottom: 12,
+                                justifyContent: "center",
+                                minHeight: 44,
+                                minWidth: 44,
+                                paddingHorizontal: 16,
+                                position: "absolute",
+                            }}
+                        >
+                            <Text style={{ fontWeight: "600" }}>{scrollToLatestText(sending)}</Text>
+                        </Pressable>
+                        )
+                        : null}
+                </View>
                 {error
                     ? (
                     <Text accessibilityRole="alert" style={{ color: "#b00020", padding: 12 }}>
@@ -403,7 +656,7 @@ const Chat = () => {
                     </Text>
                     )
                     : null}
-                <View style={{ flexDirection: "row", gap: 8, padding: 12, paddingBottom: sendControl.reason ? 12 : 12 + safeBottom }}>
+                <View style={{ flexDirection: "row", gap: 8, padding: 12, paddingBottom: sendReason ? 12 : 12 + safeBottom }}>
                     <TextInput
                         accessibilityHint={composer.reason}
                         accessibilityLabel="Message"
@@ -416,21 +669,17 @@ const Chat = () => {
                         value={draft}
                     />
                     <Pressable
-                        accessibilityHint={sendControl.reason}
+                        accessibilityHint={sendReason}
                         accessibilityRole="button"
-                        accessibilityState={{ disabled: sending || sendControl.disabled }}
-                        disabled={sending || sendControl.disabled}
+                        accessibilityState={{ disabled: isSendBlocked }}
+                        disabled={isSendBlocked}
                         onPress={send}
-                        style={{ justifyContent: "center", opacity: sendControl.disabled ? 0.5 : 1, padding: 12 }}
+                        style={{ justifyContent: "center", opacity: isSendBlocked ? 0.5 : 1, padding: 12 }}
                     >
                         <Text style={{ fontWeight: "600" }}>Send</Text>
                     </Pressable>
                 </View>
-                {sendControl.reason
-                    ? (
-                    <Text style={{ fontSize: 12, paddingBottom: 8 + safeBottom, paddingHorizontal: 12 }}>{sendControl.reason}</Text>
-                    )
-                    : null}
+                {sendReason ? <Text style={{ fontSize: 12, paddingBottom: 8 + safeBottom, paddingHorizontal: 12 }}>{sendReason}</Text> : null}
             </KeyboardAvoidingView>
         </View>
     );

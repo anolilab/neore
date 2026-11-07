@@ -14,6 +14,7 @@ import {
     getCreatorSlug,
     getModelLabel,
     getModelSearchText,
+    initialCreatorSlug,
     moveFavorite,
     sortModels,
     swapFavorites,
@@ -98,6 +99,21 @@ describe(filterModelsByBlockedCreators, () => {
 
     it("returns the same list when nothing is blocked", () => {
         expect(filterModelsByBlockedCreators(all, [])).toBe(all);
+    });
+});
+
+describe(initialCreatorSlug, () => {
+    const kimi = { displayProvider: "Moonshot", id: "cf-kimi-k2.5", provider: "cloudflare" } as GatewayModel;
+    const kimiRouter = { displayProvider: "Moonshot", id: "moonshotai/kimi-k2-0905", provider: "openrouter" } as GatewayModel;
+
+    it("scopes to the selected model's creator as the sidebar names it, whatever its id looks like", () => {
+        expect(initialCreatorSlug([kimi, kimiRouter], "cf-kimi-k2.5")).toBe("moonshot");
+        expect(initialCreatorSlug([kimi, kimiRouter], "moonshotai/kimi-k2-0905")).toBe("moonshot");
+    });
+
+    it("scopes to no creator when the model is not in the list or none is selected", () => {
+        expect(initialCreatorSlug([kimi], "openai/gpt-5")).toBeNull();
+        expect(initialCreatorSlug([kimi], undefined)).toBeNull();
     });
 });
 

@@ -16,6 +16,14 @@
         "plugins": ["expo-router", "expo-secure-store", "expo-web-browser"],
         "experiments": {
             "typedRoutes": false
+        },
+        "runtimeVersion": {
+            "policy": "fingerprint"
+        },
+        "updates": {
+            "enabled": true,
+            "checkAutomatically": "ON_LOAD",
+            "fallbackToCacheTimeout": 0
         }
     }
 }

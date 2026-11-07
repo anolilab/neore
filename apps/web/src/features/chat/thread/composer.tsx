@@ -33,6 +33,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import ComposerAskAside from "@/features/chat/aside/composer-ask-aside";
+import CompactionChip from "@/features/chat/compaction/compaction-chip";
 import { CinemaPanel } from "@/features/chat/components/cinema-studio";
 import { DEFAULT_MESSAGE_OPTS } from "@/features/chat/core/constants/query-options";
 import { useChatIsEmpty, useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
@@ -138,7 +139,7 @@ const MODE_ICON_COLOR: Record<ComposerMode, string> = {
  * Vertical mode switcher — lives on the left side of the input area.
  * ↑/↓ arrows (or scroll wheel) cycle through modes; clicking the icon opens a full picker.
  */
-const ComposerModeSwitcher: FC<{
+export const ComposerModeSwitcher: FC<{
     disabled?: boolean;
     mode: ComposerMode;
     onModeChange: (mode: ComposerMode) => void;
@@ -776,6 +777,7 @@ const Composer: FC<ComposerProps> = ({ className, compact = false, initialMessag
                                 )}
                             </AnimatePresence>
                             <div className="grow" />
+                            {composerMode === "text" && validThreadId && !minimal && !compact && <CompactionChip key={validThreadId} />}
                             {composerMode === "text" && validThreadId && !minimal && <ComposerAskAside />}
                             <ComposerContextCount />
                             <ComposerLanguageSelector />

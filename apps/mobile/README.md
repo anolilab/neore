@@ -60,7 +60,7 @@ pnpm --filter @neore/mobile ios         # expo run:ios, needs Xcode
 pnpm --filter @neore/mobile android     # expo run:android, needs the Android SDK
 ```
 
-Start the backend first (`pnpm dev`; the port map is in the root `CLAUDE.md`).
+Start the backend first (`pnpm dev`; the port map is in `docs/agents/local-dev.md`).
 `expo run:*` generates the native `ios/` and `android/` projects, which are not in the tree.
 
 ## Test, lint, build

@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../../schema";
 import { ASK_USER_ANSWER_MAX } from "../tools/ask-user-constants";
+import { type AskUserReply, resolveQuestionAnswers } from "./ask-user-claim";
 import { claimAskUserAnswer, normalizeAskUserAnswer } from "./ask-user-claim";
 import { collectApprovalRequestIds, collectAskUserApprovalIds } from "./tool-approval-claim";
 
@@ -24,6 +25,7 @@ const loadTool = async () => await import("../tools/ask-user");
 
 interface ToolDefinition {
     execute: (context: unknown, input: unknown, options: unknown) => Promise<unknown>;
+    inputSchema: { safeParse: (input: unknown) => { success: boolean } };
     needsApproval: unknown;
 }
 
@@ -41,10 +43,19 @@ const CONFIG = {
     toolNames: ["askUser", "webSearch"],
 };
 
-const request = (approvalId: string, toolName: string) => {
+const LEGACY_INPUT = { choices: ["Red", "Blue"], question: "Which colour?" };
+
+const MULTI_INPUT = {
+    questions: [
+        { choices: ["Red", "Blue"], question: "Which colour?" },
+        { choices: ["Matte", "Gloss", "Metallic"], multiSelect: true, question: "Which finishes?" },
+    ],
+};
+
+const request = (approvalId: string, toolName: string, input: unknown = LEGACY_INPUT) => {
     return {
         content: [
-            { input: { choices: ["Red", "Blue"], question: "Which colour?" }, toolCallId: `call-${approvalId}`, toolName, type: "tool-call" },
+            { input, toolCallId: `call-${approvalId}`, toolName, type: "tool-call" },
             { approvalId, toolCallId: `call-${approvalId}`, type: "tool-approval-request" },
         ],
         role: "assistant",
@@ -176,5 +187,100 @@ describe("resumed askUser", () => {
     it("normalises answers", () => {
         expect(normalizeAskUserAnswer(" ok ")).toBe("ok");
         expect(normalizeAskUserAnswer("")).toBeUndefined();
+    });
+});
+
+const claimReply = async (askReply: AskUserReply) =>
+    await harness.run(
+        async (ctx: any) => await claimAskUserAnswer(ctx, { approvalId: "ask-1", callerId: OWNER, reply: askReply, threadId: threadId as never }),
+    );
+
+describe("askUser input", () => {
+    it("keeps the single-question form valid, and refuses both forms or neither", async () => {
+        const { default: askUserTool } = await loadTool();
+        const { inputSchema } = askUserTool as unknown as ToolDefinition;
+
+        expect(inputSchema.safeParse(LEGACY_INPUT).success).toBe(true);
+        expect(inputSchema.safeParse({ question: "Why?" }).success).toBe(true);
+        expect(inputSchema.safeParse(MULTI_INPUT).success).toBe(true);
+        expect(inputSchema.safeParse({ ...MULTI_INPUT, question: "Why?" }).success).toBe(false);
+        expect(inputSchema.safeParse({ choices: ["A"], ...MULTI_INPUT }).success).toBe(false);
+        expect(inputSchema.safeParse({}).success).toBe(false);
+        expect(inputSchema.safeParse({ questions: [] }).success).toBe(false);
+        expect(
+            inputSchema.safeParse({
+                questions: Array.from({ length: 5 }, () => {
+                    return { question: "Q?" };
+                }),
+            }).success,
+        ).toBe(false);
+        expect(inputSchema.safeParse({ questions: [{ question: " ".repeat(3) }] }).success).toBe(false);
+    });
+
+    it("matches a pick against the choices as the card shows them, trimmed and each once", () => {
+        const questions = [{ choices: [" Blue ", "Blue", "Red"], multiSelect: false, question: "Colour?" }];
+
+        expect(resolveQuestionAnswers(questions, [{ selected: ["Blue"] }])).toStrictEqual([{ question: "Colour?", selected: ["Blue"] }]);
+    });
+});
+
+describe("multi-question askUser", () => {
+    beforeEach(async () => {
+        // Replace the single question of the outer setup with a two-question card (the second is multi-select).
+        await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("messages").collect();
+
+            for (const row of rows) {
+                await ctx.db.delete("messages", row._id);
+            }
+        });
+        await insertMessage(0, { content: "paint it", role: "user" });
+        await insertMessage(1, request("ask-1", "askUser", MULTI_INPUT));
+    });
+
+    it("returns both answers, the multi-select one with all its picks, to the model", async () => {
+        const claim = await claimReply({
+            answers: [{ selected: ["Blue"] }, { note: " not too shiny ", selected: ["Gloss", "Matte"] }],
+            kind: "answers",
+        });
+        const expected = [
+            { question: "Which colour?", selected: ["Blue"] },
+            { note: "not too shiny", question: "Which finishes?", selected: ["Matte", "Gloss"] },
+        ];
+
+        expect(claim).toMatchObject({ answers: expected, kind: "claimed" });
+        expect(await statuses()).toStrictEqual(["approved"]);
+
+        const { createAnsweredAskUserTool } = await loadTool();
+        const answered = createAnsweredAskUserTool((claim as unknown as { answers: never }).answers) as unknown as ToolDefinition;
+
+        expect(await answered.execute({}, MULTI_INPUT, { toolCallId: "call-ask-1" })).toStrictEqual({ answered: true, answers: expected });
+    });
+
+    it("refuses a malformed list without claiming", async () => {
+        const refuse = async (answers: { note?: string; selected: string[] }[]) => await expect(claimReply({ answers, kind: "answers" })).rejects.toThrow();
+
+        await refuse([{ selected: ["Blue"] }]);
+        await refuse([{ selected: ["Green"] }, { selected: ["Gloss"] }]);
+        await refuse([{ selected: ["Red", "Blue"] }, { selected: ["Gloss"] }]);
+        await refuse([{ selected: ["Blue"] }, { note: "  ", selected: [] }]);
+        await refuse([{ selected: ["Blue", "Blue"] }, { selected: ["Gloss"] }]);
+        expect(await statuses()).toStrictEqual(["pending"]);
+    });
+
+    it("takes a list only: a text answer is refused, a dismissal closes the whole card", async () => {
+        await expect(claimReply({ answer: "Blue", kind: "answer" })).rejects.toThrow();
+        expect(await statuses()).toStrictEqual(["pending"]);
+        expect(await claimReply({ kind: "dismiss" })).toMatchObject({ kind: "claimed" });
+        expect(await statuses()).toStrictEqual(["denied"]);
+    });
+});
+
+describe("single-question askUser", () => {
+    it("is unchanged: text in, text out, and a list is refused", async () => {
+        await expect(claimReply({ answers: [{ selected: ["Blue"] }], kind: "answers" })).rejects.toThrow();
+        expect(await statuses()).toStrictEqual(["pending"]);
+        expect(await reply("Blue")).toMatchObject({ answer: "Blue", kind: "claimed" });
+        expect(await statuses()).toStrictEqual(["approved"]);
     });
 });

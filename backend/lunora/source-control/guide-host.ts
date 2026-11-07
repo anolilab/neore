@@ -108,7 +108,7 @@ export const beginHostGuide = internalMutation
         // The session start refuses only when the computer is busy or went offline between the check above and now.
         const started = await startHostSessionFor(ctx, userId, {
             agentKey: args.agentKey,
-            clientId: crypto.randomUUID(),
+            clientId: ctx.newId(),
             deviceId: args.deviceId,
             folderId: args.folderId,
         }).catch((error: unknown) => {
@@ -123,7 +123,7 @@ export const beginHostGuide = internalMutation
         // The prompt carries a pull request's title, body and paths: third-party text, so the turn is signed as tainted.
         const sent = await sendToHostFor(ctx, {
             plan: args.plan,
-            requestId: crypto.randomUUID(),
+            requestId: ctx.newId(),
             taintedBy: GUIDE_TAINT,
             text: args.text,
             threadId: started.threadId,
@@ -139,6 +139,9 @@ export const beginHostGuide = internalMutation
 
         await ctx.db.patch("pullRequestGuides", reserved.guideId, { threadId: started.threadId });
 
+        // The public `startHostSession` logs this; a guide starts its session through the helper, not the procedure.
+        // Logged only once the prompt is sent: a refused send throws and rolls the session back.
+        ctx.log.event("acp.start_host_session", { started: true });
         ctx.log.event("source_control.guide_requested", { source: "host" });
 
         return { status: "started" as const, threadId: started.threadId };
@@ -193,6 +196,8 @@ export const startHostGuide = authAction
         const flags = await ctx.runQuery(internal.auth.functions.getUserAuthFlagsQuery, { userId });
 
         if (flags.isAnonymous) {
+            ctx.log.event("source_control.start_host_guide", { status: "guest" });
+
             return { status: "guest" as const };
         }
 
@@ -204,6 +209,8 @@ export const startHostGuide = authAction
         );
 
         if (read.status !== "ok") {
+            ctx.log.event("source_control.start_host_guide", { status: read.status });
+
             return { status: read.status };
         }
 
@@ -212,11 +219,13 @@ export const startHostGuide = authAction
 
         // The reviewer's own instructions are the one part that is not trimmed to fit.
         if (hostPromptBytes(text) > HOST_PROMPT_MAX_BYTES) {
+            ctx.log.event("source_control.start_host_guide", { status: "too_large" });
+
             return { status: "too_large" as const };
         }
 
         try {
-            return await ctx.runMutation(internal.source_control.guide_host.beginHostGuide, {
+            const begun = await ctx.runMutation(internal.source_control.guide_host.beginHostGuide, {
                 agentKey: args.agentKey,
                 deviceId: args.deviceId,
                 folderId: args.folderId,
@@ -228,12 +237,18 @@ export const startHostGuide = authAction
                 text,
                 userId,
             });
+
+            ctx.log.event("source_control.start_host_guide", { status: begun.status });
+
+            return begun;
         } catch (error) {
             const reason = unavailableReason(error);
 
             if (reason === null) {
                 throw error;
             }
+
+            ctx.log.event("source_control.start_host_guide", { reason, status: "unavailable" });
 
             return { reason, status: "unavailable" as const };
         }

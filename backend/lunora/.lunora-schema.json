@@ -6133,6 +6133,13 @@
             "userId"
           ],
           "unique": false
+        },
+        "by_userId_and_kind": {
+          "fields": [
+            "userId",
+            "kind"
+          ],
+          "unique": false
         }
       },
       "memory": false,
@@ -6149,57 +6156,6 @@
         }
       },
       "shardMode": "shardBy:userId"
-    },
-    "emails": {
-      "commitOrdered": false,
-      "fields": {
-        "email": {
-          "kind": "string",
-          "nullable": false,
-          "optional": false,
-          "unique": false
-        },
-        "expectation": {
-          "kind": "union",
-          "nullable": false,
-          "optional": false,
-          "unique": false,
-          "members": [
-            {
-              "kind": "literal",
-              "nullable": false,
-              "optional": false,
-              "unique": false,
-              "literal": "\"bounced\""
-            },
-            {
-              "kind": "literal",
-              "nullable": false,
-              "optional": false,
-              "unique": false,
-              "literal": "\"complained\""
-            },
-            {
-              "kind": "literal",
-              "nullable": false,
-              "optional": false,
-              "unique": false,
-              "literal": "\"delivered\""
-            }
-          ]
-        }
-      },
-      "indexes": {
-        "by_email": {
-          "fields": [
-            "email"
-          ],
-          "unique": false
-        }
-      },
-      "memory": false,
-      "relations": {},
-      "shardMode": "global:d1"
     },
     "embeddings_1024": {
       "commitOrdered": false,
@@ -8849,6 +8805,12 @@
               "unique": false
             }
           }
+        },
+        "result": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         },
         "scope": {
           "kind": "string",
@@ -12330,7 +12292,8 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "root",
+      "refinementsRecorded": true
     },
     "payment_events": {
       "commitOrdered": false,
@@ -12371,7 +12334,8 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "root",
+      "refinementsRecorded": true
     },
     "payment_sessions": {
       "commitOrdered": false,
@@ -12380,13 +12344,15 @@
           "kind": "number",
           "nullable": false,
           "optional": false,
-          "unique": false
+          "unique": false,
+          "refined": true
         },
         "capturedMinor": {
           "kind": "number",
           "nullable": false,
           "optional": false,
-          "unique": false
+          "unique": false,
+          "refined": true
         },
         "createdAt": {
           "kind": "number",
@@ -12422,7 +12388,8 @@
           "kind": "number",
           "nullable": false,
           "optional": false,
-          "unique": false
+          "unique": false,
+          "refined": true
         },
         "revision": {
           "kind": "number",
@@ -12473,7 +12440,8 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "root",
+      "refinementsRecorded": true
     },
     "payment_subscriptions": {
       "commitOrdered": false,
@@ -12592,7 +12560,8 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "root",
+      "refinementsRecorded": true
     },
     "payment_usageEvents": {
       "commitOrdered": false,
@@ -12672,7 +12641,8 @@
       },
       "memory": false,
       "relations": {},
-      "shardMode": "root"
+      "shardMode": "root",
+      "refinementsRecorded": true
     },
     "persistentChunks": {
       "commitOrdered": false,
@@ -21114,6 +21084,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"linked\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"opened\""
             }
           ]
@@ -21128,6 +21105,12 @@
           "kind": "string",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "threadDeleted": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "threadId": {
@@ -23836,8 +23819,100 @@
           "optional": true,
           "unique": false
         },
+        "lastRunNotice": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "at": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "reason": {
+              "kind": "union",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"project_unwritable\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"thread_busy\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"thread_locked\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"thread_shared\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"thread_unavailable\""
+                }
+              ]
+            }
+          }
+        },
         "lastRunThreadId": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "lastSkipReason": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"awaiting_review\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"blocked\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"still_running\""
+            }
+          ]
+        },
+        "lastSkippedAt": {
+          "kind": "number",
           "nullable": false,
           "optional": true,
           "unique": false
@@ -23873,6 +23948,19 @@
           "unique": false,
           "ref": "tasks"
         },
+        "projectId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "projects"
+        },
+        "reasoningEffort": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "recurring": {
           "kind": "boolean",
           "nullable": false,
@@ -23890,6 +23978,35 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "runDestination": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"continue_thread\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"fresh_context\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"new_thread\""
+            }
+          ]
         },
         "skillId": {
           "kind": "id",
@@ -24441,6 +24558,13 @@
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "kind": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "\"compact\""
         },
         "summary": {
           "kind": "string",
@@ -25613,6 +25737,12 @@
         },
         "activeLeafMessageId": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "autoModel": {
+          "kind": "boolean",
           "nullable": false,
           "optional": true,
           "unique": false
@@ -28105,6 +28235,12 @@
           "optional": true,
           "unique": false
         },
+        "autoCompactThreshold": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "autoReadReplies": {
           "kind": "boolean",
           "nullable": false,
@@ -28208,6 +28344,12 @@
           }
         },
         "hidePersonalInfo": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "hostFollowUpSteer": {
           "kind": "boolean",
           "nullable": false,
           "optional": true,

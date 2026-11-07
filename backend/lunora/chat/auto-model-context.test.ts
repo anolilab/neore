@@ -92,6 +92,32 @@ describe("autoRouteContextOf", () => {
         });
     });
 
+    it("sizes a stateless reply from its prompt alone, even when the thread is compacted", async () => {
+        const long = "a".repeat(8000);
+        const covered = await message(0, "user", long);
+        const prompt = await message(1, "user", "continue");
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("threadContextSummaries", {
+                    coveredCount: 1,
+                    coveredUpToMessageId: covered,
+                    createdAt: 0,
+                    kind: "compact",
+                    summary: "a retained summary",
+                    taintedBy: [],
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        const stateless = await harness.run(
+            async (ctx: any) => await autoRouteContextOf(ctx, { promptMessageId: prompt, stateless: true, threadId: threadId as never }),
+        );
+
+        expect(stateless.contextTokens).toBe(Math.ceil(estimateTokensFromCharacters("continue".length)));
+    });
+
     it("classifies every attached file, not only the first fifty", async () => {
         const fileIds: string[] = [];
 

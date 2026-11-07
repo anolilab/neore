@@ -27,6 +27,9 @@ import { AlertTriangleIcon, EditIcon, InfoIcon, XIcon } from "lucide-react";
 import type { ChangeEvent, DragEvent, FC } from "react";
 import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
+import useInviteOnly from "@/features/auth/hooks/use-invite-only";
+import { isCompactCommand } from "@/features/chat/compaction/compaction-logic";
+import useCompactThread from "@/features/chat/compaction/use-compact-thread";
 import ReferenceStrip from "@/features/chat/components/reference-picker/reference-strip";
 import type { AttachmentAdapter } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import {
@@ -40,6 +43,7 @@ import {
 } from "@/features/chat/core/adapters/lunora-attachment-adapter";
 import { useChatActions, useChatIsStreaming, useChatLunora, useChatThread } from "@/features/chat/core/context/chat-context";
 import useComparisonChat from "@/features/chat/core/hooks/use-comparison-chat";
+import usePendingSend, { holdForSignIn } from "@/features/chat/core/hooks/use-pending-send";
 import useRunnerCapabilities from "@/features/chat/core/hooks/use-runner-capabilities";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
 import { selectAttachedReferences, selectRemoveAttachedReference, useChatUIStore, useComposerState } from "@/features/chat/core/stores/chat-ui-store";
@@ -478,6 +482,11 @@ const ComposerInput = ({
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     const { isNewThread, threadId } = useChatThread();
+    const { compact: compactThread } = useCompactThread(threadId);
+    // The thread a draft was last checked against, so the check below runs when the chat changes, not on every keystroke.
+    const draftThread = useRef<string | null | undefined>(undefined);
+    // Invite-only: a guest's comparison send is held for sign-in (a plain send is held in `ChatProvider`).
+    const { mustSignIn } = useInviteOnly();
     const { getChatKey, isMounted, trackToast } = usePasteGuard(threadId);
 
     // Opt-in ghost text; `undefined` (off) unless the user enabled it in settings.
@@ -494,6 +503,19 @@ const ComposerInput = ({
 
     // Composer state from store
     const { addAttachment, attachments, clear, removeAttachment, setText, text, updateAttachment } = useComposerState();
+
+    // A `/compact` typed in one chat is not carried into the next: submitting it there would compact the chat that is open.
+    useEffect(() => {
+        if (draftThread.current === threadId) {
+            return;
+        }
+
+        draftThread.current = threadId;
+
+        if (isCompactCommand(useChatUIStore.getState().composerText)) {
+            clear();
+        }
+    }, [threadId, clear]);
 
     // The editor's key handler reads the send preference from the UI-state store at key time; the account
     // setting (server-backed) is mirrored there so a new device honours it too.
@@ -1000,12 +1022,22 @@ const ComposerInput = ({
             return;
         }
 
+        promptHistory.reset();
+
+        // `/compact` is a command, not a message: it condenses the thread's context and sends nothing. It runs before the
+        // size guard below, because a chat too large to send is the one that most needs compacting.
+        // A new chat has no thread yet: the command still runs, and answers that there is nothing to compact.
+        if ((isThreadComposer || !threadId) && draftAttachments.length === 0 && isCompactCommand(draftText)) {
+            clear();
+            void compactThread();
+
+            return;
+        }
+
         // Block submission if context is too large
         if (contextStats.totalChars >= CONTEXT_ERROR_THRESHOLD) {
             return;
         }
-
-        promptHistory.reset();
 
         // A turn is still running: queue instead of sending. The queue sends it
         // when the stream finishes (see ComposerPromptQueue).
@@ -1018,6 +1050,14 @@ const ComposerInput = ({
                 .getState()
                 .enqueue(threadId, { attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, text: draftText });
             clear();
+
+            return;
+        }
+
+        // A comparison send does not go through `sendMessage`, where a guest's send is held under invite-only, so hold
+        // it here: the draft stays and sign-in opens.
+        if (mustSignIn && (onSubmitOverride || isComparisonValid)) {
+            holdForSignIn(draftText);
 
             return;
         }
@@ -1048,6 +1088,7 @@ const ComposerInput = ({
         onSubmitProp?.();
     }, [
         disabled,
+        mustSignIn,
         sendMessage,
         onSubmitProp,
         contextStats,
@@ -1060,6 +1101,7 @@ const ComposerInput = ({
         isStreaming,
         isThreadComposer,
         threadId,
+        compactThread,
     ]);
 
     // "Send as a new chat" from outside the chat UI (the native shell's Quick
@@ -1067,6 +1109,8 @@ const ComposerInput = ({
     // composer takes it; it fills the text, and the effect below submits once
     // that text has rendered and the composer can send.
     const autoSubmitTextRef = useRef<string | null>(null);
+    // Bumped with each request, so a requested text that is already the draft still submits.
+    const [autoSubmitRequest, setAutoSubmitRequest] = useState(0);
     const isAutoSubmitTarget = !onSubmitOverride && !compact && isNewThread;
 
     useEffect(() => {
@@ -1077,8 +1121,17 @@ const ComposerInput = ({
         return onComposerSubmitRequest(({ text: requested }) => {
             autoSubmitTextRef.current = requested;
             setText(requested);
+            setAutoSubmitRequest((count) => count + 1);
         });
     }, [isAutoSubmitTarget, setText]);
+
+    // The message a visitor sent before signing in (invite-only), sent once a real account's token is on the client.
+    // The new-chat composer and a thread's composer both take it: sign-in returns to the URL it started from.
+    usePendingSend(!onSubmitOverride && !compact, (pending) => {
+        autoSubmitTextRef.current = pending;
+        setText(pending);
+        setAutoSubmitRequest((count) => count + 1);
+    });
 
     // Files dropped on the dock icon (`core/utils/composer-submit.ts`) are attached the same way as a drop: uploaded, never sent.
     useEffect(() => {
@@ -1100,7 +1153,7 @@ const ComposerInput = ({
         // the composer for the user to send.
         autoSubmitTextRef.current = null;
         handleSubmit();
-    }, [disabled, handleSubmit, isStreaming, text]);
+    }, [autoSubmitRequest, disabled, handleSubmit, isStreaming, text]);
 
     // Handle cancel/stop
     // A manual stop pauses the queue: the chips stay, nothing auto-sends.

@@ -69,15 +69,23 @@ export {
     validateLocalEndpointUrl,
 } from "./local-endpoint";
 export {
+    dataHandlingRules,
     deriveModelRegions,
     type FilterableModel,
     filterModels,
     getModelRejectionReason,
+    GLOBAL_REGION,
     hasActiveFilters,
     isModelAllowed,
     type ModelFilterRules,
 } from "./model-filters";
-export { CHARACTERS_PER_TOKEN, estimateInputCostMicrodollars, estimateTokensFromCharacters, PROMPT_CACHE_COLD_START_TOKENS } from "./prompt-cache";
+export {
+    CHARACTERS_PER_TOKEN,
+    estimateInputCostMicrodollars,
+    estimateTokensFromCharacters,
+    PROMPT_CACHE_COLD_START_TOKENS,
+    PROMPT_CACHE_LIFETIME_MS,
+} from "./prompt-cache";
 
 /**
  * Model exports

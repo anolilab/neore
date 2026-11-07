@@ -22,8 +22,11 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { openLoginPrompt } from "@/features/auth/stores/login-prompt-store";
+import { holdForSignIn } from "@/features/chat/core/hooks/use-pending-send";
 import useLocalModelTurn from "@/features/local-models/hooks/use-local-model-turn";
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
@@ -412,6 +415,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         isStreaming: isLocalStreaming,
         send: sendLocalTurn,
         streamingMessage: localStreamingMessage,
+        streamingThreadId: localStreamingThreadId,
         target: localTarget,
     } = useLocalModelTurn(model, savedMessageIds);
 
@@ -640,6 +644,9 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
 
     // A local reply streams on `/chat` too, before its thread exists.
     const isStreaming = (Boolean(threadId) && (streamingMessageId !== null || Boolean(activeStreamId) || isRegenerating)) || isLocalStreaming;
+    const isThreadStreaming =
+        Boolean(threadId) &&
+        (streamingMessageId !== null || Boolean(activeStreamId) || isRegenerating || (isLocalStreaming && localStreamingThreadId === threadId));
 
     const { mutateAsync: abortStreamMutation } = useMutation(crpc.chat.functions.abortStreamByMessageId.mutationOptions());
     const { mutateAsync: abortThreadStreamMutation } = useMutation(crpc.chat.functions.abortThreadStream.mutationOptions());
@@ -658,9 +665,22 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         [authHeader, t],
     );
 
+    // Invite-only: a guest may not start a turn. Every path into one (composer, voice, the prompt queue, edit,
+    // regenerate) asks them to sign in instead. A send keeps its draft and is held for after sign-in. Here rather than
+    // in the composer, which the landing page also renders over a provider that sends nothing.
+    const { mustSignIn } = useInviteOnly();
+
     const sendMessage = useCallback(
-        (text: string, attachments?: PendingAttachment[]) =>
-            runSendMessage(
+        async (text: string, attachments?: PendingAttachment[]) => {
+            if (mustSignIn) {
+                useChatUIStore.getState().setComposerText(text);
+                useChatUIStore.getState().setIsSubmitting(false);
+                holdForSignIn(text);
+
+                return;
+            }
+
+            await runSendMessage(
                 {
                     authGate,
                     authHeader,
@@ -698,8 +718,10 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                 },
                 text,
                 attachments,
-            ),
+            );
+        },
         [
+            mustSignIn,
             authGate,
             threadId,
             model,
@@ -768,8 +790,14 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     }, [abortStreamMutation, abortThreadStreamMutation, activeStreamId, setIsRegenerating, model, cancelLocalTurn, threadId]);
 
     const reloadMessage = useCallback(
-        (messageId: string) =>
-            runReloadMessage(
+        async (messageId: string) => {
+            if (mustSignIn) {
+                openLoginPrompt();
+
+                return;
+            }
+
+            await runReloadMessage(
                 {
                     authHeader,
                     defaultLanguage,
@@ -792,13 +820,33 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     turnRef,
                 },
                 messageId,
-            ),
-        [threadId, isAuthenticated, authHeader, model, handleError, getChangedSettings, defaultLanguage, localTarget, sendLocalTurn, startTurn, kickOffMedia],
+            );
+        },
+        [
+            mustSignIn,
+            threadId,
+            isAuthenticated,
+            authHeader,
+            model,
+            handleError,
+            getChangedSettings,
+            defaultLanguage,
+            localTarget,
+            sendLocalTurn,
+            startTurn,
+            kickOffMedia,
+        ],
     );
 
     const editMessage = useCallback(
-        (messageId: string, newText: string) =>
-            runEditMessage(
+        async (messageId: string, newText: string) => {
+            if (mustSignIn) {
+                openLoginPrompt();
+
+                return;
+            }
+
+            await runEditMessage(
                 {
                     authHeader,
                     handleError,
@@ -817,8 +865,9 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                 },
                 messageId,
                 newText,
-            ),
-        [threadId, isAuthenticated, authHeader, handleError, localTarget, sendLocalTurn, startTurn],
+            );
+        },
+        [mustSignIn, threadId, isAuthenticated, authHeader, handleError, localTarget, sendLocalTurn, startTurn],
     );
 
     const copyMessage = useCallback((messageId: string, format: "markdown" | "plain" = "markdown") => {
@@ -893,12 +942,13 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             isLocalModel: localTarget !== undefined,
             isLocalStreaming,
             isStreaming,
+            isThreadStreaming,
             pause,
             pendingStreamId: gatewayInfo.streamId,
             streamingMessageId,
             streamToken: gatewayInfo.streamToken,
         };
-    }, [isStreaming, isLocalStreaming, localTarget, streamingMessageId, activeStreamId, gatewayInfo, pause]);
+    }, [isStreaming, isThreadStreaming, isLocalStreaming, localTarget, streamingMessageId, activeStreamId, gatewayInfo, pause]);
 
     const actionsContextValue = useMemo((): ChatActionsContextValue => {
         return {

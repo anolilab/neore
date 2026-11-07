@@ -29,6 +29,7 @@ import {
     Folder,
     GitBranch,
     GitCompareArrows,
+    GitPullRequestArrow,
     GripVertical,
     HourglassIcon,
     Loader2,
@@ -51,17 +52,21 @@ import { ThreadLockDialog } from "@/features/chat/lock/thread-lock-dialog";
 import { THREAD_CATEGORY_LABELS } from "@/features/chat/tags/thread-categories";
 import ThreadTagChips from "@/features/chat/tags/thread-tag-chips";
 import ThreadTagsMenu from "@/features/chat/tags/thread-tags-menu";
+import { usePullRequestCount } from "@/features/develop/components/pull-request-counts";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { createLunoraQueryOptions, useCRPC, useLunora } from "@/lib/lunora/crpc";
 import { openThreadWindow, supportsThreadWindows } from "@/lib/native/bridge";
 import { showError } from "@/lib/toast";
 
+import useCanHover from "./hooks/use-can-hover";
 import { useThreadStateActions } from "./hooks/use-thread-state-actions";
 import { releaseBlinkWindow } from "./lib/needs-you-blink";
 import { hasUnreadReply, isSnoozed } from "./lib/thread-state-rules";
 import MessageSearchMatches from "./message-search-matches";
 import SortableThreadItem from "./sortable-thread-item";
 import { selectSetShowManageTagsDialog, useThreadListUIStore } from "./stores/thread-list-ui-store";
+import { isThreadLocked } from "./thread-lock";
+import ThreadOptionsMenu from "./thread-options-menu";
 import ThreadStatusIcon, { NEEDS_YOU_TEXT_CLASS } from "./thread-status-icon";
 import type { BranchNode, LoadingStates } from "./types";
 
@@ -122,6 +127,7 @@ const ThreadNodeChildren: FC<{
     handleUnpinThread: (threadId: string) => void;
     isKeyboardNavigating: boolean;
     isSelectionMode: boolean;
+    keyboardThreadId?: string;
     loadingStates: LoadingStates;
     nodes: BranchNode[];
     searchQuery: string;
@@ -141,6 +147,7 @@ const ThreadNodeChildren: FC<{
     handleUnpinThread,
     isKeyboardNavigating,
     isSelectionMode,
+    keyboardThreadId,
     loadingStates,
     nodes: children,
     searchQuery,
@@ -163,10 +170,11 @@ const ThreadNodeChildren: FC<{
                 handleUnpinThread={handleUnpinThread}
                 index={childIndex}
                 isKeyboardNavigating={isKeyboardNavigating}
-                isKeyboardSelected={false}
+                isKeyboardSelected={child.threadId === keyboardThreadId}
                 isSelected={selectedThreadIds.has(child.threadId)}
                 isSelectionMode={isSelectionMode}
                 key={child.threadId}
+                keyboardThreadId={keyboardThreadId}
                 loadingStates={loadingStates}
                 node={child}
                 searchQuery={searchQuery}
@@ -193,6 +201,7 @@ interface ThreadNodeProperties {
     isKeyboardSelected?: boolean;
     isSelected: boolean;
     isSelectionMode: boolean;
+    keyboardThreadId?: string;
     loadingStates: LoadingStates;
     node: BranchNode;
     searchQuery: string;
@@ -215,6 +224,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     isKeyboardSelected,
     isSelected,
     isSelectionMode,
+    keyboardThreadId,
     loadingStates,
     node,
     searchQuery,
@@ -245,7 +255,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
             },
         }),
     );
-    const isLocked = node.lockedAt !== undefined && node.lockedAt !== null;
+    const isLocked = isThreadLocked(node.lockedAt);
     const unlockProof = useUnlockProof(node.threadId);
     const isUnlocked = isLocked && unlockProof !== undefined;
     // A locked chat shows no title: the list never has one for it.
@@ -259,6 +269,12 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
         setCanOpenWindow(supportsThreadWindows());
     }, []);
     const setShowManageTagsDialog = useThreadListUIStore(selectSetShowManageTagsDialog);
+    const isOptionsMenuOpen = useThreadListUIStore((state) => state.optionsMenuThreadId === node.threadId);
+    const setOptionsMenuThreadId = useThreadListUIStore((state) => state.setOptionsMenuThreadId);
+    const setRenameThreadId = useThreadListUIStore((state) => state.setRenameThreadId);
+    // The menu has a copy in the row (screens without hover) and one in the hover strip; only the copy this screen shows may open, so
+    // opening it (by click or the context-menu key) never puts two menus on the page.
+    const canHover = useCanHover();
     const isTransitioningRef = useRef(false);
 
     const urlThreadId = location.pathname.match(CHAT_THREAD_PATH_RE)?.[1];
@@ -280,6 +296,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     // Check thread status directly from Lunora - "running" means actively streaming, "error" means failed
     const isStreaming = node.status === "running";
     // Owner-only fields: absent on a thread shared with the caller, so none of the states below can show there.
+    const linkedPullRequests = usePullRequestCount(node.threadId);
     const needsYou = isStreaming ? undefined : node.awaitingInput;
     const isFailed = node.status === "error" && needsYou === undefined;
     const isUnread = hasUnreadReply(node, { isOpen: isActive, isStreaming });
@@ -528,6 +545,15 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             {needsYou !== undefined && (
                                 <span className={cn("shrink-0 text-xs", NEEDS_YOU_TEXT_CLASS)}>{needsYou === "approval" ? t`Approval` : t`Question`}</span>
                             )}
+                            {linkedPullRequests > 0 && (
+                                <span
+                                    aria-label={t`Linked pull requests: ${linkedPullRequests}`}
+                                    className="text-muted-foreground inline-flex shrink-0 items-center gap-0.5 text-xs"
+                                >
+                                    <GitPullRequestArrow aria-hidden className="size-3" />
+                                    {linkedPullRequests}
+                                </span>
+                            )}
                         </span>
                     }
                 />
@@ -607,6 +633,18 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 </Tooltip>
             )}
 
+            {/* A touch screen has no hover to reveal the action strip: the options menu shows there by itself, in the row's flow, so it
+                takes room from the title instead of covering it, and the rest of the strip stays hidden. */}
+            <ThreadOptionsMenu
+                className="hidden [@media(hover:none)]:contents"
+                isHostRun={node.runner === "host"}
+                isLocked={isLocked}
+                label={displayTitle}
+                onOpenChange={(open) => setOptionsMenuThreadId(open ? node.threadId : null)}
+                onRename={() => setRenameThreadId(node.threadId)}
+                open={isOptionsMenuOpen && !canHover}
+                threadId={node.threadId}
+            />
             <div className="bg-accent-foreground/80 absolute right-0 flex items-center gap-1 rounded-l-lg opacity-0 transition-opacity group-hover/action-item:opacity-100 focus-within:opacity-100">
                 {node.status !== "archived" && (
                     <Tooltip>
@@ -846,6 +884,16 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         </DropdownMenuContent>
                     </DropdownMenu>
                 )}
+                <ThreadOptionsMenu
+                    className="[@media(hover:none)]:hidden"
+                    isHostRun={node.runner === "host"}
+                    isLocked={isLocked}
+                    label={displayTitle}
+                    onOpenChange={(open) => setOptionsMenuThreadId(open ? node.threadId : null)}
+                    onRename={() => setRenameThreadId(node.threadId)}
+                    open={isOptionsMenuOpen && canHover}
+                    threadId={node.threadId}
+                />
                 <DropdownMenu>
                     <Tooltip>
                         <TooltipTrigger
@@ -1168,6 +1216,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     handleUnpinThread={handleUnpinThread}
                     isKeyboardNavigating={false}
                     isSelectionMode={isSelectionMode}
+                    keyboardThreadId={keyboardThreadId}
                     loadingStates={loadingStates}
                     nodes={node.children}
                     searchQuery={searchQuery}

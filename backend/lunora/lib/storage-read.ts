@@ -65,6 +65,26 @@ export const readStoredObject = async (storage: StorageReader | undefined, key: 
     return { bytes, contentType: object.httpMetadata?.contentType };
 };
 
+/**
+ * The stored object's size from the store's metadata, with its body cancelled unread, or `null` when the object is gone.
+ * For a file the answer names but does not read: its bytes are never loaded here.
+ */
+export const storedObjectSize = async (storage: StorageReader | undefined, key: string): Promise<number | null> => {
+    if (!storage) {
+        throw new LunoraError("INTERNAL", "Storage is not configured");
+    }
+
+    const object = await storage.download(key);
+
+    if (!object) {
+        return null;
+    }
+
+    await object.body?.cancel();
+
+    return object.size;
+};
+
 export const readStoredText = async (storage: StorageReader | undefined, key: string, options: { maxBytes: number }): Promise<string> => {
     const { bytes } = await readStoredObject(storage, key, options);
 

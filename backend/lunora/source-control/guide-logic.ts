@@ -10,6 +10,8 @@
  *
  * Pure: no host, no database, no model.
  */
+import { hasHiddenText, stripHiddenText } from "@neore/ai/utils";
+
 import type { PullRequestFile } from "./types";
 
 export type GuideFile = Pick<PullRequestFile, "additions" | "deletions" | "patch" | "path" | "previousPath" | "status">;
@@ -80,6 +82,8 @@ export const MAX_PROPOSALS = 20;
 export const MAX_LABEL_PROPOSALS = 5;
 const MAX_TITLE = 200;
 const MAX_EXPLANATION = 2000;
+/** An answer's path, before it is decoded: a source path of up to 4,096 characters, and each character escapes to at most 10. */
+const MAX_ANSWER_PATH = 40_960;
 const MAX_SUMMARY = 2000;
 const MAX_COMMENT = 4000;
 const MAX_LABEL = 50;
@@ -182,6 +186,96 @@ const record = (value: unknown): Record<string, unknown> | null =>
 
 const text = (value: unknown, max: number): string => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
+/** Characters a path cannot show, by class: controls, format, private-use, surrogates, line separators and variation selectors. */
+const UNSHOWN_IN_PATH = /[\p{Cc}\p{Cf}\p{Co}\p{Cs}\p{Zl}\p{Zp}\u{FE00}-\u{FE0F}]/u;
+
+/**
+ * Whether the prompt's cleaner would remove this character, or the strict check flags it. Asked of each character on its
+ * own, so the escape set is at least the cleaner's: a character the cleaner could remove is always escaped first.
+ */
+const removedByCleaner = (char: string): boolean => hasHiddenText(char, { strict: true }) || stripHiddenText(char).removed > 0;
+
+/** Characters that need a look to be classed: anything outside printable ASCII, and the line breaks and tabs a patch keeps. */
+const NEEDS_LOOK = /[^\n\t\u{20}-\u{7E}]/u;
+/**
+ * A visible letter needs no look. An invisible letter (a Hangul filler is category Lo) is default-ignorable, so it is not
+ * taken for granted: it is checked like any other character.
+ */
+const VISIBLE_LETTER = /\p{L}/u;
+const DEFAULT_IGNORABLE = /\p{Default_Ignorable_Code_Point}/u;
+
+/**
+ * `text` with each hidden character written as an escape, so a reader sees that it is there. A backslash is doubled, so an
+ * escape already written in the source reads differently from the character it spells. Line breaks and tabs stay as they
+ * are, so a patch keeps its shape. A patch's text is evidence for the model: it is shown, not removed.
+ */
+/**
+ * One character as a patch shows it. A backslash is doubled only where it could read as an escape: before another backslash,
+ * before a `u`, or before a character that is itself written as one. Other backslashes (a regex's `\d`, a string's `\n`) read as written. `next` is
+ * the character after it.
+ */
+export const showHiddenChar = (char: string, next: string | undefined): string => {
+    if (char === BACKSLASH) {
+        return next === BACKSLASH || next === "u" || (next !== undefined && NEEDS_LOOK.test(next)) ? BACKSLASH + BACKSLASH : char;
+    }
+
+    if (!NEEDS_LOOK.test(char) || (VISIBLE_LETTER.test(char) && !DEFAULT_IGNORABLE.test(char))) {
+        return char;
+    }
+
+    return UNSHOWN_IN_PATH.test(char) || removedByCleaner(char) ? escapeChar(char) : char;
+};
+
+/** `value` with each character shown as `showHiddenChar` shows it. */
+export const showHiddenText = (value: string): string => {
+    const chars = [...value];
+
+    return chars.map((char, index) => showHiddenChar(char, chars[index + 1])).join("");
+};
+
+/** A character escaped as `\uXXXX`, or `\u{XXXXX}` past the BMP. */
+const escapeChar = (char: string): string => {
+    const hex = (char.codePointAt(0) ?? 0).toString(16).toUpperCase();
+
+    return hex.length > 4 ? String.raw`\u{${hex}}` : String.raw`\u${hex.padStart(4, "0")}`;
+};
+
+const BACKSLASH = "\\";
+
+/**
+ * A changed file's path as the prompt shows it, in a form that can be read back exactly. A literal backslash is doubled,
+ * and each character that cannot be shown, or that the prompt's cleaner would remove, is written as an escape. The cleaner
+ * therefore leaves the path unchanged, and the agent names the file in this same form.
+ */
+export const encodePath = (path: string): string =>
+    [...path]
+        .map((char) => {
+            if (char === BACKSLASH) {
+                return BACKSLASH + BACKSLASH;
+            }
+
+            return UNSHOWN_IN_PATH.test(char) || removedByCleaner(char) ? escapeChar(char) : char;
+        })
+        .join("");
+
+/** The escapes `encodePath` writes: a doubled backslash, `\uXXXX`, and `\u{X…}` past the BMP. */
+const ESCAPE_IN_PATH = /\\\\|\\u\{([\dA-Fa-f]{1,6})\}|\\u([\dA-Fa-f]{4})/gu;
+
+/**
+ * The real path an answer names, read back from `encodePath`'s form. Its inverse: `decodePath(encodePath(p)) === p` for
+ * every path, so two different files never read as one. A text that is not in that form is read as written.
+ */
+export const decodePath = (value: string): string =>
+    value.replaceAll(ESCAPE_IN_PATH, (match: string, braced: string | undefined, plain: string | undefined) => {
+        if (braced === undefined && plain === undefined) {
+            return BACKSLASH;
+        }
+
+        const code = Number.parseInt(braced ?? plain ?? "", 16);
+
+        return code <= 1_114_111 ? String.fromCodePoint(code) : match;
+    });
+
 const wholeLine = (value: unknown): number | null => (typeof value === "number" && Number.isSafeInteger(value) && value >= 1 ? value : null);
 
 const sideOf = (value: unknown): GuideSide | null => (value === "new" || value === "old" ? value : null);
@@ -247,7 +341,7 @@ const modelStopsOf = (value: unknown, byPath: Map<string, GuideFile>, lines: Map
 
         for (const entryNamed of named) {
             const fileEntry = record(entryNamed);
-            const path = text(fileEntry?.path, 1024);
+            const path = decodePath(text(fileEntry?.path, MAX_ANSWER_PATH));
             const known = byPath.get(path);
 
             // A path the pull request does not change, a mechanical file, or one the stop already names is not a place to read.
@@ -290,12 +384,13 @@ const proposalsOf = (value: unknown, byPath: Map<string, GuideFile>, lines: Map<
         const id = `proposal-${String(proposals.length + 1)}`;
 
         if (candidate?.kind === "comment") {
-            const path = text(candidate.path, 1024);
+            const path = decodePath(text(candidate.path, MAX_ANSWER_PATH));
+            const known = byPath.get(path);
             const body = text(candidate.body, MAX_COMMENT);
             const line = wholeLine(candidate.line);
             const side = sideOf(candidate.side);
 
-            if (!byPath.has(path) || body === "" || line === null || side === null) {
+            if (!known || body === "" || line === null || side === null) {
                 continue;
             }
 

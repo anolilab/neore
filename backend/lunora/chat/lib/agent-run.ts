@@ -25,6 +25,7 @@ import { lastRowOf, SUMMARY_IDLE_MS, SUMMARY_MIN_ORDER } from "../../agent/threa
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
+import { answerFilesMessage, filesTheModelReads, loadAskUserFiles, modelReads, withAnswerFiles } from "./ask-user-files";
 import { loadModelFilterRules } from "./model-filter-rules";
 import { backupCanServe, backupCapabilities, backupFilterRejection, eligibleBackupModel, supportsBackupFallback } from "./backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "./paid-model";
@@ -52,6 +53,7 @@ import {
 } from "./persist-stream";
 import { buildReasoningProviderOptions } from "./reasoning-options";
 import { ASK_USER_TOOL_NAME } from "../tools/ask-user-constants";
+import type { AskUserQuestionAnswer } from "../tools/ask-user-constants";
 import { REQUEST_SECRET_TOOL_NAME } from "../tools/request-secret-constants";
 import { collectApprovalRequestIds, collectAskUserApprovalIds } from "./tool-approval-claim";
 import type { SearchMode } from "./tool-builder";
@@ -461,6 +463,7 @@ export const loadRunContext = async (
         knowledgeSources: knowledgeContext?.sources ?? [],
         memoryEnabled: prefs.memoryEnabled,
         prefs: {
+            autoCompactThreshold: prefs.autoCompactThreshold,
             backupModel: prefs.backupModel,
             language: args.threadLanguage || prefs.language,
             location: prefs.location,
@@ -1051,6 +1054,10 @@ export const resumeApprovedRun = async (
     args: {
         /** An approved `askUser` call's answer, or a saved `requestSecret`'s reference: the resumed tool returns it as its result. */
         answer?: string;
+        /** Files an `askUser` answer carries, read as the owner for this one call (`lib/ask-user-files.ts`). */
+        answerFileIds?: string[];
+        /** The answers to a multi-question `askUser` call, one per question: the resumed tool returns them as its result. */
+        answers?: AskUserQuestionAnswer[];
         approvalId: string;
         approved: boolean;
         config: ToolRunConfig;
@@ -1074,7 +1081,7 @@ export const resumeApprovedRun = async (
         steerable?: boolean;
     } = {},
 ): Promise<{ awaitingInput?: AwaitingInput; lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
-    const { answer, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
+    const { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { customProvider } = await resolveRunModel(ctx, config.model, userId);
     const [toolResult, userProviderKeys, preferences] = await Promise.all([
         buildAgentTools(ctx, {
@@ -1099,6 +1106,9 @@ export const resumeApprovedRun = async (
     // Set once the continuation has a result: a run that fails after it still leaves the record of its auto-approved calls.
     let started: { savedMessages?: SavedToolCallStamp["savedMessages"] } | undefined;
 
+    // The answered files the model reads, on every step of the continuation (`answerFilesMessage`); never saved.
+    let answerFiles: ReturnType<typeof answerFilesMessage>;
+
     try {
         // Checked against our own state rather than inferred from the agent
         // library's error text: the request must still be the open one on the
@@ -1116,14 +1126,26 @@ export const resumeApprovedRun = async (
         // An answered question: the approved call executes a copy of the tool
         // that returns the answer, so the answer is the call's tool result.
         if (approved && pending.toolName === ASK_USER_TOOL_NAME) {
-            if (answer === undefined) {
+            if (answer === undefined && answers === undefined) {
                 throw new AgentRunError("stale-approval", "A question can only be resumed with an answer");
             }
 
             // Loaded here, not at the top: the tool module pulls in the agent client.
             const { createAnsweredAskUserTool } = await import("../tools/ask-user");
+            const definition = MODEL_LOOKUP.get(config.model);
+            const capabilities = definition ? backupCapabilities(definition) : undefined;
+            // Read only what the model can take: a file it cannot read is named in the answer, but costs no bytes or budget.
+            const loaded = answerFileIds?.length
+                ? await loadAskUserFiles(ctx, { fileIds: answerFileIds, threadId, userId }, (mediaType) => modelReads(capabilities, mediaType))
+                : [];
+            const readableFiles = filesTheModelReads(loaded, capabilities);
 
-            toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(answer) as (typeof toolResult.tools)[string];
+            toolResult.tools[ASK_USER_TOOL_NAME] = createAnsweredAskUserTool(
+                answers ?? (answer as string),
+                loaded,
+                readableFiles,
+            ) as (typeof toolResult.tools)[string];
+            answerFiles = answerFilesMessage(readableFiles);
         }
 
         // An answered secret request: the call's result is the stored value's reference, never the value.
@@ -1181,6 +1203,21 @@ export const resumeApprovedRun = async (
 
         streamTextArgs.abortSignal = stopping.signal;
         streamTextArgs.stopWhen = stopWhenStopped(ctx, streamId, getMaxSteps(config.shouldAutoContinue));
+
+        if (answerFiles) {
+            // Every step of the continuation reads the files, so a tool call inside it does not cost the model the
+            // images. The saved history never holds them: this shapes only the model's input.
+            const compressStep = streamTextArgs.prepareStep as ((options: unknown) => unknown) | undefined;
+            const attached = answerFiles;
+
+            streamTextArgs.prepareStep = async (step: { messages: ReadonlyArray<unknown> }) => {
+                // Sized with the files in it: the step's context check counts what the model is sent.
+                const sized = withAnswerFiles(step.messages, attached);
+                const adjusted = (await compressStep?.({ ...step, messages: sized })) as { messages?: ReadonlyArray<unknown> } | undefined;
+
+                return { ...adjusted, messages: adjusted?.messages ?? sized };
+            };
+        }
 
         await options.beforeStream?.();
 

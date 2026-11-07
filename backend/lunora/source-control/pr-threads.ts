@@ -18,19 +18,25 @@ import { addMessagesHandler } from "../agent/messages";
 import { insertThread } from "../agent/table-writes";
 import { isValidBranchName } from "../coding-agents/commands";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { GITHUB_WEB_ORIGIN, splitGithubRepo } from "./drivers/github";
 
 /** Threads kept per pull request: a list, not a history. The newest are the ones anyone is working in. */
-const MAX_THREADS_PER_PULL_REQUEST = 50;
+export const MAX_THREADS_PER_PULL_REQUEST = 50;
+/**
+ * Link rows read for one pull request. Above the live cap: links to deleted threads stay as rows, and they must not fill the
+ * read and hide a link that was just made.
+ */
+const MAX_LINKS_READ_PER_PULL_REQUEST = 200;
 
 const MAX_TITLE_CHARS = 200;
 
-const vPullRequestThread = v.object({
+export const vPullRequestThread = v.object({
     baseBranch: v.optional(v.string()),
     createdAt: v.number(),
     headBranch: v.optional(v.string()),
-    kind: v.union(v.literal("attached"), v.literal("opened")),
+    kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
     number: v.number(),
     repository: v.string(),
     threadId: v.string(),
@@ -40,8 +46,20 @@ const vPullRequestThread = v.object({
 
 type PullRequestThread = Doc<"pullRequestThreads">;
 
+/**
+ * The title a link shows: the chat's current one, and none of it while the chat is locked, whatever the row stored.
+ * Without the thread read, the stored title.
+ */
+export const shownTitle = (row: PullRequestThread, thread: Pick<Doc<"threads">, "lockedAt" | "title"> | null | undefined): string => {
+    if (!thread) {
+        return row.title;
+    }
+
+    return isThreadLocked(thread) ? LOCKED_THREAD_TITLE : (thread.title ?? row.title);
+};
+
 /** The row as the client reads it. Never the owner column: it is the caller's own by construction. */
-const toOutput = (row: PullRequestThread) => {
+export const toOutput = (row: PullRequestThread, thread?: Pick<Doc<"threads">, "lockedAt" | "title"> | null) => {
     return {
         ...(row.baseBranch !== undefined && { baseBranch: row.baseBranch }),
         createdAt: row.createdAt,
@@ -50,13 +68,13 @@ const toOutput = (row: PullRequestThread) => {
         number: row.number,
         repository: row.repository,
         threadId: row.threadId,
-        title: row.title,
+        title: shownTitle(row, thread),
         url: row.url,
     };
 };
 
 /** An address the host's own rules accept: `owner/name` and a whole number from 1. */
-const requireAddress = (repo: string, number: number): { number: number; repository: string } => {
+export const requireAddress = (repo: string, number: number): { number: number; repository: string } => {
     if (!splitGithubRepo(repo)) {
         throw new LunoraError("BAD_REQUEST", "Not a repository address this host serves");
     }
@@ -82,26 +100,35 @@ const requireBranch = (branch: string | undefined): string | undefined => {
 };
 
 /** The pull request's page on the host: built from the host's origin, never taken from a client. */
-const pullRequestUrl = (repo: string, number: number): string => `${GITHUB_WEB_ORIGIN}/${repo}/pull/${String(number)}`;
+export const pullRequestUrl = (repo: string, number: number): string => `${GITHUB_WEB_ORIGIN}/${repo}/pull/${String(number)}`;
 
-const linksFor = async (ctx: QueryCtx | MutationCtx, userId: string, repo: string, number: number): Promise<PullRequestThread[]> =>
+export const linksFor = async (ctx: QueryCtx | MutationCtx, userId: string, repo: string, number: number): Promise<PullRequestThread[]> =>
     await ctx.db
         .query("pullRequestThreads")
         .withIndex("by_user_and_repository_number", (q) => q.eq("userId", userId).eq("repository", repo).eq("number", number))
-        .take(MAX_THREADS_PER_PULL_REQUEST);
+        .take(MAX_LINKS_READ_PER_PULL_REQUEST);
 
 /** The links whose thread is still there and not deleted; a link to one that is not is dead. */
-const partitionLinks = async (ctx: QueryCtx | MutationCtx, rows: PullRequestThread[]): Promise<{ dead: PullRequestThread[]; live: PullRequestThread[] }> => {
+export const partitionLinks = async (
+    ctx: QueryCtx | MutationCtx,
+    rows: PullRequestThread[],
+): Promise<{ dead: PullRequestThread[]; live: PullRequestThread[]; threads: ReadonlyMap<string, Doc<"threads"> | null> }> => {
     const dead: PullRequestThread[] = [];
     const live: PullRequestThread[] = [];
+    // Several links can sit on one thread: read each thread once per call.
+    const threads = new Map<string, Doc<"threads"> | null>();
 
     for (const row of rows) {
-        const thread = await ctx.db.get("threads", row.threadId);
+        if (!threads.has(row.threadId)) {
+            threads.set(row.threadId, await ctx.db.get("threads", row.threadId));
+        }
+
+        const thread = threads.get(row.threadId);
 
         (thread && thread.deleted !== true ? live : dead).push(row);
     }
 
-    return { dead, live };
+    return { dead, live, threads };
 };
 
 /**
@@ -133,6 +160,8 @@ export const startWorkOnPullRequest = authMutation
         }
 
         if (attached) {
+            ctx.log.event("source_control.start_work_on_pull_request", { clearedDeadLinks: deadAttached.length, created: false });
+
             return { created: false, threadId: attached.threadId };
         }
 
@@ -184,6 +213,8 @@ export const startWorkOnPullRequest = authMutation
             userId,
         });
 
+        ctx.log.event("source_control.start_work_on_pull_request", { clearedDeadLinks: deadAttached.length, created: true });
+
         return { created: true, threadId };
     });
 
@@ -193,10 +224,12 @@ export const listForPullRequest = authQuery
     .output(v.array(vPullRequestThread))
     .query(async ({ args, ctx }) => {
         const address = requireAddress(args.repository, args.number);
-        const { live: rows } = await partitionLinks(ctx, await linksFor(ctx, ctx.user.userId, address.repository, address.number));
+        const { live: rows, threads } = await partitionLinks(ctx, await linksFor(ctx, ctx.user.userId, address.repository, address.number));
 
         // Newest first; the id breaks a tie so two rows saved in the same millisecond still read in one order.
-        return rows.toSorted((left, right) => right.createdAt - left.createdAt || right._id.localeCompare(left._id)).map((row) => toOutput(row));
+        return rows
+            .toSorted((left, right) => right.createdAt - left.createdAt || right._id.localeCompare(left._id))
+            .map((row) => toOutput(row, threads.get(row.threadId)));
     });
 
 /** The pull request one thread was attached to or opened, or `null` for a thread that has none. */
@@ -215,9 +248,9 @@ export const getForThread = authQuery
             return null;
         }
 
-        const { live } = await partitionLinks(ctx, [row]);
+        const { live, threads } = await partitionLinks(ctx, [row]);
 
-        return live.length === 0 ? null : toOutput(row);
+        return live.length === 0 ? null : toOutput(row, threads.get(row.threadId));
     });
 
 /** `https://<host>/<owner>/<name>/pull/<number>`, and nothing else. */
@@ -273,7 +306,10 @@ export const recordOpenedPullRequest = internalMutation
             number: address.number,
             repository: address.repository,
             threadId: args.threadId as Id<"threads">,
-            title: thread.title ?? `${address.repository}#${String(address.number)}`,
+            // A locked chat's title is its content: the row keeps the address instead, and a read shows the live title.
+            title: isThreadLocked(thread)
+                ? `${address.repository}#${String(address.number)}`
+                : (thread.title ?? `${address.repository}#${String(address.number)}`),
             url: pullRequestUrl(address.repository, address.number),
             userId: args.userId,
         });

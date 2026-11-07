@@ -14,7 +14,7 @@ export const VARIABLE_REGEX = /\{\{([a-z_][\w.]*)\}\}/gi;
 /**
  * Reserved skill slugs that cannot be used by users
  */
-export const RESERVED_SLUGS = ["anthropic", "claude", "neore", "system", "admin"];
+export const RESERVED_SLUGS = ["anthropic", "claude", "compact", "neore", "system", "admin"];
 
 /**
  * File size limits in bytes

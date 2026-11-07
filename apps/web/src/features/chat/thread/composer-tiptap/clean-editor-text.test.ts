@@ -35,12 +35,15 @@ describe(cleanEditorText, () => {
         expect(editor.getText({ blockSeparator: "\n" })).toBe("hi there\nx");
     });
 
-    it("keeps a joiner at the end of a block, where the next letter will follow it", () => {
-        const editor = editorWith("<p>\u{645}\u{6CC}\u{200C}</p>");
+    it("keeps a ZWJ at the end of a block, where the next emoji will follow it, and strips a ZWNJ there", () => {
+        const emoji = editorWith("<p>\u{1F469}\u{200D}</p>");
+        const persian = editorWith("<p>\u{645}\u{6CC}\u{200C}</p>");
 
-        cleanEditorText(editor);
+        cleanEditorText(emoji);
+        cleanEditorText(persian);
 
-        expect(editor.getText()).toBe("\u{645}\u{6CC}\u{200C}");
+        expect(emoji.getText()).toBe("\u{1F469}\u{200D}");
+        expect(persian.getText()).toBe("\u{645}\u{6CC}");
     });
 
     it("agrees with the store on a joiner that ends an earlier paragraph, and counts it once", () => {

@@ -7,7 +7,18 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { claimKey, claimKeyFenced, claimOnce, completeKey, holdClaim, purgeExpiredClaims, reapLapsedClaims, releaseKey } from "./claim-once";
+import {
+    claimKey,
+    claimKeyFenced,
+    claimOnce,
+    completeKey,
+    holdClaim,
+    holdKey,
+    holdTtlFrom,
+    purgeExpiredClaims,
+    reapLapsedClaims,
+    releaseKey,
+} from "./claim-once";
 
 const NOW = 1_800_000_000_000;
 const TTL = 60_000;
@@ -223,5 +234,43 @@ describe("purgeExpiredClaims", () => {
         const remaining = await rows();
 
         expect(remaining.map((row) => row.key)).toStrictEqual(["fresh"]);
+    });
+});
+
+describe("holdKey", () => {
+    // What a run calls when it is admitted: its own fenced claim is stretched, and a key another request took is left to it.
+    it("stretches the claim its claimedAt names, and refuses a fence that is not the key's claim", async () => {
+        const claimedAt = (await mutate(claimKeyFenced, { key: "t", scope: "rt", ttlMs: TTL })) as number;
+
+        await expect(mutate(holdKey, { claimedAt, key: "t", scope: "rt", ttlMs: TTL * 10 })).resolves.toBe(true);
+        vi.setSystemTime(NOW + TTL * 5);
+        await expect(claim("t", { scope: "rt" })).resolves.toBe(false);
+
+        await expect(mutate(holdKey, { claimedAt: claimedAt + 1, key: "t", scope: "rt", ttlMs: TTL })).resolves.toBe(false);
+    });
+});
+
+describe("holdTtlFrom", () => {
+    it("holds a late-starting run's claim for a full run from its start, not from the request", async () => {
+        const claimedAt = (await mutate(claimKeyFenced, { key: "run", scope: "rt", ttlMs: TTL })) as number;
+
+        // The request's short claim lapsed long before the job started.
+        vi.setSystemTime(NOW + TTL * 20);
+        await expect(mutate(holdKey, { claimedAt, key: "run", scope: "rt", ttlMs: holdTtlFrom(claimedAt, TTL * 10) })).resolves.toBe(true);
+
+        // Still inside a full run from the start: another request is refused.
+        vi.setSystemTime(NOW + TTL * 25);
+        await expect(claim("run", { scope: "rt" })).resolves.toBe(false);
+    });
+
+    it("lapses inside the run when counted from the request instead, which is why the start is used", async () => {
+        const claimedAt = (await mutate(claimKeyFenced, { key: "late", scope: "rt", ttlMs: TTL })) as number;
+
+        vi.setSystemTime(NOW + TTL * 20);
+        await expect(mutate(holdKey, { claimedAt, key: "late", scope: "rt", ttlMs: TTL * 10 })).resolves.toBe(true);
+
+        // The hold ended at the request's clock (ten minutes from the request), so a second request takes the key mid-run.
+        vi.setSystemTime(NOW + TTL * 25);
+        await expect(claim("late", { scope: "rt" })).resolves.toBe(true);
     });
 });

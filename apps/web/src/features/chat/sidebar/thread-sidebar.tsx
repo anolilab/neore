@@ -288,7 +288,7 @@ const ThreadSidebar: FC<ThreadSidebarProps> = ({ threadId }) => {
     const activeRightSidebarTab = !isTextModel && (storedRightSidebarTab === ASIDE_TAB || storedRightSidebarTab === "pins") ? "summary" : storedRightSidebarTab;
 
     return (
-        <Sidebar className="py-1 [&>div]:rounded-l-xl" collapsible="offcanvas" name="right" side="right" variant="inset">
+        <Sidebar className="py-1 [&>div]:rounded-l-xl" collapsible="offcanvas" data-focus-area="panel" name="right" side="right" variant="inset">
             <SidebarResizeHandle />
             <SidebarContent className="overflow-hidden">
                 <Tabs className="flex min-h-0 flex-1 flex-col" onValueChange={setActiveRightSidebarTab} value={activeRightSidebarTab}>

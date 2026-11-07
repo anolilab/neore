@@ -34,7 +34,7 @@ The defaults match `pnpm dev`, so a local run needs nothing set.
 
 ## Run it locally
 
-Start the web app and backend first (`pnpm dev`; see the root `CLAUDE.md` for
+Start the web app and backend first (`pnpm dev`; see `docs/agents/local-dev.md` for
 the port map), then:
 
 ```bash

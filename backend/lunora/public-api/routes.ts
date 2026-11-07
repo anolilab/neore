@@ -21,7 +21,6 @@ import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { isHostRunThread } from "../acp/lib/host-thread";
-import { runChatStart } from "../chat/http";
 import { verifyStreamToken } from "../chat/streaming/persistent/stream-token";
 import { isSelectableTextModel } from "../skills/builder-logic";
 import { PublicApiError } from "./errors";
@@ -230,6 +229,7 @@ const startChat = async (input: RouteInput, request: { model?: string; prompt: s
         throw new PublicApiError("service_unavailable", "Chat is not configured on this deployment.");
     }
 
+    const { runChatStart } = await import("../chat/http");
     const response = await runChatStart(
         input.ctx,
         {
@@ -703,9 +703,9 @@ export const ROUTES: ReadonlyArray<RouteDefinition> = [
                 data: {
                     // Pages are fetched newest-first but `toUIMessages` returns each
                     // page oldest-first; sort so the whole list reads newest-first.
-                    // An agent-switch divider is a marker for the app's thread view, not a turn of the conversation.
+                    // An agent-switch or context-reset divider is a marker for the app's thread view, not a turn of the conversation.
                     data: page.page
-                        .filter((message) => message.parts.every((part) => part.type !== "data-agentSwitch"))
+                        .filter((message) => message.parts.every((part) => part.type !== "data-agentSwitch" && part.type !== "data-contextReset"))
                         .toSorted((a, b) => b.order - a.order || b.stepOrder - a.stepOrder)
                         .map((message) => {
                             return {

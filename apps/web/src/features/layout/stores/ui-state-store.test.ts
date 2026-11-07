@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultKeyboardShortcuts, mergeKeyboardShortcuts } from "./ui-state-store";
+import { defaultKeyboardShortcuts, mergeKeyboardShortcuts, useUIStateStore } from "./ui-state-store";
 
 describe("default keyboard shortcuts", () => {
     it("carry no binding that nothing registers", () => {
@@ -38,5 +38,21 @@ describe("find in thread shortcut", () => {
 
     it("fills every default for nothing saved", () => {
         expect(mergeKeyboardShortcuts(undefined)).toEqual(defaultKeyboardShortcuts);
+    });
+});
+
+describe("focus-area keys", () => {
+    it("clears a saved binding on F6 or Shift+F6, so it cannot run beside focus navigation", () => {
+        const merged = mergeKeyboardShortcuts({ help: "f6", newChat: "Shift+F6", newTemporaryChat: "ctrl+f6" });
+
+        expect(merged.help).toBe("");
+        expect(merged.newChat).toBe("");
+        expect(merged.newTemporaryChat).toBe("ctrl+f6");
+    });
+
+    it("refuses a binding on F6 when one is set in the store", () => {
+        useUIStateStore.getState().setKeyboardShortcuts({ help: "f6" });
+
+        expect(useUIStateStore.getState().keyboardShortcuts.help).toBe("");
     });
 });

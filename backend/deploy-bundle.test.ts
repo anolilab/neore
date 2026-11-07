@@ -50,7 +50,7 @@ const workerCalls = (() => {
 describe("deployed Worker bundles", () => {
     it("finds every bundled Worker in alchemy.run.ts", () => {
         expect(new Set(workerCalls.map(({ name }) => name))).toStrictEqual(
-            new Set(["browser-renderer", "document-parser", "llm-gateway", "neore-backend", "nsfw-checker", "website"]),
+            new Set(["advisor-companion", "browser-renderer", "document-parser", "llm-gateway", "neore-backend", "nsfw-checker", "website"]),
         );
     });
 

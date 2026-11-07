@@ -20,6 +20,7 @@ import type { HostChanges } from "../acp/lib/changes";
 import { readHostChanges, withoutHostChanges } from "../acp/lib/changes";
 import { omit, pick } from "../lib/collections";
 import { agentSwitchForWire, agentSwitchOf } from "./agent-switch-logic";
+import { contextResetOf } from "./context-reset-shape";
 import type { MessageBranch } from "./branch-tree";
 import { fromModelMessage, toModelMessage, toUIFilePart } from "./mapping";
 import { type MessageCost, type StepUsage, sumMessageCosts, sumStepUsage } from "./message-cost";
@@ -322,9 +323,21 @@ const createSystemUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataType
     // An agent switch is a system row whose part is the divider, not text (`agent-switch-logic.ts`).
     const agentSwitch = agentSwitchOf(message);
     // The handoff is transcript text for the next model, not for the divider, and a coding agent's ids are not a reader's: neither goes on the wire.
-    const parts = agentSwitch
-        ? ([{ data: agentSwitchForWire(agentSwitch), id: message._id, type: "data-agentSwitch" }] as unknown as UIMessage<METADATA, DATA_PARTS, TOOLS>["parts"])
-        : [{ text, type: "text", ...partCommon } satisfies TextUIPart];
+    // So is a context reset a task run leaves before a run that starts from a clean context (`context-reset-shape.ts`).
+    const contextReset = agentSwitch ? undefined : contextResetOf(message);
+    let parts: UIMessage<METADATA, DATA_PARTS, TOOLS>["parts"];
+
+    if (agentSwitch) {
+        parts = [{ data: agentSwitchForWire(agentSwitch), id: message._id, type: "data-agentSwitch" }] as unknown as UIMessage<
+            METADATA,
+            DATA_PARTS,
+            TOOLS
+        >["parts"];
+    } else if (contextReset) {
+        parts = [{ data: contextReset, id: message._id, type: "data-contextReset" }] as unknown as UIMessage<METADATA, DATA_PARTS, TOOLS>["parts"];
+    } else {
+        parts = [{ text, type: "text", ...partCommon } satisfies TextUIPart];
+    }
 
     return {
         _creationTime: message.createdAt ?? message._creationTime,

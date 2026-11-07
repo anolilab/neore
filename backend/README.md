@@ -98,15 +98,14 @@ With `vis`, target the project by its `package.json` name:
 
 ## Where the rules are
 
-The invariants live in the root `CLAUDE.md`; read the section before touching
-the area instead of duplicating it here:
+The invariants live in `AGENTS.md` here and in the `AGENTS.md` of each feature folder under
+`lunora/` (the root `AGENTS.md` lists them all); read the file before touching the area instead
+of duplicating it here:
 
-- "LUNORA": codegen, validators (`v` vs zod), modules and table ownership,
-  advisories.
-- "RUNTIME LESSONS (D1 vs DO)": `.global()` readers, sharding and scheduler
-  lanes, the jobs queue, crons, auth, row-level security.
-- "SUBSYSTEMS": services over bindings, edge streaming, storage access,
-  device execution, the public API and everything else per feature.
-- "INVITE-ONLY REGISTRATION" and "Build and deploy".
+- `AGENTS.md`: services over bindings, codegen, validators (`v` vs zod), modules and table
+  ownership, `.global()` readers, sharding and scheduler lanes, the jobs queue, crons.
+- `lunora/auth/AGENTS.md`: invite-only registration, auth, row-level security.
+- `lunora/<feature>/AGENTS.md`: edge streaming, storage access, the public API and the rest, per feature.
+- `../docs/agents/lunora-upstream.md` (advisories) and `../docs/agents/build-and-deploy.md`.
 
 Plans: `per-user-sharding.md`, `backend-split.md`.

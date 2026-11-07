@@ -3,6 +3,7 @@ import { skipToken, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
+import { titleOnScreen, useTitleSaveRevision } from "@/features/chat/core/lib/thread-title-saves";
 import { useOptimisticDeletions, useOptimisticPins, useOptimisticStatuses } from "@/features/chat/core/stores/thread-store-hooks";
 import { matchesThreadFilters, pruneSelectedTagIds, resolveThreadTags } from "@/features/chat/tags/thread-tag-logic";
 import { useProjectList } from "@/features/projects/hooks/use-projects";
@@ -89,6 +90,8 @@ const useThreadGroups = (
 
     // Tag filter, with ids of since-deleted tags ignored so they cannot hide everything.
     const rawSelectedTagIds = useThreadListUIStore(selectSelectedTagIds);
+    // Re-derives the rows on every save that begins or settles: their titles come from the save coordinator.
+    const titleRevision = useTitleSaveRevision();
     const selectedTagIds = useMemo(() => pruneSelectedTagIds(rawSelectedTagIds, compositeData?.tags), [rawSelectedTagIds, compositeData?.tags]);
 
     const { isAnswered: projectsAnswered, projects } = useProjectList();
@@ -209,6 +212,8 @@ const useThreadGroups = (
                 .filter((node): node is BranchNode => node !== null);
 
             // Apply optimistic state overrides (instant UI updates)
+            // The title the header shows too (`titleOnScreen`): the save coordinator, which the metadata store is written with.
+            const screenTitle = titleOnScreen(thread._id, thread.title);
             const optimisticPin = optimisticPins.get(threadId);
             const optimisticStatus = optimisticStatuses.get(threadId);
 
@@ -229,14 +234,16 @@ const useThreadGroups = (
                 order: threadOrderMap.get(threadId),
                 projectId: thread.projectId,
                 relevantMessages: thread.relevantMessages,
+                runner: thread.runner,
                 snoozedUntil: thread.snoozedUntil,
                 source: thread.source,
                 statelessMode: thread.statelessMode,
                 status: optimisticStatus === undefined ? thread.status || "active" : optimisticStatus,
+                storedTitle: screenTitle ?? "",
                 tagIds: thread.tagIds,
                 tags: resolveThreadTags(thread.tagIds, userTags),
                 threadId: thread._id,
-                title: thread.title || t`New Chat`,
+                title: screenTitle || t`New Chat`,
                 updatedAt: thread.updatedAt,
             };
         };
@@ -285,7 +292,7 @@ const useThreadGroups = (
             statelessThreads,
             temporaryThreadsList: filteredTemporaryThreadsList,
         };
-    }, [lookupMaps, optimisticPins, optimisticStatuses, optimisticDeletions, selectedCategory, selectedTagIds, compositeData?.tags, t]);
+    }, [lookupMaps, optimisticPins, optimisticStatuses, optimisticDeletions, selectedCategory, selectedTagIds, compositeData?.tags, titleRevision, t]);
 
     // --- Stage 3: Sort callback for search results (stable reference) ---
     const sortThreadsByPriority = useCallback(

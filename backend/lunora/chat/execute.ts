@@ -14,12 +14,14 @@
  * continuation into `persistentChunks` exactly like the original run. What the
  * two share lives in `lib/agent-run.ts`.
  */
-import { estimateTokensFromCharacters, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
+import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
+import { estimateTokensFromCharacters, hasActiveFilters, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { internalAction } from "../_generated/server";
+import { autoCompactBeforeReply } from "../agent/thread-compaction";
 import { streamLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
 import { findSkillCommand, parseSkillCommand, resolveReasoningEffort, resolveSkillModel } from "../skills/slash-command";
@@ -50,22 +52,26 @@ import {
     stampSavedToolCalls,
 } from "./lib/agent-run";
 import { buildAgentTools } from "./lib/agent-tools";
-import { getMaxSteps } from "./lib/auto-continue";
+import { chargeCompactionCall } from "./lib/compaction-quota";
+import { getMaxSteps, getModelContextWindow } from "./lib/auto-continue";
 import { RUN_BEAT_MS } from "./lib/interrupted-run";
 import { createToolRunMarker } from "./lib/mark-tool-runs";
 import { isRunReplaced } from "./lib/run-epoch";
 import { gatewayFetch } from "../lib/services";
 import getAgent from "./lib/get-agent";
-import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
+import { loadModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
+import { defaultModelUnderRules, readsImagesAndCallsTools } from "../lib/utility-model";
 import { injectsSkillText } from "./lib/low-risk-approval";
 import { closeMCPClientsThenSettle } from "./lib/mcp-tools";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
+import { MAX_LENGTH } from "../lib/validators";
 import { resolveAutoModel, shouldRouteAuto } from "./lib/auto-model";
 import classifyQuery from "./lib/query-classifier";
 import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
 import { getToolsForModelAndMode, type SearchMode } from "./lib/tool-builder";
 import { getAgentForUser } from "./lib/thread-helpers";
 import { vToolRunConfig } from "./lib/tool-run-config";
+import { vAskUserAnswers } from "./tools/ask-user-validators";
 import { pauseOnRateLimit } from "./lib/pause-run";
 import { scheduleRepliesUsage } from "./lib/pause-usage";
 import { runStreamingAgentFields } from "./lib/streaming-run-args";
@@ -316,6 +322,8 @@ export const runStreamingAgent = internalAction
                     ? requestedModel
                     : resolveSkillModel(requestedModel, invokedSkill?.config?.preferredModel, (id) => MODEL_LOOKUP.get(id), isAnonymous === true);
 
+                // The model before Auto picks one: a route is always made from it, so a second route starts from the same place.
+                const preRouteModel = model;
                 // "Auto": this send runs on the one model the gateway's routing picks, named like any other pick below. A bot's or a
                 // skill's model stands, and so does a switched thread's agent (`shouldRouteAuto`). A resume continues a reply that
                 // already has a model: the one recorded in its job arguments below.
@@ -325,24 +333,29 @@ export const runStreamingAgent = internalAction
 
                 // A goal runs on the model it starts with, every round: its continuation rounds are machine-written and read the
                 // goal's saved model, so routing its first round alone would leave the later rounds on another model.
-                if (
-                    resume === undefined &&
-                    goalSkill === undefined &&
-                    sseMessages?.[0]?.agentName !== GOAL_CONTINUATION_AGENT &&
-                    shouldRouteAuto({
-                        currentModel: model,
-                        isAnonymous: isAnonymous === true,
-                        pinnedByBotOrSkill: liveBot !== null || Boolean(invokedSkill?.config?.preferredModel),
-                        prompt,
-                        requestedModel,
-                        thread,
-                        userId,
-                    })
-                ) {
+                const routeAuto = async (): Promise<void> => {
+                    const routes =
+                        resume === undefined &&
+                        goalSkill === undefined &&
+                        sseMessages?.[0]?.agentName !== GOAL_CONTINUATION_AGENT &&
+                        shouldRouteAuto({
+                            currentModel: preRouteModel,
+                            isAnonymous: isAnonymous === true,
+                            pinnedByBotOrSkill: liveBot !== null || Boolean(invokedSkill?.config?.preferredModel),
+                            prompt,
+                            requestedModel,
+                            thread,
+                            userId,
+                        });
+
+                    if (!routes) {
+                        return;
+                    }
+
                     // The route is sized for what the model will receive: the history, the instructions it is given (the agent's
                     // own, the loaded context and the skill's), and the built-in tools. MCP tools are added later and not counted.
                     const fallbackTools = getToolsForModelAndMode(
-                        model,
+                        preRouteModel,
                         "chat",
                         invokedSkill?.config
                             ? { additionalTools: invokedSkill.config.additionalTools, disabledTools: invokedSkill.config.disabledTools }
@@ -359,7 +372,7 @@ export const runStreamingAgent = internalAction
                                     threadId: threadId as Id<"threads">,
                                 }),
                                 runContextPromise,
-                                getAgentForUser(ctx, userId, model, thread?.language),
+                                getAgentForUser(ctx, userId, preRouteModel, thread?.language),
                             ]);
                             const systemCharacters =
                                 (fallbackAgent.options.instructions ?? "").length +
@@ -373,7 +386,7 @@ export const runStreamingAgent = internalAction
                             };
                         },
                         // The thread's own model is the fallback: a send that names another model must not run on it.
-                        fallbackModel: thread?.model ?? model,
+                        fallbackModel: thread?.model ?? preRouteModel,
                         filterRules: agentModulePrefs.modelFilterRules ?? undefined,
                         plan: async () => {
                             autoPlan = await readRunPlan(ctx, userId, organizationId);
@@ -386,6 +399,39 @@ export const runStreamingAgent = internalAction
                         userId,
                     });
                     model = routedModel;
+                };
+
+                // The route is chosen before compaction, so the auto-compact threshold is measured against the window of the
+                // model the reply will run on. A compaction that changes the context sends the route through again.
+                await routeAuto();
+
+                // Auto-compact (`agent/thread-compaction.ts`): a context past the owner's threshold is compacted before
+                // this reply reads it, measured against the window of the model the route picked. A resumed run continues a
+                // reply that already read its context.
+                if (resume === undefined && !statelessMode) {
+                    const compacted = await autoCompactBeforeReply(ctx, {
+                        anchorMessageId: messageId as Id<"messages">,
+                        // Charged like a manual `/compact` before its first summarising call; a refusal leaves the reply uncompacted.
+                        beforeFirstCall: async () => {
+                            // The run's plan, organization included: the user's own plan alone would charge an organization's member to the free bucket.
+                            const [flags, runPlan] = await Promise.all([
+                                ctx.runQuery(internal.auth.functions.getUserAuthFlagsQuery, { userId }),
+                                readRunPlan(ctx, userId, organizationId),
+                            ]);
+
+                            await chargeCompactionCall(ctx, { _id: userId, isAnonymous: flags.isAnonymous, plan: runPlan.plan, role: flags.role });
+                        },
+                        contextWindow: getModelContextWindow(model),
+                        // Stop and a newer run both end it, so the reply does not wait on a compaction nobody reads.
+                        signal: stopping.signal,
+                        threadId: threadId as Id<"threads">,
+                        thresholdPercent: agentModulePrefs.autoCompactThreshold,
+                        userId,
+                    });
+
+                    if (compacted) {
+                        await routeAuto();
+                    }
                 }
 
                 // Auto-detect task complexity
@@ -422,6 +468,18 @@ export const runStreamingAgent = internalAction
                 // An invoked skill's search mode is deliberate, so it beats the classifier.
                 if (invokedSkill?.config?.searchMode) {
                     effectiveSearchMode = invokedSkill.config.searchMode as SearchMode;
+                }
+
+                // The Workers AI default cannot keep to a region rule: a user with one runs on a default their rules allow, with
+                // the plan grant (`loadModelFilterRules`) so a paid user may land on a paid model. Recorded like an Auto route,
+                // so a resume continues on the same model even if the rules changed meanwhile.
+                if (resume === undefined && model === DEFAULT_CHAT_MODEL && hasActiveFilters(agentModulePrefs.modelFilterRules ?? undefined)) {
+                    const standIn = defaultModelUnderRules(model, await loadModelFilterRules(ctx, userId), readsImagesAndCallsTools);
+
+                    if (standIn !== model) {
+                        model = standIn;
+                        routedModel = standIn;
+                    }
                 }
 
                 // A custom endpoint gets no tools (built-in or MCP) unless the user
@@ -886,6 +944,10 @@ export const continueAfterToolApproval = internalAction
     .input({
         /** The user's answer to an approved `askUser` call — its tool result (`chat/ask-user.ts`). */
         answer: v.optional(v.string()),
+        /** Files the answer carries; read as the owner by the continuation (`lib/ask-user-files.ts`). */
+        answerFileIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
+        /** The answers to a multi-question `askUser` call, one per question: its tool result in place of `answer`. */
+        answers: v.optional(vAskUserAnswers),
         approvalId: v.string(),
         approved: v.boolean(),
         config: vToolRunConfig,
@@ -895,7 +957,7 @@ export const continueAfterToolApproval = internalAction
         threadId: v.string(),
         userId: v.string(),
     })
-    .action(async ({ args: { answer, approvalId, approved, config, denyReason, streamId, threadId, userId }, ctx }) => {
+    .action(async ({ args: { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId }, ctx }) => {
         // Enqueued on the jobs queue (at-least-once): only the claiming delivery resumes the run.
         if (!(await ctx.runMutation(internal.chat.streaming.persistent.library.claimStreamRun, { streamId: streamId as Id<"persistentStreams"> }))) {
             streamLogger.warn(`[ToolApproval] Stream ${streamId} already claimed — ignoring a redelivered continuation`);
@@ -924,6 +986,8 @@ export const continueAfterToolApproval = internalAction
             if (config.group) {
                 await continueGroupAfterToolApproval(ctx, {
                     answer,
+                    answerFileIds,
+                    answers,
                     approvalId,
                     approved,
                     config: { ...config, group: config.group },
@@ -939,7 +1003,7 @@ export const continueAfterToolApproval = internalAction
             // The gate above admitted this continuation, so its knowledge search may read the chat's own files.
             const resumed = await resumeApprovedRun(
                 ctx,
-                { answer, approvalId, approved, config, denyReason, streamId, threadId, userId },
+                { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId },
                 { admittedRun: true, steerable: true },
             );
 

@@ -60,7 +60,7 @@ describe("setComposerText hidden characters", () => {
         expect(useChatUIStore.getState().composerHiddenRemoved).toBe(3);
     });
 
-    it("keeps a Persian ZWNJ typed one character at a time, and sending strips a lone trailing joiner", () => {
+    it("strips a Persian ZWNJ as it is typed, and sending strips a lone trailing joiner", () => {
         const word = "\u{645}\u{6CC}\u{200C}\u{62E}\u{648}\u{627}\u{647}\u{645}";
         let typed = "";
 
@@ -70,7 +70,7 @@ describe("setComposerText hidden characters", () => {
             typed = useChatUIStore.getState().composerText;
         }
 
-        expect(typed).toBe(word);
+        expect(typed).toBe("\u{645}\u{6CC}\u{62E}\u{648}\u{627}\u{647}\u{645}");
         expect(stripHiddenText("\u{645}\u{6CC}\u{200C}").text).toBe("\u{645}\u{6CC}");
     });
 

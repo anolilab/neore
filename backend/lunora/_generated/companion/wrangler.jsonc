@@ -1,0 +1,12 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "compatibility_date": "2026-06-10",
+    "main": "src/worker.ts",
+    "name": "neore-backend-advisor",
+    "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1
+    },
+    "preview_urls": false,
+    "workers_dev": false
+}

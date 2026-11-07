@@ -1,10 +1,22 @@
-import { assistantMessages, expect, expectAssistantReply, openChat, sendMessage, settle, test, trackBackendRequests } from "./chat-helpers";
+import {
+    assistantMessages,
+    contextPoster,
+    expect,
+    expectAssistantReply,
+    freshUser,
+    openChat,
+    sendMessage,
+    settle,
+    test,
+    trackBackendRequests,
+} from "./chat-helpers";
+import { signUpInvited } from "./seed";
 
 const THREAD_URL_RE = /\/chat\/[\w-]+$/;
 const PUBLIC_LINK_RE = /\/thread\/[\w-]+$/;
 
 test.describe("In-thread branches (mock model)", () => {
-    test("regenerate adds a 2/2 version, switching moves it, and the choice survives a reload", async ({ page }) => {
+    test("regenerate adds a 2/2 version, switching moves it, and the choice survives a reload", async ({ userPage: page }) => {
         await openChat(page);
         await sendMessage(page, "Branch me please");
 
@@ -73,7 +85,7 @@ test.describe("Public share (mock model)", () => {
             await stranger.close();
         }
 
-        // A SIGNED-IN stranger (a guest) opening the app URL belongs on the share
+        // A SIGNED-IN stranger (an account of their own: under invite-only there are no guests) opening the app URL belongs on the share
         // page too. The thread is on its owner's shard, not theirs, so this is the
         // cross-shard `getThreadShareToken` lookup, not the redacted `getThread`.
         const threadPath = new URL(page.url()).pathname;
@@ -82,9 +94,10 @@ test.describe("Public share (mock model)", () => {
         const guestDrain = trackBackendRequests(guestPage);
 
         try {
+            await signUpInvited(freshUser("stranger"), contextPoster(guestPage));
             await openChat(guestPage);
             // Let /chat's first paint finish: abandoning it mid-flight is what
-            // drops local-dev backend requests (root AGENTS.md, "Local dev").
+            // drops local-dev backend requests (`docs/agents/local-dev.md`).
             await settle(guestPage);
             await guestPage.goto(threadPath);
             await guestPage.waitForURL(`**${new URL(url).pathname}`, { timeout: 60_000 });

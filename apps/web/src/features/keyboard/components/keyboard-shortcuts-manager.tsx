@@ -4,6 +4,7 @@ import { HotkeysProvider, useHotkeys } from "react-hotkeys-hook";
 import { useKeyboardShortcuts as useUIKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
+import { useFocusAreaHotkeys } from "../hooks/use-focus-area-hotkeys";
 import { hasFindInThreadTarget } from "../lib/find-in-thread-target";
 import { convertRecordedShortcutToHotkeysHook, effortCommandsToRegister } from "../lib/recorded-shortcut-converter";
 import convertShortcutToHotkeysHook from "../lib/shortcut-converter";
@@ -58,6 +59,8 @@ const KeyboardShortcutsHandler: React.FC<{
     onShortcut?: (action: keyof KeyboardShortcutsConfig, event: KeyboardEvent) => void;
     shortcuts: KeyboardShortcuts;
 }> = ({ onShortcut, shortcuts }) => {
+    useFocusAreaHotkeys();
+
     // Track if component is mounted using a ref to prevent state updates during unmount
 
     // Check if we're in an input - use a ref to track this without causing re-renders.

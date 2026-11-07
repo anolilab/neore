@@ -12,9 +12,15 @@ import AuthCard from "./auth-card";
 interface LoginModalProperties {
     onOpenChange: (open: boolean) => void;
     open: boolean;
+
+    /**
+     * Where a sign-in that leaves the page (OAuth, magic link) comes back to, and where a password sign-in lands.
+     * Pass the current URL to keep the visitor where they are.
+     */
+    redirectTo?: string;
 }
 
-const LoginModal: FC<LoginModalProperties> = ({ onOpenChange, open }) => {
+const LoginModal: FC<LoginModalProperties> = ({ onOpenChange, open, redirectTo }) => {
     const { t } = useLingui();
     const { isAnonymous, user } = useIsAnonymous();
 
@@ -45,6 +51,7 @@ const LoginModal: FC<LoginModalProperties> = ({ onOpenChange, open }) => {
                         // Centered: the card is narrower than the dialog, and a left-aligned card leaves the gap on the right.
                         base: "mx-auto border-0 shadow-none ring-0 bg-transparent",
                     }}
+                    redirectTo={redirectTo}
                     view="SIGN_IN"
                 />
             </DialogContent>

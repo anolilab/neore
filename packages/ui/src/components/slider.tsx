@@ -26,6 +26,9 @@ export interface SliderProps extends Omit<SliderPrimitive.Root.Props, "onValueCh
      * Full callback matching Base UI's signature with event details.
      */
     onValueCommittedWithDetails?: SliderPrimitive.Root.Props["onValueCommitted"];
+
+    /** The accessible name of each thumb (the focusable control), for a slider with no associated label. */
+    thumbLabel?: string;
 }
 
 const Slider = ({
@@ -37,6 +40,7 @@ const Slider = ({
     onValueChangeWithDetails,
     onValueCommitted,
     onValueCommittedWithDetails,
+    thumbLabel,
     value,
     ...props
 }: SliderProps) => {
@@ -84,6 +88,7 @@ const Slider = ({
                 </SliderPrimitive.Track>
                 {Array.from({ length: thumbValues.length }, (_, index) => (
                     <SliderPrimitive.Thumb
+                        aria-label={thumbLabel}
                         className="border-primary ring-ring/30 block size-4 shrink-0 rounded-md border bg-white shadow-sm transition-colors select-none hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
                         data-slot="slider-thumb"
                         key={index}

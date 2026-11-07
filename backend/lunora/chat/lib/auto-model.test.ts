@@ -55,13 +55,16 @@ const request = {
     toolCount: 3,
     userId: "user-1",
 };
+/** The gateway's route to `modelId`, on the registry row's own provider and API id when there is one. */
 const route = (modelId: string) => {
+    const row = MODEL_REGISTRY.find((candidate) => candidate.id === modelId);
+
     return {
         confidence: 1,
         estimatedCost: 0,
-        modelApiId: modelId,
+        modelApiId: row?.modelApiId ?? modelId,
         modelId,
-        provider: "openrouter",
+        provider: row?.provider ?? "openrouter",
         routingReason: "",
         tier: "standard",
     };
@@ -107,7 +110,7 @@ describe("registryModelForRoute", () => {
     });
 
     it("is none for a gateway-only model", () => {
-        expect(registryModelForRoute(route("cf-llama-4-scout"))).toBeUndefined();
+        expect(registryModelForRoute({ ...route("mistral-nemo"), modelApiId: "mistralai/mistral-nemo" })).toBeUndefined();
     });
 });
 
@@ -137,7 +140,7 @@ describe("resolveAutoModel", () => {
     });
 
     it("keeps the fallback when the routed id is not a registry model", async () => {
-        routeViaGateway.mockResolvedValue(route("cf-llama-4-scout"));
+        routeViaGateway.mockResolvedValue({ ...route("mistral-nemo"), modelApiId: "mistralai/mistral-nemo" });
 
         await expect(resolveAutoModel(ctx, request)).resolves.toBe(fallback.id);
     });

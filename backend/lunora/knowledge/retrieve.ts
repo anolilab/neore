@@ -2,7 +2,7 @@
  * Knowledge Base Retrieval
  *
  * Hybrid search over user-uploaded knowledge base files: vector similarity
- * (Vectorize, text-embedding-004) and BM25 keyword search (FTS5 `searchIndex`
+ * (Vectorize, Workers AI bge-m3) and BM25 keyword search (FTS5 `searchIndex`
  * on `knowledgeChunks`), fused with Reciprocal Rank Fusion. See `hybrid.ts`.
  */
 import { LunoraError, v } from "lunorash/server";
@@ -13,13 +13,14 @@ import { type ActionCtx, internalAction } from "../_generated/server";
 import { authAction, rateLimit } from "../lib/crpc";
 import { searchVectors } from "../agent/vector/index";
 import { validateVectorDimension, type VectorDimension } from "../agent/vector/tables";
+import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { callOnShard } from "../lib/cross-shard";
 import { assertOk, fetchWithDeadline, HttpError } from "../lib/fetch-timeout";
 import { gatewayFetch, SERVICE_ORIGIN } from "../lib/services";
 import { reciprocalRankFusion } from "./hybrid";
 import { MAX_LENGTH } from "../lib/validators";
 
-const EMBEDDING_MODEL_NAME = "text-embedding-004";
+const EMBEDDING_MODEL_NAME = "bge-m3";
 const MAX_RESULTS = 5;
 
 /**
@@ -51,13 +52,20 @@ const SCOPED_VECTOR_TOP_K = 100;
 /**
  * Embeds the query ONCE, under the requester — billed to them, never to the
  * owner of a shared collection — and the vector is reused for every scope
- * searched (this shard and each owner's). `null` when there is no gateway or
- * the embedding fails: the keyword leg still runs.
+ * searched (this shard and each owner's). `null` when there is no gateway, the
+ * embedding fails or the requester's model filters exclude the embedding model
+ * (the gateway refuses it): the keyword leg still runs.
  */
 const embedQuery = async (ctx: ActionCtx, query: string, userId: string): Promise<number[] | null> => {
     try {
-        const { createGatewayEmbeddingModel } = await import("../chat/lib/gateway-embedding-model");
-        const embeddingModel = createGatewayEmbeddingModel(gatewayFetch(ctx), { userId });
+        const { createGatewayEmbeddingModel, embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
+        const modelFilterRules = await loadModelFilterRules(ctx, userId);
+
+        if (!embeddingModelAllowed(modelFilterRules)) {
+            return null;
+        }
+
+        const embeddingModel = createGatewayEmbeddingModel(gatewayFetch(ctx), { modelFilterRules, userId });
 
         const { embedMany } = await import("../agent/client/search");
         const { embeddings } = await embedMany(ctx, {

@@ -1,3 +1,4 @@
+import type { GatewayModel } from "@neore/ai/models";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement } from "react";
@@ -72,7 +73,7 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 });
 
-const { useBlockedCreators, useUpdateModelFilterRules, withCreatorHidden, withoutCreator } = await import("./use-model-filter-rules");
+const { useBlockedCreators, useFilteredModels, useUpdateModelFilterRules, withCreatorHidden, withoutCreator } = await import("./use-model-filter-rules");
 
 const PREFERENCES_KEY = ["aiUserPreferences"];
 
@@ -448,5 +449,28 @@ describe(useUpdateModelFilterRules, () => {
         });
 
         expect(server.sent).toEqual([{ rules: { blockedProviders: ["groq"], blockedRegions: ["EU"] }, userId: "account-b" }]);
+    });
+});
+
+describe(useFilteredModels, () => {
+    const workersAi = { id: "cf-kimi-k2.5", provider: "cloudflare", regions: ["GLOBAL"] } as GatewayModel;
+    const openRouter = { id: "openai/gpt-5", provider: "openrouter", regions: ["US"] } as GatewayModel;
+
+    const filtered = async (rules: ModelFilterRules) => {
+        server.rules = rules;
+        const { result } = renderHook(() => useFilteredModels([workersAi, openRouter]), { wrapper: wrapperFor(newClient()) });
+
+        await waitFor(() => expect(result.current).toHaveLength(1));
+
+        return result.current.map((model: GatewayModel) => model.id);
+    };
+
+    it("hides the Workers AI models under either privacy setting alone, as the gateway refuses them", async () => {
+        await expect(filtered({ requireZDR: true })).resolves.toStrictEqual(["openai/gpt-5"]);
+        await expect(filtered({ denyDataCollection: true })).resolves.toStrictEqual(["openai/gpt-5"]);
+    });
+
+    it("hides them under a region rule that admits the OpenRouter model", async () => {
+        await expect(filtered({ blockedRegions: ["CN"] })).resolves.toStrictEqual(["openai/gpt-5"]);
     });
 });

@@ -7,7 +7,8 @@ load or mirror this app; they are not built from it.
 
 Conventions for working in the code (cRPC, feature layout, TanStack patterns)
 are in [`src/AGENTS.md`](src/AGENTS.md) and [`AGENTS.md`](AGENTS.md). The
-non-obvious runtime facts (live queries, auth, sharding) are in the root `CLAUDE.md`.
+non-obvious runtime facts are in `AGENTS.md` (live queries), `backend/AGENTS.md` (sharding) and
+`backend/lunora/auth/AGENTS.md` (auth); the root `AGENTS.md` lists the rest.
 
 ## Layout
 
@@ -52,7 +53,7 @@ The app is on `http://localhost:5173`. `lunora dev`, started by the backend's
 dev target, runs the backend's bound services (a copy of the gateway, document
 parser, browser renderer, NSFW checker) in the same session; the browser's
 `/v1/*` calls still go to the standalone gateway on 8787; see `services/*/README.md` and
-"Services" in the root `CLAUDE.md`. Starting the backend needs the Rust
+"Services" in `backend/AGENTS.md`. Starting the backend needs the Rust
 toolchain for the document parser unless `services/document-parser/build/`
 exists.
 

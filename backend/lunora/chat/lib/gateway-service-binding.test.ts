@@ -209,6 +209,24 @@ describe("GatewayEmbeddingModel over the gateway binding", () => {
         expect(gateway.calls[0]?.url).toBe("https://llm-gateway.internal/internal/embeddings");
         expect(JSON.parse(gateway.calls[0]?.body ?? "{}")).toMatchObject({ input: ["hello"], userId: "u1" });
     });
+
+    it("sends the user's active model filters, for the gateway to refuse an excluded model, and none when inactive", async () => {
+        const gateway = new FakeBinding(() => Response.json({ embeddings: [[0.1]] }));
+        const binding = gatewayFetch(servicesCtx({ llmGateway: gateway }));
+
+        await createGatewayEmbeddingModel(binding, { modelFilterRules: { blockedRegions: ["CN"] }, userId: "u1" }).doEmbed({ values: ["a"] });
+        await createGatewayEmbeddingModel(binding, { modelFilterRules: {}, userId: "u1" }).doEmbed({ values: ["b"] });
+
+        expect(JSON.parse(gateway.calls[0]?.body ?? "{}")).toMatchObject({ modelFilterRules: { blockedRegions: ["CN"] } });
+        expect(JSON.parse(gateway.calls[1]?.body ?? "{}")).not.toHaveProperty("modelFilterRules");
+    });
+
+    it("fails the call when the gateway refuses the model, so callers fall back", async () => {
+        const gateway = new FakeBinding(() => Response.json({ error: { code: "MODEL_BLOCKED" } }, { status: 403 }));
+        const model = createGatewayEmbeddingModel(gatewayFetch(servicesCtx({ llmGateway: gateway })), { modelFilterRules: { blockedRegions: ["CN"] } });
+
+        await expect(model.doEmbed({ values: ["a"] })).rejects.toThrow("Gateway embedding failed (403)");
+    });
 });
 
 describe("gateway-client over the gateway binding", () => {

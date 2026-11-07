@@ -35,7 +35,7 @@ import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries"
 import { canReadSkill } from "../skills/access";
 import { vSkillConfig } from "../skills/validators";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } from "./account";
-import type { TaskStatus } from "./logic";
+import type { TaskRunNoticeReason, TaskSkipReason, TaskStatus } from "./logic";
 import {
     canTransition,
     decideAfterVerdict,
@@ -46,11 +46,15 @@ import {
     MAX_RECURRENCES_PER_USER_PER_SWEEP,
     MAX_TASKS_PER_USER,
     nextRecurrenceAt,
+    latestSlotAtOrBefore,
     pickFairRecurrences,
-    shouldRecurNow,
+    isPassingFallback,
+    pickRunThread,
+    recurrenceSkipReason,
 } from "./logic";
-import { vTaskRunOrigin, vVerdict } from "./validators";
+import { vTaskRunNoticeReason, vTaskRunOrigin, vVerdict } from "./validators";
 import { vCodingAgentAssignment } from "../coding-agents/validators";
+import { writableProject } from "../projects/functions";
 
 export type TaskRunOrigin = "dependency" | "manual" | "repair" | "retry" | "schedule";
 
@@ -67,6 +71,17 @@ const STALE_QUEUED_MS = 15 * 60_000;
 
 /** A running round that stopped reporting — longer than any 25-step Deep Work run. */
 const STALE_RUNNING_MS = 60 * 60_000;
+
+const STALE_AFTER_MS = { queued: STALE_QUEUED_MS, running: STALE_RUNNING_MS } as const;
+
+const STALE_MESSAGE = {
+    queued: "The run never started. Try running the task again.",
+    running: "The run stopped responding and was abandoned. Try running the task again.",
+} as const;
+
+/** Why a task's round counts as dead (`updatedAt` is its last sign of life), or `undefined` when it does not. */
+const staleRoundMessage = (task: Doc<"tasks">, now: number): string | undefined =>
+    (task.status === "queued" || task.status === "running") && task.updatedAt < now - STALE_AFTER_MS[task.status] ? STALE_MESSAGE[task.status] : undefined;
 
 const RESULT_SUMMARY_MAX = 600;
 
@@ -145,20 +160,45 @@ const summarise = (answer: string | undefined): string | undefined => {
 
 // ─── Runner hand-offs ────────────────────────────────────────────────────────
 
+/**
+ * What every path that fails a task writes: the error, and no `resultSummary`,
+ * so an earlier run's result is never shown as the outcome of the one that
+ * failed (`tasks/AGENTS.md`). The earlier answer stays on its own `taskRuns` row.
+ */
+const failedTaskPatch = (lastError: string, now: number) => {
+    return {
+        activeCycle: undefined,
+        lastError,
+        resultSummary: undefined,
+        status: "failed" as const,
+        updatedAt: now,
+    };
+};
+
 /** Ends a cycle before its round runs, with `lastError` saying why. No `taskRuns` row: nothing ran. */
 const refuseRound = async (ctx: MutationCtx, task: Doc<"tasks">, lastError: string): Promise<void> => {
-    await patchById(ctx.db, "tasks", task._id, { activeCycle: undefined, lastError, status: "failed", updatedAt: Date.now() });
+    await patchById(ctx.db, "tasks", task._id, failedTaskPatch(lastError, Date.now()));
 };
 
 const vClaim = v.union(
     v.null(),
     v.object({
         codingAgent: v.optional(vCodingAgentAssignment),
+        /** Writes the divider that marks the run's start; the first round of a fresh-context run only. */
+        contextDivider: v.optional(v.boolean()),
+        /** The thread this round appends to; unset starts a new thread (`pickRunThread`). */
+        continueThreadId: v.optional(v.string()),
+        /** No earlier turns sent to the model. */
+        freshContext: v.optional(v.boolean()),
         goal: v.optional(v.object({ description: v.optional(v.string()), successCriteria: v.optional(v.string()), title: v.string() })),
         instructions: v.string(),
+        /** The kept thread was only briefly out of reach (locked, busy): the task keeps it for its next run. */
+        keepLastThread: v.optional(v.boolean()),
         model: v.optional(v.string()),
         organizationId: v.optional(v.string()),
-        repair: v.optional(v.object({ reasons: v.array(v.string()), repairInstructions: v.optional(v.string()) })),
+        projectId: v.optional(v.id("projects")),
+        reasoningEffort: v.optional(v.number()),
+        repair: v.optional(v.object({ previousAnswer: v.optional(v.string()), reasons: v.array(v.string()), repairInstructions: v.optional(v.string()) })),
         reviewNote: v.optional(v.string()),
         runId: v.id("taskRuns"),
         skillId: v.optional(v.id("skills")),
@@ -234,17 +274,17 @@ export const claimRound = internalMutation
             return null;
         }
 
-        let repair: { reasons: string[]; repairInstructions?: string } | undefined;
+        let repair: { previousAnswer?: string; reasons: string[]; repairInstructions?: string } | undefined;
+        const previous =
+            round > 0
+                ? await ctx.db
+                      .query("taskRuns")
+                      .withIndex("by_cycle_and_round", (q) => q.eq("cycle", cycle).eq("round", round - 1))
+                      .first()
+                : null;
 
-        if (round > 0) {
-            const previous = await ctx.db
-                .query("taskRuns")
-                .withIndex("by_cycle_and_round", (q) => q.eq("cycle", cycle).eq("round", round - 1))
-                .first();
-
-            if (previous?.verdict && !previous.verdict.pass) {
-                repair = { reasons: previous.verdict.reasons, repairInstructions: previous.verdict.repairInstructions };
-            }
+        if (previous?.verdict && !previous.verdict.pass) {
+            repair = { reasons: previous.verdict.reasons, repairInstructions: previous.verdict.repairInstructions };
         }
 
         const { now } = ctx;
@@ -261,9 +301,32 @@ export const claimRound = internalMutation
         await ctx.db.patch("tasks", taskId, { attemptCount: task.attemptCount + 1, status: "running", updatedAt: now });
 
         const goal = task.goalId ? await ctx.db.get("goals", task.goalId) : null;
+        const { destination, notice, project } = await resolveRunPlace(ctx, task, round);
+
+        // The attempt being repaired travels with the claim; the runner drops it only when the round really continues
+        // a thread whose history holds it (it may still fall back to a new thread right before it writes).
+        if (repair && previous?.finalAnswer) {
+            repair.previousAnswer = previous.finalAnswer;
+        }
+
+        const projectId = project?._id;
+
+        // Only the first round of a cycle says where the run went: a repair round continues the thread round 0
+        // ended in (`lastRunThreadId`), so clearing here would erase why round 0 fell back.
+        if (round === 0 && (notice || task.lastRunNotice)) {
+            await patchById(ctx.db, "tasks", task._id, { lastRunNotice: notice && { at: now, reason: notice } });
+        }
 
         return {
             ...(task.codingAgent && { codingAgent: task.codingAgent }),
+            ...(destination.threadId && { continueThreadId: destination.threadId }),
+            ...(destination.divider && { contextDivider: true }),
+            ...(destination.freshContext && { freshContext: true }),
+            // A passing fallback this round, or a repair round continuing its cycle's fallback thread (not the task's
+            // kept one): either way the task keeps its thread when the round completes.
+            ...((isPassingFallback(destination.fallback) || (destination.threadId !== undefined && destination.threadId !== task.lastRunThreadId)) && {
+                keepLastThread: true,
+            }),
             goal:
                 goal && goal.userId === task.userId
                     ? { description: goal.description ?? undefined, successCriteria: goal.successCriteria ?? undefined, title: goal.title }
@@ -271,6 +334,8 @@ export const claimRound = internalMutation
             instructions: task.instructions,
             model: task.model ?? undefined,
             organizationId: task.organizationId ?? undefined,
+            projectId,
+            reasoningEffort: task.reasoningEffort ?? undefined,
             repair,
             reviewNote: task.reviewNote ?? undefined,
             runId: runId as Id<"taskRuns">,
@@ -279,6 +344,98 @@ export const claimRound = internalMutation
             title: task.title,
             userId: task.userId,
         };
+    });
+
+/**
+ * Where a round of `task` runs: the project it may file into and the thread it continues, re-read now. Run at
+ * the claim, and again by the runner right before it writes (`runThreadProblem`), since a thread can be
+ * moved, locked or start a chat reply in between. Write access, not read access, decides the project
+ * (`writableProject`): a run never files into a project the owner could not move a thread into.
+ */
+const resolveRunPlace = async (ctx: QueryCtx, task: Doc<"tasks">, round: number) => {
+    const project = task.projectId ? await writableProject(ctx, task.projectId, task.userId) : null;
+    const cycle = task.activeCycle;
+    // A repair round continues the thread its cycle's previous round ran in, where the attempt it repairs is: after a
+    // passing fallback that is not the task's kept thread (`lastRunThreadId`).
+    const previous =
+        round > 0 && cycle
+            ? await ctx.db
+                  .query("taskRuns")
+                  .withIndex("by_cycle_and_round", (q) => q.eq("cycle", cycle).eq("round", round - 1))
+                  .first()
+            : null;
+    const keptThreadId = previous?.threadId ?? task.lastRunThreadId;
+    const lastThread =
+        task.recurring && task.runDestination && task.runDestination !== "new_thread" && keptThreadId
+            ? await ctx.db.get("threads", keptThreadId as Id<"threads">)
+            : null;
+    const liveReply = lastThread
+        ? await ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId: lastThread._id as string } })
+        : null;
+    const destination = pickRunThread({
+        destination: task.runDestination,
+        lastRunThreadId: keptThreadId,
+        projectId: project?._id,
+        recurring: task.recurring,
+        round,
+        thread: lastThread && { ...lastThread, busy: liveReply !== null },
+        userId: task.userId,
+    });
+    // A project the owner can no longer file into is the first reason: the thread in it is then unusable too.
+    const notice: TaskRunNoticeReason | undefined = task.projectId && !project ? "project_unwritable" : destination.fallback;
+
+    return { destination, notice, project };
+};
+
+/**
+ * The project a run may still file into, and its own instructions, re-read right before the run uses them: the
+ * owner may have lost write access since the claim (left the organization). `null` when there is none.
+ */
+export const runProjectFor = internalQuery
+    .input({ taskId: v.id("tasks") })
+    .output(v.union(v.null(), v.object({ context: v.optional(v.string()), projectId: v.id("projects") })))
+    .query(async ({ args, ctx }) => {
+        const task = await ctx.db.get("tasks", args.taskId);
+        const project = task?.projectId ? await writableProject(ctx, task.projectId, task.userId) : null;
+
+        return project ? { projectId: project._id, ...(project.context && { context: project.context }) } : null;
+    });
+
+/**
+ * Why the runner may no longer write into `threadId` for this round (moved, locked, a reply started since the
+ * claim), or `null` when it still may. The reason is the one the task view shows.
+ */
+export const runThreadProblem = internalQuery
+    .input({ cycle: v.string(), round: v.number(), taskId: v.id("tasks"), threadId: v.string() })
+    .output(v.union(vTaskRunNoticeReason, v.null()))
+    .query(async ({ args, ctx }) => {
+        const task = await ctx.db.get("tasks", args.taskId);
+
+        // A cancelled (or replaced) round writes into no kept thread: the thread may already be the newer cycle's.
+        if (task?.activeCycle !== args.cycle) {
+            return "thread_unavailable";
+        }
+
+        const { destination, notice } = await resolveRunPlace(ctx, task, args.round);
+
+        return destination.threadId === args.threadId ? null : (notice ?? "thread_unavailable");
+    });
+
+/**
+ * Records that a round started a new thread after all, because its thread changed between the claim and the run.
+ * Only for the task's current cycle: a cancelled round's late action never overwrites a newer run's notice.
+ */
+export const recordRunNotice = internalMutation
+    .input({ cycle: v.string(), reason: vTaskRunNoticeReason, taskId: v.id("tasks") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const task = await ctx.db.get("tasks", args.taskId);
+
+        if (task?.activeCycle === args.cycle) {
+            await ctx.db.patch("tasks", args.taskId, { lastRunNotice: { at: ctx.now, reason: args.reason } });
+        }
+
+        return null;
     });
 
 /** Whether a round is still waiting for its outcome — a redelivered finisher checks this before paying for a verifier call. */
@@ -359,6 +516,8 @@ const notifyTaskRound = async (
  */
 export const completeRound = internalMutation
     .input({
+        /** The round ran in a fallback thread for a passing reason (`isPassingFallback`): the task keeps its thread. */
+        keepLastThread: v.optional(v.boolean()),
         outcome: vRoundOutcome,
         runId: v.id("taskRuns"),
         threadId: v.optional(v.string()),
@@ -384,13 +543,13 @@ export const completeRound = internalMutation
             return "cancelled";
         }
 
-        const lastRunThreadId = args.threadId ?? task.lastRunThreadId;
+        const lastRunThreadId = args.keepLastThread ? task.lastRunThreadId : (args.threadId ?? task.lastRunThreadId);
 
         if (outcome.kind === "error") {
             const error = outcome.error.slice(0, 2000);
 
             await ctx.db.patch("taskRuns", run._id, { ...runResult, error, status: "error" });
-            await patchById(ctx.db, "tasks", task._id, { activeCycle: undefined, lastError: error, lastRunThreadId, status: "failed", updatedAt: now });
+            await patchById(ctx.db, "tasks", task._id, { ...failedTaskPatch(error, now), lastRunThreadId });
             await notifyTaskRound(ctx, task, run, "failure", error, args.threadId ?? run.threadId);
 
             return "failed";
@@ -523,15 +682,61 @@ export const resolveTaskSkill = internalQuery
 // ─── Periodic work ───────────────────────────────────────────────────────────
 
 /**
- * Due recurrences and stale rounds. Rides on the trigger schedule's
+ * Stale rounds, then due recurrences. Rides on the trigger schedule's
  * every-minute tick (`triggers/schedule.ts:checkDueTriggers`) rather than a cron
  * of its own.
+ *
+ * Stale rounds go first: after an outage a round that stopped reporting is
+ * failed before its slot is looked at, so the slot starts the catch-up run
+ * instead of being skipped as "still running".
  */
 export const checkDueTasks = internalMutation
     .input({})
     .output(v.null())
     .mutation(async ({ ctx }) => {
         const { now } = ctx;
+
+        const failStaleTask = async (task: Doc<"tasks">, message: string): Promise<void> => {
+            const cycle = task.activeCycle;
+
+            if (cycle) {
+                const runs = await ctx.db
+                    .query("taskRuns")
+                    .withIndex("by_cycle_and_round", (q) => q.eq("cycle", cycle))
+                    .take(20);
+
+                for (const run of runs) {
+                    if (run.status === "running") {
+                        await ctx.db.patch("taskRuns", run._id, { completedAt: now, error: message, status: "error" });
+                    }
+                }
+            }
+
+            await patchById(ctx.db, "tasks", task._id, failedTaskPatch(message, now));
+            // The inbox keeps the trace: a recurring task's catch-up may start in this same sweep, which clears
+            // `lastError`, and a round that never started has no run row to show it.
+            await notifyQuietly(ctx, {
+                body: message,
+                dedupeKey: `task-stale:${task._id}:${cycle ?? String(task.updatedAt)}`,
+                emailOutcome: true,
+                link: "/tasks",
+                outcome: "failure",
+                title: task.title,
+                type: "task",
+                userId: task.userId,
+            });
+        };
+
+        for (const status of ["queued", "running"] as const) {
+            const stale = await ctx.db
+                .query("tasks")
+                .withIndex("by_status_and_updatedAt", (q) => q.eq("status", status).lt("updatedAt", now - STALE_AFTER_MS[status]))
+                .take(SWEEP_BATCH);
+
+            for (const task of stale) {
+                await failStaleTask(task, STALE_MESSAGE[status]);
+            }
+        }
 
         const due = pickFairRecurrences(
             await ctx.db
@@ -544,19 +749,44 @@ export const checkDueTasks = internalMutation
 
         const statusesByUser = new Map<string, Map<string, TaskStatus>>();
 
-        for (const task of due) {
-            if (task.nextRunAt === undefined || !task.cronExpression) {
+        for (const dueTask of due) {
+            if (dueTask.nextRunAt === undefined || !dueTask.cronExpression) {
                 continue;
             }
 
-            // Advance first, whatever happens next, so a task that cannot start
-            // now is not re-examined every minute. `updatedAt` is left alone: only a
-            // task that really starts changes, and a quiet routine reads it as activity.
-            await ctx.db.patch("tasks", task._id, { nextRunAt: nextRecurrenceAt(task.cronExpression, now) });
+            let task = dueTask;
+            const stale = staleRoundMessage(task, now);
 
-            if (!shouldRecurNow(task.status)) {
+            // A dead round the bounded batch above did not reach: failed here, so its slot is the catch-up
+            // rather than a slot skipped as "still running".
+            if (stale) {
+                await failStaleTask(task, stale);
+                task = { ...task, activeCycle: undefined, status: "failed" };
+            }
+
+            // Advance first, from `now`, whatever happens next: a task that cannot start is not
+            // re-examined every minute, and slots missed while the sweep was down collapse into
+            // this one run. `updatedAt` is left alone, including on a skip: only a task that
+            // really starts changes, and the stale-round check above reads `updatedAt` as the
+            // run's last sign of life.
+            const advance = { nextRunAt: nextRecurrenceAt(dueTask.cronExpression, now) };
+            // The skip a slot this sweep cannot run leaves on the task: the latest real slot, or nothing when the
+            // schedule had no real slot to skip. Bounded work, so a skipped task never holds up the rest of the batch.
+            const { cronExpression, nextRunAt: dueSlot } = dueTask;
+            const skipRecord = (reason: TaskSkipReason) => {
+                const at = latestSlotAtOrBefore(cronExpression, dueSlot, now, dueTask.createdAt);
+
+                return at === undefined ? {} : { lastSkippedAt: at, lastSkipReason: reason };
+            };
+            const skipped = recurrenceSkipReason(task.status);
+
+            if (skipped) {
+                await ctx.db.patch("tasks", task._id, { ...advance, ...skipRecord(skipped) });
+
                 continue;
             }
+
+            await ctx.db.patch("tasks", task._id, advance);
 
             let statusById = statusesByUser.get(task.userId);
 
@@ -565,41 +795,21 @@ export const checkDueTasks = internalMutation
                 statusesByUser.set(task.userId, statusById);
             }
 
+            statusById.set(task._id as string, task.status);
+
             const landed = await startTask(ctx, task, "schedule", statusById, now);
 
             if (landed) {
                 statusById.set(task._id as string, landed);
             }
-        }
 
-        const failStale = async (status: "queued" | "running", olderThan: number, message: string): Promise<void> => {
-            const stale = await ctx.db
-                .query("tasks")
-                .withIndex("by_status_and_updatedAt", (q) => q.eq("status", status).lt("updatedAt", olderThan))
-                .take(SWEEP_BATCH);
+            // Its dependencies are not done: this slot does not run now, so it is recorded like any other skip.
+            const blockedSkip = landed === "blocked" ? skipRecord("blocked") : {};
 
-            for (const task of stale) {
-                const cycle = task.activeCycle;
-
-                if (cycle) {
-                    const runs = await ctx.db
-                        .query("taskRuns")
-                        .withIndex("by_cycle_and_round", (q) => q.eq("cycle", cycle))
-                        .take(20);
-
-                    for (const run of runs) {
-                        if (run.status === "running") {
-                            await ctx.db.patch("taskRuns", run._id, { completedAt: now, error: message, status: "error" });
-                        }
-                    }
-                }
-
-                await patchById(ctx.db, "tasks", task._id, { activeCycle: undefined, lastError: message, status: "failed", updatedAt: now });
+            if ("lastSkippedAt" in blockedSkip) {
+                await ctx.db.patch("tasks", task._id, blockedSkip);
             }
-        };
-
-        await failStale("queued", now - STALE_QUEUED_MS, "The run never started. Try running the task again.");
-        await failStale("running", now - STALE_RUNNING_MS, "The run stopped responding and was abandoned. Try running the task again.");
+        }
 
         return null;
     });
