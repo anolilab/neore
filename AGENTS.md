@@ -56,7 +56,7 @@ Entry points: `apps/web/src/routes/__root.tsx` (app), `backend/lunora/chat/execu
 
 ## COMMANDS
 
-Always `pnpm`. Lint does not include types: run both.
+Always `pnpm`. Lint does not include types: run both. Git hooks format on commit and check formatting on push.
 
 ```bash
 pnpm lint:types                          # vis run lint:types — NOT `pnpm typecheck`
@@ -90,7 +90,7 @@ the files from the root down to their working directory, so **read the file for 
 | Web auth (session reads), chat UI, local models                                     | `apps/web/src/features/{auth,chat,local-models}/AGENTS.md` |
 | Desktop shell, dictation, ACP registry installs; mobile app; UI components          | `apps/desktop/AGENTS.md`, `apps/mobile/AGENTS.md`, `packages/ui/AGENTS.md` |
 | Device execution, sandbox, SSH servers, `neore-host`                                | `packages/device-core/AGENTS.md`                        |
-| Dev servers and local failures; build, deploy, Worker size; pnpm and vis              | `docs/agents/{local-dev,build-and-deploy,tooling}.md`   |
+| Dev servers, build, deploy, pnpm, vis; review checklist and test rules for a PR      | `docs/agents/{local-dev,build-and-deploy,tooling,review-checklist,testing}.md` |
 
 ## A NOTE TO THE AGENT
 
