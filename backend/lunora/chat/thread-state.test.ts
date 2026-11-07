@@ -242,6 +242,24 @@ describe("a snoozed thread wakes early", () => {
         expect(row.snoozedUntil).toBeUndefined();
     });
 
+    it("leaves an unsnoozed thread's row untouched when a stream fails while another stream of the thread still runs", async () => {
+        const id = await harness.run(
+            async (context: any) => await context.db.insert("threads", { status: "running", title: "Parallel", updatedAt: 111, userId: OWNER }),
+        );
+        const streaming = (order: number): Record<string, unknown> => {
+            return { order, state: { kind: "streaming", lastHeartbeat: 1 }, stateKind: "streaming", stepOrder: 0, threadId: id };
+        };
+        const failing = await harness.run(async (context: any) => await context.db.insert("streamingMessages", streaming(1)));
+
+        await harness.run(async (context: any) => await context.db.insert("streamingMessages", streaming(2)));
+
+        const before = await readThread(id);
+
+        await harness.run(async (context: any) => await context.runMutation(timeoutStream as never, { streamId: failing } as never));
+
+        expect(await readThread(id)).toEqual(before);
+    });
+
     it("stays snoozed for an ordinary write", async () => {
         const id = await insertSnoozed();
 
