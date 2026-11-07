@@ -346,6 +346,11 @@ export class AgentSession {
         await this.stopping;
     }
 
+    /** The agent's pid on this computer while the session is live; undefined for a server's agent or an ended session. */
+    public get agentPid(): number | undefined {
+        return this.status === "ended" ? undefined : this.options.process.pid;
+    }
+
     public summary(): SessionSummary {
         return {
             agentKey: this.options.agentKey,

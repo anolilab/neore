@@ -35,6 +35,8 @@ export const LOCAL_CHANNEL = {
     acpPermissionAnswerBatch: "neore:device-local:acp-permission-answer-batch",
     acpPermissionDecline: "neore:device-local:acp-permission-decline",
     acpPermissions: "neore:device-local:acp-permissions",
+    acpPorts: "neore:device-local:acp-ports",
+    acpPortStop: "neore:device-local:acp-port-stop",
     acpProbe: "neore:device-local:acp-probe",
     acpRegistryInstall: "neore:device-local:acp-registry-install",
     acpRegistrySearch: "neore:device-local:acp-registry-search",

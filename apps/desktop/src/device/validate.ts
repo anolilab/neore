@@ -213,6 +213,14 @@ export const readRequestId = (value: unknown): number => {
     return value;
 };
 
+export const readPortTarget = (pid: unknown, startedAt: unknown): { pid: number; startedAt: string } => {
+    if (typeof pid !== "number" || !Number.isSafeInteger(pid) || pid < 2) {
+        throw new Error("device: process is invalid");
+    }
+
+    return { pid, startedAt: text(startedAt, "start time", 40) };
+};
+
 export const readOptionId = (value: unknown): string => text(value, "option", 256);
 
 export const readRequestIds = (value: unknown): number[] => {

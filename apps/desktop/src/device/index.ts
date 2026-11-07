@@ -52,6 +52,7 @@ import {
     readOptionalDeviceId,
     readOptionId,
     readPairing,
+    readPortTarget,
     readPrompt,
     readPromptAnswer,
     readRequestId,
@@ -820,6 +821,11 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     local(LOCAL_CHANNEL.acpPermissionAnswerBatch, (ids) => requireCore().acpPermissionAnswerBatch(readRequestIds(ids)));
 
     local(LOCAL_CHANNEL.acpSessions, () => requireAcp().summaries());
+
+    // Local window only, like the approvals: no page, backend call or ACP command can list or stop a server.
+    local(LOCAL_CHANNEL.acpPorts, (id) => requireAcp().ports(readSessionId(id)));
+
+    local(LOCAL_CHANNEL.acpPortStop, (id, pid, startedAt) => requireAcp().stopPort(readSessionId(id), readPortTarget(pid, startedAt)));
 
     local(LOCAL_CHANNEL.acpSession, (id) => requireAcp().snapshot(readSessionId(id)));
 

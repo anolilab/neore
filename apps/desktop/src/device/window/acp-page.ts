@@ -133,7 +133,7 @@ const startIn = (key: string, folder: string) =>
     guarded(async () => {
         const id = await globalThis.neoreDevice.acpStart(key, folder);
 
-        state.selected = id;
+        selectSession(id);
         await refreshSessions();
     });
 
@@ -717,11 +717,124 @@ const renderHooks = async (snapshot: SessionSnapshot, force = false, review = fa
     }
 };
 
+/** How often the open session's listening ports are read again; a server can start without any session event. */
+const PORTS_POLL_MS = 5000;
+const MAX_QUIET_SKIPS = 5;
+
+/** The newest port read. A read that finishes after a newer one is dropped, so a stopped server cannot reappear from an older answer. */
+const portsRead = { busy: false, latest: 0, quiet: 0, shown: undefined as string | undefined, skip: 0 };
+
+/**
+ * The one place the open session changes. The previous session's ports must not stay on screen, where Stop would still
+ * act on them: pending reads are dropped, the rows go, and the new session's ports are read at once.
+ */
+const selectSession = (id: string | undefined): void => {
+    state.selected = id;
+    portsRead.latest += 1;
+    portsRead.quiet = 0;
+    portsRead.shown = undefined;
+    portsRead.skip = 0;
+    $("acp-ports-status").textContent = id === undefined ? "" : "Loading ports…";
+    $("acp-ports-list").replaceChildren(...id === undefined ? [item("None.")] : []);
+
+    if (id === undefined) {
+        portsRead.busy = false;
+    } else {
+        refreshPorts();
+    }
+};
+
+const refreshPorts = async (): Promise<void> => {
+    const { selected } = state;
+
+    portsRead.latest += 1;
+    portsRead.busy = true;
+    const read = portsRead.latest;
+    let ports: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPorts>>;
+
+    try {
+        ports = selected === undefined ? [] : await globalThis.neoreDevice.acpPorts(selected);
+    } catch (error: unknown) {
+        if (read === portsRead.latest) {
+            portsRead.busy = false;
+        }
+
+        // A read that fails (a tool missing, a timeout) is said where the list is; it never stops the session from refreshing.
+        if (read === portsRead.latest && state.selected === selected) {
+            $("acp-ports-status").textContent = `Ports cannot be read: ${error instanceof Error ? error.message : String(error)}`;
+            portsRead.shown = undefined;
+            $("acp-ports-list").replaceChildren();
+        }
+
+        return;
+    }
+
+    if (read === portsRead.latest) {
+        portsRead.busy = false;
+    }
+
+    // A newer read started, or another session was opened while this one was read.
+    if (read !== portsRead.latest || state.selected !== selected) {
+        return;
+    }
+
+    // A session with no servers is read less and less often (up to every 30 s); the first server, an Open or a Stop starts over.
+    portsRead.quiet = ports.length === 0 ? portsRead.quiet + 1 : 0;
+    portsRead.skip = Math.min(portsRead.quiet, MAX_QUIET_SKIPS);
+
+    // The same ports for the same session are already on screen: leave the rows alone, so a focused Stop keeps its focus.
+    const shownKey = JSON.stringify([selected, ports]);
+
+    $("acp-ports-status").textContent = "";
+
+    if (shownKey === portsRead.shown) {
+        return;
+    }
+
+    portsRead.shown = shownKey;
+    $("acp-ports-list").replaceChildren(
+        ...ports.length === 0
+            ? [item("None.")]
+            : ports.map((port) =>
+                item(
+                    `Port ${String(port.port)} on ${port.address} — ${port.name} (process ${String(port.pid)})`,
+                    button("Stop", `Stop ${port.name} on port ${String(port.port)}`, () => {
+                        guarded(async () => {
+                            // The list was read for another session: its port may belong to that one, so nothing is stopped.
+                            if (state.selected !== selected) {
+                                $("acp-notice").textContent = "This list belongs to another session. Open the session again to stop its server.";
+
+                                return;
+                            }
+
+                            portsRead.quiet = 0;
+
+                            const result = await globalThis.neoreDevice.acpPortStop(selected as string, port.pid, port.startedAt);
+
+                            // Another session was opened during the stop: its panel keeps its own notice and focus.
+                            if (state.selected !== selected) {
+                                return;
+                            }
+
+                            $("acp-notice").textContent = result.ended ? `Stopped ${port.name} on port ${String(port.port)}.` : `${port.name} on port ${String(port.port)} did not end: ${result.reason ?? "unknown reason"}.`;
+                            await refreshPorts();
+
+                            // The button that was pressed is gone with its row: keyboard focus moves to the result, not the top of the page.
+                            const notice = $("acp-notice");
+
+                            notice.tabIndex = -1;
+                            notice.focus();
+                        });
+                    }),
+                )),
+    );
+};
+
 const refreshSessions = async (): Promise<void> => {
     state.sessions = await globalThis.neoreDevice.acpSessions();
 
     if (state.selected !== undefined && state.sessions.every((session) => session.id !== state.selected)) {
-        state.selected = undefined;
+        selectSession(undefined);
     }
 
     $("acp-sessions").replaceChildren(
@@ -733,7 +846,7 @@ const refreshSessions = async (): Promise<void> => {
                 return item(
                     label,
                     button(state.selected === session.id ? "Showing" : "Open", `Open the session with ${session.agentLabel} in ${session.folder}`, () => {
-                        state.selected = session.id;
+                        selectSession(session.id);
                         refreshSessions();
                     }),
                 );
@@ -860,6 +973,19 @@ export const initAcp = async (): Promise<void> => {
         state.importing = undefined;
         renderImport();
     });
+
+    setInterval(() => {
+        // A slow read is let finish: a new one every poll would supersede it each time and nothing would ever show.
+        if (portsRead.skip > 0) {
+            portsRead.skip -= 1;
+
+            return;
+        }
+
+        if (state.selected !== undefined && !document.hidden && !portsRead.busy) {
+            refreshPorts();
+        }
+    }, PORTS_POLL_MS);
 
     globalThis.neoreDevice.onAcpChanged(async () => {
         try {
