@@ -32,7 +32,8 @@ export const getSessionOrganizationForCap = internalQuery
     .query(async ({ args: { sessionId, userId }, ctx }) => {
         const session = await ctx.db.session.findFirst({ where: { _id: sessionId as Id<"session"> } });
 
-        if (!session || session.userId !== userId || session.expiresAt <= Date.now()) {
+        // `ctx.now`, not the wall clock: a query re-run on the same data must give the same answer.
+        if (!session || session.userId !== userId || session.expiresAt <= ctx.now) {
             return null;
         }
 
