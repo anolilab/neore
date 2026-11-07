@@ -12,3 +12,17 @@
   grouping (`backfill-logic.ts#groupReplies`) must keep matching what one run
   saves, or its keys stop lining up with the live ones. Keys are pruned only
   after the user's backfill is done.
+- **Project rows** — a reply in a thread with a project also adds a
+  `__project__` row (`projectKey` = project id), read from the thread when
+  `recordReplyUsage` lands (pass `threadId`; rows carry it via `SavedRowLike`).
+  A caller off the thread's shard passes `threadAttribution` instead
+  (`getThreadAttribution`); a shared thread's record is forwarded through
+  `forwardReplyUsage`. A replier who cannot open the project files none.
+  Replies outside a project write none: "No project" is total − projects, so
+  never write a project row for a reply the total does not count. The project
+  walk (`runUsageProjectBackfillStep`) starts only once the first walk is done,
+  with its cutoff, adds only project rows for replies from before it, skips keys
+  the live path marked `projectFiled` and marks its own `project:<key>`, which
+  the live path checks. The first walk marks `pending:<key>` for a reply it
+  passed still running; the project walk files such a reply only once its live
+  record's key is held. Key pruning waits for both walks.

@@ -39,10 +39,12 @@ export const recordPausedRunUsage = async (ctx: MutationCtx, stream: Doc<"persis
     // The stored `message` is the AI SDK's, wider than the usage record reads: only its role is.
     const rows = docs.map((row) => {
         return {
+            _creationTime: row._creationTime,
             _id: row._id,
             message: row.message as { role?: string } | null | undefined,
             order: row.order,
             providerMetadata: row.providerMetadata,
+            threadId: row.threadId as string,
             usage: row.usage,
         };
     });
