@@ -247,6 +247,8 @@ export interface CursorPage<T> {
     endCursor: string | null;
     hasMore: boolean;
     items: T[];
+    /** How many there are in all, when the host says. */
+    total?: number;
 }
 
 export interface ViewedFile {

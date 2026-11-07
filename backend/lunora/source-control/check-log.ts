@@ -62,7 +62,7 @@ const tailOf = (text: string, maxChars: number): string => {
  * The lines around the failure markers (the host's own `##[error]`, else words that name one), the last ones first
  * when they do not all fit, else the log's tail. `partial` says the text given is already only part of the log.
  */
-export const excerptLog = (raw: string, maxChars: number = LOG_EXCERPT_MAX_CHARS, partial = false): CheckLog => {
+const cutLog = (raw: string, maxChars: number, partial: boolean): CheckLog => {
     const lines = raw.split(LINE_BREAK).map((line) => cleanLine(line));
 
     while (lines.length > 0 && lines.at(-1) === "") {
@@ -123,6 +123,29 @@ export const excerptLog = (raw: string, maxChars: number = LOG_EXCERPT_MAX_CHARS
     const covered = windows.length === 1 && windows[0]?.start === 0 && windows[0].end === lines.length;
 
     return { excerpt: kept.join("\n...\n"), source: "job_log", truncated: partial || cut || !covered };
+};
+
+/** Room kept for the marker line at the head of a cut excerpt. */
+const MARKER_ROOM = 64;
+
+/**
+ * The excerpt with its marker: `[truncated, N more lines]` first when lines of the text were left out, so a reader of
+ * the excerpt alone knows it is part of the log. Inside `maxChars` all told.
+ */
+export const excerptLog = (raw: string, maxChars: number = LOG_EXCERPT_MAX_CHARS, partial = false): CheckLog => {
+    const lineCount = raw.split(LINE_BREAK).length;
+    const cut = cutLog(raw, maxChars - MARKER_ROOM, partial);
+
+    if (!cut.truncated) {
+        return cut;
+    }
+
+    const shownLines = cut.excerpt === "" ? 0 : cut.excerpt.split("\n").filter((line) => line !== "...").length;
+    const more = Math.max(0, lineCount - shownLines);
+    const where = partial ? " before these" : "";
+    const marker = more > 0 ? `[truncated, ${String(more)} more lines${where}]` : "[truncated]";
+
+    return { ...cut, excerpt: `${marker}\n${cut.excerpt}` };
 };
 
 /**
@@ -194,7 +217,13 @@ export const readTail = async (
 
 /** The excerpt of a log read with {@link readTail}, marked when the read did not reach the log's end. */
 export const excerptRead = (read: { endReached: boolean; partial: boolean; text: string }, maxChars: number): CheckLog => {
-    const log = excerptLog(read.text, maxChars, read.partial);
+    if (read.endReached) {
+        return excerptLog(read.text, maxChars, read.partial);
+    }
 
-    return read.endReached ? log : { ...log, endRead: false };
+    // The log goes on past what was read: said at the end, where its failure may still be.
+    const ending = "\n[truncated, the log goes on past what was read]";
+    const log = excerptLog(read.text, maxChars - ending.length, read.partial);
+
+    return { ...log, endRead: false, excerpt: `${log.excerpt}${ending}`, truncated: true };
 };

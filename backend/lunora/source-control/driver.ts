@@ -66,12 +66,13 @@ export interface HostDriver {
     /** The request headers the host's API wants, besides the token. */
     readonly headers: Record<string, string>;
     readonly kind: HostKind;
-    listChecks: (request: HostRequest, ref: PullRequestRef, headSha: string) => Promise<CheckSummary>;
+    /** One bounded page of the head's checks, or up to `maxPages` of them (`CheckSummary.total` says how many there are). */
+    listChecks: (request: HostRequest, ref: PullRequestRef, headSha: string, maxPages?: number) => Promise<CheckSummary>;
     listCommits: (request: HostRequest, ref: PullRequestRef, page: number) => Promise<CommitPage>;
     listFiles: (request: HostRequest, ref: PullRequestRef, page: number) => Promise<FilePage>;
     listInbox: (request: HostRequest, section: InboxSection, page: number) => Promise<InboxPage>;
-    /** The submitted reviews (verdict and top-level text), oldest first, one bounded page. */
-    listReviews: (request: HostRequest, ref: PullRequestRef) => Promise<PullRequestReview[]>;
+    /** The newest submitted reviews (verdict and top-level text), newest first, and how many there are in all. */
+    listReviews: (request: HostRequest, ref: PullRequestRef) => Promise<{ items: PullRequestReview[]; total: number }>;
     /** The review conversation: threads of line comments, with their replies. */
     listThreads: (request: HostRequest, ref: PullRequestRef, after: string | null) => Promise<CursorPage<ReviewThread>>;
     /** Which files the reviewer has marked viewed on the host. */

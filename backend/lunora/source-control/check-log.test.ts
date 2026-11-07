@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { excerptLog, excerptRead, isLogAddress, LOG_EXCERPT_MAX_CHARS, readTail } from "./check-log";
 
+/** A cut excerpt opens with its marker. */
+const MARKED_TAIL = /^\[truncated, \d+ more lines\]\nline /u;
+
 const stamp = (line: string): string => `2026-11-06T10:00:00.1234567Z ${line}`;
 
 describe(excerptLog, () => {
@@ -43,7 +46,7 @@ describe(excerptLog, () => {
 
         expect(log.excerpt.length).toBeLessThanOrEqual(200);
         expect(log.excerpt.endsWith("line 999")).toBe(true);
-        expect(log.excerpt.startsWith("line ")).toBe(true);
+        expect(log.excerpt).toMatch(MARKED_TAIL);
     });
 
     it("keeps a short log whole", () => {
@@ -97,7 +100,12 @@ describe(readTail, () => {
     });
 
     it("marks an excerpt whose log was not read to its end", () => {
-        expect(excerptRead({ endReached: false, partial: true, text: "##[error]boom" }, 100)).toMatchObject({ endRead: false, excerpt: "##[error]boom" });
+        const cut = excerptRead({ endReached: false, partial: true, text: "##[error]boom" }, 200);
+
+        expect(cut).toMatchObject({ endRead: false, truncated: true });
+        expect(cut.excerpt).toContain("##[error]boom");
+        expect(cut.excerpt.endsWith("[truncated, the log goes on past what was read]")).toBe(true);
+        expect(cut.excerpt.length).toBeLessThanOrEqual(200);
         expect(excerptRead({ endReached: true, partial: false, text: "ok" }, 100)).not.toHaveProperty("endRead");
     });
 

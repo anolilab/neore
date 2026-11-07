@@ -9,13 +9,15 @@ import { LOG_EXCERPT_MAX_CHARS } from "./check-log";
 import { githubDriver } from "./drivers/github";
 import type { LinkedPullRequest, PullRequestAgentDependencies } from "./pr-agent-host";
 import {
+    AGENT_MAX_THREAD_PAGES,
     AGENT_REVIEW_COMMENTS_BUDGET_CHARS,
     mergeForAgent,
     pickLinkedPullRequest,
     readFailingChecksForAgent,
     readPullRequestForAgent,
     rerunFailedForAgent,
-    reviewCommentsWithin,
+    parseThreadCursor,
+    readThreadsWithin,
 } from "./pr-agent-host";
 
 const SHA = "b".repeat(40);
@@ -24,6 +26,8 @@ const API = "https://api.github.com/repos/octo/hello";
 const STORAGE = ["productionresultssa1", "blob", "core", "windows", "net"].join(".");
 const LOG_URL = `https://${STORAGE}/actions-results/job-11?sig=abc`;
 const TOKEN = "token-1";
+/** A cut excerpt opens with its marker. */
+const MARKED = /^\[truncated, \d+ more lines/u;
 
 const pull = {
     additions: 1,
@@ -136,20 +140,22 @@ describe("reading the failing checks of a linked pull request", () => {
             throw new Error("expected checks");
         }
 
-        expect(outcome.checks.map((check) => check.name)).toStrictEqual(["test"]);
+        expect(outcome.checks.items.map((check) => check.name)).toStrictEqual(["test"]);
+        expect(outcome.checks).not.toHaveProperty("truncated");
         expect(outcome.passing).toBe(1);
 
-        const [failed] = outcome.checks;
+        const [failed] = outcome.checks.items;
 
         expect(failed?.log?.source).toBe("job_log");
         expect(failed?.log?.excerpt).toContain("FAIL src/sum.test.ts > adds");
         expect(failed?.log?.excerpt.length).toBeLessThanOrEqual(LOG_EXCERPT_MAX_CHARS);
         expect(failed?.log?.truncated).toBe(true);
+        expect(failed?.log?.excerpt).toMatch(MARKED);
 
-        const logRead = seen.find((call) => call.url.startsWith(`https://${STORAGE}/`));
+        const logRead = seen.find((call) => new URL(call.url).hostname === STORAGE);
 
         expect(logRead?.authorization).toBeNull();
-        expect(seen.filter((call) => call.url.startsWith("https://api.github.com/")).every((call) => call.authorization === `Bearer ${TOKEN}`)).toBe(true);
+        expect(seen.filter((call) => new URL(call.url).hostname === "api.github.com").every((call) => call.authorization === `Bearer ${TOKEN}`)).toBe(true);
     });
 
     it("does not follow a log redirect to an origin that is not the host's storage", async () => {
@@ -168,8 +174,8 @@ describe("reading the failing checks of a linked pull request", () => {
 
         const outcome = await readFailingChecksForAgent(dependencies(), {});
 
-        expect(seen.some((call) => call.url.startsWith("https://evil.example"))).toBe(false);
-        expect(outcome.status === "ok" && "checks" in outcome && outcome.checks[0]?.log).toStrictEqual({
+        expect(seen.some((call) => new URL(call.url).hostname === "evil.example")).toBe(false);
+        expect(outcome.status === "ok" && "checks" in outcome && outcome.checks.items[0]?.log).toStrictEqual({
             excerpt: "Tests\n\n1 test failed",
             source: "check_output",
             truncated: false,
@@ -196,7 +202,7 @@ describe("when a check's log cannot be had", () => {
         });
 
         const outcome = await readFailingChecksForAgent(dependencies(), {});
-        const [check] = outcome.status === "ok" && "checks" in outcome ? outcome.checks : [];
+        const [check] = outcome.status === "ok" && "checks" in outcome ? outcome.checks.items : [];
 
         expect(check?.logStatus).toBe("ok");
         expect(check?.log).toStrictEqual({ excerpt: "Tests\n\n2 failed", source: "check_output", truncated: false });
@@ -207,31 +213,121 @@ describe("when a check's log cannot be had", () => {
 
         const outcome = await readFailingChecksForAgent(dependencies(), {});
 
-        expect(outcome).toMatchObject({ checks: [{ log: null, logStatus: "unavailable", name: "test" }], complete: false, status: "ok" });
+        expect(outcome).toMatchObject({
+            checks: { items: [{ log: null, logStatus: "unavailable", name: "test" }] },
+            status: "ok",
+            unlisted: { truncated: "truncated, 2 more" },
+        });
     });
 });
 
-describe("reading a linked pull request's review threads", () => {
-    it("hands back a cursor for the next page and reads that page when given it", async () => {
-        const after: (string | null)[] = [];
+describe("reading a linked pull request's reviews and review threads", () => {
+    const review = (index: number) => {
+        return { authorLogin: "r", body: `review ${String(index)}`, id: String(index), state: "commented" as const, submittedAt: index };
+    };
+
+    it("hands over the newest reviews first, and counts the rest", async () => {
+        const items = Array.from({ length: 40 }, (_, index) => review(39 - index));
         const driver = {
             ...githubDriver,
             getPullRequest: async () => ({ ...pull, baseBranch: "main", bodyTruncated: false, headBranch: "feat/sum", headSha: SHA }) as never,
-            listReviews: async () => [],
-            listThreads: async (_request: unknown, _ref: unknown, cursor: string | null) => {
-                after.push(cursor);
-
-                return { endCursor: "page-2", hasMore: cursor === null, items: [] };
+            listReviews: async () => {
+                return { items, total: 40 };
+            },
+            listThreads: async () => {
+                return { endCursor: null, hasMore: false, items: [], total: 0 };
             },
         };
-        const first = await readPullRequestForAgent({ ...dependencies(), driver }, {});
+        const read = await readPullRequestForAgent({ ...dependencies(), driver }, {});
 
-        expect(first).toMatchObject({ moreReviewComments: true, nextReviewCursor: "page-2" });
+        expect(read).toMatchObject({ reviews: { truncated: "truncated, 10 more" }, status: "ok" });
+        expect("reviews" in read && read.reviews.items[0]?.body).toBe("review 39");
+    });
+});
 
-        const second = await readPullRequestForAgent({ ...dependencies(), driver }, {}, "page-2");
+describe(readThreadsWithin, () => {
+    const comment = (id: number, size = 10) => {
+        return { authorLogin: "a", body: "x".repeat(size), createdAt: 0, id: String(id) };
+    };
+    const thread = (id: string, comments: ReturnType<typeof comment>[]) => {
+        return {
+            canResolve: true,
+            canUnresolve: false,
+            comments,
+            id,
+            isOutdated: false,
+            isResolved: false,
+            line: 1,
+            path: "a.ts",
+            side: "new" as const,
+            startLine: null,
+        };
+    };
 
-        expect(second).toMatchObject({ moreReviewComments: false, nextReviewCursor: null });
-        expect(after).toStrictEqual([null, "page-2"]);
+    it("shows a thread's first and latest comments, and marks the rest", async () => {
+        const read = await readThreadsWithin(
+            async () => {
+                return {
+                    endCursor: null,
+                    hasMore: false,
+                    items: [
+                        thread(
+                            "t",
+                            Array.from({ length: 30 }, (_, index) => comment(index)),
+                        ),
+                    ],
+                    total: 1,
+                };
+            },
+            { page: null, skip: 0 },
+        );
+
+        expect(read.nextCursor).toBeNull();
+        expect(read).not.toHaveProperty("truncated");
+        expect(read.items[0]?.comments.items.map((entry) => entry.id)).toStrictEqual(["0", "21", "22", "23", "24", "25", "26", "27", "28", "29"]);
+        expect(read.items[0]?.comments.truncated).toBe("truncated, 20 more");
+    });
+
+    it("pages through the host's threads, stops at the budget, and goes on from the next thread", async () => {
+        const perThread = 2000;
+        const pageSize = 5;
+        const pages = 8;
+        const all = Array.from({ length: pageSize * pages }, (_, index) => thread(`t${String(index)}`, [comment(index, perThread)]));
+        const asked: (string | null)[] = [];
+        const readPage = async (after: string | null) => {
+            asked.push(after);
+
+            const start = after === null ? 0 : Number(after);
+
+            return {
+                endCursor: String(start + pageSize),
+                hasMore: start + pageSize < all.length,
+                items: all.slice(start, start + pageSize),
+                total: all.length,
+            };
+        };
+        const fitting = Math.floor(AGENT_REVIEW_COMMENTS_BUDGET_CHARS / perThread);
+        const first = await readThreadsWithin(readPage, { page: null, skip: 0 });
+
+        expect(first.items).toHaveLength(Math.min(fitting, pageSize * AGENT_MAX_THREAD_PAGES));
+        expect(first.truncated).toBe(`truncated, ${String(all.length - first.items.length)} more`);
+
+        const next = parseThreadCursor(first.nextCursor);
+
+        expect(next).not.toBeNull();
+
+        const second = await readThreadsWithin(readPage, next!);
+        const shown = [...first.items, ...second.items].map((entry) => entry.comments.items[0]?.id);
+
+        // Nothing comes twice and nothing is skipped between the two reads.
+        expect(shown).toStrictEqual(all.slice(0, shown.length).map((entry) => entry.comments[0]?.id));
+        expect(asked.length).toBeGreaterThan(1);
+    });
+
+    it("refuses a cursor it did not give", () => {
+        expect(parseThreadCursor("../../x")).toBeNull();
+        expect(parseThreadCursor("abc#5")).toStrictEqual({ page: "abc", skip: 5 });
+        expect(parseThreadCursor(undefined)).toStrictEqual({ page: null, skip: 0 });
     });
 });
 
@@ -335,45 +431,5 @@ describe("re-running checks of a linked pull request", () => {
 
         expect(outcome).toMatchObject({ notRerun: ["11", "12"], status: "ok" });
         expect("rerun" in outcome && outcome.rerun).toHaveLength(10);
-    });
-});
-
-describe(reviewCommentsWithin, () => {
-    const comment = (id: number, size = 10) => {
-        return { authorLogin: "a", body: "x".repeat(size), createdAt: 0, id: String(id) };
-    };
-    const thread = (comments: ReturnType<typeof comment>[]) => {
-        return {
-            canResolve: true,
-            canUnresolve: false,
-            comments,
-            id: "t",
-            isOutdated: false,
-            isResolved: false,
-            line: 1,
-            path: "a.ts",
-            side: "new" as const,
-            startLine: null,
-        };
-    };
-
-    it("keeps a thread's first and latest comments and counts the rest", () => {
-        const { omittedReviewThreads, reviewComments } = reviewCommentsWithin([thread(Array.from({ length: 30 }, (_, index) => comment(index)))]);
-
-        expect(omittedReviewThreads).toBe(0);
-        expect(reviewComments[0]?.comments.map((entry) => entry.id)).toStrictEqual(["0", "21", "22", "23", "24", "25", "26", "27", "28", "29"]);
-        expect(reviewComments[0]?.omittedComments).toBe(20);
-    });
-
-    it("stops adding threads once the budget is spent, and says how many it left out", () => {
-        const big = thread([comment(1, 2000)]);
-        const threads = Array.from({ length: Math.ceil(AGENT_REVIEW_COMMENTS_BUDGET_CHARS / 2000) + 5 }, (_, index) => {
-            return { ...big, id: `t${String(index)}` };
-        });
-        const { omittedReviewThreads, reviewComments } = reviewCommentsWithin(threads);
-
-        expect(reviewComments.length * 2000).toBeLessThanOrEqual(AGENT_REVIEW_COMMENTS_BUDGET_CHARS);
-        expect(omittedReviewThreads).toBe(threads.length - reviewComments.length);
-        expect(omittedReviewThreads).toBeGreaterThan(0);
     });
 });

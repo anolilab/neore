@@ -581,3 +581,67 @@ describe("the newest reviews", () => {
         expect(lastPageOf('<https://api.github.com/x?page=2>; rel="next"')).toBeUndefined();
     });
 });
+
+describe("reading past the first page", () => {
+    /** A host that answers by path and page: `pages[path][page - 1]` is that page's body, with an optional Link header. */
+    const paged =
+        (pages: Record<string, { body: unknown; link?: string }[]>): HostRequest =>
+        async (path, options: HostRequestOptions = {}) => {
+            const page = Number(options.query?.page ?? 1);
+            const answer = pages[path]?.[page - 1];
+
+            if (answer === undefined) {
+                throw new HostApiError(`no route ${path} page ${String(page)}`, 404);
+            }
+
+            return Response.json(answer.body, { headers: answer.link === undefined ? {} : { link: answer.link } });
+        };
+
+    it("lists every page of checks a reader asks for, so a failure on a later page is not missed", async () => {
+        const runs = (from: number, count: number, conclusion = "success") =>
+            Array.from({ length: count }, (_, index) => run(from + index, `job ${String(from + index)}`, conclusion));
+        const request = paged({
+            [`${REPO}/branches/main`]: [{ body: { protected: false } }],
+            [`${REPO}/commits/${SHA}/check-runs`]: [
+                { body: { check_runs: runs(1, 100), total_count: 150 } },
+                { body: { check_runs: runs(101, 50, "failure"), total_count: 150 } },
+            ],
+            [`${REPO}/commits/${SHA}/status`]: [{ body: { statuses: [], total_count: 0 } }],
+            [`${REPO}/pulls/7`]: [{ body: { base: { ref: "main" } } }],
+            [`${REPO}/rules/branches/main`]: [{ body: [] }],
+        });
+
+        const one = await githubDriver.listChecks(request, REF, SHA);
+        const all = await githubDriver.listChecks(request, REF, SHA, 10);
+
+        expect(one.checks).toHaveLength(100);
+        expect(all.checks).toHaveLength(150);
+        expect(all.checks.filter((check) => check.state === "failure")).toHaveLength(50);
+    });
+
+    it("reads the newest reviews from the last page and hands them over newest first, with the total", async () => {
+        const review = (id: number) => {
+            return {
+                body: `r${String(id)}`,
+                id,
+                state: "COMMENTED",
+                submitted_at: new Date(Date.UTC(2026, 0, 1, 0, 0, id)).toISOString(),
+                user: { login: "x" },
+            };
+        };
+        const link = `<https://api.github.com/repositories/1/pulls/7/reviews?page=2&per_page=100>; rel="next", <https://api.github.com/repositories/1/pulls/7/reviews?page=3&per_page=100>; rel="last"`;
+        const request = paged({
+            [`${REPO}/pulls/7/reviews`]: [
+                { body: Array.from({ length: 100 }, (_, index) => review(index + 1)), link },
+                { body: Array.from({ length: 100 }, (_, index) => review(index + 101)) },
+                { body: Array.from({ length: 20 }, (_, index) => review(index + 201)) },
+            ],
+        });
+
+        const reviews = await githubDriver.listReviews(request, REF);
+
+        expect(reviews.total).toBe(220);
+        expect(reviews.items[0]?.body).toBe("r220");
+        expect(reviews.items.at(-1)?.body).toBe("r101");
+    });
+});

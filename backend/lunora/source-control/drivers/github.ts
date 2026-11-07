@@ -520,6 +520,7 @@ const THREADS_QUERY = `query ($owner: String!, $name: String!, $number: Int!, $a
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       reviewThreads(first: ${THREAD_PAGE_SIZE}, after: $after) {
+        totalCount
         pageInfo { endCursor hasNextPage }
         nodes {
           id isResolved isOutdated path line startLine diffSide viewerCanResolve viewerCanUnresolve
@@ -565,7 +566,11 @@ const threadSchema = z.object({
 
 const threadsDataSchema = z.object({
     repository: z
-        .object({ pullRequest: z.object({ reviewThreads: z.object({ nodes: z.array(z.unknown()), pageInfo: pageInfoSchema }) }).nullable() })
+        .object({
+            pullRequest: z
+                .object({ reviewThreads: z.object({ nodes: z.array(z.unknown()), pageInfo: pageInfoSchema, totalCount: z.number().optional() }) })
+                .nullable(),
+        })
         .nullable(),
 });
 
@@ -637,6 +642,7 @@ const listThreads = async (request: HostRequest, ref: PullRequestRef, after: str
         endCursor: reviewThreads.pageInfo.endCursor,
         hasMore: reviewThreads.pageInfo.hasNextPage,
         items: threads.filter((thread): thread is ReviewThread => thread !== undefined),
+        ...(reviewThreads.totalCount !== undefined && { total: reviewThreads.totalCount }),
     };
 };
 
@@ -699,10 +705,10 @@ export const lastPageOf = (link: string | null): number | undefined => {
 };
 
 /**
- * The newest reviews, oldest first. The host lists reviews oldest first, so past one page the last page is read too,
- * with the one before it when the last is short: the newest verdicts are what a reader acts on.
+ * The newest reviews, newest first, and how many there are in all. The host lists reviews oldest first, so past one
+ * page the last page is read too, with the one before it when the last is short.
  */
-const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<PullRequestReview[]> => {
+const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<{ items: PullRequestReview[]; total: number }> => {
     const path = `${repoPath(ref)}/pulls/${ref.number}/reviews`;
     const readPage = async (page: number): Promise<{ last: number | undefined; values: unknown[] }> => {
         const response = await request(path, { query: { page, per_page: REVIEW_PAGE_SIZE } });
@@ -712,11 +718,13 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<P
     };
     const first = await readPage(1);
     let { values } = first;
+    let total = first.values.length;
 
     if (first.last !== undefined && first.last > 1) {
         const last = await readPage(first.last);
 
         values = last.values;
+        total = (first.last - 1) * REVIEW_PAGE_SIZE + last.values.length;
 
         if (last.values.length < REVIEW_PAGE_SIZE) {
             const before = first.last > 2 ? await readPage(first.last - 1) : first;
@@ -725,7 +733,7 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<P
         }
     }
 
-    return values.flatMap((value) => {
+    const items = values.flatMap((value): PullRequestReview[] => {
         const review = submittedReviewSchema.safeParse(value);
         const state = review.success ? REVIEW_STATES[review.data.state] : undefined;
 
@@ -744,6 +752,9 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<P
             },
         ];
     });
+
+    // Newest first: the latest verdict is what a reader acts on.
+    return { items: items.toSorted((left, right) => right.submittedAt - left.submittedAt), total };
 };
 
 const RESOLVE_MUTATION = `mutation ($threadId: ID!) { resolveReviewThread(input: { threadId: $threadId }) { thread { id isResolved } } }`;
@@ -1106,7 +1117,19 @@ const requiredChecksOf = async (request: HostRequest, ref: PullRequestRef): Prom
     };
 };
 
-const listChecks = async (request: HostRequest, ref: PullRequestRef, headSha: string): Promise<CheckSummary> => {
+/** Every page past the first, up to `maxPages`, of a list whose first page said how many it holds. */
+const laterPages = async (request: HostRequest, path: string, total: number, maxPages: number, itemsOf: (body: unknown) => unknown[]): Promise<unknown[]> => {
+    const pages = Math.min(maxPages, Math.ceil(total / GITHUB_PAGE_SIZE));
+    const items: unknown[] = [];
+
+    for (let page = 2; page <= pages; page += 1) {
+        items.push(...itemsOf(await readJson(await request(path, { query: { page, per_page: GITHUB_PAGE_SIZE } }))));
+    }
+
+    return items;
+};
+
+const listChecks = async (request: HostRequest, ref: PullRequestRef, headSha: string, maxPages = 1): Promise<CheckSummary> => {
     if (!SHA.test(headSha)) {
         throw new HostApiError("Not a commit id", 404);
     }
@@ -1142,6 +1165,17 @@ const listChecks = async (request: HostRequest, ref: PullRequestRef, headSha: st
     }
 
     const statuses = parse(commitStatusSchema, await readJson(statusResponse));
+
+    // A reader that wants more than one bounded page (an agent looking for every failure) reads on, page by page.
+    if (maxPages > 1) {
+        runs.check_runs.push(
+            ...(await laterPages(request, `${base}/check-runs`, runs.total_count, maxPages, (body) => parse(checkRunsSchema, body).check_runs)),
+        );
+        statuses.statuses.push(
+            ...(await laterPages(request, `${base}/status`, statuses.total_count ?? 0, maxPages, (body) => parse(commitStatusSchema, body).statuses)),
+        );
+    }
+
     const required = await requiredChecksOf(request, ref);
     const checks: CheckRun[] = [
         ...runs.check_runs.flatMap((value) => {
