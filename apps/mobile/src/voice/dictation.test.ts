@@ -7,6 +7,7 @@ import { createOnDeviceSession, createRecognizerLock, ON_DEVICE_UNAVAILABLE_MESS
 import { MIC_BUSY_MESSAGE } from "./voice-input";
 
 const NOTHING_SENT = /Nothing was sent/u;
+const NOTHING_HEARD = /No speech was heard/u;
 
 const fakeEngine = (): DictationEngine => {
     return { finish: vi.fn(async () => {}), start: vi.fn(async () => {}) };
@@ -224,5 +225,29 @@ describe(createRecognizerLock, () => {
 
         expect(onText).toHaveBeenCalledWith("hello");
         expect(lock.isTaken()).toBe(false);
+    });
+
+    it("an end the press did not ask for cuts the recognizer off, so the microphone is never left on", async () => {
+        const recognizer = fakeRecognizer(true);
+        const errors: (string | undefined)[] = [];
+        const session = createOnDeviceSession({
+            lang: "en-US",
+            lock: createRecognizerLock(),
+            now: () => 0,
+            onError: (message) => {
+                errors.push(message);
+            },
+            onPhase: () => {},
+            onText: () => {},
+            platform: { OS: "ios", Version: "18.0" },
+            recognizer,
+        });
+
+        await session.start();
+        session.handle({ type: "start" });
+        session.handle({ type: "end" });
+
+        expect(recognizer.abort).toHaveBeenCalledOnce();
+        expect(errors.at(-1)).toMatch(NOTHING_HEARD);
     });
 });

@@ -347,7 +347,7 @@ export const createOnDeviceSession = ({
             hasStarted = false;
             hasErrored = false;
             // Never `requiresOnDeviceRecognition: false`, and no service package: the system's on-device recognizer only.
-            recognizer.start({ addsPunctuation: true, continuous: true, interimResults: false, lang: locale, requiresOnDeviceRecognition: true });
+            recognizer.start({ addsPunctuation: true, continuous: true, interimResults: true, lang: locale, requiresOnDeviceRecognition: true });
             startedAt = now();
             onPhase("recording");
             timer = setTimeout(() => {
@@ -363,6 +363,14 @@ export const createOnDeviceSession = ({
     /** This recognition ended: its text goes to the draft, or its failure to the composer. */
     const complete = (): void => {
         const text = finals.join(" ");
+
+        // An end this press did not ask for may be an earlier recognition's, with this one still running: it is cut off,
+        // so the microphone is never left on without a press. When nothing runs, the abort does nothing.
+        if (!isStopping) {
+            didNativeCall(() => {
+                recognizer.abort();
+            });
+        }
 
         if (!isAttached) {
             // The screen is gone: nobody to tell.
@@ -406,6 +414,15 @@ export const createOnDeviceSession = ({
             if (event.code !== "aborted") {
                 hasErrored = true;
                 failure ??= ERROR_MESSAGES[event.code] ?? ON_DEVICE_FAILED_MESSAGE;
+
+                // Not every native failure sends an end: an abort makes sure one comes, and the deadline covers the rest.
+                if (!isStopping) {
+                    isStopping = true;
+                    didNativeCall(() => {
+                        recognizer.abort();
+                    });
+                    giveUpAfterDeadline();
+                }
             }
 
             return;
