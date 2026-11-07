@@ -3324,7 +3324,7 @@ msgstr "匿名用户"
 msgid "Anonymous users inactive for this many days become eligible for deletion."
 msgstr "不活跃超过此天数的匿名用户将可被删除。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:321
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:330
 msgid "Another action already uses this key combination. Change or clear one of them to save."
 msgstr ""
 
@@ -3634,12 +3634,12 @@ msgstr ""
 msgid "Archive open thread"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:128
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:137
 msgid "Archive Open Thread"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("archiveThread")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:147
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:156
 msgid "Archive the open thread, or restore it when it is archived ({0})"
 msgstr ""
 
@@ -3809,7 +3809,7 @@ msgstr ""
 msgid "Ask a side question"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:129
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:138
 msgid "Ask a Side Question"
 msgstr ""
 
@@ -6036,8 +6036,8 @@ msgstr "清理失败"
 #: src/features/prompts/components/prompt-list.tsx:615
 #: src/features/settings/components/chat/api-keys-settings.tsx:401
 #: src/features/settings/components/chat/models-settings.tsx:477
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:358
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:376
 msgid "Clear"
 msgstr "清除"
 
@@ -6208,7 +6208,7 @@ msgstr "关闭"
 msgid "Close {0}"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:153
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:162
 msgid "Close dialogs and menus"
 msgstr "关闭对话框和菜单"
 
@@ -6546,7 +6546,7 @@ msgstr "请输入命令"
 msgid "Command must be {SKILL_SLUG_MAX} characters or less"
 msgstr "命令不能超过 {SKILL_SLUG_MAX} 个字符"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:130
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:139
 #: src/features/settings/lib/settings-keywords.ts:36
 msgid "Command Palette"
 msgstr ""
@@ -7656,7 +7656,7 @@ msgstr "请立即复制——它不会再次显示。"
 msgid "Copy last code block"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:131
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:140
 #: src/features/settings/lib/settings-keywords.ts:41
 msgid "Copy Last Code Block"
 msgstr ""
@@ -7703,7 +7703,7 @@ msgid "Copy the JSON configuration"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("copyLastCodeBlock")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:150
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:159
 msgid "Copy the last code block of the latest assistant reply ({0})"
 msgstr ""
 
@@ -8773,7 +8773,7 @@ msgstr ""
 msgid "Customize and regenerate"
 msgstr "自定义并重新生成"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:296
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:305
 msgid "Customize keyboard shortcuts for common actions. Click \"Record\" and press your desired key combination."
 msgstr "为常用操作自定义键盘快捷键。点击“录制”并按下你想要的组合键。"
 
@@ -8998,7 +8998,7 @@ msgstr "将目标分解为可执行的计划。"
 msgid "Decrease number of images"
 msgstr "减少图片数量"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:132
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:141
 #: src/features/settings/lib/settings-keywords.ts:43
 msgid "Decrease Reasoning Effort"
 msgstr ""
@@ -9369,7 +9369,7 @@ msgstr "删除模型？"
 msgid "Delete node"
 msgstr "删除节点"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:133
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:142
 msgid "Delete Open Thread"
 msgstr ""
 
@@ -9465,7 +9465,7 @@ msgid "Delete Team"
 msgstr "删除团队"
 
 #. placeholder {0}: defaultShortcut("deleteThread")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:152
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:161
 msgid "Delete the open thread after you confirm ({0})"
 msgstr ""
 
@@ -11625,7 +11625,7 @@ msgstr "错误：{error}"
 msgid "Errors"
 msgstr "错误"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:134
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:143
 msgid "Escape"
 msgstr "Escape"
 
@@ -12931,7 +12931,7 @@ msgstr "更新收藏状态失败"
 msgid "Failed to update filter rules"
 msgstr "更新筛选规则失败"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:183
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:192
 msgid "Failed to update keyboard shortcuts"
 msgstr "更新键盘快捷键失败"
 
@@ -13667,7 +13667,7 @@ msgstr "在表格中查找..."
 msgid "Find in thread"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:135
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:144
 msgid "Find in Thread"
 msgstr ""
 
@@ -13803,7 +13803,7 @@ msgstr "焦距"
 msgid "Focal Length"
 msgstr "焦距"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:136
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:145
 #: src/features/settings/lib/settings-keywords.ts:40
 msgid "Focus Search"
 msgstr ""
@@ -15305,7 +15305,7 @@ msgstr "你好，{0}！今天想做点什么？"
 #: src/features/chat/signed-out/signed-out-chat.tsx:116
 #: src/features/layout/components/mobile-section-nav.tsx:72
 #: src/features/layout/components/sidebar-shortcut.tsx:301
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:137
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:146
 msgid "Help"
 msgstr "帮助"
 
@@ -16327,7 +16327,7 @@ msgstr ""
 msgid "Increase number of images"
 msgstr "增加图片数量"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:138
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:147
 #: src/features/settings/lib/settings-keywords.ts:42
 msgid "Increase Reasoning Effort"
 msgstr ""
@@ -17005,7 +17005,7 @@ msgid "Keyboard shortcuts"
 msgstr "键盘快捷键"
 
 #: src/features/layout/lib/dashboard-page-names.ts:25
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:294
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:303
 #: src/features/settings/lib/settings-keywords.ts:36
 #: src/features/settings/lib/settings-keywords.ts:37
 #: src/features/settings/lib/settings-keywords.ts:38
@@ -17026,11 +17026,11 @@ msgstr "键盘快捷键"
 msgid "Keyboard shortcuts (?)"
 msgstr "键盘快捷键（?）"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:279
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:288
 msgid "Keyboard shortcuts reset to defaults"
 msgstr "键盘快捷键已恢复默认"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:194
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:203
 msgid "Keyboard shortcuts updated successfully"
 msgstr "键盘快捷键已更新"
 
@@ -18366,7 +18366,7 @@ msgstr "成本低于 Wan 2.5"
 msgid "Lower reasoning effort"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:151
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:160
 msgid "Lower the composer's reasoning effort by one step. Not bound by default."
 msgstr ""
 
@@ -20331,7 +20331,7 @@ msgstr "新聊天"
 #: src/features/chat/signed-out/signed-out-chat.tsx:305
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:263
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:159
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:139
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:148
 #: src/features/settings/lib/settings-keywords.ts:37
 msgid "New Chat"
 msgstr "新聊天"
@@ -20437,7 +20437,7 @@ msgstr "新的任务运行 · 之前的消息未发送给模型"
 msgid "New temporary chat"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:140
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:149
 #: src/features/settings/lib/settings-keywords.ts:38
 msgid "New Temporary Chat"
 msgstr "新建临时聊天"
@@ -21403,8 +21403,8 @@ msgstr ""
 msgid "Not read yet."
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:333
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:338
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:342
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:347
 #: src/features/settings/components/privacy/data-access.tsx:36
 msgid "Not set"
 msgstr "未设置"
@@ -22035,7 +22035,7 @@ msgstr "打开消息"
 msgid "Open model picker"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:141
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:150
 #: src/features/settings/lib/settings-keywords.ts:39
 msgid "Open Model Picker"
 msgstr ""
@@ -22136,7 +22136,7 @@ msgid "Open the agent's conversation"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("commandPalette")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:149
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:158
 msgid "Open the command palette and global search ({0})"
 msgstr ""
 
@@ -22145,7 +22145,7 @@ msgid "Open the Developer tab and start the server."
 msgstr "打开 Developer 标签页并启动服务器。"
 
 #. placeholder {0}: defaultShortcut("openModelPicker")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:160
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:169
 msgid "Open the model picker in the composer ({0})"
 msgstr ""
 
@@ -22160,7 +22160,7 @@ msgid "Open the run's conversation"
 msgstr "打开此次运行的对话"
 
 #. placeholder {0}: defaultShortcut("askAside")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:148
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:157
 msgid "Open the side-question panel without interrupting a running reply ({0})"
 msgstr ""
 
@@ -22169,7 +22169,7 @@ msgid "Open the sub-agent's thread"
 msgstr "打开子代理的对话"
 
 #. placeholder {0}: defaultShortcut("focusSearch")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:155
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:164
 msgid "Open the thread list search and focus it ({0})"
 msgstr ""
 
@@ -23948,7 +23948,7 @@ msgstr "按 Enter 发送，Shift+Enter 换行"
 msgid "Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default."
 msgstr "按 Esc 退出输入模式，然后用 h j k l、w b、0 $、i a I A、o O、x、dd、D 和 u 编辑。Enter 仍然发送。默认关闭。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:337
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:346
 msgid "Press keys..."
 msgstr "请按键..."
 
@@ -24852,7 +24852,7 @@ msgstr ""
 msgid "Raise reasoning effort"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:157
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:166
 msgid "Raise the composer's reasoning effort by one step. Not bound by default."
 msgstr ""
 
@@ -25252,8 +25252,8 @@ msgstr "正在重新连接服务器…"
 msgid "Reconnecting…"
 msgstr "正在重新连接…"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:342
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:355
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:351
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:364
 msgid "Record"
 msgstr "录制"
 
@@ -26132,7 +26132,7 @@ msgid "Reset to defaults"
 msgstr "恢复默认"
 
 #: src/features/settings/components/chat/models-settings.tsx:381
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:384
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:393
 msgid "Reset to Defaults"
 msgstr "恢复默认"
 
@@ -26918,7 +26918,7 @@ msgstr "保存预设"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "保存可复用的系统提示词，并将其绑定到特定模型。使用“优化”按钮，通过提示词优化器改进每个预设。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:391
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:400
 msgid "Save Shortcuts"
 msgstr "保存快捷键"
 
@@ -26977,7 +26977,7 @@ msgstr "已保存到“{0}”"
 #: src/features/settings/components/chat/native-providers-settings.tsx:711
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:247
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:391
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:400
 #: src/features/slides/components/slide-editor-dialog.tsx:117
 msgid "Saving..."
 msgstr "正在保存..."
@@ -27294,7 +27294,7 @@ msgid "Search the marketplace"
 msgstr "搜索市场"
 
 #. placeholder {0}: defaultShortcut("findInThread")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:154
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:163
 msgid "Search the open thread's messages and highlight the matches. Leave it unbound to keep the browser's find ({0})"
 msgstr ""
 
@@ -28133,7 +28133,7 @@ msgid "Show follow-up suggestions after assistant messages."
 msgstr "在助手消息后显示后续建议。"
 
 #. placeholder {0}: defaultShortcut("help")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:156
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:165
 msgid "Show help dialog ({0})"
 msgstr "显示帮助对话框（{0}）"
 
@@ -28266,12 +28266,12 @@ msgstr ""
 msgid "Sidebar"
 msgstr "侧边栏"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:142
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:151
 #: src/features/settings/lib/settings-keywords.ts:44
 msgid "Sidebar Left"
 msgstr "左侧边栏"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:143
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:152
 #: src/features/settings/lib/settings-keywords.ts:45
 msgid "Sidebar Right"
 msgstr "右侧边栏"
@@ -29255,7 +29255,7 @@ msgid "Start a new chat"
 msgstr "开始新对话"
 
 #. placeholder {0}: defaultShortcut("newChat")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:158
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:167
 msgid "Start a new chat ({0})"
 msgstr "开始新聊天（{0}）"
 
@@ -29268,7 +29268,7 @@ msgid "Start a new conversation to create your first thread"
 msgstr "开始聊天，创建你的第一个对话"
 
 #. placeholder {0}: defaultShortcut("newTemporaryChat")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:159
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:168
 msgid "Start a new temporary chat ({0})"
 msgstr "开始新的临时聊天（{0}）"
 
@@ -29531,8 +29531,8 @@ msgstr "股票"
 #: src/features/chat/host/host-composer.tsx:890
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 #: src/features/develop/components/watched-repositories.tsx:86
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:342
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:355
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:351
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:364
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
 #: src/features/sub-agents/components/worker-stop-bar.tsx:56
 #: src/features/workflow/components/canvas/workflow-controls.tsx:618
@@ -30948,7 +30948,7 @@ msgstr ""
 msgid "That is not a repository address."
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:200
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:209
 msgid "That key combination cannot be used as a shortcut"
 msgstr ""
 
@@ -32489,7 +32489,7 @@ msgid "Toggle left sidebar"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("sidebarLeft")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:161
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:170
 msgid "Toggle left sidebar ({0})"
 msgstr "切换左侧边栏（{0}）"
 
@@ -32512,7 +32512,7 @@ msgid "Toggle right sidebar"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("sidebarRight")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:162
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:171
 msgid "Toggle right sidebar ({0})"
 msgstr "切换右侧边栏（{0}）"
 
