@@ -4,6 +4,12 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+const LINKED_PULL_REQUESTS = /Linked pull requests/u;
+
+const linkedPullRequests = vi.hoisted(() => {
+    return { count: 0 };
+});
+
 vi.mock("@lingui/core/macro", () => {
     return { msg: (strings: TemplateStringsArray) => strings[0] };
 });
@@ -22,6 +28,12 @@ vi.mock("@lingui/react/macro", () => {
 
 vi.mock("@neore/backend/api", () => {
     return { api: {} };
+});
+
+vi.mock("@/features/develop/components/pull-request-counts", () => {
+    return {
+        usePullRequestCount: () => linkedPullRequests.count,
+    };
 });
 
 vi.mock("@tanstack/react-query", () => {
@@ -178,6 +190,20 @@ const baseProps = {
 };
 
 describe("ThreadNode", () => {
+    it("shows the linked pull request count with an accessible label, and none for a thread with no link", () => {
+        linkedPullRequests.count = 2;
+        const { unmount } = render(<ThreadNode {...baseProps} />);
+
+        expect(screen.getByLabelText("Linked pull requests: 2").textContent).toContain("2");
+        unmount();
+
+        linkedPullRequests.count = 0;
+        render(<ThreadNode {...baseProps} />);
+
+        expect(screen.queryByLabelText(LINKED_PULL_REQUESTS)).toBeNull();
+        linkedPullRequests.count = 0;
+    });
+
     it.each([
         "Expand branches",
         "Pin thread",

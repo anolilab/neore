@@ -724,9 +724,14 @@ export interface ApiTypes {
             rerunCheck: FunctionReference<"action", { number: number; repository: string; checkId: string }, { status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
             setAutoMerge: FunctionReference<"action", { number: number; repository: string; enabled: boolean; headSha: string; method: "merge" | "rebase" | "squash" }, { status: "ok" } | { status: "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" } | { reason: string | null; status: "rejected" } | { status: "unconfirmed" }>;
         };
+        pr_thread_attach: {
+            attachPullRequests: FunctionReference<"action", { pullRequests: Array<{ number: number; repository: string }>; threadId: string }, { results: Array<{ number: number; repository: string; status: "attached" | "already_linked" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" | "pull_request_full" | "thread_full" }> }>;
+            countsForThreads: FunctionReference<"query", { threadIds: Array<string> }, Array<{ count: number; threadId: string }>>;
+            listForThread: FunctionReference<"query", { threadId: string }, Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "linked" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }>>;
+        };
         pr_threads: {
-            getForThread: FunctionReference<"query", { threadId: string }, { baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "opened"; number: number; repository: string; threadId: string; title: string; url: string } | null>;
-            listForPullRequest: FunctionReference<"query", { number: number; repository: string }, Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }>>;
+            getForThread: FunctionReference<"query", { threadId: string }, { baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "linked" | "opened"; number: number; repository: string; threadId: string; title: string; url: string } | null>;
+            listForPullRequest: FunctionReference<"query", { number: number; repository: string }, Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "linked" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }>>;
             startWorkOnPullRequest: FunctionReference<"mutation", { baseBranch?: string; headBranch?: string; number: number; repository: string }, { created: boolean; threadId: string }>;
         };
         review_drafts: {
@@ -1587,6 +1592,11 @@ export const api: ApiTypes = {
             mergePullRequest: { __lunoraRef: "source_control_merge_functions:mergePullRequest" },
             rerunCheck: { __lunoraRef: "source_control_merge_functions:rerunCheck" },
             setAutoMerge: { __lunoraRef: "source_control_merge_functions:setAutoMerge" },
+        },
+        pr_thread_attach: {
+            attachPullRequests: { __lunoraRef: "source_control_pr_thread_attach:attachPullRequests" },
+            countsForThreads: { __lunoraRef: "source_control_pr_thread_attach:countsForThreads" },
+            listForThread: { __lunoraRef: "source_control_pr_thread_attach:listForThread" },
         },
         pr_threads: {
             getForThread: { __lunoraRef: "source_control_pr_threads:getForThread" },

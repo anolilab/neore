@@ -219,7 +219,7 @@ export const collectPullRequestThreadsForExport = internalQuery
                     baseBranch: v.optional(v.string()),
                     createdAt: v.number(),
                     headBranch: v.optional(v.string()),
-                    kind: v.union(v.literal("attached"), v.literal("opened")),
+                    kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
                     number: v.number(),
                     repository: v.string(),
                     threadId: v.string(),

@@ -1344,9 +1344,10 @@ export interface Doc_pullRequestThreads {
     baseBranch?: string;
     createdAt: number;
     headBranch?: string;
-    kind: "attached" | "opened";
+    kind: "attached" | "linked" | "opened";
     number: number;
     repository: string;
+    threadDeleted?: boolean;
     threadId: Id<"threads">;
     title: string;
     url: string;
@@ -4342,9 +4343,10 @@ export interface Insert_pullRequestThreads {
     baseBranch?: string;
     createdAt: number;
     headBranch?: string;
-    kind: "attached" | "opened";
+    kind: "attached" | "linked" | "opened";
     number: number;
     repository: string;
+    threadDeleted?: boolean;
     threadId: Id<"threads">;
     title: string;
     url: string;

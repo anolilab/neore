@@ -1,7 +1,8 @@
 import { api } from "@neore/backend/api";
 import type { InboxSection } from "@neore/backend/source-control/types";
 import { LIVE_META_KEY } from "@neore/client-runtime";
-import { skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { createLunoraActionQueryOptions, useAction, useCRPC, useLunora } from "@/lib/lunora/crpc";
@@ -144,9 +145,33 @@ export const useStartWorkOnPullRequest = () => {
     return useMutation(crpc.source_control.pr_threads.startWorkOnPullRequest.mutationOptions());
 };
 
-/** The pull request a thread was attached to or opened, for the thread's own header. */
-export const useThreadPullRequest = (threadId: string | undefined) => {
+/** Every pull request a thread is linked to, for the thread's own header. Live: a link made elsewhere shows up here too. */
+export const useThreadPullRequests = (threadId: string | undefined) => {
     const crpc = useCRPC();
 
-    return useQuery(crpc.source_control.pr_threads.getForThread.queryOptions(threadId === undefined ? skipToken : { threadId }));
+    return useQuery(crpc.source_control.pr_thread_attach.listForThread.queryOptions(threadId === undefined ? skipToken : { threadId }));
+};
+
+/** Attaches existing pull requests to a thread by hand. The host reads each one first; a refusal is reported per pull request. */
+export const useAttachPullRequests = () => useAction(api.source_control.pr_thread_attach.attachPullRequests);
+
+/** Threads one count read asks for: the backend's own cap. The rows past it show no badge. */
+const MAX_COUNT_THREADS = 200;
+
+/**
+ * How many pull requests each of the given threads is linked to, read ONCE for a whole list (the sidebar), not per
+ * row. The first 200 in list order are kept, then sorted so the query keeps one identity while the list only reorders,
+ * and nothing is asked until
+ * the page has painted, so the sidebar does not add to the queries the first paint waits for.
+ */
+export const usePullRequestCounts = (threadIds: ReadonlyArray<string>, ready: boolean): ReadonlyMap<string, number> => {
+    const crpc = useCRPC();
+    const sorted = useMemo(() => [...new Set(threadIds)].slice(0, MAX_COUNT_THREADS).toSorted((left, right) => left.localeCompare(right)), [threadIds]);
+    const { data } = useQuery({
+        ...crpc.source_control.pr_thread_attach.countsForThreads.queryOptions(ready && sorted.length > 0 ? { threadIds: sorted } : skipToken),
+        // The visible set changes as groups open and threads come and go: the last counts stay until the new ones arrive.
+        placeholderData: keepPreviousData,
+    });
+
+    return useMemo(() => new Map((data ?? []).map((row) => [row.threadId, row.count])), [data]);
 };

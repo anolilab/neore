@@ -2,13 +2,13 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-import * as lunora_sub_agents_execute_202 from "../../sub-agents/execute.js";
+import * as lunora_tasks_execute_206 from "../../tasks/execute.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_sub_agents_execute_202.runSubAgent.args, (source) => {
+installCompiledValidatorMap(lunora_tasks_execute_206.finishCodingAgentRound.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["runId"] !== "string") return DEFER;
-return { "runId": source["runId"] };
+if (typeof source["codingRunId"] !== "string") return DEFER;
+return { "codingRunId": source["codingRunId"] };
 });
-export * from "../../sub-agents/execute.js";
+export * from "../../tasks/execute.js";
