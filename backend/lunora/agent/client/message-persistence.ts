@@ -153,7 +153,8 @@ export async function saveStepFor<CustomContext extends object, AgentTools exten
         messages: messages as MessageWithMetadataInternal[],
         promptMessageId: asId<"messages">(args.promptMessageId),
         threadId: asId<"threads">(args.threadId),
-        userId: args.userId,
+        // The owner the media was stored for (`addMessages` would read the same one off the thread).
+        userId: mediaOwner,
     });
 }
 
