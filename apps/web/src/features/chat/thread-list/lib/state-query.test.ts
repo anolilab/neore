@@ -29,8 +29,12 @@ describe("parseStateQuery", () => {
 
     it("accepts a tag on its own, in any case", () => {
         expect(parseStateQuery("#Working")).toEqual({ state: "working", text: "" });
-        expect(parseStateQuery("  #idle  ")).toEqual({ state: "idle", text: "" });
+        expect(parseStateQuery("  #snoozed  ")).toEqual({ state: "snoozed", text: "" });
         expect(parseStateQuery("#snoozed")).toEqual({ state: "snoozed", text: "" });
+    });
+
+    it("does not offer #idle while no thread can be idle, so it searches titles instead", () => {
+        expect(parseStateQuery("#idle")).toEqual({ state: undefined, text: "#idle" });
     });
 
     it("treats an unknown tag as ordinary text, so a title that starts with # still matches", () => {

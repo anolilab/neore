@@ -1,8 +1,10 @@
 import type { ThreadState } from "./derived-sections";
 
-/** The `#` tags the command palette accepts, mapped to the state they filter on. */
+/**
+ * The `#` tags the command palette accepts, mapped to the state they filter on. `#idle` is not offered yet: no thread list row
+ * reports a bound recurring task, so no thread can be idle (`isIdleThread`), and a tag that never matches would only mislead.
+ */
 const STATE_TAGS: ReadonlyMap<string, ThreadState> = new Map<string, ThreadState>([
-    ["idle", "idle"],
     ["needs-you", "needsYou"],
     ["snoozed", "snoozed"],
     ["working", "working"],

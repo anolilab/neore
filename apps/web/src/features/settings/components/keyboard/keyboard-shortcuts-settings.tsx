@@ -42,6 +42,8 @@ const shortcutIdentity = (value: string): string => {
 // Only these two are checked: other defaults share a chord with a fixed binding (Escape) by design.
 const THREAD_ACTION_KEYS = ["archiveThread", "deleteThread"] as const;
 
+const CTRL_MODIFIER = /\bctrl\b/u;
+
 const keyboardShortcutSchema = z
     .strictObject({
         archiveThread: shortcutValueSchema,
@@ -85,10 +87,17 @@ const keyboardShortcutSchema = z
 
         // Runtime bindings this page does not edit: audio recording and list navigation. Read from the store, since they can be rebound.
         const runtime = useUIStateStore.getState().keyboardShortcuts;
-        const fixedChords = new Set<string>([
-            ...[runtime.audioRecord, runtime.nextItem, runtime.prevItem, runtime.firstItem, runtime.lastItem].map((value) => shortcutIdentity(value)),
-            ...SHORTCUT_ENTRIES.flatMap((entry) => ("fixed" in entry ? [shortcutIdentity(entry.fixed)] : [])),
-        ]);
+        // A fixed chord written with Ctrl answers to Cmd as well on a Mac (the list's select-all does), so both count as taken.
+        const fixedChords = new Set<string>(
+            [
+                runtime.audioRecord,
+                runtime.nextItem,
+                runtime.prevItem,
+                runtime.firstItem,
+                runtime.lastItem,
+                ...SHORTCUT_ENTRIES.flatMap((entry) => ("fixed" in entry ? [entry.fixed] : [])),
+            ].flatMap((value) => [shortcutIdentity(value), shortcutIdentity(value.replace(CTRL_MODIFIER, "meta"))]),
+        );
 
         for (const key of THREAD_ACTION_KEYS) {
             const value = context.value[key];

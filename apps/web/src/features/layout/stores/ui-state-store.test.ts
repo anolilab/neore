@@ -26,6 +26,13 @@ describe("thread action defaults against saved bindings", () => {
         expect(mergeKeyboardShortcuts({ newChat: "ctrl+j" }).archiveThread).toBe(defaultKeyboardShortcuts.archiveThread);
     });
 
+    it("reads the thread actions' old defaults in a set saved before they were removed as unset, so the new defaults apply", () => {
+        const merged = mergeKeyboardShortcuts({ archiveThread: "ctrl+a", deleteThread: "ctrl+d" });
+
+        expect(merged.archiveThread).toBe(defaultKeyboardShortcuts.archiveThread);
+        expect(merged.deleteThread).toBe(defaultKeyboardShortcuts.deleteThread);
+    });
+
     it("keeps a binding the user saved for the thread action itself", () => {
         expect(mergeKeyboardShortcuts({ archiveThread: "ctrl+j" }).archiveThread).toBe("ctrl+j");
     });

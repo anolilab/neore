@@ -171,6 +171,19 @@ describe("KeyboardShortcutsSettings", () => {
         expect(screen.getAllByRole("alert")).toHaveLength(1);
     });
 
+    it("refuses Save when an archive chord is Cmd+A on a Mac, which the list's select-all answers to as it does Ctrl+A", async () => {
+        renderSettings();
+
+        fireEvent.click(screen.getByRole("button", { name: "Record Archive Open Thread" }));
+        fireEvent.keyDown(document, { key: "a", metaKey: true });
+        fireEvent.keyUp(document, { key: "a", metaKey: true });
+
+        await waitFor(() => {
+            expect((screen.getByRole("button", { name: "Save Shortcuts" }) as HTMLButtonElement).disabled).toBe(true);
+        });
+        expect(screen.getAllByRole("alert")).toHaveLength(1);
+    });
+
     it("saves the defaults to the server on reset", async () => {
         act(() => {
             useUIStateStore.setState({ keyboardShortcuts: { ...defaultKeyboardShortcuts, newChat: "ctrl+j" } });

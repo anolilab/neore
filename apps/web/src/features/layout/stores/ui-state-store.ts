@@ -113,12 +113,38 @@ export const defaultKeyboardShortcuts: KeyboardShortcuts = {
     sidebarRight: `${platformModifier}+shift+b`,
 };
 
+/** The thread actions' old defaults, which sets saved before they were removed still carry. */
+const RETIRED_DEFAULTS: Readonly<Partial<Record<keyof KeyboardShortcuts, string>>> = {
+    archiveThread: `${platformModifier}+a`,
+    deleteThread: `${platformModifier}+d`,
+};
+
+/** `saved` without a binding still equal to its retired default. */
+const withoutRetiredDefaults = (saved: Partial<KeyboardShortcuts> | undefined): Partial<KeyboardShortcuts> | undefined => {
+    if (saved === undefined) {
+        return undefined;
+    }
+
+    const kept = { ...saved };
+
+    for (const [key, retired] of Object.entries(RETIRED_DEFAULTS) as [keyof KeyboardShortcuts, string][]) {
+        if (kept[key] === retired) {
+            delete kept[key];
+        }
+    }
+
+    return kept;
+};
+
 /**
  * Saved bindings merged over the defaults. `findInThread` took Mod+F from Focus Search, so a user who
  * never changed Focus Search (still the old default) and has no Find saved moves to the new default;
  * a custom Focus Search is theirs and stays.
  */
-export const mergeKeyboardShortcuts = (saved: Partial<KeyboardShortcuts> | undefined): KeyboardShortcuts => {
+export const mergeKeyboardShortcuts = (savedSet: Partial<KeyboardShortcuts> | undefined): KeyboardShortcuts => {
+    // The thread actions' defaults before they were removed (Mod+A, Mod+D) are still in sets saved back then, though nobody chose them:
+    // read as unset, so the new defaults apply instead of archiving on select-all or deleting on the bookmark key.
+    const saved = withoutRetiredDefaults(savedSet);
     // A binding on F6 or Shift+F6 is cleared: those keys move focus, and a saved action on them would run as well.
     const merged = withoutFocusAreaKeys({ ...defaultKeyboardShortcuts, ...saved });
 
