@@ -9,6 +9,8 @@
  *
  * Purposes: "provider-keys", "tool-keys", "messenger-keys", "custom-providers", "connector-tokens", "usage-cursors"
  */
+import { bytesToBase64 } from "./crypto";
+
 // Trimmed like `assertEnv()` and the deploy guard check it, so a key that passes
 // them always decodes here (`atob` rejects surrounding whitespace such as U+00A0).
 const ENCRYPTION_KEY = process.env["ENCRYPTION_KEY"]?.trim();
@@ -132,7 +134,8 @@ export const encryptKey = async (plaintext: string, purpose: KeyPurpose = "provi
     combined.set(iv, 0);
     combined.set(encryptedArray, iv.length);
 
-    const b64 = btoa(String.fromCodePoint(...combined));
+    // Byte by byte: spreading a long ciphertext into one call overruns the argument limit.
+    const b64 = bytesToBase64(combined);
 
     return `${CURRENT_VERSION}:${b64}`;
 };

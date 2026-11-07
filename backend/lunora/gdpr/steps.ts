@@ -357,6 +357,14 @@ export const collectFiles = internalQuery
 /** Rows of each activity table in the export. Past this the export says so rather than growing without bound. */
 const EXPORT_ACTIVITY_CAP = 5000;
 
+/**
+ * Usage rows one export reads: day and skill rows, and project and organization rows within a bound of their own, so
+ * neither kind pushes the other out. Together they stay within the old single bound: the collected activity is a
+ * workflow step's result, which has a size cap.
+ */
+const EXPORT_DAY_AND_SKILL_ROWS = 4000;
+const EXPORT_ATTRIBUTION_ROWS = EXPORT_ACTIVITY_CAP - EXPORT_DAY_AND_SKILL_ROWS;
+
 /** The usage rollup's project and organization rows, exported within a bound of their own. */
 const ATTRIBUTION_SKILL_KEYS = [ORGANIZATION_SKILL_KEY, PROJECT_SKILL_KEY] as const;
 
@@ -382,12 +390,12 @@ export const collectActivityForExport = internalQuery
         // the other out, and the export says when either was cut short.
         const [dayAndSkillRows, attributionRows, subAgentRuns, { page: collections }] = await Promise.all([
             context.db.usageDaily.findMany({
-                limit: EXPORT_ACTIVITY_CAP + 1,
+                limit: EXPORT_DAY_AND_SKILL_ROWS + 1,
                 orderBy: [{ date: "desc" }],
                 where: { skillKey: { notIn: [...ATTRIBUTION_SKILL_KEYS] }, userId },
             }),
             context.db.usageDaily.findMany({
-                limit: EXPORT_ACTIVITY_CAP + 1,
+                limit: EXPORT_ATTRIBUTION_ROWS + 1,
                 orderBy: [{ date: "desc" }],
                 where: { skillKey: { in: [...ATTRIBUTION_SKILL_KEYS] }, userId },
             }),
@@ -423,7 +431,7 @@ export const collectActivityForExport = internalQuery
                     task: run.task,
                 };
             }),
-            usageDaily: [...dayAndSkillRows.page.slice(0, EXPORT_ACTIVITY_CAP), ...attributionRows.page.slice(0, EXPORT_ACTIVITY_CAP)].map((row) => {
+            usageDaily: [...dayAndSkillRows.page.slice(0, EXPORT_DAY_AND_SKILL_ROWS), ...attributionRows.page.slice(0, EXPORT_ATTRIBUTION_ROWS)].map((row) => {
                 return {
                     costMicrodollars: row.costMicrodollars,
                     date: row.date,
@@ -434,7 +442,7 @@ export const collectActivityForExport = internalQuery
                     ...(row.organizationId !== undefined && row.organizationId !== null && { organization: row.organizationId }),
                 };
             }),
-            usageDailyTruncated: dayAndSkillRows.page.length > EXPORT_ACTIVITY_CAP || attributionRows.page.length > EXPORT_ACTIVITY_CAP,
+            usageDailyTruncated: dayAndSkillRows.page.length > EXPORT_DAY_AND_SKILL_ROWS || attributionRows.page.length > EXPORT_ATTRIBUTION_ROWS,
         };
     });
 

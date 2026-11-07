@@ -56,8 +56,15 @@ const { registerModule } = await import("../../test/registered-api");
 const { default: schema } = await import("../schema");
 const { recordReplyUsage } = await import("./activity");
 const { DEFAULT_SKILL_KEY } = await import("./activity-logic");
-const { getOrganizationProjectUsage, isOrganizationAdminRole, memberOrganizationUsage, MEMBERS_PER_CALL, openCursor, organizationUsageScope } =
-    await import("./organization");
+const {
+    getOrganizationProjectUsage,
+    isOrganizationAdminRole,
+    MAX_CURSOR_PROJECTS,
+    memberOrganizationUsage,
+    MEMBERS_PER_CALL,
+    openCursor,
+    organizationUsageScope,
+} = await import("./organization");
 
 const ADMIN = "user-admin";
 const MEMBER = "user-member";
@@ -205,6 +212,37 @@ describe("organization usage", () => {
 
         expect(last.result.total.costMicrodollars).toBe(MEMBERS_PER_CALL);
         expect(last.cursor).toBeUndefined();
+    });
+
+    it("keeps the cursor bounded when members use more projects than it carries, and says the result was cut", async () => {
+        await insert("member", { createdAt: 0, organizationId: ORG, role: "admin", userId: ADMIN });
+
+        // One more project than a cursor carries, filed under the organization, on a member past the first page.
+        for (let index = 0; index < MEMBERS_PER_CALL; index += 1) {
+            await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: `user-${String(index).padStart(3, "0")}` });
+        }
+
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index <= MAX_CURSOR_PROJECTS; index += 1) {
+                await ctx.db.insert("usageDaily", {
+                    costMicrodollars: index + 1,
+                    date: "2026-09-20",
+                    organizationId: ORG,
+                    projectKey: `project-${String(index)}`,
+                    replies: 1,
+                    skillKey: "__project__",
+                    tokens: 1,
+                    updatedAt: 1,
+                    userId: ADMIN,
+                });
+            }
+        });
+
+        const first = await read();
+        const last = await read(first.cursor);
+
+        expect(first.cursor!.length).toBeLessThan(200_000);
+        expect(last.result.truncated).toBe(true);
     });
 
     it("refuses a caller who is not an admin or owner of the organization", async () => {

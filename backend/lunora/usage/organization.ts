@@ -46,6 +46,9 @@ export const MEMBER_ROW_LIMIT = 20_000;
 /** Project titles one lookup reads. */
 const TITLE_BATCH = 50;
 
+/** Projects a cursor carries, at most; the smallest past it count under "No project" and the result says it was cut. */
+export const MAX_CURSOR_PROJECTS = 500;
+
 /** How long a cursor stays usable. */
 const CURSOR_TTL_MS = 10 * 60 * 1000;
 
@@ -264,13 +267,15 @@ export const getOrganizationProjectUsage = authAction
             total.tokens += member.total.tokens;
         }
 
+        // The cursor stays small: past the bound, the smallest projects' spend stays in the total, under "No project".
+        const kept = [...projects].toSorted(([, a], [, b]) => b.costMicrodollars - a.costMicrodollars).slice(0, MAX_CURSOR_PROJECTS);
         const next: CursorState = {
             ...state,
             afterUserId: scope.nextCursor ?? "",
             members: state.members + scope.memberIds.length,
-            projects: [...projects],
+            projects: kept,
             total,
-            truncated: state.truncated || perMember.some((member) => member.truncated),
+            truncated: state.truncated || kept.length < projects.size || perMember.some((member) => member.truncated),
         };
 
         if (scope.nextCursor !== undefined) {
@@ -281,7 +286,8 @@ export const getOrganizationProjectUsage = authAction
         // its projects with no usage yet, at zero. Anything else — a member's personal project, one that left the
         // organization — stays in "No project", without its name or id.
         const titles = new Map(scope.projects.map((project) => [project.projectId, project.title]));
-        const unknown = [...projects.keys()].filter((projectKey) => !titles.has(projectKey));
+        const carried = new Map(kept);
+        const unknown = [...carried.keys()].filter((projectKey) => !titles.has(projectKey));
 
         for (let index = 0; index < unknown.length; index += TITLE_BATCH) {
             const owned = await ctx.runQuery(internal.usage.organization.organizationProjectTitles, {
@@ -295,7 +301,7 @@ export const getOrganizationProjectUsage = authAction
         }
 
         const rows = [...titles].map(([projectKey, title]) => {
-            return { ...(projects.get(projectKey) ?? { costMicrodollars: 0, replies: 0, tokens: 0 }), projectKey, title };
+            return { ...(carried.get(projectKey) ?? { costMicrodollars: 0, replies: 0, tokens: 0 }), projectKey, title };
         });
 
         ctx.log.event("usage.get_organization_project_usage", { members: next.members, projects: rows.length });
