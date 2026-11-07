@@ -90,7 +90,7 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
                                 <circle cx={size / 2} cy={size / 2} fill="none" r={radius} stroke="var(--muted)" strokeWidth={strokeWidth} />
                                 {usedTokens > 0 && (
                                     <circle
-                                        className="transition-[stroke-dashoffset,stroke] duration-300"
+                                        className="transition-[stroke-dashoffset,stroke] duration-300 motion-reduce:transition-none"
                                         cx={size / 2}
                                         cy={size / 2}
                                         fill="none"

@@ -29,6 +29,15 @@ describe("the context meter's token count", () => {
         expect(screen.getByRole("button", { name: "1/200 token used (0.5%)" })).toBeTruthy();
     });
 
+    it("does not animate the ring's stroke for a user who prefers reduced motion", () => {
+        render(<ContextUsageMeter contextWindow={200} usedTokens={2} />);
+        // eslint-disable-next-line testing-library/no-node-access -- the ring is a plain SVG circle, which no query finds by role or text
+        const rings = [...screen.getByRole("button").querySelectorAll("circle")];
+        const ring = rings.find((circle) => circle.getAttribute("class")?.includes("transition-["));
+
+        expect(ring?.getAttribute("class")).toContain("motion-reduce:transition-none");
+    });
+
     it("uses the plural noun for any other count", () => {
         render(<ContextUsageMeter contextWindow={200} usedTokens={2} />);
 
