@@ -1815,8 +1815,15 @@ const writeGeneratedTitle = async (
             throw error;
         }
 
-        title = textResult.text;
+        title = textResult.text.trim();
         usage = textResult.usage;
+
+        // A blank answer (a reply spent on reasoning, or filtered) is no title: the chat keeps the one it has, and nothing is recorded.
+        if (title === "") {
+            context.log.event("chat.thread_title", titleUsageEvent(model, usage, "empty-answer"));
+
+            return;
+        }
 
         // Recorded before the write, so a write that fails below is retried from this answer, not by asking the model again.
         const recorded = await tryTimes(TITLE_WRITE_ATTEMPTS, () =>
@@ -1852,7 +1859,6 @@ const writeGeneratedTitle = async (
         }
 
         await scheduleTitleWriteRetry(context, {
-            attempt: 1,
             chargeKey: arguments_.chargeKey,
             expectedTitleDigest,
             requestedBy: arguments_.requestedBy,
@@ -1923,14 +1929,10 @@ export const titleDispatchGateway = (context: ActionContext, threadId: string, i
     };
 };
 
-/** How many scheduled writes of a recorded title answer are tried before it is given up, loudly. */
-export const TITLE_WRITE_RETRY_MAX_ATTEMPTS = 5;
-
-/** Delay before scheduled write `attempt` (1-based) of a recorded title answer: 5 s, then tripling. */
-export const titleWriteRetryDelayMs = (attempt: number): number => 5000 * 3 ** (attempt - 1);
+/** How long after a run's own write kept failing the recorded answer is written by `retryTitleWrite`. */
+const TITLE_WRITE_RETRY_DELAY_MS = 5000;
 
 interface TitleWriteRetry {
-    attempt: number;
     chargeKey: string;
     expectedTitleDigest: string;
     requestedBy?: string;
@@ -1938,44 +1940,27 @@ interface TitleWriteRetry {
 }
 
 const scheduleTitleWriteRetry = async (context: Pick<ActionContext, "scheduler">, retry: TitleWriteRetry): Promise<void> => {
-    await context.scheduler.runAfter(titleWriteRetryDelayMs(retry.attempt), internal.chat.functions.retryTitleWrite, { ...retry });
+    await context.scheduler.runAfter(TITLE_WRITE_RETRY_DELAY_MS, internal.chat.functions.retryTitleWrite, { ...retry });
 };
 
 /**
- * One scheduled write of a recorded title answer (`writeRecordedTitle`, which checks everything again and drops the answer). A write
- * that still fails schedules the next attempt; past {@link TITLE_WRITE_RETRY_MAX_ATTEMPTS} it throws, so the failure is visible. No
- * model call is made again.
+ * One write of a recorded title answer (`writeRecordedTitle`, which checks everything again and drops the answer). A write that fails
+ * is thrown: the scheduler's own retry policy (five dispatches, with backoff) tries again, and dead-letters the job after the last, so
+ * the failure is visible. Each dispatch makes one write, and no model call is made again.
  */
-export const runTitleWriteRetry = async (context: Pick<ActionContext, "log" | "runMutation" | "scheduler">, retry: TitleWriteRetry): Promise<void> => {
-    let outcome: string;
+export const runTitleWriteRetry = async (context: Pick<ActionContext, "log" | "runMutation">, retry: TitleWriteRetry): Promise<void> => {
+    const outcome = await context.runMutation(internal.agent.thread_title.writeRecordedTitle, {
+        chargeKey: retry.chargeKey,
+        expectedTitleDigest: retry.expectedTitleDigest,
+        requestedBy: retry.requestedBy,
+        threadId: retry.threadId as Id<"threads">,
+    });
 
-    try {
-        outcome = await firstResultOf(TITLE_WRITE_ATTEMPTS, () =>
-            context.runMutation(internal.agent.thread_title.writeRecordedTitle, {
-                chargeKey: retry.chargeKey,
-                expectedTitleDigest: retry.expectedTitleDigest,
-                requestedBy: retry.requestedBy,
-                threadId: retry.threadId as Id<"threads">,
-            }),
-        );
-    } catch (error) {
-        if (retry.attempt >= TITLE_WRITE_RETRY_MAX_ATTEMPTS) {
-            context.log.event("chat.thread_title", { skipped: "write-retry-exhausted" });
-
-            throw error;
-        }
-
-        await scheduleTitleWriteRetry(context, { ...retry, attempt: retry.attempt + 1 });
-
-        return;
-    }
-
-    context.log.event("chat.thread_title", { retried: retry.attempt, ...(outcome !== "written" && { skipped: `${outcome}-on-retry` }) });
+    context.log.event("chat.thread_title", { retried: true, ...(outcome !== "written" && { skipped: `${outcome}-on-retry` }) });
 };
 
 export const retryTitleWrite = internalAction
     .input({
-        attempt: v.number(),
         chargeKey: v.string().max(MAX_LENGTH.short),
         expectedTitleDigest: v.string().max(MAX_LENGTH.short),
         requestedBy: v.optional(v.string().max(MAX_LENGTH.id)),

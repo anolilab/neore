@@ -115,7 +115,9 @@ export const promptInView = async (context: Reader, thread: Doc<"threads">, prom
         return true;
     }
 
-    const { next } = await walkPath(context, thread._id, leaf, { limit: TITLE_READ_WINDOW, stopAtId: promptId });
+    // The leaf is the window's first row, so at most WINDOW - 1 rows lie above it before the window ends: a walk of that many stops on
+    // the prompt only when the prompt is the window's last row or nearer, and `next` is then the prompt itself.
+    const { next } = await walkPath(context, thread._id, leaf, { limit: TITLE_READ_WINDOW - 1, stopAtId: promptId });
 
     return next?._id === promptId;
 };
@@ -279,7 +281,8 @@ export const recordTitleAnswer = internalMutation
 export const writeTitleIfUnchanged = async (ctx: Pick<MutationContext, "db">, arguments_: TitleCheck & { title: string }): Promise<boolean> => {
     const thread = await ctx.db.get("threads", arguments_.threadId);
 
-    if (!thread) {
+    // A blank title is no title: whatever wrote it, the chat keeps the one it has.
+    if (!thread || arguments_.title.trim() === "") {
         return false;
     }
 

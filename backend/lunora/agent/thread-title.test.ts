@@ -121,6 +121,13 @@ describe("writing a generated title", () => {
         await expect(titleOf(threadId)).resolves.toBe("Renamed by the owner");
     });
 
+    it("refuses a blank title, keeping the one the chat has", async () => {
+        const threadId = await threadWith({ title: "Set by the owner" });
+
+        await expect(writeTitle(threadId, "Set by the owner", { title: "  \n " })).resolves.toBe(false);
+        await expect(titleOf(threadId)).resolves.toBe("Set by the owner");
+    });
+
     it("treats a thread with no title as the empty title", async () => {
         const threadId = await threadWith({ title: undefined });
 
@@ -552,4 +559,23 @@ describe("writing a recorded title answer later", () => {
         await expect(titleOf(threadId)).resolves.toBe("Old");
         await expect(writeRecorded(threadId, key)).resolves.toBe("none");
     });
+});
+
+describe("the window a regenerate's prompt must still be in", () => {
+    it("accepts the prompt as the window's last row, and refuses it one row further up", async () => {
+        const threadId = await threadWith();
+        const row = rowIn(threadId);
+        const prompt = await row(0, { message: { content: "Plan a trip", role: "user" } });
+
+        // The prompt and TITLE_READ_WINDOW - 1 rows below it: the prompt is the window's last row.
+        for (let order = 1; order < TITLE_READ_WINDOW; order += 1) {
+            await row(order, { message: { content: `Step ${order}`, role: "assistant" } });
+        }
+
+        await expect(writeTitle(threadId, "Old", { promptId: prompt, requestedBy: OWNER })).resolves.toBe(true);
+
+        // One more row pushes it just past the window.
+        await row(TITLE_READ_WINDOW, { message: { content: "One more", role: "assistant" } });
+        await expect(writeTitle(threadId, "Generated", { promptId: prompt, requestedBy: OWNER, title: "Stale" })).resolves.toBe(false);
+    }, 60_000);
 });

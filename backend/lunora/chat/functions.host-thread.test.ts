@@ -21,8 +21,6 @@ import {
     autoTitleChargeKey,
     firstResultOf,
     runTitleWriteRetry,
-    TITLE_WRITE_RETRY_MAX_ATTEMPTS,
-    titleWriteRetryDelayMs,
     refusedBeforeDispatch,
     releaseTitleCharge,
     giveBackTitleCharge,
@@ -338,11 +336,12 @@ describe("the gateway a title's model call is sent through", () => {
 });
 
 describe("a scheduled write of a recorded title answer", () => {
-    const retryContext = (fails: boolean) => {
-        const scheduled: { args: Record<string, unknown>; delay: number }[] = [];
+    const retryContext = (outcome: "fails" | "none" | "written") => {
         const events: Record<string, unknown>[] = [];
+        let calls = 0;
 
         return {
+            calls: () => calls,
             context: {
                 log: {
                     event: (_name: string, fields: Record<string, unknown>) => {
@@ -350,47 +349,36 @@ describe("a scheduled write of a recorded title answer", () => {
                     },
                 },
                 runMutation: async () => {
-                    if (fails) {
+                    calls += 1;
+
+                    if (outcome === "fails") {
                         throw new Error("storage down");
                     }
 
-                    return "written";
-                },
-                scheduler: {
-                    runAfter: async (delay: number, _reference: unknown, args: Record<string, unknown>) => {
-                        scheduled.push({ args, delay });
-                    },
+                    return outcome;
                 },
             } as never,
             events,
-            scheduled,
         };
     };
-    const retry = { attempt: 1, chargeKey: "thread-r:1", expectedTitleDigest: "digest", threadId: "thread-r" };
+    const retry = { chargeKey: "thread-r:1", expectedTitleDigest: "digest", threadId: "thread-r" };
 
-    it("schedules the next attempt when the write still fails, with no model call", async () => {
-        const { context, scheduled } = retryContext(true);
+    it("makes one write per dispatch and throws a failure, so the scheduler's own retry policy bounds the retries", async () => {
+        const { calls, context } = retryContext("fails");
 
-        await runTitleWriteRetry(context, retry);
-
-        expect(scheduled).toEqual([{ args: { ...retry, attempt: 2 }, delay: titleWriteRetryDelayMs(2) }]);
+        await expect(runTitleWriteRetry(context, retry)).rejects.toThrow("storage down");
+        expect(calls()).toBe(1);
     });
 
-    it("throws once the last attempt fails, so the failure is visible", async () => {
-        const { context, events, scheduled } = retryContext(true);
+    it("logs a landed write, and an answer already written or dropped", async () => {
+        const written = retryContext("written");
+        const none = retryContext("none");
 
-        await expect(runTitleWriteRetry(context, { ...retry, attempt: TITLE_WRITE_RETRY_MAX_ATTEMPTS })).rejects.toThrow("storage down");
-        expect(scheduled).toEqual([]);
-        expect(events).toEqual([{ skipped: "write-retry-exhausted" }]);
-    });
+        await runTitleWriteRetry(written.context, retry);
+        await runTitleWriteRetry(none.context, retry);
 
-    it("logs a landed write and schedules nothing more", async () => {
-        const { context, events, scheduled } = retryContext(false);
-
-        await runTitleWriteRetry(context, retry);
-
-        expect(scheduled).toEqual([]);
-        expect(events).toEqual([{ retried: 1 }]);
+        expect(written.events).toEqual([{ retried: true }]);
+        expect(none.events).toEqual([{ retried: true, skipped: "none-on-retry" }]);
     });
 });
 
