@@ -347,16 +347,19 @@ describe("buildAgentTools pull request tools", () => {
     const toolsFor = async (linked: unknown[]): Promise<Record<string, unknown>> => {
         const runQuery = vi.fn();
 
-        // MCP servers, overrides, grants, the quick check's eligibility, then the thread's pull request links.
+        // MCP servers, overrides, grants, the run's thread (for its permission cap), the quick check's eligibility, then the
+        // thread's pull request links.
         runQuery
             .mockResolvedValueOnce([])
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
+            .mockResolvedValueOnce({ organizationId: null })
             .mockResolvedValueOnce(false)
             .mockResolvedValueOnce({ complete: true, links: linked });
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
             model: "test-model",
+            organizationId: null,
             searchMode: "web",
             threadId: "thread",
             userId: "user",
@@ -379,11 +382,13 @@ describe("buildAgentTools pull request tools", () => {
             .mockResolvedValueOnce([])
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
+            .mockResolvedValueOnce({ organizationId: null })
             .mockResolvedValueOnce(false)
             .mockResolvedValueOnce({ complete: true, links: [] });
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
             model: "test-model",
+            organizationId: null,
             searchMode: "web",
             skillTools: { additionalTools: ["readPullRequest", "mergePullRequest"] },
             threadId: "thread",
