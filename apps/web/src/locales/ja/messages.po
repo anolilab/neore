@@ -93,7 +93,7 @@ msgstr "（{0} / {MAX_PARTICIPANTS}、最低 {MIN_PARTICIPANTS}）"
 msgid "({jobFailed} failed)"
 msgstr "（{jobFailed} 件失敗）"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:250
+#: src/features/chat/thread/composer-prompt-queue.tsx:275
 msgid "(attachments only)"
 msgstr "（添付ファイルのみ）"
 
@@ -797,7 +797,7 @@ msgstr "{count, plural, other {#件のメッセージを選択中}}"
 msgid "{count, plural, one {# of {maxReferenceImages} reference attached} other {# of {maxReferenceImages} references attached}}"
 msgstr "{count, plural, other {参照画像 # / {maxReferenceImages} 枚を添付済み}}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:421
+#: src/features/chat/thread/composer-prompt-queue.tsx:583
 msgid "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 msgstr ""
 
@@ -817,11 +817,11 @@ msgstr "{count, plural, other {# 件のソースを使用}}"
 msgid "{count} characters now."
 msgstr ""
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:418
+#: src/features/chat/thread/composer-prompt-queue.tsx:580
 msgid "{count} queued"
 msgstr "{count} 件待機中"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:418
+#: src/features/chat/thread/composer-prompt-queue.tsx:580
 msgid "{count} queued — sends when the current reply finishes"
 msgstr "{count} 件待機中 — 現在の返信が終わると送信されます"
 
@@ -843,7 +843,7 @@ msgstr ""
 msgid "{days}d ago"
 msgstr "{days} 日前"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:277
+#: src/features/chat/thread/composer-prompt-queue.tsx:316
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, other {再読み込み時に # 個の添付ファイルが削除されました}}"
 
@@ -3914,7 +3914,7 @@ msgstr "添付ファイル（非表示）"
 msgid "Attachment only"
 msgstr "添付のみ"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:271
+#: src/features/chat/thread/composer-prompt-queue.tsx:310
 msgid "Attachments:"
 msgstr "添付ファイル："
 
@@ -7826,7 +7826,7 @@ msgstr "チャットを添付できませんでした"
 msgid "could not be saved"
 msgstr "保存できませんでした"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:231
+#: src/features/chat/thread/composer-prompt-queue.tsx:241
 msgid "Could not cancel the message. It is still queued."
 msgstr ""
 
@@ -19666,6 +19666,14 @@ msgstr "1 ページ下へ移動"
 msgid "Move out one level"
 msgstr "1 階層上へ移動"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:330
+msgid "Move queued message {position} down"
+msgstr "キュー内のメッセージ {position} を下へ"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:320
+msgid "Move queued message {position} up"
+msgstr "キュー内のメッセージ {position} を上へ"
+
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:100
 msgid "Move to first cell"
 msgstr "最初のセルへ移動"
@@ -19727,6 +19735,12 @@ msgstr "1 ページ上へ移動"
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:33
 msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
 msgstr ""
+
+#. placeholder {0}: to + 1
+#: src/features/chat/thread/composer-prompt-queue.tsx:530
+#: src/features/chat/thread/composer-prompt-queue.tsx:557
+msgid "Moved to position {0}"
+msgstr "{0} 番目に移動しました"
 
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:113
 msgid "MP4/MOV video"
@@ -24643,7 +24657,7 @@ msgid "Queued"
 msgstr "待機中"
 
 #: src/features/chat/host/host-composer.tsx:322
-#: src/features/chat/thread/composer-prompt-queue.tsx:430
+#: src/features/chat/thread/composer-prompt-queue.tsx:597
 msgid "Queued messages"
 msgstr "待機中のメッセージ"
 
@@ -25687,7 +25701,7 @@ msgstr "プロバイダーを削除しますか？"
 msgid "Remove queued message {0}"
 msgstr "キューのメッセージ {0} を削除"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:281
+#: src/features/chat/thread/composer-prompt-queue.tsx:340
 msgid "Remove queued message {position}"
 msgstr "待機中のメッセージ {position} を削除"
 
@@ -27620,7 +27634,7 @@ msgid "Send messages to the AI bot via Telegram. Conversations appear as threads
 msgstr "Telegram 経由で AI ボットにメッセージを送信できます。会話はチャット一覧にスレッドとして表示されます。"
 
 #: src/features/chat/host/host-composer.tsx:772
-#: src/features/chat/thread/composer-prompt-queue.tsx:438
+#: src/features/chat/thread/composer-prompt-queue.tsx:616
 msgid "Send next"
 msgstr "次を送信"
 
@@ -29342,7 +29356,7 @@ msgstr ""
 msgid "Steer the reply"
 msgstr ""
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:262
+#: src/features/chat/thread/composer-prompt-queue.tsx:301
 msgid "Steering:"
 msgstr ""
 

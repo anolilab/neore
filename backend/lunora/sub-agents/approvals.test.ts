@@ -561,6 +561,17 @@ describe("the reaper of a waiting run", () => {
         expect(await runStatus()).toBe("failed");
     });
 
+    it("stops the resumed child's stream when the reaper fails the run, so its tools stop running", async () => {
+        await internalCall(resumeAwaitingRun, { runId });
+        const { reapAt } = await runRow();
+
+        await run(async (context) => await reapSubAgentRun(context, runId, reapAt));
+        expect(await runStatus()).toBe("failed");
+
+        // The harness does not name a function reference, so the stop is told apart by its only argument: its child thread.
+        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: { threadId: childId } }));
+    });
+
     it("still fails a run that never waited at its admission deadline", async () => {
         const { createdAt } = await runRow();
 

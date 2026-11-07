@@ -93,7 +93,7 @@ msgstr "({0} di {MAX_PARTICIPANTS}, almeno {MIN_PARTICIPANTS})"
 msgid "({jobFailed} failed)"
 msgstr "({jobFailed} non riusciti)"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:250
+#: src/features/chat/thread/composer-prompt-queue.tsx:275
 msgid "(attachments only)"
 msgstr "(solo allegati)"
 
@@ -797,7 +797,7 @@ msgstr "{count, plural, one {# messaggio selezionato} other {# messaggi selezion
 msgid "{count, plural, one {# of {maxReferenceImages} reference attached} other {# of {maxReferenceImages} references attached}}"
 msgstr "{count, plural, one {# di {maxReferenceImages} riferimento allegato} other {# di {maxReferenceImages} riferimenti allegati}}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:421
+#: src/features/chat/thread/composer-prompt-queue.tsx:583
 msgid "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 msgstr ""
 
@@ -817,11 +817,11 @@ msgstr "{count, plural, one {# fonte usata} other {# fonti usate}}"
 msgid "{count} characters now."
 msgstr ""
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:418
+#: src/features/chat/thread/composer-prompt-queue.tsx:580
 msgid "{count} queued"
 msgstr "{count} in coda"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:418
+#: src/features/chat/thread/composer-prompt-queue.tsx:580
 msgid "{count} queued — sends when the current reply finishes"
 msgstr "{count} in coda: verranno inviati al termine della risposta attuale"
 
@@ -843,7 +843,7 @@ msgstr ""
 msgid "{days}d ago"
 msgstr "{days} g fa"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:277
+#: src/features/chat/thread/composer-prompt-queue.tsx:316
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, one {# allegato rimosso al ricaricamento} other {# allegati rimossi al ricaricamento}}"
 
@@ -3914,7 +3914,7 @@ msgstr "Allegato (nascosto)"
 msgid "Attachment only"
 msgstr "Solo allegato"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:271
+#: src/features/chat/thread/composer-prompt-queue.tsx:310
 msgid "Attachments:"
 msgstr "Allegati:"
 
@@ -7826,7 +7826,7 @@ msgstr "Impossibile allegare la chat"
 msgid "could not be saved"
 msgstr "impossibile salvare"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:231
+#: src/features/chat/thread/composer-prompt-queue.tsx:241
 msgid "Could not cancel the message. It is still queued."
 msgstr ""
 
@@ -19666,6 +19666,14 @@ msgstr "Scendi di una pagina"
 msgid "Move out one level"
 msgstr "Sposta fuori di un livello"
 
+#: src/features/chat/thread/composer-prompt-queue.tsx:330
+msgid "Move queued message {position} down"
+msgstr "Sposta in basso il messaggio in coda {position}"
+
+#: src/features/chat/thread/composer-prompt-queue.tsx:320
+msgid "Move queued message {position} up"
+msgstr "Sposta in alto il messaggio in coda {position}"
+
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:100
 msgid "Move to first cell"
 msgstr "Vai alla prima cella"
@@ -19727,6 +19735,12 @@ msgstr "Sali di una pagina"
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:33
 msgid "Moved selected node {0}. New position, x: {x}, y: {y}"
 msgstr ""
+
+#. placeholder {0}: to + 1
+#: src/features/chat/thread/composer-prompt-queue.tsx:530
+#: src/features/chat/thread/composer-prompt-queue.tsx:557
+msgid "Moved to position {0}"
+msgstr "Spostato in posizione {0}"
 
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:113
 msgid "MP4/MOV video"
@@ -24643,7 +24657,7 @@ msgid "Queued"
 msgstr "In coda"
 
 #: src/features/chat/host/host-composer.tsx:322
-#: src/features/chat/thread/composer-prompt-queue.tsx:430
+#: src/features/chat/thread/composer-prompt-queue.tsx:597
 msgid "Queued messages"
 msgstr "Messaggi in coda"
 
@@ -25687,7 +25701,7 @@ msgstr "Rimuovere il provider?"
 msgid "Remove queued message {0}"
 msgstr "Rimuovi il messaggio in coda {0}"
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:281
+#: src/features/chat/thread/composer-prompt-queue.tsx:340
 msgid "Remove queued message {position}"
 msgstr "Rimuovi il messaggio in coda {position}"
 
@@ -27620,7 +27634,7 @@ msgid "Send messages to the AI bot via Telegram. Conversations appear as threads
 msgstr "Invia messaggi al bot IA tramite Telegram. Le conversazioni compaiono nel tuo elenco delle chat."
 
 #: src/features/chat/host/host-composer.tsx:772
-#: src/features/chat/thread/composer-prompt-queue.tsx:438
+#: src/features/chat/thread/composer-prompt-queue.tsx:616
 msgid "Send next"
 msgstr "Invia successivo"
 
@@ -29342,7 +29356,7 @@ msgstr ""
 msgid "Steer the reply"
 msgstr ""
 
-#: src/features/chat/thread/composer-prompt-queue.tsx:262
+#: src/features/chat/thread/composer-prompt-queue.tsx:301
 msgid "Steering:"
 msgstr ""
 
