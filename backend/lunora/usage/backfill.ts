@@ -25,10 +25,23 @@
  * walk's window and grouping, keeps its own position on the same row, and
  * counts a reply once against the live path: the live record marks its key
  * `projectFiled`, the walk marks `project:<key>`, and each skips what the other
- * marked. It takes only replies from before the first walk's cutoff, which the
- * total provably holds; later history stays under "No project", so the
- * projects never add up to more than the total. Keys are pruned only once both
- * walks are done.
+ * marked. Keys are pruned only once both walks are done.
+ *
+ * The project walk reconstructs nothing (the cutoff in `usage/AGENTS.md`). It
+ * files a reply only from the durable snapshot the first walk stored on its key
+ * (`counted`: the amount and the day the total holds), so history it cannot
+ * verify stays under "No project":
+ * - a backfill row written before projects were filed (no `timeZone`) gets no
+ *   project walk at all;
+ * - a reply key without `counted` (one the live path recorded, which files its
+ *   own project, or one written before projects were filed) is passed over;
+ * - replies in a thread the user does not own (a teammate's shared thread) are
+ *   not walked: the first walk never counted them either, and their live record
+ *   files their project;
+ * - a thread's project is filed only when the user can open it (a confirmed lack
+ *   of access files none; a failed read fails the step, which is retried);
+ *   a sub-agent's or worker's thread is filed under its lead's project.
+ * As a last guard, a day's project rows never exceed that day's total row.
  *
  * Threads are paged through `by_userId`, whose key no thread edit changes, so
  * a thread archived, restored or moved mid-walk keeps its place: every thread
@@ -47,8 +60,8 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
 import { currentUserShard } from "../lib/shard-context";
 import type { Attribution, AttributionIncrement, RollupIncrement } from "./activity-logic";
-import { pendingKey, projectFiledKey } from "./activity-logic";
-import { addToAttributionRollup, addToRollup, isReplyRecorded, markReplyRecorded, threadProject } from "./activity";
+import { PROJECT_SKILL_KEY, projectFiledKey, TOTAL_SKILL_KEY } from "./activity-logic";
+import { addToAttributionRollup, addToRollup, isReplyRecorded, markReplyRecorded, readableAttribution, threadProject } from "./activity";
 import type { BackfillRow, BackfillWindow, ReplyGroup } from "./backfill-logic";
 import { backfillIncrement, completeOrders, groupReplies } from "./backfill-logic";
 
@@ -150,6 +163,17 @@ export const ensureProjectBackfill = async (ctx: MutationCtx, userId: string, no
     const walk = state.projects;
 
     if (walk?.status === "done") {
+        return "done";
+    }
+
+    // A row written before projects were filed (no zone snapshot): its counts carry no `counted` snapshot to file from,
+    // so it gets no project walk and its history stays under "No project" (`usage/AGENTS.md`).
+    if (!walk && state.timeZone === undefined) {
+        await ctx.db.patch("usageBackfill", state._id, {
+            projects: { finishedAt: now, leaseUntil: now, replies: 0, runId: `${String(now)}:legacy`, startedAt: state.startedAt, status: "done" as const },
+            updatedAt: now,
+        });
+
         return "done";
     }
 
@@ -277,7 +301,7 @@ const readCompleteRows = async (
 };
 
 /** One step of a walk from `position`: what it counts, and where the next step starts. */
-const walk = async <I>(ctx: DbCtx, userId: string, position: Position, pass: WalkPass<I>): Promise<StepResult<I>> => {
+const walk = async <I>(ctx: MutationCtx, userId: string, position: Position, pass: WalkPass<I>): Promise<StepResult<I>> => {
     let { lastOrder, threadCursor, threadId } = position;
     let thread: Attribution = {};
     const increments: I[] = [];
@@ -287,7 +311,10 @@ const walk = async <I>(ctx: DbCtx, userId: string, position: Position, pass: Wal
 
     if (threadId !== undefined && pass.skipThread) {
         // A position saved before the project was kept with it reads the thread's project now.
-        thread = position.threadProjectKey === undefined ? await threadProject(ctx, threadId) : { projectKey: position.threadProjectKey };
+        thread =
+            position.threadProjectKey === undefined
+                ? await readableAttribution(ctx, await threadProject(ctx, threadId), userId)
+                : { projectKey: position.threadProjectKey };
     }
 
     while (budget > 0) {
@@ -303,7 +330,8 @@ const walk = async <I>(ctx: DbCtx, userId: string, position: Position, pass: Wal
             }
 
             ({ threadCursor, threadId } = next);
-            thread = pass.skipThread ? await threadProject(ctx, threadId, next) : {};
+            // The project the user can open: the thread's own, or its lead's for a sub-agent's or worker's thread.
+            thread = pass.skipThread ? await readableAttribution(ctx, await threadProject(ctx, threadId, next), userId) : {};
             lastOrder = undefined;
             threadsStarted += 1;
 
@@ -391,18 +419,9 @@ export const runUsageBackfillStep = internalMutation
             userId,
             { lastOrder: state.lastOrder, threadCursor: state.threadCursor, threadId: state.threadId },
             {
+                // A reply still running here is left to its live record, which files its own project.
                 count: async (group) => {
                     const increment = backfillIncrement(group, window);
-                    const first = group.rows[0];
-
-                    // A reply still running here is left to its live record; the project walk must know it skipped it.
-                    if (!increment && first && first._creationTime < window.cutoff && group.rows.some((row) => row.status === "pending")) {
-                        if (!(await isReplyRecorded(ctx, userId, pendingKey(first._id)))) {
-                            await markReplyRecorded(ctx, userId, pendingKey(first._id), now);
-                        }
-
-                        return undefined;
-                    }
 
                     return increment && !(await anyRecorded(ctx, userId, group.rows)) ? increment : undefined;
                 },
@@ -435,6 +454,48 @@ export const runUsageBackfillStep = internalMutation
 
         return null;
     });
+
+/**
+ * `increments` cut so no day's project rows add up to more than that day's total row: a last guard that the projects
+ * and "No project" always add up to the total, whatever a snapshot says.
+ */
+const clampToDayTotals = async (ctx: DbCtx, userId: string, increments: ReadonlyArray<AttributionIncrement>): Promise<AttributionIncrement[]> => {
+    const room = new Map<string, { costMicrodollars: number; replies: number; tokens: number }>();
+    const clamped: AttributionIncrement[] = [];
+
+    for (const increment of increments) {
+        let left = room.get(increment.date);
+
+        if (!left) {
+            const { page } = await ctx.db.usageDaily.findMany({ where: { date: increment.date, userId } });
+            const total = page.find((row) => row.skillKey === TOTAL_SKILL_KEY);
+            const filed = page.filter((row) => row.skillKey === PROJECT_SKILL_KEY);
+
+            left = {
+                costMicrodollars: (total?.costMicrodollars ?? 0) - filed.reduce((sum, row) => sum + row.costMicrodollars, 0),
+                replies: (total?.replies ?? 0) - filed.reduce((sum, row) => sum + row.replies, 0),
+                tokens: (total?.tokens ?? 0) - filed.reduce((sum, row) => sum + row.tokens, 0),
+            };
+            room.set(increment.date, left);
+        }
+
+        const take = {
+            costMicrodollars: Math.max(0, Math.min(increment.costMicrodollars, left.costMicrodollars)),
+            replies: Math.max(0, Math.min(increment.replies, left.replies)),
+            tokens: Math.max(0, Math.min(increment.tokens, left.tokens)),
+        };
+
+        left.costMicrodollars -= take.costMicrodollars;
+        left.replies -= take.replies;
+        left.tokens -= take.tokens;
+
+        if (take.costMicrodollars > 0 || take.replies > 0 || take.tokens > 0) {
+            clamped.push({ ...increment, ...take });
+        }
+    }
+
+    return clamped;
+};
 
 /**
  * One step of the user's project walk: files the finished replies of threads
@@ -484,20 +545,14 @@ export const runUsageProjectBackfillStep = internalMutation
                         return undefined;
                     }
 
-                    // A reply the first walk skipped as still running (it marked it), or one still writing rows after that walk
-                    // started, is counted in the total only by its live record. File it only once that record has landed (its
-                    // key is held): a record that never landed must not leave a project row with no total.
-                    const reliesOnLiveRecord =
-                        (await isReplyRecorded(ctx, userId, pendingKey(key))) || group.rows.some((row) => row._creationTime >= state.startedAt);
+                    // Only from what the first walk stored on the key: the amount the total holds (a run it passed while
+                    // paused holds only the steps saved by then) on the day it holds it. A key without it is passed over.
+                    const keyRow = await ctx.db.usageReplies.findFirst({ where: { replyKey: key, userId } });
+                    const counted = keyRow?.counted;
 
-                    if (reliesOnLiveRecord && !(await anyRecorded(ctx, userId, group.rows))) {
+                    if (counted === undefined) {
                         return undefined;
                     }
-
-                    // What the first walk counted for the reply, when it did: a run it passed while paused holds only the
-                    // steps saved by then, and the project must not hold more than the total.
-                    const keyRow = await ctx.db.usageReplies.findFirst({ where: { replyKey: key, userId } });
-                    const counted = keyRow?.counted ?? increment;
 
                     return {
                         costMicrodollars: counted.costMicrodollars,
@@ -515,7 +570,7 @@ export const runUsageProjectBackfillStep = internalMutation
             await markReplyRecorded(ctx, userId, projectFiledKey(key), now);
         }
 
-        await addToAttributionRollup(ctx, userId, step.increments, now);
+        await addToAttributionRollup(ctx, userId, await clampToDayTotals(ctx, userId, step.increments), now);
         await ctx.db.patch("usageBackfill", state._id, {
             projects: {
                 leaseUntil: now + BACKFILL_LEASE_MS,

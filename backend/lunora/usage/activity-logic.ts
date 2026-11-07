@@ -190,8 +190,17 @@ export const replyUsageArgs = (
     };
 };
 
-/** The key `usageReplies` holds for a reply the first walk passed while it was still running, and left to its live record. */
-export const pendingKey = (replyKey: string): string => `pending:${replyKey}`;
+/**
+ * How a usage record whose read of the thread's project failed is run again: the job throws, and the scheduler retries
+ * it at +10 s, +30 s and +70 s.
+ */
+export const RECORD_RETRY = { backoff: "exponential", baseMs: 10_000, maxAttempts: 4, maxMs: 60_000 } as const;
+
+/**
+ * Past this long after the reply was recorded, a record whose project read fails again files the reply without a
+ * project instead of failing: by then the retries above are spent, and the total and skill rows must land.
+ */
+export const LAST_TRY_AFTER_MS = 60_000;
 
 /** The key `usageReplies` holds once a reply (keyed `replyKey`) has been filed under its project. */
 export const projectFiledKey = (replyKey: string): string => `project:${replyKey}`;

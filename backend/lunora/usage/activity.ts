@@ -40,10 +40,10 @@ import {
     foldSkillTotals,
     HEATMAP_DAYS,
     isDayKey,
+    LAST_TRY_AFTER_MS,
     PROJECT_SKILL_KEY,
     projectFiledKey,
     TOTAL_SKILL_KEY,
-    usageDayOf,
     withDayTotals,
 } from "./activity-logic";
 
@@ -120,24 +120,48 @@ export const threadProject = async (ctx: ReadCtx, threadId: string, known?: { pr
     return attributionOf(current);
 };
 
-/** The attribution of the user's thread `threadId`, when it is on this shard. */
-const attributionOfThread = async (ctx: ReadCtx, threadId: string | undefined): Promise<Attribution> =>
-    threadId === undefined || threadId.length === 0 ? {} : await threadProject(ctx, threadId);
-
 /**
- * What `userId`'s reply in a thread they may not own is filed under: the thread's attribution, without a project the
- * replier cannot open — a teammate's personal project shared through one thread is not theirs to see in their usage.
+ * `attribution` as `userId` may file it: without a project they cannot open (a confirmed lack of access — a teammate's
+ * personal project, or an organization they have left). A read that fails throws: the record is retried (`RECORD_RETRY`)
+ * or the side question refused before it is charged, never filed as if the user had no access.
  */
-const attributionForReplier = async (ctx: MutationCtx | QueryCtx, threadId: string, userId: string): Promise<Attribution> => {
-    const attribution = await attributionOfThread(ctx, threadId);
-
-    // A failed read throws: the forward tries again (`forwardReplyUsage`), and a side question is refused before it is
-    // charged, never filed as if the replier could not open the project.
-    if (attribution.projectKey === undefined || (await readableProject(ctx, attribution.projectKey as Id<"projects">, userId))) {
+export const readableAttribution = async (ctx: MutationCtx | QueryCtx, attribution: Attribution, userId: string): Promise<Attribution> => {
+    if (attribution.projectKey === undefined) {
         return attribution;
     }
 
-    return {};
+    return (await readableProject(ctx, attribution.projectKey as Id<"projects">, userId)) ? attribution : {};
+};
+
+/** What `userId`'s reply in `threadId` is filed under: the thread's (or its lead's) project, when they can open it. */
+const attributionFor = async (ctx: MutationCtx | QueryCtx, threadId: string | undefined, userId: string): Promise<Attribution> =>
+    threadId === undefined || threadId.length === 0 ? {} : await readableAttribution(ctx, await threadProject(ctx, threadId), userId);
+
+/**
+ * `read`, or — once the record's retries are spent ({@link LAST_TRY_AFTER_MS} after the reply was recorded) — no
+ * project, so a project that cannot be read never costs the reply its total.
+ */
+const attributionOrNone = async (
+    ctx: Pick<MutationCtx, "now">,
+    reply: { at: number; replyKey: string; threadId?: string; userId: string },
+    read: () => Promise<Attribution>,
+): Promise<Attribution> => {
+    try {
+        return await read();
+    } catch (error) {
+        if (ctx.now - reply.at < LAST_TRY_AFTER_MS) {
+            throw error;
+        }
+
+        usageLogger.warn("[usage] the thread's project could not be read; recording the reply without one", {
+            error,
+            replyKey: reply.replyKey,
+            threadId: reply.threadId,
+            userId: reply.userId,
+        });
+
+        return {};
+    }
 };
 
 const vAttribution = v.object({ projectKey: v.optional(v.string()) });
@@ -149,7 +173,7 @@ const vAttribution = v.object({ projectKey: v.optional(v.string()) });
 export const getThreadAttribution = internalQuery
     .input({ threadId: v.string(), userId: v.string() })
     .output(vAttribution)
-    .query(async ({ args: { threadId, userId }, ctx }) => await attributionForReplier(ctx, threadId, userId));
+    .query(async ({ args: { threadId, userId }, ctx }) => await attributionFor(ctx, threadId, userId));
 
 /**
  * Files a recorded reply under its project, once: the project walk may have filed it already (it marks
@@ -230,22 +254,6 @@ export const addToRollup = async (ctx: DbCtx, userId: string, increments: Readon
 };
 
 /**
- * The day an already-counted reply's total sits on. The first walk dates a reply by its first row, in the zone it
- * snapshotted when it started; a reply that ran past midnight would otherwise put its project row on the next day.
- */
-const countedDayOf = async (ctx: DbCtx, args: { date: string; startedAt?: number; userId: string }): Promise<string> => {
-    if (args.startedAt === undefined) {
-        return args.date;
-    }
-
-    const state = await ctx.db.usageBackfill.findFirst({ where: { userId: args.userId } });
-    const settings = state?.timeZone ? null : await ctx.db.userSettings.findFirst({ where: { userId: args.userId } });
-    const timeZone = state?.timeZone ?? settings?.timezone;
-
-    return usageDayOf(args.startedAt, timeZone);
-};
-
-/**
  * One finished reply: adds to the day's total row and to the day's row for the
  * skill that answered, once per `replyKey`. `at` is the caller's clock, so the
  * handler stays deterministic.
@@ -279,21 +287,23 @@ export const recordReplyUsage = internalMutation
         const costMicrodollars = Math.max(0, Math.round(args.costMicrodollars));
         const tokens = Math.max(0, Math.round(args.tokens));
         const recorded = await ctx.db.usageReplies.findFirst({ where: { replyKey: args.replyKey, userId: args.userId } });
+        const attribution = async (): Promise<Attribution> =>
+            args.threadAttribution ?? (await attributionOrNone(ctx, args, async () => await attributionFor(ctx, args.threadId, args.userId)));
 
         // A redelivered job (already filed), or a reply the backfill reached first: the first walk files no project, so
-        // the project is filed here, once.
+        // the project is filed here, once — at what the walk counted (`counted`: a run it passed while paused holds less
+        // than this record says), on the day it counted it. A key without that snapshot was written before projects were
+        // filed: nothing says what its total holds, so it stays under "No project" (`usage/AGENTS.md`).
         if (recorded) {
             if (!recorded.projectFiled) {
-                // The project gets what the total holds for the reply: the first walk's count when it made one (a run it
-                // passed while paused holds less than this record says), else this record dated as the walk would.
                 const { counted } = recorded;
 
                 await fileAttribution(
                     ctx,
                     args,
-                    args.threadAttribution ?? (await attributionOfThread(ctx, args.threadId)),
-                    counted?.date ?? (await countedDayOf(ctx, args)),
-                    counted ? { costMicrodollars: counted.costMicrodollars, tokens: counted.tokens } : { costMicrodollars, tokens },
+                    counted ? await attribution() : {},
+                    counted?.date ?? args.date,
+                    { costMicrodollars: counted?.costMicrodollars ?? 0, tokens: counted?.tokens ?? 0 },
                     true,
                 );
             }
@@ -319,23 +329,10 @@ export const recordReplyUsage = internalMutation
             true,
         );
 
-        await fileAttribution(
-            ctx,
-            args,
-            args.threadAttribution ?? (await attributionOfThread(ctx, args.threadId)),
-            args.date,
-            { costMicrodollars, tokens },
-            false,
-        );
+        await fileAttribution(ctx, args, await attribution(), args.date, { costMicrodollars, tokens }, false);
 
         return null;
     });
-
-/** Tries a forward makes at reading the thread's project before it records the reply without one. */
-const FORWARD_READ_TRIES = 3;
-
-/** The first retry's delay; each later one doubles it. */
-const FORWARD_RETRY_MS = 30_000;
 
 /**
  * A reply that ran in another user's thread (shared with the replier) is recorded on the replier's own shard, where the
@@ -347,8 +344,6 @@ export const forwardReplyUsage = internalMutation
         at: v.number(),
         costMicrodollars: v.number(),
         date: v.string(),
-        /** Reads of the thread's project that failed so far. */
-        failedReads: v.optional(v.number()),
         replyKey: v.string(),
         skillKey: v.string(),
         skillName: v.optional(v.string()),
@@ -359,35 +354,12 @@ export const forwardReplyUsage = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const { failedReads = 0, ...usage } = args;
-        let threadAttribution: Attribution;
+        // A failed read throws, and the scheduler runs this again (`RECORD_RETRY`); the last try forwards without a
+        // project, so the reply's total and skill rows still land.
+        const threadAttribution = await attributionOrNone(ctx, args, async () => await attributionFor(ctx, args.threadId, args.userId));
+        const record: ReplyUsageArgs & { threadAttribution: Attribution } = { ...args, threadAttribution };
 
-        try {
-            threadAttribution = await attributionForReplier(ctx, usage.threadId, usage.userId);
-        } catch (error) {
-            // Nothing retries a scheduled job: this one tries again itself, and after the last try records the reply
-            // without a project rather than lose its total.
-            if (failedReads + 1 < FORWARD_READ_TRIES) {
-                await ctx.scheduler.runAfter(FORWARD_RETRY_MS * 2 ** failedReads, internal.usage.activity.forwardReplyUsage, {
-                    ...usage,
-                    failedReads: failedReads + 1,
-                });
-
-                return null;
-            }
-
-            usageLogger.warn("[usage] the thread's project could not be read; recording the reply without one", {
-                error,
-                replyKey: usage.replyKey,
-                threadId: usage.threadId,
-                userId: usage.userId,
-            });
-            threadAttribution = {};
-        }
-
-        const record: ReplyUsageArgs & { threadAttribution: Attribution } = { ...usage, threadAttribution };
-
-        await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...record }, usage.userId);
+        await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...record }, args.userId);
 
         return null;
     });

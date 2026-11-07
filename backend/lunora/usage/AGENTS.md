@@ -13,16 +13,21 @@
   saves, or its keys stop lining up with the live ones. Keys are pruned only
   after the user's backfill is done.
 - **Project rows** — a reply in a thread with a project also adds a
-  `__project__` row (`projectKey` = project id), read from the thread when
-  `recordReplyUsage` lands (pass `threadId`; rows carry it via `SavedRowLike`).
-  A caller off the thread's shard passes `threadAttribution` instead
-  (`getThreadAttribution`); a shared thread's record is forwarded through
-  `forwardReplyUsage`. A replier who cannot open the project files none.
-  Replies outside a project write none: "No project" is total − projects, so
-  never write a project row for a reply the total does not count. The project
-  walk (`runUsageProjectBackfillStep`) starts only once the first walk is done,
-  with its cutoff, adds only project rows for replies from before it, skips keys
-  the live path marked `projectFiled` and marks its own `project:<key>`, which
-  the live path checks. The first walk marks `pending:<key>` for a reply it
-  passed still running; the project walk files such a reply only once its live
-  record's key is held. Key pruning waits for both walks.
+  `__project__` row (`projectKey` = project id), read when `recordReplyUsage`
+  lands through `threadProject` (a sub-agent's or worker's thread: its lead's
+  project, via `subAgentRuns`) and `readableAttribution` (only a project the
+  user can open: no access files none, a failed read throws). A caller off the
+  thread's shard passes `threadAttribution` (`getThreadAttribution`); a shared
+  thread's record goes through `forwardReplyUsage`. Reading jobs are scheduled
+  with `RECORD_RETRY`; past `LAST_TRY_AFTER_MS` a failed read records the
+  reply without a project, so the total always lands. Replies outside a project
+  write none: "No project" is total − projects.
+- **Project history cutoff** — the project walk (`runUsageProjectBackfillStep`)
+  reconstructs nothing. It runs after the first walk, and files a reply only
+  from the `counted` snapshot (amount and day) the first walk stored on its key.
+  Under "No project" for good: a `usageBackfill` row without `timeZone`
+  (written before projects were filed: no project walk), a key without
+  `counted`, replies in threads the user does not own (teammates' shared
+  threads; their live records file them), sub-agent threads whose
+  `subAgentRuns` link was pruned (90 days). A day's project rows are clamped to
+  that day's total row. Key pruning waits for both walks.

@@ -533,13 +533,13 @@ describe("project backfill", () => {
         return rows.filter((row) => row.skillKey === PROJECT_SKILL_KEY).toSorted((a, b) => b.costMicrodollars - a.costMicrodollars);
     };
 
-    const live = async (replyKey: string, threadId: string, cost: number, tokens: number) =>
+    const live = async (replyKey: string, threadId: string, cost: number, tokens: number, date = "2026-09-20") =>
         await harness.run(
             async (ctx: any) =>
                 await ctx.runMutation(recordReplyUsage, {
                     at: STARTED,
                     costMicrodollars: cost,
-                    date: "2026-09-20",
+                    date,
                     replyKey,
                     skillKey: DEFAULT_SKILL_KEY,
                     threadId,
@@ -813,9 +813,15 @@ describe("project backfill", () => {
 
         vi.setSystemTime(STARTED);
 
-        // The first walk counted the reply (its key, with no project) and the project walk had passed it while it ran.
+        // The first walk counted the reply (its key, with what it counted and no project) and the project walk had
+        // passed it while it ran.
         await harness.run(async (ctx: any) => {
-            await ctx.db.insert("usageReplies", { recordedAt: STARTED, replyKey: key, userId: USER });
+            await ctx.db.insert("usageReplies", {
+                counted: { costMicrodollars: 100, date: "2026-09-20", tokens: 10 },
+                recordedAt: STARTED,
+                replyKey: key,
+                userId: USER,
+            });
         });
         await live(key, inAlpha.threadId, 100, 10);
         await live(key, inAlpha.threadId, 100, 10);
@@ -826,6 +832,60 @@ describe("project backfill", () => {
         expect(rows).toStrictEqual([EXPECTED_PROJECTS(alpha, "")[0]]);
         // The total is the first walk's to write, which this fixture skips: the live record adds no second one.
         expect(all.filter((row) => row.skillKey === TOTAL_SKILL_KEY)).toStrictEqual([]);
+    });
+
+    it("files a reply that ran past midnight on the day its total was counted, not the day it finished", async () => {
+        const alpha = await insertProject("Alpha");
+        // Started a minute before midnight; its live record lands the next day.
+        const thread = await insertThread(Date.UTC(2026, 8, 20, 23, 59), [[prompt(), reply(10, 100)]], "active", alpha);
+        const key = thread.rowIds[0]![1]!;
+
+        vi.setSystemTime(STARTED);
+        await start();
+
+        for (let current = await state(); current.status !== "done"; current = await state()) {
+            await step(current.runId);
+        }
+
+        await live(key, thread.threadId, 100, 10, "2026-09-21");
+        await drain();
+
+        const rows = await rollup();
+
+        expect(rows.filter((row) => row.skillKey === PROJECT_SKILL_KEY).map((row) => row.date)).toStrictEqual(["2026-09-20"]);
+        expect(rows.filter((row) => row.skillKey === TOTAL_SKILL_KEY).map((row) => row.date)).toStrictEqual(["2026-09-20"]);
+    });
+
+    it("counts a reply in a teammate's shared thread once, with its project, and the walk adds nothing for it", async () => {
+        const orgProject = await harness.run(
+            async (ctx: any) => await ctx.db.insert("projects", { createdAt: DAY_1, organizationId: "org_1", title: "Org", userId: "teammate" }),
+        );
+        const shared = await harness.run(
+            async (ctx: any) => await ctx.db.insert("threads", { projectId: orgProject, status: "active", title: "Shared", userId: "teammate" }),
+        );
+
+        // The teammate's shard read the thread's project and forwarded the record to the user's.
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(recordReplyUsage, {
+                    at: STARTED,
+                    costMicrodollars: 60,
+                    date: "2026-09-20",
+                    replyKey: "shared-reply",
+                    skillKey: DEFAULT_SKILL_KEY,
+                    threadAttribution: { projectKey: orgProject },
+                    threadId: shared,
+                    tokens: 6,
+                    userId: USER,
+                }),
+        );
+        vi.setSystemTime(STARTED);
+        await start();
+        await drain();
+
+        expect(await projectRows()).toStrictEqual([
+            { costMicrodollars: 60, date: "2026-09-20", projectKey: orgProject, replies: 1, skillKey: PROJECT_SKILL_KEY, tokens: 6 },
+        ]);
     });
 
     it("files no project for a reply after the first walk's cutoff whose total never landed", async () => {

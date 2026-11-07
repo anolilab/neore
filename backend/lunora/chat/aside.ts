@@ -430,13 +430,19 @@ export const askAside = authAction
                 const at = Date.now();
                 const cost = sumMessageCosts((result.steps ?? []).map((step: { providerMetadata?: unknown }) => step.providerMetadata));
 
+                // The project as it is now, read again after the call: the pre-charge read stands in when this one fails,
+                // so a paid answer always records its total.
+                const recordedAttribution = await ctx
+                    .runQuery(internal.usage.activity.getThreadAttribution, { threadId, userId })
+                    .catch(() => threadAttribution);
+
                 scheduleReplyUsage(ctx.scheduler as never, {
                     at,
                     costMicrodollars: Math.round(cost?.microdollars ?? 0),
                     date: usageDayOf(at, timezone),
                     replyKey: `aside:${entryId}`,
                     skillKey: DEFAULT_SKILL_KEY,
-                    threadAttribution,
+                    threadAttribution: recordedAttribution,
                     threadId,
                     tokens: result.totalUsage?.totalTokens ?? 0,
                     userId,

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import { forwardReplyUsage, getActivityHeatmap, getSkillBreakdown, getThreadAttribution, recordReplyUsage } from "./activity";
-import { DEFAULT_SKILL_KEY } from "./activity-logic";
+import { DEFAULT_SKILL_KEY, LAST_TRY_AFTER_MS } from "./activity-logic";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -303,21 +303,20 @@ describe("recording usage by project", () => {
         }
     });
 
-    it("forwards a shared thread's reply after its project read keeps failing, without the project but with its total", async () => {
+    it("fails a forward whose project read fails so it is retried, then forwards with the project once the read works", async () => {
         const alpha = await insertThread(USER, "Alpha");
-        const forward = async (failedReads: number) =>
+        const forward = async (at: number) =>
             await harness.run(
                 async (ctx: any) =>
                     await ctx.runMutation(forwardReplyUsage, {
-                        at: 1,
+                        at,
                         costMicrodollars: 100,
                         date: "2026-09-20",
-                        failedReads,
                         replyKey: "shared-reply",
                         skillKey: DEFAULT_SKILL_KEY,
                         threadId: alpha.threadId,
                         tokens: 10,
-                        userId: OTHER,
+                        userId: USER,
                     }),
             );
 
@@ -325,16 +324,40 @@ describe("recording usage by project", () => {
         projectReadFails.value = true;
 
         try {
-            // An early failure tries again later and forwards nothing yet.
-            await forward(0);
+            // The first try fails, so the scheduler runs it again (`RECORD_RETRY`); nothing is forwarded yet.
+            await expect(forward(Date.now())).rejects.toThrow("project read failed");
             expect(forwarded).toStrictEqual([]);
 
-            // The last try records the reply, so its total is never lost.
-            await forward(2);
-            expect(forwarded).toMatchObject([{ costMicrodollars: 100, replyKey: "shared-reply", threadAttribution: {}, userId: OTHER }]);
+            // The last try, once the retries are spent, forwards without the project: the total still lands.
+            await forward(Date.now() - LAST_TRY_AFTER_MS - 1);
+            expect(forwarded).toMatchObject([{ costMicrodollars: 100, replyKey: "shared-reply", threadAttribution: {} }]);
         } finally {
             projectReadFails.value = false;
         }
+
+        // A retry whose read works forwards the reply with its project.
+        forwarded.length = 0;
+        await forward(Date.now());
+        expect(forwarded).toMatchObject([{ threadAttribution: { projectKey: alpha.projectId } }]);
+    });
+
+    it("files no project once the user's membership in the project's organization is revoked", async () => {
+        const projectId = await harness.run(
+            async (ctx: any) => await ctx.db.insert("projects", { createdAt: 1, organizationId: "org_1", title: "Org", userId: OTHER }),
+        );
+        const threadId = await harness.run(async (ctx: any) => await ctx.db.insert("threads", { projectId, status: "active", title: "T", userId: USER }));
+        const membership = await harness.run(
+            async (ctx: any) => await ctx.db.insert("member", { createdAt: 0, organizationId: "org_1", role: "member", userId: USER }),
+        );
+
+        await record({ costMicrodollars: 30, replyKey: "as-member", threadId, tokens: 3 });
+        await harness.run(async (ctx: any) => {
+            await ctx.db.delete("member", membership);
+        });
+        await record({ costMicrodollars: 50, replyKey: "after-revoked", threadId, tokens: 5 });
+
+        // Only the reply recorded while a member is under the project; the other counts in the total alone.
+        expect(await projectTotals(USER)).toStrictEqual({ [projectId]: { costMicrodollars: 30, replies: 1, tokens: 3 } });
     });
 
     it("writes no marker rows beyond the reply's own key when it records a reply first", async () => {
