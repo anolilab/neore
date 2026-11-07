@@ -189,29 +189,34 @@ describe("derived sections", () => {
     it("marks a snoozed stateless root idle when its snooze ends, with no regular snoozed root to wake the timer", () => {
         vi.useFakeTimers();
         vi.setSystemTime(NOW);
-        composite.threads.page = [
-            {
-                _id: "s",
-                _creationTime: NOW,
-                createdAt: NOW,
-                lastReplyAt: NOW - 10,
-                scheduled: false,
-                snoozedUntil: NOW + 60_000,
-                statelessMode: true,
-                status: "active",
-                title: "Stateless",
-            },
-        ] as never;
-        const { result } = renderHook(() => useThreadGroups(new Set<GroupType>(), new Set<string>(), "", "threads", undefined, [], undefined, undefined));
-        const idleOf = () => result.current.threadGroups.find((group) => group.title === "Stateless")?.threads[0]?.isIdle;
 
-        expect(idleOf()).toBe(false);
+        // Real timers come back even when an assertion fails, so no later test runs on the fake clock.
+        try {
+            composite.threads.page = [
+                {
+                    _id: "s",
+                    _creationTime: NOW,
+                    createdAt: NOW,
+                    lastReplyAt: NOW - 10,
+                    scheduled: false,
+                    snoozedUntil: NOW + 60_000,
+                    statelessMode: true,
+                    status: "active",
+                    title: "Stateless",
+                },
+            ] as never;
+            const { result } = renderHook(() => useThreadGroups(new Set<GroupType>(), new Set<string>(), "", "threads", undefined, [], undefined, undefined));
+            const idleOf = () => result.current.threadGroups.find((group) => group.title === "Stateless")?.threads[0]?.isIdle;
 
-        act(() => {
-            vi.advanceTimersByTime(60_100);
-        });
+            expect(idleOf()).toBe(false);
 
-        expect(idleOf()).toBe(true);
-        vi.useRealTimers();
+            act(() => {
+                vi.advanceTimersByTime(60_100);
+            });
+
+            expect(idleOf()).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
