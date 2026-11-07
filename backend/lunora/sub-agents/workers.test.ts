@@ -30,6 +30,10 @@ const insertUser = async (fields: Record<string, unknown> = {}) =>
             }),
     )) as string;
 
+/** Makes `member` a member of `organizationId`: a run in an organization its owner left is refused before it is charged. */
+const joinOrganization = async (member: string, organizationId: string) =>
+    await harness.run(async (ctx: any) => await ctx.db.insert("member", { createdAt: 0, organizationId, role: "member", userId: member }));
+
 const insertThread = async (owner: string, fields: Record<string, unknown> = {}) =>
     (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "T", userId: owner, ...fields }))) as string;
 
@@ -52,6 +56,7 @@ const MISSING_TOOL = /shellExecution/u;
 const FAN_OUT_CAP = /At most 3/u;
 const LIFETIME_CAP = /at most 5 sub-agents of its own/u;
 const DAILY_LIMIT = /daily limit/u;
+const LEFT_ORGANIZATION = /no longer a member of the organization/u;
 
 const runs = async () => (await harness.run(async (ctx: any) => await ctx.db.query("subAgentRuns").collect())) as any[];
 const rateLimitKeys = async () =>
@@ -159,6 +164,8 @@ describe("dispatching to a worker", () => {
     });
 
     it("keeps the worker's organization on a follow-up that names none, so the follow-up is capped as the first run was", async () => {
+        await joinOrganization(userId, "org-x");
+
         const first = await create({ organizationId: "org-x", toolCallId: "call-org-1" });
         const second = await dispatch({ childThreadId: first.run.childThreadId, toolCallId: "call-org-2" });
 
@@ -173,6 +180,7 @@ describe("dispatching to a worker", () => {
 
         await claim(first.run._id);
         await finish(first.run._id);
+        await joinOrganization(userId, "org-run");
 
         const sent = await harness.run(
             async (ctx: any) =>
@@ -193,6 +201,24 @@ describe("dispatching to a worker", () => {
         const followUp = allRuns.find((run) => run._id === sent.runId);
 
         expect(followUp).toMatchObject({ organizationId: "org-run" });
+    });
+
+    it("refuses a worker run whose owner left its organization, charging nothing", async () => {
+        const result = await dispatch({ name: "Researcher", organizationId: "org-left", toolCallId: "call-left" });
+
+        expect(result).toMatchObject({ error: expect.stringMatching(LEFT_ORGANIZATION), kind: "forbidden" });
+        expect(await runs()).toHaveLength(0);
+        expect(await rateLimitKeys()).toHaveLength(0);
+    });
+
+    it("refuses a sub-agent whose owner left its organization, charging nothing", async () => {
+        const result = await harness.run(
+            async (ctx: any) =>
+                await admitSubAgentRun(ctx, { organizationId: "org-left", parentThreadId: leadId, task: "Research the topic", toolCallId: "call-sub", userId }),
+        );
+
+        expect(result).toMatchObject({ error: expect.stringMatching(LEFT_ORGANIZATION) });
+        expect(await rateLimitKeys()).toHaveLength(0);
     });
 
     it("returns the same run for a redelivered tool call and consumes nothing more", async () => {

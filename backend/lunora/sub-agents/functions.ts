@@ -243,6 +243,12 @@ export const admitSubAgentRun = async (
         return { error: capProblem };
     }
 
+    const leftOrganization = await membershipRefusal(ctx, parent.organizationId ?? args.organizationId, args.userId);
+
+    if (leftOrganization) {
+        return { error: leftOrganization };
+    }
+
     const { ok } = await createRatelimit(`subAgents/run:${account.tier}`, ctx.db as never).limit(args.userId);
 
     if (!ok) {
@@ -405,6 +411,13 @@ const isHostInLeadScope = async (ctx: MutationCtx, run: Pick<RunDoc, "parentThre
 };
 
 /**
+ * `LEFT_ORGANIZATION_MESSAGE` when the owner is no longer a member of the run's organization, else `null`. Checked before
+ * anything is charged: such a run would fail when it starts (`runHeadlessAgent` refuses it), so it must not cost a round.
+ */
+const membershipRefusal = async (ctx: MutationCtx, organizationId: string | null | undefined, userId: string): Promise<string | null> =>
+    organizationId && !(await getMemberByOrganizationAndUser(ctx, organizationId, userId)) ? LEFT_ORGANIZATION_MESSAGE : null;
+
+/**
  * Why a computer worker cannot run for this organization, or `null`. The owner must still be a member, and the cap must be
  * `auto`: a computer agent's tools are approved there, out of the backend's reach. Checked at admission, before any session
  * is opened, and again when a queued turn is sent.
@@ -414,8 +427,10 @@ const hostOrganizationRefusal = async (ctx: MutationCtx, organizationId: string 
         return null;
     }
 
-    if (!(await getMemberByOrganizationAndUser(ctx, organizationId, userId))) {
-        return LEFT_ORGANIZATION_MESSAGE;
+    const leftOrganization = await membershipRefusal(ctx, organizationId, userId);
+
+    if (leftOrganization) {
+        return leftOrganization;
     }
 
     const policy = await ctx.db.organizationPolicies.findFirst({ where: { organizationId } });
@@ -706,15 +721,17 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         return await refuse({ error: HOST_NEEDS_OWN_CONVERSATION, kind: "forbidden" });
     }
 
-    // The owner must still be a member and the organization's cap must allow `auto` (`hostOrganizationRefusal`), before any
-    // thread, session or start call exists. A new worker takes the organization its thread is stamped with; an existing one
-    // keeps its own.
-    if (runnerKind === "host") {
-        const refused = await hostOrganizationRefusal(ctx, child?.organizationId ?? parent.organizationId ?? args.organizationId, args.userId);
+    // The owner must still be a member, before anything is created or charged; a worker on a computer also needs the
+    // organization's cap at `auto` (`hostOrganizationRefusal`), before any thread, session or start call exists. A new worker
+    // takes the organization its thread is stamped with; an existing one keeps its own.
+    const workerOrganizationId = child?.organizationId ?? parent.organizationId ?? args.organizationId;
+    const organizationRefusal =
+        runnerKind === "host"
+            ? await hostOrganizationRefusal(ctx, workerOrganizationId, args.userId)
+            : await membershipRefusal(ctx, workerOrganizationId, args.userId);
 
-        if (refused) {
-            return await refuse({ error: refused, kind: "forbidden" });
-        }
+    if (organizationRefusal) {
+        return await refuse({ error: organizationRefusal, kind: "forbidden" });
     }
 
     // Only the task text reaches a coding agent on a computer: a tool list or skill the caller asks for would read as a
