@@ -12,19 +12,19 @@ auditConfig:
   # eight of those did not even apply to the installed 16.x — they were written
   # against `< 15.5.21`. The ninth was live and suppressed.
   ignoreGhsas:
-    # @ai-sdk/provider-utils <=3.0.97. No patched release exists; the 5.x copies
-    # in the tree are unaffected, the older ones come in transitively.
-    - GHSA-866g-f22w-33x8
     # braces <=3.0.3, via micromatch/fast-glob (28 paths). No patched release exists.
     - GHSA-vfj7-8cjw-p6xm
     # sprintf-js <=1.1.3, via argparse 1 under `mammoth`. No patched release exists.
     - GHSA-86w9-cpqp-85rv
-    # zod <4.6.6 has no patched 3.x release. The only zod 3 copy left is the one
-    # eslint-plugin-react-compiler calls through its zod 3 API (it breaks on zod 4),
-    # and it runs at lint time only. The MCP packages and the product use zod 4.6.7.
+    # zod <4.6.6 has no patched 3.x release. The zod 3 copies left belong to dev
+    # tools: the Expo CLI (apps/mobile builds) and eslint-plugin-react-compiler, which
+    # calls the zod 3 API and breaks on zod 4. The MCP packages,
+    # @cloudflare/sandbox (see the overrides) and the product use zod 4.6.7.
     - GHSA-mrhx-c7xc-m3w5
-    # deepmerge >=4.2.0 <=4.3.1, via @lunora/mail > @react-email/render > html-to-text.
-    # No patched release exists; it merges the renderer's own option objects, not input.
+    # deepmerge >=4.2.0 <=4.3.1. No patched release exists. At run time it comes only
+    # through html-to-text under @react-email/render (via @lunora/mail, and via
+    # @lunora/notify > @visulima/email), which merges its own option objects, never
+    # input; the other users (Expo config, rollup, shadcn) are build tools.
     - GHSA-gcqx-w48m-w2h4
     # minimatch <11.0.1 and glob >=9 <=14.0.1 are fixed only in new majors (minimatch
     # 11, glob 14). Their consumers ask for minimatch 3/9/10 (3 kept CJS on purpose,
@@ -73,7 +73,6 @@ catalogs:
     # Moves with `ai` below: each release depends on exactly one `ai`.
     "@ai-sdk/react": 4.0.142
     "@ai-sdk/replicate": 3.0.60
-    "@ai-sdk/ui-utils": ^1.2.11
     "@ai-sdk/xai": 5.0.21
     "@e2b/code-interpreter": 2.9.1
     "@openrouter/ai-sdk-provider": 3.1.0
@@ -873,6 +872,8 @@ overrides:
   "@mcp-ui/client>zod": ^4.6.7
   "@modelcontextprotocol/ext-apps>zod": ^4.6.7
   "@modelcontextprotocol/sdk>zod": ^4.6.7
+  # @cloudflare/sandbox 1.0.0 pins zod 4.5.4 exactly (GHSA-mrhx-c7xc-m3w5, fixed in 4.6.6).
+  "@cloudflare/sandbox>zod": ^4.6.7
   shadcn>undici: ^8.12.2
   ajv>fast-uri: ^3.1.9
 shellEmulator: true
