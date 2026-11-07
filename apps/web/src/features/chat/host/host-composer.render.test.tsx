@@ -531,6 +531,9 @@ describe("the coding-agent composer", () => {
         await endTurn();
 
         expect(await screen.findByRole("button", { name: "Send next" })).toBeTruthy();
+        // Another round of reads after the end has been taken in: a drain of the second message would have posted by now.
+        await harness.client?.invalidateQueries();
+        await waitFor(() => expect(screen.queryByText("first")).toBeNull());
         expect(sendCalls()).toHaveLength(1);
     });
 
