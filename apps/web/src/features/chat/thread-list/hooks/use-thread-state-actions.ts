@@ -18,6 +18,15 @@ interface SnoozeMutateVariables {
 type SnoozeMutate = (variables: SnoozeMutateVariables) => Promise<unknown>;
 
 /**
+ * Whether a failed write got no answer at all: the request was sent (or may have been) and the reply never arrived. A network failure
+ * is a `TypeError` from `fetch`; an aborted or timed-out request is a `DOMException`. A reply from the server, whatever its code, is
+ * an answer, so the write did not save.
+ */
+const answerWasLost = (error: unknown): boolean =>
+    error instanceof TypeError ||
+    (typeof DOMException !== "undefined" && error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError"));
+
+/**
  * What became of a snooze: `saved`; `refused` (the client refused it before sending, so nothing was saved); or `unconfirmed` (the write
  * was sent and its answer was lost, so the server may have committed it, and the owner should check before saving again).
  */
@@ -87,17 +96,17 @@ export const useThreadStateActions = (): ThreadStateActions => {
             } catch (error) {
                 console.error("Failed to snooze thread:", error);
 
-                // A refusal before sending is definite: nothing was saved. Any other failure may come after the server committed the
-                // write (its answer was lost), so it is not reported as a plain failure that invites an immediate duplicate.
-                if ((error as { code?: unknown } | null)?.code === "OFFLINE_NOT_QUEUED") {
-                    showError(t`Could not snooze the thread. Please try again.`);
+                // Only a lost answer is "may have saved": the request went out and no answer came back, so the server may have committed
+                // it. Anything the server answered, including the client's own refusal before sending, did not save.
+                if (answerWasLost(error)) {
+                    showError(t`Could not confirm the snooze. It may have saved; check the thread before saving again.`);
 
-                    return "refused";
+                    return "unconfirmed";
                 }
 
-                showError(t`Could not confirm the snooze. It may have saved; check the thread before saving again.`);
+                showError(t`Could not snooze the thread. Please try again.`);
 
-                return "unconfirmed";
+                return "refused";
             }
 
             const when = new Date(until).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });

@@ -353,6 +353,19 @@ describe("the list's snooze dialog across threads", () => {
         list.remove();
     });
 
+    it("a server-refused snooze shows the refused message and does not claim it may have saved", async () => {
+        const onOpenChange = mountDialog();
+
+        state.snoozeAt.mockResolvedValueOnce("refused");
+        submit();
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("Could not snooze the thread. Please try again.");
+        expect(alert.textContent).not.toContain("may have");
+        expect(onOpenChange).not.toHaveBeenCalled();
+    });
+
     it("shows that a save may have gone through when its answer was lost, and keeps the dialog open", async () => {
         const onOpenChange = mountDialog();
 

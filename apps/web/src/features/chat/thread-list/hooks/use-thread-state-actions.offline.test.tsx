@@ -11,15 +11,20 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { server, write } = vi.hoisted(() => {
-    const fake = { loseResponse: false, online: true, queued: [] as (() => void)[], written: [] as unknown[] };
+    const fake = { loseResponse: false, online: true, queued: [] as (() => void)[], refuse: false, written: [] as unknown[] };
 
     const send = (args: unknown, call?: { onlineOnly?: boolean }): Promise<unknown> => {
         if (fake.online) {
+            // The server answers with a refusal, and applies nothing.
+            if (fake.refuse) {
+                return Promise.reject(Object.assign(new Error("A snooze must end in the future, within a year"), { code: "BAD_REQUEST" }));
+            }
+
             fake.written.push(args);
 
-            // The server committed the write, but the answer never reached the client.
+            // The server committed the write, but the answer never reached the client: a network failure.
             if (fake.loseResponse) {
-                return Promise.reject(new Error("Network connection lost."));
+                return Promise.reject(new TypeError("Failed to fetch"));
             }
 
             return Promise.resolve(null);
@@ -131,6 +136,7 @@ describe("snoozing while offline", () => {
     beforeEach(() => {
         server.online = true;
         server.loseResponse = false;
+        server.refuse = false;
         server.queued.length = 0;
         server.written.length = 0;
         onlineManager.setOnline(true);
@@ -141,6 +147,14 @@ describe("snoozing while offline", () => {
         client.clear();
         refetchFails.clear();
         vi.restoreAllMocks();
+    });
+
+    it("a custom snooze the server refuses is refused, not unconfirmed, and nothing is written", async () => {
+        const { result } = renderHook(() => useThreadStateActions(), { wrapper });
+
+        server.refuse = true;
+        await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe("refused");
+        expect(server.written).toHaveLength(0);
     });
 
     it("a custom snooze whose answer is lost after the server committed it is unconfirmed, not refused", async () => {
