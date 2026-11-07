@@ -52,6 +52,13 @@ DEPLOY_ENV=preview pnpm run deploy
 
 ## Linters
 
+`pnpm lint` runs the root vis target `lint:all` (root `project.json`): every project's `lint:eslint`, plus the root
+`lint:oxlint`, `lint:oxfmt` and `lint:dedupe`, in parallel, failing if any fails. vis treats the root `package.json`
+scripts as root targets, except those that start with `vis run`. A root script that shares its name with a project
+target (`deploy`, `test:storybook`, …) is set to a no-op in `project.json`, or `vis run <name>` would run it too
+(`vis run deploy` would run the Alchemy deploy); `pnpm <name>` still runs it. Add a name there when a project gains a
+target that matches a root script.
+
 ESLint is the authority; oxlint is a fast first pass that enforces only what ESLint enforces, and gates CI like it.
 `.oxlintrc.json` is generated, never edited: `pnpm lint:oxlint:sync` (`scripts/sync-oxlint-rules.mjs`) asks ESLint, from
 inside each project, which files it lints and how each rule is set, then enables a rule only when ESLint sets it the

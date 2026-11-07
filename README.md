@@ -90,7 +90,7 @@ development stubs and are optional.
 | `pnpm dev:backend`            | Backend only                                              |
 | `pnpm build:packages`         | Build all shared packages                                 |
 | `pnpm build:chat`             | Build the web app                                         |
-| `pnpm lint`                   | oxfmt, ESLint, and dedupe checks                          |
+| `pnpm lint`                   | ESLint, oxlint, format and dedupe checks, in parallel     |
 | `pnpm lint:types`             | TypeScript checks (run separately; `lint` does not include types) |
 | `pnpm lint:eslint:fix`        | Fix ESLint issues                                         |
 | `pnpm lint:oxfmt:fix`         | Fix formatting                                            |
