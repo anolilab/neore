@@ -144,18 +144,18 @@ export const markThreadViewedAt = async (db: Database, thread: Doc<"threads">, n
 
 /**
  * Whether a snooze write is stale, so it changes nothing. `chosenAt` is when the owner made the choice, by the client's clock; the
- * thread's `snoozeChosenAt` is the newest ordering it has seen (a choice, or a wake). Once a thread has an ordering, a write without
- * one (a client that predates it) is stale, and so is one chosen before the stored ordering. So a queued write cannot undo a newer
- * choice or re-hide a thread that has since woken, and another device's earlier write cannot undo a later one.
+ * thread's `snoozeChosenAt` is the newest ordering it has seen (a choice, or a wake). Once a thread has an ordering, a choice chosen
+ * before it is stale. So a queued write cannot undo a newer choice or re-hide a thread that has since woken, and another device's
+ * earlier write cannot undo a later one.
  */
-export const isStaleSnoozeChoice = (thread: Pick<Doc<"threads">, "snoozeChosenAt">, chosenAt: number | undefined): boolean =>
-    thread.snoozeChosenAt !== undefined && (chosenAt === undefined || chosenAt < thread.snoozeChosenAt);
+export const isStaleSnoozeChoice = (thread: Pick<Doc<"threads">, "snoozeChosenAt">, chosenAt: number): boolean =>
+    thread.snoozeChosenAt !== undefined && chosenAt < thread.snoozeChosenAt;
 
 /**
  * Sets the thread's snooze: `until`, or `undefined` to bring it back, and records `chosenAt` as the ordering. Leaves `updatedAt` alone.
  * A stale write (`isStaleSnoozeChoice`) changes nothing.
  */
-export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, until: number | undefined, chosenAt?: number): Promise<void> => {
+export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, until: number | undefined, chosenAt: number): Promise<void> => {
     if (isStaleSnoozeChoice(thread, chosenAt)) {
         return;
     }

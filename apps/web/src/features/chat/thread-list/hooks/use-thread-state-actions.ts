@@ -17,15 +17,21 @@ interface SnoozeMutateVariables {
 
 type SnoozeMutate = (variables: SnoozeMutateVariables) => Promise<unknown>;
 
+/**
+ * What became of a snooze: `saved`; `refused` (the client refused it before sending, so nothing was saved); or `unconfirmed` (the write
+ * was sent and its answer was lost, so the server may have committed it, and the owner should check before saving again).
+ */
+export type SnoozeOutcome = "saved" | "refused" | "unconfirmed";
+
 interface ThreadStateActions {
     /** Hides the thread until the choice's time; the toast offers an undo that restores the previous snooze, if any. */
     snooze: (threadId: string, choice: SnoozeChoice, previousUntil: number | undefined) => void;
 
     /**
-     * Hides the thread until an exact time (a custom snooze); same toast and undo as `snooze`. Resolves true once saved,
-     * false (after the error toast) when not. Offline, the save is refused at once and never queued for the reconnect.
+     * Hides the thread until an exact time (a custom snooze); same toast and undo as `snooze`. Offline, the save is refused at once and
+     * never queued for the reconnect.
      */
-    snoozeAt: (threadId: string, until: number, previousUntil: number | undefined) => Promise<boolean>;
+    snoozeAt: (threadId: string, until: number, previousUntil: number | undefined) => Promise<SnoozeOutcome>;
     /** Brings a snoozed thread back; the toast offers an undo that snoozes it again until the same time. */
     unsnooze: (threadId: string, previousUntil: number | undefined) => void;
 }
@@ -75,27 +81,36 @@ export const useThreadStateActions = (): ThreadStateActions => {
     // The result is the write's own outcome. Only the write sits in the try: an error after a successful write (the toast) is not
     // reported as a failed snooze.
     const save = useCallback(
-        async (mutate: SnoozeMutate, threadId: string, until: number, previousUntil: number | undefined): Promise<boolean> => {
+        async (mutate: SnoozeMutate, threadId: string, until: number, previousUntil: number | undefined): Promise<SnoozeOutcome> => {
             try {
                 await mutate({ chosenAt: Date.now(), threadId: threadId as Id<"threads">, until });
             } catch (error) {
                 console.error("Failed to snooze thread:", error);
-                showError(t`Could not snooze the thread. Please try again.`);
 
-                return false;
+                // A refusal before sending is definite: nothing was saved. Any other failure may come after the server committed the
+                // write (its answer was lost), so it is not reported as a plain failure that invites an immediate duplicate.
+                if ((error as { code?: unknown } | null)?.code === "OFFLINE_NOT_QUEUED") {
+                    showError(t`Could not snooze the thread. Please try again.`);
+
+                    return "refused";
+                }
+
+                showError(t`Could not confirm the snooze. It may have saved; check the thread before saving again.`);
+
+                return "unconfirmed";
             }
 
             const when = new Date(until).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
             showSuccess(t`Snoozed until ${when}`, { action: { label: t`Undo`, onClick: () => restore(threadId, previousUntil) } });
 
-            return true;
+            return "saved";
         },
         [restore, t],
     );
 
     const snoozeAt = useCallback(
-        (threadId: string, until: number, previousUntil: number | undefined): Promise<boolean> => save(writeNow, threadId, until, previousUntil),
+        (threadId: string, until: number, previousUntil: number | undefined): Promise<SnoozeOutcome> => save(writeNow, threadId, until, previousUntil),
         [save, writeNow],
     );
 

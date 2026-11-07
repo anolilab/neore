@@ -97,7 +97,7 @@ describe("useThreadStateActions", () => {
     it("writes a custom time directly and online only; a preset keeps the client's queued default", async () => {
         const { result } = renderHook(() => useThreadStateActions());
 
-        await expect(result.current.snoozeAt("t1", 1000, undefined)).resolves.toBe(true);
+        await expect(result.current.snoozeAt("t1", 1000, undefined)).resolves.toBe("saved");
 
         expect(direct).toMatchObject([{ args: { threadId: "t1", until: 1000 }, call: { onlineOnly: true } }]);
 

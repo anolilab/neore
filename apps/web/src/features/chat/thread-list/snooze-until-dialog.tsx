@@ -90,19 +90,22 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
     }, []);
 
     // Focus goes back to the thread once the dialog is gone, on desktop and on mobile alike. This is not `finalFocus`: the mobile drawer
-    // drops that prop, which is why focus was lost there. Skipped when another thread's dialog has opened: the store names it, and its
-    // focus is its own (this also covers a StrictMode mount, which unmounts once while the dialog is open).
+    // drops that prop, which is why focus was lost there. The check is made when the return runs, not when the dialog unmounts: a thread
+    // that left the list still has its id in the store until the list clears it, and that must not cancel the return. Only another
+    // thread's open dialog suppresses it, since its focus is its own.
     useEffect(
         () => () => {
-            if (useThreadListUIStore.getState().snoozeThreadId !== null) {
-                return;
-            }
-
             pendingFocusReturn.timer = globalThis.setTimeout(() => {
+                const openThreadId = useThreadListUIStore.getState().snoozeThreadId;
+
+                if (openThreadId !== null && openThreadId !== threadId) {
+                    return;
+                }
+
                 returnFocus()?.focus();
             }, 0);
         },
-        [returnFocus],
+        [returnFocus, threadId],
     );
 
     // The dialog closes once the snooze is saved. A failure (offline included) keeps the chosen time here, with the error, and the
@@ -137,7 +140,9 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
 
         setSaving(true);
 
-        if (await snoozeAt(threadId, result.until, previousUntil)) {
+        const outcome = await snoozeAt(threadId, result.until, previousUntil);
+
+        if (outcome === "saved") {
             // A save that finishes after this dialog closed (cancelled, or taken over) closes nothing: a new opening may be open now.
             if (opened.current) {
                 onOpenChange(false);
@@ -153,7 +158,11 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
         // The button was disabled while saving, so it lost focus: put focus back on it once it is enabled, so the user is not left on nothing.
         flushSync(() => {
             setSaving(false);
-            setError(t`Could not snooze the thread. Please try again.`);
+            setError(
+                outcome === "unconfirmed"
+                    ? t`Could not confirm the snooze. It may have saved; check the thread before saving again.`
+                    : t`Could not snooze the thread. Please try again.`,
+            );
         });
         submitReference.current?.focus();
     };

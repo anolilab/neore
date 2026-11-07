@@ -30,13 +30,16 @@ export const markThreadViewed = authMutation
  * The time the owner chose, by the client's clock, clamped to now: a device whose clock runs ahead cannot lock its later choices out.
  * A write queued offline carries the time it was made with, so it can arrive after a newer choice; `setThreadSnooze` drops it then.
  */
-const chosenAtNow = (chosenAt: number | undefined, now: number): number | undefined => (chosenAt === undefined ? undefined : Math.min(chosenAt, now));
+const chosenAtNow = (chosenAt: number, now: number): number => Math.min(chosenAt, now);
 
-/** Hides the thread from the owner's active list until `until`. */
+/**
+ * Hides the thread from the owner's active list until `until`. The choice time is required: a request without it is refused with a
+ * validation error, rather than applied or silently ignored, so an older client cannot erase a newer choice's ordering unnoticed.
+ */
 export const snoozeThread = authMutation
     .use(rateLimit("chat/update"))
     .input({
-        chosenAt: v.optional(v.number().check((value) => Number.isFinite(value), { message: "Invalid choice time" })),
+        chosenAt: v.number().check((value) => Number.isFinite(value), { message: "Invalid choice time" }),
         threadId: v.id("threads"),
         until: v.number().check((value) => Number.isFinite(value), { message: "Invalid snooze time" }),
     })
@@ -65,7 +68,7 @@ export const snoozeThread = authMutation
 export const unsnoozeThread = authMutation
     .use(rateLimit("chat/update"))
     .input({
-        chosenAt: v.optional(v.number().check((value) => Number.isFinite(value), { message: "Invalid choice time" })),
+        chosenAt: v.number().check((value) => Number.isFinite(value), { message: "Invalid choice time" }),
         threadId: v.id("threads"),
     })
     .output(v.null())

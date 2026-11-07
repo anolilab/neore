@@ -25828,6 +25828,7 @@
                       }
                     },
                     "required": [
+                      "chosenAt",
                       "threadId",
                       "until"
                     ],
@@ -25895,6 +25896,7 @@
                       }
                     },
                     "required": [
+                      "chosenAt",
                       "threadId"
                     ],
                     "type": "object"

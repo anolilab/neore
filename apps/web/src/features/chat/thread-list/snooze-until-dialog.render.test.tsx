@@ -3,10 +3,11 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { SnoozeOutcome } from "./hooks/use-thread-state-actions";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
 
 const state = vi.hoisted(() => {
-    return { snoozeAt: vi.fn<(threadId: string, until: number, previousUntil: number | undefined) => Promise<boolean>>() };
+    return { snoozeAt: vi.fn<(threadId: string, until: number, previousUntil: number | undefined) => Promise<SnoozeOutcome>>() };
 });
 
 vi.mock("@lingui/react/macro", () => {
@@ -65,7 +66,7 @@ describe("SnoozeUntilDialog when the send fails", () => {
 
     it("shows the error in the dialog, keeps the chosen time, re-enables Snooze, returns focus to it, and Cancel closes it", async () => {
         // An offline custom snooze is refused at once: the action reports a failed save, with the error toast already shown.
-        state.snoozeAt.mockResolvedValueOnce(false);
+        state.snoozeAt.mockResolvedValueOnce("refused");
         const onOpenChange = mountDialog();
         const chosen = localInput(new Date(Date.now() + 2 * 60 * 60 * 1000));
 
@@ -107,7 +108,7 @@ describe("SnoozeUntilDialog when the send fails", () => {
     });
 
     it("lets Cancel close the dialog while a send that never settles is still pending", async () => {
-        state.snoozeAt.mockReturnValueOnce(new Promise<boolean>(() => {}));
+        state.snoozeAt.mockReturnValueOnce(new Promise<SnoozeOutcome>(() => {}));
         const onOpenChange = mountDialog();
 
         submit();
@@ -180,7 +181,7 @@ describe("the list's snooze dialog across threads", () => {
             });
             saveSettled = true;
 
-            return true;
+            return "saved";
         });
         useThreadListUIStore.getState().setSnoozeThreadId("thread-a");
         render(
@@ -223,7 +224,7 @@ describe("the list's snooze dialog across threads", () => {
             });
             saveSettled = true;
 
-            return true;
+            return "saved";
         });
         useThreadListUIStore.getState().setSnoozeThreadId("thread-a");
         render(
@@ -252,7 +253,7 @@ describe("the list's snooze dialog across threads", () => {
     });
 
     it("a save that finishes for the thread still open closes its dialog", async () => {
-        state.snoozeAt.mockResolvedValueOnce(true);
+        state.snoozeAt.mockResolvedValueOnce("saved");
         useThreadListUIStore.getState().setSnoozeThreadId("thread-a");
         render(
             <>
@@ -269,7 +270,7 @@ describe("the list's snooze dialog across threads", () => {
     });
 
     it("returns focus to the thread's row once a save closes the dialog", async () => {
-        state.snoozeAt.mockResolvedValueOnce(true);
+        state.snoozeAt.mockResolvedValueOnce("saved");
         useThreadListUIStore.getState().setSnoozeThreadId("thread-a");
         render(
             <>
@@ -278,7 +279,11 @@ describe("the list's snooze dialog across threads", () => {
             </>,
         );
 
-        fireEvent.click(screen.getByRole("button", { name: "Snooze" }));
+        // Focus starts on the Snooze button, as it does for a user who clicked or tabbed to it.
+        const snooze = screen.getByRole("button", { name: "Snooze" });
+
+        snooze.focus();
+        fireEvent.click(snooze);
 
         await waitFor(() => {
             expect(useThreadListUIStore.getState().snoozeThreadId).toBeNull();
@@ -299,12 +304,65 @@ describe("the list's snooze dialog across threads", () => {
             </>,
         );
 
-        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+        // The keyboard or pointer puts focus on Cancel first; the close then moves it from that button to the thread's row.
+        const cancel = screen.getByRole("button", { name: "Cancel" });
+
+        cancel.focus();
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+        expect(document.activeElement).toBe(cancel);
+
+        fireEvent.click(cancel);
 
         await waitFor(() => {
             // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
             expect(document.activeElement).toBe(screen.getByRole("button", { name: "Thread B" }));
         });
+    });
+
+    it("a thread that leaves the list while its dialog is open still gets focus back to the list", async () => {
+        // The list removes the dialog before it clears the thread's id, so the id is still in the store when the return runs.
+        useThreadListUIStore.getState().setSnoozeThreadId("thread-a");
+        const list = document.createElement("div");
+
+        list.tabIndex = -1;
+        list.id = "list-root";
+        document.body.appendChild(list);
+
+        const Host = ({ present }: { present: boolean }) => (
+            <>
+                {present && (
+                    <SnoozeUntilDialog
+                        onOpenChange={() => {}}
+                        open
+                        previousUntil={undefined}
+                        returnFocusTo={() => threadRowFocusTarget(list, "thread-a")}
+                        threadId="thread-a"
+                    />
+                )}
+            </>
+        );
+        const { rerender } = render(<Host present />);
+
+        rerender(<Host present={false} />);
+
+        await waitFor(() => {
+            // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+            expect(document.activeElement).toBe(list);
+        });
+        expect(useThreadListUIStore.getState().snoozeThreadId).toBe("thread-a");
+        list.remove();
+    });
+
+    it("shows that a save may have gone through when its answer was lost, and keeps the dialog open", async () => {
+        const onOpenChange = mountDialog();
+
+        state.snoozeAt.mockResolvedValueOnce("unconfirmed");
+        submit();
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("Could not confirm the snooze. It may have saved; check the thread before saving again.");
+        expect(onOpenChange).not.toHaveBeenCalled();
     });
 });
 

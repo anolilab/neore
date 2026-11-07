@@ -351,17 +351,17 @@ describe("snooze and unsnooze", () => {
     it("snoozes for the owner, then removes the column, leaving updatedAt alone", async () => {
         const until = Date.now() + DAY;
 
-        await as(OWNER).mutation(snoozeThread as never, { threadId, until } as never);
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: Date.now(), threadId, until } as never);
         expect(await read()).toMatchObject({ snoozedUntil: until, updatedAt: 111 });
 
-        await as(OWNER).mutation(unsnoozeThread as never, { threadId } as never);
+        await as(OWNER).mutation(unsnoozeThread as never, { chosenAt: Date.now(), threadId } as never);
 
         const row = await read();
 
         expect("snoozedUntil" in row).toBe(false);
         expect(row.updatedAt).toBe(111);
         // Removing it again is quiet.
-        await as(OWNER).mutation(unsnoozeThread as never, { threadId } as never);
+        await as(OWNER).mutation(unsnoozeThread as never, { chosenAt: Date.now(), threadId } as never);
     });
 
     it("a queued preset or undo chosen before the latest choice does not replace it", async () => {
@@ -394,8 +394,8 @@ describe("snooze and unsnooze", () => {
         await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + 2 * DAY } as never);
         expect(await read()).toMatchObject({ snoozedUntil: now + 2 * DAY });
 
-        // A client that predates the ordering field carries no choice time: it cannot replace a stored choice.
-        await as(OWNER).mutation(snoozeThread as never, { threadId, until: now + 5 * DAY } as never);
+        // A client that predates the ordering field sends no choice time: it is refused, and the stored choice stands.
+        await expect(as(OWNER).mutation(snoozeThread as never, { threadId, until: now + 5 * DAY } as never)).rejects.toThrow();
         expect(await read()).toMatchObject({ snoozedUntil: now + 2 * DAY });
     });
 
@@ -412,12 +412,23 @@ describe("snooze and unsnooze", () => {
         expect(await read()).not.toHaveProperty("snoozedUntil");
     });
 
-    it("a write with no choice time, and an older client's unsnooze, cannot erase a newer snooze", async () => {
+    it("an older client's snooze or unsnooze, which sends no choice time, is refused and cannot erase a newer snooze", async () => {
         const now = Date.now();
 
         await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + 2 * DAY } as never);
-        await as(OWNER).mutation(snoozeThread as never, { threadId, until: now + DAY } as never);
-        await as(OWNER).mutation(unsnoozeThread as never, { threadId } as never);
+        // A legacy write is refused outright, so the caller is told it did not happen (no silent success).
+        await expect(as(OWNER).mutation(snoozeThread as never, { threadId, until: now + DAY } as never)).rejects.toThrow();
+        await expect(as(OWNER).mutation(unsnoozeThread as never, { threadId } as never)).rejects.toThrow();
+
+        expect(await read()).toMatchObject({ snoozeChosenAt: now - 1000, snoozedUntil: now + 2 * DAY });
+    });
+
+    it("a legacy request followed by an older queued stamped request leaves the newer choice standing", async () => {
+        const now = Date.now();
+
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + 2 * DAY } as never);
+        await expect(as(OWNER).mutation(unsnoozeThread as never, { threadId } as never)).rejects.toThrow();
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 5000, threadId, until: now + DAY } as never);
 
         expect(await read()).toMatchObject({ snoozeChosenAt: now - 1000, snoozedUntil: now + 2 * DAY });
     });
@@ -433,10 +444,12 @@ describe("snooze and unsnooze", () => {
     });
 
     it("rejects a past time or one beyond 366 days, and any non-owner", async () => {
-        await expect(as(OWNER).mutation(snoozeThread as never, { threadId, until: Date.now() - 1000 } as never)).rejects.toThrow();
-        await expect(as(OWNER).mutation(snoozeThread as never, { threadId, until: Date.now() + 400 * DAY } as never)).rejects.toThrow();
-        await expect(as(STRANGER).mutation(snoozeThread as never, { threadId, until: Date.now() + DAY } as never)).rejects.toThrow(NOT_FOUND_PATTERN);
-        await expect(as(STRANGER).mutation(unsnoozeThread as never, { threadId } as never)).rejects.toThrow(NOT_FOUND_PATTERN);
+        await expect(as(OWNER).mutation(snoozeThread as never, { chosenAt: Date.now(), threadId, until: Date.now() - 1000 } as never)).rejects.toThrow();
+        await expect(as(OWNER).mutation(snoozeThread as never, { chosenAt: Date.now(), threadId, until: Date.now() + 400 * DAY } as never)).rejects.toThrow();
+        await expect(as(STRANGER).mutation(snoozeThread as never, { chosenAt: Date.now(), threadId, until: Date.now() + DAY } as never)).rejects.toThrow(
+            NOT_FOUND_PATTERN,
+        );
+        await expect(as(STRANGER).mutation(unsnoozeThread as never, { chosenAt: Date.now(), threadId } as never)).rejects.toThrow(NOT_FOUND_PATTERN);
         const rowAfter169 = await read();
 
         expect(rowAfter169.snoozedUntil).toBeUndefined();

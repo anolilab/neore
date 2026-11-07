@@ -11,17 +11,23 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { server, write } = vi.hoisted(() => {
-    const fake = { online: true, queued: [] as (() => void)[], written: [] as unknown[] };
+    const fake = { loseResponse: false, online: true, queued: [] as (() => void)[], written: [] as unknown[] };
 
     const send = (args: unknown, call?: { onlineOnly?: boolean }): Promise<unknown> => {
         if (fake.online) {
             fake.written.push(args);
 
+            // The server committed the write, but the answer never reached the client.
+            if (fake.loseResponse) {
+                return Promise.reject(new Error("Network connection lost."));
+            }
+
             return Promise.resolve(null);
         }
 
         if (call?.onlineOnly) {
-            return Promise.reject(new Error("Offline: this change needs the connection."));
+            // The client's own refusal, before anything is sent (`OFFLINE_NOT_QUEUED`).
+            return Promise.reject(Object.assign(new Error("'snoozeThread' is online-only and the connection is not live"), { code: "OFFLINE_NOT_QUEUED" }));
         }
 
         return new Promise((resolve) => {
@@ -124,6 +130,7 @@ const flush = async (): Promise<void> => {
 describe("snoozing while offline", () => {
     beforeEach(() => {
         server.online = true;
+        server.loseResponse = false;
         server.queued.length = 0;
         server.written.length = 0;
         onlineManager.setOnline(true);
@@ -136,10 +143,20 @@ describe("snoozing while offline", () => {
         vi.restoreAllMocks();
     });
 
+    it("a custom snooze whose answer is lost after the server committed it is unconfirmed, not refused", async () => {
+        const { result } = renderHook(() => useThreadStateActions(), { wrapper });
+
+        server.loseResponse = true;
+        await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe("unconfirmed");
+
+        // The write did reach the server; the dialog must not invite a blind retry as if nothing happened.
+        expect(server.written).toHaveLength(1);
+    });
+
     it("a custom snooze that is written, followed by a failing refetch, still reports success", async () => {
         const { result } = renderHook(() => useThreadStateActions(), { wrapper: refetchWrapper });
 
-        await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe(true);
+        await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe("saved");
         expect(server.written).toHaveLength(1);
     });
 
@@ -148,7 +165,7 @@ describe("snoozing while offline", () => {
         const { result } = renderHook(() => useThreadStateActions(), { wrapper });
 
         // The dialog's Cancel does not reach the hook: the dialog keeps the choice and closes, so nothing is saved after this.
-        await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe(false);
+        await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe("refused");
         expect(client.isMutating()).toBe(0);
 
         reconnect();
@@ -193,7 +210,7 @@ describe("snoozing while offline", () => {
         // Back online, the custom time is sent first; the preset queued before it drains after.
         server.online = true;
         clock.mockReturnValue(choseLater);
-        await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe(true);
+        await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe("saved");
         onlineManager.setOnline(true);
 
         await waitFor(() => {
