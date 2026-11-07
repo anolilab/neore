@@ -10,16 +10,19 @@ import { z } from "zod";
 
 const require = createRequire(import.meta.url);
 const schema = require("@agentclientprotocol/sdk/schema/v1/schema.json");
+const unstable = require("@agentclientprotocol/sdk/schema/v1/schema.unstable.json");
 const check = (name) => z.fromJSONSchema({ $ref: `#/$defs/${name}`, $defs: schema.$defs });
+const checkUnstable = (name) => z.fromJSONSchema({ $ref: `#/$defs/${name}`, $defs: unstable.$defs });
 const REQUEST_SCHEMAS = {
     initialize: check("InitializeRequest"),
     "session/new": check("NewSessionRequest"),
     "session/prompt": check("PromptRequest"),
     "session/list": check("ListSessionsRequest"),
     "session/load": check("LoadSessionRequest"),
+    "session/fork": checkUnstable("ForkSessionRequest"),
 };
 
-// FAKE_AGENT_SESSIONS = "list", "load" or "list,load": which saved-session methods the agent advertises (and answers).
+// FAKE_AGENT_SESSIONS = any of "list", "load" and "fork", comma-separated: which saved-session methods the agent advertises (and answers).
 const advertised = new Set((process.env.FAKE_AGENT_SESSIONS ?? "").split(",").filter(Boolean));
 // The sessions the agent keeps. One is for a folder nobody approved, which a host must not offer.
 const SAVED = [
@@ -81,7 +84,14 @@ const options = () => [
 
 const permissionRequest = (sessionId, index) => ({
     sessionId,
-    toolCall: { toolCallId: `perm-${index}`, title: `Run command ${index}`, kind: "execute", status: "pending", rawInput: { command: `echo ${index}` }, locations: [{ path: "/work/file.txt" }] },
+    toolCall: {
+        toolCallId: `perm-${index}`,
+        title: `Run command ${index}`,
+        kind: "execute",
+        status: "pending",
+        rawInput: { command: `echo ${index}` },
+        locations: [{ path: "/work/file.txt" }],
+    },
     options: options(),
 });
 
@@ -240,7 +250,7 @@ const handle = async (message) => {
                 agentCapabilities: {
                     loadSession: advertised.has("load"),
                     promptCapabilities: { image: false, audio: false, embeddedContext: false },
-                    ...advertised.has("list") && { sessionCapabilities: { list: {} } },
+                    sessionCapabilities: { ...(advertised.has("list") && { list: {} }), ...(advertised.has("fork") && { fork: {} }) },
                 },
                 agentInfo: { name: "fake-agent", title: "Fake Agent", version: "1.2.3" },
                 authMethods: [],
@@ -258,6 +268,18 @@ const handle = async (message) => {
             return send({ id: message.id, error: { code: -32603, message: `cannot start: ${process.env.API_KEY}` } });
         }
         state.sessionId = "fake-session-1";
+        return send({ id: message.id, result: { sessionId: state.sessionId } });
+    }
+
+    if (message.method === "session/fork") {
+        if (!advertised.has("fork")) {
+            return violation(`${message.method} without advertising it`, message);
+        }
+        record({ fork: message.params });
+        if (HISTORY[message.params.sessionId] === undefined) {
+            return send({ id: message.id, error: { code: -32002, message: "Resource not found" } });
+        }
+        state.sessionId = process.env.FAKE_AGENT_FORK_SAME === "1" ? message.params.sessionId : `${message.params.sessionId}-fork`;
         return send({ id: message.id, result: { sessionId: state.sessionId } });
     }
 
@@ -281,7 +303,7 @@ const handle = async (message) => {
                 sessions.push({ sessionId: "s-elsewhere", title: "Other folder", cwd: "/elsewhere" });
             }
 
-            return send({ id: message.id, result: { sessions, ...process.env.FAKE_AGENT_PAGES === "1" && !second && { nextCursor: "p2" } } });
+            return send({ id: message.id, result: { sessions, ...(process.env.FAKE_AGENT_PAGES === "1" && !second && { nextCursor: "p2" }) } });
         }
 
         const history = HISTORY[message.params.sessionId];
