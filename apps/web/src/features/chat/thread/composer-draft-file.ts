@@ -19,10 +19,10 @@ interface MoveDraftToFileOptions {
     onFailure: (error: string) => void;
 }
 
-/** The characters a text attachment of `draft` adds to the context: its UTF-8 bytes, as `attachmentTextChars` counts them. */
-/** Whether a paste carries text as well as any files: the editor inserts that text, so the paste is not taken whole. */
+/** Whether a paste carries text as well as any files: that text is the editor's to insert, or a file when it is long. */
 export const pasteHasText = (data: Pick<DataTransfer, "types">): boolean => data.types.includes("text/plain") || data.types.includes("text/html");
 
+/** The characters a text attachment of `draft` adds to the context: its UTF-8 bytes, as `attachmentTextChars` counts them. */
 export const draftFileChars = (draft: string): number => new TextEncoder().encode(draft).length;
 
 /** Whether `draft`, as a file next to the attachments already there, stays inside the attachment and context limits. */

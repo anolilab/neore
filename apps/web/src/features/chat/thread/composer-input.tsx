@@ -899,15 +899,15 @@ const ComposerInput = ({
             }
 
             if (files.length > 0) {
-                // Office apps put a picture of the copied text next to the text itself: the picture is attached and the
-                // editor still inserts the text. A paste of files alone is the composer's to take.
-                if (!pasteHasText(e.clipboardData)) {
-                    e.preventDefault();
-                }
-
                 handleFileSelect(files);
 
-                return;
+                // A paste of files alone is the composer's to take. Office apps put a picture of the copied text next to the
+                // text itself: the picture is attached, and the text goes on to the long-text check below like any paste.
+                if (!pasteHasText(e.clipboardData)) {
+                    e.preventDefault();
+
+                    return;
+                }
             }
 
             // Check for long text content
