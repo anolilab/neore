@@ -2,7 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import { TransportError } from "@lunora/client";
 import type { Id } from "@neore/backend/dataModel";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError, showSuccess } from "@/lib/toast";
@@ -71,6 +71,14 @@ export const useThreadStateActions = (): ThreadStateActions => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
+    // The stamp of this hook's last choice. Each choice is stamped after the one before it, even within the same millisecond, so two
+    // rapid choices keep the order they were made in: the server orders them by this stamp, not by the order their writes arrive.
+    const lastChoiceAt = useRef(0);
+    const choiceTime = useCallback((): number => {
+        lastChoiceAt.current = Math.max(Date.now(), lastChoiceAt.current + 1);
+
+        return lastChoiceAt.current;
+    }, []);
     // Presets and undo keep the client's default: a snooze made offline is queued and sent once the connection returns.
     const { mutateAsync: snoozeMutation } = useMutation(crpc.chat.thread_state.snoozeThread.mutationOptions());
     // A custom time is written straight to the client, online only, and not through the query client. The write's result is then the
@@ -93,7 +101,7 @@ export const useThreadStateActions = (): ThreadStateActions => {
     const restore = useCallback(
         (threadId: string, previousUntil: number | undefined) => {
             // Undo is a choice made now: it is stamped now, so a snooze queued before it cannot bring back a newer one.
-            const chosenAt = Date.now();
+            const chosenAt = choiceTime();
             const request =
                 previousUntil !== undefined && isSnoozed(previousUntil, chosenAt)
                     ? snoozeMutation({ chosenAt, threadId: threadId as Id<"threads">, until: previousUntil })
@@ -112,7 +120,7 @@ export const useThreadStateActions = (): ThreadStateActions => {
                     showError(t`Could not undo. Please try again.`);
                 });
         },
-        [snoozeMutation, unsnoozeMutation, t],
+        [choiceTime, snoozeMutation, unsnoozeMutation, t],
     );
 
     // The choice is stamped when the user makes it, not when the write is sent: a write queued offline keeps that time, so a choice
@@ -126,7 +134,7 @@ export const useThreadStateActions = (): ThreadStateActions => {
             let result: unknown;
 
             try {
-                result = await mutate({ chosenAt: Date.now(), threadId: threadId as Id<"threads">, until });
+                result = await mutate({ chosenAt: choiceTime(), threadId: threadId as Id<"threads">, until });
             } catch (error) {
                 console.error("Failed to snooze thread:", error);
 
@@ -160,7 +168,7 @@ export const useThreadStateActions = (): ThreadStateActions => {
 
             return "saved";
         },
-        [restore, t],
+        [choiceTime, restore, t],
     );
 
     const snoozeAt = useCallback(
@@ -177,7 +185,7 @@ export const useThreadStateActions = (): ThreadStateActions => {
 
     const unsnooze = useCallback(
         (threadId: string, previousUntil: number | undefined) => {
-            unsnoozeMutation({ chosenAt: Date.now(), threadId: threadId as Id<"threads"> })
+            unsnoozeMutation({ chosenAt: choiceTime(), threadId: threadId as Id<"threads"> })
                 .then((result) => {
                     // A newer change kept the thread as it is: the unsnooze did not happen, so it is not reported as done.
                     if (superseded(result)) {
@@ -195,7 +203,7 @@ export const useThreadStateActions = (): ThreadStateActions => {
                     showError(t`Could not unsnooze the thread. Please try again.`);
                 });
         },
-        [unsnoozeMutation, restore, t],
+        [choiceTime, unsnoozeMutation, restore, t],
     );
 
     return { snooze, snoozeAt, unsnooze };

@@ -318,4 +318,29 @@ describe("snoozing while offline", () => {
         });
         expect(server.written.map((args) => (args as { chosenAt: number }).chosenAt)).toEqual([choseLater, choseEarlier]);
     });
+
+    it("two choices made in the same millisecond keep their order, so the later one is the one that stands when the queue drains", async () => {
+        vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+
+        goOffline();
+        const { result } = renderHook(() => useThreadStateActions(), { wrapper });
+
+        // The earlier choice is queued while the connection is down.
+        act(() => {
+            result.current.snooze("t1", "hour", undefined);
+        });
+        await flush();
+
+        // Back online, the later choice is written at once, and the queued one drains after it, as it does on reconnect.
+        server.online = true;
+        await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe("saved");
+        onlineManager.setOnline(true);
+
+        await waitFor(() => {
+            expect(server.written).toHaveLength(2);
+        });
+        const [later, earlier] = server.written.map((args) => (args as { chosenAt: number }).chosenAt) as [number, number];
+
+        expect(later).toBeGreaterThan(earlier);
+    });
 });

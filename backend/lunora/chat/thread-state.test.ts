@@ -378,6 +378,20 @@ describe("snooze and unsnooze", () => {
         expect(await read()).toMatchObject({ snoozeChosenAt: customChosenAt, snoozedUntil: customUntil });
     });
 
+    it("two rapid choices delivered in reverse order leave the later choice in place", async () => {
+        const now = Date.now();
+        const earlierChosenAt = now - 2000;
+        const laterChosenAt = now - 1000;
+
+        // The later choice arrives first, then the earlier one: the chosen time decides, not the order the writes arrive in.
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: laterChosenAt, threadId, until: now + 2 * DAY } as never);
+        await expect(as(OWNER).mutation(snoozeThread as never, { chosenAt: earlierChosenAt, threadId, until: now + DAY } as never)).resolves.toEqual({
+            applied: false,
+        });
+
+        expect(await read()).toMatchObject({ snoozeChosenAt: laterChosenAt, snoozedUntil: now + 2 * DAY });
+    });
+
     it("a stale queued preset whose time has passed is dropped without an error", async () => {
         const now = Date.now();
 
