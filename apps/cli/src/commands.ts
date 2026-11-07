@@ -125,6 +125,96 @@ const sendPrompt = async (context: Context, client: NeoreClient, flags: Flags, p
     return { threadId: started.threadId };
 };
 
+// ─── Thread start / send ────────────────────────────────────────────────────
+
+/** Exit codes of `thread start|send`: a reply (0), a failed run (1), anything else (2). */
+export const THREAD_EXIT = { failed: 1, ok: 0, other: 2 } as const;
+
+/**
+ * `ChatCompleted.status` values that mean the reply cannot be read from this
+ * answer (the five-minute wait ran out, the run is paused on a person, or the
+ * read was cut): not a failed run, so the caller is told where to read it later.
+ */
+const UNFINISHED_STATUSES: ReadonlySet<string> = new Set(["interrupted", "relay_timeout", "unknown", "waiting_on_person"]);
+
+const postThread = async (context: Context, flags: Flags, threadId: string | undefined, prompt: string): Promise<number> => {
+    const client = await clientFor(context, flags);
+    const body = { model: flags.model, prompt, ...(threadId && { threadId }) };
+
+    if (!flags.wait) {
+        const started = await client.request<ChatStarted>("POST", "/chat", { body: { ...body, stream: true } });
+
+        if (flags.json) {
+            printJson(context.io, { messageId: started.messageId, threadId: started.threadId });
+        } else {
+            context.io.stdout.write(`${started.threadId}\n`);
+        }
+
+        return THREAD_EXIT.ok;
+    }
+
+    let result: ChatCompleted;
+
+    try {
+        result = await client.request<ChatCompleted>("POST", "/chat", { body: { ...body, stream: false }, timeoutMs: BLOCKING_TIMEOUT_MS });
+    } catch (error) {
+        if (error instanceof ApiError && error.code === "network_error") {
+            throw new ApiError({
+                code: error.code,
+                message: `${error.message} The run may still be going; read it later with \`neore threads show ${threadId ?? "<thread-id>"}\`.`,
+                status: error.status,
+            });
+        }
+
+        throw error;
+    }
+
+    if (flags.json) {
+        printJson(context.io, result);
+    } else if (result.text) {
+        context.io.stdout.write(result.text.endsWith("\n") ? result.text : `${result.text}\n`);
+    }
+
+    if (result.status === "done") {
+        return THREAD_EXIT.ok;
+    }
+
+    const colors = paint(shouldUseColor(context.io.stderr, context.io.env));
+
+    if (UNFINISHED_STATUSES.has(result.status)) {
+        context.io.stderr.write(
+            `${colors.red("error:")} no finished reply yet (${result.status}). Read it later with \`neore threads show ${result.threadId}\`.\n`,
+        );
+
+        return THREAD_EXIT.other;
+    }
+
+    context.io.stderr.write(`${colors.red("error:")} the run ended in failure (${result.status}). Thread ${result.threadId}.\n`);
+
+    return THREAD_EXIT.failed;
+};
+
+export const threadStart = async (context: Context, { args, flags }: ParsedCommand): Promise<number> => {
+    const prompt = args.join(" ").trim();
+
+    if (!prompt) {
+        throw new UsageError("Missing <prompt>.");
+    }
+
+    return await postThread(context, flags, undefined, prompt);
+};
+
+export const threadSend = async (context: Context, { args, flags }: ParsedCommand): Promise<number> => {
+    const threadId = requireArgument(args, "thread-id");
+    const prompt = args.slice(1).join(" ").trim();
+
+    if (!prompt) {
+        throw new UsageError("Missing <prompt>.");
+    }
+
+    return await postThread(context, flags, threadId, prompt);
+};
+
 const repl = async (context: Context, client: NeoreClient, flags: Flags): Promise<void> => {
     const colors = paint(shouldUseColor(context.io.stderr, context.io.env));
     let threadId = flags.thread;
