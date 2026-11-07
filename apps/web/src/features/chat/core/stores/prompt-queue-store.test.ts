@@ -38,6 +38,16 @@ describe("prompt queue across a reload", () => {
             ["q1", "look at this", ["file-1"], 1],
             ["q2", "", ["file-2"], undefined],
         ]);
-        expect(queue?.items[0]?.attachments[0]).toMatchObject({ name: "cat.png", status: "complete", type: "image" });
+        // The uploaded size comes back as a number, so the composer still counts it toward the context.
+        expect(queue?.items[0]?.attachments[0]).toMatchObject({ name: "cat.png", restoredSize: 12, status: "complete", type: "image" });
+
+        // A second reload stores the restored attachment again: its size comes from the marker, not its empty stand-in.
+        after.getState().enqueue("thread-1", { attachments: [], id: "q3", text: "later" });
+
+        const again = await reload();
+
+        again.getState().hydrate("thread-1");
+
+        expect(again.getState().queues["thread-1"]?.items[0]?.attachments[0]).toMatchObject({ fileId: "file-1", restoredSize: 12 });
     });
 });

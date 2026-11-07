@@ -200,6 +200,8 @@ export interface StoredAttachment {
     kind: "document" | "file" | "image";
     mediaType: string;
     name: string;
+    /** The uploaded file's size in bytes, so the composer can still estimate what it adds to the context. */
+    size: number;
 }
 
 /** What a queue looks like in sessionStorage. */
@@ -211,13 +213,19 @@ const ATTACHMENT_KINDS: ReadonlySet<string> = new Set(["document", "file", "imag
 
 /** Storage is read back as untrusted: an entry missing a field, or with a blank file id, is not an attachment. */
 const readStoredAttachment = (value: unknown): StoredAttachment | undefined => {
-    const { fileId, kind, mediaType, name } = (value ?? {}) as Partial<Record<keyof StoredAttachment, unknown>>;
+    const { fileId, kind, mediaType, name, size } = (value ?? {}) as Partial<Record<keyof StoredAttachment, unknown>>;
 
     if (typeof fileId !== "string" || fileId === "" || typeof kind !== "string" || !ATTACHMENT_KINDS.has(kind) || typeof name !== "string") {
         return undefined;
     }
 
-    return { fileId, kind: kind as StoredAttachment["kind"], mediaType: typeof mediaType === "string" ? mediaType : "", name };
+    return {
+        fileId,
+        kind: kind as StoredAttachment["kind"],
+        mediaType: typeof mediaType === "string" ? mediaType : "",
+        name,
+        size: typeof size === "number" && Number.isFinite(size) && size > 0 ? Math.floor(size) : 0,
+    };
 };
 
 /**

@@ -69,7 +69,13 @@ const generatePromptId = () => `queued-${Date.now()}-${Math.random().toString(36
 /** Keeps an attachment by its uploaded file id; one still uploading or failed has none, so it is not kept. */
 export const toStoredAttachment = (attachment: PendingAttachment): StoredAttachment | undefined =>
     attachment.status === "complete" && attachment.fileId
-        ? { fileId: attachment.fileId, kind: attachment.type, mediaType: attachment.file.type, name: attachment.name }
+        ? {
+              fileId: attachment.fileId,
+              kind: attachment.type,
+              mediaType: attachment.file.type,
+              name: attachment.name,
+              size: attachment.restoredSize ?? attachment.file.size,
+          }
         : undefined;
 
 /** An uploaded attachment again: the send reads only its file id, so its `File` is an empty stand-in. */
@@ -79,6 +85,7 @@ export const fromStoredAttachment = (stored: StoredAttachment): PendingAttachmen
         fileId: stored.fileId,
         id: `restored-${stored.fileId}`,
         name: stored.name,
+        restoredSize: stored.size,
         status: "complete",
         type: stored.kind,
     };
