@@ -2,19 +2,20 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-import * as lunora_tasks_gdpr_212 from "../../tasks/gdpr.js";
+import * as lunora_workflow_fork_228 from "../../workflow/fork.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_tasks_gdpr_212.collectTasksForExport.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_fork_228.getAuthorVaultRows.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "userId": source["userId"] };
+if (typeof source["authorId"] !== "string") return DEFER;
+if (typeof source["sourceProjectId"] !== "string") return DEFER;
+return { "authorId": source["authorId"], "sourceProjectId": source["sourceProjectId"] };
 });
-installCompiledValidatorMap(lunora_tasks_gdpr_212.deleteUserTasks.args, (source) => {
+installCompiledValidatorMap(lunora_workflow_fork_228.getForkSource.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["userId"] !== "string") return DEFER;
-return { "userId": source["userId"] };
+if (typeof source["sourceProjectId"] !== "string") return DEFER;
+return { "sourceProjectId": source["sourceProjectId"] };
 });
-export * from "../../tasks/gdpr.js";
+export * from "../../workflow/fork.js";

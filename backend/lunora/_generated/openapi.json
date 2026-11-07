@@ -50922,6 +50922,9 @@
                               "canUnresolve": {
                                 "type": "boolean"
                               },
+                              "commentCount": {
+                                "type": "number"
+                              },
                               "comments": {
                                 "items": {
                                   "properties": {
@@ -50947,6 +50950,9 @@
                                   "type": "object"
                                 },
                                 "type": "array"
+                              },
+                              "commentsComplete": {
+                                "const": false
                               },
                               "id": {
                                 "type": "string"

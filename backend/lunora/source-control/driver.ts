@@ -10,6 +10,7 @@
 import type { HostKind } from "./identity";
 import type { HostRequest } from "./origin-fetch";
 import type {
+    CheckLog,
     CheckSummary,
     CommitPage,
     CursorPage,
@@ -23,6 +24,7 @@ import type {
     MergeStatus,
     PullRequestDetail,
     PullRequestRef,
+    PullRequestReview,
     RepoPoll,
     ReviewSubmission,
     ReviewThread,
@@ -64,10 +66,13 @@ export interface HostDriver {
     /** The request headers the host's API wants, besides the token. */
     readonly headers: Record<string, string>;
     readonly kind: HostKind;
-    listChecks: (request: HostRequest, ref: PullRequestRef, headSha: string) => Promise<CheckSummary>;
+    /** One bounded page of the head's checks, or up to `maxPages` of them (`CheckSummary.total` says how many there are). */
+    listChecks: (request: HostRequest, ref: PullRequestRef, headSha: string, maxPages?: number) => Promise<CheckSummary>;
     listCommits: (request: HostRequest, ref: PullRequestRef, page: number) => Promise<CommitPage>;
     listFiles: (request: HostRequest, ref: PullRequestRef, page: number) => Promise<FilePage>;
     listInbox: (request: HostRequest, section: InboxSection, page: number) => Promise<InboxPage>;
+    /** The newest submitted reviews (verdict and top-level text), newest first, and how many there are in all. */
+    listReviews: (request: HostRequest, ref: PullRequestRef) => Promise<{ items: PullRequestReview[]; total: number }>;
     /** The review conversation: threads of line comments, with their replies. */
     listThreads: (request: HostRequest, ref: PullRequestRef, after: string | null) => Promise<CursorPage<ReviewThread>>;
     /** Which files the reviewer has marked viewed on the host. */
@@ -85,10 +90,24 @@ export interface HostDriver {
      * spares the call that finds out who is signed in.
      */
     pollReviewRequests: (request: HostRequest, repo: string, known: { etag: string | null; login: string | null }) => Promise<RepoPoll>;
+    /** The part of one check's log that says why it failed, cut to `maxChars`. The caller picks the check from `listChecks` of the head it read. */
+    readCheckLog: (request: HostRequest, ref: PullRequestRef, checkId: string, maxChars: number, timeoutMs?: number) => Promise<CheckLog>;
     /** Posts a reply to the thread `commentId` belongs to, at once. */
     replyToThread: (request: HostRequest, ref: PullRequestRef, commentId: string, body: string) => Promise<{ id: string }>;
     /** Re-runs the narrowest scope the host offers for one check: a single job, not its whole workflow. */
     rerunCheck: (request: HostRequest, ref: PullRequestRef, checkId: string) => Promise<void>;
+    /** Re-runs every failed job of one group in ONE host call: a group's jobs cannot be re-run one by one once one runs. */
+    rerunFailedOfGroup?: (request: HostRequest, ref: PullRequestRef, groupId: string) => Promise<void>;
+    /**
+     * The group a check re-runs with (a workflow run whose jobs the host re-runs together), or `null` for a check that
+     * re-runs alone. Optional: a host without such groups leaves it out, and each check re-runs on its own.
+     */
+    rerunGroupOf?: (request: HostRequest, ref: PullRequestRef, checkId: string) => Promise<string | null>;
+    /**
+     * The ids of the jobs {@link HostDriver.rerunFailedOfGroup} would re-run (failed and cancelled), or `null` when they
+     * cannot all be listed: the grouped call is used only when these are exactly the checks chosen.
+     */
+    rerunnableOfGroup?: (request: HostRequest, ref: PullRequestRef, groupId: string) => Promise<string[] | null>;
     /** Turns auto-merge on (merging `headSha` with `method` once the host's rules are met) or off. */
     setAutoMerge: (request: HostRequest, ref: PullRequestRef, enabled: boolean, method: MergeMethod, headSha: string) => Promise<void>;
     setThreadResolved: (request: HostRequest, threadId: string, resolved: boolean) => Promise<void>;
