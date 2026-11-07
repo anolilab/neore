@@ -208,9 +208,9 @@ catalogs:
     "@dnd-kit/utilities": ^3.2.2
   editor:
     "@fellow/prosemirror-recreate-transform": 1.2.3
-    slate: 0.146.0
-    slate-dom: 0.146.1
-    slate-react: 0.146.1
+    slate: 0.147.4
+    slate-dom: 0.147.3
+    slate-react: 0.147.5
   file-renderers:
     hls.js: 1.7.4
     mammoth: 1.13.0
@@ -248,7 +248,7 @@ catalogs:
     effect: 4.1.2
     tsx: 4.23.15
   icons:
-    "@lobehub/icons": 5.23.0
+    "@lobehub/icons": 6.15.0
     lucide-react: 1.70.0
   lint:
     "@anolilab/commitlint-config": 10.1.5
@@ -477,13 +477,10 @@ catalogs:
     tailwind-merge: 3.7.0
     vaul: 1.1.2
   utils:
-    # HELD AT 2.3 — 3.0 is a migration, not a bump: `ConsentManagerProvider` is now
-    # `ConsentProvider` and `ConsentManagerOptions` is gone (`apps/web/src/routes/__root.tsx`
-    # fails to compile), and the consent config shape moved with them. Do it as its own change.
-    "@c15t/react": 2.3.0
+    "@c15t/react": 3.2.2
     # Imported at runtime by `apps/web/src/lib/consent/show-banner.ts`; moves
     # with `@c15t/react`, which depends on exactly this version through `c15t`.
-    "@c15t/translations": 2.3.0
+    "@c15t/translations": 3.2.2
     "@toon-format/toon": 4.4.0
     "@ungap/structured-clone": 1.4.0
     "@visulima/pail": 5.0.0

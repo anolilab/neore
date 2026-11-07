@@ -1,3 +1,4 @@
+import { useEffectivePermissions } from "@c15t/react";
 import { posthog } from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import type { FC, PropsWithChildren } from "react";
@@ -6,22 +7,26 @@ import { useEffect } from "react";
 import { reportFirstNativeLaunch } from "@/lib/analytics/first-native-launch";
 
 /**
- * Apply a consent decision to PostHog.
+ * Apply the effective consent permissions to PostHog.
  *
- * This has to be handed to the live `<ConsentManagerProvider>` in
- * `routes/__root.tsx`. It used to be registered here via
- * `configureConsentManager(...)`, whose return value was discarded — the
- * provider builds its own manager from its own options, so these callbacks
- * never ran and a consent decision never reached PostHog either way.
+ * Mounted inside the live `<ConsentProvider>` in `routes/__root.tsx`. c15t 3's callbacks no longer fire at
+ * startup, so this follows the permissions hook instead: it runs once with the stored (or default) state and
+ * again on every change, as v2's `onConsentSet` did.
  */
-export const syncConsentToPostHog = ({ preferences }: { preferences: Record<string, boolean> }): void => {
-    if (preferences.measurement) {
-        posthog.opt_in_capturing();
-        // A launch that happened before consent is reported now; its stored flag keeps it from repeating.
-        reportFirstNativeLaunch();
-    } else {
-        posthog.opt_out_capturing();
-    }
+export const PostHogConsentSync: FC = () => {
+    const { measurement } = useEffectivePermissions();
+
+    useEffect(() => {
+        if (measurement) {
+            posthog.opt_in_capturing();
+            // A launch that happened before consent is reported now; its stored flag keeps it from repeating.
+            reportFirstNativeLaunch();
+        } else {
+            posthog.opt_out_capturing();
+        }
+    }, [measurement]);
+
+    return null;
 };
 
 const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
