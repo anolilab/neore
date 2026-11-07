@@ -185,7 +185,7 @@ export const readPullRequestForAgent = async (dependencies: PullRequestAgentDepe
     const { driver } = dependencies;
     const { ref } = picked;
 
-    return await readFromHost(driver, await dependencies.token(), async (request) => {
+    const outcome = await readFromHost(driver, await dependencies.token(), async (request) => {
         const [detail, reviews, threads] = await Promise.all([
             driver.getPullRequest(request, ref),
             driver.listReviews(request, ref),
@@ -221,6 +221,8 @@ export const readPullRequestForAgent = async (dependencies: PullRequestAgentDepe
             },
         };
     });
+
+    return outcome;
 };
 
 /** One review thread as an agent reads it: its first comment and its latest ones, each cut short, the rest counted. */
@@ -256,14 +258,23 @@ type AgentThread = ReturnType<typeof threadForAgent>;
  */
 const THREAD_CURSOR = /^(?<page>[\w=+/-]{0,500})#(?<skip>\d{1,3})$/u;
 
+/** The most threads any host's page of review threads holds (the host API's own page ceiling). */
+const MAX_THREADS_PER_HOST_PAGE = 100;
+
 export const parseThreadCursor = (cursor: string | null | undefined): { page: string | null; skip: number } | null => {
     if (cursor === null || cursor === undefined) {
         return { page: null, skip: 0 };
     }
 
     const match = THREAD_CURSOR.exec(cursor);
+    const skip = Number(match?.groups?.skip);
 
-    return match?.groups ? { page: match.groups.page === "" ? null : (match.groups.page ?? null), skip: Number(match.groups.skip) } : null;
+    // No host page holds more than this many threads: a skip past it is not one a read gave.
+    if (!match?.groups || skip > MAX_THREADS_PER_HOST_PAGE) {
+        return null;
+    }
+
+    return { page: match.groups.page === "" ? null : (match.groups.page ?? null), skip };
 };
 
 const threadCursor = (page: string | null, skip: number): string => `${page ?? ""}#${String(skip)}`;
@@ -282,8 +293,10 @@ export const readThreadsWithin = async (readPage: (after: string | null) => Prom
 
     for (let read = 0; read < AGENT_MAX_THREAD_PAGES; read += 1) {
         const answer = await readPage(page);
-        const threads = answer.items.slice(skip);
-        let shownOfPage = skip;
+
+        // A page can shrink between two reads (a thread deleted on the host): a skip past its end means the page is done.
+        const threads = answer.items.slice(Math.min(skip, answer.items.length));
+        let shownOfPage = Math.min(skip, answer.items.length);
 
         total ??= answer.total;
 

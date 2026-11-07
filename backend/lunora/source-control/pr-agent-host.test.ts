@@ -401,7 +401,7 @@ describe(readThreadsWithin, () => {
         const first = await readThreadsWithin(readPage, { page: null, skip: 0 });
 
         expect(first.items).toHaveLength(Math.min(fitting, pageSize * AGENT_MAX_THREAD_PAGES));
-        expect(first.truncated).toBe(`truncated, ${String(all.length - first.items.length)} more`);
+        expect(first).toMatchObject({ truncated: `truncated, ${String(all.length - first.items.length)} more` });
 
         const next = parseThreadCursor(first.nextCursor);
 
@@ -415,9 +415,24 @@ describe(readThreadsWithin, () => {
         expect(asked.length).toBeGreaterThan(1);
     });
 
+    it("goes on from the next page when the page a cursor named has shrunk since", async () => {
+        const read = await readThreadsWithin(
+            async (after) => {
+                return after === null
+                    ? { endCursor: "p2", hasMore: true, items: [thread("a", [comment(1)])], total: 2 }
+                    : { endCursor: null, hasMore: false, items: [thread("b", [comment(2)])], total: 2 };
+            },
+            { page: null, skip: 8 },
+        );
+
+        expect(read.items.map((entry) => entry.comments.items[0]?.id)).toStrictEqual(["2"]);
+        expect(read.nextCursor).toBeNull();
+    });
+
     it("refuses a cursor it did not give", () => {
         expect(parseThreadCursor("../../x")).toBeNull();
         expect(parseThreadCursor("abc#5")).toStrictEqual({ page: "abc", skip: 5 });
+        expect(parseThreadCursor("abc#999")).toBeNull();
         expect(parseThreadCursor(undefined)).toStrictEqual({ page: null, skip: 0 });
     });
 });
