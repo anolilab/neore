@@ -139,6 +139,8 @@ export type HostQueueEvent =
     | { type: "stopped" }
     /** A queued message was edited, and took a new id. */
     | { from: string; to: string; type: "edited" }
+    /** Send now with no turn to stop: `itemId`, moved to the head, goes next past a paused queue, which stays paused behind it. */
+    | { itemId: string; type: "released" }
     /** A wait that has a deadline ran out (`waitDeadline`). */
     | { type: "timed-out" };
 
@@ -417,6 +419,10 @@ export const stepHostQueue = (state: HostQueueState, event: HostQueueEvent): Hos
             // A refused queued message waits at the head for the person: the composer pauses the queue for it, if it is still queued.
             return { effects: [{ error: event.error, itemId: event.itemId, type: "send-refused" }], state: { ...state, phase: { kind: "idle" } } };
         }
+        case "released": {
+            // Only from idle: anything else is a send or a stop in flight, which the message must not overtake.
+            return { effects: [], state: phase.kind === "idle" && !state.sent.includes(event.itemId) ? { ...state, released: event.itemId } : state };
+        }
         case "send": {
             // One send at a time, and a queued one only from idle. A direct send may go before the reads have answered, as the
             // backend refuses it if a turn runs.
@@ -503,3 +509,28 @@ export const canSendQueueHead = (
     !gates.starting &&
     !gates.running &&
     !gates.editing;
+
+/** Whether a queued message may be edited: not while it is being sent, and never once the backend took it. */
+export const canEditQueued = (state: HostQueueState, itemId: string): boolean =>
+    !(state.phase.kind === "sending" && state.phase.itemId === itemId) && !state.sent.includes(itemId);
+
+/**
+ * What Send now does for a queued message: `interrupt` stops the running turn and sends it next (the Interrupt and send
+ * path), `release` sends it next when no turn runs. `undefined` while a send or a stop is in flight, before the reads have
+ * answered, while an accepted send's turn has not shown, or for a message the backend already took: it is sent once.
+ */
+export const sendNowAction = (state: HostQueueState, gates: { itemId: string; running: boolean }): "interrupt" | "release" | undefined => {
+    const { phase } = state;
+
+    if (state.sent.includes(gates.itemId)) {
+        return undefined;
+    }
+
+    if (phase.kind === "idle" && !gates.running) {
+        return "release";
+    }
+
+    const turnKnown = phase.kind === "idle" || (phase.kind === "awaiting-turn-end" && phase.streamId !== undefined);
+
+    return turnKnown && gates.running && canInterruptAndSend() ? "interrupt" : undefined;
+};

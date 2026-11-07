@@ -30,11 +30,13 @@ import { caretAfterRemoval } from "./host-caret";
 import { exceedsRawInputLimit } from "./host-input";
 import type { HostQueueEffect, HostQueueEvent, HostQueueState } from "./host-queue";
 import {
+    canEditQueued,
     canInterruptAndSend,
     canSendQueueHead,
     holdsDrainLock,
     INITIAL_HOST_QUEUE,
     isTurnLive,
+    sendNowAction,
     shouldQueueMessage,
     stepHostQueue,
     waitDeadline,
@@ -218,6 +220,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     const setPaused = usePromptQueueStore((state) => state.setPaused);
     const edit = usePromptQueueStore((state) => state.edit);
     const enqueueNext = usePromptQueueStore((state) => state.enqueueNext);
+    const move = usePromptQueueStore((state) => state.move);
     const [editing, setEditing] = useState<{ id: string; text: string } | undefined>(undefined);
     const boxRef = useRef<HTMLTextAreaElement>(null);
     const editorRef = useRef<HTMLTextAreaElement>(null);
@@ -551,6 +554,17 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     // Send is off only for that wait, so the person is told what it waits for.
     const waitsForSetting = canWrite && !sending && running && userSettings.isPending;
 
+    /** The message at the head waits, paused, until the stop is answered AND the stopped turn's end is seen. */
+    const stopFor = (itemId: string, wasPaused: boolean) => {
+        const streamId = liveStreamId as Id<"persistentStreams"> | undefined;
+
+        dispatch({ itemId, streamId, type: "interrupt", wasPaused });
+        void cancel
+            .mutateAsync({ streamId, threadId: id })
+            .catch(() => undefined)
+            .then((outcome) => dispatch({ outcome, type: "stop-answered" }));
+    };
+
     /** Interrupt and send: the text goes to the head of the queue, then the running reply is stopped, so it goes next. */
     const interrupt = () => {
         const wasPaused = usePromptQueueStore.getState().queues[threadId]?.paused === true;
@@ -568,18 +582,44 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         boxText.current = "";
         setText("");
 
-        if (interruptId === undefined) {
+        if (interruptId !== undefined) {
+            stopFor(interruptId, wasPaused);
+        }
+    };
+
+    const sendNowFor = (itemId: string, state: HostQueueState) =>
+        cancel.isPending || blocked || starting ? undefined : sendNowAction(state, { itemId, running: isTurnLive(state, liveStreamId) });
+
+    /**
+     * Send now: the queued message moves to the head and goes next, through the same machine as everything else. With a turn
+     * running it is Interrupt and send for that message; with none, it goes past a paused queue, which stays paused behind
+     * it. It keeps its id, so a send of it the backend already took comes back as a duplicate and starts nothing.
+     */
+    const sendNow = (itemId: string) => {
+        const action = sendNowFor(itemId, machineRef.current);
+
+        if (action === undefined) {
             return;
         }
 
-        // The text waits at the head, paused, until the stop is answered AND the stopped turn's end is seen.
-        const streamId = liveStreamId as Id<"persistentStreams"> | undefined;
+        // A move keeps the pause, so this is the queue's state from before Send now.
+        const wasPaused = usePromptQueueStore.getState().queues[threadId]?.paused === true;
 
-        dispatch({ itemId: interruptId, streamId, type: "interrupt", wasPaused });
-        void cancel
-            .mutateAsync({ streamId, threadId: id })
-            .catch(() => undefined)
-            .then((outcome) => dispatch({ outcome, type: "stop-answered" }));
+        move(threadId, itemId, 0);
+
+        if (usePromptQueueStore.getState().queues[threadId]?.items[0]?.id !== itemId) {
+            return;
+        }
+
+        setQueueError(undefined);
+
+        if (action === "release") {
+            dispatch({ itemId, type: "released" });
+
+            return;
+        }
+
+        stopFor(itemId, wasPaused);
     };
 
     /** Stop keeps what is queued behind the reply: the queue pauses first, so nothing starts once the reply is stopped. */
@@ -622,6 +662,14 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     /** Saves an edit of a queued message. An empty or over-long text leaves the message as it was. */
     const saveEdit = () => {
         if (editing === undefined) {
+            return;
+        }
+
+        // The message went out while its editor was open: what was sent stays as it was sent.
+        if (!canEditQueued(machineRef.current, editing.id)) {
+            setEditing(undefined);
+            boxRef.current?.focus();
+
             return;
         }
 
@@ -772,10 +820,22 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                                             {t`Send next`}
                                         </Button>
                                     )}
+                                    {editing?.id !== item.id && (index > 0 || running) && (
+                                        <Button
+                                            aria-label={t`Send queued message ${index + 1} now`}
+                                            disabled={sendNowFor(item.id, machine) === undefined}
+                                            onClick={() => sendNow(item.id)}
+                                            size="sm"
+                                            type="button"
+                                            variant="outline"
+                                        >
+                                            {t`Send now`}
+                                        </Button>
+                                    )}
                                     {editing?.id !== item.id && (
                                         <Button
                                             aria-label={t`Edit queued message ${index + 1}`}
-                                            disabled={phase.kind === "sending" && phase.itemId === item.id}
+                                            disabled={!canEditQueued(machine, item.id)}
                                             onClick={() => setEditing({ id: item.id, text: item.text })}
                                             size="sm"
                                             type="button"

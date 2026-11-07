@@ -797,6 +797,40 @@ describe("the coding-agent composer", () => {
 
         expect(queued[0]?.textContent).toContain("rewritten");
         expect(queued[1]?.textContent).toContain("second");
+
+        await endTurn();
+
+        // What goes out is the edited text, never the text it replaced.
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+        expect(sendCalls()[0]).toEqual(["send", { requestId: expect.any(String), text: "rewritten", threadId: "thread-1" }]);
+    });
+
+    it("sends a queued message next on Send now, by stopping the reply, and sends it once", async () => {
+        usePromptQueueStore.getState().enqueue("thread-1", { attachments: [], text: "first" });
+        usePromptQueueStore.getState().enqueue("thread-1", { attachments: [], text: "urgent" });
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const sendNow = await screen.findByRole("button", { name: "Send queued message 2 now" });
+
+        // Off until the reads have answered, as every queue action is.
+        await waitFor(() => expect((sendNow as HTMLButtonElement).disabled).toBe(false));
+        fireEvent.click(sendNow);
+
+        await waitFor(() => expect(harness.calls).toContainEqual(["acp.remote.cancelHostTurn", { streamId: "stream-1", threadId: "thread-1" }]));
+        // It waits for the stopped turn's end, at the head.
+        expect(sendCalls()).toHaveLength(0);
+        expect(within(screen.getByRole("region", { name: "Queued messages" })).getAllByRole("listitem")[0]?.textContent).toContain("urgent");
+
+        await endTurn("stopped");
+
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+        expect(sendCalls()[0]).toEqual(["send", { requestId: expect.any(String), text: "urgent", threadId: "thread-1" }]);
+        await waitFor(() => expect(screen.queryByText("urgent")).toBeNull());
+
+        await endTurn();
+
+        await waitFor(() => expect(sendCalls()).toHaveLength(2));
+        expect(sendCalls().map(([, args]: [string, unknown]) => (args as { text: string }).text)).toEqual(["urgent", "first"]);
     });
 
     it("interrupts the turn on Enter when the person chose to send during a turn", async () => {

@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import type { HostQueueEvent, HostQueueState, HostQueueStep } from "./host-queue";
-import { canInterruptAndSend, canSendQueueHead, holdsDrainLock, INITIAL_HOST_QUEUE, shouldQueueMessage, stepHostQueue, waitDeadline } from "./host-queue";
+import {
+    canEditQueued,
+    canInterruptAndSend,
+    canSendQueueHead,
+    holdsDrainLock,
+    INITIAL_HOST_QUEUE,
+    sendNowAction,
+    shouldQueueMessage,
+    stepHostQueue,
+    waitDeadline,
+} from "./host-queue";
 
 /** Runs events in order and collects every effect they produced. */
 const run = (events: HostQueueEvent[], from: HostQueueState = INITIAL_HOST_QUEUE): HostQueueStep => {
@@ -540,5 +550,54 @@ describe("interrupt and send", () => {
 
         expect(step.state.phase.kind).toBe("idle");
         expect(step.state.released).toBeUndefined();
+    });
+});
+
+describe("editing a queued message", () => {
+    it("cannot edit the message being sent, nor one the backend took, and can edit the rest", () => {
+        const sending = run([{ itemId: "a", type: "send" }], IDLE).state;
+        const taken = run([{ itemId: "a", streamId: "stream-2", type: "accepted" }], sending).state;
+
+        expect(canEditQueued(IDLE, "a")).toBe(true);
+        expect(canEditQueued(sending, "a")).toBe(false);
+        expect(canEditQueued(sending, "b")).toBe(true);
+        expect(canEditQueued(taken, "a")).toBe(false);
+    });
+});
+
+describe("Send now", () => {
+    it("interrupts a running turn, and sends next with no turn running", () => {
+        expect(sendNowAction(RUNNING, { itemId: "b", running: true })).toBe("interrupt");
+        expect(sendNowAction(IDLE, { itemId: "b", running: false })).toBe("release");
+    });
+
+    it("waits while a send or a stop is in flight, before the reads answer, and while an accepted send's turn has not shown", () => {
+        const sending = run([{ itemId: "a", type: "send" }], IDLE).state;
+        const unseen = run([{ itemId: "a", type: "accepted" }], sending).state;
+        const stopping = run([{ itemId: "a", streamId: "stream-1", type: "interrupt", wasPaused: false }], RUNNING).state;
+
+        expect(sendNowAction(INITIAL_HOST_QUEUE, { itemId: "b", running: false })).toBeUndefined();
+        expect(sendNowAction(sending, { itemId: "b", running: false })).toBeUndefined();
+        expect(sendNowAction(unseen, { itemId: "b", running: false })).toBeUndefined();
+        expect(sendNowAction(stopping, { itemId: "b", running: true })).toBeUndefined();
+    });
+
+    it("sends the message past a paused queue once, and keeps the rest paused", () => {
+        const released = run([{ itemId: "b", type: "released" }], IDLE).state;
+        const paused = { ...gates, headId: "b", paused: true };
+
+        expect(canSendQueueHead(released, paused)).toBe(true);
+        // Only the released message goes: the one behind it still waits for the person.
+        expect(canSendQueueHead(released, { ...paused, headId: "a" })).toBe(false);
+
+        const sent = run(
+            [{ itemId: "b", type: "send" }, { itemId: "b", streamId: "stream-2", type: "accepted" }, observed(undefined, ["stream-2", "finished"])],
+            released,
+        ).state;
+
+        expect(sent.phase.kind).toBe("idle");
+        expect(canSendQueueHead(sent, paused)).toBe(false);
+        expect(sendNowAction(sent, { itemId: "b", running: false })).toBeUndefined();
+        expect(run([{ itemId: "b", type: "released" }], sent).state.released).toBeUndefined();
     });
 });
