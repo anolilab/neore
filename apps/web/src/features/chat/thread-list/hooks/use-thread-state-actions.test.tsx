@@ -3,7 +3,7 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const calls: { args: unknown; fn: string }[] = [];
-const seenOptions: { fn: string; networkMode?: string; retry?: number }[] = [];
+const seenOptions: { call?: unknown; fn: string; networkMode?: string; retry?: number }[] = [];
 const toasts: { message: string; options?: { action?: { onClick: () => void } } }[] = [];
 
 vi.mock("@lingui/react/macro", () => {
@@ -19,7 +19,7 @@ vi.mock("@lingui/react/macro", () => {
 
 vi.mock("@tanstack/react-query", () => {
     return {
-        useMutation: (options: { fn: string; networkMode?: string; retry?: number }) => {
+        useMutation: (options: { call?: unknown; fn: string; networkMode?: string; retry?: number }) => {
             seenOptions.push(options);
 
             return {
@@ -38,8 +38,8 @@ vi.mock("@/lib/lunora/crpc", () => {
                 chat: {
                     thread_state: {
                         snoozeThread: {
-                            mutationOptions: () => {
-                                return { fn: "snooze" };
+                            mutationOptions: (_overrides?: unknown, call?: unknown) => {
+                                return { call, fn: "snooze" };
                             },
                         },
                         unsnoozeThread: {
@@ -77,10 +77,15 @@ describe("useThreadStateActions", () => {
         toasts.length = 0;
     });
 
-    it("sends a snooze even while offline and never retries it, so a failed send reports at once", () => {
+    it("saves a custom time only while online, without a retry; a preset keeps the client's queued default", () => {
         renderHook(() => useThreadStateActions());
 
-        expect(seenOptions.find((options) => options.fn === "snooze")).toMatchObject({ networkMode: "always", retry: 0 });
+        const snoozes = seenOptions.filter((options) => options.fn === "snooze");
+        const custom = snoozes.find((options) => options.networkMode === "always");
+        const preset = snoozes.find((options) => options.networkMode === undefined);
+
+        expect(custom).toMatchObject({ call: { onlineOnly: true }, retry: 0 });
+        expect(preset?.call).toBeUndefined();
     });
 
     it("snoozes, then undoes to a plain unsnooze when nothing was snoozed before", async () => {

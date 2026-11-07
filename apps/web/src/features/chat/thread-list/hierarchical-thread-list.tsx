@@ -32,7 +32,7 @@ import useKeyboardNavigation from "./hooks/use-keyboard-navigation";
 import useThreadGroups from "./hooks/use-thread-groups";
 import useThreadHandlers from "./hooks/use-thread-handlers";
 import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
-import SnoozeUntilDialog from "./snooze-until-dialog";
+import SnoozeUntilDialog, { closeSnoozeDialogFor } from "./snooze-until-dialog";
 import SortableThreadItem from "./sortable-thread-item";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
 import type { BranchNode, GroupType, HierarchicalThreadListProperties, MinimalThreadRelationship, ThreadGroup } from "./types";
@@ -1325,9 +1325,11 @@ const HierarchicalThreadList: FC<
                 />
                 {snoozeThread && (
                     <SnoozeUntilDialog
+                        // One dialog instance per thread, so a save still in flight for another thread cannot write into this one's state.
+                        key={snoozeThread.threadId}
                         onOpenChange={(open) => {
                             if (!open) {
-                                setSnoozeThreadId(null);
+                                closeSnoozeDialogFor(snoozeThread.threadId);
                             }
                         }}
                         open

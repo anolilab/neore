@@ -9,8 +9,21 @@ import { flushSync } from "react-dom";
 
 import { useThreadStateActions } from "./hooks/use-thread-state-actions";
 import { customSnoozeCheck } from "./lib/thread-state-rules";
+import { useThreadListUIStore } from "./stores/thread-list-ui-store";
 
 const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * Closes the snooze dialog, but only while it is still open for `threadId`. A save that finishes after the owner opened another
+ * thread's dialog must not close that one.
+ */
+export const closeSnoozeDialogFor = (threadId: string): void => {
+    const { setSnoozeThreadId, snoozeThreadId } = useThreadListUIStore.getState();
+
+    if (snoozeThreadId === threadId) {
+        setSnoozeThreadId(null);
+    }
+};
 
 /** The local `YYYY-MM-DDTHH:mm` a `datetime-local` input takes, for a time. */
 const toLocalInputValue = (time: number): string => {

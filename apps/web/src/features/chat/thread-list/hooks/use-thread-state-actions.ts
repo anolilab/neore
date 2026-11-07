@@ -9,13 +9,15 @@ import { showError, showSuccess } from "@/lib/toast";
 import type { SnoozeChoice } from "../lib/thread-state-rules";
 import { isSnoozed, snoozeUntil } from "../lib/thread-state-rules";
 
+type SnoozeMutate = (variables: { threadId: Id<"threads">; until: number }) => Promise<unknown>;
+
 interface ThreadStateActions {
     /** Hides the thread until the choice's time; the toast offers an undo that restores the previous snooze, if any. */
     snooze: (threadId: string, choice: SnoozeChoice, previousUntil: number | undefined) => void;
 
     /**
      * Hides the thread until an exact time (a custom snooze); same toast and undo as `snooze`. Resolves true once saved,
-     * false (after the error toast) when not.
+     * false (after the error toast) when not. Offline, the save is refused at once and never queued for the reconnect.
      */
     snoozeAt: (threadId: string, until: number, previousUntil: number | undefined) => Promise<boolean>;
     /** Brings a snoozed thread back; the toast offers an undo that snoozes it again until the same time. */
@@ -25,10 +27,13 @@ interface ThreadStateActions {
 export const useThreadStateActions = (): ThreadStateActions => {
     const { t } = useLingui();
     const crpc = useCRPC();
-    // Sent even while the browser reports offline, and never retried: the default holds a snooze until the connection returns, so the
-    // dialog would wait on it with no way out. The request fails at once instead, and the snooze reports that failure.
-    const { mutateAsync: snoozeMutation } = useMutation({
-        ...crpc.chat.thread_state.snoozeThread.mutationOptions(),
+    // Presets and undo keep the client's default: a snooze made offline is queued and sent once the connection returns.
+    const { mutateAsync: snoozeMutation } = useMutation(crpc.chat.thread_state.snoozeThread.mutationOptions());
+    // A custom time is saved only while online. The client refuses an `onlineOnly` write at once when the connection is down (the
+    // default queues it for the reconnect), so no write is left to land later. `networkMode: "always"` stops the query client from
+    // pausing it first, and `retry: 0` stops a second attempt.
+    const { mutateAsync: snoozeNowMutation } = useMutation({
+        ...crpc.chat.thread_state.snoozeThread.mutationOptions(undefined, { onlineOnly: true }),
         networkMode: "always",
         retry: 0,
     });
@@ -49,9 +54,9 @@ export const useThreadStateActions = (): ThreadStateActions => {
         [snoozeMutation, unsnoozeMutation, t],
     );
 
-    const snoozeAt = useCallback(
-        (threadId: string, until: number, previousUntil: number | undefined): Promise<boolean> =>
-            snoozeMutation({ threadId: threadId as Id<"threads">, until })
+    const save = useCallback(
+        (mutate: SnoozeMutate, threadId: string, until: number, previousUntil: number | undefined): Promise<boolean> =>
+            mutate({ threadId: threadId as Id<"threads">, until })
                 .then(() => {
                     const when = new Date(until).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
@@ -65,14 +70,19 @@ export const useThreadStateActions = (): ThreadStateActions => {
 
                     return false;
                 }),
-        [snoozeMutation, restore, t],
+        [restore, t],
+    );
+
+    const snoozeAt = useCallback(
+        (threadId: string, until: number, previousUntil: number | undefined): Promise<boolean> => save(snoozeNowMutation, threadId, until, previousUntil),
+        [save, snoozeNowMutation],
     );
 
     const snooze = useCallback(
         (threadId: string, choice: SnoozeChoice, previousUntil: number | undefined) => {
-            void snoozeAt(threadId, snoozeUntil(choice, new Date()), previousUntil);
+            void save(snoozeMutation, threadId, snoozeUntil(choice, new Date()), previousUntil);
         },
-        [snoozeAt],
+        [save, snoozeMutation],
     );
 
     const unsnooze = useCallback(
