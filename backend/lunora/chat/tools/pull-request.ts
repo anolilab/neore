@@ -47,7 +47,7 @@ const MESSAGES: Record<string, string> = {
     method_not_allowed: "The repository does not allow that merge method.",
     needs_reconnect: "The source-control connection needs signing in again (Settings → Connectors).",
     none_linked: "No pull request is linked to this thread. The person can link one from the thread's pull request panel.",
-    not_allowed: "Pull request tools work only in a chat of your own that nobody else reads or writes to.",
+    not_allowed: "Pull request tools work only in an unlocked chat of your own that nobody else reads or writes to.",
     not_connected: "No source-control account is connected (Settings → Connectors).",
     not_found: "The host has no such pull request, or the connected account cannot see it.",
     not_linked: "That pull request is not linked to this thread; only linked pull requests can be read or changed here.",

@@ -109,6 +109,15 @@ describe("where the pull request tools may run", () => {
         }
     });
 
+    it("refuses a locked thread, a lock that came after the link included", async () => {
+        const threadId = await threadWith();
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: 1 }));
+
+        expect(await allowed(threadId)).toBe(false);
+        expect(await linked(threadId)).toStrictEqual({ complete: true, links: [] });
+    });
+
     it("refuses a thread someone else was given access to", async () => {
         const threadId = await threadWith();
 
