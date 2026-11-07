@@ -188,11 +188,11 @@ export default defineConfig({
             cache: true,
         },
         "lint:oxfmt": {
-            inputs: ["default", "{workspaceRoot}/.prettierrc.cjs", "{workspaceRoot}/oxfmt.config.ts"],
+            inputs: ["default", "{workspaceRoot}/.prettierrc.cjs", "{workspaceRoot}/.prettierignore", "{workspaceRoot}/oxfmt.config.ts"],
             cache: true,
         },
         "lint:oxfmt:fix": {
-            inputs: ["default", "{workspaceRoot}/.prettierrc.cjs", "{workspaceRoot}/oxfmt.config.ts"],
+            inputs: ["default", "{workspaceRoot}/.prettierrc.cjs", "{workspaceRoot}/.prettierignore", "{workspaceRoot}/oxfmt.config.ts"],
             cache: false,
         },
         "lint:types": {

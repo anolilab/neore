@@ -56,7 +56,7 @@ DEPLOY_ENV=preview pnpm run deploy
 `.vis/hooks/`. **pre-commit** runs the secret scan and `vis staged` (oxfmt on staged code and data files, Prettier on
 CSS and HTML, Markdown untouched, `sort-package-json` on staged `package.json` files, from the `staged` map in
 `vis.config.ts`). **pre-push** runs the package.json order check and the same two formatters in check mode on every
-file changed since the merge base with `main` (root files included, Markdown skipped as in CI; both hooks go through
+file changed since the merge base with `main` (root files included; Markdown is skipped, though a project's `lint:oxfmt` in CI checks it; both hooks go through
 the `oxfmt:hooks` and `prettier:hooks` scripts, which also read `.formatignore-hooks`, the list of projects without a
 `lint:oxfmt` task, read by no project check),
 then `vis affected lint:types:fast` from that same base. The fast type check runs `tsrs`, a Rust port of the compiler
