@@ -14,12 +14,14 @@ import { StoryPage } from "@/storybook/page";
 
 // Page data arrives after the route loads; under a loaded machine that can outlast the 1 s default of `find*`.
 const PAGE_WAIT = { timeout: 5000 } as const;
+// The state a story names (a stream's text, a pause, a banner) follows the page's first load and its polling.
+const STATE_WAIT = { timeout: 15_000 } as const;
 
 /** The chat: the real `(chat)` layout (sidebar, header, command palette) and the thread page. */
 const meta = {
     args: {
         levels: [
-            { id: "(chat)", route: ChatLayoutRoute },
+            { id: "/(chat)", route: ChatLayoutRoute },
             { path: "chat/$threadId", route: ThreadRoute },
         ],
         url: `/chat/${THREAD_IDS.main}`,
@@ -54,6 +56,10 @@ export const Thread: Story = {
 
 /** A reply streaming in from the gateway, word by word, with its reasoning first. */
 export const Streaming: Story = {
+    play: async ({ canvas }) => {
+        // The streamed reply has started to render (its first line is in the body before the stream hangs).
+        await expect(await canvas.findByText(/Meet the new Neore/i, undefined, STATE_WAIT)).toBeInTheDocument();
+    },
     parameters: {
         msw: {
             handlers: {
@@ -129,7 +135,7 @@ export const Offline: Story = { parameters: { connection: "offline" } };
 export const NewChat: Story = {
     args: {
         levels: [
-            { id: "(chat)", route: ChatLayoutRoute },
+            { id: "/(chat)", route: ChatLayoutRoute },
             { path: "chat/", route: ChatIndexRoute },
         ],
         url: "/chat",

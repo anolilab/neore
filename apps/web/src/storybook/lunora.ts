@@ -1,5 +1,5 @@
 import type { ArgsOf, FunctionReference, ReturnOf } from "@lunora/react";
-import { encodeWire } from "@lunora/wire";
+import { decodeWire, encodeWire } from "@lunora/wire";
 import type { HttpHandler } from "msw";
 import { delay, http, HttpResponse } from "msw";
 
@@ -95,9 +95,23 @@ const waiting = new Map<string, (() => void)[]>();
 /** Calls in flight, and when the last one was answered: what `lunoraIdle` waits on. */
 const traffic = { inFlight: 0, lastAnswerAt: 0 };
 
+const storyResets: (() => void)[] = [];
+
+/**
+ * Registers a fixture's reset: stateful rows (a write merges into them) start over before each story, so a story
+ * never sees what an earlier story, or an earlier visit to the same one, saved.
+ */
+export const onStoryReset = (reset: () => void): void => {
+    storyResets.push(reset);
+};
+
 /** Called by a preview loader before each story. */
 export const resetLunoraAnswers = (): void => {
     answeredPaths.clear();
+
+    for (const reset of storyResets) {
+        reset();
+    }
 };
 
 const QUIET_MS = 300;
@@ -168,14 +182,17 @@ export const lunoraHandlers = (...fixtures: ReadonlyArray<LunoraFixture>): HttpH
             return { body: { error: { code: "NOT_FOUND", message: `No Storybook fixture for ${functionPath}` } }, status: 404 };
         }
 
+        // The app's arguments arrive in Lunora's wire format; a resolver gets the value the real server would decode.
+        const decoded = decodeWire(args);
+
         if (fixture.pending) {
-            return await fixture.answer(args);
+            return await fixture.answer(decoded);
         }
 
         traffic.inFlight += 1;
 
         try {
-            return await fixture.answer(args);
+            return await fixture.answer(decoded);
         } finally {
             traffic.inFlight -= 1;
             traffic.lastAnswerAt = Date.now();
@@ -193,9 +210,10 @@ export const lunoraHandlers = (...fixtures: ReadonlyArray<LunoraFixture>): HttpH
             const { calls = [] } = (await request.json()) as { calls?: RpcCall[] };
             const results = await Promise.all(
                 calls.map(async (call) => {
-                    const { body } = await answerCall(call);
+                    // Each slot carries its own status, as Lunora's batch contract requires: a failed call is not a 200.
+                    const { body, status } = await answerCall(call);
 
-                    return { body, id: call.id };
+                    return { body, id: call.id, status };
                 }),
             );
 

@@ -1,6 +1,6 @@
 import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, userEvent, waitFor } from "storybook/test";
+import { expect, screen, userEvent, waitFor } from "storybook/test";
 
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
 import { userFixtures } from "@/storybook/fixtures/user";
@@ -91,6 +91,8 @@ export const SaveFails: Story = {
 
         await lunoraAnswered(api.auth.functions.getAIUserPreferences);
         await userEvent.click(toggle);
+        // The save was refused, so the failure toast shows, and the switch ends where it started.
+        await expect(await screen.findByText("Failed to update filter rules")).toBeInTheDocument();
         await waitFor(async () => {
             await expect(toggle).not.toBeChecked();
         });

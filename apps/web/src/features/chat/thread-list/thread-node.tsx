@@ -497,7 +497,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
             {!isDeleting && !loadingStates.reordering && !isSelectionMode && (
                 <div
                     aria-label={named(t`Reorder`)}
-                    className="rounded-sm opacity-0 transition-opacity group-hover/action-item:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none"
+                    // A 24 × 24 px target (WCAG 2.5.8 at its minimum); the ring is the theme's, so it shows on the light sidebar too.
+                    className="focus-visible:ring-ring flex size-6 items-center justify-center rounded-sm opacity-0 transition-opacity group-hover/action-item:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
                     {...dragAttributes}
                     {...dragListeners}
                 >
@@ -545,7 +546,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                 // The title is the row's keyboard target: the row itself holds no role, so the link is what Tab reaches.
                                 <Link
                                     className={cn(
-                                        "truncate rounded-sm focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none",
+                                        "focus-visible:ring-ring truncate rounded-sm focus-visible:ring-2 focus-visible:outline-none",
                                         isUnread && "font-medium",
                                     )}
                                     params={{ threadId: node.threadId }}

@@ -52,10 +52,22 @@ export const Empty: Story = {
 };
 
 /** `/api-key/list` has not answered yet. */
-export const Loading: Story = { parameters: { msw: { handlers: { apiKeys: apiKeyHandlers("pending") } } } };
+export const Loading: Story = {
+    parameters: { msw: { handlers: { apiKeys: apiKeyHandlers("pending") } } },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByText("Loading API keys…")).toBeVisible();
+        await expect(canvas.queryByText(/no api keys found/i)).not.toBeInTheDocument();
+    },
+};
 
 /** `/api-key/list` failed. */
-export const LoadError: Story = { parameters: { msw: { handlers: { apiKeys: apiKeyHandlers("error") } } } };
+export const LoadError: Story = {
+    parameters: { msw: { handlers: { apiKeys: apiKeyHandlers("error") } } },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByRole("alert")).toHaveTextContent(/could not load api keys/i);
+        await expect(canvas.queryByText(/no api keys found/i)).not.toBeInTheDocument();
+    },
+};
 
 export const CreateDialog: Story = {
     play: async ({ canvas }) => {

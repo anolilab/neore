@@ -4,6 +4,7 @@ import { api } from "@neore/backend/api";
 import { ago, DAY, HOUR, MINUTE, STORY_NOW } from "../clock";
 import type { LunoraFixture } from "../lunora";
 import { lunora } from "../lunora";
+import { OWNER, ownedBy } from "./owner";
 
 type Thread = NonNullable<ReturnOf<typeof api.chat.functions.getThread>>;
 type ThreadList = ReturnOf<typeof api.chat.composite.getThreadListData>;
@@ -33,7 +34,8 @@ export const thread = (overrides: Partial<Thread> & { _id: string }): Thread => 
         status: "active",
         title: "Untitled",
         updatedAt: ago(HOUR),
-        userId: "user_pro",
+        // The signed-in persona owns the mock threads, whichever persona is shown.
+        userId: OWNER,
         ...overrides,
     } as Thread;
 };
@@ -65,7 +67,7 @@ const message = (role: "assistant" | "user", text: string, order: number, extra:
     } as ChatMessage;
 };
 
-export const userMessage = (text: string, order: number): ChatMessage => message("user", text, order, { userId: "user_pro" });
+export const userMessage = (text: string, order: number): ChatMessage => message("user", text, order, { userId: OWNER });
 
 export const assistantMessage = (text: string, order: number, extra: Partial<ChatMessage> & { reasoning?: string } = {}): ChatMessage => {
     const { reasoning, ...rest } = extra;
@@ -160,16 +162,16 @@ export const chatFixtures = (options: ChatFixtureOptions = {}): LunoraFixture[] 
     return [
         lunora(api.chat.composite.getThreadListData, () => threadList(options.threads)),
         lunora(api.projects.functions.listProjects, () => pageOf([]) as ReturnOf<typeof api.projects.functions.listProjects>),
-        lunora(api.chat.functions.getThread, () => current),
+        lunora(api.chat.functions.getThread, () => ownedBy(current)),
         lunora(api.chat.composite.getThreadWithData, () => {
             return {
-                messages: pageOf(messages),
+                messages: pageOf(messages.map(ownedBy)),
                 permission: options.permission ?? "admin",
                 suggestions: { suggestions: options.suggestions ?? [] },
-                thread: current,
+                thread: ownedBy(current),
             } as unknown as ReturnOf<typeof api.chat.composite.getThreadWithData>;
         }),
-        lunora(api.chat.functions.getThreadUIMessages, () => pageOf(messages) as ReturnOf<typeof api.chat.functions.getThreadUIMessages>),
+        lunora(api.chat.functions.getThreadUIMessages, () => pageOf(messages.map(ownedBy)) as ReturnOf<typeof api.chat.functions.getThreadUIMessages>),
         lunora(api.chat.sharing.resolveThreadShard, null),
         lunora(api.chat.slides.functions.getGeneratingPresentation, null),
         lunora(api.chat.functions.getFollowupSuggestions, { suggestions: options.suggestions ?? [] }),

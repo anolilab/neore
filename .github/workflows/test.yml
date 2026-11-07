@@ -849,7 +849,7 @@ jobs:
               run: "pnpm --filter @neore/desktop exec playwright test --grep terminal"
 
     test-required-check:
-        needs: ["files-changed", "test", "rust-worker", "e2e", "device-core", "desktop-package", "desktop-macos-check", "desktop-windows-check"]
+        needs: ["files-changed", "test", "storybook", "rust-worker", "e2e", "device-core", "desktop-package", "desktop-macos-check", "desktop-windows-check"]
         name: "Check Test Run"
         # `always()` and nothing else: a job skipped by its own `if:` reports
         # success to a ruleset, so gating this one on its needs' results made the

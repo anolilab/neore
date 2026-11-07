@@ -2,13 +2,13 @@ import type { ReturnOf } from "@lunora/react";
 import { api } from "@neore/backend/api";
 
 import type { LunoraFixture } from "../lunora";
-import { lunora } from "../lunora";
+import { lunora, onStoryReset } from "../lunora";
 import { getActivePersona } from "../session";
+import { OWNER, ownedBy } from "./owner";
 
 type Preferences = NonNullable<ReturnOf<typeof api.auth.functions.getAIUserPreferences>>;
 type Settings = NonNullable<ReturnOf<typeof api.auth.functions.getUserSettings>>;
 
-const USER_ID = "user_pro";
 const CREATED = Date.UTC(2026, 0, 15);
 
 /** `aiUserPreferences` for the signed-in persona; override any field. */
@@ -16,7 +16,7 @@ export const preferences = (overrides: Partial<Preferences> = {}): Preferences =
     return {
         _creationTime: CREATED,
         _id: "prefs_storybook" as Preferences["_id"],
-        userId: USER_ID,
+        userId: OWNER,
         ...overrides,
     };
 };
@@ -28,7 +28,7 @@ export const settings = (overrides: Partial<Settings> = {}): Settings => {
         _id: "settings_storybook" as Settings["_id"],
         // The welcome tour would cover every page story; its own stories set this to false.
         onboardingCompleted: true,
-        userId: USER_ID,
+        userId: OWNER,
         ...overrides,
     } as Settings;
 };
@@ -49,12 +49,21 @@ export const userFixtures = (
         settings?: Partial<Settings>;
     } = {},
 ): LunoraFixture[] => {
-    let preferencesRow = preferences(options.preferences);
-    let settingsRow = settings(options.settings);
+    let preferencesRow: Preferences;
+    let settingsRow: Settings;
+
+    // Fresh rows for each story and for each visit to one, so a save in one story never shows in the next.
+    const reset = () => {
+        preferencesRow = preferences(options.preferences);
+        settingsRow = settings(options.settings);
+    };
+
+    reset();
+    onStoryReset(reset);
 
     return [
-        lunora(api.auth.functions.getAIUserPreferences, () => preferencesRow),
-        lunora(api.auth.functions.getUserSettings, () => settingsRow),
+        lunora(api.auth.functions.getAIUserPreferences, () => ownedBy(preferencesRow)),
+        lunora(api.auth.functions.getUserSettings, () => ownedBy(settingsRow)),
         // Unless a story says otherwise, these follow the persona.
         lunora(api.auth.admin.isCurrentUserAdmin, () => {
             return { isAdmin: options.isAdmin ?? getActivePersona() === "admin" };

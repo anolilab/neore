@@ -155,7 +155,9 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
     const triggerButton = isComparisonMode ? (
         // Multi-model comparison trigger
         <Button
-            aria-label={plural(selectedModelIds!.length, { one: "Comparing # model", other: "Comparing # models" })}
+            // Inside `t`: a bare `plural()` compiles to the global i18n, which this app never activates.
+            // eslint-disable-next-line no-restricted-syntax -- the macro compiles this to a message, not a string conversion
+            aria-label={t`${plural(selectedModelIds!.length, { one: "Comparing # model", other: "Comparing # models" })}`}
             className={cn(
                 "justify-between gap-1.5",
                 // When comparison mode is active, remove fixed width so it auto-sizes

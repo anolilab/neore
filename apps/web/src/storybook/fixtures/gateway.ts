@@ -82,7 +82,18 @@ export const gatewaySendHandlers = (response: SendResponse, options: { bannedWor
         }
 
         if (options.status) {
-            return HttpResponse.json({ bannedWords: options.bannedWords, message: "This message cannot be sent" }, { status: options.status });
+            // A 400 that names the banned words is the content filter: it carries the `BANNED_CONTENT` discriminator the
+            // send path reads, so the composer is restored. Other errors stay generic.
+            const isContentFilter = options.status === 400 && options.bannedWords !== undefined;
+
+            return HttpResponse.json(
+                {
+                    ...(isContentFilter ? { error: "BANNED_CONTENT" } : {}),
+                    bannedWords: options.bannedWords,
+                    message: "This message cannot be sent",
+                },
+                { status: options.status },
+            );
         }
 
         return HttpResponse.json({

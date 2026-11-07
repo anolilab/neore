@@ -10,7 +10,7 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet
 import { ThemeProvider } from "next-themes";
 import { PostHogProvider } from "posthog-js/react";
 import type { ReactNode } from "react";
-import { createContext, use, useMemo } from "react";
+import { createContext, use, useEffect, useMemo } from "react";
 
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
@@ -32,6 +32,8 @@ export const loadStoryLocale = async (locale: string): Promise<void> => {
     const { messages } = (await import(`../locales/${locale}/messages.po`)) as { messages: Record<string, string> };
 
     storyI18n.loadAndActivate({ locale, messages });
+    // The translated words need the document's language too, or a screen reader pronounces them as English.
+    document.documentElement.lang = locale;
 };
 
 const noop = (): void => {};
@@ -170,6 +172,15 @@ export const AppProviders = ({ children, connection, direction, featureFlags, pe
 
         return { lunoraClient, queryClient };
     }, [connection, persona]);
+
+    // A replaced client must not keep reconnecting in the background: close it when the persona or connection changes.
+    useEffect(
+        () => () => {
+            clients.lunoraClient.close();
+        },
+        [clients],
+    );
+
     const posthog = useMemo(() => fakePostHog(featureFlags), [featureFlags]);
 
     return (
