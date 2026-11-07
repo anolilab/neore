@@ -6,7 +6,7 @@
  */
 import { MODEL_REGISTRY, requiresPaidPlan } from "@neore/ai/models";
 import { getSystemPrompt } from "@neore/ai/prompts";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mappedReferences } from "../../../test/registered-api";
 
@@ -20,7 +20,7 @@ const seen = vi.hoisted(() => {
         buildOptions: [] as unknown[],
         callOptions: [] as unknown[],
         created: [] as unknown[],
-        failAt: undefined as "generate" | "keys" | "thread" | undefined,
+        failAt: undefined as "generate" | "keys" | "round" | "thread" | undefined,
         filterRules: undefined as Record<string, string[]> | undefined,
         filters: [] as unknown[],
         met: [] as boolean[],
@@ -62,7 +62,8 @@ vi.mock("./get-agent", () => {
                     seen.providerOptions.push(args.providerOptions);
                     seen.callOptions.push(callOptions);
 
-                    if (seen.failAt === "generate") {
+                    // "round": the first generation answers, a goal's later round fails.
+                    if (seen.failAt === "generate" || (seen.failAt === "round" && seen.prompts.length > 1)) {
                         throw new Error("model call failed");
                     }
 
@@ -605,5 +606,40 @@ describe("runHeadlessAgent with a goal and memory", () => {
         });
 
         expect(extractions(ctx as never)).toEqual(["only answer"]);
+    });
+});
+
+describe("runHeadlessAgent failure on a thread it continues", () => {
+    beforeEach(() => {
+        seen.prompts = [];
+    });
+
+    afterEach(() => {
+        seen.failAt = undefined;
+    });
+
+    // A snoozed thread wakes when a run on it fails, whichever generation fails; the run's own error is still thrown.
+    it.each([
+        ["the first generation", "generate"],
+        ["a goal's later round", "round"],
+    ] as const)("wakes the thread when %s fails", async (_label, failAt) => {
+        seen.failAt = failAt;
+        seen.met = [false];
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await expect(
+            runHeadlessAgent(ctx as never, {
+                goal: { text: "Ship it" },
+                memory: false,
+                model: "test-model",
+                origin: "lead",
+                personalization: "none",
+                prompt: "Run the report",
+                thread: { threadId: "thread-1" },
+                tools: "none",
+                userId: "owner",
+            }),
+        ).rejects.toThrow("model call failed");
+        expect(ctx.runMutation).toHaveBeenCalledWith("agent_threads:updateThread", { failed: true, patch: {}, threadId: "thread-1" });
     });
 });
