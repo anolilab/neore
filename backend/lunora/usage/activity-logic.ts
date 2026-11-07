@@ -191,8 +191,8 @@ export const replyUsageArgs = (
 };
 
 /**
- * How a usage record whose read of the thread's project failed is run again: the job throws, and the scheduler retries
- * it at +10 s, +30 s and +70 s.
+ * How a usage record whose read of the thread's project failed is run again: the job throws, and the scheduler runs it
+ * again at +10 s, +30 s, +70 s and +130 s (it dead-letters only past `maxAttempts` failures).
  */
 export const RECORD_RETRY = { backoff: "exponential", baseMs: 10_000, maxAttempts: 4, maxMs: 60_000 } as const;
 
