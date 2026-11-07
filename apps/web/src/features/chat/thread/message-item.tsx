@@ -56,6 +56,7 @@ import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
 import AgentSwitchDivider from "./agent-switch-divider";
+import ContextResetDivider from "./context-reset-divider";
 import ForkBranchDialog from "./fork-branch-dialog";
 import formatMessageTime from "./format-message-time";
 import GenerationModelMenu from "./generation-model-menu";
@@ -584,6 +585,14 @@ const MessageItem: FC<MessageItemProps> = memo(
                 return (
                     <div {...containerProps}>
                         <AgentSwitchDivider part={agentSwitch.data as AgentSwitchPart} />
+                    </div>
+                );
+            }
+
+            if (message.parts.some((part) => part.type === "data-contextReset")) {
+                return (
+                    <div {...containerProps}>
+                        <ContextResetDivider />
                     </div>
                 );
             }

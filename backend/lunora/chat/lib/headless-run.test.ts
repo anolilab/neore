@@ -18,6 +18,7 @@ const seen = vi.hoisted(() => {
     return {
         backups: [] as (string | undefined)[],
         buildOptions: [] as unknown[],
+        callOptions: [] as unknown[],
         created: [] as unknown[],
         failAt: undefined as "generate" | "keys" | "thread" | undefined,
         filterRules: undefined as Record<string, string[]> | undefined,
@@ -25,6 +26,7 @@ const seen = vi.hoisted(() => {
         met: [] as boolean[],
         prepareSteps: [] as unknown[],
         prompts: [] as (string | undefined)[],
+        providerOptions: [] as unknown[],
         replies: [] as string[],
         saved: [] as unknown[][],
         steps: [] as number[],
@@ -53,9 +55,14 @@ vi.mock("./get-agent", () => {
 
             const instructions = getSystemPrompt(options.timezone, options.location, options.language, options.personalization);
             const thread = {
-                generateText: async (args: { prepareStep?: (options: { messages: unknown[] }) => unknown; prompt?: string; system?: string }) => {
+                generateText: async (
+                    args: { prepareStep?: (options: { messages: unknown[] }) => unknown; prompt?: string; providerOptions?: unknown; system?: string },
+                    callOptions?: unknown,
+                ) => {
                     seen.prepareSteps.push(args.prepareStep);
                     seen.prompts.push(args.prompt);
+                    seen.providerOptions.push(args.providerOptions);
+                    seen.callOptions.push(callOptions);
 
                     if (seen.failAt === "generate") {
                         throw new Error("model call failed");
@@ -124,6 +131,7 @@ vi.mock("./agent-tools", () => {
 });
 
 const { runHeadlessAgent } = await import("./headless-run");
+const { buildRunStreamArgs } = await import("./agent-run");
 
 const EMPTY_AFTER_STRIPPING = /empty after removing hidden characters/u;
 
@@ -407,6 +415,73 @@ describe("runHeadlessAgent thread tags", () => {
         const patches = ctx.runMutation.mock.calls.map(([, args]) => (args as { patch?: object }).patch);
 
         expect(patches[0]).toEqual({ botId: "bot-1" });
+    });
+});
+
+describe("runHeadlessAgent fresh context and reasoning effort", () => {
+    beforeEach(() => {
+        seen.callOptions = [];
+        seen.providerOptions = [];
+    });
+
+    // A registry model whose provider takes an effort, so the effort becomes a provider option.
+    const effortOptions = (model: string, effort: number) =>
+        (buildRunStreamArgs({ model, reasoningEffort: effort }) as { providerOptions?: unknown }).providerOptions;
+    const reasoningModel = MODEL_REGISTRY.find(
+        (model) => model.enabled !== false && (model.mode ?? "text") === "text" && effortOptions(model.id, 100) !== undefined,
+    );
+
+    /** The owner is on a paid plan, so any registry model may run. */
+    const paidCtx = () => {
+        const ctx = fakeCtx() as unknown as { runQuery: (reference: string, args?: unknown) => Promise<unknown> };
+        const base = ctx.runQuery;
+
+        ctx.runQuery = async (reference, args) =>
+            reference === "auth_functions:getUserRunPlanQuery" ? { isAdmin: false, plan: "premium" } : await base(reference, args);
+
+        return ctx;
+    };
+
+    const run = async (extra: Partial<Parameters<typeof runHeadlessAgent>[1]> = {}) =>
+        await runHeadlessAgent(paidCtx() as never, {
+            memory: false,
+            model: "test-model",
+            origin: "lead",
+            personalization: "none",
+            prompt: "Run the report",
+            thread: { threadId: "thread-1" },
+            tools: "none",
+            userId: "owner",
+            ...extra,
+        });
+
+    it("sends no earlier turns of the thread on a fresh-context run", async () => {
+        await run({ freshContext: true });
+
+        expect(seen.callOptions).toStrictEqual([{ contextOptions: { recentMessages: 0 } }]);
+    });
+
+    it("starts only the first generation fresh: a goal's later round reads the run's own turns", async () => {
+        seen.met = [false, true];
+
+        await run({ freshContext: true, goal: { text: "Ship it" } });
+
+        expect(seen.callOptions).toStrictEqual([{ contextOptions: { recentMessages: 0 } }, undefined]);
+    });
+
+    it("leaves the thread's history in a run that continues it", async () => {
+        await run();
+
+        expect(seen.callOptions).toStrictEqual([undefined]);
+    });
+
+    it("hands the run's reasoning effort to the model", async () => {
+        expect(reasoningModel).toBeDefined();
+
+        await run({ model: reasoningModel!.id, reasoningEffort: 100 });
+
+        expect(seen.providerOptions).toStrictEqual([effortOptions(reasoningModel!.id, 100)]);
+        expect(effortOptions(reasoningModel!.id, 100)).not.toStrictEqual(effortOptions(reasoningModel!.id, 0));
     });
 });
 

@@ -3,13 +3,14 @@ import { skipToken, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
+import { titleOnScreen, useTitleSaveRevision } from "@/features/chat/core/lib/thread-title-saves";
 import { useOptimisticDeletions, useOptimisticPins, useOptimisticStatuses } from "@/features/chat/core/stores/thread-store-hooks";
 import { matchesThreadFilters, pruneSelectedTagIds, resolveThreadTags } from "@/features/chat/tags/thread-tag-logic";
 import { useProjectList } from "@/features/projects/hooks/use-projects";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
 import { useDateBoundaries } from "../contexts/date-boundaries-context";
-import { nextSnoozeWake, partitionDerivedSections } from "../lib/derived-sections";
+import { isIdleThread, nextSnoozeWake, partitionDerivedSections } from "../lib/derived-sections";
 import { selectSelectedTagIds, useThreadListUIStore } from "../stores/thread-list-ui-store";
 import type { BranchNode, GroupType, MinimalThreadRelationship, ThreadGroup } from "../types";
 import { usePersistThreadList, useThreadListPlaceholder } from "./use-thread-list-cache";
@@ -89,6 +90,8 @@ const useThreadGroups = (
 
     // Tag filter, with ids of since-deleted tags ignored so they cannot hide everything.
     const rawSelectedTagIds = useThreadListUIStore(selectSelectedTagIds);
+    // Re-derives the rows on every save that begins or settles: their titles come from the save coordinator.
+    const titleRevision = useTitleSaveRevision();
     const selectedTagIds = useMemo(() => pruneSelectedTagIds(rawSelectedTagIds, compositeData?.tags), [rawSelectedTagIds, compositeData?.tags]);
 
     const { isAnswered: projectsAnswered, projects } = useProjectList();
@@ -104,6 +107,9 @@ const useThreadGroups = (
 
     // Get date boundaries from context (updates at midnight)
     const dateBoundaries = useDateBoundaries();
+
+    // Snoozes end on their own (the timer below re-arms per wake); idle rows read the same clock.
+    const [now, setNow] = useState(() => Date.now());
 
     // --- Stage 1: Build lookup maps (only recomputes when raw data changes) ---
     const lookupMaps = useMemo(() => {
@@ -209,14 +215,29 @@ const useThreadGroups = (
                 .filter((node): node is BranchNode => node !== null);
 
             // Apply optimistic state overrides (instant UI updates)
+            // The title the header shows too (`titleOnScreen`): the save coordinator, which the metadata store is written with.
+            const screenTitle = titleOnScreen(thread._id, thread.title);
             const optimisticPin = optimisticPins.get(threadId);
             const optimisticStatus = optimisticStatuses.get(threadId);
+            const status = optimisticStatus === undefined ? thread.status || "active" : optimisticStatus;
+            const { scheduled } = thread;
 
             return {
                 awaitingInput: thread.awaitingInput,
                 branchPoint: 0,
                 branchType: "branch",
                 category: thread.category,
+                isIdle: isIdleThread(
+                    {
+                        awaitingInput: thread.awaitingInput,
+                        lastReplyAt: thread.lastReplyAt,
+                        lastUserMessageAt: thread.lastUserMessageAt,
+                        scheduled,
+                        snoozedUntil: thread.snoozedUntil,
+                        status,
+                    },
+                    now,
+                ),
                 lockedAt: thread.lockedAt,
                 children,
                 createdAt: thread.createdAt ?? thread._creationTime,
@@ -229,14 +250,17 @@ const useThreadGroups = (
                 order: threadOrderMap.get(threadId),
                 projectId: thread.projectId,
                 relevantMessages: thread.relevantMessages,
+                runner: thread.runner,
+                scheduled,
                 snoozedUntil: thread.snoozedUntil,
                 source: thread.source,
                 statelessMode: thread.statelessMode,
-                status: optimisticStatus === undefined ? thread.status || "active" : optimisticStatus,
+                status,
+                storedTitle: screenTitle ?? "",
                 tagIds: thread.tagIds,
                 tags: resolveThreadTags(thread.tagIds, userTags),
                 threadId: thread._id,
-                title: thread.title || t`New Chat`,
+                title: screenTitle || t`New Chat`,
                 updatedAt: thread.updatedAt,
             };
         };
@@ -285,7 +309,7 @@ const useThreadGroups = (
             statelessThreads,
             temporaryThreadsList: filteredTemporaryThreadsList,
         };
-    }, [lookupMaps, optimisticPins, optimisticStatuses, optimisticDeletions, selectedCategory, selectedTagIds, compositeData?.tags, t]);
+    }, [lookupMaps, optimisticPins, optimisticStatuses, optimisticDeletions, selectedCategory, selectedTagIds, compositeData?.tags, titleRevision, now, t]);
 
     // --- Stage 3: Sort callback for search results (stable reference) ---
     const sortThreadsByPriority = useCallback(
@@ -358,9 +382,12 @@ const useThreadGroups = (
         return { heldProjectThreads, map, threadsWithoutProject };
     }, [hierarchyData, holdProjectThreads, projects, searchQuery]);
 
-    // Snoozes end on their own: one timer to the next wake, none while nothing is snoozed.
-    const [now, setNow] = useState(() => Date.now());
-    const nextWake = useMemo(() => (hierarchyData ? nextSnoozeWake(hierarchyData.regularThreads, now) : undefined), [hierarchyData, now]);
+    // Snoozes end on their own: one timer to the next wake, none while nothing is snoozed. Every root counts, since an idle
+    // marker reads the clock too, and stateless and temporary roots sit outside the regular list.
+    const nextWake = useMemo(
+        () => (hierarchyData ? nextSnoozeWake([...hierarchyData.allThreadsList, ...hierarchyData.temporaryThreadsList], now) : undefined),
+        [hierarchyData, now],
+    );
 
     useEffect(() => {
         const delay = nextWake === undefined ? 0 : Math.min(Math.max(nextWake - Date.now(), 0) + 25, MAX_TIMEOUT_MS);

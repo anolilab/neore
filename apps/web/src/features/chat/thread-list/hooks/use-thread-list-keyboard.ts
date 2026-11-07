@@ -1,10 +1,56 @@
 import { useEffect, useEffectEvent } from "react";
 
+/** How long after the ContextMenu key a browser's own `contextmenu` event is still swallowed. */
+const CONTEXT_MENU_KEY_WINDOW_MS = 500;
+
+/**
+ * Windows fires a `contextmenu` event after the ContextMenu key's keydown, and cancelling the keydown does not stop it: the
+ * browser's own menu would open over the options menu. That event is cancelled when it targets the same element as the key.
+ * A pointer press ends the window first, so a real right-click is never cancelled.
+ */
+const suppressNextContextMenu = (keyTarget: EventTarget | null): void => {
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    document.addEventListener(
+        "contextmenu",
+        (event) => {
+            if (event.target === keyTarget) {
+                event.preventDefault();
+            }
+
+            controller.abort();
+        },
+        { capture: true, once: true, signal },
+    );
+    document.addEventListener(
+        "pointerdown",
+        () => {
+            controller.abort();
+        },
+        { capture: true, once: true, signal },
+    );
+    globalThis.setTimeout(() => {
+        controller.abort();
+    }, CONTEXT_MENU_KEY_WINDOW_MS);
+};
+
+/**
+ * Whether the keys act on the remembered selection: focus is in the sidebar, or on nothing. Once F6 moves focus into the thread,
+ * the composer or the right panel, the selection stays where it was, and the keys belong to the focused area.
+ */
+const focusIsOnList = (target: HTMLElement | null): boolean =>
+    target === null || target === document.body || target.closest('[data-focus-area="sidebar"]') !== null;
+
 interface UseThreadListKeyboardProps {
     handleArrowDown: () => void;
     handleArrowUp: () => void;
     handleEnter: () => void;
     handleKeyboardEscape: () => void;
+    /** Opens the keyboard-selected thread's options menu (the context-menu key). False when nothing opened, so the key stays with the browser. */
+    handleOpenSelectedMenu: () => boolean;
+    /** Opens the rename dialog for the keyboard-selected thread (F2). */
+    handleRenameSelected: () => void;
     handleSelectAll: () => void;
     isKeyboardNavigating: boolean;
     isSelectionMode: boolean;
@@ -23,6 +69,8 @@ const useThreadListKeyboard = ({
     handleArrowUp,
     handleEnter,
     handleKeyboardEscape,
+    handleOpenSelectedMenu,
+    handleRenameSelected,
     handleSelectAll,
     isKeyboardNavigating,
     isSelectionMode,
@@ -87,6 +135,11 @@ const useThreadListKeyboard = ({
             return;
         }
 
+        // A key pressed in an open dialog or menu (Save, Cancel, a menu item) belongs to that control, not to the selected row.
+        if (target !== null && target.closest('[role="dialog"]:not([data-mobile="true"]), [role="menu"]') !== null) {
+            return;
+        }
+
         const isCtrlOrCommand = event.ctrlKey || event.metaKey;
 
         switch (event.key) {
@@ -125,6 +178,15 @@ const useThreadListKeyboard = ({
 
                 break;
             }
+            case "ContextMenu": {
+                // Taken only when a menu opens: otherwise the browser's own menu shows, as it does for a right-click on that row.
+                if (isKeyboardNavigating && !isSelectionMode && focusIsOnList(target) && handleOpenSelectedMenu()) {
+                    event.preventDefault();
+                    suppressNextContextMenu(target);
+                }
+
+                break;
+            }
             case "Enter": {
                 if (isKeyboardNavigating) {
                     event.preventDefault();
@@ -144,6 +206,14 @@ const useThreadListKeyboard = ({
 
                     handleKeyboardEscape();
                     setShowKeyboardHelp(false);
+                }
+
+                break;
+            }
+            case "F2": {
+                if (isKeyboardNavigating && !isSelectionMode && focusIsOnList(target)) {
+                    event.preventDefault();
+                    handleRenameSelected();
                 }
 
                 break;

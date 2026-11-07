@@ -18,6 +18,7 @@ import {
     nextRecurrenceAt,
     parseVerifierOutput,
     pickFairRecurrences,
+    pickRunThread,
     resolveTaskModel,
     shouldRecurNow,
     validateParent,
@@ -372,5 +373,98 @@ describe(latestSlotAtOrBefore, () => {
 
         expect(latestSlotAtOrBefore("0 0 30 2 *", nine, nine + 30 * 24 * HOUR, 0)).toBeUndefined();
         expect(performance.now() - started).toBeLessThan(2000);
+    });
+});
+
+describe(pickRunThread, () => {
+    const base = {
+        destination: "continue_thread" as const,
+        lastRunThreadId: "thread-1",
+        projectId: "project-a",
+        recurring: true,
+        round: 0,
+        thread: { projectId: "project-a", userId: "owner" },
+        userId: "owner",
+    };
+
+    it("starts a new thread by default, and for a task that does not recur", () => {
+        expect(pickRunThread({ ...base, destination: undefined })).toStrictEqual({ divider: false, freshContext: false });
+        expect(pickRunThread({ ...base, destination: "new_thread" })).toStrictEqual({ divider: false, freshContext: false });
+        expect(pickRunThread({ ...base, recurring: false })).toStrictEqual({ divider: false, freshContext: false });
+    });
+
+    it("continues the last run's thread", () => {
+        expect(pickRunThread(base)).toStrictEqual({ divider: false, freshContext: false, threadId: "thread-1" });
+    });
+
+    it("sends no earlier turns on every round of a fresh-context run, with the divider before the first only", () => {
+        expect(pickRunThread({ ...base, destination: "fresh_context" })).toStrictEqual({ divider: true, freshContext: true, threadId: "thread-1" });
+        expect(pickRunThread({ ...base, destination: "fresh_context", round: 1 })).toStrictEqual({ divider: false, freshContext: true, threadId: "thread-1" });
+    });
+
+    it("starts a new thread once the task moved to another project, or the thread left it", () => {
+        expect(pickRunThread({ ...base, projectId: "project-b" })).toStrictEqual({ divider: false, fallback: "thread_unavailable", freshContext: false });
+        expect(pickRunThread({ ...base, projectId: undefined })).toStrictEqual({ divider: false, fallback: "thread_unavailable", freshContext: false });
+        expect(pickRunThread({ ...base, thread: { userId: "owner" } })).toStrictEqual({ divider: false, fallback: "thread_unavailable", freshContext: false });
+    });
+
+    it("starts a new thread when the last one is gone, deleted, temporary, host-run or someone else's", () => {
+        expect(pickRunThread({ ...base, thread: null })).toStrictEqual({ divider: false, fallback: "thread_unavailable", freshContext: false });
+        expect(pickRunThread({ ...base, lastRunThreadId: undefined })).toStrictEqual({ divider: false, freshContext: false });
+
+        for (const thread of [{ deleted: true }, { isTemporary: true }, { runner: "host" }, { userId: "someone-else" }]) {
+            expect(pickRunThread({ ...base, thread: { ...base.thread, ...thread } })).toStrictEqual({
+                divider: false,
+                fallback: "thread_unavailable",
+                freshContext: false,
+            });
+        }
+    });
+
+    it("never writes into a passcode-locked chat, and says so", () => {
+        expect(pickRunThread({ ...base, thread: { ...base.thread, lockedAt: 1 } })).toStrictEqual({
+            divider: false,
+            fallback: "thread_locked",
+            freshContext: false,
+        });
+    });
+
+    it("never continues a chat waiting on its owner's approval or answer", () => {
+        expect(pickRunThread({ ...base, thread: { ...base.thread, awaitingInput: "approval" } })).toStrictEqual({
+            divider: false,
+            fallback: "thread_busy",
+            freshContext: false,
+        });
+    });
+
+    it("never publishes into a chat shared by public link, and hands over even while it also waits on its owner", () => {
+        const shared = { divider: false, fallback: "thread_shared", freshContext: false };
+
+        expect(pickRunThread({ ...base, thread: { ...base.thread, isPublic: true } })).toStrictEqual(shared);
+        expect(pickRunThread({ ...base, thread: { ...base.thread, awaitingInput: "approval", isPublic: true } })).toStrictEqual(shared);
+    });
+
+    it("waits for no live chat reply: a busy thread starts a new one, and says so", () => {
+        expect(pickRunThread({ ...base, thread: { ...base.thread, busy: true } })).toStrictEqual({
+            divider: false,
+            fallback: "thread_busy",
+            freshContext: false,
+        });
+    });
+});
+
+describe("buildTaskPrompt repair", () => {
+    it("gives a repair round the attempt it repairs, apart from the verifier's words", () => {
+        const prompt = buildTaskPrompt({
+            instructions: "Write the report",
+            repair: { previousAnswer: "Draft one", reasons: ["Missing totals"], repairInstructions: "Add totals" },
+            title: "Report",
+        });
+
+        const verifierSection = prompt.slice(prompt.indexOf("The verifier said:"));
+
+        expect(prompt).toContain('"previousAnswer": "Draft one"');
+        expect(verifierSection).toContain('"repairInstructions": "Add totals"');
+        expect(verifierSection).not.toContain("previousAnswer");
     });
 });

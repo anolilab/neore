@@ -1261,6 +1261,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                 <PopoverPrimitive.Positioner align="start" anchor={pickerRef} className="isolate z-50" side="right" sideOffset={8}>
                     <PopoverPrimitive.Popup
                         className="bg-popover text-popover-foreground ring-foreground/10 data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=right]:slide-in-from-left-2 w-64 origin-(--transform-origin) overflow-hidden rounded-lg shadow-md ring-1 outline-hidden duration-100"
+                        data-slot="popover-content"
                         onMouseEnter={cancelInfoClose}
                         onMouseLeave={scheduleInfoClose}
                     >

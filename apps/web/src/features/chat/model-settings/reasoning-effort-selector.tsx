@@ -54,6 +54,7 @@ export const ReasoningEffortSelector: FC<ReasoningEffortSelectorProps> = ({ mode
                 min={EFFORT_MIN}
                 onValueChange={(nextValue: number | ReadonlyArray<number>) => onChange(Array.isArray(nextValue) ? nextValue[0] : nextValue)}
                 step={EFFORT_STEP}
+                thumbLabel={t`Reasoning Effort`}
                 value={[value ?? EFFORT_DEFAULT]}
             />
             <p className="text-muted-foreground text-xs">{t`Higher reasoning effort may produce more thoughtful responses but takes longer.`}</p>

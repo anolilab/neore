@@ -11,18 +11,26 @@ export interface BranchNode {
     createdAt: number;
     depth: number;
     expiresAt?: number; // Present if thread is temporary
+    /** Finished and waiting on nothing: shown with a quiet Idle marker, root threads only (`isIdleThread`). */
+    isIdle?: boolean;
     isPinned?: boolean;
     lastReplyAt?: number; // When the thread last got a reply (owned threads only)
+    lastUserMessageAt?: number; // When a person last sent a message past the thread's first (owned threads only)
     lastViewedAt?: number; // When its owner last opened it after a reply (owned threads only)
-    lockedAt?: number; // Present while the chat has a passcode
+    lockedAt?: number | null; // Present while the chat has a passcode (`isThreadLocked`)
     model?: string;
     order?: number;
     projectId?: string; // Project ID if thread belongs to a project
     relevantMessages?: any[]; // Messages that matched the search query
+    runner?: "host"; // Present on a chat that runs on a paired computer (its title is not generated in the cloud)
+    /** A recurring task is bound to this thread, so it is not idle. The list row does not carry it yet. */
+    scheduled?: boolean;
     snoozedUntil?: number; // Hidden from the main sections until then (owned threads only)
     source?: string; // "telegram" | "slack" | "discord" | undefined (web)
     statelessMode?: boolean; // Present if thread is in stateless mode
     status: string;
+    /** The title as stored: empty for an untitled chat, where `title` shows the fallback. */
+    storedTitle?: string;
     tagIds?: string[]; // User-defined tag ids
     tags?: ThreadTag[]; // `tagIds` resolved against the user's tags, in display order
     threadId: string;

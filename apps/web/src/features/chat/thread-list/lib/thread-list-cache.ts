@@ -11,11 +11,16 @@
  * corrupt store reads as "no cache".
  */
 
+import { isThreadLocked } from "../thread-lock";
+
 const CACHE_PREFIX = "neore-thread-list:";
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 
 /** Keyed by the signed-in user, so one account's list is never read for another. */
 const cacheKey = (userId: string): string => `${CACHE_PREFIX}v${CACHE_VERSION}:${userId}`;
+
+/** The keys a previous build wrote one user's list under (versions start at 1). They hold the same titles and must not outlive the account. */
+const olderCacheKeys = (userId: string): string[] => Array.from({ length: CACHE_VERSION - 1 }, (_, index) => `${CACHE_PREFIX}v${index + 1}:${userId}`);
 
 const clears = { count: 0 };
 
@@ -105,6 +110,7 @@ const THREAD_FIELDS = [
     "lockedAt",
     "model",
     "projectId",
+    "runner",
     "source",
     "statelessMode",
     "status",
@@ -149,7 +155,7 @@ const pickAll = (source: unknown, fields: ReadonlyArray<string>): PersistedRecor
 const pickThread = (source: unknown): PersistedRecord | undefined => {
     const picked = pick(source, THREAD_FIELDS);
 
-    if (picked && picked.lockedAt !== undefined) {
+    if (picked && isThreadLocked(picked.lockedAt)) {
         delete picked.title;
     }
 
@@ -222,6 +228,7 @@ const FIELD_TYPES: Record<string, (value: unknown) => boolean> = {
     parentThreadId: (value) => typeof value === "string",
     projectId: (value) => typeof value === "string",
     source: (value) => typeof value === "string",
+    runner: (value) => typeof value === "string",
     statelessMode: (value) => typeof value === "boolean",
     status: (value) => typeof value === "string",
     tagIds: isStringArray,
@@ -269,6 +276,10 @@ export const readThreadListCache = (userId: string | undefined, storage: Storage
     }
 
     try {
+        for (const key of olderCacheKeys(userId)) {
+            storage.removeItem(key);
+        }
+
         const raw = storage.getItem(cacheKey(userId));
 
         if (raw === null) {
@@ -349,7 +360,9 @@ export const clearThreadListCacheFor = (userId: string, storage: Storage | undef
     writeHold.blockedUsers.add(userId);
 
     try {
-        storage?.removeItem(cacheKey(userId));
+        for (const key of [cacheKey(userId), ...olderCacheKeys(userId)]) {
+            storage?.removeItem(key);
+        }
     } catch {
         // Nothing to clear when the store is unavailable.
     }
