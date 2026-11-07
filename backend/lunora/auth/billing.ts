@@ -52,6 +52,11 @@ const DEFAULT_ALLOWED_MODELS: Record<BillingTier, string[]> = {
 };
 
 /**
+ * Better Auth can store several organization roles comma-joined ("admin,owner"); a member is an owner when one of them is `owner`.
+ */
+const isOwnerRole = (role: string | null | undefined): boolean => !!role && role.split(",").some((part) => part.trim() === "owner");
+
+/**
  * Get billing information for the active organization.
  */
 export const getBillingInfo = authQuery
@@ -64,6 +69,7 @@ export const getBillingInfo = authQuery
                 creditsPerUser: v.number(),
                 creemCustomerId: v.optional(v.union(v.string(), v.null())),
                 creemSubscriptionId: v.optional(v.union(v.string(), v.null())),
+                isOwner: v.boolean(),
             }),
             v.null(),
         ),
@@ -88,6 +94,8 @@ export const getBillingInfo = authQuery
         // local alias here becomes `Cannot find name` there. Exporting the alias fixes that and costs 59 unrelated `TS4023:
         // has or is using name … from external module` errors elsewhere, so the
         // name is kept out of the printed type instead.
+        const isOwner = isOwnerRole(context.user.activeOrganization?.role);
+
         const result: {
             allowedModels?: string[];
             baseTier: "enterprise" | "free" | "pro";
@@ -95,15 +103,15 @@ export const getBillingInfo = authQuery
             creditsPerUser: number;
             creemCustomerId?: string | null;
             creemSubscriptionId?: string | null;
+            isOwner: boolean;
         } = {
             baseTier,
             creditsPerUser: org.creditsPerUser ?? DEFAULT_CREDITS_PER_USER[baseTier],
+            isOwner,
         };
 
         // Members see the plan and credit allowance only. The contact e-mail, the model list and the Creem ids are for owners.
-        const memberRole = context.user.activeOrganization?.role;
-
-        if (memberRole === "owner") {
+        if (isOwner) {
             result.allowedModels = org.allowedModels ?? DEFAULT_ALLOWED_MODELS[baseTier];
             result.billingEmail = org.billingEmail ?? null;
             result.creemCustomerId = org.creemCustomerId ?? null;
@@ -194,7 +202,7 @@ export const updateBillingSettings = authMutation
         const orgRole = context.user.activeOrganization?.role;
 
         // Only owners can update billing settings
-        if (orgRole !== "owner") {
+        if (!isOwnerRole(orgRole)) {
             throw new LunoraError("FORBIDDEN", "Only organization owners can update billing settings");
         }
 

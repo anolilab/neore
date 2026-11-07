@@ -115,7 +115,7 @@ export interface ApiTypes {
             createScopedApiKey: FunctionReference<"action", { expiresInDays?: number | null; name: string; scopes: Array<string> }, { expiresAt: number | null; id: string; key: string; name: string; scopes: Array<string>; start: string | null }>;
         };
         billing: {
-            getBillingInfo: FunctionReference<"query", {}, { allowedModels?: Array<string>; baseTier: "free" | "pro" | "enterprise"; billingEmail?: string | null; creditsPerUser: number; creemCustomerId?: string | null; creemSubscriptionId?: string | null } | null>;
+            getBillingInfo: FunctionReference<"query", {}, { allowedModels?: Array<string>; baseTier: "free" | "pro" | "enterprise"; billingEmail?: string | null; creditsPerUser: number; creemCustomerId?: string | null; creemSubscriptionId?: string | null; isOwner: boolean } | null>;
             getMemberCredits: FunctionReference<"query", { userId?: string }, ({} & { creditOverride: number | null; effectiveCredits: number; orgDefault: number; resetAt: number | null; usedCredits: number; userId: string; }) | null>;
             listMemberCredits: FunctionReference<"query", {}, ({} & { creditOverride: number | null; effectiveCredits: number; role: string; usedCredits: number; userEmail: string | null; userId: string; userName: string | null; })[]>;
             setMemberCreditOverride: FunctionReference<"mutation", { creditOverride: number | null; organizationId: string; userId: string }, void>;

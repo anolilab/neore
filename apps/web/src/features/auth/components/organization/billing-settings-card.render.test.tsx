@@ -43,9 +43,6 @@ vi.mock("@/features/auth/hooks/organization-management", () => {
         useActiveOrganization: () => {
             return { data: { id: "org_1" }, isPending: false };
         },
-        useHasPermission: () => {
-            return { data: { success: harness.isOwner }, isPending: false };
-        },
     };
 });
 
@@ -84,7 +81,8 @@ vi.mock("@/lib/lunora/crpc", () => {
                                                       throw new Error("billing unavailable");
                                                   }
 
-                                                  return harness.billingInfo ?? null;
+                                                  // The server reports the viewer's ownership with the read; the test drives it through `isOwner`.
+                                                  return harness.billingInfo ? { isOwner: harness.isOwner, ...harness.billingInfo } : null;
                                               },
                                     queryKey: ["billing-info"],
                                 };
@@ -107,7 +105,7 @@ const { default: BillingSettingsCard } = await import("./billing-settings-card")
 const mount = () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-    return render(createElement(QueryClientProvider, { client: queryClient }, createElement(BillingSettingsCard)));
+    return { queryClient, ...render(createElement(QueryClientProvider, { client: queryClient }, createElement(BillingSettingsCard))) };
 };
 
 afterEach(() => {
@@ -131,6 +129,33 @@ describe("BillingSettingsCard", () => {
         expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
         expect(screen.queryByLabelText("Billing Email")).toBeNull();
         expect(screen.queryByRole("button", { name: "Upgrade organization to Team" })).toBeNull();
+    });
+
+    it("shows an organization admin the read-only plan, with no billing form to save", async () => {
+        // Admins hold the organization-update permission too, so ownership is the server's `isOwner`, not that permission.
+        harness.isOwner = false;
+        harness.billingInfo = { baseTier: "pro", creditsPerUser: 1000 };
+        mount();
+
+        expect(await screen.findByText("pro")).toBeTruthy();
+        expect(screen.getByText("1000")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+        expect(screen.queryByLabelText("Billing Email")).toBeNull();
+    });
+
+    it("shows the error, not the earlier plan, when a refetch after an organization switch fails", async () => {
+        harness.isOwner = false;
+        harness.billingInfo = { baseTier: "enterprise", creditsPerUser: 500 };
+        const { queryClient } = mount();
+
+        expect(await screen.findByText("enterprise")).toBeTruthy();
+
+        harness.billingError = true;
+        await queryClient.invalidateQueries({ queryKey: ["billing-info"] });
+
+        expect(await screen.findByText("Could not load your organization's billing details. Try again later.")).toBeTruthy();
+        expect(screen.queryByText("enterprise")).toBeNull();
+        expect(screen.queryByText("500")).toBeNull();
     });
 
     it("offers an owner of a Free organization the Team upgrade, which starts a Team checkout", async () => {

@@ -17,7 +17,7 @@ import * as z from "zod";
 
 import type { SettingsCardProperties } from "@/components/settings/settings-card";
 import SettingsCard from "@/components/settings/settings-card";
-import { useActiveOrganization, useHasPermission } from "@/features/auth/hooks/organization-management";
+import { useActiveOrganization } from "@/features/auth/hooks/organization-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import useBillingOptions from "@/features/billing/hooks/use-billing-options";
 import useCheckout from "@/features/billing/hooks/use-checkout";
@@ -39,20 +39,14 @@ const AVAILABLE_MODELS = [
 ];
 
 const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsCardProperties) => {
-    const { authClient, toast } = useAuth();
+    const { toast } = useAuth();
     const { t } = useLingui();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
 
-    const { data: hasPermission, isPending: isPermissionPending } = useHasPermission(authClient, {
-        permissions: {
-            organization: ["update"],
-        },
-    });
-
-    const isOwner = hasPermission?.success;
-
     // Every member may read the active organization's tier and credits; only an owner gets the editing controls.
+    // The server decides ownership (`isOwner`), the same rule its billing mutation applies. An organization-update permission is
+    // not enough: admins hold it too.
     // One-shot (`live: false`): a live subscription answers from its last value, so after an organization switch it would keep the
     // previous organization's plan and an invalidation would refetch that same value. A plain read follows the session's active organization.
     const {
@@ -60,6 +54,8 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
         isError: isBillingError,
         isPending: isBillingPending,
     } = useQuery(crpc.auth.billing.getBillingInfo.queryOptions({}, { live: false }));
+
+    const isOwner = billingInfo?.isOwner === true;
 
     const updateBillingMutation = useMutation(crpc.auth.billing.updateBillingSettings.mutationOptions());
     const { isPending: checkoutPending, openPortal, startCheckout } = useCheckout();
@@ -133,10 +129,11 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
     }, []);
 
     const { isSubmitting } = form.state;
-    const isPending = isPermissionPending || isBillingPending;
+    const isPending = isBillingPending;
 
-    // A failed read is "unknown", not the Free plan: show the error instead of fallback values or plan buttons.
-    if (isBillingError && !billingInfo && !isPending) {
+    // A failed read is "unknown", not the Free plan: show the error instead of fallback values or plan buttons. This holds even when
+    // an earlier read is still cached (a failed refetch after an organization switch), and when the read returned nothing.
+    if ((isBillingError || billingInfo === null) && !isPending) {
         return (
             <SettingsCard
                 className={className}

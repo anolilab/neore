@@ -3564,7 +3564,7 @@ export interface Caller {
             applyCreemSubscription: (args: { baseTier: "free" | "pro"; creemCustomerId?: string; creemPurchaserId?: string; creemSubscriptionId: string; referenceId: string; subject: "organization" | "user" }) => Promise<null>;
             creditsLeftQuery: (args: { orgId: string; userId: string }) => Promise<{ creditsLeft: number | null }>;
             deductCreditsFromGateway: (args: { billingMode?: "platform" | "custom" | "byok"; byokFeeRate?: number; costMicrodollars: number; modelId: string; orgId?: string; requestId: string; userId: string }) => Promise<void>;
-            getBillingInfo: (args?: {}) => Promise<{ allowedModels?: Array<string>; baseTier: "free" | "pro" | "enterprise"; billingEmail?: string | null; creditsPerUser: number; creemCustomerId?: string | null; creemSubscriptionId?: string | null } | null>;
+            getBillingInfo: (args?: {}) => Promise<{ allowedModels?: Array<string>; baseTier: "free" | "pro" | "enterprise"; billingEmail?: string | null; creditsPerUser: number; creemCustomerId?: string | null; creemSubscriptionId?: string | null; isOwner: boolean } | null>;
             getMemberCredits: (args: { userId?: string }) => Promise<({} & { creditOverride: number | null; effectiveCredits: number; orgDefault: number; resetAt: number | null; usedCredits: number; userId: string; }) | null>;
             getRunPlanForOrganizationQuery: (args: { organizationId: string | null; userId: string }) => Promise<{ isAdmin: boolean; plan: "premium" | null }>;
             listMemberCredits: (args?: {}) => Promise<({} & { creditOverride: number | null; effectiveCredits: number; role: string; usedCredits: number; userEmail: string | null; userId: string; userName: string | null; })[]>;

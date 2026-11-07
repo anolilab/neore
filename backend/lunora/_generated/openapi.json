@@ -10968,11 +10968,15 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "isOwner": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
                         "baseTier",
-                        "creditsPerUser"
+                        "creditsPerUser",
+                        "isOwner"
                       ],
                       "type": "object"
                     },
