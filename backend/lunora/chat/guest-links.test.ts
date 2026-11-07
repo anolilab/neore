@@ -130,6 +130,15 @@ describe("creating a link", () => {
             harness.withIdentity({ userId: STRANGER } as never).mutation(guestLinks.createGuestLink as never, { threadId } as never),
         ).rejects.toBeDefined();
 
+        // A thread grantee with admin access is not the owner: a grant does not let it give out a link.
+        await harness.run(
+            async (ctx: any) => await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "admin", threadId, userId: "user-admin" }),
+        );
+        await expect(
+            harness.withIdentity({ userId: "user-admin" } as never).mutation(guestLinks.createGuestLink as never, { threadId } as never),
+        ).rejects.toBeDefined();
+        expect(await rows("threadGuestLinks")).toHaveLength(0);
+
         const first = await createLink();
         const second = await createLink();
 
