@@ -1332,8 +1332,9 @@ export const resumeApprovedRun = async (
                 mcpLabels: toolResult.mcpLabels,
                 pending: piped.pending,
                 savedMessages: result.savedMessages,
-                // A further pause is checked against the tools THIS run offered, which may differ from the first run's.
-                snapshot: { ...config, mcpToolFingerprints: toolResult.mcpToolFingerprints },
+                // A further pause is checked against the tools THIS run offered, which may differ from the first run's: their
+                // fingerprints, and the permission key each runtime name stands for now ("Always allow" writes that key).
+                snapshot: { ...config, mcpToolFingerprints: toolResult.mcpToolFingerprints, toolPermissionKeys: toolResult.permissionKeys },
                 streamId,
                 threadId,
                 unsaved: piped.unsaved,
