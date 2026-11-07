@@ -7,6 +7,8 @@
  * The continuation runs as the OWNER — the snapshot, tools, keys and thread are
  * theirs.
  */
+import { LunoraError } from "lunorash/server";
+
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
@@ -66,6 +68,17 @@ export const resumeClaimedRun = async (ctx: MutationCtx, args: ResumeClaimedRunA
 
     // In this transaction, not scheduled: a late write would wipe the `awaitingInput` of a continuation that paused again.
     await patchThread(ctx.db, threadId, { status: "running", updatedAt: ctx.now });
+
+    // A sub-agent's run leaves its wait with the claim, not when the job starts: a second answer meanwhile is refused
+    // (`claimToolApproval`) rather than claimed for a continuation that would find the run already running. Loaded
+    // lazily: the sub-agent module reads the claim helpers.
+    if (config.subAgentRunId !== undefined) {
+        const { resumeRunForAnswer } = await import("../../sub-agents/functions");
+
+        if (!(await resumeRunForAnswer(ctx, config.subAgentRunId))) {
+            throw new LunoraError("CONFLICT", "This sub-agent has already ended");
+        }
+    }
 
     return streamId;
 };

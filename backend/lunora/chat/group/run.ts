@@ -849,6 +849,7 @@ export const continueGroupAfterToolApproval = async (
         return;
     }
 
+    const lastMessageId = resumed.messageIds.at(-1);
     const turn = await loadTurnContext(ctx, {
         baseModel: group.baseModel,
         config: groupConfig,
@@ -857,7 +858,7 @@ export const continueGroupAfterToolApproval = async (
         organizationId: group.organizationId,
         // The approval snapshot kept what started the turn: a person answering it does not make it the lead's.
         origin: config.dispatchOrigin ?? "lead",
-        promptMessageId: resumed.lastMessageId ?? approvalId,
+        promptMessageId: lastMessageId ?? approvalId,
         replyKey: config.replyKey ?? streamId,
         researchDepth: config.researchDepth,
         searchMode: config.searchMode,
@@ -874,8 +875,8 @@ export const continueGroupAfterToolApproval = async (
     const remaining: TurnQueue = group.steps ? { kind: "steps", steps: group.steps } : { kind: "speakers", queue: group.queue };
 
     await runQueue(ctx, turn, {
-        continueFromMessageId: resumed.lastMessageId,
-        plan: resumed.lastMessageId ? remaining : { kind: "speakers", queue: [] },
+        continueFromMessageId: lastMessageId,
+        plan: lastMessageId ? remaining : { kind: "speakers", queue: [] },
         spokenSkillIds: group.spokenSkillIds,
     });
 };

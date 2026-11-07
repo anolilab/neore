@@ -26601,12 +26601,37 @@
               "unique": false,
               "refined": true
             },
+            "stepsTaken": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
             "subAgentRunId": {
               "kind": "id",
               "nullable": false,
               "optional": true,
               "unique": false,
               "ref": "subAgentRuns"
+            },
+            "toolEndpoints": {
+              "kind": "record",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "key": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              }
             },
             "toolNames": {
               "kind": "array",

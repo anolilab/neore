@@ -24,7 +24,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("./lib/agent-run")>()),
         resumeApprovedRun: vi.fn(async () => {
-            return { lastMessageId: undefined, paused: false, stopped: false };
+            return { messageIds: [], paused: false, stopped: false };
         }),
     };
 });
@@ -165,7 +165,7 @@ describe("continueAfterToolApproval and the pause it answered", () => {
             vi.mocked(resumeApprovedRun).mockImplementationOnce(async () => {
                 await harness.run(async (ctx: any) => await ctx.db.patch("persistentStreams", ids.streamId as never, { status: "done" }));
 
-                return { lastMessageId: undefined, paused: false, stopped: true };
+                return { messageIds: [], paused: false, stopped: true };
             });
 
             await resume(harness, ids);
@@ -184,7 +184,7 @@ describe("continueAfterToolApproval and the pause it answered", () => {
 
             // The stream is still live: a newer run owns `awaitingInput` now.
             await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { awaitingInput: "question" }));
-            vi.mocked(resumeApprovedRun).mockResolvedValueOnce({ lastMessageId: undefined, paused: false, stopped: true });
+            vi.mocked(resumeApprovedRun).mockResolvedValueOnce({ messageIds: [], paused: false, stopped: true });
 
             await resume(harness, ids);
 
@@ -202,7 +202,7 @@ describe("continueAfterToolApproval and the pause it answered", () => {
         try {
             const ids = await seedPausedRun(harness, undefined);
 
-            vi.mocked(resumeApprovedRun).mockResolvedValueOnce({ awaitingInput: "question", lastMessageId: undefined, paused: true, stopped: false });
+            vi.mocked(resumeApprovedRun).mockResolvedValueOnce({ awaitingInput: "question", messageIds: [], paused: true, stopped: false });
 
             await resume(harness, ids);
 

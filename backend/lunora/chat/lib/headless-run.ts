@@ -65,6 +65,9 @@ import { scheduleReplyUsage } from "../../usage/schedule";
 /** No tools, so no permission keys: typed, so the union with the built tools' map stays a plain record. */
 const NO_PERMISSION_KEYS: Record<string, string> = {};
 
+/** Likewise no MCP endpoints. */
+const NO_TOOL_ENDPOINTS: Record<string, string> = {};
+
 /** Autonomous work benefits from search; a skill's own search mode still wins. */
 const DEFAULT_HEADLESS_SEARCH_MODE: SearchMode = "web";
 
@@ -152,6 +155,11 @@ export interface HeadlessRunOptions {
     /** The skill the usage page files this run under; absent = the plain assistant. */
     usageSkill?: ReplySkill;
     userId: string;
+    /**
+     * Built-ins this run never gets, whatever their permission: a sub-agent at the nesting cap may ask for other tools
+     * ({@link HeadlessRunOptions.pauseForApproval}) but must not ask to delegate further (`sub-agents/execute.ts`).
+     */
+    withheldTools?: ReadonlyArray<string>;
 }
 
 export interface HeadlessRunResult {
@@ -171,14 +179,16 @@ export interface HeadlessRunResult {
 const headlessSkillTools = (
     config: SkillConfig | undefined,
     additionalTools: ReadonlyArray<string> | undefined,
+    withheldTools: ReadonlyArray<string> | undefined,
 ): { additionalTools?: string[]; disabledTools?: string[] } | undefined => {
-    if (!config && !additionalTools?.length) {
+    if (!config && !additionalTools?.length && !withheldTools?.length) {
         return undefined;
     }
 
     const extra = [...(config?.additionalTools ?? []), ...(additionalTools ?? [])];
+    const disabled = [...(config?.disabledTools ?? []), ...(withheldTools ?? [])];
 
-    return { additionalTools: extra.length > 0 ? extra : undefined, disabledTools: config?.disabledTools };
+    return { additionalTools: extra.length > 0 ? extra : undefined, disabledTools: disabled.length > 0 ? disabled : undefined };
 };
 
 /**
@@ -222,10 +232,10 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                   ...(options.pauseForApproval && { headlessCanAsk: true }),
                   model,
                   searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
-                  skillTools: headlessSkillTools(skill?.config, options.additionalTools),
+                  skillTools: headlessSkillTools(skill?.config, options.additionalTools, options.withheldTools),
                   userId,
               })
-            : { mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: NO_PERMISSION_KEYS, tools: {} };
+            : { mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: NO_PERMISSION_KEYS, toolEndpoints: NO_TOOL_ENDPOINTS, tools: {} };
     const toolAllowlist =
         options.toolAllowlist && options.toolAllowlistKeepsMcp ? [...options.toolAllowlist, ...Object.keys(toolResult.mcpLabels)] : options.toolAllowlist;
 
@@ -320,13 +330,23 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const paused = approvalIds.length > 0;
 
         if (paused && options.pauseForApproval) {
+            const toolEndpoints = Object.fromEntries(
+                Object.keys(runTools).flatMap((name) => {
+                    const endpoint = toolResult.toolEndpoints[name];
+
+                    return endpoint === undefined ? [] : [[name, endpoint]];
+                }),
+            );
             // What the continuation rebuilds the run from (`resumeApprovedRun`): the same model, servers, tools after the
-            // allowlist, and the final system prompt, so an answer never widens what the child had.
+            // allowlist, the final system prompt and what is left of the step budget, so an answer never widens what the
+            // child had. The run's own origin is read from the run when it resumes (`sub_agents.functions.continuingRun`).
             const snapshot: ToolRunConfig = {
                 autoMediaEnrichment: false,
                 ...(options.origin === "outside_agent" && { dispatchOrigin: "outside_agent" as const }),
                 instructions: system ?? agent.options.instructions,
                 mcpServerNames: toolResult.mcpServerNames,
+                // The pause extracted the prompt; the continuation extracts only what is steered into it, as an interactive run's does.
+                ...(extractMemory && prompt && { memory: { ...(options.botId && { botId: options.botId }) } }),
                 model,
                 ...(skill?.config?.reasoningEffort !== undefined && { reasoningEffort: skill.config.reasoningEffort }),
                 researchDepth: "balanced",
@@ -334,7 +354,9 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 shouldAutoContinue,
                 ...(options.approvedTools && { headlessApproved: [...options.approvedTools] }),
                 startedBy: userId,
+                stepsTaken: result.steps?.length ?? 0,
                 subAgentRunId: options.pauseForApproval.subAgentRunId,
+                ...(Object.keys(toolEndpoints).length > 0 && { toolEndpoints }),
                 toolNames: Object.keys(runTools),
                 toolPermissionKeys: Object.fromEntries(
                     Object.keys(runTools).flatMap((name) => {
@@ -386,11 +408,6 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         };
         const first = settle(result);
 
-        // Nothing was answered yet: no memory is learned and no goal is reviewed until the run resumes.
-        if (paused) {
-            return { costMicrodollars: first.priced, paused: true, text, threadId, totalTokens: result.totalUsage?.totalTokens };
-        }
-
         // Memory learns from the answer the run ends on: a goal's interim rounds are not what the user was given.
         const extract = (answer: string): void => {
             if (extractMemory && answer && prompt && servesUser(userId)) {
@@ -403,6 +420,14 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 });
             }
         };
+
+        // No goal is reviewed until the run resumes. The prompt is learned from at the pause, as an interactive run's is: the
+        // continuation does not have it (the snapshot's `memory` flag tells it to extract only what is steered into it).
+        if (paused) {
+            extract(text);
+
+            return { costMicrodollars: first.priced, paused: true, text, threadId, totalTokens: result.totalUsage?.totalTokens };
+        }
 
         if (!options.goal) {
             extract(text);

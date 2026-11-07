@@ -1077,10 +1077,12 @@ export const resumeApprovedRun = async (
         agentName?: string;
         beforeStream?: () => Promise<void>;
         contextHandler?: ContextHandler;
+        /** What started the run that paused, when the snapshot cannot say (a sub-agent's trigger or messenger chain). */
+        dispatchOrigin?: DispatchOrigin;
         keepOpenUnlessPaused?: boolean;
         steerable?: boolean;
     } = {},
-): Promise<{ awaitingInput?: AwaitingInput; lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
+): Promise<{ awaitingInput?: AwaitingInput; messageIds: string[]; paused: boolean; stopped: boolean }> => {
     const { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { customProvider } = await resolveRunModel(ctx, config.model, userId);
     // A sub-agent child is not interactive: no person is in its chat, so it resumes with the refusals its paused run had
@@ -1139,6 +1141,14 @@ export const resumeApprovedRun = async (
             throw new AgentRunError("stale-approval", `Tool ${pending.toolName} no longer matches the one the approval was for`);
         }
 
+        // The same name and key can reach another endpoint when the server's url changed while the request waited: the
+        // owner approved sending the input to the url the run paused with, so the call runs only while it is still that one.
+        const pausedEndpoint = pending.toolName === null ? undefined : config.toolEndpoints?.[pending.toolName];
+
+        if (approved && pending.toolName !== null && pausedEndpoint !== undefined && toolResult.toolEndpoints[pending.toolName] !== pausedEndpoint) {
+            throw new AgentRunError("stale-approval", `The server of ${pending.toolName} changed since the approval was requested`);
+        }
+
         // An answered question: the approved call executes a copy of the tool
         // that returns the answer, so the answer is the call's tool result.
         if (approved && pending.toolName === ASK_USER_TOOL_NAME) {
@@ -1177,11 +1187,15 @@ export const resumeApprovedRun = async (
 
         const modelFilterRules = await loadModelFilterRules(ctx, userId);
         const backupModelId = await resolveBackupModelId(ctx, userId, preferences.backupModel, config.model, modelFilterRules);
+        // A sub-agent's continuation runs what is left of its run's budget, not a fresh one: each answer would otherwise grant
+        // the child another full set of steps. At least one, so the approved call's result is still answered.
+        const maxSteps =
+            config.stepsTaken === undefined ? getMaxSteps(config.shouldAutoContinue) : Math.max(1, getMaxSteps(config.shouldAutoContinue) - config.stepsTaken);
         const agent = await getAgent(config.model, {
             backupModelId,
             customProvider,
             gateway: gatewayFetch(ctx),
-            maxSteps: getMaxSteps(config.shouldAutoContinue),
+            maxSteps,
             modelFilterRules,
             threadId,
             tools: toolResult.tools,
@@ -1204,7 +1218,7 @@ export const resumeApprovedRun = async (
 
         setResearchDepth(ctx, config.researchDepth);
         // The snapshot keeps what started the run: a person answering an approval does not make it the lead's.
-        setDispatchOrigin(ctx, config.dispatchOrigin ?? "lead");
+        setDispatchOrigin(ctx, options.dispatchOrigin ?? config.dispatchOrigin ?? "lead");
 
         if (subAgentChild) {
             setHeadlessRun(ctx);
@@ -1223,7 +1237,7 @@ export const resumeApprovedRun = async (
         });
 
         streamTextArgs.abortSignal = stopping.signal;
-        streamTextArgs.stopWhen = stopWhenStopped(ctx, streamId, getMaxSteps(config.shouldAutoContinue));
+        streamTextArgs.stopWhen = stopWhenStopped(ctx, streamId, maxSteps);
 
         if (answerFiles) {
             // Every step of the continuation reads the files, so a tool call inside it does not cost the model the
@@ -1305,7 +1319,7 @@ export const resumeApprovedRun = async (
             // The steps that finished before the stop are a reply like any other on the usage page; nothing is mined for memory.
             await recordRun(false);
 
-            return { lastMessageId: undefined, paused: false, stopped: true };
+            return { messageIds: [], paused: false, stopped: true };
         };
 
         let piped: PipedStream;
@@ -1333,13 +1347,17 @@ export const resumeApprovedRun = async (
         let awaitingInput: AwaitingInput | undefined;
 
         try {
+            // A pause again carries the steps this continuation took into the budget the next one gets.
+            const steps = config.stepsTaken === undefined ? undefined : await result.steps;
+            const snapshot = steps === undefined ? config : { ...config, stepsTaken: (config.stepsTaken ?? 0) + steps.length };
+
             ({ awaitingInput, paused } = await finishRun(ctx, {
                 autoApprovals: toolResult.autoApprovals,
                 keepOpenUnlessPaused: options.keepOpenUnlessPaused,
                 mcpLabels: toolResult.mcpLabels,
                 pending: piped.pending,
                 savedMessages: result.savedMessages,
-                snapshot: config,
+                snapshot,
                 streamId,
                 threadId,
                 unsaved: piped.unsaved,
@@ -1351,7 +1369,7 @@ export const resumeApprovedRun = async (
 
         await recordRun(true);
 
-        return { awaitingInput, lastMessageId: messageIds.at(-1), paused, stopped: false };
+        return { awaitingInput, messageIds, paused, stopped: false };
     } catch (error) {
         if (started) {
             await stampSavedToolCallsQuietly(ctx, {

@@ -27,6 +27,7 @@ const seen = vi.hoisted(() => {
         prompts: [] as (string | undefined)[],
         replies: [] as string[],
         saved: [] as unknown[][],
+        steps: [] as number[],
         system: [] as string[],
         tools: [] as string[][],
     };
@@ -62,7 +63,13 @@ vi.mock("./get-agent", () => {
 
                     seen.system.push(args.system ?? instructions);
 
-                    return { savedMessages: seen.saved.shift() ?? [], text: seen.replies.shift() ?? "reply" };
+                    return {
+                        savedMessages: seen.saved.shift() ?? [],
+                        steps: Array.from({ length: seen.steps.shift() ?? 0 }, () => {
+                            return {};
+                        }),
+                        text: seen.replies.shift() ?? "reply",
+                    };
                 },
             };
 
@@ -109,6 +116,7 @@ vi.mock("./agent-tools", () => {
                     mcp_notes_search: "mcp:notes:search",
                     webSearch: "builtin:webSearch",
                 },
+                toolEndpoints: { mcp_notes_other: "hash-other", mcp_notes_search: "hash-notes" },
                 tools: { browser: {}, dateTime: {}, imageGeneration: {}, mcp_notes_search: {}, webSearch: {} },
             };
         },
@@ -619,6 +627,44 @@ describe("runHeadlessAgent pauseForApproval", () => {
 
         expect(patches.at(-1)).toMatchObject({ awaitingInput: "approval", status: "active" });
         expect(patches.at(-1)).not.toHaveProperty("lastReplyAt");
+    });
+
+    it("records the steps the run took and the url hash of each kept MCP tool, so a continuation keeps the budget and the endpoint", async () => {
+        seen.saved = [approvalRequest];
+        seen.steps = [7];
+
+        const ctx = fakeCtx();
+
+        await run(ctx, { pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+        expect(recorded!.config).toMatchObject({ stepsTaken: 7, toolEndpoints: { mcp_notes_search: "hash-notes" } });
+        // Only the tools the run kept after its allowlist.
+        expect(recorded!.config.toolEndpoints).not.toHaveProperty("mcp_notes_other");
+    });
+
+    it("learns from the prompt at the pause and tells the continuation so, when the run feeds memory", async () => {
+        seen.saved = [approvalRequest];
+        seen.replies = ["Checking the files first."];
+
+        const ctx = fakeCtx({ ...PREFS, memoryEnabled: true }) as any;
+
+        await run(ctx, { memory: true, pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+        const extracted = ctx.scheduler.runAfter.mock.calls.flatMap((call: unknown[]) =>
+            (call[2] as { assistantResponse?: string } | undefined)?.assistantResponse ? [(call[2] as { userMessage: string }).userMessage] : [],
+        );
+
+        expect(recorded!.config.memory).toStrictEqual({});
+        expect(extracted).toStrictEqual(["Do the thing"]);
+    });
+
+    it("withholds the tools a caller names, whatever their permission", async () => {
+        await run(fakeCtx(), { pauseForApproval: { subAgentRunId: RUN_ID }, withheldTools: ["delegateToSubAgent", "messageWorker"] });
+
+        expect(seen.buildOptions.at(-1)).toMatchObject({ skillTools: { disabledTools: ["delegateToSubAgent", "messageWorker"] } });
     });
 
     it("keeps the nested-dispatch consent a child inherited in its snapshot, so the owner's answer does not ask again", async () => {

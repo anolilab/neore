@@ -13,10 +13,12 @@ import { respondToToolApproval } from "../chat/tool-permissions";
 import { PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
 import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
+import { createStreamWithMessage } from "../chat/streaming/index";
 import {
     awaitApproval,
     cancelSubAgentRunsForStop,
     completeResumedRun,
+    continuingRun,
     endApprovalWaitForMessage,
     listSubAgentApprovals,
     markRunAwaiting,
@@ -31,6 +33,8 @@ const APPROVAL_ID = "approval-1";
 const TOOL = "mcp_Files__delete";
 const TOOL_KEY = "mcp:Files:delete";
 const NOT_FOUND = /not found/iu;
+const STILL_WORKING = /still working/iu;
+const ALREADY_ENDED = /already ended/iu;
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
@@ -93,6 +97,46 @@ const run = async <T>(body: (context: any) => Promise<T>): Promise<T> => await h
 const internalCall = async (procedure: unknown, args: Record<string, unknown>): Promise<unknown> =>
     await harness.action(async (context: any) => await context.runMutation(procedure, args));
 const runRow = async (): Promise<any> => await run(async (context) => await context.db.get("subAgentRuns", runId));
+const pendingRequests = async (): Promise<any[]> =>
+    await run(
+        async (context) =>
+            await context.db
+                .query("toolApprovalRuns")
+                .withIndex("by_threadId_status_createdAt", (q: any) => q.eq("threadId", childId).eq("status", "pending"))
+                .collect(),
+    );
+const answer = async (approvalId: string, decision: string): Promise<unknown> =>
+    await as(OWNER).mutation(respondToToolApproval as never, { approvalId, decision, threadId: childId } as never);
+const continuations = () => jobsQueueMessages.filter((message) => message.body.functionPath.includes("continueAfterToolApproval"));
+/** A request of the same run on the same child turn: the step asked for two tools at once. */
+const addSiblingRequest = async (approvalId: string): Promise<void> => {
+    await run(async (context) => {
+        const rows = await context.db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", childId))
+            .collect();
+        const turn = rows.find((row: any) => row.message.role === "assistant");
+
+        await context.db.patch("messages", turn._id, {
+            message: {
+                ...turn.message,
+                content: [
+                    ...turn.message.content,
+                    { input: { path: "/tmp/other.txt" }, toolCallId: `call-${approvalId}`, toolName: TOOL, type: "tool-call" },
+                    { approvalId, toolCallId: `call-${approvalId}`, type: "tool-approval-request" },
+                ],
+            },
+        });
+        await context.db.insert("toolApprovalRuns", {
+            approvalId,
+            config: CONFIG(),
+            createdAt: Date.now(),
+            status: "pending",
+            threadId: childId,
+            userId: OWNER,
+        });
+    });
+};
 const runStatus = async (): Promise<string> => {
     const row = await runRow();
 
@@ -248,6 +292,41 @@ describe("a child that stopped on a request", () => {
         expect(await runStatus()).toBe("running");
     });
 
+    it("closes the requests a run recorded after it was stopped, so none stays answerable and the child does not show as waiting", async () => {
+        await run(async (context) => {
+            await context.db.patch("subAgentRuns", runId, { status: "cancelled" });
+            await context.db.patch("threads", childId, { awaitingInput: "approval" });
+        });
+
+        expect(await run(async (context) => await markRunAwaiting(context, runId))).toBe(false);
+        expect(await pendingRequests()).toHaveLength(0);
+
+        const child = await run(async (context) => await context.db.get("threads", childId));
+
+        expect(child.awaitingInput).toBeUndefined();
+    });
+
+    it("waits on, and lists, its request behind more than a page of older open requests of the child's chat", async () => {
+        await run(async (context) => {
+            for (let index = 0; index < 60; index += 1) {
+                await context.db.insert("toolApprovalRuns", {
+                    approvalId: `chat-${index}`,
+                    config: { ...CONFIG(), subAgentRunId: undefined },
+                    createdAt: 1 + index,
+                    status: "pending",
+                    threadId: childId,
+                    userId: OWNER,
+                });
+            }
+        });
+
+        expect(await run(async (context) => await markRunAwaiting(context, runId))).toBe(true);
+
+        const approvals = await as(OWNER).query(listSubAgentApprovals as never, { parentThreadId: parentId } as never);
+
+        expect(approvals).toStrictEqual([expect.objectContaining({ approvalId: APPROVAL_ID })]);
+    });
+
     it("is taken down by a Stop of its parent, like a running one", async () => {
         await run(async (context) => await markRunAwaiting(context, runId));
 
@@ -328,6 +407,7 @@ describe("listSubAgentApprovals", () => {
                 approvalId: APPROVAL_ID,
                 childThreadId: childId,
                 input: expect.stringContaining("/tmp/old.txt"),
+                omittedCharacters: 0,
                 runId,
                 server: "Files",
                 skillSlug: null,
@@ -335,6 +415,28 @@ describe("listSubAgentApprovals", () => {
                 toolName: TOOL,
             },
         ]);
+    });
+
+    it("cuts a long input and says how much it left out, for the card to word", async () => {
+        await run(async (context) => {
+            const rows = await context.db
+                .query("messages")
+                .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", childId))
+                .collect();
+            const turn = rows.find((row: any) => row.message.role === "assistant");
+
+            await context.db.patch("messages", turn._id, {
+                message: {
+                    ...turn.message,
+                    content: [{ ...turn.message.content[0], input: "x".repeat(4500) }, turn.message.content[1]],
+                },
+            });
+        });
+
+        const [approval] = (await as(OWNER).query(listSubAgentApprovals as never, { parentThreadId: parentId } as never)) as any[];
+
+        expect(approval.input).toHaveLength(4000);
+        expect(approval.omittedCharacters).toBe(500);
     });
 
     it("refuses anyone else as if the conversation did not exist", async () => {
@@ -366,15 +468,32 @@ describe("answering from the parent's card", () => {
 
         expect(prefs[0].toolPermissions).toMatchObject({ [TOOL_KEY]: "auto" });
 
-        const continuations = jobsQueueMessages.filter((message) => message.body.functionPath.includes("continueAfterToolApproval"));
-
-        expect(continuations).toHaveLength(1);
-        expect(continuations[0]!.body.args).toMatchObject({ approved: true, config: { subAgentRunId: runId }, threadId: childId });
+        expect(continuations()).toHaveLength(1);
+        expect(continuations()[0]!.body.args).toMatchObject({ approved: true, config: { subAgentRunId: runId }, threadId: childId });
+        // The claim puts the run back to running, in its own transaction.
+        expect(await runStatus()).toBe("running");
 
         const second = await as(OWNER).mutation(respondToToolApproval as never, { approvalId: APPROVAL_ID, decision: "approve", threadId: childId } as never);
 
         expect(second).toMatchObject({ alreadyResolved: true });
-        expect(jobsQueueMessages.filter((message) => message.body.functionPath.includes("continueAfterToolApproval"))).toHaveLength(1);
+        expect(continuations()).toHaveLength(1);
+    });
+
+    it("refuses a second answer to the same run while the first one's continuation runs, and keeps that request open", async () => {
+        await addSiblingRequest("approval-2");
+
+        await answer(APPROVAL_ID, "approve");
+        await expect(answer("approval-2", "always")).rejects.toThrow(STILL_WORKING);
+
+        expect(continuations()).toHaveLength(1);
+        const open = await pendingRequests();
+
+        expect(open.map((row) => row.approvalId)).toStrictEqual(["approval-2"]);
+
+        // The refusal rolled back with its claim: "Always allow" wrote nothing.
+        const prefs = await run(async (context) => await context.db.query("aiUserPreferences").collect());
+
+        expect(prefs[0]?.toolPermissions?.[TOOL_KEY]).toBeUndefined();
     });
 
     it("refuses anyone but the owner", async () => {
@@ -382,6 +501,44 @@ describe("answering from the parent's card", () => {
             as(STRANGER).mutation(respondToToolApproval as never, { approvalId: APPROVAL_ID, decision: "approve", threadId: childId } as never),
         ).rejects.toThrow();
         expect(jobsQueueMessages).toHaveLength(0);
+    });
+});
+
+describe("answering a request the run does not wait on", () => {
+    it("refuses an answer sent before the run waits, and keeps the request open", async () => {
+        await expect(answer(APPROVAL_ID, "approve")).rejects.toThrow(STILL_WORKING);
+
+        expect(continuations()).toHaveLength(0);
+        expect(await pendingRequests()).toHaveLength(1);
+
+        // Once it waits, the same request is answered.
+        await run(async (context) => await markRunAwaiting(context, runId));
+        expect(await answer(APPROVAL_ID, "approve")).toMatchObject({ alreadyResolved: false });
+    });
+
+    it("refuses an answer to a run that ended, and writes no permission for Always allow", async () => {
+        await run(async (context) => await context.db.patch("subAgentRuns", runId, { status: "cancelled" }));
+
+        await expect(answer(APPROVAL_ID, "always")).rejects.toThrow(ALREADY_ENDED);
+
+        expect(continuations()).toHaveLength(0);
+        expect(await run(async (context) => await context.db.query("aiUserPreferences").collect())).toHaveLength(0);
+    });
+});
+
+describe("a new message saved into the child", () => {
+    it("ends the run's wait in the write that opens the reply's stream", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+
+        await internalCall(createStreamWithMessage, {
+            messageId: "new-prompt",
+            streamingConfig: { contentType: "text", model: "test-model" },
+            threadId: childId,
+            userId: OWNER,
+        });
+
+        expect(await runStatus()).toBe("cancelled");
+        expect(await pendingRequests()).toHaveLength(0);
     });
 });
 
@@ -420,8 +577,8 @@ describe("the continuation's end", () => {
                 }),
         );
 
-        expect(await internalCall(completeResumedRun, { lastMessageId: answerId, outcome: { kind: "succeeded" }, runId })).toBe(true);
-        expect(await internalCall(completeResumedRun, { lastMessageId: answerId, outcome: { kind: "succeeded" }, runId })).toBe(false);
+        expect(await internalCall(completeResumedRun, { messageIds: [answerId], outcome: { kind: "succeeded" }, runId })).toBe(true);
+        expect(await internalCall(completeResumedRun, { messageIds: [answerId], outcome: { kind: "succeeded" }, runId })).toBe(false);
 
         expect(await runRow()).toMatchObject({ result: "Removed /tmp/old.txt.", status: "succeeded" });
 
@@ -434,7 +591,7 @@ describe("the continuation's end", () => {
     it("answers with the newest assistant text when the continuation's last saved row is a tool result", async () => {
         await internalCall(resumeAwaitingRun, { runId });
 
-        await run(
+        const answerId = await run(
             async (context) =>
                 await context.db.insert("messages", {
                     message: { content: [{ text: "Removed /tmp/old.txt.", type: "text" }], role: "assistant" },
@@ -459,7 +616,7 @@ describe("the continuation's end", () => {
                 }),
         );
 
-        expect(await internalCall(completeResumedRun, { lastMessageId: toolRowId, outcome: { kind: "succeeded" }, runId })).toBe(true);
+        expect(await internalCall(completeResumedRun, { messageIds: [answerId, toolRowId], outcome: { kind: "succeeded" }, runId })).toBe(true);
         expect(await runRow()).toMatchObject({ result: "Removed /tmp/old.txt.", status: "succeeded" });
     });
 
@@ -476,10 +633,6 @@ describe("the continuation's end", () => {
                     userId: OWNER,
                 }),
         );
-        // The earlier text is written before the continuation starts, so it is older than the resume stamp.
-        await new Promise((resolve) => {
-            setTimeout(resolve, 5);
-        });
         await internalCall(resumeAwaitingRun, { runId });
 
         const toolRowId = await run(
@@ -495,9 +648,51 @@ describe("the continuation's end", () => {
                 }),
         );
 
-        expect(await internalCall(completeResumedRun, { lastMessageId: toolRowId, outcome: { kind: "succeeded" }, runId })).toBe(true);
+        expect(await internalCall(completeResumedRun, { messageIds: [toolRowId], outcome: { kind: "succeeded" }, runId })).toBe(true);
         expect(JSON.stringify(await runRow())).not.toContain("Earlier answer");
         expect(await runStatus()).toBe("succeeded");
+    });
+
+    it("never answers with a reply the owner started in the child while the continuation ran", async () => {
+        await internalCall(resumeAwaitingRun, { runId });
+
+        await run(
+            async (context) =>
+                await context.db.insert("messages", {
+                    message: { content: [{ text: "The owner's own reply.", type: "text" }], role: "assistant" },
+                    order: 4,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId: childId,
+                    tool: false,
+                    userId: OWNER,
+                }),
+        );
+        const toolRowId = await run(
+            async (context) =>
+                await context.db.insert("messages", {
+                    message: { content: [{ output: { type: "text", value: "ok" }, toolCallId: "call-1", toolName: TOOL, type: "tool-result" }], role: "tool" },
+                    order: 3,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId: childId,
+                    tool: true,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(await internalCall(completeResumedRun, { messageIds: [toolRowId], outcome: { kind: "succeeded" }, runId })).toBe(true);
+        expect(await runRow()).toMatchObject({ result: "", status: "succeeded" });
+    });
+
+    it("resumes with the origin that reached the run, so an unattended chain is not read as the lead's", async () => {
+        await run(async (context) => await context.db.patch("subAgentRuns", runId, { dispatchedBy: "trigger" }));
+        await internalCall(resumeAwaitingRun, { runId });
+
+        expect(await run(async (context) => await context.runQuery(continuingRun, { runId }))).toStrictEqual({ origin: "trigger" });
+
+        await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER));
+        expect(await run(async (context) => await context.runQuery(continuingRun, { runId }))).toBeNull();
     });
 
     it("waits again when the continuation stopped on another request", async () => {
@@ -523,7 +718,7 @@ describe("the continuation's end", () => {
                 }),
         );
 
-        await internalCall(completeResumedRun, { lastMessageId: elsewhere, outcome: { kind: "succeeded" }, runId });
+        await internalCall(completeResumedRun, { messageIds: [elsewhere], outcome: { kind: "succeeded" }, runId });
 
         expect(await runRow()).toMatchObject({ result: "" });
     });
@@ -561,15 +756,36 @@ describe("the reaper of a waiting run", () => {
         expect(await runStatus()).toBe("failed");
     });
 
-    it("stops the resumed child's stream when the reaper fails the run, so its tools stop running", async () => {
-        await internalCall(resumeAwaitingRun, { runId });
+    it("stops the resumed child's own stream when the reaper fails the run, so its tools stop running", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+        await answer(APPROVAL_ID, "approve");
         const { reapAt } = await runRow();
 
         await run(async (context) => await reapSubAgentRun(context, runId, reapAt));
         expect(await runStatus()).toBe("failed");
 
-        // The harness does not name a function reference, so the stop is told apart by its only argument: its child thread.
-        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: { threadId: childId } }));
+        // The harness does not name a function reference, so the stop is told apart by its arguments: only the stream the
+        // answer opened (keyed on the approval id), not every live reply of the child thread.
+        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: { messageId: APPROVAL_ID, threadId: childId } }));
+    });
+
+    it("stops nothing when the run has no continuation streaming: a reply the owner started in the child keeps going", async () => {
+        // The run's request was answered; the run is running, with no stream of its own yet.
+        await run(async (context) => {
+            const [row] = await context.db.query("toolApprovalRuns").collect();
+
+            await context.db.patch("toolApprovalRuns", row._id, { resolvedAt: Date.now(), status: "approved" });
+        });
+        await internalCall(createStreamWithMessage, {
+            messageId: "owner-prompt",
+            streamingConfig: { contentType: "text", model: "test-model" },
+            threadId: childId,
+            userId: OWNER,
+        });
+
+        await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER));
+        expect(await runStatus()).toBe("cancelled");
+        expect(harness.scheduler.list()).not.toContainEqual(expect.objectContaining({ args: expect.objectContaining({ threadId: childId }) }));
     });
 
     it("still fails a run that never waited at its admission deadline", async () => {

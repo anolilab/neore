@@ -377,7 +377,7 @@ describe(resumeApprovedRun, () => {
             { agentName: "Reviewer" },
         );
 
-        expect(result).toStrictEqual({ lastMessageId: undefined, paused: false, stopped: true });
+        expect(result).toStrictEqual({ messageIds: [], paused: false, stopped: true });
         expect(streamArgs.abortSignal?.aborted).toBe(true);
 
         const reply = mutations.find((mutation) => mutation.ref === internal.chat.streaming.persistent.library.finishStoppedReply);

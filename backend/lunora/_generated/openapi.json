@@ -52264,6 +52264,17 @@
                             }
                           ]
                         },
+                        "errorCode": {
+                          "anyOf": [
+                            {
+                              "const": "approval-expired",
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "result": {
                           "anyOf": [
                             {
@@ -52313,6 +52324,7 @@
                         "createdAt",
                         "depth",
                         "error",
+                        "errorCode",
                         "result",
                         "status",
                         "task"
@@ -52822,6 +52834,9 @@
                       "input": {
                         "type": "string"
                       },
+                      "omittedCharacters": {
+                        "type": "number"
+                      },
                       "runId": {
                         "description": "Id<\"subAgentRuns\">",
                         "type": "string",
@@ -52865,6 +52880,7 @@
                       "approvalId",
                       "childThreadId",
                       "input",
+                      "omittedCharacters",
                       "runId",
                       "server",
                       "skillSlug",

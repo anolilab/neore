@@ -30,6 +30,12 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
+installCompiledValidatorMap(lunora_sub_agents_functions_206.continuingRun.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["runId"] !== "string") return DEFER;
+return { "runId": source["runId"] };
+});
 installCompiledValidatorMap(lunora_sub_agents_functions_206.getWorker.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;

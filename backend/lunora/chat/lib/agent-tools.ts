@@ -14,6 +14,7 @@ import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { getConnectorMcpServers, withMcpServerGrants } from "../../connectors/lib/grant-runtime";
+import { sha256Hex } from "../../lib/crypto";
 import { toolsLogger } from "../../lib/logger";
 import type { DeviceToolsResult } from "./device-tools";
 import { buildDeviceTools } from "./device-tools";
@@ -111,6 +112,11 @@ export interface BuildAgentToolsResult {
      * without re-deriving it from the runtime name.
      */
     permissionKeys: Record<string, string>;
+    /**
+     * Runtime name -> a hash of the url of the MCP server the tool comes from (connectors and other tools have none).
+     * Recorded in approval snapshots, so an approved call never reaches a server whose url changed meanwhile.
+     */
+    toolEndpoints: Record<string, string>;
     tools: ToolSet;
 }
 
@@ -297,12 +303,24 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         }
     }
 
+    // Hashed: a server url can carry a token, and the snapshot only needs to tell a changed url apart.
+    const toolEndpoints: Record<string, string> = Object.fromEntries(
+        await Promise.all(
+            Object.keys(tools).flatMap((name) => {
+                const url = mcpResult.descriptors.get(name)?.url;
+
+                return url === undefined ? [] : [sha256Hex(url).then((hash) => [name, hash] as const)];
+            }),
+        ),
+    );
+
     return {
         autoApprovals: quickCheck?.approvals ?? {},
         mcpClients: mcpResult.clients,
         mcpLabels,
         mcpServerNames: selectedServers.map((s) => s.name),
         permissionKeys,
+        toolEndpoints,
         tools,
     };
 };

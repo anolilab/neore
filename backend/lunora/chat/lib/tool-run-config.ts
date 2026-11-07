@@ -62,10 +62,23 @@ export const vToolRunConfig = v.object({
      */
     startedBy: v.optional(v.string().max(MAX_LENGTH.id)),
     /**
+     * A sub-agent child's steps so far, across its first run and every continuation (`chat/lib/headless-run.ts`): a
+     * continuation runs only the steps left of the run's budget, so answering approvals never grants the child more. Absent
+     * on an interactive snapshot, and on one that predates it, which reads as a full budget.
+     */
+    stepsTaken: v.optional(v.number()),
+    /**
      * Set when a sub-agent's child run paused (`sub-agents/execute.ts`): the continuation hands the run back to it
      * (`sub_agents.functions.resumeAwaitingRun`, then the run's end), so the result still reaches the parent once.
      */
     subAgentRunId: v.optional(v.id("subAgentRuns")),
+    /**
+     * Runtime tool name -> a hash of the MCP server url the tool was built from (`agent-tools.ts#toolEndpoints`). An
+     * approved call runs only while its server still has that url: a server whose url changed while the request waited
+     * would receive input the owner approved for another endpoint. Absent for other tools, and on a snapshot that
+     * predates it, which checks nothing.
+     */
+    toolEndpoints: v.optional(v.record(v.string(), v.string().max(MAX_LENGTH.id))),
     toolNames: v.array(v.string()),
     /**
      * Runtime tool name -> stable permission key, taken from the tools as they

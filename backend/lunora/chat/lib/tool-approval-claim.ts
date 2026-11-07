@@ -123,6 +123,9 @@ export const APPROVAL_ABANDONED_BY = "abandoned";
 /** `error.data.code` of the refusal to answer such a request; the card words it. */
 export const TOOL_REQUEST_ABANDONED = "TOOL_REQUEST_ABANDONED";
 
+/** `error.data.code` of the refusal to answer a sub-agent's request while the sub-agent is still working. */
+export const SUB_AGENT_STILL_WORKING = "SUB_AGENT_STILL_WORKING";
+
 export const claimToolApproval = async (
     ctx: Pick<MutationCtx, "db">,
     args: { approvalId: string; callerId: string; decision: ToolApprovalDecision; threadId: Id<"threads">; unlockProof?: string | null },
@@ -187,6 +190,23 @@ export const claimToolApproval = async (
 
     if (!pending) {
         throw new LunoraError("CONFLICT", "This tool request is no longer pending");
+    }
+
+    // A sub-agent's request is answered only while its run waits on it. Its continuation puts the run back to running in this
+    // transaction (`resumeClaimedRun`), so a second answer to the same run, or one sent before the run starts waiting, is
+    // refused here and its request stays open, instead of being consumed by a continuation that cannot run it.
+    if (run.config.subAgentRunId !== undefined) {
+        const subAgentRun = await ctx.db.get("subAgentRuns", run.config.subAgentRunId);
+
+        if (subAgentRun?.status === "queued" || subAgentRun?.status === "running") {
+            throw new LunoraError("CONFLICT", "The sub-agent is still working. Answer this request once it waits for you", {
+                data: { code: SUB_AGENT_STILL_WORKING },
+            });
+        }
+
+        if (subAgentRun?.status !== "awaiting") {
+            throw new LunoraError("CONFLICT", "This sub-agent has already ended");
+        }
     }
 
     await ctx.db.patch("toolApprovalRuns", run._id, {

@@ -127,6 +127,7 @@ vi.mock("./lib/agent-tools", () => {
                 mcpLabels: modelState.mcpLabels,
                 mcpServerNames: [],
                 permissionKeys: {},
+                toolEndpoints: {},
                 tools: {
                     echo: tool({
                         description: "Echo",

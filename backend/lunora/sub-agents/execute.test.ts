@@ -190,9 +190,10 @@ describe("a one-shot sub-agent and its approvals", () => {
         await execute(runId);
 
         expect(runs[0]).toMatchObject({ approvedTools: [SUB_AGENT_TOOL_NAME, "messageWorker"], pauseForApproval: { subAgentRunId: runId } });
+        expect(runs[0]).not.toHaveProperty("withheldTools");
     });
 
-    it("keeps ask tools removed at the depth cap: no approval card there", async () => {
+    it("still pauses on its other ask tools at the depth cap, with the dispatch tools withheld rather than asked for", async () => {
         const level1 = await admitOneShot();
         const child1 = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "c1", userId }))) as string;
 
@@ -204,7 +205,7 @@ describe("a one-shot sub-agent and its approvals", () => {
 
         await execute(level2);
 
-        expect(runs[0]).not.toHaveProperty("pauseForApproval");
+        expect(runs[0]).toMatchObject({ pauseForApproval: { subAgentRunId: level2 }, withheldTools: [SUB_AGENT_TOOL_NAME, "messageWorker"] });
         expect(runs[0]).not.toHaveProperty("approvedTools");
     });
 

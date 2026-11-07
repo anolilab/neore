@@ -68,6 +68,9 @@ export const SUB_AGENT_REAP_SLACK_MS = 1000;
 /** What a one-shot run ends with when its approval request was never answered. */
 export const SUB_AGENT_APPROVAL_EXPIRED_MESSAGE = "The sub-agent's request for approval was not answered in time.";
 
+/** The newest rows of a continuation handed to its run's end (`completeResumedRun`), searched for its answer. */
+export const COMPLETION_MESSAGE_IDS_MAX = 50;
+
 /**
  * Whether a one-shot run's reaper may end it now. A run that waited on an approval carries its own deadline
  * (`reapAt`), and an earlier reaper (the admission's, or one from before a resume) finds it not yet due. Without one,
