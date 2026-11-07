@@ -3,6 +3,7 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const calls: { args: unknown; fn: string }[] = [];
+const seenOptions: { fn: string; networkMode?: string; retry?: number }[] = [];
 const toasts: { message: string; options?: { action?: { onClick: () => void } } }[] = [];
 
 vi.mock("@lingui/react/macro", () => {
@@ -18,7 +19,9 @@ vi.mock("@lingui/react/macro", () => {
 
 vi.mock("@tanstack/react-query", () => {
     return {
-        useMutation: (options: { fn: string }) => {
+        useMutation: (options: { fn: string; networkMode?: string; retry?: number }) => {
+            seenOptions.push(options);
+
             return {
                 mutateAsync: async (args: unknown) => {
                     calls.push({ args, fn: options.fn });
@@ -70,7 +73,14 @@ const flush = () =>
 describe("useThreadStateActions", () => {
     beforeEach(() => {
         calls.length = 0;
+        seenOptions.length = 0;
         toasts.length = 0;
+    });
+
+    it("sends a snooze even while offline and never retries it, so a failed send reports at once", () => {
+        renderHook(() => useThreadStateActions());
+
+        expect(seenOptions.find((options) => options.fn === "snooze")).toMatchObject({ networkMode: "always", retry: 0 });
     });
 
     it("snoozes, then undoes to a plain unsnooze when nothing was snoozed before", async () => {

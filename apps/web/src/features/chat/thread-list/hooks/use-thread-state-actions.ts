@@ -25,7 +25,13 @@ interface ThreadStateActions {
 export const useThreadStateActions = (): ThreadStateActions => {
     const { t } = useLingui();
     const crpc = useCRPC();
-    const { mutateAsync: snoozeMutation } = useMutation(crpc.chat.thread_state.snoozeThread.mutationOptions());
+    // Sent even while the browser reports offline, and never retried: the default holds a snooze until the connection returns, so the
+    // dialog would wait on it with no way out. The request fails at once instead, and the snooze reports that failure.
+    const { mutateAsync: snoozeMutation } = useMutation({
+        ...crpc.chat.thread_state.snoozeThread.mutationOptions(),
+        networkMode: "always",
+        retry: 0,
+    });
     const { mutateAsync: unsnoozeMutation } = useMutation(crpc.chat.thread_state.unsnoozeThread.mutationOptions());
 
     const restore = useCallback(

@@ -4,7 +4,8 @@ import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import type { FormEvent } from "react";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 import { useThreadStateActions } from "./hooks/use-thread-state-actions";
 import { customSnoozeCheck } from "./lib/thread-state-rules";
@@ -42,8 +43,10 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
     const [value, setValue] = useState(() => toLocalInputValue(Date.now() + HOUR_MS));
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+    const submitReference = useRef<HTMLButtonElement>(null);
 
-    // The dialog closes only once the snooze is saved. A failure keeps the chosen time here, with the error, so it can be retried.
+    // The dialog closes once the snooze is saved. A failure (offline included) keeps the chosen time here, with the error, and the
+    // dialog stays cancellable: Cancel and Escape never wait on the save.
     const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
@@ -71,23 +74,17 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
             return;
         }
 
-        setSaving(false);
-        setError(t`Could not snooze the thread. Please try again.`);
+        // The button was disabled while saving, so it lost focus: put focus back on it once it is enabled, so the user is not left on nothing.
+        flushSync(() => {
+            setSaving(false);
+            setError(t`Could not snooze the thread. Please try again.`);
+        });
+        submitReference.current?.focus();
     };
 
     // The dialog is mounted only while it is open, so each opening starts from a fresh default time.
     return (
-        <Dialog
-            onOpenChange={(next) => {
-                // A save in flight cannot be abandoned: it closes the dialog itself when it succeeds.
-                if (!next && saving) {
-                    return;
-                }
-
-                onOpenChange(next);
-            }}
-            open={open}
-        >
+        <Dialog onOpenChange={onOpenChange} open={open}>
             <DialogContent className="sm:max-w-sm" finalFocus={returnFocusTo}>
                 <DialogHeader>
                     <DialogTitle>{t`Snooze until`}</DialogTitle>
@@ -115,10 +112,10 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
                         )}
                     </div>
                     <DialogFooter>
-                        <Button disabled={saving} onClick={() => onOpenChange(false)} type="button" variant="outline">
+                        <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
                             {t`Cancel`}
                         </Button>
-                        <Button disabled={saving} type="submit">
+                        <Button disabled={saving} ref={submitReference} type="submit">
                             {saving ? t`Saving…` : t`Snooze`}
                         </Button>
                     </DialogFooter>
