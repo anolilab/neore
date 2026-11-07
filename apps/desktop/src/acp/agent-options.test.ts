@@ -89,6 +89,14 @@ describe("optionsOf", () => {
         });
     });
 
+    it("names an option or choice the agent left unnamed after its id, cut to the length a name may have", () => {
+        const id = "m".repeat(128);
+        const read = optionsOf({ configOptions: [{ currentValue: id, id, options: [{ value: id }], type: "select" }], sessionId: "s" }, keep);
+
+        expect(read.configOptions?.[0]?.name).toBe("m".repeat(120));
+        expect(read.configOptions?.[0]?.choices[0]).toEqual({ name: "m".repeat(120), value: id });
+    });
+
     it("reads nothing from an agent that advertises nothing", () => {
         expect(optionsOf({ sessionId: "s" }, keep)).toEqual({});
         expect(optionsOf(null, keep)).toEqual({});

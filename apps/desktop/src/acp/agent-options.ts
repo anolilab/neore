@@ -52,7 +52,8 @@ const idOf = (value: unknown, scrub: Scrub): string | undefined =>
 const nameOf = (value: unknown, fallback: string, scrub: Scrub): string => {
     const name = typeof value === "string" ? scrub(value).slice(0, MAX_NAME_CHARS) : "";
 
-    return name === "" ? fallback : name;
+    // The fallback is the id, which may be longer than a name is allowed to be.
+    return (name === "" ? fallback : name).slice(0, MAX_NAME_CHARS);
 };
 
 /** A list of `{ [idKey], name }` entries, groups (`{ options: [...] }`) flattened, duplicates and bad ids dropped. */
