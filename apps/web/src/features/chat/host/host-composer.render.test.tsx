@@ -536,6 +536,26 @@ describe("the coding-agent composer", () => {
         expect((sendNow as HTMLButtonElement).disabled).toBe(true);
     });
 
+    it("offers Send now for a queued message the backend refused outright, since its send started nothing", async () => {
+        harness.sendResults = [{ error: "busy", ok: false }];
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "refused" } });
+        fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+        await screen.findByText("refused");
+        await endTurn();
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+
+        harness.data = { ...harness.data, "chat.streaming.getActiveStreamForThread": { streamId: "stream-2" } };
+        await harness.client?.invalidateQueries();
+
+        const sendNow = await screen.findByRole("button", { name: "Send queued message 1 now" });
+
+        await waitFor(() => expect((sendNow as HTMLButtonElement).disabled).toBe(false));
+    });
+
     it("keeps the interrupting text queued and paused when the reply did not stop", async () => {
         mount({ ...session(), "acp.remote.cancelHostTurn:result": { cancelled: false }, "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
 

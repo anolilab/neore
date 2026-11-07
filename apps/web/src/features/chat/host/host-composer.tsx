@@ -455,8 +455,8 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
             liveNow = freshSession.data?.liveStreamId ?? freshLive.data?.streamId ?? undefined;
         }
 
-        // The backend checks for a repeat before it checks for a running turn, so `turn_running` means this id was never taken.
-        const taken = result.error !== "turn_running";
+        // The backend answers every refusal before it takes the id, so only a send whose answer never came may have been taken.
+        const taken = result.error === "unreachable";
 
         if (queuedId !== undefined) {
             usePromptQueueStore.getState().setTried(threadId, queuedId, taken);
