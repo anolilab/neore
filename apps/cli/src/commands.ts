@@ -127,22 +127,51 @@ const sendPrompt = async (context: Context, client: NeoreClient, flags: Flags, p
 
 // ─── Thread start / send ────────────────────────────────────────────────────
 
-/** Exit codes of `thread start|send`: a reply (0), a failed run (1), anything else (2). */
+/** Exit codes of `thread start|send` for an answer: a reply (0), a failed run (1), no finished reply yet (2). */
 export const THREAD_EXIT = { failed: 1, ok: 0, other: 2 } as const;
 
 /**
  * `ChatCompleted.status` values that mean the reply cannot be read from this
- * answer (the five-minute wait ran out, the run is paused on a person, or the
- * read was cut): not a failed run, so the caller is told where to read it later.
+ * answer (the five-minute wait or the read budget ran out, the run is paused on
+ * a person, or the read was cut): not a failed run, so the caller is told where
+ * to read it later.
  */
-const UNFINISHED_STATUSES: ReadonlySet<string> = new Set(["interrupted", "relay_timeout", "unknown", "waiting_on_person"]);
+const UNFINISHED_STATUSES: ReadonlySet<string> = new Set(["interrupted", "relay_budget", "relay_timeout", "unknown", "waiting_on_person"]);
+
+/** Errors after which the run may have started: the send was lost, the server failed late, or a retry found it in progress or could not tell. */
+const MAYBE_RUNNING_CODES: ReadonlySet<string> = new Set(["idempotency_in_progress", "idempotency_outcome_unknown", "network_error", "service_unavailable"]);
+
+const readLaterHint = (threadId: string | undefined): string =>
+    threadId
+        ? `read it later with \`neore threads show ${threadId}\``
+        : "find the new thread with `neore threads ls`, then read it with `neore threads show <thread-id>`";
+
+/** Runs one send; an error after which the run may have started names where to find it instead of inviting a resend. */
+const withReadLaterHint = async <T>(threadId: string | undefined, request: Promise<T>): Promise<T> => {
+    try {
+        return await request;
+    } catch (error) {
+        if (error instanceof ApiError && MAYBE_RUNNING_CODES.has(error.code)) {
+            // A new invocation sends a new idempotency key, so sending again could start and bill a second run.
+            throw new ApiError({
+                code: error.code,
+                details: error.details,
+                message: `${error.message} The run may have started; ${readLaterHint(threadId)} before sending it again.`,
+                requestId: error.requestId,
+                status: error.status,
+            });
+        }
+
+        throw error;
+    }
+};
 
 const postThread = async (context: Context, flags: Flags, threadId: string | undefined, prompt: string): Promise<number> => {
     const client = await clientFor(context, flags);
     const body = { model: flags.model, prompt, ...(threadId && { threadId }) };
 
     if (!flags.wait) {
-        const started = await client.request<ChatStarted>("POST", "/chat", { body: { ...body, stream: true } });
+        const started = await withReadLaterHint(threadId, client.request<ChatStarted>("POST", "/chat", { body: { ...body, stream: true } }));
 
         if (flags.json) {
             printJson(context.io, { messageId: started.messageId, threadId: started.threadId });
@@ -153,21 +182,10 @@ const postThread = async (context: Context, flags: Flags, threadId: string | und
         return THREAD_EXIT.ok;
     }
 
-    let result: ChatCompleted;
-
-    try {
-        result = await client.request<ChatCompleted>("POST", "/chat", { body: { ...body, stream: false }, timeoutMs: BLOCKING_TIMEOUT_MS });
-    } catch (error) {
-        if (error instanceof ApiError && error.code === "network_error") {
-            throw new ApiError({
-                code: error.code,
-                message: `${error.message} The run may still be going; read it later with \`neore threads show ${threadId ?? "<thread-id>"}\`.`,
-                status: error.status,
-            });
-        }
-
-        throw error;
-    }
+    const result = await withReadLaterHint(
+        threadId,
+        client.request<ChatCompleted>("POST", "/chat", { body: { ...body, stream: false }, timeoutMs: BLOCKING_TIMEOUT_MS }),
+    );
 
     if (flags.json) {
         printJson(context.io, result);
@@ -194,8 +212,21 @@ const postThread = async (context: Context, flags: Flags, threadId: string | und
     return THREAD_EXIT.failed;
 };
 
-export const threadStart = async (context: Context, { args, flags }: ParsedCommand): Promise<number> => {
+/** The prompt from the arguments, or from piped stdin when there are none. */
+const promptFrom = async (context: Context, args: ReadonlyArray<string>): Promise<string> => {
     const prompt = args.join(" ").trim();
+
+    if (prompt || context.stdinIsTTY) {
+        return prompt;
+    }
+
+    const piped = await context.readStdin();
+
+    return piped?.trim() ?? "";
+};
+
+export const threadStart = async (context: Context, { args, flags }: ParsedCommand): Promise<number> => {
+    const prompt = await promptFrom(context, args);
 
     if (!prompt) {
         throw new UsageError("Missing <prompt>.");
@@ -206,7 +237,7 @@ export const threadStart = async (context: Context, { args, flags }: ParsedComma
 
 export const threadSend = async (context: Context, { args, flags }: ParsedCommand): Promise<number> => {
     const threadId = requireArgument(args, "thread-id");
-    const prompt = args.slice(1).join(" ").trim();
+    const prompt = await promptFrom(context, args.slice(1));
 
     if (!prompt) {
         throw new UsageError("Missing <prompt>.");

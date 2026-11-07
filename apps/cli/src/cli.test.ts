@@ -2,7 +2,7 @@ import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { parseCommand, UsageError } from "./args";
 import { run } from "./cli";
@@ -355,23 +355,25 @@ describe("chat end to end against a fake API", () => {
         });
 
         it("--wait exits 1 when the run ended in failure", async () => {
-            const { context } = await setup(() => completed("error", ""));
-
-            expect(await run(["thread", "start", "hi", "--wait"], context)).toBe(1);
-            expect(context.io.stderr.text()).toContain("ended in failure (error)");
-        });
-
-        it("--wait exits 1 on a generation_failed status", async () => {
             const { context } = await setup(() => completed("generation_failed", "partial"));
 
             expect(await run(["thread", "start", "hi", "--wait"], context)).toBe(1);
+            expect(context.io.stderr.text()).toContain("ended in failure (generation_failed)");
         });
 
-        it("--wait exits 2 and names threads show when the wait ran out", async () => {
-            const { context } = await setup(() => completed("interrupted", ""));
+        it.each(["interrupted", "relay_budget"])("--wait exits 2 and names threads show on %s", async (status) => {
+            const { context } = await setup(() => completed(status, ""));
 
             expect(await run(["thread", "send", "th1", "hi", "--wait"], context)).toBe(2);
             expect(context.io.stderr.text()).toContain("neore threads show th1");
+        });
+
+        it("reads the prompt from piped stdin", async () => {
+            const { bodies, context } = await setup(() => started("th9"));
+            const piped = { ...context, readStdin: async () => "from a pipe\n", stdinIsTTY: false };
+
+            expect(await run(["thread", "send", "th9"], piped)).toBe(0);
+            expect(bodies).toEqual([{ prompt: "from a pipe", stream: true, threadId: "th9" }]);
         });
 
         it("exits 2 on a usage error", async () => {
@@ -381,23 +383,58 @@ describe("chat end to end against a fake API", () => {
             expect(await run(["thread", "send", "th1"], context)).toBe(2);
             expect(await run(["thread"], context)).toBe(2);
             expect(await run(["thread", "start", "hi", "--wiat"], context)).toBe(2);
+            expect(await run(["thread", "--help"], context)).toBe(0);
         });
 
-        it("exits 2 on a sign-in error", async () => {
+        it("keeps the sign-in exit code", async () => {
             const { context } = await setup(() => Response.json({ error: { code: "invalid_api_key", message: "bad key" } }, { status: 401 }));
+
+            expect(await run(["thread", "start", "hi", "--wait"], context)).toBe(EXIT.auth);
+        });
+
+        it("exits 2 on an error with no code of its own", async () => {
+            const { context } = await setup(() => Response.json({ error: { code: "conflict", message: "no" } }, { status: 409 }));
 
             expect(await run(["thread", "start", "hi", "--wait"], context)).toBe(2);
         });
 
-        it("exits 2 on a transport error and names threads show", async () => {
+        it("on a transport error keeps the network exit code and says where to read the run", async () => {
             await writeConfig({ apiKey: "nk_1", apiUrl: "https://api.test" }, join(directory, "config.json"));
 
             const context = contextWith((async () => {
                 throw new TypeError("fetch failed");
             }) as unknown as typeof fetch);
 
-            expect(await run(["thread", "send", "th1", "hi", "--wait"], context)).toBe(2);
-            expect(context.io.stderr.text()).toContain("neore threads show th1");
+            // The client retries a lost send with backoff; skip the waits (config reads are real I/O, so yield to it).
+            vi.useFakeTimers({ toFake: ["setTimeout"] });
+
+            const settle = async (pending: Promise<number>): Promise<number> => {
+                let isDone = false;
+
+                pending
+                    .finally(() => {
+                        isDone = true;
+                    })
+                    .catch(() => {});
+
+                while (!isDone) {
+                    await new Promise((resolve) => {
+                        setImmediate(resolve);
+                    });
+                    await vi.advanceTimersByTimeAsync(60_000);
+                }
+
+                return await pending;
+            };
+
+            try {
+                expect(await settle(run(["thread", "send", "th1", "hi", "--wait"], context))).toBe(EXIT.network);
+                expect(context.io.stderr.text()).toContain("neore threads show th1");
+                expect(await settle(run(["thread", "start", "hi"], context))).toBe(EXIT.network);
+                expect(context.io.stderr.text()).toContain("neore threads ls");
+            } finally {
+                vi.useRealTimers();
+            }
         });
     });
 

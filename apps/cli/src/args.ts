@@ -83,6 +83,10 @@ export const parseCommand = (argv: ReadonlyArray<string>): ParsedCommand => {
         const [sub, ...args] = rest;
 
         if (!sub) {
+            if (flags.help) {
+                return { args: [], command: "help", flags };
+            }
+
             if (!(GROUPS[head] as ReadonlyArray<string>).includes("ls")) {
                 throw new UsageError(`Missing subcommand. Try: ${GROUPS[head].map((name) => `${head} ${name}`).join(", ")}.`);
             }

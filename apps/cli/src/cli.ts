@@ -45,13 +45,15 @@ Chat
   models                              List models
 
 Threads
-  thread start <prompt> [-m MODEL] [--wait]
-  thread send <thread-id> <prompt> [-m MODEL] [--wait]
-                                      Without --wait: print the thread id and exit; the run
+  thread start [prompt] [-m MODEL] [--wait]
+  thread send <thread-id> [prompt] [-m MODEL] [--wait]
+                                      The prompt is read from stdin when piped. Without
+                                      --wait: print the thread id and exit; the run
                                       continues on the server. With --wait: block (up to 5
                                       minutes), print the reply (or JSON with --json).
-                                      Exit 0 reply, 1 the run failed, 2 any other error or
-                                      the wait ran out (read it later: threads show <id>).
+                                      Exit 0 reply, 1 the run failed, 2 usage or other error,
+                                      or no finished reply yet (read it later: threads show
+                                      <id>); 3-6 as below.
   threads ls [--limit N] [--cursor C] [--all]
   threads show <thread-id>
   threads rm <thread-id> [--yes]
@@ -86,8 +88,8 @@ Exit codes: 0 ok, 1 error, 2 usage, 3 auth/scope, 4 not found, 5 rate/daily limi
 /** A number is the exit code itself; `false` is exit 1. */
 type Handler = (context: Context, command: ParsedCommand) => Promise<boolean | number | void>;
 
-/** Commands whose errors of every kind exit 2, so 1 can mean only "the run failed". */
-const COARSE_EXIT: ReadonlySet<string> = new Set(["thread send", "thread start"]);
+/** Commands whose generic errors exit 2 instead of 1, so 1 can mean only "the run failed". */
+const RUN_FAILED_EXIT: ReadonlySet<string> = new Set(["thread send", "thread start"]);
 
 const HANDLERS: Record<string, Handler> = {
     chat,
@@ -163,6 +165,12 @@ export const run = async (argv: ReadonlyArray<string>, context: Context): Promis
 
         reportError(context, error);
 
-        return error instanceof UsageError || COARSE_EXIT.has(command.command) ? EXIT.usage : exitCodeFor(error);
+        if (error instanceof UsageError) {
+            return EXIT.usage;
+        }
+
+        const code = exitCodeFor(error);
+
+        return code === EXIT.error && RUN_FAILED_EXIT.has(command.command) ? EXIT.usage : code;
     }
 };
