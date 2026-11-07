@@ -1,8 +1,10 @@
 #!/usr/bin/env sh
 
-# vis:secrets-hook
-pnpm exec vis secrets --staged --quiet || exit 1
+# Format and sort the staged files first (the `staged` map in vis.config.ts), so
+# a commit never carries a Prettier or package.json-order failure to CI. Serial:
+# a package.json matches both the Prettier and the sort-package-json pattern.
+pnpm exec vis staged --revert --concurrent false || exit 1
 
-# Format and sort the staged files (the `staged` map in vis.config.ts), so a
-# commit never carries a Prettier or package.json-order failure to CI.
-pnpm exec vis staged --revert || exit 1
+# vis:secrets-hook
+# After formatting, so the scan sees exactly what the commit will contain.
+pnpm exec vis secrets --staged --quiet || exit 1
