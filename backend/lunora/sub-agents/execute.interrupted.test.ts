@@ -163,6 +163,26 @@ describe("a sub-agent run whose worker died", () => {
         expect(await runRow(runId)).toMatchObject({ status: "running" });
     });
 
+    it("reads its loop's newest saved step, not the row highest in order", async () => {
+        const runId = await admit();
+        const claimedAt = await claimThenDie(runId);
+        const childThreadId = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "running", title: "Child", userId }))) as string;
+        const insertRow = async (at: number, order: number, stepOrder: number) => {
+            vi.setSystemTime(at);
+            await harness.run(async (ctx: any) => await ctx.db.insert("messages", { order, status: "success", stepOrder, threadId: childThreadId, userId }));
+        };
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", runId, { childThreadId }));
+        vi.useFakeTimers({ toFake: ["Date"] });
+        // A nested run's post-back lands early above the loop's order; the loop then saves a later step under its own.
+        await insertRow(claimedAt + 10_000, 5, 0);
+        await insertRow(claimedAt + 120_000, 1, 3);
+
+        await watch(runId, claimedAt, claimedAt + RUN_STALE_MS + 60_000);
+
+        expect(await runRow(runId)).toMatchObject({ status: "running" });
+    });
+
     it("is left running while its loop beats", async () => {
         const runId = await admit();
         const claimedAt = await claimThenDie(runId);

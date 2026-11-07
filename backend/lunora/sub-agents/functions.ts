@@ -1363,6 +1363,9 @@ export const completeRun = internalMutation
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => await finishRunFromLoop(ctx, args.runId, args.outcome));
 
+/** How many of a thread's top rows {@link workerActivity} reads for the newest one saved. */
+const ACTIVITY_ROWS = 25;
+
 /**
  * When a worker run last showed progress. A headless run writes a message row per step (the pending row of the step
  * that follows), so its thread's newest row keeps this moving. A host run's thread shows nothing until the turn ends,
@@ -1373,9 +1376,20 @@ const workerActivity = async (ctx: QueryCtx, run: RunDoc, precision: "chunk" | "
         return await hostRunActivity(ctx, run, precision);
     }
 
-    const newest = run.childThreadId === undefined ? null : await getMaxMessage(ctx, run.childThreadId as Id<"threads">);
+    if (run.childThreadId === undefined) {
+        return { at: undefined, waitingOnPerson: false };
+    }
 
-    return { at: newest?._creationTime, waitingOnPerson: false };
+    // The newest SAVED row, not the highest in order: a nested run's post-back (one row each) can land mid-run above
+    // the order the loop keeps saving its steps under, so the newest of the top rows is read. A loop whose newest step
+    // is buried under more post-backs than this reads as quiet, and is failed only if its beats stopped landing too.
+    const top = await ctx.db
+        .query("messages")
+        .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", run.childThreadId as Id<"threads">))
+        .order("desc")
+        .take(ACTIVITY_ROWS);
+
+    return { at: top.length > 0 ? Math.max(...top.map((row) => row._creationTime)) : undefined, waitingOnPerson: false };
 };
 
 /**
