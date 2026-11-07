@@ -2,47 +2,28 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_tasks_internal_214.ts
-import * as lunora_tasks_internal_214 from "../../tasks/internal.js";
+import * as lunora_tasks_internal_216 from "../../tasks/internal.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_tasks_internal_214.canRunForUser.args, (source) => {
-========
-import * as lunora_tasks_internal_215 from "../../tasks/internal.js";
-
-/** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_tasks_internal_215.canRunForUser.args, (source) => {
->>>>>>>> bef023ac (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_tasks_internal_215.ts
+installCompiledValidatorMap(lunora_tasks_internal_216.canRunForUser.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_tasks_internal_214.ts
-installCompiledValidatorMap(lunora_tasks_internal_214.getTaskForVerification.args, (source) => {
-========
-installCompiledValidatorMap(lunora_tasks_internal_215.getTaskForVerification.args, (source) => {
->>>>>>>> bef023ac (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_tasks_internal_215.ts
+installCompiledValidatorMap(lunora_tasks_internal_216.getTaskForVerification.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["taskId"] !== "string") return DEFER;
 return { "taskId": source["taskId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_tasks_internal_214.ts
-installCompiledValidatorMap(lunora_tasks_internal_214.isRoundRunning.args, (source) => {
-========
-installCompiledValidatorMap(lunora_tasks_internal_215.isRoundRunning.args, (source) => {
->>>>>>>> bef023ac (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_tasks_internal_215.ts
+installCompiledValidatorMap(lunora_tasks_internal_216.isRoundRunning.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "runId": source["runId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_tasks_internal_214.ts
-installCompiledValidatorMap(lunora_tasks_internal_214.resolveTaskSkill.args, (source) => {
-========
-installCompiledValidatorMap(lunora_tasks_internal_215.resolveTaskSkill.args, (source) => {
->>>>>>>> bef023ac (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_tasks_internal_215.ts
+installCompiledValidatorMap(lunora_tasks_internal_216.resolveTaskSkill.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 let __has1 = false;
@@ -56,21 +37,13 @@ if (typeof source["skillId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { ...(__has1 ? { "organizationId": __val1 } : {}), "skillId": source["skillId"], "userId": source["userId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_tasks_internal_214.ts
-installCompiledValidatorMap(lunora_tasks_internal_214.runProjectFor.args, (source) => {
-========
-installCompiledValidatorMap(lunora_tasks_internal_215.runProjectFor.args, (source) => {
->>>>>>>> bef023ac (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_tasks_internal_215.ts
+installCompiledValidatorMap(lunora_tasks_internal_216.runProjectFor.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["taskId"] !== "string") return DEFER;
 return { "taskId": source["taskId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_tasks_internal_214.ts
-installCompiledValidatorMap(lunora_tasks_internal_214.runThreadProblem.args, (source) => {
-========
-installCompiledValidatorMap(lunora_tasks_internal_215.runThreadProblem.args, (source) => {
->>>>>>>> bef023ac (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_tasks_internal_215.ts
+installCompiledValidatorMap(lunora_tasks_internal_216.runThreadProblem.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["cycle"] !== "string") return DEFER;

@@ -2,41 +2,21 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_workflow_functions_229.ts
-import * as lunora_workflow_functions_229 from "../../workflow/functions.js";
-
-/** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_workflow_functions_229.createExecution.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["projectId"] !== "string") return DEFER;
-return { "projectId": source["projectId"] };
-});
-installCompiledValidatorMap(lunora_workflow_functions_229.getExecution.args, (source) => {
-========
 import * as lunora_agent_node_executions_23 from "../../agent/node-executions.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
 installCompiledValidatorMap(lunora_agent_node_executions_23.deleteByExecution.args, (source) => {
->>>>>>>> 675b3971 (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_agent_node_executions_23.ts
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["executionId"] !== "string") return DEFER;
 return { "executionId": source["executionId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_workflow_functions_229.ts
-installCompiledValidatorMap(lunora_workflow_functions_229.getWorkflow.args, (source) => {
-========
 installCompiledValidatorMap(lunora_agent_node_executions_23.get.args, (source) => {
->>>>>>>> 675b3971 (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_agent_node_executions_23.ts
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["nodeExecutionId"] !== "string") return DEFER;
 return { "nodeExecutionId": source["nodeExecutionId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_workflow_functions_229.ts
-installCompiledValidatorMap(lunora_workflow_functions_229.listNodeExecutions.args, (source) => {
-========
 installCompiledValidatorMap(lunora_agent_node_executions_23.getByNode.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -45,7 +25,6 @@ if (typeof source["nodeId"] !== "string") return DEFER;
 return { "executionId": source["executionId"], "nodeId": source["nodeId"] };
 });
 installCompiledValidatorMap(lunora_agent_node_executions_23.listByExecution.args, (source) => {
->>>>>>>> 675b3971 (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_agent_node_executions_23.ts
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["executionId"] !== "string") return DEFER;

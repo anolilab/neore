@@ -2,29 +2,10 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_workflow_gallery_230.ts
-import * as lunora_workflow_gallery_230 from "../../workflow/gallery.js";
-
-/** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_workflow_gallery_230.getPublicWorkflowOwner.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["publicAccessToken"] !== "string") return DEFER;
-return { "publicAccessToken": source["publicAccessToken"] };
-});
-installCompiledValidatorMap(lunora_workflow_gallery_230.readPublicWorkflow.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["publicAccessToken"] !== "string") return DEFER;
-return { "publicAccessToken": source["publicAccessToken"] };
-});
-installCompiledValidatorMap(lunora_workflow_gallery_230.unpublishWorkflow.args, (source) => {
-========
 import * as lunora_projects_functions_173 from "../../projects/functions.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
 installCompiledValidatorMap(lunora_projects_functions_173.getProject.args, (source) => {
->>>>>>>> 675b3971 (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_projects_functions_173.ts
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["projectId"] !== "string") return DEFER;

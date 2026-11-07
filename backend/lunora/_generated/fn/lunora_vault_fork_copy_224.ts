@@ -2,17 +2,10 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_vault_fork_copy_222.ts
-import * as lunora_vault_fork_copy_222 from "../../vault/fork-copy.js";
+import * as lunora_vault_fork_copy_224 from "../../vault/fork-copy.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_vault_fork_copy_222.copyVaultObjects.args, (source) => {
-========
-import * as lunora_vault_fork_copy_223 from "../../vault/fork-copy.js";
-
-/** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_vault_fork_copy_223.copyVaultObjects.args, (source) => {
->>>>>>>> bef023ac (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_vault_fork_copy_223.ts
+installCompiledValidatorMap(lunora_vault_fork_copy_224.copyVaultObjects.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (!Array.isArray(source["copies"])) return DEFER;

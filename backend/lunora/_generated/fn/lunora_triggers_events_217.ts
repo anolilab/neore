@@ -2,38 +2,23 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_triggers_events_215.ts
-import * as lunora_triggers_events_215 from "../../triggers/events.js";
+import * as lunora_triggers_events_217 from "../../triggers/events.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_triggers_events_215.isEventRunPending.args, (source) => {
-========
-import * as lunora_triggers_events_216 from "../../triggers/events.js";
-
-/** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_triggers_events_216.isEventRunPending.args, (source) => {
->>>>>>>> bef023ac (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_triggers_events_216.ts
+installCompiledValidatorMap(lunora_triggers_events_217.isEventRunPending.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["firing"] !== "number" || !Number.isFinite(source["firing"])) return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "firing": source["firing"], "triggerId": source["triggerId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_triggers_events_215.ts
-installCompiledValidatorMap(lunora_triggers_events_215.runEventCheck.args, (source) => {
-========
-installCompiledValidatorMap(lunora_triggers_events_216.runEventCheck.args, (source) => {
->>>>>>>> bef023ac (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_triggers_events_216.ts
+installCompiledValidatorMap(lunora_triggers_events_217.runEventCheck.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["triggerId"] !== "string") return DEFER;
 return { "triggerId": source["triggerId"] };
 });
-<<<<<<<< HEAD:backend/lunora/_generated/fn/lunora_triggers_events_215.ts
-installCompiledValidatorMap(lunora_triggers_events_215.settleEventRun.args, (source) => {
-========
-installCompiledValidatorMap(lunora_triggers_events_216.settleEventRun.args, (source) => {
->>>>>>>> bef023ac (feat(chat): /clear starts a new model context in the same thread):backend/lunora/_generated/fn/lunora_triggers_events_216.ts
+installCompiledValidatorMap(lunora_triggers_events_217.settleEventRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["attempt"] !== "number" || !Number.isFinite(source["attempt"])) return DEFER;
