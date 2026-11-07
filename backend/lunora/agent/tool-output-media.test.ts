@@ -117,6 +117,112 @@ describe(offloadToolOutputMedia, () => {
         expect(store).not.toHaveBeenCalled();
     });
 
+    it("stores small blobs too once the step's row has kept its share of them inline", async () => {
+        const store = fakeStore();
+        const image = (data: string) => {
+            return { data, mimeType: "image/png", type: "image" };
+        };
+        const step = { fallbackChars: 0, smallChars: SMALL.length };
+
+        const result = await offloadToolOutputMedia(MCP_TOOL, { content: [image(SMALL), image(SMALL)] }, store, step, BUDGET);
+
+        expect(result.output).toStrictEqual({ content: [image(SMALL), image(`storage:${keyOf(1)}`)] });
+        expect(step.smallChars).toBe(0);
+    });
+
+    it("keeps a small blob whose store failed while the fallback lasts, then drops and counts the rest", async () => {
+        const store = vi.fn(async () => {
+            throw new Error("R2 unavailable");
+        });
+        const image = (data: string) => {
+            return { data, mimeType: "image/png", type: "image" };
+        };
+
+        const result = await offloadToolOutputMedia(
+            MCP_TOOL,
+            { content: [image(SMALL), image(SMALL)] },
+            store,
+            { fallbackChars: SMALL.length, smallChars: 0 },
+            BUDGET,
+        );
+
+        expect(result.output).toStrictEqual({ content: [image(SMALL), image("")], unsavedMedia: 1 });
+    });
+
+    it("keeps SVG and text that is not plain base64 only while the row's small share lasts", async () => {
+        const store = fakeStore();
+        const svg = `<svg>${"x".repeat(BUDGET)}</svg>`;
+        const wrapped = `${SMALL}\n${SMALL}`;
+        const step = { fallbackChars: 0, smallChars: svg.length };
+
+        const code = await offloadToolOutputMedia(
+            CODE_TOOL,
+            {
+                results: [
+                    { format: "svg", type: "image", value: svg },
+                    { format: "svg", type: "image", value: svg },
+                ],
+            },
+            store,
+            step,
+            BUDGET,
+        );
+        const mcp = await offloadToolOutputMedia(MCP_TOOL, { content: [{ data: wrapped, mimeType: "image/png", type: "image" }] }, store, step, BUDGET);
+
+        expect(code.output).toStrictEqual({
+            results: [
+                { format: "svg", type: "image", value: svg },
+                { format: "svg", type: "image", value: "" },
+            ],
+            unsavedMedia: 1,
+        });
+        expect(mcp.output).toStrictEqual({ content: [{ data: "", mimeType: "image/png", type: "image" }], unsavedMedia: 1 });
+        expect(store).not.toHaveBeenCalled();
+    });
+
+    it("drops a link field the browser or code tool returned itself, so only a stored image becomes one", async () => {
+        const store = fakeStore();
+        const tracker = "https://tracker.example/p.png";
+
+        const browser = await offloadToolOutputMedia(
+            BROWSER_TOOL,
+            { screenshot: SMALL, screenshotFormat: "png", screenshotUrl: tracker },
+            store,
+            stepInlineBudget(),
+            BUDGET,
+        );
+        const code = await offloadToolOutputMedia(
+            CODE_TOOL,
+            {
+                results: [
+                    { format: "png", type: "image", url: tracker, value: SMALL },
+                    { type: "text", url: tracker, value: "1" },
+                ],
+            },
+            store,
+            stepInlineBudget(),
+            BUDGET,
+        );
+
+        const svgBrowser = await offloadToolOutputMedia(
+            BROWSER_TOOL,
+            { screenshotFormat: "svg", screenshotUrl: tracker, success: true },
+            store,
+            stepInlineBudget(),
+            BUDGET,
+        );
+
+        expect(browser.output).toStrictEqual({ screenshot: SMALL, screenshotFormat: "png" });
+        expect(svgBrowser.output).toStrictEqual({ screenshotFormat: "svg", success: true });
+        expect(code.output).toStrictEqual({
+            results: [
+                { format: "png", type: "image", value: SMALL },
+                { type: "text", value: "1" },
+            ],
+        });
+        expect(store).not.toHaveBeenCalled();
+    });
+
     it("leaves a look-alike reference, a URL or other non-base64 text exactly as the tool wrote it", async () => {
         const store = fakeStore();
         const output = {

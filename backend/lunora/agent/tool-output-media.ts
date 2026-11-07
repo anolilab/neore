@@ -14,7 +14,9 @@
  * reference inside a tool result only when the message's owner owns the key, so
  * a tool that writes a `storage:` look-alike of a key its user does not own gets
  * an empty string, never a link. Only real base64 in the known fields is moved:
- * a string that merely looks like a reference or a URL stays as the tool wrote it.
+ * a string that merely looks like a reference or a URL is never stored. Like SVG
+ * markup, it stays as the tool wrote it while the row's share for small media
+ * lasts, and is dropped (and counted) past it.
  *
  * The browser and code tools' media moves to a field of its own (`screenshotUrl`,
  * a result's `url`) that only this module writes, so the transcript loads an image
@@ -41,14 +43,27 @@ export const CODE_TOOL = "codeExecution";
  */
 export const INLINE_FALLBACK_CHARS = 1024 * 1024;
 
-/** The inline fallback left for one step: every tool result of a step is saved in the same row. */
+/**
+ * Base64 under the per-field budget a step's row keeps inline in total. Many small images (a few dozen charts, a page
+ * of thumbnails) would fill the row as surely as one large one, so past this they are stored too.
+ */
+export const SMALL_INLINE_CHARS = 512 * 1024;
+
+/** What one step's row has left: every tool result of a step is saved in the same row. */
 export interface InlineBudget {
-    chars: number;
+    /** For blobs kept inline because storing them failed. */
+    fallbackChars: number;
+    /** For blobs under the per-field budget, kept inline without storing. */
+    smallChars: number;
 }
 
 export const stepInlineBudget = (): InlineBudget => {
-    return { chars: INLINE_FALLBACK_CHARS };
+    return { fallbackChars: INLINE_FALLBACK_CHARS, smallChars: SMALL_INLINE_CHARS };
 };
+
+/** Without `key`: a field this module writes must never arrive from the tool. */
+const without = (record: Record<string, unknown>, key: string): Record<string, unknown> =>
+    key in record ? Object.fromEntries(Object.entries(record).filter(([name]) => name !== key)) : record;
 
 /** How many media fields could be neither stored nor kept: the model and the transcript see that something is missing. */
 export const UNSAVED_MEDIA_FIELD = "unsavedMedia";
@@ -58,7 +73,7 @@ const BASE64 = /^[\d+/A-Za-z]+={0,2}$/u;
 /** Passive types storage may serve inline (`lib/signed-storage.ts`); anything else is kept as opaque bytes. */
 const STORED_MEDIA_TYPE = /^(?:image\/(?:png|jpeg|gif|webp|avif)|audio\/[\w.+-]+|video\/[\w.+-]+|application\/pdf)$/u;
 
-/** Formats the browser and code tools report for a raster image. SVG is markup, not base64, and stays inline. */
+/** Formats the browser and code tools report for a raster image. SVG is markup, not base64: it is never stored. */
 const RASTER_FORMAT = /^(?:png|jpe?g|webp|gif)$/u;
 
 /** Bytes `base64` decodes to: three per four characters, less its `=` padding. */
@@ -113,6 +128,19 @@ export const offloadToolOutputMedia = async (
     const fileIds: string[] = [];
     let unsaved = 0;
 
+    /** Media that cannot be stored (markup, or text that is not plain base64): kept while the row's share lasts. */
+    const keepInline = (value: string): Moved => {
+        if (value.length <= inline.smallChars) {
+            inline.smallChars -= value.length;
+
+            return { kind: "kept" };
+        }
+
+        unsaved += 1;
+
+        return { kind: "dropped" };
+    };
+
     const move = async (value: unknown, mediaType: string): Promise<Moved> => {
         // Already a reference (a tool may echo one): never stored or decoded again.
         if (typeof value !== "string" || value.startsWith(STORAGE_REF_PREFIX)) {
@@ -121,7 +149,13 @@ export const offloadToolOutputMedia = async (
 
         const size = decodedSize(value);
 
-        if (size <= budgetBytes || !BASE64.test(value)) {
+        if (!BASE64.test(value)) {
+            return keepInline(value);
+        }
+
+        if (size <= budgetBytes && value.length <= inline.smallChars) {
+            inline.smallChars -= value.length;
+
             return { kind: "kept" };
         }
 
@@ -135,8 +169,8 @@ export const offloadToolOutputMedia = async (
             // The step must still save: a thrown save leaves its row pending for good.
             storageLogger.warn("tool_output_media.store_failed", { error: error instanceof Error ? error.message : String(error), size, toolName });
 
-            if (value.length <= inline.chars) {
-                inline.chars -= value.length;
+            if (value.length <= inline.fallbackChars) {
+                inline.fallbackChars -= value.length;
 
                 return { kind: "kept" };
             }
@@ -181,30 +215,45 @@ export const offloadToolOutputMedia = async (
 
     const format = output["screenshotFormat"];
 
-    if (toolName === BROWSER_TOOL && typeof format === "string" && RASTER_FORMAT.test(format)) {
-        const moved = await move(output["screenshot"], rasterMediaType(format));
+    if (toolName === BROWSER_TOOL) {
+        next = without(next, "screenshotUrl");
 
-        if (moved.kind !== "kept") {
-            const rest = Object.fromEntries(Object.entries(next).filter(([key]) => key !== "screenshot"));
+        if (typeof format === "string" && RASTER_FORMAT.test(format)) {
+            const moved = await move(output["screenshot"], rasterMediaType(format));
 
-            next = moved.kind === "stored" ? { ...rest, screenshotUrl: moved.ref } : rest;
+            if (moved.kind !== "kept") {
+                const rest = without(next, "screenshot");
+
+                next = moved.kind === "stored" ? { ...rest, screenshotUrl: moved.ref } : rest;
+            }
         }
     }
 
     if (toolName === CODE_TOOL && Array.isArray(output["results"])) {
         const items = output["results"] as unknown[];
         const results = await mapInOrder(items, async (item) => {
-            if (!isRecord(item) || item["type"] !== "image" || typeof item["format"] !== "string" || !RASTER_FORMAT.test(item["format"])) {
+            if (!isRecord(item)) {
                 return item;
             }
 
-            const moved = await move(item["value"], rasterMediaType(item["format"]));
+            const own = without(item, "url");
+
+            if (own["type"] !== "image" || typeof own["format"] !== "string") {
+                return own;
+            }
+
+            if (!RASTER_FORMAT.test(own["format"])) {
+                // SVG markup: nothing to store, but it fills the row like any other image.
+                return typeof own["value"] === "string" && keepInline(own["value"]).kind === "dropped" ? { ...own, value: "" } : own;
+            }
+
+            const moved = await move(own["value"], rasterMediaType(own["format"]));
 
             if (moved.kind === "kept") {
-                return item;
+                return own;
             }
 
-            return moved.kind === "stored" ? { ...item, url: moved.ref, value: "" } : { ...item, value: "" };
+            return moved.kind === "stored" ? { ...own, url: moved.ref, value: "" } : { ...own, value: "" };
         });
 
         if (results.some((item, index) => item !== items[index])) {
