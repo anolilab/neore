@@ -50,13 +50,15 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
 });
 
-const { getMemberCredits, listMemberCredits, setMemberCreditOverride, setOrganizationBillingTier, updateBillingSettings } = await import("./billing");
+const { getBillingInfo, getMemberCredits, listMemberCredits, setMemberCreditOverride, setOrganizationBillingTier, updateBillingSettings } =
+    await import("./billing");
 
 const PLATFORM_ADMIN = "user-platform-admin";
 const OWNER = "user-owner";
 const ORG_ADMIN = "user-org-admin";
 const MEMBER = "user-member";
 const OUTSIDER = "user-outsider";
+const MULTI_OWNER = "user-multi-owner";
 
 let harness: ReturnType<typeof lunoraTest>;
 let orgId: string;
@@ -102,6 +104,48 @@ beforeEach(async () => {
 
 afterEach(() => {
     harness.close();
+});
+
+describe("getBillingInfo", () => {
+    beforeEach(async () => {
+        await seed(async (db) => {
+            await db.patch("organization", db.asId("organization", orgId), {
+                allowedModels: ["m1"],
+                billingEmail: "pay@acme.test",
+                creditsPerUser: 500,
+                creemSubscriptionId: "sub_1",
+            });
+        });
+    });
+
+    it.each([MEMBER, ORG_ADMIN])("shows %s the plan and credit allowance, and nothing else about the organization's billing", async (userId) => {
+        await expect(as(userId).query(getBillingInfo as never, {} as never)).resolves.toEqual({ baseTier: "free", creditsPerUser: 500, isOwner: false });
+    });
+
+    it("shows an owner the contact e-mail, the model list and the Creem ids", async () => {
+        await expect(as(OWNER).query(getBillingInfo as never, {} as never)).resolves.toMatchObject({
+            allowedModels: ["m1"],
+            baseTier: "free",
+            billingEmail: "pay@acme.test",
+            creditsPerUser: 500,
+            creemSubscriptionId: "sub_1",
+            isOwner: true,
+        });
+    });
+
+    it("treats a member with owner among comma-joined roles as an owner, for the read and the save", async () => {
+        await insertMember(MULTI_OWNER, orgId, "admin,owner");
+        sessions.set(MULTI_OWNER, { id: orgId, role: "admin,owner" });
+
+        await expect(as(MULTI_OWNER).query(getBillingInfo as never, {} as never)).resolves.toMatchObject({
+            billingEmail: "pay@acme.test",
+            isOwner: true,
+        });
+
+        await as(MULTI_OWNER).mutation(updateBillingSettings as never, { billingEmail: "new@acme.test" } as never);
+
+        expect(await readOrganization(orgId)).toMatchObject({ billingEmail: "new@acme.test" });
+    });
 });
 
 describe("setOrganizationBillingTier", () => {
