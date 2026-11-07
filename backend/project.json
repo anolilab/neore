@@ -26,6 +26,10 @@
             "//": "`tsc` compiles `_generated/app.ts`, which imports the git-ignored `architecture.ts`; codegen writes it, so it must run first (cached on the sources). `codegen` itself depends on `^build`: without the packages' declarations it infers `unknown` return types and still exits 0.",
             "dependsOn": ["codegen"]
         },
+        "lint:types:fast": {
+            "//": "Same reason as `lint:types`: `_generated/app.ts` imports the git-ignored `architecture.ts`.",
+            "dependsOn": ["codegen"]
+        },
         "test": {
             "//": "`src/server.ts` (and its tests) load `_generated/app.ts`, which imports the git-ignored `architecture.ts`.",
             "dependsOn": ["codegen"]

@@ -64,6 +64,7 @@
         "lint:prettier": "prettier --check . --ignore-path ../.prettierignore --ignore-path .prettierignore",
         "lint:prettier:fix": "prettier --write . --ignore-path ../.prettierignore --ignore-path .prettierignore",
         "lint:types": "tsc --noEmit",
+        "lint:types:fast": "tsrs --noEmit",
         "lunora:advise": "lunora advisor",
         "prepare:deploy": "node scripts/run-then-codegen.mjs lunora prepare",
         "test": "vitest run",

@@ -9,6 +9,7 @@
         "ios": "expo run:ios",
         "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "lint:types": "tsc --noEmit",
+        "lint:types:fast": "tsrs --noEmit",
         "start": "expo start",
         "test": "vitest run",
         "test:coverage": "vitest run --coverage --coverage.reporter=lcov --coverage.reporter=text-summary"

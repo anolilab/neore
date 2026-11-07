@@ -12,6 +12,7 @@
         "host-bundle": "node scripts/host-bundle.mjs",
         "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "lint:types": "tsc --noEmit",
+        "lint:types:fast": "tsrs --noEmit",
         "pack": "NEORE_RELEASE=1 node scripts/build.mjs && electron-builder --dir --config electron-builder.yml",
         "smoke": "node scripts/smoke.mjs",
         "smoke:artifacts": "node scripts/smoke-artifacts.mjs",

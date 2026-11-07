@@ -432,6 +432,9 @@ catalogs:
     # "Named export 'formatDiagnostics' not found". Revisit once packem supports TS 7.
     # Re-confirmed against 7.0.2 with packem 2.1.0 / packem-rollup 1.1.0: still held.
     typescript: 6.0.3
+    # Rust port of the compiler with TS 7.1 semantics, used only by `lint:types:fast`
+    # (the pre-push hook). CI and `lint:types` stay on `typescript` above.
+    tsrs: 0.23.0-ts7.1.0-beta
   types:
     "@types/chrome": 0.3.5
     "@types/json-schema": ^7.0.15
@@ -523,6 +526,15 @@ minimumReleaseAgeExclude:
   - "@better-auth/scim@1.7.16"
   - "@better-auth/telemetry@1.7.16"
   - "better-call@1.4.5"
+  # tsrs 0.23.0-ts7.1.0-beta, published 2026-11-07 04:09 UTC; drop after 2026-11-08 04:10 UTC.
+  - "tsrs@0.23.0-ts7.1.0-beta"
+  - "@tsrs/win32-x64@0.23.0-ts7.1.0-beta"
+  - "@tsrs/darwin-x64@0.23.0-ts7.1.0-beta"
+  - "@tsrs/darwin-arm64@0.23.0-ts7.1.0-beta"
+  - "@tsrs/linux-x64-gnu@0.23.0-ts7.1.0-beta"
+  - "@tsrs/linux-x64-musl@0.23.0-ts7.1.0-beta"
+  - "@tsrs/linux-arm64-gnu@0.23.0-ts7.1.0-beta"
+  - "@tsrs/linux-arm64-musl@0.23.0-ts7.1.0-beta"
 
 # pnpm 11 replaced onlyBuiltDependencies with this map (true = may run its
 # build scripts). `strictDepBuilds` is on by default since 11, so a NEW
@@ -851,5 +863,9 @@ trustPolicy: no-downgrade
 # every install.
 trustPolicyExclude:
   - xlsx
+  # pnpm 12.8.1 rejects this release as a "high-risk trust downgrade", although it,
+  # like every release since 0.12, is published by the same GitHub trusted publisher
+  # with provenance (checked against the registry). Drop it when bumping tsrs.
+  - "tsrs@0.23.0-ts7.1.0-beta"
 
 trustPolicyIgnoreAfter: 1440
