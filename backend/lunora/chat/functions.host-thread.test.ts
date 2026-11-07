@@ -20,6 +20,9 @@ import {
     getFollowupSuggestions,
     autoTitleChargeKey,
     firstResultOf,
+    runTitleWriteRetry,
+    TITLE_WRITE_RETRY_MAX_ATTEMPTS,
+    titleWriteRetryDelayMs,
     refusedBeforeDispatch,
     releaseTitleCharge,
     giveBackTitleCharge,
@@ -331,6 +334,63 @@ describe("the gateway a title's model call is sent through", () => {
         }
 
         await expect(lock(cloud)).resolves.toMatchObject({ ok: true });
+    });
+});
+
+describe("a scheduled write of a recorded title answer", () => {
+    const retryContext = (fails: boolean) => {
+        const scheduled: { args: Record<string, unknown>; delay: number }[] = [];
+        const events: Record<string, unknown>[] = [];
+
+        return {
+            context: {
+                log: {
+                    event: (_name: string, fields: Record<string, unknown>) => {
+                        events.push(fields);
+                    },
+                },
+                runMutation: async () => {
+                    if (fails) {
+                        throw new Error("storage down");
+                    }
+
+                    return "written";
+                },
+                scheduler: {
+                    runAfter: async (delay: number, _reference: unknown, args: Record<string, unknown>) => {
+                        scheduled.push({ args, delay });
+                    },
+                },
+            } as never,
+            events,
+            scheduled,
+        };
+    };
+    const retry = { attempt: 1, chargeKey: "thread-r:1", expectedTitleDigest: "digest", threadId: "thread-r" };
+
+    it("schedules the next attempt when the write still fails, with no model call", async () => {
+        const { context, scheduled } = retryContext(true);
+
+        await runTitleWriteRetry(context, retry);
+
+        expect(scheduled).toEqual([{ args: { ...retry, attempt: 2 }, delay: titleWriteRetryDelayMs(2) }]);
+    });
+
+    it("throws once the last attempt fails, so the failure is visible", async () => {
+        const { context, events, scheduled } = retryContext(true);
+
+        await expect(runTitleWriteRetry(context, { ...retry, attempt: TITLE_WRITE_RETRY_MAX_ATTEMPTS })).rejects.toThrow("storage down");
+        expect(scheduled).toEqual([]);
+        expect(events).toEqual([{ skipped: "write-retry-exhausted" }]);
+    });
+
+    it("logs a landed write and schedules nothing more", async () => {
+        const { context, events, scheduled } = retryContext(false);
+
+        await runTitleWriteRetry(context, retry);
+
+        expect(scheduled).toEqual([]);
+        expect(events).toEqual([{ retried: 1 }]);
     });
 });
 

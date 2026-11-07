@@ -127,6 +127,9 @@ export const capTitlePrompt = (text: string): string => {
     return kept.join("");
 };
 
+/** The text a message carries when a file is sent with no question (`chat/http.ts`). */
+export const FILE_ONLY_PROMPT = "Please analyze the uploaded file.";
+
 /**
  * The first user message on a context window that has any text: its text, trimmed and capped, and the id of the message it came
  * from. The person's typed question is the title's subject; attached document or page text is used only when the message has no
@@ -138,7 +141,9 @@ export const firstUserPrompt = (rows: ReadonlyArray<ContextRow>): { id: string |
             continue;
         }
 
-        const text = textWanted(row.message.content, "typed") || textWanted(row.message.content, "attached");
+        // The text sent for a file with no question is not a question: the attached text is the subject, when there is any.
+        const typed = textWanted(row.message.content, "typed");
+        const text = (typed === FILE_ONLY_PROMPT ? "" : typed) || textWanted(row.message.content, "attached") || typed;
 
         if (text) {
             return { id: row._id, text: capTitlePrompt(text) };

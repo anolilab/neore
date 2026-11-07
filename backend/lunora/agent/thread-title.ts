@@ -323,6 +323,40 @@ export const setGeneratedTitle = internalMutation
         return written;
     });
 
+/**
+ * Writes the answer recorded on a title run's charge, for a run whose own write kept failing: the same checks as any title write
+ * ({@link writeTitleIfUnchanged}), against the prompt the answer came from, and the answer is dropped in the same transaction. `none`
+ * when no answer is recorded (it was written or dropped already).
+ */
+export const writeRecordedTitle = internalMutation
+    .input({
+        chargeKey: v.string().max(MAX_LENGTH.short),
+        expectedTitleDigest: v.string().max(MAX_LENGTH.short),
+        requestedBy: v.optional(v.string().max(MAX_LENGTH.id)),
+        threadId: v.id("threads"),
+    })
+    .output(v.union(v.literal("written"), v.literal("refused"), v.literal("none")))
+    .mutation(async ({ args, ctx }) => {
+        const claim = await claimRow(ctx, TITLE_CHARGE_SCOPE, args.chargeKey);
+        const answer = parseAnswer(claim?.result);
+
+        if (!answer) {
+            return "none" as const;
+        }
+
+        const written = await writeTitleIfUnchanged(ctx, {
+            expectedTitleDigest: args.expectedTitleDigest,
+            promptId: answer.promptId,
+            requestedBy: args.requestedBy,
+            threadId: args.threadId,
+            title: answer.title,
+        });
+
+        await clearClaimResult(ctx, TITLE_CHARGE_SCOPE, args.chargeKey);
+
+        return written ? ("written" as const) : ("refused" as const);
+    });
+
 /** Whether a title model request for this thread is being sent: locking the chat waits until none is. */
 export const titleDispatchInFlight = async (context: Reader, threadId: Id<"threads">): Promise<boolean> =>
     await hasClaimWithPrefix(context, TITLE_DISPATCH_SCOPE, `${threadId}:`);

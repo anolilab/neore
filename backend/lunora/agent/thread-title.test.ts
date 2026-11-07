@@ -28,6 +28,7 @@ import {
     titleDispatchInFlight,
     titlePromptIn,
     titleRequestDeadline,
+    writeRecordedTitle,
     writeTitleIfUnchanged,
 } from "./thread-title";
 
@@ -509,5 +510,46 @@ describe("a recorded title answer", () => {
         expect(await resultOf(`${locked}:auto-title:job`)).toBeUndefined();
         // Another chat's answer is not touched.
         expect(await resultOf(`${other}:run`)).toBeDefined();
+    });
+});
+
+describe("writing a recorded title answer later", () => {
+    const writeRecorded = async (threadId: string, key: string) =>
+        await harness.run(
+            async (context: any) =>
+                await context.runMutation(writeRecordedTitle as never, { chargeKey: key, expectedTitleDigest: await sha256Hex("Old"), threadId }),
+        );
+
+    it("writes the answer a run recorded, drops it, and finds none the second time", async () => {
+        const threadId = await threadWith();
+        const key = `${threadId}:run`;
+        const prompt = await rowIn(threadId)(1, { message: { content: "Plan a trip", role: "user" } });
+        const { claimedAt } = await admit(threadId, key, { promptId: prompt });
+
+        await harness.run(
+            async (context: any) =>
+                await context.runMutation(recordTitleAnswer as never, { chargeKey: key, claimedAt, promptId: prompt, title: "Lisbon trip" }),
+        );
+
+        await expect(writeRecorded(threadId, key)).resolves.toBe("written");
+        await expect(titleOf(threadId)).resolves.toBe("Lisbon trip");
+        await expect(writeRecorded(threadId, key)).resolves.toBe("none");
+    });
+
+    it("refuses the answer once the chat is locked, and drops it", async () => {
+        const threadId = await threadWith();
+        const key = `${threadId}:run`;
+        const prompt = await rowIn(threadId)(1, { message: { content: "Plan a trip", role: "user" } });
+        const { claimedAt } = await admit(threadId, key, { promptId: prompt });
+
+        await harness.run(
+            async (context: any) =>
+                await context.runMutation(recordTitleAnswer as never, { chargeKey: key, claimedAt, promptId: prompt, title: "Lisbon trip" }),
+        );
+        await harness.run(async (context: any) => await context.db.patch("threads", threadId, { lockedAt: 1000 }));
+
+        await expect(writeRecorded(threadId, key)).resolves.toBe("refused");
+        await expect(titleOf(threadId)).resolves.toBe("Old");
+        await expect(writeRecorded(threadId, key)).resolves.toBe("none");
     });
 });

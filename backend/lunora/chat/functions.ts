@@ -1780,6 +1780,8 @@ const writeGeneratedTitle = async (
 
     let title: string;
     let { promptId } = arguments_;
+    // Whether the answer is on the run's charge, for a later write to pick up (`retryTitleWrite`).
+    let answerRecorded = admission.outcome === "answered";
     let usage: { inputTokens?: number; outputTokens?: number } | undefined;
 
     if (admission.outcome === "answered") {
@@ -1821,24 +1823,47 @@ const writeGeneratedTitle = async (
             context.runMutation(internal.agent.thread_title.recordTitleAnswer, { chargeKey: arguments_.chargeKey, claimedAt, promptId, title }),
         );
 
+        answerRecorded = recorded;
+
         if (!recorded) {
             context.log.event("chat.thread_title", { skipped: "answer-not-recorded" });
         }
     }
 
     // The write checks everything again in its own transaction: a rename, a lock, a branch switch or a revoked grant committed while the
-    // model ran keeps the thread as it is. A transient failure is tried again; one that persists is thrown, and the run's retry resumes
-    // from the recorded answer.
-    const written = await firstResultOf(TITLE_WRITE_ATTEMPTS, () =>
-        context.runMutation(internal.agent.thread_title.setGeneratedTitle, {
+    // model ran keeps the thread as it is. A transient failure is tried again here. One that persists is handed to a scheduled write of the
+    // recorded answer (`retryTitleWrite`): the scheduler does not retry a job that throws, so nothing else would write it.
+    let written: boolean;
+
+    try {
+        written = await firstResultOf(TITLE_WRITE_ATTEMPTS, () =>
+            context.runMutation(internal.agent.thread_title.setGeneratedTitle, {
+                chargeKey: arguments_.chargeKey,
+                expectedTitleDigest,
+                promptId,
+                requestedBy: arguments_.requestedBy,
+                threadId: arguments_.threadId as Id<"threads">,
+                title,
+            }),
+        );
+    } catch (error) {
+        if (!answerRecorded) {
+            throw error;
+        }
+
+        await scheduleTitleWriteRetry(context, {
+            attempt: 1,
             chargeKey: arguments_.chargeKey,
             expectedTitleDigest,
-            promptId,
             requestedBy: arguments_.requestedBy,
-            threadId: arguments_.threadId as Id<"threads">,
-            title,
-        }),
-    );
+            threadId: arguments_.threadId,
+        }).catch(() => {
+            throw error;
+        });
+        context.log.event("chat.thread_title", titleUsageEvent(model, usage, "write-retry-scheduled"));
+
+        return;
+    }
 
     context.log.event("chat.thread_title", titleUsageEvent(model, usage, written ? undefined : "changed-before-write"));
 };
@@ -1897,6 +1922,68 @@ export const titleDispatchGateway = (context: ActionContext, threadId: string, i
         refused: () => refused,
     };
 };
+
+/** How many scheduled writes of a recorded title answer are tried before it is given up, loudly. */
+export const TITLE_WRITE_RETRY_MAX_ATTEMPTS = 5;
+
+/** Delay before scheduled write `attempt` (1-based) of a recorded title answer: 5 s, then tripling. */
+export const titleWriteRetryDelayMs = (attempt: number): number => 5000 * 3 ** (attempt - 1);
+
+interface TitleWriteRetry {
+    attempt: number;
+    chargeKey: string;
+    expectedTitleDigest: string;
+    requestedBy?: string;
+    threadId: string;
+}
+
+const scheduleTitleWriteRetry = async (context: Pick<ActionContext, "scheduler">, retry: TitleWriteRetry): Promise<void> => {
+    await context.scheduler.runAfter(titleWriteRetryDelayMs(retry.attempt), internal.chat.functions.retryTitleWrite, { ...retry });
+};
+
+/**
+ * One scheduled write of a recorded title answer (`writeRecordedTitle`, which checks everything again and drops the answer). A write
+ * that still fails schedules the next attempt; past {@link TITLE_WRITE_RETRY_MAX_ATTEMPTS} it throws, so the failure is visible. No
+ * model call is made again.
+ */
+export const runTitleWriteRetry = async (context: Pick<ActionContext, "log" | "runMutation" | "scheduler">, retry: TitleWriteRetry): Promise<void> => {
+    let outcome: string;
+
+    try {
+        outcome = await firstResultOf(TITLE_WRITE_ATTEMPTS, () =>
+            context.runMutation(internal.agent.thread_title.writeRecordedTitle, {
+                chargeKey: retry.chargeKey,
+                expectedTitleDigest: retry.expectedTitleDigest,
+                requestedBy: retry.requestedBy,
+                threadId: retry.threadId as Id<"threads">,
+            }),
+        );
+    } catch (error) {
+        if (retry.attempt >= TITLE_WRITE_RETRY_MAX_ATTEMPTS) {
+            context.log.event("chat.thread_title", { skipped: "write-retry-exhausted" });
+
+            throw error;
+        }
+
+        await scheduleTitleWriteRetry(context, { ...retry, attempt: retry.attempt + 1 });
+
+        return;
+    }
+
+    context.log.event("chat.thread_title", { retried: retry.attempt, ...(outcome !== "written" && { skipped: `${outcome}-on-retry` }) });
+};
+
+export const retryTitleWrite = internalAction
+    .input({
+        attempt: v.number(),
+        chargeKey: v.string().max(MAX_LENGTH.short),
+        expectedTitleDigest: v.string().max(MAX_LENGTH.short),
+        requestedBy: v.optional(v.string().max(MAX_LENGTH.id)),
+        threadId: v.string().max(MAX_LENGTH.id),
+    })
+    .action(async ({ args, ctx }) => {
+        await runTitleWriteRetry(ctx, args);
+    });
 
 /** The one event a title run records: the model call's tokens (none for a run that resumed an earlier answer), and why it was not written. */
 export const titleUsageEvent = (model: string, usage: { inputTokens?: number; outputTokens?: number } | undefined, skipped?: string) => {

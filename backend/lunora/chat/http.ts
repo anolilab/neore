@@ -28,7 +28,7 @@ import { vGoalRunConfig } from "./goals/validators";
 import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
-import { capTitlePrompt } from "./lib/first-user-prompt";
+import { capTitlePrompt, FILE_ONLY_PROMPT } from "./lib/first-user-prompt";
 import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
 import { documentTextPart } from "./lib/attached-text";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
@@ -574,7 +574,7 @@ const runChatStartOnShard = async (
     } else if (contentType === "image") {
         messageContent.push({ text: "Generate an image", type: "text" });
     } else {
-        messageContent.push({ text: "Please analyze the uploaded file.", type: "text" });
+        messageContent.push({ text: FILE_ONLY_PROMPT, type: "text" });
     }
 
     // Page context goes in front of the typed text, like extracted documents,

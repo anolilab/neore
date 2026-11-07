@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { documentTextPart } from "./attached-text";
-import { firstUserPromptText } from "./first-user-prompt";
+import { FILE_ONLY_PROMPT, firstUserPromptText } from "./first-user-prompt";
 
 describe("firstUserPromptText", () => {
     it("takes the first user message that has text", () => {
@@ -102,6 +102,16 @@ describe("a message with attached text and a question", () => {
         const content = "What is this?\n[Attached Document]\n\nExtracted text ".repeat(1);
 
         expect(firstUserPromptText([{ message: { content, role: "user" } }])).toBe("What is this?");
+    });
+
+    it("takes the attached document, not the text sent for a file with no question", () => {
+        const content = [documentTextPart("notes.pdf", "Quarterly figures"), { text: FILE_ONLY_PROMPT, type: "text" }];
+
+        expect(firstUserPromptText([{ message: { content, role: "user" } }])).toBe("[Document: notes.pdf]\n\nQuarterly figures");
+    });
+
+    it("keeps the text sent for a file when nothing was extracted from it", () => {
+        expect(firstUserPromptText([{ message: { content: [{ text: FILE_ONLY_PROMPT, type: "text" }], role: "user" } }])).toBe(FILE_ONLY_PROMPT);
     });
 
     it("keeps the attached text when the message has no question", () => {
