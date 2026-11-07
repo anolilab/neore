@@ -5,13 +5,16 @@
  */
 import { v } from "lunorash/server";
 
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { internalQuery } from "../_generated/server";
+import { loadEligibleThread } from "../devices/internal";
 import { MAX_LENGTH } from "../lib/validators";
-import { linksFor, partitionLinks } from "./pr-threads";
+import { partitionLinks } from "./pr-threads";
 
-/** Link rows read for one thread: the thread list's own read bound (`pr-thread-attach.ts`). */
-const MAX_LINKS_READ = 100;
+/** Link rows read per page; a thread's links and a pull request's links are paged to the end. */
+const LINK_PAGE_SIZE = 100;
+/** Pages of a thread's links one read goes through: far past what any thread holds, a bound and not a filter. */
+const MAX_LINK_PAGES = 20;
 
 const vLinkedPullRequest = v.object({
     kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
@@ -27,16 +30,31 @@ export const linkedPullRequestsOfThread = internalQuery
     .input({ threadId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.array(vLinkedPullRequest))
     .query(async ({ args, ctx }) => {
-        const thread = await ctx.db.get("threads", args.threadId as Id<"threads">);
+        // Only a thread the tools may run in has links an agent can see (`pullRequestToolsAllowed`).
+        const thread = await loadEligibleThread(ctx, args.threadId as Id<"threads">, args.userId);
 
-        if (!thread || thread.deleted === true || thread.userId !== args.userId) {
+        if (!thread) {
             return [];
         }
 
-        const rows = await ctx.db
-            .query("pullRequestThreads")
-            .withIndex("by_user_and_threadId", (q) => q.eq("userId", args.userId).eq("threadId", thread._id))
-            .take(MAX_LINKS_READ);
+        const rows: Doc<"pullRequestThreads">[] = [];
+        let cursor: string | null = null;
+
+        for (let page = 0; page < MAX_LINK_PAGES; page += 1) {
+            const read = await ctx.db
+                .query("pullRequestThreads")
+                .withIndex("by_user_and_threadId", (q) => q.eq("userId", args.userId).eq("threadId", thread._id))
+                .paginate({ cursor, numItems: LINK_PAGE_SIZE });
+
+            rows.push(...read.page);
+
+            if (read.isDone) {
+                break;
+            }
+
+            cursor = read.continueCursor;
+        }
+
         const { live } = await partitionLinks(ctx, rows);
         const seen = new Set<string>();
 
@@ -68,13 +86,40 @@ export const isPullRequestLinkedToThread = internalQuery
     })
     .output(v.boolean())
     .query(async ({ args, ctx }) => {
-        const thread = await ctx.db.get("threads", args.threadId as Id<"threads">);
+        const thread = await loadEligibleThread(ctx, args.threadId as Id<"threads">, args.userId);
 
-        if (!thread || thread.deleted === true || thread.userId !== args.userId) {
+        if (!thread) {
             return false;
         }
 
-        const links = await linksFor(ctx, args.userId, args.repository, args.number);
+        // Every link of the pull request is looked at, page by page, so many links to it never hide this thread's.
+        let cursor: string | null = null;
 
-        return links.some((link) => link.threadId === thread._id);
+        for (;;) {
+            const read = await ctx.db
+                .query("pullRequestThreads")
+                .withIndex("by_user_and_repository_number", (q) => q.eq("userId", args.userId).eq("repository", args.repository).eq("number", args.number))
+                .paginate({ cursor, numItems: LINK_PAGE_SIZE });
+
+            if (read.page.some((link) => link.threadId === thread._id)) {
+                return true;
+            }
+
+            if (read.isDone) {
+                return false;
+            }
+
+            cursor = read.continueCursor;
+        }
     });
+
+/**
+ * Whether an agent run in this thread may use the pull request tools at all: the thread is the user's own, live, and
+ * used by them alone (not a group, not public, not an outside chat, nobody granted access). The same rule device
+ * tools keep (`isDeviceEligibleThread`): the tools read and act with the owner's connection, so nobody else may steer
+ * them or see what they read. Checked when a tool RUNS, whatever put the tool in the run (a skill, an approval).
+ */
+export const pullRequestToolsAllowed = internalQuery
+    .input({ threadId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .query(async ({ args, ctx }) => (await loadEligibleThread(ctx, args.threadId as Id<"threads">, args.userId)) !== null);

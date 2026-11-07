@@ -88,7 +88,7 @@ export interface BoundRequesterConfig {
     via?: FetchWithDeadlineInit["via"];
 }
 
-const REDIRECT_STATUSES = new Set([301, 302, 307, 308]);
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 const isRateLimited = (response: Response, body: string | undefined): boolean =>
     response.status === 429 ||

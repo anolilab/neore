@@ -139,7 +139,9 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
     // skill's extra tool is not in the mode's set, and the narrowing below keeps
     // this from ever exceeding the snapshot). Unavailable tools are never added.
     const availableBuiltIns = new Set(listBuiltInTools().flatMap((tool) => (tool.available ? [tool.name as string] : [])));
-    const baseExtraBuiltIns = snapshot ? snapshot.toolNames : (skillTools?.additionalTools ?? []);
+    // A skill never adds the pull request tools: they join a run only through the link check below (a snapshot rebuild
+    // keeps the ones its run had, and each tool checks the thread again when it runs).
+    const baseExtraBuiltIns = snapshot ? snapshot.toolNames : (skillTools?.additionalTools ?? []).filter((name) => !PULL_REQUEST_TOOLS.includes(name));
     const linkThreadId = threadId ?? deviceThreadId;
     const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers, pullRequestTools] = await Promise.all([
         ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),

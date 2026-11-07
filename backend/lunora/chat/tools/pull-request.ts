@@ -47,13 +47,14 @@ const MESSAGES: Record<string, string> = {
     method_not_allowed: "The repository does not allow that merge method.",
     needs_reconnect: "The source-control connection needs signing in again (Settings → Connectors).",
     none_linked: "No pull request is linked to this thread. The person can link one from the thread's pull request panel.",
+    not_allowed: "Pull request tools work only in a chat of your own that nobody else reads or writes to.",
     not_connected: "No source-control account is connected (Settings → Connectors).",
     not_found: "The host has no such pull request, or the connected account cannot see it.",
     not_linked: "That pull request is not linked to this thread; only linked pull requests can be read or changed here.",
     not_open: "The pull request is not open.",
     rate_limited: "The host is rate limiting requests. Try again in a few minutes.",
     rejected: "The host refused it.",
-    signed_out: "Sign in to work on pull requests.",
+    signed_out: "Pull request tools work only in a chat of your own, in a turn you started.",
     unconfirmed: "The host's answer never came: it may have done it. Check the pull request before trying again.",
     unsupported: "This host does not offer that.",
 };
@@ -62,8 +63,21 @@ const MESSAGES: Record<string, string> = {
 const explain = <T extends { status: string }>(outcome: T): T & { message?: string } =>
     outcome.status === "ok" ? outcome : { ...outcome, message: MESSAGES[outcome.status] ?? "That did not work." };
 
-const dependenciesOf = (context: ToolContext): PullRequestAgentDependencies | undefined =>
-    context.userId && context.threadId ? agentDependenciesFor(context, context.userId, context.threadId) : undefined;
+/**
+ * The person's connection for this call, or nothing. A turn someone other than the owner started (a member of a group,
+ * a guest) never gets the owner's connection; the thread itself is checked by every call (`pullRequestToolsAllowed`).
+ */
+const dependenciesOf = (context: ToolContext): PullRequestAgentDependencies | undefined => {
+    if (!context.userId || !context.threadId) {
+        return undefined;
+    }
+
+    if (context.startedBy !== undefined && context.startedBy !== context.userId) {
+        return undefined;
+    }
+
+    return agentDependenciesFor(context, context.userId, context.threadId);
+};
 
 const signedOut = { message: MESSAGES.signed_out, status: "signed_out" as const };
 

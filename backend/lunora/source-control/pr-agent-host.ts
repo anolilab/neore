@@ -51,6 +51,8 @@ export interface LinkedPullRequest {
 }
 
 export interface PullRequestAgentDependencies {
+    /** Whether the thread is one the tools may run in at all (`pullRequestToolsAllowed`): asked before anything else. */
+    allowed: () => Promise<boolean>;
     driver: HostDriver;
     /** Whether this one pull request is linked to the thread: a keyed read, so a thread with many links is not cut short. */
     isLinked: (ref: PullRequestRef) => Promise<boolean>;
@@ -61,6 +63,7 @@ export interface PullRequestAgentDependencies {
 /** The person's own connection and the thread's links, for one tool call. */
 export const agentDependenciesFor = (ctx: Pick<ActionCtx, "runMutation" | "runQuery">, userId: string, threadId: string): PullRequestAgentDependencies => {
     return {
+        allowed: async () => await ctx.runQuery(internal.source_control.pr_agent.pullRequestToolsAllowed, { threadId, userId }),
         driver: DEVELOP_DRIVER,
         isLinked: async (ref) =>
             await ctx.runQuery(internal.source_control.pr_agent.isPullRequestLinkedToThread, {
@@ -79,8 +82,11 @@ export interface WantedPullRequest {
     repository?: string;
 }
 
-/** Why no pull request was picked: none is linked, the one named is not, or several are and none was named. */
-export type TargetRefusal = { linked: LinkedPullRequest[]; status: "choose" | "none_linked" | "not_linked" };
+/**
+ * Why no pull request was picked: the thread is not one the tools may run in (`not_allowed`, nothing else is read),
+ * none is linked, the one named is not, or several are and none was named.
+ */
+export type TargetRefusal = { linked: LinkedPullRequest[]; status: "choose" | "none_linked" | "not_linked" } | { status: "not_allowed" };
 
 /**
  * The linked pull request the call names. With none named, the thread's only one; with only a number or only a
@@ -108,6 +114,11 @@ const target = async (
     dependencies: PullRequestAgentDependencies,
     wanted: WantedPullRequest,
 ): Promise<TargetRefusal | { ref: PullRequestRef; status: "ok" }> => {
+    // First, before any link or host read: a run nobody but the owner steers, in a thread nobody but the owner reads.
+    if (!(await dependencies.allowed())) {
+        return { status: "not_allowed" };
+    }
+
     if (wanted.repository === undefined || wanted.number === undefined) {
         return pickLinkedPullRequest(await dependencies.linked(), wanted);
     }
@@ -179,7 +190,9 @@ export const readPullRequestForAgent = async (dependencies: PullRequestAgentDepe
             // Newest first: the latest verdict is what to act on.
             reviews: {
                 items: shownReviews.map((review) => {
-                    return { authorLogin: review.authorLogin, body: cap(review.body, AGENT_COMMENT_MAX_CHARS).text, state: review.state };
+                    const shown = cap(review.body, AGENT_COMMENT_MAX_CHARS);
+
+                    return { authorLogin: review.authorLogin, body: shown.text, ...(shown.truncated && { bodyTruncated: true }), state: review.state };
                 }),
                 ...truncatedMarker(reviews.total - shownReviews.length),
             },
@@ -195,9 +208,12 @@ const threadForAgent = (thread: ReviewThread) => {
     return {
         comments: {
             items: kept.map((comment) => {
-                return { authorLogin: comment.authorLogin, body: cap(comment.body, AGENT_COMMENT_MAX_CHARS).text, id: comment.id };
+                const shown = cap(comment.body, AGENT_COMMENT_MAX_CHARS);
+
+                return { authorLogin: comment.authorLogin, body: shown.text, ...(shown.truncated && { bodyTruncated: true }), id: comment.id };
             }),
-            ...truncatedMarker(thread.comments.length - kept.length),
+            // Counted against the thread's own total: comments past the pages read are left out too.
+            ...truncatedMarker((thread.commentCount ?? thread.comments.length) - kept.length),
         },
         isOutdated: thread.isOutdated,
         isResolved: thread.isResolved,
@@ -390,7 +406,7 @@ export const rerunFailedForAgent = async (
     dependencies: PullRequestAgentDependencies,
     wanted: WantedPullRequest,
     checkIds: string[] | undefined,
-): Promise<AgentWriteOutcome<{ notRerun: string[]; rerun: RerunResult[]; skipped: string[] }> | { status: "head_moved" }> => {
+): Promise<AgentWriteOutcome<{ notRerun: string[]; rerun: RerunResult[]; skipped: string[]; unlisted: string[] }> | { status: "head_moved" }> => {
     const picked = await target(dependencies, wanted);
 
     if (picked.status !== "ok") {
@@ -418,7 +434,12 @@ export const rerunFailedForAgent = async (
     const rerunnable = listed.checks.filter((check): check is CheckRun & { id: string } => check.id !== null && RERUNNABLE.has(check.state));
     // Unnamed, a call re-runs what failed; a cancelled check runs again only when it is named.
     const chosen = checkIds === undefined ? rerunnable.filter((check) => FAILING.has(check.state)) : rerunnable.filter((check) => checkIds.includes(check.id));
-    const skipped = checkIds === undefined ? [] : checkIds.filter((id) => chosen.every((check) => check.id !== id));
+    // A named check the pages read do not list is not known to be anything: said so, rather than called skipped.
+    const listedIds = new Set(listed.checks.flatMap((check) => (check.id === null ? [] : [check.id])));
+    const complete = listed.checks.length >= listed.total;
+    const missed = checkIds === undefined ? [] : checkIds.filter((id) => chosen.every((check) => check.id !== id));
+    const skipped = missed.filter((id) => complete || listedIds.has(id));
+    const unlisted = missed.filter((id) => !complete && !listedIds.has(id));
     // Past the cap, a check is named back rather than dropped: the agent can ask for it in a second call.
     const notRerun = chosen.slice(AGENT_MAX_RERUNS).map((check) => check.id);
     const rerun: RerunResult[] = [];
@@ -444,7 +465,7 @@ export const rerunFailedForAgent = async (
         rerun.push({ id: check.id, name: check.name, status: outcome.status, ...(outcome.status === "rejected" && { reason: outcome.reason }) });
     }
 
-    return { notRerun, rerun, skipped, status: "ok" };
+    return { notRerun, rerun, skipped, status: "ok", unlisted };
 };
 
 /** The method a merge uses: the one asked for when the repository allows it, else squash, else the first it allows. */

@@ -48,6 +48,10 @@ const cleanLine = (line: string): string => line.replace(TIMESTAMP, "").replaceA
 
 /** The last `maxChars` of `text`, starting on a whole line when one fits. */
 const tailOf = (text: string, maxChars: number): string => {
+    if (maxChars <= 0) {
+        return "";
+    }
+
     if (text.length <= maxChars) {
         return text;
     }
@@ -85,7 +89,7 @@ const cutLog = (raw: string, maxChars: number, partial: boolean): CheckLog => {
     }
 
     // Windows around each marker, merged where they overlap, taken from the last one back until the cap.
-    const windows: { end: number; start: number }[] = [];
+    const windows: { end: number; marker: number; start: number }[] = [];
 
     for (const index of markers) {
         const start = Math.max(0, index - LINES_BEFORE);
@@ -94,8 +98,9 @@ const cutLog = (raw: string, maxChars: number, partial: boolean): CheckLog => {
 
         if (last && start <= last.end) {
             last.end = Math.max(last.end, end);
+            last.marker = index;
         } else {
-            windows.push({ end, start });
+            windows.push({ end, marker: index, start });
         }
     }
 
@@ -108,8 +113,9 @@ const cutLog = (raw: string, maxChars: number, partial: boolean): CheckLog => {
         const separator = kept.length > 0 ? 5 : 0;
 
         if (used + separator + text.length > maxChars) {
+            // Even the last window does not fit: its failure line stays, with as many lines before it as there is room for.
             if (kept.length === 0) {
-                kept.unshift(tailOf(text, maxChars));
+                kept.unshift(aroundMarker(lines, window, maxChars));
             }
 
             cut = true;
@@ -123,6 +129,31 @@ const cutLog = (raw: string, maxChars: number, partial: boolean): CheckLog => {
     const covered = windows.length === 1 && windows[0]?.start === 0 && windows[0].end === lines.length;
 
     return { excerpt: kept.join("\n...\n"), source: "job_log", truncated: partial || cut || !covered };
+};
+
+/** The failure line of a window that does not fit, cut to `maxChars`, and the lines just before it while they fit. */
+const aroundMarker = (lines: string[], window: { marker: number; start: number }, maxChars: number): string => {
+    const marker = lines[window.marker] ?? "";
+
+    if (marker.length >= maxChars) {
+        return marker.slice(0, Math.max(0, maxChars));
+    }
+
+    const kept = [marker];
+    let used = marker.length;
+
+    for (let index = window.marker - 1; index >= window.start; index -= 1) {
+        const line = lines[index] ?? "";
+
+        if (used + 1 + line.length > maxChars) {
+            break;
+        }
+
+        kept.unshift(line);
+        used += 1 + line.length;
+    }
+
+    return kept.join("\n");
 };
 
 /** Room kept for the marker line at the head of a cut excerpt. */
@@ -145,7 +176,8 @@ export const excerptLog = (raw: string, maxChars: number = LOG_EXCERPT_MAX_CHARS
     const where = partial ? " before these" : "";
     const marker = more > 0 ? `[truncated, ${String(more)} more lines${where}]` : "[truncated]";
 
-    return { ...cut, excerpt: `${marker}\n${cut.excerpt}` };
+    // However small the budget, the excerpt never passes it: the marker first, then what fits of the cut.
+    return { ...cut, excerpt: `${marker}\n${cut.excerpt}`.slice(0, Math.max(0, maxChars)) };
 };
 
 /**
@@ -186,9 +218,13 @@ export const readTail = async (
             break;
         }
 
-        received += value.byteLength;
-        chunks.push(value);
-        kept += value.byteLength;
+        // A chunk that crosses the read cap is taken only up to it: nothing past the cap is kept or counted.
+        const room = maxBytes - received;
+        const taken = value.byteLength > room ? value.subarray(0, room) : value;
+
+        received += taken.byteLength;
+        chunks.push(taken);
+        kept += taken.byteLength;
 
         while (chunks.length > 1 && kept - (chunks[0]?.byteLength ?? 0) >= keepBytes) {
             kept -= chunks.shift()?.byteLength ?? 0;

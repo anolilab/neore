@@ -524,7 +524,7 @@ const THREADS_QUERY = `query ($owner: String!, $name: String!, $number: Int!, $a
         pageInfo { endCursor hasNextPage }
         nodes {
           id isResolved isOutdated path line startLine diffSide viewerCanResolve viewerCanUnresolve
-          comments(first: ${THREAD_COMMENTS}) { pageInfo { endCursor hasNextPage } nodes { fullDatabaseId author { login } body createdAt } }
+          comments(first: ${THREAD_COMMENTS}) { totalCount pageInfo { endCursor hasNextPage } nodes { fullDatabaseId author { login } body createdAt } }
         }
       }
     }
@@ -540,7 +540,7 @@ const COMMENTS_QUERY = `query ($id: ID!, $after: String) {
   }
 }`;
 
-const commentsSchema = z.object({ nodes: z.array(z.unknown()), pageInfo: pageInfoSchema.optional() });
+const commentsSchema = z.object({ nodes: z.array(z.unknown()), pageInfo: pageInfoSchema.optional(), totalCount: z.number().optional() });
 
 const commentsDataSchema = z.object({ node: z.object({ comments: commentsSchema }).nullable() });
 
@@ -622,6 +622,8 @@ const toThread = async (request: HostRequest, value: unknown): Promise<ReviewThr
     return {
         canResolve: thread.data.viewerCanResolve,
         canUnresolve: thread.data.viewerCanUnresolve,
+        // How many the thread holds, read or not: a thread longer than the pages read says so.
+        ...(thread.data.comments.totalCount !== undefined && { commentCount: thread.data.comments.totalCount }),
         comments,
         id: thread.data.id,
         isOutdated: thread.data.isOutdated,
@@ -1259,7 +1261,8 @@ const jobLogAnswer = async (request: HostRequest, ref: PullRequestRef, checkId: 
         // An Actions job has the id of its check run, so the check's id names the job.
         return await request(`${repoPath(ref)}/actions/jobs/${checkId}/logs`, { redirect: "return" });
     } catch (error) {
-        if (error instanceof HostApiError && !error.rateLimited && (error.status === 404 || error.status === 410)) {
+        // Gone, never written, or refused to this account (403 that is not a rate limit): the check's own output is next.
+        if (error instanceof HostApiError && !error.rateLimited && [403, 404, 410].includes(error.status)) {
             return undefined;
         }
 

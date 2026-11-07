@@ -49,6 +49,21 @@ describe(excerptLog, () => {
         expect(log.excerpt).toMatch(MARKED_TAIL);
     });
 
+    it("keeps the failure line when even its window does not fit", () => {
+        const log = excerptLog(["setup", "##[error]the build broke here", ...Array.from({ length: 5 }, () => "z".repeat(400))].join("\n"), 200);
+
+        expect(log.excerpt).toContain("##[error]the build broke here");
+        expect(log.excerpt.length).toBeLessThanOrEqual(200);
+    });
+
+    it("never passes the cap, however small it is", () => {
+        const raw = Array.from({ length: 50 }, (_, index) => `line ${String(index)}`).join("\n");
+
+        for (const cap of [0, 10, 64, 80]) {
+            expect(excerptLog(raw, cap).excerpt.length).toBeLessThanOrEqual(cap);
+        }
+    });
+
     it("keeps a short log whole", () => {
         expect(excerptLog("one\ntwo\n")).toStrictEqual({ excerpt: "one\ntwo", source: "job_log", truncated: false });
     });
@@ -107,6 +122,13 @@ describe(readTail, () => {
         expect(cut.excerpt.endsWith("[truncated, the log goes on past what was read]")).toBe(true);
         expect(cut.excerpt.length).toBeLessThanOrEqual(200);
         expect(excerptRead({ endReached: true, partial: false, text: "ok" }, 100)).not.toHaveProperty("endRead");
+    });
+
+    it("takes a chunk that crosses the read cap only up to the cap", async () => {
+        const { endReached, text } = await readTail(streamOf(["a".repeat(100), "b".repeat(100)]), 1000, 150);
+
+        expect(endReached).toBe(false);
+        expect(text).toBe(`${"a".repeat(100)}${"b".repeat(50)}`);
     });
 
     it("answers a short body whole", async () => {

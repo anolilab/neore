@@ -1117,6 +1117,7 @@ export interface InternalApiTypes {
         pr_agent: {
             isPullRequestLinkedToThread: FunctionReference<"query", { number: number; repository: string; threadId: string; userId: string }, boolean>;
             linkedPullRequestsOfThread: FunctionReference<"query", { threadId: string; userId: string }, Array<{ kind: "attached" | "linked" | "opened"; number: number; repository: string }>>;
+            pullRequestToolsAllowed: FunctionReference<"query", { threadId: string; userId: string }, boolean>;
         };
         pr_link_retry: {
             retryOpenedPullRequestLink: FunctionReference<"action", { attempt: number; prUrl: string; threadId: string; userId: string }, null>;
@@ -2365,6 +2366,7 @@ export const internal: InternalApiTypes = {
         pr_agent: {
             isPullRequestLinkedToThread: { __lunoraRef: "source_control_pr_agent:isPullRequestLinkedToThread" },
             linkedPullRequestsOfThread: { __lunoraRef: "source_control_pr_agent:linkedPullRequestsOfThread" },
+            pullRequestToolsAllowed: { __lunoraRef: "source_control_pr_agent:pullRequestToolsAllowed" },
         },
         pr_link_retry: {
             retryOpenedPullRequestLink: { __lunoraRef: "source_control_pr_link_retry:retryOpenedPullRequestLink" },

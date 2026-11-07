@@ -76,6 +76,7 @@ const LINKED: LinkedPullRequest[] = [{ kind: "linked", number: 7, repository: "o
 
 const dependencies = (linked: LinkedPullRequest[] = LINKED): PullRequestAgentDependencies => {
     return {
+        allowed: async () => true,
         driver: githubDriver,
         isLinked: async (ref) => linked.some((link) => link.repository === ref.repository && link.number === ref.number),
         linked: async () => linked,
@@ -206,6 +207,20 @@ describe("when a check's log cannot be had", () => {
 
         expect(check?.logStatus).toBe("ok");
         expect(check?.log).toStrictEqual({ excerpt: "Tests\n\n2 failed", source: "check_output", truncated: false });
+    });
+
+    it("falls back to the check's own output when the job log is refused to the account", async () => {
+        stubHost({
+            ...failingRoutes,
+            [`GET ${API}/actions/jobs/11/logs`]: () => Response.json({ message: "Must have admin rights" }, { status: 403 }),
+            [`GET ${API}/check-runs/11`]: () =>
+                Response.json({ app: { slug: "github-actions" }, id: 11, name: "test", output: { summary: "3 failed", text: null, title: "Tests" } }),
+        });
+
+        const outcome = await readFailingChecksForAgent(dependencies(), {});
+        const [check] = outcome.status === "ok" && "checks" in outcome ? outcome.checks.items : [];
+
+        expect(check?.log).toMatchObject({ excerpt: "Tests\n\n3 failed", source: "check_output" });
     });
 
     it("says the log was unavailable when reading it failed, and that the list is partial", async () => {
@@ -461,6 +476,15 @@ describe("re-running checks of a linked pull request", () => {
         });
 
         await expect(rerunFailedForAgent(dependencies(), {}, ["150"])).resolves.toMatchObject({ rerun: [{ id: "150", status: "ok" }], skipped: [] });
+    });
+
+    it("calls a named check the host did not list unlisted, not skipped", async () => {
+        stubHost({
+            ...routes([run(1, "failure")]),
+            [`GET ${API}/commits/${SHA}/check-runs`]: () => Response.json({ check_runs: [run(1, "failure")], total_count: 2 }),
+        });
+
+        await expect(rerunFailedForAgent(dependencies(), {}, ["999"])).resolves.toMatchObject({ rerun: [], skipped: [], unlisted: ["999"] });
     });
 
     it("names back the failed checks past the cap instead of dropping them", async () => {

@@ -346,6 +346,23 @@ describe("buildAgentTools pull request tools", () => {
         expect((tools.mergePullRequest as { needsApproval?: unknown }).needsApproval).toBe(true);
     });
 
+    it("cannot be added by a skill to a thread without a linked pull request", async () => {
+        const runQuery = vi.fn();
+
+        runQuery.mockResolvedValueOnce([]).mockResolvedValueOnce(overrides).mockResolvedValueOnce({}).mockResolvedValueOnce(false).mockResolvedValueOnce([]);
+
+        const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+            model: "test-model",
+            searchMode: "web",
+            skillTools: { additionalTools: ["readPullRequest", "mergePullRequest"] },
+            threadId: "thread",
+            userId: "user",
+        });
+
+        expect(tools.readPullRequest).toBeUndefined();
+        expect(tools.mergePullRequest).toBeUndefined();
+    });
+
     it("are not offered to a thread without one", async () => {
         const tools = await toolsFor([]);
 

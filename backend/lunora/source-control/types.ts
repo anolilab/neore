@@ -232,6 +232,8 @@ export interface ThreadComment {
 export interface ReviewThread {
     canResolve: boolean;
     canUnresolve: boolean;
+    /** How many comments the thread holds, when the host says: more than `comments` when it is longer than was read. */
+    commentCount?: number;
     comments: ThreadComment[];
     id: string;
     isOutdated: boolean;
