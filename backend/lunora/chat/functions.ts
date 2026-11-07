@@ -1782,6 +1782,8 @@ const writeGeneratedTitle = async (
     let { promptId } = arguments_;
     // Whether the answer is on the run's charge, for a later write to pick up (`retryTitleWrite`).
     let answerRecorded = admission.outcome === "answered";
+    // The charge this run took itself (not one an earlier try took), to give back when the answer is kept nowhere.
+    const ownCharge = admission.outcome === "admitted" ? admission.claimedAt : undefined;
     let usage: { inputTokens?: number; outputTokens?: number } | undefined;
 
     if (admission.outcome === "answered") {
@@ -1863,6 +1865,14 @@ const writeGeneratedTitle = async (
         );
     } catch (error) {
         if (!answerRecorded) {
+            // The answer could be neither recorded nor written: it is kept nowhere, so the charge is given back and the scheduler's retry
+            // of this run may ask again, rather than finding the charge and leaving the chat untitled.
+            const giveBack = chargeToGiveBackOnLostAnswer(answerRecorded, ownCharge);
+
+            if (giveBack !== undefined) {
+                await giveBackTitleCharge(context, arguments_.chargeKey, giveBack);
+            }
+
             throw error;
         }
 
@@ -1943,6 +1953,14 @@ export const titleDispatchGateway = (
         timedOut: () => timedOut,
     };
 };
+
+/**
+ * The charge to give back when a run's title write failed for good: its own charge, when the answer was not recorded anywhere a later
+ * write could take it from. A recorded answer keeps the charge (the scheduled write lands it), and a charge an earlier try took is not
+ * this run's to give back.
+ */
+export const chargeToGiveBackOnLostAnswer = (answerRecorded: boolean, ownCharge: number | undefined): number | undefined =>
+    answerRecorded ? undefined : ownCharge;
 
 /** How long after a run's own write kept failing the recorded answer is written by `retryTitleWrite`. */
 const TITLE_WRITE_RETRY_DELAY_MS = 5000;

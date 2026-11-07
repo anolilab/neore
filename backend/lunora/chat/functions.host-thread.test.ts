@@ -19,6 +19,7 @@ import {
     generateSummary,
     getFollowupSuggestions,
     autoTitleChargeKey,
+    chargeToGiveBackOnLostAnswer,
     firstResultOf,
     runTitleWriteRetry,
     refusedBeforeDispatch,
@@ -336,6 +337,14 @@ describe("the gateway a title's model call is sent through", () => {
         }
 
         await expect(lock(cloud)).resolves.toMatchObject({ ok: true });
+    });
+});
+
+describe("a title answer that could be neither recorded nor written", () => {
+    it("gives the run's own charge back, so a retry may ask again; a recorded answer or an earlier try's charge is kept", () => {
+        expect(chargeToGiveBackOnLostAnswer(false, 42)).toBe(42);
+        expect(chargeToGiveBackOnLostAnswer(true, 42)).toBeUndefined();
+        expect(chargeToGiveBackOnLostAnswer(false, undefined)).toBeUndefined();
     });
 });
 
