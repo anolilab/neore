@@ -395,6 +395,12 @@ export class AgentSession {
             throw new Error(timedOut ? "the agent did not answer" : "the agent did not accept the change");
         }
 
+        // A later change of this option was asked for while this one was outstanding: its answer is the newer one, so this answer is not
+        // applied, and this change is not reported as made (the same as a late answer to an older change, `onLate`).
+        if (request !== this.optionRequests.get(key)) {
+            throw new Error("the agent did not apply the change");
+        }
+
         // The agent sent its own list while this was outstanding, and that list is newer than the answer: it stands. It must show the
         // value asked for, or the change was not made.
         if (this.versionOf(optionId) !== versionAtRequest) {

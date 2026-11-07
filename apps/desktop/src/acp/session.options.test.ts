@@ -206,6 +206,25 @@ describe("setOption", () => {
         expect(states.at(-1)?.modes?.current).toBe("code");
     });
 
+    it("does not apply an older change to an option once a newer one to it was answered, even when the older answer comes after", async () => {
+        const { player, session, states, steps } = await start("options-overlapping-changes");
+        const older = session.setOption("model", "deep");
+        const olderRefused = expect(older).rejects.toThrow("the agent did not apply the change");
+
+        await player.play(steps.slice(0, 1));
+
+        const newer = session.setOption("model", "mid");
+
+        await player.play(steps.slice(1, 3));
+        await expect(newer).resolves.toBeUndefined();
+
+        await player.play(steps.slice(3));
+        await olderRefused;
+
+        // The newer change stands: the older answer, which came last, did not put its value back.
+        expect(states.at(-1)?.configOptions?.find((option) => option.id === "model")?.currentValue).toBe("mid");
+    });
+
     it("sends nothing for a value the agent did not offer", async () => {
         const { agent, session } = await start("options-and-change");
         const before = agent.written.length;
