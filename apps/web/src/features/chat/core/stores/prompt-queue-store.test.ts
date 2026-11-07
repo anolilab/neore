@@ -52,4 +52,20 @@ describe("prompt queue across a reload", () => {
 
         expect(again.getState().queues["thread-1"]?.items[0]?.attachments[0]).toMatchObject({ fileId: "file-1", restoredSize: 12 });
     });
+
+    it("drops the stored copy when a write fails, so a reload cannot bring back messages already sent", async () => {
+        const store = await reload();
+
+        store.getState().enqueue("thread-2", { attachments: [], id: "old", text: "already sent" });
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-2")).toContain("already sent");
+
+        const full = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+            throw new DOMException("full", "QuotaExceededError");
+        });
+
+        store.getState().enqueue("thread-2", { attachments: [], id: "new", text: "newer" });
+        full.mockRestore();
+
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-2")).toBeNull();
+    });
 });

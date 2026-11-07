@@ -110,7 +110,13 @@ const writeStoredQueue = (threadId: string, queue: ThreadQueue): void => {
             globalThis.sessionStorage?.removeItem(STORAGE_KEY_PREFIX + threadId);
         }
     } catch {
-        // Quota or blocked storage: the queue still works for this page load.
+        // Quota or blocked storage: the queue still works for this page load. An older stored copy must not come back on a
+        // reload with messages already sent in it, so it goes (a removal needs no quota).
+        try {
+            globalThis.sessionStorage?.removeItem(STORAGE_KEY_PREFIX + threadId);
+        } catch {
+            // Storage is blocked altogether: there is nothing stored to come back.
+        }
     }
 };
 
