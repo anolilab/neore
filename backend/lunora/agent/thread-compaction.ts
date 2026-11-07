@@ -412,8 +412,15 @@ const foldJob = async (
 /** The role a stored row was written with; an assistant row when the message names none. */
 const rowRole = (row: { message?: unknown }): string => (row.message as { role?: string } | undefined)?.role ?? "assistant";
 
-/** A tool output's value as text. Media is named, never encoded: a base64 part would crowd the text after it out of the row. */
-const outputText = (output: { type?: unknown; value?: unknown } | undefined): string => {
+/**
+ * A tool output's value as text. Media is named, never encoded: a base64 part would crowd the text after it out of the
+ * row. A denied call carries its reason, not a value.
+ */
+const outputText = (output: { reason?: unknown; type?: unknown; value?: unknown } | undefined): string => {
+    if (output?.type === "execution-denied") {
+        return typeof output.reason === "string" && output.reason !== "" ? `[denied] ${output.reason}` : "[denied]";
+    }
+
     if (output?.type !== "content" || !Array.isArray(output.value)) {
         return JSON.stringify(output?.value ?? null);
     }
@@ -461,10 +468,10 @@ const toolCallsText = (message: unknown): string | undefined => {
 
 /**
  * What a row carried besides its typed text, for the summariser: an attached document's text (a text part of its own,
- * not in the row's `text`), and a name for each image or file, whose content a text summary cannot hold. `undefined`
- * when there is none.
+ * not in the row's `text`), the reasoning an assistant row stored (the model is sent it too), and a name for each image
+ * or file, whose content a text summary cannot hold. `undefined` when there is none.
  */
-const attachmentsText = (message: unknown, typed: string | undefined): string | undefined => {
+const extraPartsText = (message: unknown, typed: string | undefined): string | undefined => {
     const content = (message as { content?: unknown } | undefined)?.content;
 
     if (!Array.isArray(content)) {
@@ -474,6 +481,10 @@ const attachmentsText = (message: unknown, typed: string | undefined): string | 
     const parts = content.flatMap((part: { filename?: unknown; mediaType?: unknown; text?: unknown; type?: unknown } | null) => {
         if (part?.type === "text") {
             return typeof part.text === "string" && part.text !== "" && !typed?.includes(part.text) ? [part.text] : [];
+        }
+
+        if (part?.type === "reasoning") {
+            return typeof part.text === "string" && part.text !== "" ? [`[reasoning]\n${part.text}`] : [];
         }
 
         if (part?.type === "image") {
@@ -502,7 +513,7 @@ export const transcriptTextOf = (row: { message?: unknown; text?: string }): str
     }
 
     return (
-        [row.text, attachmentsText(row.message, row.text), toolCallsText(row.message)].filter((part): part is string => Boolean(part)).join("\n") || undefined
+        [row.text, extraPartsText(row.message, row.text), toolCallsText(row.message)].filter((part): part is string => Boolean(part)).join("\n") || undefined
     );
 };
 

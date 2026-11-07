@@ -790,6 +790,38 @@ describe("a long path with no compaction to extend", () => {
 });
 
 describe("what the summariser reads of a row", () => {
+    it("reads the reasoning an assistant row stored, which the model is sent too", () => {
+        expect.assertions(1);
+
+        const reply = {
+            message: {
+                content: [
+                    { text: "The budget only covers Lisbon.", type: "reasoning" },
+                    { text: "Lisbon it is.", type: "text" },
+                ],
+                role: "assistant",
+            },
+            text: "Lisbon it is.",
+        };
+
+        expect(transcriptTextOf(reply as never)).toBe("Lisbon it is.\n[reasoning]\nThe budget only covers Lisbon.");
+    });
+
+    it("keeps the reason a tool call was denied", () => {
+        expect.assertions(1);
+
+        const denied = {
+            message: {
+                content: [
+                    { output: { reason: "The user declined the purchase.", type: "execution-denied" }, toolCallId: "c1", toolName: "buy", type: "tool-result" },
+                ],
+                role: "tool",
+            },
+        };
+
+        expect(transcriptTextOf(denied as never)).toBe("[tool results]\nbuy: [denied] The user declined the purchase.");
+    });
+
     it("reads an attached document's text and names an image or file, beside the typed text", () => {
         expect.assertions(1);
 
