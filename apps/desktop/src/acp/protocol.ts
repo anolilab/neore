@@ -14,7 +14,15 @@
  * - **No `authenticate`.** Neore stores no credential for an agent. An agent that needs a login is told so in
  * plain words; the user signs in with the agent's own tool.
  */
-import type { InitializeRequest, InitializeResponse, ListSessionsRequest, LoadSessionRequest, NewSessionRequest, PromptRequest } from "@agentclientprotocol/sdk";
+import type {
+    InitializeRequest,
+    InitializeResponse,
+    ListSessionsRequest,
+    LoadSessionRequest,
+    NewSessionRequest,
+    PromptRequest,
+} from "@agentclientprotocol/sdk";
+import type { ForkSessionRequest } from "@agentclientprotocol/sdk/unstable";
 
 import type { JsonRpcConnection } from "./jsonrpc";
 import { RpcError } from "./rpc-error";
@@ -24,6 +32,7 @@ export const PROTOCOL_VERSION = 1;
 
 export const METHOD = {
     cancel: "session/cancel",
+    forkSession: "session/fork",
     initialize: "initialize",
     listSessions: "session/list",
     loadSession: "session/load",
@@ -79,7 +88,11 @@ export const initialize = async (connection: JsonRpcConnection, appVersion: stri
         clientInfo: { name: "neore-desktop", title: "Neore", version: appVersion },
         protocolVersion: PROTOCOL_VERSION,
     };
-    const response = (await withTimeout(connection.request(METHOD.initialize, params), timeoutMs, "the agent did not answer the handshake")) as Partial<InitializeResponse> | null;
+    const response = (await withTimeout(
+        connection.request(METHOD.initialize, params),
+        timeoutMs,
+        "the agent did not answer the handshake",
+    )) as Partial<InitializeResponse> | null;
     const version = response?.protocolVersion;
 
     if (typeof version !== "number") {
@@ -127,6 +140,21 @@ export const newSession = async (connection: JsonRpcConnection, cwd: string, tim
     }
 };
 
+/**
+ * `session/fork` (unstable in ACP v1): a new session that starts with the history of `sessionId`, which stays as it was.
+ * Returns the new session's id. Call only when the agent advertised `sessionCapabilities.fork`.
+ */
+export const forkSession = async (connection: JsonRpcConnection, sessionId: string, cwd: string, timeoutMs = LOAD_TIMEOUT_MS): Promise<string> => {
+    const params: ForkSessionRequest = { cwd, mcpServers: [], sessionId };
+    const response = await withTimeout(connection.request(METHOD.forkSession, params), timeoutMs, "the agent did not fork the session");
+
+    if (!isRecord(response) || typeof response.sessionId !== "string" || response.sessionId === "") {
+        throw new Error("the agent did not return a session id");
+    }
+
+    return response.sessionId;
+};
+
 export const promptParams = (sessionId: string, text: string): PromptRequest => {
     return { prompt: [{ text, type: "text" }], sessionId };
 };
@@ -144,7 +172,7 @@ const MAX_LIST_PAGES = 10;
 const MAX_LISTED_SESSIONS = 200;
 const LIST_TIMEOUT_MS = 30_000;
 
-const textOf = (value: unknown): string => typeof value === "string" ? value : "";
+const textOf = (value: unknown): string => (typeof value === "string" ? value : "");
 
 /**
  * `session/list` for one folder, newest first. The agent may ignore the `cwd` filter, and the user approved this folder

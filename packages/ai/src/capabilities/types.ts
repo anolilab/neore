@@ -70,6 +70,8 @@ export interface CapabilityGroups {
     };
     sessions?: {
         create?: Capability;
+        /** The runner starts a new session from another's history, leaving that one as it was (ACP `session/fork`). */
+        fork?: Capability;
         listNative?: Capability;
         load?: Capability;
     };
