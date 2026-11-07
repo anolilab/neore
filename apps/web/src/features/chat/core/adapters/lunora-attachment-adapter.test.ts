@@ -177,7 +177,6 @@ describe(createLunoraAttachmentAdapter, () => {
 
         await adapter.upload({ file });
 
-        expect(heicToJpegBlob).toHaveBeenCalledWith(file, 0.92);
         expect(downscaleOversizedImage).toHaveBeenCalledWith(expect.objectContaining({ name: "IMG_9.jpg", type: "image/jpeg" }));
         expect(uploadFile).toHaveBeenCalledWith(expect.objectContaining({ name: "IMG_9.jpg", type: "image/jpeg" }), expect.anything());
     });

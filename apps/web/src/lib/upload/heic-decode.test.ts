@@ -226,13 +226,25 @@ describe(heicToJpegBlob, () => {
             await expect(heicToJpegBlob(photo, 0.92)).resolves.toBe(encoded);
             expect(URL.createObjectURL).toHaveBeenCalledWith(photo);
             expect(built[0]?.src).toBe("blob:heic");
-            expect(canvas.width).toBe(100);
-            expect(canvas.height).toBe(80);
             expect(context.fillStyle).toBe("#fff");
             expect(context.fillRect).toHaveBeenCalledWith(0, 0, 100, 80);
-            expect(context.drawImage).toHaveBeenCalledWith(built[0], 0, 0);
+            expect(context.drawImage).toHaveBeenCalledWith(built[0], 0, 0, 100, 80);
             expect(canvas.toBlob).toHaveBeenCalledWith(expect.any(Function), "image/jpeg", 0.92);
             expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:heic");
+        });
+
+        it("draws a 24-megapixel photo at the downscaler's first size, within iOS's canvas limit, and frees the canvas", async () => {
+            const encoded = new Blob([Uint8Array.from([0xff, 0xd8, 0xff])], { type: "image/jpeg" });
+            const { canvas, context } = canvasElement({ context: true, encoded });
+            const built: { src: string }[] = [];
+
+            vi.stubGlobal("Image", imageElement({ height: 4284, width: 5712 }, built));
+            useCanvas(canvas);
+
+            await expect(heicToJpegBlob(photoOf(5712, 4284), 0.92)).resolves.toBe(encoded);
+            expect(context.drawImage).toHaveBeenCalledWith(built[0], 0, 0, 2048, 1536);
+            expect(canvas.width).toBe(0);
+            expect(canvas.height).toBe(0);
         });
 
         it("refuses a photo whose decoded size is over the budget, though its header was not, and releases the object URL", async () => {

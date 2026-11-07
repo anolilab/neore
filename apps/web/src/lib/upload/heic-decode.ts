@@ -1,4 +1,4 @@
-import { MAX_DECODE_PIXELS } from "./image-downscale";
+import { firstAttempt, MAX_DECODE_PIXELS } from "./image-downscale";
 
 export interface HeicSize {
     height: number;
@@ -217,6 +217,7 @@ export const heicToJpegBlob = async (file: File, quality: number): Promise<Blob>
     }
 
     const url = URL.createObjectURL(file);
+    let canvas: HTMLCanvasElement | undefined;
 
     try {
         const image = new Image();
@@ -230,10 +231,13 @@ export const heicToJpegBlob = async (file: File, quality: number): Promise<Blob>
             throw new Error("The photo is too large to convert.");
         }
 
-        const canvas = document.createElement("canvas");
+        // Drawn at the downscaler's first size, never at full resolution: iOS refuses a canvas over about 16.7 million pixels,
+        // which a 24 or 48 megapixel iPhone photo is, and the downscaler would shrink a larger JPEG to this size anyway.
+        const { height, width } = firstAttempt(image.naturalWidth, image.naturalHeight);
 
-        canvas.width = image.naturalWidth;
-        canvas.height = image.naturalHeight;
+        canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
 
         const context = canvas.getContext("2d");
 
@@ -244,10 +248,11 @@ export const heicToJpegBlob = async (file: File, quality: number): Promise<Blob>
         // JPEG has no alpha: a transparent pixel would come out black.
         context.fillStyle = "#fff";
         context.fillRect(0, 0, canvas.width, canvas.height);
-        context.drawImage(image, 0, 0);
+        context.drawImage(image, 0, 0, width, height);
 
+        const target = canvas;
         const blob = await new Promise<Blob | null>((resolve) => {
-            canvas.toBlob(resolve, "image/jpeg", quality);
+            target.toBlob(resolve, "image/jpeg", quality);
         });
 
         // A canvas that cannot encode JPEG hands back another type: that is not a JPEG, so it is not sent as one.
@@ -258,5 +263,11 @@ export const heicToJpegBlob = async (file: File, quality: number): Promise<Blob>
         return blob;
     } finally {
         URL.revokeObjectURL(url);
+
+        // A canvas holds its pixels until it is collected; several photos picked at once would add up to iOS's canvas memory limit.
+        if (canvas) {
+            canvas.width = 0;
+            canvas.height = 0;
+        }
     }
 };
