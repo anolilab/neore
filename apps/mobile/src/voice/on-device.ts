@@ -72,15 +72,41 @@ export const speechLocale = (locale: string): string => locale.split("-u-", 1)[0
 
 const normalized = (locale: string): string => locale.replaceAll("_", "-").toLowerCase();
 
+/** The regions whose speech is written in a script, most likely first, for a tag with a script but no listed region. */
+const SCRIPT_REGIONS: Record<string, string[]> = { hans: ["cn", "sg"], hant: ["tw", "hk", "mo"] };
+
+const REGION_SUBTAG = /^(?:[a-z]{2}|\d{3})$/u;
+const SCRIPT_SUBTAG = /^[a-z]{4}$/u;
+
+/** Language, script and region of a BCP-47 tag, lower case ("zh-Hant-TW" → zh, hant, tw). */
+const parseTag = (locale: string): { language: string; region: string | undefined; script: string | undefined } => {
+    const [language = "", ...rest] = normalized(locale).split("-");
+
+    return {
+        language,
+        region: rest.find((part) => REGION_SUBTAG.test(part)),
+        script: rest.find((part) => SCRIPT_SUBTAG.test(part)),
+    };
+};
+
 /**
- * The recognizer's locale for the phone's language: the same tag, else the first one of the same language. The phone's
- * tag mixes language and region ("en-DE"), which the recognizer may not list. With no match, the phone's tag is kept.
+ * The recognizer's locale for the phone's language. The phone's tag mixes language, script and region ("en-DE",
+ * "zh-Hant-TW"), which the recognizer may not list as such. In order: the same tag, the same language and region, a
+ * region written in the same script, then any of the same language. With no match, the phone's tag is kept.
  */
 export const pickSpeechLocale = (wanted: string, available: string[]): string => {
     const tag = normalized(wanted);
-    const language = tag.split("-", 1)[0] ?? tag;
+    const { language, region, script } = parseTag(wanted);
+    const sameLanguage = available.filter((locale) => parseTag(locale).language === language);
+    const scriptRegions = SCRIPT_REGIONS[script ?? ""] ?? [];
 
-    return available.find((locale) => normalized(locale) === tag) ?? available.find((locale) => normalized(locale).split("-", 1)[0] === language) ?? wanted;
+    return (
+        available.find((locale) => normalized(locale) === tag)
+        ?? sameLanguage.find((locale) => region !== undefined && parseTag(locale).region === region)
+        ?? scriptRegions.map((scriptRegion) => sameLanguage.find((locale) => parseTag(locale).region === scriptRegion)).find(Boolean)
+        ?? sameLanguage[0]
+        ?? wanted
+    );
 };
 
 /** How long a press waits for the recognizer's language list. */

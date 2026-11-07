@@ -177,6 +177,9 @@ describe(pickSpeechLocale, () => {
         ["de-DE", ["de-DE", "en-US"], "de-DE"],
         ["en-DE", ["de-DE", "en-GB", "en-US"], "en-GB"],
         ["zh-Hans-CN", ["zh_CN", "zh_TW"], "zh_CN"],
+        ["zh-Hant-TW", ["zh-CN", "zh-HK", "zh-TW"], "zh-TW"],
+        ["zh-Hant-MO", ["zh-CN", "zh-HK"], "zh-HK"],
+        ["zh-Hant", ["zh-CN", "zh-HK", "zh-TW"], "zh-TW"],
         ["fi-FI", ["de-DE"], "fi-FI"],
     ])("picks a recognizer locale for %s", (wanted, available, expected) => {
         expect(pickSpeechLocale(wanted, available)).toBe(expected);
