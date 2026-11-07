@@ -291,6 +291,7 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
                 return await fingerprintMcpTool(tool, {
                     ...(annotations && { annotations }),
                     ...(server.connectorSlug && { connectorSlug: server.connectorSlug }),
+                    protocol: server.protocol,
                     serverName: server.name,
                     toolName,
                     url: server.url,

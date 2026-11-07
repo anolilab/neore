@@ -14,7 +14,7 @@ const mcpTool = (schema: JSONSchema7 | PromiseLike<JSONSchema7>): ToolSet[string
 
 const SEARCH_SCHEMA: JSONSchema7 = { additionalProperties: false, properties: { query: { type: "string" } }, required: ["query"], type: "object" };
 const SHORT_HASH = /^[0-9a-f]{32}$/u;
-const SOURCE = { serverName: "Docs", toolName: "search", url: "https://docs.example.com/mcp" };
+const SOURCE = { protocol: "http", serverName: "Docs", toolName: "search", url: "https://docs.example.com/mcp" };
 
 describe(fingerprintMcpTool, () => {
     it("is the same for the same tool, whatever order its server writes the schema's keys in", async () => {
@@ -43,6 +43,42 @@ describe(fingerprintMcpTool, () => {
         const shuffled: JSONSchema7 = { ...SEARCH_SCHEMA, properties: { scope: { enum: ["code", "docs", "issues"], type: "string" } } };
 
         expect(await fingerprintMcpTool(mcpTool(shuffled), SOURCE)).toBe(await fingerprintMcpTool(mcpTool(sorted), SOURCE));
+    });
+
+    it("changes when the server is reached over another transport at the same address", async () => {
+        const tool = mcpTool(SEARCH_SCHEMA);
+
+        expect(await fingerprintMcpTool(tool, { ...SOURCE, protocol: "sse" })).not.toBe(await fingerprintMcpTool(tool, SOURCE));
+    });
+
+    it("is the same when a type union or object-valued enum is listed in another order", async () => {
+        const listed = (type: JSONSchema7["type"], choices: JSONSchema7["enum"]): JSONSchema7 => {
+            return { ...SEARCH_SCHEMA, properties: { filter: { enum: choices, type } } };
+        };
+        const first = listed(["string", "object"], [{ field: "title", op: "eq" }, "any"]);
+        // The member's keys in another order too: built from reversed entries, since the lint sort would reorder a literal.
+        const member = Object.fromEntries(Object.entries({ field: "title", op: "eq" }).toReversed());
+        const reordered = listed(["object", "string"], ["any", member]);
+
+        expect(Object.keys(member)).toStrictEqual(["op", "field"]);
+
+        expect(await fingerprintMcpTool(mcpTool(reordered), SOURCE)).toBe(await fingerprintMcpTool(mcpTool(first), SOURCE));
+    });
+
+    it("keeps the order of a list inside data, so two different constants never hash alike", async () => {
+        const withConst = (types: string[]): JSONSchema7 => {
+            return { ...SEARCH_SCHEMA, properties: { mode: { const: { type: types } } } };
+        };
+
+        expect(await fingerprintMcpTool(mcpTool(withConst(["b", "a"])), SOURCE)).not.toBe(await fingerprintMcpTool(mcpTool(withConst(["a", "b"])), SOURCE));
+    });
+
+    it("changes when an enum gains a value", async () => {
+        const listed = (choices: string[]): JSONSchema7 => {
+            return { ...SEARCH_SCHEMA, properties: { scope: { enum: choices, type: "string" } } };
+        };
+
+        expect(await fingerprintMcpTool(mcpTool(listed(["docs", "code"])), SOURCE)).not.toBe(await fingerprintMcpTool(mcpTool(listed(["docs"])), SOURCE));
     });
 
     it("changes when a connector's tool now goes to another address", async () => {

@@ -23,20 +23,24 @@ const byCodeUnit = (a: string, b: string): number => {
 };
 
 /**
- * `value` with its keys in code-unit order, when it is a plain object. A `required` list is a set, so it is sorted too: a
- * server that writes it from an unordered collection would otherwise hash differently on every listing.
+ * Schema keywords whose list is a set (`required` names, `enum` values, the members of a `type` union): a server that
+ * writes one from an unordered collection would otherwise hash differently on every listing.
  */
-const sortedKeys = (field: string, value: unknown): unknown => {
-    if (field === "required" && Array.isArray(value) && value.every((item) => typeof item === "string")) {
-        return (value as string[]).toSorted(byCodeUnit);
+const UNORDERED_KEYWORDS = new Set(["enum", "required", "type"]);
+
+/** Keywords whose value is DATA, not schema: an array in it keeps its order whatever its keys are called. */
+const DATA_KEYWORDS = new Set(["const", "default", "enum", "examples"]);
+
+/**
+ * `value` with every object's keys sorted and, in schema position only, each set keyword's list sorted by its members'
+ * canonical JSON. Inside data (`inData`) nothing but key order changes, so two different constants never hash alike.
+ */
+const canonical = (value: unknown, inData: boolean): unknown => {
+    if (Array.isArray(value)) {
+        return value.map((member: unknown) => canonical(member, inData));
     }
 
-    // The allowed values of an `enum` are a set too.
-    if (field === "enum" && Array.isArray(value)) {
-        return value.toSorted((a: unknown, b: unknown) => byCodeUnit(JSON.stringify(a), JSON.stringify(b)));
-    }
-
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
+    if (!value || typeof value !== "object") {
         return value;
     }
 
@@ -45,12 +49,17 @@ const sortedKeys = (field: string, value: unknown): unknown => {
     return Object.fromEntries(
         Object.keys(object)
             .toSorted(byCodeUnit)
-            .map((key) => [key, object[key]]),
+            .map((key) => {
+                const member = canonical(object[key], inData || DATA_KEYWORDS.has(key));
+                const isSet = !inData && UNORDERED_KEYWORDS.has(key) && Array.isArray(member);
+
+                return [key, isSet ? (member as unknown[]).toSorted((a, b) => byCodeUnit(JSON.stringify(a), JSON.stringify(b))) : member];
+            }),
     );
 };
 
 /** JSON with every object's keys sorted, so the same schema served in another key order hashes the same. */
-const canonicalJson = (value: unknown): string => JSON.stringify(value, (key, inner: unknown) => sortedKeys(key, inner));
+const canonicalJson = (value: unknown): string => JSON.stringify(canonical(value, false));
 
 const toHex = (bytes: ArrayBuffer): string => [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
@@ -62,6 +71,8 @@ export interface FingerprintedTool {
     annotations?: ToolAnnotationHints;
     /** The connector the tool came through. With it the server is the connector, whatever its name or address. */
     connectorSlug?: string;
+    /** How the calls travel: the same address over another transport is another server. */
+    protocol: string;
     serverName: string;
     toolName: string;
     /** Where the tool's calls go, a connector's included: the same tool behind another address is another tool. */
@@ -80,7 +91,11 @@ export const fingerprintMcpTool = async (tool: ToolSet[string], source: Fingerpr
             readOnlyHint: hints.readOnlyHint ?? null,
         },
         input: await inputJsonSchema(tool),
-        server: source.connectorSlug === undefined ? { name: source.serverName, url: source.url } : { connector: source.connectorSlug, url: source.url },
+        server: {
+            ...(source.connectorSlug === undefined ? { name: source.serverName } : { connector: source.connectorSlug }),
+            protocol: source.protocol,
+            url: source.url,
+        },
         tool: source.toolName,
     });
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity));
