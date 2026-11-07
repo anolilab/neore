@@ -529,7 +529,8 @@ export const canEditQueued = (state: HostQueueState, itemId: string): boolean =>
 export const sendNowAction = (state: HostQueueState, gates: { itemId: string; running: boolean; tried: boolean }): "interrupt" | "release" | undefined => {
     const { phase } = state;
 
-    if (state.sent.includes(gates.itemId)) {
+    // Before the reads have answered, nothing is known about a running turn (a refused direct send can leave the phase idle).
+    if (!state.arrived || state.sent.includes(gates.itemId)) {
         return undefined;
     }
 

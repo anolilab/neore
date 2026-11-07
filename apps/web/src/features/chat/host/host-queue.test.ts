@@ -577,6 +577,14 @@ describe("Send now", () => {
         const stopping = run([{ itemId: "a", streamId: "stream-1", type: "interrupt", wasPaused: false }], RUNNING).state;
 
         expect(sendNowAction(INITIAL_HOST_QUEUE, { itemId: "b", running: false, tried: false })).toBeUndefined();
+        // A direct send refused before the reads answered leaves the phase idle, but nothing is known yet.
+        const refusedEarly = run([
+            { itemId: undefined, type: "send" },
+            { error: "busy", itemId: undefined, live: undefined, type: "refused" },
+        ]).state;
+
+        expect(refusedEarly.phase.kind).toBe("idle");
+        expect(sendNowAction(refusedEarly, { itemId: "b", running: false, tried: false })).toBeUndefined();
         expect(sendNowAction(sending, { itemId: "b", running: false, tried: false })).toBeUndefined();
         expect(sendNowAction(unseen, { itemId: "b", running: false, tried: false })).toBeUndefined();
         expect(sendNowAction(stopping, { itemId: "b", running: true, tried: false })).toBeUndefined();
