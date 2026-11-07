@@ -139,6 +139,8 @@ export const offloadToolOutputMedia = async (
 
     const fileIds: string[] = [];
     let unsaved = 0;
+    /** Failed stores, logged once for the output: an outage would otherwise log once per image. */
+    const failed = { bytes: 0, count: 0, first: "" };
 
     /** Media that cannot be stored (markup, or text that is not plain base64): kept while the row's share lasts. */
     const keepInline = (value: string): Moved => {
@@ -188,7 +190,9 @@ export const offloadToolOutputMedia = async (
             return { kind: "stored", ref: toStorageRef(storageId) };
         } catch (error) {
             // The step must still save: a thrown save leaves its row pending for good.
-            storageLogger.warn("tool_output_media.store_failed", { error: error instanceof Error ? error.message : String(error), size, toolName });
+            failed.count += 1;
+            failed.bytes += size;
+            failed.first ||= error instanceof Error ? error.message : String(error);
 
             if (value.length <= inline.fallbackChars) {
                 inline.fallbackChars -= value.length;
@@ -280,6 +284,10 @@ export const offloadToolOutputMedia = async (
         if (results.some((item, index) => item !== items[index])) {
             next = { ...next, results };
         }
+    }
+
+    if (failed.count > 0) {
+        storageLogger.warn("tool_output_media.store_failed", { bytes: failed.bytes, count: failed.count, error: failed.first, toolName });
     }
 
     if (unsaved > 0) {
