@@ -29,7 +29,6 @@
         "lint:prettier:fix": "prettier --write . --ignore-path ../../.prettierignore --ignore-path .prettierignore",
         "lint:types": "tsc --noEmit",
         "lint:types:fast": "tsrs --noEmit",
-        "postinstall": "pnpm run cf:typegen && fumadocs-mdx",
         "preview": "npm run build && vite preview",
         "start": "node dist/server/index.mjs",
         "storybook": "storybook dev --port 6006 --no-open",
