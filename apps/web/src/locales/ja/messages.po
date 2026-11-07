@@ -1095,7 +1095,7 @@ msgstr "残り {minutes} 分"
 msgid "{modeLabel} mode — click to change"
 msgstr "{modeLabel}モード — クリックして変更"
 
-#: src/features/chat/thread/thread.tsx:237
+#: src/features/chat/thread/thread.tsx:243
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 msgstr "{modelCount, plural, other {# 個のモデルに何でも質問...}}"
 
@@ -2007,7 +2007,7 @@ msgstr "アクティブ日数"
 msgid "Active Sessions ({0})"
 msgstr "アクティブなセッション（{0}）"
 
-#: src/components/command-palette.tsx:447
+#: src/components/command-palette.tsx:508
 msgid "Active Threads"
 msgstr "アクティブなスレッド"
 
@@ -3324,7 +3324,7 @@ msgstr "匿名ユーザー"
 msgid "Anonymous users inactive for this many days become eligible for deletion."
 msgstr "この日数の間アクティブでない匿名ユーザーは削除の対象になります。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:295
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:321
 msgid "Another action already uses this key combination. Change or clear one of them to save."
 msgstr ""
 
@@ -3630,9 +3630,22 @@ msgstr "アーカイブ"
 msgid "Archive {0}"
 msgstr ""
 
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:71
+msgid "Archive open thread"
+msgstr ""
+
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:128
+msgid "Archive Open Thread"
+msgstr ""
+
+#. placeholder {0}: defaultShortcut("archiveThread")
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:147
+msgid "Archive the open thread, or restore it when it is archived ({0})"
+msgstr ""
+
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
-#: src/components/command-palette.tsx:415
-#: src/components/command-palette.tsx:555
+#: src/components/command-palette.tsx:476
+#: src/components/command-palette.tsx:631
 #: src/features/chat/thread-list/thread-node.tsx:115
 msgid "Archive thread"
 msgstr "スレッドをアーカイブ"
@@ -3644,7 +3657,7 @@ msgstr "スレッドをアーカイブ"
 msgid "Archived"
 msgstr "アーカイブ済み"
 
-#: src/components/command-palette.tsx:464
+#: src/components/command-palette.tsx:525
 msgid "Archived Threads"
 msgstr "アーカイブ済みのスレッド"
 
@@ -3674,6 +3687,7 @@ msgid "Are you sure you want to delete this item? This action cannot be undone."
 msgstr "この項目を削除してもよろしいですか？この操作は元に戻せません。"
 
 #: src/features/chat/thread-list/thread-node.tsx:1040
+#: src/features/chat/thread/thread-shortcuts-listener.tsx:66
 msgid "Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation."
 msgstr "このスレッドを削除してもよろしいですか？この操作は元に戻せず、この会話のすべてのメッセージが完全に削除されます。"
 
@@ -3795,7 +3809,7 @@ msgstr ""
 msgid "Ask a side question"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:106
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:129
 msgid "Ask a Side Question"
 msgstr ""
 
@@ -3803,7 +3817,7 @@ msgstr ""
 msgid "Ask a side question without interrupting the reply"
 msgstr ""
 
-#: src/features/chat/thread/thread.tsx:237
+#: src/features/chat/thread/thread.tsx:243
 msgid "Ask all models anything..."
 msgstr "すべてのモデルに何でも質問..."
 
@@ -5274,7 +5288,7 @@ msgstr "インポートをキャンセル"
 msgid "Cancel Invitation"
 msgstr "招待を取り消す"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:75
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:77
 msgid "Cancel or close"
 msgstr ""
 
@@ -6022,8 +6036,8 @@ msgstr "クリーンアップに失敗しました"
 #: src/features/prompts/components/prompt-list.tsx:615
 #: src/features/settings/components/chat/api-keys-settings.tsx:401
 #: src/features/settings/components/chat/models-settings.tsx:477
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:332
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:341
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:358
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
 msgid "Clear"
 msgstr "クリア"
 
@@ -6174,7 +6188,7 @@ msgstr ""
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
 #: ../../packages/ui/src/components/sheet.tsx:75
-#: src/components/command-palette.tsx:626
+#: src/components/command-palette.tsx:702
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:818
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
@@ -6194,7 +6208,7 @@ msgstr "閉じる"
 msgid "Close {0}"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:127
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:153
 msgid "Close dialogs and menus"
 msgstr "ダイアログとメニューを閉じる"
 
@@ -6532,7 +6546,7 @@ msgstr "コマンドは必須です"
 msgid "Command must be {SKILL_SLUG_MAX} characters or less"
 msgstr "コマンドは {SKILL_SLUG_MAX} 文字以内で入力してください"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:107
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:130
 #: src/features/settings/lib/settings-keywords.ts:36
 msgid "Command Palette"
 msgstr ""
@@ -7638,11 +7652,11 @@ msgstr "招待リンクをコピー"
 msgid "Copy it now — it is not shown again."
 msgstr "今すぐコピーしてください。再表示はされません。"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:73
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:74
 msgid "Copy last code block"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:108
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:131
 #: src/features/settings/lib/settings-keywords.ts:41
 msgid "Copy Last Code Block"
 msgstr ""
@@ -7689,7 +7703,7 @@ msgid "Copy the JSON configuration"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("copyLastCodeBlock")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:125
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:150
 msgid "Copy the last code block of the latest assistant reply ({0})"
 msgstr ""
 
@@ -8324,7 +8338,7 @@ msgstr "API キーを作成"
 msgid "Create bot"
 msgstr ""
 
-#: src/components/command-palette.tsx:403
+#: src/components/command-palette.tsx:464
 #: src/features/chat/thread-list/thread-node.tsx:692
 #: src/features/chat/thread-list/thread-node.tsx:715
 msgid "Create branch"
@@ -8624,7 +8638,7 @@ msgstr "キューバ"
 msgid "Currency Conversion"
 msgstr "通貨換算"
 
-#: src/components/command-palette.tsx:551
+#: src/components/command-palette.tsx:627
 #: src/features/auth/components/settings/security/session-cell.tsx:80
 #: src/features/projects/components/move-to-project-dialog.tsx:84
 #: src/features/prompts/components/prompt-history-dialog.tsx:136
@@ -8751,7 +8765,7 @@ msgstr "カスタマーメッセージングとサポートのプラットフォ
 msgid "Customization"
 msgstr "カスタマイズ"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:130
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:132
 msgid "Customize"
 msgstr ""
 
@@ -8759,7 +8773,7 @@ msgstr ""
 msgid "Customize and regenerate"
 msgstr "カスタマイズして再生成"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:270
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:296
 msgid "Customize keyboard shortcuts for common actions. Click \"Record\" and press your desired key combination."
 msgstr "よく使う操作のキーボードショートカットをカスタマイズします。「記録」をクリックして、使いたいキーの組み合わせを押してください。"
 
@@ -8984,7 +8998,7 @@ msgstr "目標を実行可能な計画に分解します。"
 msgid "Decrease number of images"
 msgstr "画像の枚数を減らす"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:109
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:132
 #: src/features/settings/lib/settings-keywords.ts:43
 msgid "Decrease Reasoning Effort"
 msgstr ""
@@ -9355,6 +9369,14 @@ msgstr "モデルを削除しますか？"
 msgid "Delete node"
 msgstr "ノードを削除"
 
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:133
+msgid "Delete Open Thread"
+msgstr ""
+
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:76
+msgid "Delete open thread (asks first)"
+msgstr ""
+
 #: src/features/auth/components/organization/delete-organization-card.tsx:37
 #: src/features/auth/components/organization/delete-organization-card.tsx:42
 #: src/features/auth/components/organization/delete-organization-dialog.tsx:90
@@ -9442,13 +9464,18 @@ msgstr "タスク「{deleteTitle}」を削除しますか？"
 msgid "Delete Team"
 msgstr "チームを削除"
 
+#. placeholder {0}: defaultShortcut("deleteThread")
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:152
+msgid "Delete the open thread after you confirm ({0})"
+msgstr ""
+
 #: src/features/evals/components/dataset-panel.tsx:328
 msgid "Delete this case?"
 msgstr "このケースを削除しますか？"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
-#: src/components/command-palette.tsx:421
-#: src/components/command-palette.tsx:579
+#: src/components/command-palette.tsx:482
+#: src/components/command-palette.tsx:655
 #: src/features/chat/thread-list/thread-node.tsx:1019
 #: src/features/chat/thread-list/thread-node.tsx:1037
 #: src/features/pages/components/page-comments-panel.tsx:188
@@ -9458,6 +9485,10 @@ msgstr "スレッドを削除"
 #: src/features/chat/thread-list/thread-node.tsx:1052
 msgid "Delete Thread"
 msgstr "スレッドを削除"
+
+#: src/features/chat/thread/thread-shortcuts-listener.tsx:80
+msgid "Delete thread?"
+msgstr ""
 
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:160
 msgid "Delete Threads"
@@ -11594,7 +11625,7 @@ msgstr "エラー: {error}"
 msgid "Errors"
 msgstr "エラー"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:110
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:134
 msgid "Escape"
 msgstr "Escape"
 
@@ -12900,7 +12931,7 @@ msgstr "お気に入りの状態を更新できませんでした"
 msgid "Failed to update filter rules"
 msgstr "フィルタールールを更新できませんでした"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:157
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:183
 msgid "Failed to update keyboard shortcuts"
 msgstr "キーボードショートカットを更新できませんでした"
 
@@ -13590,8 +13621,8 @@ msgstr ""
 msgid "Filter rules updated"
 msgstr "フィルタールールを更新しました"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:136
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:142
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:138
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:144
 msgid "Filter shortcuts"
 msgstr ""
 
@@ -13632,11 +13663,11 @@ msgstr "テーブル内を検索..."
 #: src/features/chat/thread/find/thread-find-bar.tsx:192
 #: src/features/chat/thread/find/thread-find-bar.tsx:200
 #: src/features/chat/thread/find/thread-find-bar.tsx:206
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:76
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:78
 msgid "Find in thread"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:111
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:135
 msgid "Find in Thread"
 msgstr ""
 
@@ -13772,7 +13803,7 @@ msgstr "焦点距離"
 msgid "Focal Length"
 msgstr "焦点距離"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:112
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:136
 #: src/features/settings/lib/settings-keywords.ts:40
 msgid "Focus Search"
 msgstr ""
@@ -14674,7 +14705,7 @@ msgstr "ツールを切り替えずに、アイデアから完成品まで。テ
 msgid "Go to chat"
 msgstr "チャットへ移動"
 
-#: src/components/command-palette.tsx:351
+#: src/components/command-palette.tsx:412
 #: src/routes/(public)/invite/$inviteToken.tsx:70
 msgid "Go to Chat"
 msgstr "チャットへ移動"
@@ -14683,7 +14714,7 @@ msgstr "チャットへ移動"
 msgid "Go to commented text: "
 msgstr "コメント箇所へ移動： "
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:77
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:79
 msgid "Go to first item"
 msgstr ""
 
@@ -14691,7 +14722,7 @@ msgstr ""
 msgid "Go to Home"
 msgstr "ホームへ移動"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:82
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:84
 msgid "Go to last item"
 msgstr ""
 
@@ -14712,11 +14743,11 @@ msgstr "次のページへ"
 msgid "Go to previous page"
 msgstr "前のページへ"
 
-#: src/components/command-palette.tsx:357
+#: src/components/command-palette.tsx:418
 msgid "Go to Prompts"
 msgstr "プロンプトへ移動"
 
-#: src/components/command-palette.tsx:369
+#: src/components/command-palette.tsx:430
 msgid "Go to Settings"
 msgstr "設定へ移動"
 
@@ -14741,7 +14772,7 @@ msgstr "スライド {slideNumber} へ移動"
 msgid "Go to step {0}"
 msgstr "ステップ {0} へ移動"
 
-#: src/components/command-palette.tsx:363
+#: src/components/command-palette.tsx:424
 msgid "Go to Vault"
 msgstr "ボールトへ移動"
 
@@ -15274,7 +15305,7 @@ msgstr "こんにちは、{0} さん！今日は何をしますか？"
 #: src/features/chat/signed-out/signed-out-chat.tsx:116
 #: src/features/layout/components/mobile-section-nav.tsx:72
 #: src/features/layout/components/sidebar-shortcut.tsx:301
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:113
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:137
 msgid "Help"
 msgstr "ヘルプ"
 
@@ -16296,7 +16327,7 @@ msgstr ""
 msgid "Increase number of images"
 msgstr "画像の枚数を増やす"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:114
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:138
 #: src/features/settings/lib/settings-keywords.ts:42
 msgid "Increase Reasoning Effort"
 msgstr ""
@@ -16875,7 +16906,7 @@ msgstr "ジャッジスコア"
 msgid "Judge: {0}"
 msgstr "ジャッジ：{0}"
 
-#: src/features/chat/thread/thread.tsx:92
+#: src/features/chat/thread/thread.tsx:94
 msgid "Jump to my last message"
 msgstr ""
 
@@ -16968,13 +16999,13 @@ msgstr ""
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
 #: src/features/chat/signed-out/signed-out-chat.tsx:153
 #: src/features/chat/thread-list/thread-list-header.tsx:146
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:122
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:124
 #: src/features/workflow/components/canvas/workflow-controls.tsx:374
 msgid "Keyboard shortcuts"
 msgstr "キーボードショートカット"
 
 #: src/features/layout/lib/dashboard-page-names.ts:25
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:268
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:294
 #: src/features/settings/lib/settings-keywords.ts:36
 #: src/features/settings/lib/settings-keywords.ts:37
 #: src/features/settings/lib/settings-keywords.ts:38
@@ -16995,11 +17026,11 @@ msgstr "キーボードショートカット"
 msgid "Keyboard shortcuts (?)"
 msgstr "キーボードショートカット（?）"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:253
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:279
 msgid "Keyboard shortcuts reset to defaults"
 msgstr "キーボードショートカットを既定に戻しました"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:168
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:194
 msgid "Keyboard shortcuts updated successfully"
 msgstr "キーボードショートカットを更新しました"
 
@@ -17506,7 +17537,7 @@ msgstr "接続されたノードの入力を使う場合は空欄のままにし
 msgid "Leave Organization"
 msgstr "組織から退出"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:83
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:85
 msgid "Leave selection or navigation"
 msgstr ""
 
@@ -18331,11 +18362,11 @@ msgstr "低い = 控えめな変化、高い = 大幅な変換"
 msgid "Lower cost than Wan 2.5"
 msgstr "Wan 2.5 より低コスト"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:74
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:75
 msgid "Lower reasoning effort"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:126
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:151
 msgid "Lower the composer's reasoning effort by one step. Not bound by default."
 msgstr ""
 
@@ -19019,7 +19050,7 @@ msgstr "メッセージのバージョン"
 msgid "Message..."
 msgstr "メッセージ..."
 
-#: src/components/command-palette.tsx:483
+#: src/components/command-palette.tsx:544
 #: src/features/chat/sharing/shared-thread-page.tsx:151
 #: src/features/chat/thread-list/search-bar.tsx:57
 msgid "Messages"
@@ -20052,7 +20083,7 @@ msgid "navigate"
 msgstr "移動"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:110
-#: src/components/command-palette.tsx:612
+#: src/components/command-palette.tsx:688
 msgid "Navigate"
 msgstr "移動"
 
@@ -20064,7 +20095,7 @@ msgstr "移動 → {url}"
 msgid "Navigate between cells"
 msgstr "セル間を移動"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:84
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:86
 msgid "Navigate threads"
 msgstr "スレッド間を移動"
 
@@ -20081,7 +20112,7 @@ msgid "Navigating to {target}..."
 msgstr "{target} に移動しています..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:132
-#: src/components/command-palette.tsx:376
+#: src/components/command-palette.tsx:437
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:66
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:59
 msgid "Navigation"
@@ -20289,7 +20320,7 @@ msgid "New case"
 msgstr "新しいケース"
 
 #: src/components/not-found.tsx:10
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:87
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:89
 msgid "New chat"
 msgstr "新しいチャット"
 
@@ -20300,7 +20331,7 @@ msgstr "新しいチャット"
 #: src/features/chat/signed-out/signed-out-chat.tsx:305
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:263
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:159
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:115
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:139
 #: src/features/settings/lib/settings-keywords.ts:37
 msgid "New Chat"
 msgstr "新しいチャット"
@@ -20402,16 +20433,16 @@ msgstr "新しいタスク"
 msgid "New task run · earlier messages were not sent to the model"
 msgstr "新しいタスク実行 · 以前のメッセージはモデルに送信されていません"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:88
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:90
 msgid "New temporary chat"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:116
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:140
 #: src/features/settings/lib/settings-keywords.ts:38
 msgid "New Temporary Chat"
 msgstr "新しい一時チャット"
 
-#: src/components/command-palette.tsx:392
+#: src/components/command-palette.tsx:453
 msgid "New temporary thread"
 msgstr "新しい一時スレッド"
 
@@ -20419,7 +20450,7 @@ msgstr "新しい一時スレッド"
 msgid "New this week"
 msgstr "今週の新着"
 
-#: src/components/command-palette.tsx:385
+#: src/components/command-palette.tsx:446
 msgid "New thread"
 msgstr "新しいスレッド"
 
@@ -20468,7 +20499,7 @@ msgstr "次のブランチ"
 msgid "next gen"
 msgstr "次世代"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:89
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:91
 msgid "Next item"
 msgstr ""
 
@@ -21035,7 +21066,7 @@ msgstr "結果が見つかりません"
 msgid "No results found for “{searchTerm}”"
 msgstr "“{searchTerm}” の結果が見つかりません"
 
-#: src/components/command-palette.tsx:534
+#: src/components/command-palette.tsx:610
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "No results found."
 msgstr "結果が見つかりません。"
@@ -21056,7 +21087,7 @@ msgstr "スプレッドシートにシートが見つかりません"
 msgid "No shortcuts found"
 msgstr "ショートカットが見つかりません"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:169
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:171
 msgid "No shortcuts match \"{query}\"."
 msgstr ""
 
@@ -21372,8 +21403,8 @@ msgstr ""
 msgid "Not read yet."
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:307
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:312
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:333
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:338
 #: src/features/settings/components/privacy/data-access.tsx:36
 msgid "Not set"
 msgstr "未設定"
@@ -21893,7 +21924,7 @@ msgid "Opacity"
 msgstr "不透明度"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:679
-#: src/components/command-palette.tsx:618
+#: src/components/command-palette.tsx:694
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-view.tsx:73
 #: src/features/tasks/hooks/use-task-notifications.ts:30
@@ -21922,7 +21953,7 @@ msgstr "変更を含むプルリクエストを作成（GitHub、GitHub コネ�
 msgid "Open as page"
 msgstr "ページとして開く"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:72
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:73
 msgid "Open command palette"
 msgstr ""
 
@@ -22000,11 +22031,11 @@ msgstr "メニューを開く"
 msgid "Open messages"
 msgstr "メッセージを開く"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:90
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:92
 msgid "Open model picker"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:117
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:141
 #: src/features/settings/lib/settings-keywords.ts:39
 msgid "Open Model Picker"
 msgstr ""
@@ -22105,7 +22136,7 @@ msgid "Open the agent's conversation"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("commandPalette")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:124
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:149
 msgid "Open the command palette and global search ({0})"
 msgstr ""
 
@@ -22114,7 +22145,7 @@ msgid "Open the Developer tab and start the server."
 msgstr "Developer タブを開いてサーバーを起動してください。"
 
 #. placeholder {0}: defaultShortcut("openModelPicker")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:134
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:160
 msgid "Open the model picker in the composer ({0})"
 msgstr ""
 
@@ -22129,7 +22160,7 @@ msgid "Open the run's conversation"
 msgstr "実行の会話を開く"
 
 #. placeholder {0}: defaultShortcut("askAside")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:123
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:148
 msgid "Open the side-question panel without interrupting a running reply ({0})"
 msgstr ""
 
@@ -22138,11 +22169,11 @@ msgid "Open the sub-agent's thread"
 msgstr "サブエージェントのスレッドを開く"
 
 #. placeholder {0}: defaultShortcut("focusSearch")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:129
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:155
 msgid "Open the thread list search and focus it ({0})"
 msgstr ""
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:85
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:87
 msgid "Open thread"
 msgstr "スレッドを開く"
 
@@ -23450,7 +23481,7 @@ msgid "Pin message"
 msgstr "メッセージをピン留め"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:409
+#: src/components/command-palette.tsx:470
 #: src/features/chat/thread-list/thread-node.tsx:107
 msgid "Pin thread"
 msgstr "スレッドをピン留め"
@@ -23917,7 +23948,7 @@ msgstr "Enter で送信、Shift+Enter で改行"
 msgid "Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default."
 msgstr "Escape で入力モードを終えると、h j k l、w b、0 $、i a I A、o O、x、dd、D、u で編集できます。Enter は引き続き送信します。既定では無効です。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:311
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:337
 msgid "Press keys..."
 msgstr "キーを押してください..."
 
@@ -24013,7 +24044,7 @@ msgstr "前回のエクスポートはキャンセルされました"
 msgid "Previous generation high-quality model for complex scenes"
 msgstr "複雑なシーン向けの旧世代の高品質モデル"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:91
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:93
 msgid "Previous item"
 msgstr ""
 
@@ -24817,11 +24848,11 @@ msgstr "半径"
 msgid "rag"
 msgstr ""
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:81
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:83
 msgid "Raise reasoning effort"
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:131
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:157
 msgid "Raise the composer's reasoning effort by one step. Not bound by default."
 msgstr ""
 
@@ -25221,12 +25252,12 @@ msgstr "サーバーに再接続しています…"
 msgid "Reconnecting…"
 msgstr "再接続しています…"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:316
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:329
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:342
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:355
 msgid "Record"
 msgstr "記録"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:71
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:72
 msgid "Record audio"
 msgstr ""
 
@@ -26101,7 +26132,7 @@ msgid "Reset to defaults"
 msgstr "デフォルトに戻す"
 
 #: src/features/settings/components/chat/models-settings.tsx:381
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:358
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:384
 msgid "Reset to Defaults"
 msgstr "既定に戻す"
 
@@ -26887,7 +26918,7 @@ msgstr "プリセットを保存"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "再利用可能なシステムプロンプトを保存し、特定のモデルに紐付けます。「最適化」ボタンで、プロンプトオプティマイザーを使って各プリセットを改善できます。"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:365
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:391
 msgid "Save Shortcuts"
 msgstr "ショートカットを保存"
 
@@ -26946,7 +26977,7 @@ msgstr "「{0}」に保存しました"
 #: src/features/settings/components/chat/native-providers-settings.tsx:711
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:247
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:365
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:391
 #: src/features/slides/components/slide-editor-dialog.tsx:117
 msgid "Saving..."
 msgstr "保存しています..."
@@ -27053,7 +27084,7 @@ msgstr "列を 1 ページ左にスクロール"
 msgid "Scroll right one page of columns"
 msgstr "列を 1 ページ右にスクロール"
 
-#: src/features/chat/thread/thread.tsx:98
+#: src/features/chat/thread/thread.tsx:100
 msgid "Scroll to bottom"
 msgstr "一番下までスクロール"
 
@@ -27263,7 +27294,7 @@ msgid "Search the marketplace"
 msgstr "マーケットプレイスを検索"
 
 #. placeholder {0}: defaultShortcut("findInThread")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:128
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:154
 msgid "Search the open thread's messages and highlight the matches. Leave it unbound to keep the browser's find ({0})"
 msgstr ""
 
@@ -27277,7 +27308,7 @@ msgstr "スレッドのタイトルを検索..."
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:144
 #: src/features/chat/thread-list/thread-list-header.tsx:70
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:78
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:80
 msgid "Search threads"
 msgstr "スレッドを検索"
 
@@ -27285,7 +27316,7 @@ msgstr "スレッドを検索"
 msgid "Search threads ({focusSearchShortcut})"
 msgstr ""
 
-#: src/components/command-palette.tsx:532
+#: src/components/command-palette.tsx:608
 msgid "Search threads, navigate, or perform actions..."
 msgstr "スレッドの検索、移動、操作の実行..."
 
@@ -27425,7 +27456,7 @@ msgstr "音声を選択"
 msgid "Select all"
 msgstr "すべて選択"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:86
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:88
 msgid "Select all (in selection mode)"
 msgstr ""
 
@@ -28102,7 +28133,7 @@ msgid "Show follow-up suggestions after assistant messages."
 msgstr "アシスタントのメッセージの後にフォローアップの提案を表示します。"
 
 #. placeholder {0}: defaultShortcut("help")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:130
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:156
 msgid "Show help dialog ({0})"
 msgstr "ヘルプダイアログを表示（{0}）"
 
@@ -28111,11 +28142,11 @@ msgid "Show installed models in picker"
 msgstr "インストール済みのモデルをモデル選択に表示"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:282
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:79
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:81
 msgid "Show keyboard shortcuts"
 msgstr "キーボードショートカットを表示"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:80
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:82
 msgid "Show keyboard shortcuts (outside text fields)"
 msgstr ""
 
@@ -28235,12 +28266,12 @@ msgstr ""
 msgid "Sidebar"
 msgstr "サイドバー"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:118
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:142
 #: src/features/settings/lib/settings-keywords.ts:44
 msgid "Sidebar Left"
 msgstr "サイドバーを左に"
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:119
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:143
 #: src/features/settings/lib/settings-keywords.ts:45
 msgid "Sidebar Right"
 msgstr "サイドバーを右に"
@@ -29224,7 +29255,7 @@ msgid "Start a new chat"
 msgstr "新しいチャットを開始"
 
 #. placeholder {0}: defaultShortcut("newChat")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:132
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:158
 msgid "Start a new chat ({0})"
 msgstr "新しいチャットを開始（{0}）"
 
@@ -29237,7 +29268,7 @@ msgid "Start a new conversation to create your first thread"
 msgstr "新しい会話を始めて、最初のスレッドを作成しましょう"
 
 #. placeholder {0}: defaultShortcut("newTemporaryChat")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:133
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:159
 msgid "Start a new temporary chat ({0})"
 msgstr "新しい一時チャットを開始（{0}）"
 
@@ -29500,8 +29531,8 @@ msgstr "株式"
 #: src/features/chat/host/host-composer.tsx:890
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 #: src/features/develop/components/watched-repositories.tsx:86
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:316
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:329
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:342
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:355
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
 #: src/features/sub-agents/components/worker-stop-bar.tsx:56
 #: src/features/workflow/components/canvas/workflow-controls.tsx:618
@@ -30917,7 +30948,7 @@ msgstr ""
 msgid "That is not a repository address."
 msgstr ""
 
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:174
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:200
 msgid "That key combination cannot be used as a shortcut"
 msgstr ""
 
@@ -31270,7 +31301,7 @@ msgstr "インポートしたファイルは空のようです。"
 msgid "The improved prompt will appear here..."
 msgstr "改善されたプロンプトがここに表示されます..."
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:124
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:126
 msgid "The keys you have set now."
 msgstr ""
 
@@ -32226,7 +32257,7 @@ msgstr ""
 msgid "Thread"
 msgstr "スレッド"
 
-#: src/components/command-palette.tsx:428
+#: src/components/command-palette.tsx:489
 msgid "Thread Actions"
 msgstr "スレッドの操作"
 
@@ -32453,12 +32484,12 @@ msgstr "要素パレットの表示を切り替え"
 msgid "Toggle interactivity"
 msgstr ""
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:92
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:94
 msgid "Toggle left sidebar"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("sidebarLeft")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:135
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:161
 msgid "Toggle left sidebar ({0})"
 msgstr "左サイドバーの切り替え（{0}）"
 
@@ -32476,12 +32507,12 @@ msgstr "メニューの切り替え"
 msgid "Toggle property panel"
 msgstr "プロパティパネルの表示を切り替え"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:93
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:95
 msgid "Toggle right sidebar"
 msgstr ""
 
 #. placeholder {0}: defaultShortcut("sidebarRight")
-#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:136
+#: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:162
 msgid "Toggle right sidebar ({0})"
 msgstr "右サイドバーの切り替え（{0}）"
 
@@ -33217,8 +33248,8 @@ msgstr "超広角、建築的"
 msgid "unarchive"
 msgstr "アーカイブ解除"
 
-#: src/components/command-palette.tsx:415
-#: src/components/command-palette.tsx:555
+#: src/components/command-palette.tsx:476
+#: src/components/command-palette.tsx:631
 #: src/features/chat/thread-list/thread-node.tsx:115
 msgid "Unarchive thread"
 msgstr "スレッドのアーカイブを解除"
@@ -33407,7 +33438,7 @@ msgid "Unpin memory"
 msgstr "メモリのピン留めを解除"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:409
+#: src/components/command-palette.tsx:470
 #: src/features/chat/thread-list/thread-node.tsx:107
 msgid "Unpin thread"
 msgstr "スレッドのピン留めを解除"
@@ -33462,9 +33493,9 @@ msgstr "無題"
 msgid "Untitled chat"
 msgstr "無題のチャット"
 
-#: src/components/command-palette.tsx:218
-#: src/components/command-palette.tsx:229
-#: src/components/command-palette.tsx:475
+#: src/components/command-palette.tsx:272
+#: src/components/command-palette.tsx:285
+#: src/components/command-palette.tsx:536
 #: src/features/chat/core/hooks/use-thread-manager.ts:234
 msgid "Untitled Thread"
 msgstr "無題のスレッド"
