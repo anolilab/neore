@@ -389,16 +389,22 @@ export const getProjectBreakdown = authQuery
         };
     });
 
-/** The caller's replies, tokens and cost in one project from `fromDate` on. */
+/** Project rows one project read sums: a project row per day (and per organization it was filed under) for a year. */
+const PROJECT_USAGE_ROW_LIMIT = HEATMAP_DAYS * 2;
+
+/**
+ * The caller's replies, tokens and cost in one project from `fromDate` on. `truncated` is set when the period held more
+ * rows than one read sums — the oldest days are the ones left out.
+ */
 export const getProjectUsage = authQuery
     .input({ fromDate: vDayKey(), projectId: v.id("projects") })
-    .output(v.object({ ...vTotals }))
+    .output(v.object({ ...vTotals, truncated: v.boolean() }))
     .query(async ({ args, ctx }) => {
         const { page } = await ctx.db.usageDaily.findMany({
-            limit: HEATMAP_DAYS * 2,
+            limit: PROJECT_USAGE_ROW_LIMIT + 1,
             orderBy: [{ date: "desc" }],
             where: { date: { gte: args.fromDate }, projectKey: args.projectId as string, userId: ctx.user.userId },
         });
 
-        return sumRows(page);
+        return { ...sumRows(page.slice(0, PROJECT_USAGE_ROW_LIMIT)), truncated: page.length > PROJECT_USAGE_ROW_LIMIT };
     });

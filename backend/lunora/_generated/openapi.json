@@ -55894,12 +55894,16 @@
                     },
                     "tokens": {
                       "type": "number"
+                    },
+                    "truncated": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
                     "costMicrodollars",
                     "replies",
-                    "tokens"
+                    "tokens",
+                    "truncated"
                   ],
                   "type": "object"
                 }

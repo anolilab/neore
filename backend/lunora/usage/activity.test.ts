@@ -167,8 +167,15 @@ describe("usage by project", () => {
     const projectBreakdown = async (userId: string, fromDate: string): Promise<ProjectBreakdown> =>
         (await as(userId).query(getProjectBreakdown as never, { fromDate } as never)) as ProjectBreakdown;
 
-    const projectUsage = async (userId: string, projectId: string, fromDate: string): Promise<Totals> =>
-        (await as(userId).query(getProjectUsage as never, { fromDate, projectId } as never)) as Totals;
+    const projectUsage = async (userId: string, projectId: string, fromDate: string): Promise<Totals> => {
+        const { truncated, ...totals } = (await as(userId).query(getProjectUsage as never, { fromDate, projectId } as never)) as Totals & {
+            truncated: boolean;
+        };
+
+        expect(truncated).toBe(false);
+
+        return totals;
+    };
 
     /** A project of `userId`'s and a thread of theirs in it (or in none). */
     const insertThread = async (userId: string, title?: string): Promise<{ projectId?: string; threadId: string }> =>
@@ -229,5 +236,34 @@ describe("usage by project", () => {
         const theirs = await projectBreakdown(OTHER, "2026-09-01");
 
         expect(theirs.projects).toStrictEqual([]);
+    });
+
+    it("says when a project's period held more rows than one read sums", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+
+        await harness.run(async (ctx: any) => {
+            for (let day = 0; day <= 53 * 7 * 2; day += 1) {
+                const date = new Date(Date.UTC(2025, 0, 1) + day * 86_400_000).toISOString().slice(0, 10);
+
+                await ctx.db.insert("usageDaily", {
+                    costMicrodollars: 1,
+                    date,
+                    projectKey: alpha.projectId,
+                    replies: 1,
+                    skillKey: "__project__",
+                    tokens: 1,
+                    updatedAt: 1,
+                    userId: USER,
+                });
+            }
+        });
+
+        const result = (await as(USER).query(getProjectUsage as never, { fromDate: "2025-01-01", projectId: alpha.projectId } as never)) as {
+            costMicrodollars: number;
+            truncated: boolean;
+        };
+
+        expect(result.truncated).toBe(true);
+        expect(result.costMicrodollars).toBe(53 * 7 * 2);
     });
 });

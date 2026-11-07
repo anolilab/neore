@@ -61,6 +61,7 @@ const ProjectUsageSummary = ({ projectId }: ProjectUsageSummaryProps) => {
                     ))}
                 </dl>
             )}
+            {data?.truncated && <p className="text-muted-foreground text-xs">{t`Only part of this period is included.`}</p>}
         </section>
     );
 };
