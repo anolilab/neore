@@ -15,6 +15,7 @@ import { createAuthRetrySession, renewBearer, retryOnUnauthorized } from "./mcp-
 import { createProgressCall, runWithProgressCall } from "./mcp-progress";
 import type { ToolProgressSink } from "./mcp-progress";
 import { attachProgressTokens } from "./mcp-progress-transport";
+import { fingerprintMcpTool } from "./mcp-tool-fingerprint";
 import type { ToolAnnotationHints } from "./tool-permissions";
 import { readMcpAnnotations } from "./tool-permissions";
 
@@ -54,6 +55,11 @@ export interface MCPToolDescriptor {
     annotations?: ToolAnnotationHints;
     /** The connector this tool came through, if any. */
     connectorSlug?: string;
+    /**
+     * What the tool was when listed (`mcp-tool-fingerprint.ts`): an approval continuation compares it with the server's current one.
+     * Absent when it could not be hashed: a pause then does not pin the tool, and a continuation finding it absent does not run the call.
+     */
+    fingerprint?: string;
     serverName: string;
     toolName: string;
     /** The saved server's address, for a server that is not a connector: two servers can share a name, so trust is keyed on the pair. */
@@ -259,7 +265,8 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
     const results = await Promise.allSettled(enabledServers.map((server) => connectToMCPServer(server)));
 
     const tools: ToolSet = {};
-    const descriptors = new Map<string, MCPToolDescriptor>();
+    const taken = { has: (name: string) => Object.hasOwn(tools, name) };
+    const listed: { runtimeName: string; source: Omit<MCPToolDescriptor, "fingerprint">; tool: Tool }[] = [];
     const clients: MCPClient[] = [];
     const errors: { error: string; serverName: string }[] = [];
 
@@ -287,18 +294,22 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
             });
 
             for (const [toolName, tool] of Object.entries(serverTools)) {
-                const runtimeName = mcpRuntimeToolName(server.name, toolName, descriptors);
+                const runtimeName = mcpRuntimeToolName(server.name, toolName, taken);
                 const annotations = readMcpAnnotations(tool);
 
                 const wrapped = session.wrap(toolName, tool);
 
                 tools[runtimeName] = progress ? withProgress(wrapped, { serverName: server.name, toolName }, progress) : wrapped;
-                descriptors.set(runtimeName, {
-                    ...(annotations && { annotations }),
-                    ...(server.connectorSlug && { connectorSlug: server.connectorSlug }),
-                    serverName: server.name,
-                    toolName,
-                    ...(!server.connectorSlug && { url: server.url }),
+                listed.push({
+                    runtimeName,
+                    source: {
+                        ...(annotations && { annotations }),
+                        ...(server.connectorSlug && { connectorSlug: server.connectorSlug }),
+                        serverName: server.name,
+                        toolName,
+                        ...(!server.connectorSlug && { url: server.url }),
+                    },
+                    tool,
                 });
             }
         } else {
@@ -307,6 +318,25 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
             errors.push({ error: errorMessage, serverName: server.name });
         }
     }
+
+    // Hashed from the tool as its server listed it, before any wrapper. A tool that cannot be hashed keeps working, unpinned.
+    const fingerprints = await Promise.all(
+        listed.map(
+            async ({ source, tool }) =>
+                await fingerprintMcpTool(tool, source).catch((error: unknown) => {
+                    toolsLogger.warn(`[MCP] Could not fingerprint "${source.toolName}" of "${source.serverName}":`, error);
+
+                    return undefined;
+                }),
+        ),
+    );
+    const descriptors = new Map<string, MCPToolDescriptor>(
+        listed.map(({ runtimeName, source }, index) => {
+            const fingerprint = fingerprints[index];
+
+            return [runtimeName, { ...source, ...(fingerprint !== undefined && { fingerprint }) }];
+        }),
+    );
 
     toolsLogger.debug(`[MCP] Total MCP tools available: ${Object.keys(tools).length} from ${clients.length} server(s)`);
 

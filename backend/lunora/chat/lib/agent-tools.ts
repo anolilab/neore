@@ -104,6 +104,8 @@ export interface BuildAgentToolsResult {
     mcpLabels: McpToolLabels;
     /** Enabled MCP servers this run connected to — recorded in approval snapshots. */
     mcpServerNames: string[];
+    /** Runtime name -> fingerprint, for every MCP tool in `tools` (`mcp-tool-fingerprint.ts`). Recorded in approval snapshots. */
+    mcpToolFingerprints: Record<string, string>;
     /**
      * Runtime tool name -> stable permission key, for every tool in `tools`.
      * Recorded in approval snapshots so "Always allow" writes the right key
@@ -280,12 +282,17 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
     const permissionKeys = Object.fromEntries(Object.keys(tools).map((name) => [name, describe(name)?.key ?? toolPermissionKey("builtin", name)]));
     const mcpLabels: McpToolLabels = {};
+    const mcpToolFingerprints: Record<string, string> = {};
 
     for (const name of Object.keys(tools)) {
         const mcp = mcpResult.descriptors.get(name);
 
         if (mcp) {
             mcpLabels[name] = { serverName: mcp.serverName, toolName: mcp.toolName };
+
+            if (mcp.fingerprint !== undefined) {
+                mcpToolFingerprints[name] = mcp.fingerprint;
+            }
         }
 
         // Shown like an MCP call, with the device's name as the "server".
@@ -301,6 +308,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         mcpClients: mcpResult.clients,
         mcpLabels,
         mcpServerNames: selectedServers.map((s) => s.name),
+        mcpToolFingerprints,
         permissionKeys,
         repeatable: Object.keys(tools).filter((name) => isSafeToRepeat(name, describe(name))),
         tools,

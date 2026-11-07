@@ -511,7 +511,7 @@ export const runStreamingAgent = internalAction
                               untrustedContext: untrustedContext.catch(() => true),
                               userId,
                           })
-                        : { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, repeatable: [], tools: {} },
+                        : { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], mcpToolFingerprints: {}, permissionKeys: {}, repeatable: [], tools: {} },
                     runContextPromise,
                 ]);
 
@@ -827,6 +827,7 @@ export const runStreamingAgent = internalAction
                             ...(origin === "outside_agent" && { dispatchOrigin: origin }),
                             instructions: streamTextArgs.system ?? agent.options.instructions,
                             mcpServerNames: toolResult.mcpServerNames,
+                            mcpToolFingerprints: toolResult.mcpToolFingerprints,
                             // A run that pauses extracts at the pause; its continuation extracts only the steers it takes.
                             memory: memoryToCarry({ botId: runContext.botId, extractMemory, prompt }),
                             model,

@@ -25,6 +25,9 @@ const SERVER_TOOLS: Record<string, Record<string, unknown>> = {
 
 const OAUTH_URL = "https://oauth.example/mcp";
 
+/** What `fingerprintMcpTool` returns: a short hex hash. */
+const FINGERPRINT = /^[0-9a-f]{32}$/u;
+
 vi.mock("@ai-sdk/mcp", () => {
     return {
         createMCPClient: async ({ transport }: { transport: { headers?: Record<string, string>; url: string } }) => {
@@ -64,12 +67,28 @@ describe("getMCPTools", () => {
         const result = await getMCPTools([server("my server", "https://a.example/mcp"), server("my_server", "https://b.example/mcp")]);
 
         expect(Object.keys(result.tools)).toStrictEqual(["mcp_my_server__delete", "mcp_my_server__delete_2", "mcp_my_server__list"]);
+        const fingerprint = expect.stringMatching(FINGERPRINT);
+
         expect(Object.fromEntries(result.descriptors)).toStrictEqual({
-            mcp_my_server__delete: { annotations: { destructiveHint: true }, serverName: "my server", toolName: "delete", url: "https://a.example/mcp" },
-            mcp_my_server__delete_2: { annotations: { readOnlyHint: true }, serverName: "my_server", toolName: "delete", url: "https://b.example/mcp" },
-            mcp_my_server__list: { serverName: "my_server", toolName: "list", url: "https://b.example/mcp" },
+            mcp_my_server__delete: {
+                annotations: { destructiveHint: true },
+                fingerprint,
+                serverName: "my server",
+                toolName: "delete",
+                url: "https://a.example/mcp",
+            },
+            mcp_my_server__delete_2: {
+                annotations: { readOnlyHint: true },
+                fingerprint,
+                serverName: "my_server",
+                toolName: "delete",
+                url: "https://b.example/mcp",
+            },
+            mcp_my_server__list: { fingerprint, serverName: "my_server", toolName: "list", url: "https://b.example/mcp" },
         });
         expect((result.tools["mcp_my_server__delete_2"] as { description?: string }).description).toBe("b delete");
+        // Two servers' tools of one name are told apart, so a runtime name that moves to the other server reads as changed.
+        expect(result.descriptors.get("mcp_my_server__delete")?.fingerprint).not.toBe(result.descriptors.get("mcp_my_server__delete_2")?.fingerprint);
     });
 
     it("names the same servers the same way on a rebuild", async () => {
