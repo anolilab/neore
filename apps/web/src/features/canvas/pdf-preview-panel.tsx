@@ -17,6 +17,29 @@ const PdfViewer = lazy(() => import("@neore/ui/components/file-renderers/pdf-vie
 // The backend serves the signed storage URLs, so its origin is the one the viewer and the download may fetch from.
 const PANEL_ORIGINS = originsOf(import.meta.env.VITE_LUNORA_URL as string | undefined);
 
+/** How long a download may go without receiving any bytes before it is failed, as the viewer fails a stalled load. */
+const DOWNLOAD_STALL_MS = 30_000;
+
+/**
+ * The response body as a blob, read chunk by chunk: each chunk restarts `restartDeadline`, so a body that stops arriving
+ * is aborted by it rather than leaving the download pending.
+ */
+const readBody = async (response: Response, restartDeadline: () => void): Promise<Blob> => {
+    if (!response.body) {
+        return await response.blob();
+    }
+
+    const chunks: BlobPart[] = [];
+    const reader = response.body.getReader();
+
+    for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+        chunks.push(new Uint8Array(chunk.value));
+        restartDeadline();
+    }
+
+    return new Blob(chunks, { type: response.headers.get("content-type") ?? "application/pdf" });
+};
+
 /** How long a downloaded PDF's object URL stays valid: long enough for the browser to start the download. */
 const DOWNLOAD_URL_LIFETIME_MS = 60_000;
 
@@ -96,6 +119,23 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
 
         pendingDownload.current = attempt;
 
+        let stalled = false;
+        let deadline: ReturnType<typeof setTimeout> | undefined;
+        const restartDeadline = () => {
+            clearTimeout(deadline);
+            deadline = setTimeout(() => {
+                // Already left for another file or a closed panel: not a stall to report.
+                if (attempt.signal.aborted) {
+                    return;
+                }
+
+                stalled = true;
+                attempt.abort();
+            }, DOWNLOAD_STALL_MS);
+        };
+
+        restartDeadline();
+
         try {
             const response = await fetch(url, { signal: attempt.signal });
 
@@ -103,7 +143,7 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
                 throw new Error("The PDF could not be fetched.");
             }
 
-            const blob = await response.blob();
+            const blob = await readBody(response, restartDeadline);
 
             if (attempt.signal.aborted) {
                 return;
@@ -124,7 +164,8 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
             }, DOWNLOAD_URL_LIFETIME_MS);
             setFailedUrl(undefined);
         } catch (error) {
-            if (attempt.signal.aborted) {
+            // Left for another file or a closed panel: nothing to report. A stalled download is a failure to report.
+            if (attempt.signal.aborted && !stalled) {
                 return;
             }
 
@@ -132,6 +173,8 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
             setFailedUrl(file.url);
             showError(t`The PDF could not be downloaded.`);
         } finally {
+            clearTimeout(deadline);
+
             if (pendingDownload.current === attempt) {
                 pendingDownload.current = null;
             }
@@ -177,12 +220,16 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
                 </p>
             )}
             <div className="flex min-h-0 flex-1 flex-col p-2">
+                {/* Keyed by file, so a viewer failure is that file's: the next PDF opened in the panel gets a fresh viewer. The
+                    inline alert is the message; no toast on top of it. */}
                 <ErrorBoundary
                     fallback={() => (
                         <p className="text-muted-foreground text-sm" role="alert">
                             {t`This preview could not be loaded.`}
                         </p>
                     )}
+                    key={file.url}
+                    showToast={false}
                 >
                     <Suspense fallback={<span className="text-muted-foreground text-sm" role="status">{t`Loading preview…`}</span>}>
                         {/* A new file is a new viewer: the page and zoom of the last one do not carry over. */}

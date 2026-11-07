@@ -4,10 +4,11 @@
  * A download belongs to the document it started for. Switching to another document while it is still fetching must not save
  * the one the reader left, and a download after the switch fetches the document on screen.
  */
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PreviewFile } from "@/features/chat/core/stores/chat-ui-store";
+import { showError } from "@/lib/toast";
 
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -26,7 +27,15 @@ vi.mock("@/lib/toast", () => {
 
 // The viewer is lazy and needs pdf.js; the download does not read it.
 vi.mock("@neore/ui/components/file-renderers/pdf-viewer", () => {
-    return { default: () => null };
+    return {
+        default: ({ url }: { url: string }) => {
+            if (url.includes("broken")) {
+                throw new Error("viewer failed");
+            }
+
+            return null;
+        },
+    };
 });
 
 // The panel reads its backend origin at load, so the origin is set before the module is imported.
@@ -156,5 +165,53 @@ describe("the side panel's opener and links", () => {
         clickDownload();
 
         expect(fetchSpy).toHaveBeenCalledWith(resigned, expect.anything());
+    });
+});
+
+describe("the side panel's failures", () => {
+    beforeEach(() => {
+        vi.stubGlobal("fetch", fetchSpy);
+    });
+
+    afterEach(() => {
+        pendingFetches.length = 0;
+        fetchSpy.mockClear();
+        vi.unstubAllGlobals();
+        vi.useRealTimers();
+        vi.mocked(showError).mockClear();
+    });
+
+    it("reports a download that stops arriving, rather than leaving it pending", async () => {
+        vi.useFakeTimers();
+        // A request that never answers, and fails only when it is aborted, as a real fetch does.
+        vi.stubGlobal(
+            "fetch",
+            (_url: string, init: RequestInit) =>
+                new Promise<Response>((_resolve, reject) => {
+                    init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+                }),
+        );
+        render(panelFor(DOCUMENT_A));
+        clickDownload();
+
+        await act(async () => {
+            vi.advanceTimersByTime(30_000);
+        });
+
+        expect(screen.getByRole("alert").textContent).toBe("The PDF could not be downloaded.");
+    });
+
+    it("keeps a viewer failure to its own file, without a toast, so the next PDF opens", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        const { rerender } = render(panelFor({ ...DOCUMENT_A, url: "https://api.example/files/broken.pdf?sig=x" }));
+
+        expect(await screen.findByText("This preview could not be loaded.")).toBeDefined();
+
+        rerender(panelFor(DOCUMENT_B));
+
+        await waitFor(() => {
+            expect(screen.queryByText("This preview could not be loaded.")).toBeNull();
+        });
+        expect(showError).not.toHaveBeenCalled();
     });
 });
