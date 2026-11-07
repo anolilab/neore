@@ -197,6 +197,7 @@ export interface InternalApiTypes {
             readTitlePrompt: FunctionReference<"query", { requestedBy: string; threadId: Id<"threads"> }, { outcome: "refused" } | { outcome: "none" } | { id?: string; outcome: "prompt"; text: string }>;
             recordTitleAnswer: FunctionReference<"mutation", { chargeKey: string; claimedAt: number; promptId?: string; title: string }, boolean>;
             setGeneratedTitle: FunctionReference<"mutation", { chargeKey?: string; expectedTitleDigest: string; promptId?: string; requestedBy?: string; threadId: Id<"threads">; title: string }, boolean>;
+            writeRecordedTitle: FunctionReference<"mutation", { chargeKey: string; expectedTitleDigest: string; requestedBy?: string; threadId: Id<"threads"> }, "written" | "refused" | "none">;
         };
         threads: {
             _deletePageForThreadId: FunctionReference<"mutation", { cursor?: string; deltaCursor?: string; limit?: number; messagesDone?: boolean; streamOrder?: number; streamsDone?: boolean; threadId: Id<"threads"> }, {} & { cursor: string | null; isDone: boolean; }>;
@@ -404,6 +405,7 @@ export interface InternalApiTypes {
             iteratePrompt: FunctionReference<"action", { iterateInput: string; lastOptimizedPrompt: string; mode?: "user" | "system"; threadId?: string; userId: string; userPlan?: "free" | "premium" }, { improvedPrompt: string; }>;
             optimizeSystemPrompt: FunctionReference<"action", { improvementInstructions?: string; modelId?: string; prompt: string; style?: string; threadId?: string; userId: string; userPlan?: "free" | "premium" }, { improvedPrompt: string; }>;
             regenerateTitleChat: FunctionReference<"action", { claimedAt: number; expectedTitleDigest?: string; threadId: string; userId: string }, void>;
+            retryTitleWrite: FunctionReference<"action", { attempt: number; chargeKey: string; expectedTitleDigest: string; requestedBy?: string; threadId: string }, void>;
             streamAsync: FunctionReference<"action", { customSystemPrompt?: string; enabledFeatures?: Array<string>; jobId?: string; messageId: string; model: string; parentId?: string; prompt?: string; reasoningEffort?: number; statelessMode?: boolean; threadId: string }, null>;
             updateThreadModel: FunctionReference<"mutation", { autoModel?: boolean; customSystemPrompt?: string; dictationLanguage?: string; enabledFeatures?: Array<string>; model: string; order?: number; reasoningEffort?: number; statelessMode?: boolean; threadId: string; userId: string }, null>;
         };
@@ -1437,6 +1439,7 @@ export const internal: InternalApiTypes = {
             readTitlePrompt: { __lunoraRef: "agent_thread_title:readTitlePrompt" },
             recordTitleAnswer: { __lunoraRef: "agent_thread_title:recordTitleAnswer" },
             setGeneratedTitle: { __lunoraRef: "agent_thread_title:setGeneratedTitle" },
+            writeRecordedTitle: { __lunoraRef: "agent_thread_title:writeRecordedTitle" },
         },
         threads: {
             _deletePageForThreadId: { __lunoraRef: "agent_threads:_deletePageForThreadId" },
@@ -1644,6 +1647,7 @@ export const internal: InternalApiTypes = {
             iteratePrompt: { __lunoraRef: "chat_functions:iteratePrompt" },
             optimizeSystemPrompt: { __lunoraRef: "chat_functions:optimizeSystemPrompt" },
             regenerateTitleChat: { __lunoraRef: "chat_functions:regenerateTitleChat" },
+            retryTitleWrite: { __lunoraRef: "chat_functions:retryTitleWrite" },
             streamAsync: { __lunoraRef: "chat_functions:streamAsync" },
             updateThreadModel: { __lunoraRef: "chat_functions:updateThreadModel" },
         },
