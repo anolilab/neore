@@ -128,7 +128,8 @@ export const optionsOf = (answer: unknown, scrub: Scrub): AgentOptions => {
 
     const configOptions = configOptionsOf(answer.configOptions, scrub);
 
-    if (configOptions !== undefined && configOptions.length > 0) {
+    // A list the agent sent, even an empty one, is what it offers: its legacy modes are then ignored.
+    if (configOptions !== undefined) {
         return { configOptions };
     }
 
@@ -136,10 +137,7 @@ export const optionsOf = (answer: unknown, scrub: Scrub): AgentOptions => {
     const current = idOf(modes?.currentModeId, scrub);
     const available = choicesOf(modes?.availableModes, "id", scrub);
 
-    return {
-        ...(configOptions !== undefined && { configOptions }),
-        ...(current !== undefined && available.length > 0 && { modes: { available, current } }),
-    };
+    return current !== undefined && available.length > 0 ? { modes: { available, current } } : {};
 };
 
 /**
@@ -150,7 +148,8 @@ export const applyOptionsUpdate = (options: AgentOptions, update: Record<string,
     if (update.sessionUpdate === "config_option_update") {
         const configOptions = configOptionsOf(update.configOptions, scrub);
 
-        return configOptions === undefined ? undefined : { ...options, configOptions };
+        // The options replace everything offered before, legacy modes included.
+        return configOptions === undefined ? undefined : { configOptions };
     }
 
     if (update.sessionUpdate !== "current_mode_update") {

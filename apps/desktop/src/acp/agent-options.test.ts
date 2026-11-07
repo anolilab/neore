@@ -35,7 +35,7 @@ const MODEL = {
 };
 
 describe("optionsOf", () => {
-    it("reads list options from a session/new answer, groups flattened, and leaves the legacy modes out", () => {
+    it("reads list options from a session/new answer, groups flattened, and leaves the legacy modes out, even for an empty list", () => {
         const answer = { configOptions: [MODE, MODEL], modes: { availableModes: [{ id: "x", name: "X" }], currentModeId: "x" }, sessionId: "s" };
 
         expect(acpSchema("NewSessionResponse").safeParse(answer).success).toBe(true);
@@ -63,6 +63,7 @@ describe("optionsOf", () => {
                 },
             ],
         });
+        expect(optionsOf({ ...answer, configOptions: [] }, keep)).toEqual({ configOptions: [] });
     });
 
     it("falls back to the legacy mode list for an agent that sends no options", () => {
@@ -133,6 +134,10 @@ describe("applyOptionsUpdate", () => {
         expect(applyOptionsUpdate(start, update, keep)?.configOptions?.map((option) => [option.id, option.currentValue])).toEqual([["mode", "plan"]]);
         // An explicitly empty list clears them; one with nothing usable in it changes nothing.
         expect(applyOptionsUpdate(start, { configOptions: [], sessionUpdate: "config_option_update" }, keep)).toEqual({ configOptions: [] });
+        // Options that arrive replace the legacy modes offered before.
+        const legacy = optionsOf({ modes: { availableModes: [{ id: "ask", name: "Ask" }], currentModeId: "ask" }, sessionId: "s" }, keep);
+
+        expect(applyOptionsUpdate(legacy, update, keep)).not.toHaveProperty("modes");
         expect(applyOptionsUpdate(start, { configOptions: [{ id: 3 }], sessionUpdate: "config_option_update" }, keep)).toBeUndefined();
     });
 
