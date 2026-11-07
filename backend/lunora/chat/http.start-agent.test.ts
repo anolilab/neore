@@ -13,7 +13,7 @@ import { switchThreadAgentHandler } from "./agent-switch";
 import { runChatStart } from "./http";
 
 const savedPrompts: unknown[] = [];
-const createdThreads: { language?: string }[] = [];
+const createdThreads: { language?: string; organizationId?: string }[] = [];
 
 vi.mock("../auth/lib/helper", () => {
     return {
@@ -276,5 +276,57 @@ describe("/chat/start hidden characters", () => {
 
         expect(response.status).toBe(200);
         expect(createdThreads.map((created) => created.language)).toStrictEqual(["english"]);
+    });
+});
+
+describe("/chat/start organization", () => {
+    /** A caller whose session names an organization; `failSession` makes that lookup throw. */
+    const inOrganization = (failSession = false): any => {
+        const base = fakeContext();
+        const mutations: string[] = [];
+
+        return {
+            ...base,
+            auth: {
+                getIdentity: async () => {
+                    return { sessionId: "session-1", userId: OWNER };
+                },
+            },
+            mutations,
+            runMutation: async (reference: { __lunoraRef: string }, args: any) => {
+                mutations.push(reference.__lunoraRef);
+
+                return await base.runMutation(reference, args);
+            },
+            runQuery: async (reference: { __lunoraRef: string }, args: any) => {
+                if (reference.__lunoraRef === "auth_session_organization:getActiveOrganizationIdForSession") {
+                    if (failSession) {
+                        throw new Error("session read failed");
+                    }
+
+                    return "org-1";
+                }
+
+                return await base.runQuery(reference, args);
+            },
+        };
+    };
+
+    it("creates a new chat with the caller's organization in the insert, with no later stamp", async () => {
+        createdThreads.length = 0;
+
+        const context = inOrganization();
+        const response = await runChatStart(context, { model: A, prompt: "hi" } as never, "secret");
+
+        expect(response.status).toBe(200);
+        expect(createdThreads).toMatchObject([{ organizationId: "org-1" }]);
+        expect(context.mutations).not.toContain("agent_threads:updateThread");
+    });
+
+    it("saves nothing when the organization cannot be read", async () => {
+        createdThreads.length = 0;
+
+        await expect(runChatStart(inOrganization(true), { model: A, prompt: "hi" } as never, "secret")).rejects.toThrow("session read failed");
+        expect(createdThreads).toStrictEqual([]);
     });
 });

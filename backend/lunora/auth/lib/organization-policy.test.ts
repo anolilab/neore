@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { MANAGED_SETTINGS, MAX_ALLOWED_MODELS, MAX_POLICY_CHARS, parseOrganizationPolicy, serializeOrganizationPolicy } from "./organization-policy";
+import {
+    MANAGED_SETTINGS,
+    MAX_ALLOWED_MODELS,
+    MAX_POLICY_CHARS,
+    parseOrganizationPolicy,
+    permissionCapOf,
+    readPolicyState,
+    serializeOrganizationPolicy,
+} from "./organization-policy";
 
 const parse = (document: unknown) => parseOrganizationPolicy(typeof document === "string" ? document : JSON.stringify(document));
 
@@ -222,5 +230,25 @@ describe("serializeOrganizationPolicy", () => {
         }
 
         expect(parse(serializeOrganizationPolicy(first.policy))).toEqual(first);
+    });
+});
+
+describe("permissionCapOf", () => {
+    const document = (policy: object) => JSON.stringify({ schemaVersion: 1, ...policy });
+
+    it("allows auto with no row, and with a policy that sets no cap", () => {
+        expect(permissionCapOf(readPolicyState(undefined))).toBe("auto");
+        expect(permissionCapOf(readPolicyState(null))).toBe("auto");
+        expect(permissionCapOf(readPolicyState(document({ models: { allowed: ["m"] } })))).toBe("auto");
+    });
+
+    it("returns the cap the policy sets", () => {
+        expect(permissionCapOf(readPolicyState(document({ permissionCap: "ask" })))).toBe("ask");
+        expect(permissionCapOf(readPolicyState(document({ permissionCap: "off" })))).toBe("off");
+    });
+
+    it("caps a policy that can no longer be read at ask, never auto", () => {
+        expect(permissionCapOf(readPolicyState("{ not json"))).toBe("ask");
+        expect(permissionCapOf(readPolicyState(document({ permissionCap: "superuser" })))).toBe("ask");
     });
 });

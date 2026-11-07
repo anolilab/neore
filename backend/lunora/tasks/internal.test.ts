@@ -15,13 +15,14 @@ import { patchById } from "../lib/patch";
 import schema from "../schema";
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import { DAILY_LIMIT_MESSAGE, ANONYMOUS_TASKS_MESSAGE } from "./account";
-import { checkDueTasks, claimRound, completeRound, recordRunNotice, runProjectFor, runThreadProblem } from "./internal";
+import { CODING_AGENT_CAPPED_MESSAGE, checkDueTasks, claimRound, completeRound, recordRunNotice, runProjectFor, runThreadProblem } from "./internal";
+import { LEFT_ORGANIZATION_MESSAGE } from "../auth/lib/organization-policy";
 import { MAX_RECURRENCES_PER_USER_PER_SWEEP } from "./logic";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write, so the
 // account behind each claim is looked up here instead.
-const { users } = vi.hoisted(() => {
-    return { users: new Map<string, { isAnonymous?: boolean; role?: string }>() };
+const { members, users } = vi.hoisted(() => {
+    return { members: new Set<string>(), users: new Map<string, { isAnonymous?: boolean; role?: string }>() };
 });
 
 // `projects` is a `.global()` table too: which projects the owner may file into, and their context, is set here.
@@ -42,6 +43,9 @@ vi.mock("../projects/functions", () => {
 vi.mock("../auth/lib/better-auth-queries", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../auth/lib/better-auth-queries")>()),
+        // `member` is a `.global()` table too: membership is `organizationId:userId` in `members`.
+        getMemberByOrganizationAndUser: async (_ctx: unknown, organizationId: string, userId: string) =>
+            members.has(`${organizationId}:${userId}`) ? { organizationId, userId } : null,
         getUser: async (_ctx: unknown, userId: string) => {
             const user = users.get(userId);
 
@@ -120,6 +124,7 @@ beforeEach(() => {
     users.clear();
     users.set(USER, {});
     readableProjects.clear();
+    members.clear();
 });
 
 afterEach(() => {
@@ -208,6 +213,18 @@ describe("repair loop", () => {
         expect(task.status).toBe("failed");
         expect(task.lastError).toBe("The agent run failed.");
         expect(await inbox()).toStrictEqual([{ outcome: "failure", title: "Summary", type: "task" }]);
+    });
+
+    it("stops a recurring task's schedule on an error no later round can cure, keeping the schedule itself", async () => {
+        const taskId = await insertTask({ activeCycle: "c1", cronExpression: "0 9 * * *", nextRunAt: 1000, recurring: true, status: "queued" });
+        const claimed = await claim(taskId, 0);
+
+        expect(await complete({ outcome: { error: "You left.", kind: "error", stopsRecurrence: true }, runId: claimed.runId })).toBe("failed");
+
+        const task = await getTask(taskId);
+
+        expect(task).toMatchObject({ cronExpression: "0 9 * * *", lastError: "You left.", status: "failed" });
+        expect("nextRunAt" in task).toBe(false);
     });
 });
 
@@ -822,6 +839,74 @@ describe("claim refusals", () => {
 
         expect(claimed).toBe(limit);
         expect(await runCount()).toBe(limit);
+    });
+
+    it("stops a task whose owner left its organization, charging nothing", async () => {
+        const taskId = await insertTask({
+            activeCycle: "c1",
+            cronExpression: "0 9 * * *",
+            nextRunAt: 1000,
+            organizationId: "org-left",
+            recurring: true,
+            status: "queued",
+        });
+
+        expect(await claim(taskId, 0)).toBeNull();
+        expect(await runCount()).toBe(0);
+
+        const task = await getTask(taskId);
+
+        expect(task).toMatchObject({ cronExpression: "0 9 * * *", lastError: LEFT_ORGANIZATION_MESSAGE, status: "failed" });
+        expect("nextRunAt" in task).toBe(false);
+        // Its schedule ended for good, so the owner is told once.
+        expect(await inbox()).toStrictEqual([{ outcome: "failure", title: "Summary", type: "task" }]);
+    });
+
+    it("refuses a coding-agent task under a cap below auto without charging, and keeps it scheduled", async () => {
+        members.add(`org-capped:${USER}`);
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("organizationPolicies", {
+                    document: JSON.stringify({ permissionCap: "ask", schemaVersion: 1 }),
+                    organizationId: "org-capped",
+                    revision: 1,
+                    schemaVersion: 1,
+                    updatedAt: Date.now(),
+                }),
+        );
+
+        const codingAgent = { agent: "codex", repoUrl: "https://github.com/example/repo" };
+
+        // As many refusals as the daily limit allows: a charged refusal would leave nothing for the task after them.
+        for (let index = 0; index < 10; index += 1) {
+            const taskId = await insertTask({
+                activeCycle: `c${String(index)}`,
+                codingAgent,
+                cronExpression: "0 9 * * *",
+                nextRunAt: 1000,
+                organizationId: "org-capped",
+                recurring: true,
+                status: "queued",
+            });
+
+            expect(await claim(taskId, 0, `c${String(index)}`)).toBeNull();
+            expect(await getTask(taskId)).toMatchObject({ lastError: CODING_AGENT_CAPPED_MESSAGE, nextRunAt: 1000, status: "failed" });
+        }
+
+        expect(await claim(await insertTask({ activeCycle: "c-last", status: "queued" }), 0, "c-last")).not.toBeNull();
+    });
+
+    it("lets a member's coding-agent task start when the cap is auto", async () => {
+        members.add(`org-open:${USER}`);
+
+        const taskId = await insertTask({
+            activeCycle: "c1",
+            codingAgent: { agent: "codex", repoUrl: "https://github.com/example/repo" },
+            organizationId: "org-open",
+            status: "queued",
+        });
+
+        expect(await claim(taskId, 0)).toMatchObject({ codingAgent: { agent: "codex" }, organizationId: "org-open" });
     });
 
     it("does not charge an admin", async () => {

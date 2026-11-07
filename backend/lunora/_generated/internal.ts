@@ -293,12 +293,17 @@ export interface InternalApiTypes {
         identity: {
             getUserProfileForIdentity: FunctionReference<"query", { userId: string }, null | { email: string; image?: string; name?: string }>;
         };
+        organization_policy: {
+            getPermissionCapQuery: FunctionReference<"query", { organizationId: string }, "off" | "ask" | "auto">;
+            isOrganizationMemberQuery: FunctionReference<"query", { organizationId: string; userId: string }, boolean>;
+        };
         organization_policy_erase: {
             deleteOrganizationPolicy: FunctionReference<"mutation", { organizationId: string }, null>;
             sweepOrphanedOrganizationPolicies: FunctionReference<"mutation", { cursor?: string }, null>;
         };
         session_organization: {
             getActiveOrganizationIdForSession: FunctionReference<"query", { sessionId: string; userId: string }, string | null>;
+            getSessionOrganizationForCap: FunctionReference<"query", { sessionId: string; userId: string }, { organizationId: string | null } | null>;
         };
     };
     billing: {
@@ -376,14 +381,14 @@ export interface InternalApiTypes {
             failAbandonedEditReply: FunctionReference<"mutation", { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }, { added: boolean; failed: number }>;
         };
         execute: {
-            continueAfterToolApproval: FunctionReference<"action", { answer?: string; answerFileIds?: Array<string>; answers?: Array<{ note?: string; question: string; selected: Array<string> }>; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
+            continueAfterToolApproval: FunctionReference<"action", { answer?: string; answerFileIds?: Array<string>; answers?: Array<{ note?: string; question: string; selected: Array<string> }>; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; organizationId?: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
             runStreamingAgent: FunctionReference<"action", { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }, void>;
         };
         functions: {
             createCategoryChat: FunctionReference<"action", { prompt: string; threadId: string }, void>;
             createSummarizeChat: FunctionReference<"action", { threadId: string; userId: string }, void>;
             createThreadRelationship: FunctionReference<"mutation", { branchPoint?: number; branchType?: "branch" | "continuation" | "comparison"; parentThreadId: string; threadId: string }, void>;
-            createThreadWithInitialMessage: FunctionReference<"mutation", { autoModel?: boolean; customSystemPrompt?: string; enabledFeatures?: Array<string>; fileIds?: Array<string>; language?: string; messageContent: Array<Record<string, unknown>>; mode?: "text" | "image" | "video"; model: string; reasoningEffort?: number; retentionHours?: number; statelessMode?: boolean; temporary?: boolean; title?: string; userId: string }, { messageId: string; threadId: string; }>;
+            createThreadWithInitialMessage: FunctionReference<"mutation", { autoModel?: boolean; customSystemPrompt?: string; enabledFeatures?: Array<string>; fileIds?: Array<string>; language?: string; messageContent: Array<Record<string, unknown>>; mode?: "text" | "image" | "video"; model: string; organizationId?: string; reasoningEffort?: number; retentionHours?: number; statelessMode?: boolean; temporary?: boolean; title?: string; userId: string }, { messageId: string; threadId: string; }>;
             createTitleChat: FunctionReference<"action", { jobId?: string; prompt: string; promptId?: string; threadId: string }, void>;
             deleteThreadRelationship: FunctionReference<"mutation", { threadId: string }, null>;
             editImage: FunctionReference<"action", { imageUrl: string; mask?: string; operation: string; prompt?: string }, { resultUrl: string; }>;
@@ -527,7 +532,7 @@ export interface InternalApiTypes {
             getToolPermissionGrantsQuery: FunctionReference<"query", { userId: string }, Record<string, number>>;
             getToolPermissionsQuery: FunctionReference<"query", { userId: string }, Record<string, "auto" | "ask" | "off">>;
             pruneExpiredToolPermissionGrants: FunctionReference<"mutation", {}, null>;
-            recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }; run?: { epoch: number; streamId: Id<"persistentStreams"> }; secretApprovalIds?: Array<string>; threadId: string; userId: string }, null>;
+            recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; organizationId?: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }; run?: { epoch: number; streamId: Id<"persistentStreams"> }; secretApprovalIds?: Array<string>; threadId: string; userId: string }, null>;
         };
         tools: {
             browser_node: {
@@ -1152,9 +1157,9 @@ export interface InternalApiTypes {
             beatRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
             claimRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, { childThreadId?: string; clientId?: string; depth: number; dispatchedBy?: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; mode?: "run" | "worker"; model?: string; organizationId?: string; parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; userId: string } | null>;
             completeRun: FunctionReference<"mutation", { outcome: { error: string; kind: "failed" } | { kind: "succeeded"; result: string }; runId: Id<"subAgentRuns"> }, boolean>;
-            createRun: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; host?: { agentKey: string; deviceId: string; folderId: string }; leadTools?: Array<string>; model?: string; name?: string; parentModel?: string; parentThreadId: string; persistent?: boolean; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }, { runId: Id<"subAgentRuns">; workerId?: string } | { error: string }>;
+            createRun: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; host?: { agentKey: string; deviceId: string; folderId: string }; leadTools?: Array<string>; model?: string; name?: string; organizationId?: string; parentModel?: string; parentThreadId: string; persistent?: boolean; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }, { runId: Id<"subAgentRuns">; workerId?: string } | { error: string }>;
             isHostWorker: FunctionReference<"query", { userId: string; workerId: string }, boolean>;
-            messageWorker: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
+            messageWorker: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; message: string; organizationId?: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
             postResult: FunctionReference<"mutation", { attempt: number; failures?: number; runId: Id<"subAgentRuns"> }, null>;
             reapRun: FunctionReference<"mutation", { claimedAt?: number; runId: Id<"subAgentRuns"> }, null>;
             retryHostRunStart: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
@@ -1175,7 +1180,7 @@ export interface InternalApiTypes {
             canRunForUser: FunctionReference<"query", { userId: string }, boolean>;
             checkDueTasks: FunctionReference<"mutation", {}, null>;
             claimRound: FunctionReference<"mutation", { cycle: string; origin: "manual" | "dependency" | "schedule" | "retry" | "repair"; round: number; taskId: Id<"tasks"> }, null | { codingAgent?: { agent: "claude_code" | "codex"; branch?: string; openPr?: boolean; repoUrl: string }; contextDivider?: boolean; continueThreadId?: string; freshContext?: boolean; goal?: { description?: string; successCriteria?: string; title: string }; instructions: string; keepLastThread?: boolean; model?: string; organizationId?: string; projectId?: Id<"projects">; reasoningEffort?: number; repair?: { previousAnswer?: string; reasons: Array<string>; repairInstructions?: string }; reviewNote?: string; runId: Id<"taskRuns">; skillId?: Id<"skills">; successCriteria?: string; title: string; userId: string }>;
-            completeRound: FunctionReference<"mutation", { keepLastThread?: boolean; outcome: { error: string; kind: "error" } | { finalAnswer: string; kind: "verified"; verdict: { pass: boolean; reasons: Array<string>; repairInstructions?: string } } | { finalAnswer: string; kind: "unverified" }; runId: Id<"taskRuns">; threadId?: string }, null | "done" | "repair" | "needs_review" | "failed" | "cancelled">;
+            completeRound: FunctionReference<"mutation", { keepLastThread?: boolean; outcome: { error: string; kind: "error"; stopsRecurrence?: true } | { finalAnswer: string; kind: "verified"; verdict: { pass: boolean; reasons: Array<string>; repairInstructions?: string } } | { finalAnswer: string; kind: "unverified" }; runId: Id<"taskRuns">; threadId?: string }, null | "done" | "repair" | "needs_review" | "failed" | "cancelled">;
             getTaskForVerification: FunctionReference<"query", { taskId: Id<"tasks"> }, { instructions: string; successCriteria?: string; title: string; userId: string } | null>;
             isRoundRunning: FunctionReference<"query", { runId: Id<"taskRuns"> }, boolean>;
             recordRunNotice: FunctionReference<"mutation", { cycle: string; reason: "project_unwritable" | "thread_locked" | "thread_busy" | "thread_shared" | "thread_unavailable"; taskId: Id<"tasks"> }, null>;
@@ -1208,7 +1213,7 @@ export interface InternalApiTypes {
             reserveQuietWindow: FunctionReference<"mutation", { expected?: number; triggerId: Id<"triggers">; windowStart: number }, boolean>;
             setTriggerEnabledInternal: FunctionReference<"mutation", { enabled: boolean; triggerId: Id<"triggers"> }, null>;
             switchOffConsumedMoment: FunctionReference<"mutation", { claimKey?: string; firing?: number; triggerId: Id<"triggers"> }, null>;
-            updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; status: string; threadId?: string; userFixable?: boolean }, null>;
+            updateExecution: FunctionReference<"mutation", { error?: string; executionId: Id<"triggerExecutions">; permanent?: boolean; status: string; threadId?: string; userFixable?: boolean }, null>;
             updateTriggerStats: FunctionReference<"mutation", { error?: string; lastTriggeredAt?: number; nextTriggerAt?: number; triggerId: Id<"triggers"> }, null>;
         };
         quiet_inputs: {
@@ -1550,12 +1555,17 @@ export const internal: InternalApiTypes = {
         identity: {
             getUserProfileForIdentity: { __lunoraRef: "auth_identity:getUserProfileForIdentity" },
         },
+        organization_policy: {
+            getPermissionCapQuery: { __lunoraRef: "auth_organization_policy:getPermissionCapQuery" },
+            isOrganizationMemberQuery: { __lunoraRef: "auth_organization_policy:isOrganizationMemberQuery" },
+        },
         organization_policy_erase: {
             deleteOrganizationPolicy: { __lunoraRef: "auth_organization_policy_erase:deleteOrganizationPolicy" },
             sweepOrphanedOrganizationPolicies: { __lunoraRef: "auth_organization_policy_erase:sweepOrphanedOrganizationPolicies" },
         },
         session_organization: {
             getActiveOrganizationIdForSession: { __lunoraRef: "auth_session_organization:getActiveOrganizationIdForSession" },
+            getSessionOrganizationForCap: { __lunoraRef: "auth_session_organization:getSessionOrganizationForCap" },
         },
     },
     billing: {

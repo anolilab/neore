@@ -12,6 +12,7 @@ import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { LEFT_ORGANIZATION_MESSAGE } from "../auth/lib/organization-policy";
 import schema from "../schema";
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import { ANONYMOUS_EVALS_MESSAGE, claimCase, completeCase, EVAL_DAILY_LIMIT_MESSAGE, reapCase, TOKEN_BUDGET_MESSAGE } from "./internal";
@@ -41,7 +42,7 @@ let harness: Harness;
 const run = async <T>(callback: (ctx: any) => Promise<T>): Promise<T> => await harness.run(callback);
 
 const seedRun = async (
-    options: { caseCount?: number; costCapMicrodollars?: number; costMicrodollars?: number; tokenBudget?: number } = {},
+    options: { caseCount?: number; costCapMicrodollars?: number; costMicrodollars?: number; organizationId?: string; tokenBudget?: number } = {},
 ): Promise<{ caseIds: string[]; runId: string }> =>
     await run(async (ctx) => {
         const datasetId = await ctx.db.insert("evalDatasets", {
@@ -79,6 +80,7 @@ const seedRun = async (
             datasetKind: "agent",
             judgeEnabled: true,
             nextIndex: 0,
+            ...(options.organizationId && { organizationId: options.organizationId }),
             status: "running",
             target: { kind: "model", model: DEFAULT_CHAT_MODEL },
             tokenBudget: options.tokenBudget ?? 200_000,
@@ -182,6 +184,25 @@ describe("claimCase", () => {
 
         expect(await claim(runId, 0)).toBeNull();
         expect(await getDoc(runId)).toMatchObject({ error: ANONYMOUS_EVALS_MESSAGE, status: "failed" });
+    });
+
+    it("fails the run of an owner who left its organization, before the case is charged", async () => {
+        const { runId } = await seedRun({ organizationId: "org-left" });
+
+        expect(await claim(runId, 0)).toBeNull();
+        expect(await getDoc(runId)).toMatchObject({ error: LEFT_ORGANIZATION_MESSAGE, status: "failed" });
+        expect(await resultCount()).toBe(0);
+        const rateLimits = await run(async (ctx) => await ctx.db.query("rateLimits").collect());
+
+        expect(rateLimits).toHaveLength(0);
+    });
+
+    it("claims a case for a member of the run's organization", async () => {
+        await run(async (ctx) => await ctx.db.insert("member", { createdAt: 0, organizationId: "org-in", role: "member", userId: USER }));
+
+        const { runId } = await seedRun({ organizationId: "org-in" });
+
+        expect(await claim(runId, 0)).toMatchObject({ organizationId: "org-in", userId: USER });
     });
 
     it("charges each case to the daily limits and fails the run once they are spent", async () => {

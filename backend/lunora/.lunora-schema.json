@@ -1,6 +1,8 @@
 {
   "jurisdiction": "eu",
-  "migrationIds": [],
+  "migrationIds": [
+    "backfill-approval-organization"
+  ],
   "tables": {
     "account": {
       "commitOrdered": false,
@@ -27326,6 +27328,13 @@
               "optional": false,
               "unique": false
             },
+            "organizationId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
+            },
             "promptMessageId": {
               "kind": "string",
               "nullable": false,
@@ -27568,6 +27577,12 @@
         },
         "firing": {
           "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "pausedPermanently": {
+          "kind": "boolean",
           "nullable": false,
           "optional": true,
           "unique": false

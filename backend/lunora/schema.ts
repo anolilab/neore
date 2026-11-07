@@ -3186,6 +3186,9 @@ export const schema = defineSchema({
         // The firing of an event trigger that started this run (its `eventState.firedAt`); absent on every other run, a manual one included.
         // A moment in time is switched off only by the run of its own firing (`switchOffFiredMoment`).
         firing: v.optional(v.number()),
+        // With `pausedTrigger`: the run failed in a way no later run can cure (its owner left the organization), so a
+        // re-sent pause notice gives that cause, not a streak of failures.
+        pausedPermanently: v.optional(v.boolean()),
         // Set on the run whose failure paused its trigger, so a redelivered settlement re-sends the pause notice rather than the plain one.
         pausedTrigger: v.optional(v.boolean()),
         payload: v.optional(v.string()),

@@ -23,6 +23,7 @@ import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
+import { isAgentRunError } from "../chat/lib/agent-run";
 import { RUN_BEAT_MS } from "../chat/lib/interrupted-run";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
 import { isTaskModelAllowed } from "../tasks/logic";
@@ -106,6 +107,7 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
         }
 
         const { text } = await runHeadlessAgent(ctx, {
+            organizationId: claim.organizationId ?? null,
             // The parent's `delegateToSubAgent` call only ran past its permission
             // check (approved, or set to `auto`), so that consent carries into
             // this child and nesting stays reachable. At the depth cap the
@@ -157,7 +159,11 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
     } catch (error) {
         console.error(`[SubAgent] Run ${runId} failed:`, error);
 
-        const message = error instanceof SubAgentRunError ? error.message : toUserFacingError(error, { customEndpoint: false });
+        // The owner left the run's organization: our own wording, safe to show, and it says what to do.
+        const message =
+            error instanceof SubAgentRunError || isAgentRunError(error, "left-organization")
+                ? error.message
+                : toUserFacingError(error, { customEndpoint: false });
 
         await ctx.runMutation(internal.sub_agents.functions.completeRun, { outcome: { error: message, kind: "failed" }, runId });
     } finally {

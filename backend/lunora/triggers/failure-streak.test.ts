@@ -10,7 +10,14 @@ import { AgentRunError } from "../chat/lib/agent-run";
 import type { AgentRunErrorKind } from "../chat/lib/agent-run";
 import schema from "../schema";
 import { isUserFixableRunError } from "./execute";
-import { advanceStreak, isModelUnavailableRefusal, modelUnavailableMessage, TRIGGER_PAUSE_AFTER_FAILURES } from "./failure-streak";
+import {
+    advanceStreak,
+    isModelUnavailableRefusal,
+    modelUnavailableMessage,
+    pausedNoticeBody,
+    runOutcome,
+    TRIGGER_PAUSE_AFTER_FAILURES,
+} from "./failure-streak";
 import { admitTriggerRun, createExecution, setTriggerEnabledInternal, updateExecution } from "./functions";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -97,11 +104,22 @@ describe("advanceStreak", () => {
     it("pauses on the failure that reaches the threshold", () => {
         expect(advanceStreak(TRIGGER_PAUSE_AFTER_FAILURES - 1, "user-fixable")).toEqual({ pause: true, streak: TRIGGER_PAUSE_AFTER_FAILURES });
     });
+
+    it("pauses on the first failure no later run can cure", () => {
+        expect(advanceStreak(0, "permanent")).toEqual({ pause: true, streak: 1 });
+        expect(runOutcome("failed", true, true)).toBe("permanent");
+        expect(runOutcome("completed", true, true)).toBe("success");
+    });
+
+    it("says only why a permanently failing trigger paused, not how many runs it took", () => {
+        expect(pausedNoticeBody("You left.", true)).toBe("Paused. You left.");
+    });
 });
 
 describe("what counts as user-fixable", () => {
     it.each<[AgentRunErrorKind, boolean]>([
         ["custom-endpoint", true],
+        ["left-organization", true],
         ["local-endpoint", true],
         ["plan-required", true],
         ["skill", false],
@@ -122,6 +140,41 @@ describe("what counts as user-fixable", () => {
 });
 
 describe("pausing a trigger after repeated user-fixable failures", () => {
+    it("pauses on the first run its owner can never cure (they left its organization), and says why", async () => {
+        const triggerId = await insertTrigger();
+        const executionId = await startRun(triggerId);
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(updateExecution, { error: "You left.", executionId, permanent: true, status: "failed", userFixable: true }),
+        );
+
+        expect(await readTrigger(triggerId)).toMatchObject({ enabled: false, failureStreak: 1 });
+        expect(await noticesKeyed("trigger-paused:")).toMatchObject([{ body: "Paused. You left." }]);
+    });
+
+    it("restores a lost permanent pause notice with the same cause on a redelivery that does not repeat it", async () => {
+        const triggerId = await insertTrigger();
+        const executionId = await startRun(triggerId);
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(updateExecution, { error: "You left.", executionId, permanent: true, status: "failed", userFixable: true }),
+        );
+        // The notice was lost.
+        await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("notifications").collect();
+
+            for (const row of rows) {
+                await ctx.db.delete("notifications", row._id);
+            }
+        });
+        // A redelivered settlement, without `permanent`.
+        await harness.run(async (ctx: any) => await ctx.runMutation(updateExecution, { error: "You left.", executionId, status: "failed", userFixable: true }));
+
+        expect(await noticesKeyed("trigger-paused:")).toMatchObject([{ body: "Paused. You left." }]);
+    });
+
     it("pauses on the Nth failure in a row, not before", async () => {
         const triggerId = await insertTrigger();
 

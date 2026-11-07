@@ -11,6 +11,7 @@ import type { MCPServerConfig } from "./mcp-tools";
 import { headersToRecord } from "./mcp-tools";
 import type { ToolAnnotationHints, ToolDescriptor, ToolPermissionMode, ToolPermissionOverrides } from "./tool-permissions";
 import { isToolPermissionMode, resolveToolPermission, toolPermissionKey } from "./tool-permissions";
+import { readRequestPermissionCap } from "./run-permission-cap";
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -83,10 +84,16 @@ const descriptorFor = (config: MCPServerConfig, toolName: string): ToolDescripto
         ? { key: toolPermissionKey("connector", toolName, config.connectorSlug), source: "connector" }
         : { key: toolPermissionKey("mcp", toolName, config.name), source: "mcp" };
 
-const annotatedToolMode = async (client: SDKClient, descriptor: ToolDescriptor, toolName: string): Promise<ToolPermissionMode> => {
+const annotatedToolMode = async (
+    client: SDKClient,
+    descriptor: ToolDescriptor,
+    toolName: string,
+    permissionCap: ToolPermissionMode,
+): Promise<{ member: ToolPermissionMode; mode: ToolPermissionMode }> => {
     const annotations = await readToolAnnotations(client, toolName);
+    const described = { ...descriptor, ...(annotations && { annotations }) };
 
-    return resolveToolPermission({ ...descriptor, ...(annotations && { annotations }) }, undefined);
+    return { member: resolveToolPermission(described, undefined, {}), mode: resolveToolPermission(described, undefined, { permissionCap }) };
 };
 
 /**
@@ -94,7 +101,17 @@ const annotatedToolMode = async (client: SDKClient, descriptor: ToolDescriptor, 
  * approval is a pause in the model's run (`needsApproval`), and an iframe's call
  * has no run to pause and no one to ask — running it would be auto-approval.
  */
-const refusalFor = (mode: ToolPermissionMode, toolName: string): string | null => {
+const refusalFor = (
+    mode: ToolPermissionMode,
+    toolName: string,
+    { member, permissionCap }: { member: ToolPermissionMode; permissionCap: ToolPermissionMode },
+): string | null => {
+    // The organization's policy is the reason when changing the member's own setting would change nothing: the cap
+    // lowered the mode, the cap is `off`, or the tool is at `ask` under a cap that would hold "Allow" at `ask` anyway.
+    if (member !== mode || (permissionCap !== "auto" && (permissionCap === "off" || mode === "ask"))) {
+        return `Tool "${toolName}" is limited by your organization's tool policy, so an MCP App cannot run it`;
+    }
+
     if (mode === "off") {
         return `Tool "${toolName}" is turned off in your tool permissions`;
     }
@@ -294,6 +311,14 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
         return Response.json({ error: "Missing serverName or toolName" }, { status: 400 });
     }
 
+    // This route has no thread, so the caller's session names the organization that caps the call. Read before the server
+    // is resolved: under `off` every tool is refused, so no credential is refreshed and no server is contacted for it.
+    const permissionCap = await readRequestPermissionCap(context, user._id);
+
+    if (permissionCap === "off") {
+        return Response.json({ error: refusalFor("off", toolName, { member: "off", permissionCap }) }, { status: 403 });
+    }
+
     const serverConfig = await findServerConfig(context, user._id, serverName);
 
     if (!serverConfig) {
@@ -302,8 +327,9 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
 
     const overrides = (await context.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId: user._id })) as ToolPermissionOverrides;
     const descriptor = descriptorFor(serverConfig, toolName);
-    const chosen = isToolPermissionMode(overrides[descriptor.key]) ? resolveToolPermission(descriptor, overrides) : undefined;
-    const refusedUpFront = chosen && refusalFor(chosen, toolName);
+    const chosen = isToolPermissionMode(overrides[descriptor.key]) ? resolveToolPermission(descriptor, overrides, { permissionCap }) : undefined;
+    const memberChosen = chosen === undefined ? undefined : resolveToolPermission(descriptor, overrides, {});
+    const refusedUpFront = chosen && memberChosen && refusalFor(chosen, toolName, { member: memberChosen, permissionCap });
 
     if (refusedUpFront) {
         return Response.json({ error: refusedUpFront }, { status: 403 });
@@ -311,7 +337,8 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
 
     try {
         const outcome = await withServerClient(serverConfig, async (client) => {
-            const refused = chosen ? null : refusalFor(await annotatedToolMode(client, descriptor, toolName), toolName);
+            const annotated = chosen ? undefined : await annotatedToolMode(client, descriptor, toolName, permissionCap);
+            const refused = annotated ? refusalFor(annotated.mode, toolName, { member: annotated.member, permissionCap }) : null;
 
             if (refused) {
                 return { refused };

@@ -642,6 +642,11 @@ export const createThreadWithInitialMessage = internalMutation
         messageContent: v.array(v.record(v.string(), v.any())),
         mode: v.optional(v.union(v.literal("text"), v.literal("image"), v.literal("video"))),
         model: v.string(),
+        /**
+         * The caller's verified active organization (`/chat/start` reads it from the session). Written with the insert, so a
+         * chat started in an organization is never left without it and later capped by a broader space.
+         */
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         reasoningEffort: v.optional(v.number()),
         /** Hours until expiry when `temporary`; the client sends a preset from the temporary-chat control. */
         retentionHours: v.optional(v.number().check((value) => value >= 1 && value <= 168, { message: "Invalid retention" })),
@@ -662,6 +667,7 @@ export const createThreadWithInitialMessage = internalMutation
                 messageContent,
                 mode,
                 model,
+                organizationId,
                 reasoningEffort,
                 retentionHours,
                 statelessMode,
@@ -673,8 +679,9 @@ export const createThreadWithInitialMessage = internalMutation
         }) => {
             const agent = await getAgentForUser(context, userId, model);
 
-            // Create thread with minimal required fields
+            // Create thread with minimal required fields. A temporary chat stays untagged, as `createThread` leaves it.
             const { threadId } = await agent.createThread(context, {
+                ...(organizationId && !temporary && { organizationId }),
                 title: title ?? DEFAULT_THREAD_TITLE,
                 userId,
             });

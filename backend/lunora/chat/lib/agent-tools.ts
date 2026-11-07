@@ -29,6 +29,7 @@ import type { SearchMode } from "./tool-builder";
 import { ToolName } from "../tools";
 import { admittedKnowledgeSearchTool } from "../tools/knowledge-search";
 import { getToolsForModelAndMode, listBuiltInTools, PULL_REQUEST_TOOLS } from "./tool-builder";
+import { readRunPermissionCap } from "./run-permission-cap";
 import type { ToolDescriptor, ToolPermissionOverrides } from "./tool-permissions";
 import type { RunOrigin } from "./tool-run-config";
 import { applyToolPermissions, toolPermissionKey } from "./tool-permissions";
@@ -64,6 +65,11 @@ export interface BuildAgentToolsOptions {
     /** Restrict MCP servers to these names; empty/undefined means every enabled server. */
     mcpServerNames?: string[];
     model: LanguageModel | string;
+    /**
+     * The organization the run was started from, whose policy caps its tools (`org-policy.md` §6a). A thread's stored
+     * organization takes precedence over it when a `threadId` is given. `null` is the personal space (no policy).
+     */
+    organizationId: string | null;
     /** Who started the run, when not the person at the app: an API key's run gets no device tools and no `auto` tool. */
     origin?: RunOrigin;
     searchMode: SearchMode;
@@ -127,6 +133,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         mcpProgress,
         mcpServerNames,
         model,
+        organizationId,
         origin,
         searchMode,
         skillTools,
@@ -145,13 +152,32 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
     // keeps the ones its run had, and each tool checks the thread again when it runs).
     const baseExtraBuiltIns = snapshot ? snapshot.toolNames : (skillTools?.additionalTools ?? []).filter((name) => !PULL_REQUEST_TOOLS.includes(name));
     const linkThreadId = threadId ?? deviceThreadId;
-    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers, pullRequestTools] = await Promise.all([
+
+    // The cap is read beside the reads that do not depend on it. Under `off` every tool is removed, so no quick-check, MCP,
+    // connector or pull request work (token refresh included) starts. A failed read caps at `ask` (`org-policy.md` §6a).
+    const preferences = Promise.all([
         ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),
         ctx.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId }),
         // A run nobody is at inherits no time-boxed allow, so it does not even read them.
         headless ? {} : ctx.runQuery(internal.chat.tool_permissions.getToolPermissionGrantsQuery, { userId }),
+    ]);
+
+    // Handled here so a failed preference read is not reported as unhandled when an `off` run never awaits it.
+    preferences.catch(() => undefined);
+
+    const permissionCap = await readRunPermissionCap(ctx, { organizationId, threadId });
+
+    // Decided before the preferences are awaited: a failed preference read cannot take down a run that offers no tools.
+    if (permissionCap === "off") {
+        return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], mcpToolFingerprints: {}, permissionKeys: {}, repeatable: [], tools: {} };
+    }
+
+    const [allMcpServers, overrides, timedGrants] = await preferences;
+
+    const [quickCheckOn, connectorServers, pullRequestTools] = await Promise.all([
         // Nobody answers in a headless run, and an outside agent's calls stay `ask` because only the app approves them.
-        headless || origin === "outside_agent" || threadId === undefined
+        // Under a cap below `auto` the quick check is off anyway, so its eligibility and trusted servers are not read.
+        headless || origin === "outside_agent" || threadId === undefined || permissionCap !== "auto"
             ? false
             : // A failed read turns the quick check off; it must not take the run down.
               ctx
@@ -211,7 +237,8 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         // An outside agent's (public API) event mapping drops progress chunks, so its runs write none.
         getMCPTools(selectedServers, { progress: origin === "outside_agent" ? undefined : mcpProgress }),
         // A device problem must never take the run down with it.
-        deviceThreadId === undefined || headless || origin === "outside_agent"
+        // Below `auto` every device tool is removed by the cap, so the device round-trip is skipped.
+        deviceThreadId === undefined || headless || origin === "outside_agent" || permissionCap !== "auto"
             ? noDevices
             : buildDeviceTools(ctx, { threadId: deviceThreadId, userId }).catch((error: unknown) => {
                   toolsLogger.warn("[TOOLS] Device tools unavailable:", error);
@@ -285,6 +312,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         ...(origin === "outside_agent" && { apiKeyOrigin: true }),
         headless,
         ...(headlessApproved && { headlessApproved: new Set(headlessApproved) }),
+        permissionCap,
         ...(quickCheck && { lowRiskCheck: quickCheck.check }),
         ...(trusted && { lowRiskTrusted: trusted }),
         timedGrants,

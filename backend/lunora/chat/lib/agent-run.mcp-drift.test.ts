@@ -139,15 +139,19 @@ describe("an approved MCP call after a pause", () => {
         );
     });
 
-    it("keeps the earlier check for a snapshot written before fingerprints: a gone tool is a stale approval", async () => {
+    // Not a stale approval: the approval is already claimed, so a refusal would leave the request unanswerable. It is
+    // answered as denied, as a tool the organization's cap removed is.
+    it("answers a call whose tool is gone as denied for a snapshot written before fingerprints", async () => {
         rebuiltWith(undefined);
 
-        const outcome = await resume(undefined);
-
-        expect(outcome).toBeInstanceOf(Error);
-        expect((outcome as Error).message).toContain("no longer available");
+        expect(await resume(undefined)).toBe(STOP);
         expect(agent.approveToolCall).not.toHaveBeenCalled();
-        expect(agent.denyToolCall).not.toHaveBeenCalled();
+        expect(agent.denyToolCall).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ reason: expect.stringContaining("no longer available") }),
+            expect.anything(),
+            expect.anything(),
+        );
     });
 
     it("runs a snapshot written before fingerprints as before when the tool is still there", async () => {

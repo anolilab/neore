@@ -82,8 +82,13 @@ export const INTERNAL_PREFIX_RE = /^internal-/;
  *   longer answerable — the conversation moved on, or the tool is gone.
  * - `plan-required`: a model outside the free tier, asked for without a paid
  *   plan or the user's own key for its provider. Its message is ours and safe to show.
+ * - `left-organization`: a headless run (trigger, task, eval, sub-agent) whose owner
+ *   is no longer a member of the organization it was created in. It fails the same
+ *   way every time, so its trigger or task stops. Its message is ours and safe to show.
  */
-export type AgentRunErrorKind = "custom-endpoint" | "local-endpoint" | "plan-required" | "skill" | "stale-approval";
+export type AgentRunErrorKind = "custom-endpoint" | "left-organization" | "local-endpoint" | "plan-required" | "skill" | "stale-approval";
+
+export { LEFT_ORGANIZATION_MESSAGE } from "../../auth/lib/organization-policy";
 
 /** A failure a run raised itself, so the catch branches on `kind` rather than on message text. */
 export class AgentRunError extends Error {
@@ -242,6 +247,14 @@ export const setHeadlessRun = (ctx: object): void => {
 /** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `startedBy`; the action ctx has no such field. */
 export const setRunStartedBy = (ctx: object, startedBy: string | undefined): void => {
     (ctx as { startedBy?: string }).startedBy = startedBy;
+};
+
+/**
+ * The organization whose policy caps this run's tools. A sub-agent it dispatches records it when the parent thread has no
+ * stored organization, so the child is capped as the run was.
+ */
+export const setRunOrganizationId = (ctx: object, organizationId: string | null | undefined): void => {
+    (ctx as { organizationId?: string | null }).organizationId = organizationId ?? null;
 };
 
 /**
@@ -1092,6 +1105,9 @@ export const resumeApprovedRun = async (
             deviceThreadId: threadId,
             mcpProgress: toolProgressSink(ctx, streamId),
             model: config.model,
+            // The paused run's organization, for a thread that has no stored one (see BuildAgentToolsOptions.organizationId).
+            // A group speaker's snapshot keeps it under `group`.
+            organizationId: config.organizationId ?? config.group?.organizationId ?? null,
             origin: config.dispatchOrigin,
             searchMode: config.searchMode as SearchMode,
             snapshot: { mcpServerNames: config.mcpServerNames, toolNames: config.toolNames },
@@ -1126,15 +1142,26 @@ export const resumeApprovedRun = async (
             approved && pending.toolName !== null
                 ? mcpToolDrift(config.mcpToolFingerprints, toolResult.mcpToolFingerprints, pending.toolName, Object.hasOwn(toolResult.tools, pending.toolName))
                 : "unchanged";
-        const runApproved = approved && drift === "unchanged";
-        const runDenyReason = drift === "unchanged" ? denyReason : mcpToolDriftReason(drift);
+        let runApproved = approved && drift === "unchanged";
+        let runDenyReason = drift === "unchanged" ? denyReason : mcpToolDriftReason(drift);
 
         if (drift !== "unchanged") {
             streamLogger.warn(`[ToolApproval] Approved MCP tool ${pending.toolName} is ${drift} since the pause; the call is not run`);
         }
 
-        if (runApproved && pending.toolName !== null && !Object.hasOwn(toolResult.tools, pending.toolName)) {
-            throw new AgentRunError("stale-approval", `Tool ${pending.toolName} is no longer available`);
+        // Any other tool that left the rebuilt set after the pause (its organization's cap, or the member's own setting) is
+        // denied, not refused: the approval is already claimed, so a refusal here would leave the request unanswerable. An
+        // answered question or secret request is not one: its handler below replaces the tool with one that only returns
+        // what the person submitted, so nothing runs that the cap took away.
+        if (
+            runApproved &&
+            pending.toolName !== null &&
+            pending.toolName !== ASK_USER_TOOL_NAME &&
+            pending.toolName !== REQUEST_SECRET_TOOL_NAME &&
+            !Object.hasOwn(toolResult.tools, pending.toolName)
+        ) {
+            runApproved = false;
+            runDenyReason = `Tool ${pending.toolName} is no longer available`;
         }
 
         // An answered question: the approved call executes a copy of the tool
@@ -1205,6 +1232,7 @@ export const resumeApprovedRun = async (
         setDispatchOrigin(ctx, config.dispatchOrigin ?? "lead");
         // The continuation runs as the owner; who started the turn it resumes is in the snapshot (none for a snapshot that predates it).
         setRunStartedBy(ctx, config.startedBy);
+        setRunOrganizationId(ctx, config.organizationId ?? config.group?.organizationId);
 
         const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({

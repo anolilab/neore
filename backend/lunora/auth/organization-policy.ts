@@ -1,6 +1,7 @@
 /**
  * An organization's policy document: the owner writes it, every member of the
- * active organization reads it. Nothing reads it to enforce anything yet.
+ * active organization reads it. Runs read its permission cap (`getPermissionCapQuery`);
+ * the settings locks are enforced on the preference write path.
  *
  * The organization is always the caller's ACTIVE one (verified membership,
  * `resolveActiveMembership`), never an id from args, and the owner check is the
@@ -9,10 +10,11 @@
 import { LunoraError, v } from "lunorash/server";
 
 import { claimFence, ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS, ORGANIZATION_POLICY_CREATE_SCOPE, releaseClaim } from "../lib/claim-once";
-import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { authMutation, authQuery, internalQuery, rateLimit } from "../lib/crpc";
 import { logger } from "../lib/logger";
 import { MAX_LENGTH } from "../lib/validators";
-import { parseOrganizationPolicy, serializeOrganizationPolicy } from "./lib/organization-policy";
+import { getMemberByOrganizationAndUser } from "./lib/better-auth-queries";
+import { parseOrganizationPolicy, permissionCapOf, readPolicyState, serializeOrganizationPolicy } from "./lib/organization-policy";
 
 const policyLogger = logger.scope("organization-policy");
 
@@ -142,3 +144,30 @@ export const getOrganizationPolicy = authQuery
 
         return { policy: parsed.policy, revision: row.revision, updatedAt: row.updatedAt };
     });
+
+/**
+ * The broadest tool mode an organization's runs may use (`org-policy.md` §6a), read by the agent's tool assembly.
+ * Internal: runs read it, no client calls it. A policy that cannot be read caps its runs at `ask`.
+ */
+export const getPermissionCapQuery = internalQuery
+    .input({ organizationId: v.string().max(MAX_LENGTH.id) })
+    .output(v.union(v.literal("off"), v.literal("ask"), v.literal("auto")))
+    .query(async ({ args, ctx: context }) => {
+        const row = await context.db.organizationPolicies.findFirst({ where: { organizationId: args.organizationId } });
+        const state = readPolicyState(row?.document);
+
+        if (state.kind === "unreadable") {
+            policyLogger.error("A stored organization policy no longer parses; its runs are capped at ask", { organizationId: args.organizationId });
+        }
+
+        return permissionCapOf(state);
+    });
+
+/**
+ * Whether a user is still a member of an organization. Internal: a headless run (a trigger, task, eval or sub-agent that
+ * outlived its owner's membership) checks it before the run files a thread under that organization.
+ */
+export const isOrganizationMemberQuery = internalQuery
+    .input({ organizationId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .query(async ({ args, ctx: context }) => (await getMemberByOrganizationAndUser(context, args.organizationId, args.userId)) !== null);

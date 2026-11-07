@@ -15,6 +15,7 @@ import type { MCPServerConfig } from "./mcp-tools";
 const state = vi.hoisted(() => {
     return {
         acceptedToken: "fresh",
+        cap: "auto" as "auto" | "ask" | "off",
         config: null as MCPServerConfig | null,
         connects: 0,
         overrides: {} as Record<string, string>,
@@ -27,6 +28,13 @@ vi.mock("../../auth/lib/helper", () => {
         getCurrentUserInternal: async () => {
             return { _id: "alice" };
         },
+    };
+});
+
+vi.mock("./run-permission-cap", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("./run-permission-cap")>()),
+        readRequestPermissionCap: async () => state.cap,
     };
 });
 
@@ -101,7 +109,8 @@ vi.mock("@modelcontextprotocol/sdk/client/index.js", () => {
     };
 });
 
-const context = { runQuery: async () => state.overrides } as never;
+// No session: the caller is in the personal space, which the proxy caps at auto.
+const context = { auth: { getIdentity: async () => null }, runQuery: async () => state.overrides } as never;
 
 const post = (body: unknown) => new Request("https://backend.example.com/mcp/x", { body: JSON.stringify(body), method: "POST" });
 
@@ -123,6 +132,7 @@ const oauthConfig = (refreshTo: string | null) => {
 
 beforeEach(() => {
     state.acceptedToken = "fresh";
+    state.cap = "auto";
     state.config = null;
     state.connects = 0;
     state.overrides = {};
@@ -173,6 +183,59 @@ describe("MCP Apps proxy with an OAuth grant", () => {
 
         expect(response.status).toBe(403);
         await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("needs your approval") });
+    });
+
+    it("says the organization's policy limits a tool its cap lowered, since changing the member's own setting would not help", async () => {
+        oauthConfig("fresh");
+        state.cap = "ask";
+        state.overrides = { "connector:notion:create_page": "auto" };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("organization's tool policy") });
+    });
+
+    it("names the organization's policy, not the member's setting, for a tool already at ask under an ask cap", async () => {
+        oauthConfig("fresh");
+        state.cap = "ask";
+
+        // Unannotated, so the member's own mode is the default `ask`; setting it to "Allow" would be held at `ask` by the cap.
+        const unannotated = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        state.overrides = { "connector:notion:create_page": "ask" };
+
+        const overridden = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        for (const response of [unannotated, overridden]) {
+            expect(response.status).toBe(403);
+            await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("organization's tool policy") });
+        }
+    });
+
+    it("still names the member's own setting for a tool they switched off under an ask cap", async () => {
+        oauthConfig("fresh");
+        state.cap = "ask";
+        state.overrides = { "connector:notion:create_page": "off" };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("turned off in your tool permissions") });
+    });
+
+    it("refuses every call under an off cap without contacting the server or refreshing its token", async () => {
+        const oauth = oauthConfig("fresh");
+
+        state.cap = "off";
+
+        // No override: without the early refusal this call would connect to read the tool's annotations.
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("organization's tool policy") });
+        expect(state.connects).toBe(0);
+        expect(oauth.refresh).not.toHaveBeenCalled();
     });
 
     it("refuses a tool the user set to ask before connecting, and runs one they allowed", async () => {

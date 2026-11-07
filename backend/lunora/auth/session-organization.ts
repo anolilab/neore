@@ -2,6 +2,7 @@ import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internalQuery } from "../_generated/server";
+import { getMemberByOrganizationAndUser } from "./lib/better-auth-queries";
 import { resolveActiveMembership } from "./lib/organization-helpers";
 
 /**
@@ -19,4 +20,31 @@ export const getActiveOrganizationIdForSession = internalQuery
         const membership = await resolveActiveMembership(ctx, await ctx.db.session.findFirst({ where: { _id: sessionId as Id<"session"> } }), userId);
 
         return membership?.organizationId ?? null;
+    });
+
+/**
+ * The same read for a caller whose cap must fail closed (the MCP app proxy): `null` when the session cannot be
+ * validated (missing, another user's, or expired), so the caller can cap it at `ask` rather than read it as the personal
+ * space. A valid session gives its verified active organization, or `null` for the personal space.
+ */
+export const getSessionOrganizationForCap = internalQuery
+    .input({ sessionId: v.string(), userId: v.string() })
+    .output(v.union(v.object({ organizationId: v.union(v.string(), v.null()) }), v.null()))
+    .query(async ({ args: { sessionId, userId }, ctx }) => {
+        const session = await ctx.db.session.findFirst({ where: { _id: sessionId as Id<"session"> } });
+
+        // `ctx.now`, not the wall clock: a query re-run on the same data must give the same answer.
+        if (!session || session.userId !== userId || session.expiresAt <= ctx.now) {
+            return null;
+        }
+
+        if (!session.activeOrganizationId) {
+            return { organizationId: null };
+        }
+
+        // Membership is read directly, not through `resolveActiveMembership`: that helper checks expiry again with the
+        // wall clock, so a session expiring between the two checks would read as the personal space and be uncapped.
+        const membership = await getMemberByOrganizationAndUser(ctx, session.activeOrganizationId, userId);
+
+        return { organizationId: membership ? session.activeOrganizationId : null };
     });

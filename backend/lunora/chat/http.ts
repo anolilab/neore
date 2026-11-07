@@ -545,16 +545,10 @@ const runChatStartOnShard = async (
         }
     }
 
-    // Scopes organization-shared skills. `user.activeOrganization` is always
-    // null here (no session read from an HTTP action), so resolve it from the
-    // session row, which also re-checks membership. It depends on nothing
-    // below, so it is read alongside the rest instead of just before enqueueing
-    // the run. Only a text run has one.
-    const activeOrganizationPromise = (async (): Promise<string | null> => {
-        if (contentType !== "text") {
-            return null;
-        }
-
+    // The caller's active organization, from the session row (`user.activeOrganization` is always null here: no session
+    // read from an HTTP action). It also re-checks membership. It depends on nothing below, so it is read alongside the
+    // rest instead of just before enqueueing the run.
+    const sessionOrganizationPromise = (async (): Promise<string | null> => {
         const identity = await context.auth.getIdentity();
         const sessionId = identity?.sessionId;
 
@@ -563,8 +557,11 @@ const runChatStartOnShard = async (
             : null;
     })();
 
+    // Scopes organization-shared skills and goals. Only a text run has one.
+    const activeOrganizationPromise = contentType === "text" ? sessionOrganizationPromise : Promise.resolve(null);
+
     // A request refused below never awaits it; it is only a read.
-    activeOrganizationPromise.catch(() => undefined);
+    sessionOrganizationPromise.catch(() => undefined);
 
     // Build message content
     const messageContent: any[] = [];
@@ -903,6 +900,10 @@ const runChatStartOnShard = async (
         // Title generation for existing threads too — scheduled after the agent run below.
         scheduleTitleJobs(threadId, false);
     } else {
+        // The organization goes in with the insert, so no chat exists without it. Read first: a failed lookup refuses the
+        // request before anything is saved, rather than leaving a chat a later run would cap by a broader space.
+        const threadOrganizationId = await sessionOrganizationPromise;
+
         // New thread: batched creation
         const result = await context.runMutation(internal.chat.functions.createThreadWithInitialMessage, {
             // A plain hosted text thread only: a guest, a media thread and a custom endpoint have nothing to route.
@@ -914,6 +915,7 @@ const runChatStartOnShard = async (
             messageContent,
             mode: body.mode,
             model: effectiveModel,
+            ...(threadOrganizationId && { organizationId: threadOrganizationId }),
             reasoningEffort: body.reasoningEffort,
             statelessMode: body.statelessMode,
             // Temporary only when the client asked for it; the composer applies the user's default itself.

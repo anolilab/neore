@@ -59,6 +59,8 @@ import { notifyQuietly } from "../notifications/notify";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
 import { threadGateOutcome, throwUnlessGranted } from "../chat/lib/thread-gate";
+import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
+import { LEFT_ORGANIZATION_MESSAGE, permissionCapOf, readPolicyState } from "../auth/lib/organization-policy";
 import { MAX_LENGTH } from "../lib/validators";
 import { RUN_STALE_MS, RUN_WATCH_RETRY } from "../chat/lib/interrupted-run";
 import { HOST_SESSION_BUSY_RETRY_MS, HOST_START_MAX_ATTEMPTS, hostRunActivity, hostStartRetryDelayMs, sendHostRunTurn } from "./host-runs";
@@ -110,6 +112,8 @@ type RunDoc = Doc<"subAgentRuns">;
 export interface CreateSubAgentRunArgs {
     /** Who sent the dispatch; a lead's own call when unset. */
     dispatchedBy?: DispatchSource;
+    /** The organization that capped the dispatching run; used when the parent thread has no stored organization. */
+    organizationId?: string;
     parentModel?: string;
     parentThreadId: string;
     skillSlug?: string;
@@ -239,6 +243,12 @@ export const admitSubAgentRun = async (
         return { error: capProblem };
     }
 
+    const leftOrganization = await membershipRefusal(ctx, parent.organizationId ?? args.organizationId, args.userId);
+
+    if (leftOrganization) {
+        return { error: leftOrganization };
+    }
+
     const { ok } = await createRatelimit(`subAgents/run:${account.tier}`, ctx.db as never).limit(args.userId);
 
     if (!ok) {
@@ -256,7 +266,7 @@ export const admitSubAgentRun = async (
             createdAt: now,
             depth,
             dispatchedBy: args.dispatchedBy ?? "lead",
-            organizationId: parent.organizationId,
+            organizationId: parent.organizationId ?? args.organizationId,
             parentModel: args.parentModel,
             parentThreadId: parent._id,
             skillSlug,
@@ -401,6 +411,34 @@ const isHostInLeadScope = async (ctx: MutationCtx, run: Pick<RunDoc, "parentThre
 };
 
 /**
+ * `LEFT_ORGANIZATION_MESSAGE` when the owner is no longer a member of the run's organization, else `null`. Checked before
+ * anything is charged: such a run would fail when it starts (`runHeadlessAgent` refuses it), so it must not cost a round.
+ */
+const membershipRefusal = async (ctx: MutationCtx, organizationId: string | null | undefined, userId: string): Promise<string | null> =>
+    organizationId && !(await getMemberByOrganizationAndUser(ctx, organizationId, userId)) ? LEFT_ORGANIZATION_MESSAGE : null;
+
+/**
+ * Why a computer worker cannot run for this organization, or `null`. The owner must still be a member, and the cap must be
+ * `auto`: a computer agent's tools are approved there, out of the backend's reach. Checked at admission, before any session
+ * is opened, and again when a queued turn is sent.
+ */
+const hostOrganizationRefusal = async (ctx: MutationCtx, organizationId: string | null | undefined, userId: string): Promise<string | null> => {
+    if (!organizationId) {
+        return null;
+    }
+
+    const leftOrganization = await membershipRefusal(ctx, organizationId, userId);
+
+    if (leftOrganization) {
+        return leftOrganization;
+    }
+
+    const policy = await ctx.db.organizationPolicies.findFirst({ where: { organizationId } });
+
+    return permissionCapOf(readPolicyState(policy?.document)) === "auto" ? null : HOST_NOT_UNDER_AUTO;
+};
+
+/**
  * Starts a host run in the caller's transaction: claims it (no charge: the agent bills its own account) and sends its
  * message as the `acp_send` call. A host that cannot be reached fails the run at once, through {@link finishRun}, so the
  * lead hears a failure like any other and the queue moves on. A computer that is only busy (its open-call budget is spent,
@@ -424,6 +462,16 @@ const startHostRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promis
     // ...and the computer's projects may have changed, or the lead moved to another project.
     if (!(await isHostInLeadScope(ctx, claimed))) {
         await finishRun(ctx, runId, { error: HOST_OUT_OF_SCOPE, kind: "failed" });
+
+        return;
+    }
+
+    // Read again here: a turn can wait behind another for a long time, and meanwhile the owner may have left the
+    // organization or the organization may have tightened its cap.
+    const refused = await hostOrganizationRefusal(ctx, claimed.organizationId, claimed.userId);
+
+    if (refused) {
+        await finishRun(ctx, runId, { error: refused, kind: "failed" });
 
         return;
     }
@@ -527,6 +575,8 @@ const findDispatchedRun = async (ctx: Pick<MutationCtx, "db">, args: WorkerRunAr
 };
 
 const HOST_NEEDS_A_PERSON = "Messaging a worker on a computer needs a person in the conversation to approve it, so a background run cannot do it.";
+
+const HOST_NOT_UNDER_AUTO = "Your organization does not allow agents on your computer.";
 
 const HOST_NEEDS_OWN_CONVERSATION =
     "A worker on a computer can only be used from a conversation that is yours alone: not shared, public, a group chat or a messenger conversation.";
@@ -671,6 +721,19 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         return await refuse({ error: HOST_NEEDS_OWN_CONVERSATION, kind: "forbidden" });
     }
 
+    // The owner must still be a member, before anything is created or charged; a worker on a computer also needs the
+    // organization's cap at `auto` (`hostOrganizationRefusal`), before any thread, session or start call exists. A new worker
+    // takes the organization its thread is stamped with; an existing one keeps its own.
+    const workerOrganizationId = child?.organizationId ?? parent.organizationId ?? args.organizationId;
+    const organizationRefusal =
+        runnerKind === "host"
+            ? await hostOrganizationRefusal(ctx, workerOrganizationId, args.userId)
+            : await membershipRefusal(ctx, workerOrganizationId, args.userId);
+
+    if (organizationRefusal) {
+        return await refuse({ error: organizationRefusal, kind: "forbidden" });
+    }
+
     // Only the task text reaches a coding agent on a computer: a tool list or skill the caller asks for would read as a
     // limit that nothing applies there. (The lead's own tool names, which a cloud worker inherits, are not one: a host
     // worker never stores them, below.)
@@ -785,7 +848,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
             createdAt: now,
             // A host worker runs on its agent, not on a cloud model.
             model: host ? host.offer.agentKey : model,
-            organizationId: parent.organizationId,
+            organizationId: parent.organizationId ?? args.organizationId,
             ...(host && { runner: "host" as const }),
             status: "active",
             tags: ["sub-agent", "worker"],
@@ -829,7 +892,8 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         depth,
         dispatchedBy: args.dispatchedBy ?? "lead",
         mode: "worker",
-        organizationId: parent.organizationId,
+        // An existing worker keeps the organization its thread was stamped with, so a follow-up is capped as the first run was.
+        organizationId: child?.organizationId ?? parent.organizationId ?? args.organizationId,
         parentModel: args.parentModel,
         parentThreadId: parent._id,
         runner: origin?.runner ?? (host ? { deviceId: host.device._id, kind: "host" } : { kind: "headless" }),
@@ -881,6 +945,7 @@ export const createRun = internalMutation
         leadTools: v.optional(v.array(v.string().max(128))),
         model: v.optional(v.string().max(256)),
         name: v.optional(v.string().max(1000)),
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         parentModel: v.optional(v.string()),
         parentThreadId: v.string(),
         // A worker: the thread outlives this run and is messaged again with `messageWorker`.
@@ -922,6 +987,7 @@ export const messageWorker = internalMutation
         dispatchedBy: vDispatchSource,
         headless: v.optional(v.boolean()),
         message: v.string().max(SUB_AGENT_TASK_MAX),
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         parentThreadId: v.string(),
         toolCallId: v.string(),
         userId: v.string(),
@@ -933,6 +999,7 @@ export const messageWorker = internalMutation
             childThreadId: args.workerId,
             dispatchedBy: args.dispatchedBy,
             ...(args.headless !== undefined && { headless: args.headless }),
+            ...(args.organizationId && { organizationId: args.organizationId }),
             parentThreadId: args.parentThreadId,
             task: args.message,
             toolCallId: args.toolCallId,
@@ -978,6 +1045,16 @@ export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">
 
         // The agent on a computer bills its own account: no round of ours is spent on its runs.
         if (run.runner?.kind !== "host") {
+            // The owner may have left the run's organization while it waited: the run would be refused when it starts, so it
+            // fails here, uncharged, and the queue moves on.
+            const leftOrganization = await membershipRefusal(ctx, run.organizationId, run.userId);
+
+            if (leftOrganization) {
+                await finishRun(ctx, run._id, { error: leftOrganization, kind: "failed" });
+
+                return null;
+            }
+
             const account = await loadTaskAccount(ctx, run.userId);
 
             if (!account || !(await chargeRound(ctx, run.userId, account))) {
@@ -1724,6 +1801,9 @@ export const createWorker = authMutation
             ...(lead?.model !== undefined && { parentModel: lead.model }),
             ...(args.model !== undefined && { model: args.model }),
             name: args.name,
+            // The member's verified active organization, the last fallback after the lead's stored one: a lead with none
+            // (a bot, comparison or temporary chat) must not leave the worker uncapped.
+            ...(ctx.user.activeOrganization?.id && { organizationId: ctx.user.activeOrganization.id }),
             parentThreadId: args.leadThreadId,
             ...(args.skill !== undefined && { skillSlug: args.skill }),
             task: args.task,
@@ -1765,6 +1845,8 @@ export const dispatchToWorker = authMutation
             childThreadId: args.workerId,
             clientId: args.clientId,
             dispatchedBy: "user",
+            // As in `createWorker`: the last fallback after the worker's and the lead's stored organizations.
+            ...(ctx.user.activeOrganization?.id && { organizationId: ctx.user.activeOrganization.id }),
             parentThreadId: origin.parentThreadId,
             task: args.message,
             userId: ctx.user.userId,

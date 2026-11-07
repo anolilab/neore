@@ -40,6 +40,8 @@ import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
+import { LEFT_ORGANIZATION_MESSAGE } from "../auth/lib/organization-policy";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { enqueueJob } from "../lib/job-queue";
 import { withoutUndefined } from "../lib/patch";
@@ -246,6 +248,14 @@ export const claimCase = internalMutation
 
         if (target.model && !isTaskModelAllowed(target.model, (id) => MODEL_LOOKUP.get(id))) {
             await finishRun(ctx, run, "failed", { error: `The model '${target.model}' is no longer available. Pick another model and run again.` });
+
+            return null;
+        }
+
+        // An owner who left the run's organization: every case would be refused when it starts, so the run ends here,
+        // before this case is charged, rather than spending a round on each case left.
+        if (run.organizationId && !(await getMemberByOrganizationAndUser(ctx, run.organizationId, run.userId))) {
+            await finishRun(ctx, run, "failed", { error: LEFT_ORGANIZATION_MESSAGE });
 
             return null;
         }

@@ -12,4 +12,11 @@ if (typeof source["sessionId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "sessionId": source["sessionId"], "userId": source["userId"] };
 });
+installCompiledValidatorMap(lunora_auth_session_organization_46.getSessionOrganizationForCap.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["sessionId"] !== "string") return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "sessionId": source["sessionId"], "userId": source["userId"] };
+});
 export * from "../../auth/session-organization.js";

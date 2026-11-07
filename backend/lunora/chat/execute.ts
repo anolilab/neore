@@ -46,6 +46,7 @@ import {
     resumeApprovedRun,
     setDispatchOrigin,
     setResearchDepth,
+    setRunOrganizationId,
     setRunStartedBy,
     setThreadStatus,
     readResumeInterruptedRuns,
@@ -501,6 +502,8 @@ export const runStreamingAgent = internalAction
                               mcpProgress: toolProgressSink(ctx, streamId, runEpoch),
                               mcpServerNames: streamingConfig.mcpServerNames,
                               model,
+                              // A thread's stored organization wins; the run's own caps a thread that has none.
+                              organizationId: organizationId ?? null,
                               ...(origin === "outside_agent" && { origin }),
                               searchMode: effectiveSearchMode,
                               skillTools: invokedSkill?.config
@@ -533,6 +536,7 @@ export const runStreamingAgent = internalAction
                 setDispatchOrigin(ctx, origin ?? "lead");
                 // A write collaborator's turn runs as the collaborator: `startedBy` is what its continuation, run as the owner, still knows.
                 setRunStartedBy(ctx, userId);
+                setRunOrganizationId(ctx, organizationId);
 
                 // Build agent
                 const isAutoContinue = streamingConfig.shouldAutoContinue === true;
@@ -834,6 +838,7 @@ export const runStreamingAgent = internalAction
                         snapshot: {
                             autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
                             ...(origin === "outside_agent" && { dispatchOrigin: origin }),
+                            ...(organizationId && { organizationId }),
                             instructions: streamTextArgs.system ?? agent.options.instructions,
                             mcpServerNames: toolResult.mcpServerNames,
                             mcpToolFingerprints: toolResult.mcpToolFingerprints,

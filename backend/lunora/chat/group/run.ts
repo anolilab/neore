@@ -32,6 +32,8 @@ import type { ModelMessage } from "ai";
 import { generateText, Output } from "ai";
 import z from "zod/v4";
 
+import { LunoraError } from "lunorash/server";
+
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
@@ -54,6 +56,7 @@ import {
     resumeApprovedRun,
     discardRunSecrets,
     setDispatchOrigin,
+    setRunOrganizationId,
     setRunStartedBy,
     setResearchDepth,
     setThreadStatus,
@@ -158,6 +161,8 @@ interface TurnContext {
     /** What started the turn, for a speaker's dispatch to a worker to carry. */
     origin: DispatchOrigin;
     participants: GroupParticipantRun[];
+    /** The group thread's stored organization, else the run's, which caps each speaker's tools. */
+    permissionOrganizationId: string | null;
     prefs: RunContext["prefs"];
     /** The user message the turn answers. */
     promptMessageId: string;
@@ -269,6 +274,8 @@ const runSpeaker = async (
                   mcpProgress: toolProgressSink(ctx, turn.streamId),
                   mcpServerNames: turn.mcpServerNames,
                   model,
+                  // No threadId here: the group thread's stored organization, else the run's, caps the speaker's tools.
+                  organizationId: turn.permissionOrganizationId,
                   ...(turn.origin === "outside_agent" && { origin: turn.origin }),
                   searchMode,
                   skillTools: speaker.config ? { additionalTools: speaker.config.additionalTools, disabledTools: speaker.config.disabledTools } : undefined,
@@ -281,6 +288,7 @@ const runSpeaker = async (
         setResearchDepth(ctx, turn.researchDepth);
         setDispatchOrigin(ctx, turn.origin);
         setRunStartedBy(ctx, turn.startedBy);
+        setRunOrganizationId(ctx, turn.permissionOrganizationId);
 
         const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model, modelFilterRules);
         const agent = await getAgent(model, {
@@ -637,13 +645,19 @@ const loadTurnContext = async (
         ctx.runQuery(internal.auth.functions.getAgentModulePreferencesQuery, { userId }),
         ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> }),
     ]);
+
+    // Refused before any tool is built: without the thread there is no stored organization to cap the speaker's tools by.
+    if (!thread) {
+        throw new LunoraError("NOT_FOUND", "The group thread no longer exists.");
+    }
+
     const runContext = await loadRunContext(ctx, {
         admittedRun: true,
         customSystemPrompt: args.customSystemPrompt,
         promptText: args.promptText,
         researchDepth: args.researchDepth,
         threadId,
-        threadLanguage: thread?.language,
+        threadLanguage: thread.language,
         userId,
     });
 
@@ -656,6 +670,7 @@ const loadTurnContext = async (
         organizationId: args.organizationId,
         origin: args.origin,
         participants: args.config.participants,
+        permissionOrganizationId: thread.organizationId ?? args.organizationId ?? null,
         prefs: runContext.prefs,
         promptMessageId: args.promptMessageId,
         promptMessages: undefined,

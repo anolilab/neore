@@ -5,6 +5,7 @@
  */
 import { parseCustomModelId } from "@neore/ai/models";
 
+import { isAgentRunError } from "../chat/lib/agent-run";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
 
 /**
@@ -18,11 +19,20 @@ export class TaskRunError extends Error {
     }
 }
 
+/** A round refused because its owner left the task's organization: it fails the same way every time, so the task stops recurring. */
+export const stopsRecurrence = (error: unknown): boolean => isAgentRunError(error, "left-organization");
+
 /**
- * What the task shows as its error. Our own {@link TaskRunError} passes through;
+ * What the task shows as its error. Our own {@link TaskRunError} and the run's
+ * own refusal for a task whose owner left its organization pass through;
  * anything else — provider, gateway or runtime — goes through the shared mapper,
  * which never echoes raw text (it can carry internal URLs and upstream
  * payloads). The raw error is logged by the caller.
  */
-export const taskErrorMessage = (error: unknown, model: string | undefined): string =>
-    error instanceof TaskRunError ? error.message : toUserFacingError(error, { customEndpoint: model !== undefined && parseCustomModelId(model) !== null });
+export const taskErrorMessage = (error: unknown, model: string | undefined): string => {
+    if (error instanceof TaskRunError || isAgentRunError(error, "left-organization")) {
+        return error.message;
+    }
+
+    return toUserFacingError(error, { customEndpoint: model !== undefined && parseCustomModelId(model) !== null });
+};
