@@ -47,7 +47,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
 import { currentUserShard } from "../lib/shard-context";
 import type { Attribution, AttributionIncrement, RollupIncrement } from "./activity-logic";
-import { projectFiledKey } from "./activity-logic";
+import { pendingKey, projectFiledKey } from "./activity-logic";
 import { addToAttributionRollup, addToRollup, isReplyRecorded, markReplyRecorded } from "./activity";
 import type { BackfillRow, BackfillWindow, ReplyGroup } from "./backfill-logic";
 import { backfillIncrement, completeOrders, groupReplies } from "./backfill-logic";
@@ -69,9 +69,6 @@ export const BACKFILL_LEASE_MS = 5 * 60 * 1000;
 
 /** `usageReplies` keys kept past a finished backfill — long enough for any redelivery. */
 export const REPLY_KEY_KEEP_MS = 2 * 24 * 60 * 60 * 1000;
-
-/** How long before the first walk's start a reply may have begun and still been running when that walk passed it. */
-const PENDING_MARGIN_MS = 60 * 60 * 1000;
 
 /** `threadCursor` once the last thread has been taken. */
 const THREADS_END = "end";
@@ -383,6 +380,16 @@ export const runUsageBackfillStep = internalMutation
             {
                 count: async (group) => {
                     const increment = backfillIncrement(group, window);
+                    const first = group.rows[0];
+
+                    // A reply still running here is left to its live record; the project walk must know it skipped it.
+                    if (!increment && first && first._creationTime < window.cutoff && group.rows.some((row) => row.status === "pending")) {
+                        if (!(await isReplyRecorded(ctx, userId, pendingKey(first._id)))) {
+                            await markReplyRecorded(ctx, userId, pendingKey(first._id), now);
+                        }
+
+                        return undefined;
+                    }
 
                     return increment && !(await anyRecorded(ctx, userId, group.rows)) ? increment : undefined;
                 },
@@ -454,10 +461,13 @@ export const runUsageProjectBackfillStep = internalMutation
                         return undefined;
                     }
 
-                    // A reply started just before the first walk may have still been running when that walk passed it,
-                    // and then only its live record counts it in the total. File it only once that record has landed
-                    // (its key is held): a record that never landed must not leave a project row with no total.
-                    if (group.rows[0]!._creationTime >= state.startedAt - PENDING_MARGIN_MS && !(await anyRecorded(ctx, userId, group.rows))) {
+                    // A reply the first walk skipped as still running (it marked it), or one still writing rows after that walk
+                    // started, is counted in the total only by its live record. File it only once that record has landed (its
+                    // key is held): a record that never landed must not leave a project row with no total.
+                    const reliesOnLiveRecord =
+                        (await isReplyRecorded(ctx, userId, pendingKey(key))) || group.rows.some((row) => row._creationTime >= state.startedAt);
+
+                    if (reliesOnLiveRecord && !(await anyRecorded(ctx, userId, group.rows))) {
                         return undefined;
                     }
 

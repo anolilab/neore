@@ -545,12 +545,10 @@ export const generateExportFile = internalAction
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadTags: args.threadTags ?? [],
-            // A workflow already in flight recorded its usage rows with the activity; a new one reads them all here.
-            usageDaily:
-                activity?.usageDaily ??
-                (await collectUsageDailyPages(
-                    async (cursor) => await context.runQuery(internal.usage.gdpr.collectUsageDailyForExport, { cursor, userId: args.userId }),
-                )),
+            // All of it, a page at a time, also for a workflow that was in flight with an older, capped copy in `activity`.
+            usageDaily: await collectUsageDailyPages(
+                async (cursor) => await context.runQuery(internal.usage.gdpr.collectUsageDailyForExport, { cursor, userId: args.userId }),
+            ),
             // The user's share of organizations' usage: what they spent in each organization, per day and project.
             usageOrganizations: await collectUsageDailyPages(
                 async (cursor) => await context.runQuery(internal.usage.gdpr.collectOrganizationUsageForExport, { cursor, userId: args.userId }),

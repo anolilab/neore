@@ -194,6 +194,9 @@ export const replyUsageArgs = (
     };
 };
 
+/** The key `usageReplies` holds for a reply the first walk passed while it was still running, and left to its live record. */
+export const pendingKey = (replyKey: string): string => `pending:${replyKey}`;
+
 /** The key `usageReplies` holds once a reply (keyed `replyKey`) has been filed under its project and organization. */
 export const projectFiledKey = (replyKey: string): string => `project:${replyKey}`;
 

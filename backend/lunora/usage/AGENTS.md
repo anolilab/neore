@@ -21,7 +21,10 @@
   replies from before the first walk's cutoff (the only ones the total provably
   holds; later history stays "No project"); it skips keys the
   live path marked `projectFiled` and marks its own `project:<key>`, which the
-  live path checks. Key pruning waits for both walks.
+  live path checks. The first walk marks `pending:<key>` for a reply it passed
+  still running; the project walk files such a reply (and one still writing
+  rows after the first walk began) only once its live record's key is held.
+  Key pruning waits for both walks.
 - **Organization view** (`organization.ts`) — reads the `.global()`
   `usageOrganizationDaily` rollup, keyed by organization (never by member, no
   user column): each recorded reply adds to its org's `__total__` row and, when

@@ -887,8 +887,8 @@ describe("project backfill", () => {
     it("leaves a reply that may have still been running when the first walk passed it until its live record lands", async () => {
         const alpha = await insertProject("Alpha");
 
-        // Started half an hour before the walks and still running as the first walk passed it.
-        const thread = await insertThread(STARTED - 30 * 60 * 1000, [[prompt(), reply(10, 100, { status: "pending" })]], "active", alpha);
+        // Started two hours before the walks (waiting on an approval, say) and still running as the first walk passed it.
+        const thread = await insertThread(STARTED - 2 * 60 * 60 * 1000, [[prompt(), reply(10, 100, { status: "pending" })]], "active", alpha);
 
         vi.setSystemTime(STARTED);
         await start();
@@ -904,6 +904,25 @@ describe("project backfill", () => {
         await drain();
 
         expect(await projectRows()).toStrictEqual([]);
+
+        // Its live record lands: the total holds it now, and the record files its project.
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(recordReplyUsage, {
+                    at: STARTED,
+                    costMicrodollars: 100,
+                    date: "2026-09-22",
+                    replyKey: thread.rowIds[0]![1]!,
+                    skillKey: DEFAULT_SKILL_KEY,
+                    threadId: thread.threadId,
+                    tokens: 10,
+                    userId: USER,
+                }),
+        );
+
+        const filed = await projectRows();
+
+        expect(filed.map((row) => row.costMicrodollars)).toStrictEqual([100]);
     });
 
     it("finalizes a late record's filing, so a later delivery after the thread moves files nothing elsewhere", async () => {
