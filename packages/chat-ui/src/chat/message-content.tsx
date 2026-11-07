@@ -20,7 +20,7 @@ import { getFileRendererType } from "@neore/ui/components/file-renderers/file-ty
 import useStreamdownAppearance from "@neore/ui/hooks/use-streamdown-appearance";
 import useStreamdownPlugins from "@neore/ui/hooks/use-streamdown-plugins";
 import { AlertCircle, ChevronDown, ChevronRight, FileIcon, Globe, Loader2, Play, Presentation, Terminal } from "lucide-react";
-import type { ComponentType, FC, LazyExoticComponent, ReactNode } from "react";
+import type { ComponentType, FC, ReactNode } from "react";
 import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 
@@ -36,6 +36,7 @@ import { getPageContextInfo } from "../utils/page-context";
 import { SANDBOX_FILE_TOOL_TYPES, sandboxOutputsOf } from "../utils/sandbox-files";
 import { toolImageSource } from "../utils/tool-image-source";
 import PageContextChip from "./page-context-chip";
+import PdfPart from "./pdf-part";
 import ToolGroup from "./tool-group";
 import type { ToolGroupSegment } from "./turn-summary";
 import { segmentTurn } from "./turn-summary";
@@ -44,7 +45,7 @@ import { segmentTurn } from "./turn-summary";
 // `file-type-utilities`, a small module with no heavy dependencies, so importing it statically is free.
 const LazyGenericFileCard = lazy(() => import("@neore/ui/components/file-renderers/generic-file-card"));
 
-type FileRenderer = LazyExoticComponent<ComponentType<{ filename?: string; mediaType?: string; url: string }>>;
+type FileRenderer = ComponentType<{ filename?: string; mediaType?: string; url: string }>;
 
 /** Every file type the chat previews except images, which are the overridable `Image` component. */
 const FILE_RENDERERS: Record<Exclude<FileRendererType, "image">, FileRenderer> = {
@@ -53,7 +54,7 @@ const FILE_RENDERERS: Record<Exclude<FileRendererType, "image">, FileRenderer> =
     generic: LazyGenericFileCard,
     jsonl: lazy(() => import("@neore/ui/components/file-renderers/jsonl-viewer")),
     mermaid: lazy(() => import("@neore/ui/components/file-renderers/mermaid-preview")),
-    pdf: lazy(() => import("@neore/ui/components/file-renderers/pdf-viewer")),
+    pdf: PdfPart,
     table: lazy(() => import("@neore/ui/components/file-renderers/delimited-text-preview")),
     video: lazy(() => import("@neore/ui/components/file-renderers/video-player")),
 };

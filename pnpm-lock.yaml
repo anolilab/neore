@@ -527,8 +527,8 @@ catalogs:
       specifier: 1.13.0
       version: 1.13.0
     pdfjs-dist:
-      specifier: 6.4.299
-      version: 6.4.299
+      specifier: 6.3.289
+      version: 6.3.289
     react-pdf:
       specifier: 11.0.0
       version: 11.0.0
@@ -3058,7 +3058,7 @@ importers:
         version: 5.7.0
       pdfjs-dist:
         specifier: catalog:file-renderers
-        version: 6.4.299
+        version: 6.3.289
       react-day-picker:
         specifier: catalog:forms
         version: 10.0.2(@types/react@19.3.0)(react@19.3.1)
@@ -21386,10 +21386,6 @@ packages:
 
   pdfjs-dist@6.3.289:
     resolution: {integrity: sha512-ZHjSVpDa3D6izMq8/04lvkhkATUmL9px6ChPaXc1k6nU2Mrhlg1/7F0bdUqCwUjw3NsPTfPZsMDUU6ZIcRaeQw==}
-    engines: {node: '>=22.13.0 || >=24'}
-
-  pdfjs-dist@6.4.299:
-    resolution: {integrity: sha512-AVl138zALtfaAPvADulE0PZThbYzCBS79nL4pOSL/6Sm/4AH5A21BD9VHt97OlCuzJuCpmeZtAtkinisF4Vb1g==}
     engines: {node: '>=22.13.0 || >=24'}
 
   pe-library@0.4.1:
@@ -45590,10 +45586,6 @@ snapshots:
   pathe@2.0.3: {}
 
   pdfjs-dist@6.3.289:
-    optionalDependencies:
-      '@napi-rs/canvas': 1.0.10
-
-  pdfjs-dist@6.4.299:
     optionalDependencies:
       '@napi-rs/canvas': 1.0.10
 
