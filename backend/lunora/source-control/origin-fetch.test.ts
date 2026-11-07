@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { createBoundRequester, HostApiError } from "./origin-fetch";
 
+/** What a transport is handed to fetch. */
+type FetchInput = Request | string | URL;
+
 const ORIGIN = "https://api.github.com";
 
 interface Seen {
@@ -13,7 +16,7 @@ interface Seen {
 /** A transport that answers from a script and records every request, for every host. */
 const transport = (answer: (url: string) => Response) => {
     const seen: Seen[] = [];
-    const via = async (input: Request | string | URL, init?: RequestInit): Promise<Response> => {
+    const via = async (input: FetchInput, init?: RequestInit): Promise<Response> => {
         const url = String(input);
 
         const headers = new Headers(init?.headers);
@@ -204,7 +207,7 @@ describe("createBoundRequester", () => {
     describe("writes", () => {
         it("sends a JSON body with the method, to the bound origin only", async () => {
             const bodies: { body: unknown; contentType: string | null; method: string | undefined }[] = [];
-            const via = async (_input: Request | string | URL, init?: RequestInit): Promise<Response> => {
+            const via = async (_input: FetchInput, init?: RequestInit): Promise<Response> => {
                 bodies.push({ body: init?.body, contentType: new Headers(init?.headers).get("content-type"), method: init?.method });
 
                 return Response.json({ id: 1 });
@@ -254,5 +257,29 @@ describe("createBoundRequester", () => {
             await expect(requester("/x", { json: {}, method: "POST" })).rejects.toMatchObject({ status: 0, unconfirmed: true });
             await expect(requester("/x")).rejects.toMatchObject({ status: 0, unconfirmed: false });
         });
+    });
+});
+
+describe("a request with its own deadline", () => {
+    it("spends one deadline across its redirects, not one per hop", async () => {
+        let hop = 0;
+        // Each hop takes 60 ms and honours its abort signal: 100 ms per hop would let all three through, 100 ms in all does not.
+        const via = async (_input: FetchInput, init?: RequestInit): Promise<Response> =>
+            await new Promise<Response>((resolve, reject) => {
+                const timer = setTimeout(() => {
+                    hop += 1;
+                    resolve(hop < 3 ? new Response(null, { headers: { location: `/next-${String(hop)}` }, status: 302 }) : Response.json({ ok: true }));
+                }, 60);
+
+                init?.signal?.addEventListener("abort", () => {
+                    clearTimeout(timer);
+                    reject(new Error("aborted"));
+                });
+            });
+
+        await expect(createBoundRequester({ origin: "https://api.example.com", token: "t", via })("/start", { timeoutMs: 100 })).rejects.toMatchObject({
+            status: 0,
+        });
+        expect(hop).toBeLessThan(3);
     });
 });

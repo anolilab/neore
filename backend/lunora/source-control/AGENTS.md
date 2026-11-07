@@ -37,3 +37,12 @@
   the handler never parses the body and `acceptWatchDelivery` only sets `dirtyAt` — keep it that way, what
   changed is read from the host with the user's token. `review_request` notifications dedupe on
   origin + repo + number + the pull request's `updated_at`.
+
+- **Agent pull request tools** (`pr-agent*.ts`, `check-log.ts`, `chat/tools/pull-request.ts`) — an agent acts only on a
+  pull request LINKED to its thread (`linkedPullRequestsOfThread`); anything else is refused before any host call, and
+  the run offers the tools only to a thread that has a link (`buildAgentTools`). Calls use the person's own connector
+  token. A job log is a redirect to a signed storage address: the requester answers it (`redirect: "return"`), and
+  the driver fetches it WITHOUT the token, only on `isLogAddress` origins, tail only, excerpt capped
+  (`LOG_EXCERPT_MAX_CHARS`). Reads are Auto; reply and re-run are Ask by default; merge is in
+  `BUILTIN_TOOLS_NEEDING_A_PERSON` with `needsApproval: true` hard-coded, so no override, grant or headless run skips
+  the person, and it merges only the head the approved call names.

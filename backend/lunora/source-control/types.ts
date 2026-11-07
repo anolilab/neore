@@ -135,6 +135,21 @@ export interface CheckSummary {
     total: number;
 }
 
+/** Where a check's log excerpt came from: the job's own log, the check's reported output, or nothing the host offers. */
+export type CheckLogSource = "check_output" | "job_log" | "none";
+
+export interface CheckLog {
+    /** `false` when the read stopped before the log's end (past the read cap, or cut off): its failure may be later than this. */
+    endRead?: false;
+    /** Lines around the failure, cut to a cap; untrusted text. Empty when the host has none. */
+    excerpt: string;
+    /** Set when the log was refused to the account and the check had no output either: unavailable, not absent. */
+    refused?: true;
+    source: CheckLogSource;
+    /** Whether the excerpt leaves part of the log out. */
+    truncated: boolean;
+}
+
 // ─── Merge ──────────────────────────────────────────────────────────────────
 
 export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
@@ -197,6 +212,17 @@ export interface SubmittedReview {
     url: string | null;
 }
 
+export type ReviewState = "approved" | "changes_requested" | "commented" | "dismissed" | "pending";
+
+/** One submitted review: its verdict and its top-level text. Line comments are in the review threads. */
+export interface PullRequestReview {
+    authorLogin: string;
+    body: string;
+    id: string;
+    state: ReviewState;
+    submittedAt: number;
+}
+
 export interface ThreadComment {
     authorLogin: string;
     body: string;
@@ -208,7 +234,11 @@ export interface ThreadComment {
 export interface ReviewThread {
     canResolve: boolean;
     canUnresolve: boolean;
+    /** How many comments the thread holds, when the host says: more than `comments` when it is longer than was read. */
+    commentCount?: number;
     comments: ThreadComment[];
+    /** `false` when the thread's comment pages were not read to the end (the page bound): its latest are missing. */
+    commentsComplete?: false;
     id: string;
     isOutdated: boolean;
     isResolved: boolean;
@@ -223,6 +253,8 @@ export interface CursorPage<T> {
     endCursor: string | null;
     hasMore: boolean;
     items: T[];
+    /** How many there are in all, when the host says. */
+    total?: number;
 }
 
 export interface ViewedFile {
