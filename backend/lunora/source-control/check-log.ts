@@ -220,7 +220,8 @@ export const readTail = async (
 
         // A chunk that crosses the read cap is taken only up to it: nothing past the cap is kept or counted.
         const room = maxBytes - received;
-        const taken = value.byteLength > room ? value.subarray(0, room) : value;
+        // A copy, not a view: the bytes past the cap must not keep the chunk's buffer alive.
+        const taken = value.byteLength > room ? value.slice(0, room) : value;
 
         received += taken.byteLength;
         // A chunk larger than what is kept is copied down to its tail: neither it nor its buffer stays whole.

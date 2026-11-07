@@ -238,7 +238,7 @@ const threadForAgent = (thread: ReviewThread) => {
             // Counted against the thread's own total: comments past the pages read are left out too.
             ...truncatedMarker((thread.commentCount ?? thread.comments.length) - kept.length),
             // Longer than the pages read: the comments shown are the latest READ, and the thread's very latest are not among them.
-            ...((thread.commentCount ?? 0) > thread.comments.length && { latestUnread: true }),
+            ...(((thread.commentCount ?? 0) > thread.comments.length || thread.commentsComplete === false) && { latestUnread: true }),
         },
         isOutdated: thread.isOutdated,
         isResolved: thread.isResolved,

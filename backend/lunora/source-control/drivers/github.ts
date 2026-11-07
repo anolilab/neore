@@ -592,7 +592,12 @@ const commentsOf = (nodes: unknown[]): ThreadComment[] =>
     });
 
 /** A thread's comments past the first page, a page at a time up to {@link MAX_THREAD_COMMENT_PAGES}; a longer thread ends there. */
-const laterComments = async (request: HostRequest, threadId: string, first: z.infer<typeof commentsSchema>): Promise<unknown[]> => {
+/** The thread's comments past the first page, up to the page bound, and whether they were read to the end. */
+const laterComments = async (
+    request: HostRequest,
+    threadId: string,
+    first: z.infer<typeof commentsSchema>,
+): Promise<{ complete: boolean; nodes: unknown[] }> => {
     const nodes: unknown[] = [];
     let { pageInfo } = first;
 
@@ -607,7 +612,7 @@ const laterComments = async (request: HostRequest, threadId: string, first: z.in
         pageInfo = data.node.comments.pageInfo;
     }
 
-    return nodes;
+    return { complete: pageInfo?.hasNextPage !== true, nodes };
 };
 
 const toThread = async (request: HostRequest, value: unknown): Promise<ReviewThread | undefined> => {
@@ -617,13 +622,16 @@ const toThread = async (request: HostRequest, value: unknown): Promise<ReviewThr
         return undefined;
     }
 
-    const comments = commentsOf([...thread.data.comments.nodes, ...(await laterComments(request, thread.data.id, thread.data.comments))]);
+    const later = await laterComments(request, thread.data.id, thread.data.comments);
+    const comments = commentsOf([...thread.data.comments.nodes, ...later.nodes]);
 
     return {
         canResolve: thread.data.viewerCanResolve,
         canUnresolve: thread.data.viewerCanUnresolve,
         // How many the thread holds, read or not: a thread longer than the pages read says so.
         ...(thread.data.comments.totalCount !== undefined && { commentCount: thread.data.comments.totalCount }),
+        // Pages left unread, whatever the total says: the latest comments are among them.
+        ...(!later.complete && { commentsComplete: false as const }),
         comments,
         id: thread.data.id,
         isOutdated: thread.data.isOutdated,

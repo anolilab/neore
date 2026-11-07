@@ -344,6 +344,17 @@ describe(readThreadsWithin, () => {
         expect(read.items[0]?.comments).toMatchObject({ latestUnread: true, truncated: "truncated, 498 more" });
     });
 
+    it("says the latest were not read when the comment pages stopped early, even without a total", async () => {
+        const read = await readThreadsWithin(
+            async () => {
+                return { endCursor: null, hasMore: false, items: [{ ...thread("t", [comment(1), comment(2)]), commentsComplete: false as const }], total: 1 };
+            },
+            { page: null, skip: 0 },
+        );
+
+        expect(read.items[0]?.comments).toMatchObject({ latestUnread: true });
+    });
+
     it("shows a thread's first and latest comments, and marks the rest", async () => {
         const read = await readThreadsWithin(
             async () => {
