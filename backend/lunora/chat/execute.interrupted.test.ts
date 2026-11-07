@@ -23,6 +23,10 @@ const { enqueued, modelState, registry } = vi.hoisted(() => {
             optOut: false,
             prefsFail: false,
             prefsReads: [] as { shardKey: string; userId: string }[],
+            /** The tools the run may call again after a death inside one. */
+            repeatable: [] as string[],
+            /** Calls of the tools that never return (`look`, `act`): a death inside them. */
+            stuckCalls: [] as string[],
             threadStateless: false,
             toolCalls: 0,
             withTools: false,
@@ -127,13 +131,33 @@ vi.mock("./lib/agent-tools", () => {
                 mcpLabels: modelState.mcpLabels,
                 mcpServerNames: [],
                 permissionKeys: {},
+                repeatable: modelState.repeatable,
                 tools: {
+                    act: tool({
+                        description: "Changes something, and never returns",
+                        execute: async () => {
+                            modelState.stuckCalls.push("act");
+
+                            return await new Promise<string>(() => {});
+                        },
+                        inputSchema: z.object({}),
+                    }),
                     echo: tool({
                         description: "Echo",
                         execute: async () => {
                             modelState.toolCalls += 1;
 
                             return "echoed";
+                        },
+                        inputSchema: z.object({}),
+                    }),
+                    look: tool({
+                        description: "Reads something, and never returns",
+                        // Never returns the first time (the death), and answers when the resume calls it again.
+                        execute: async () => {
+                            modelState.stuckCalls.push("look");
+
+                            return modelState.stuckCalls.filter((name) => name === "look").length > 1 ? "looked" : await new Promise<string>(() => {});
                         },
                         inputSchema: z.object({}),
                     }),
@@ -240,6 +264,8 @@ beforeEach(async () => {
     modelState.prefsFail = false;
     modelState.threadStateless = false;
     modelState.prefsReads.length = 0;
+    modelState.repeatable = [];
+    modelState.stuckCalls.length = 0;
     modelState.groupConfig = null;
     vi.mocked(runGroupTurn).mockClear();
     modelState.model = scriptedModel([textStep("Hello there.")]);
@@ -610,7 +636,113 @@ describe("a run whose worker dies mid-step", () => {
     });
 });
 
+/**
+ * A run whose worker dies inside the tools its first step called (`look` reads and is safe to repeat, `act` is not):
+ * the tools never return. Not awaited, like `startRunThatDiesInStepTwo`.
+ */
+const startRunThatDiesInTools = async (toolNames: string[]) => {
+    modelState.withTools = true;
+    modelState.repeatable = ["look"];
+    modelState.model = scriptedModel([
+        [
+            { type: "stream-start", warnings: [] },
+            ...toolNames.map((toolName, index) => {
+                return { input: "{}", toolCallId: `call-${index}`, toolName, type: "tool-call" as const };
+            }),
+            {
+                finishReason: { raw: "tool-calls", unified: "tool-calls" },
+                type: "finish",
+                usage: {
+                    inputTokens: { cacheRead: undefined, cacheWrite: undefined, noCache: 3, total: 3 },
+                    outputTokens: { reasoning: undefined, text: 5, total: 5 },
+                },
+            },
+        ],
+        textStep("Found it."),
+    ]);
+
+    void run().catch(() => undefined);
+
+    for (let attempt = 0; attempt < 200 && modelState.stuckCalls.length < toolNames.length; attempt += 1) {
+        await sleep(25);
+    }
+
+    expect(modelState.stuckCalls.toSorted((a, b) => a.localeCompare(b))).toStrictEqual(toolNames.toSorted((a, b) => a.localeCompare(b)));
+    await sleep(100);
+};
+
+describe("a run whose worker dies inside a tool", () => {
+    it("is resumed when the tool is safe to repeat: the open call is dropped and the step runs again", async () => {
+        await startRunThatDiesInTools(["look"]);
+
+        const { toolsInFlight } = await readStream();
+
+        expect(toolsInFlight).toBeUndefined();
+
+        await patchStream({ beatAt: deadBeat() });
+
+        expect(await inspect()).toStrictEqual({ kind: "resumed" });
+        expect(enqueued).toHaveLength(1);
+
+        // Nothing of the dead step was saved: the resume asks the model again from the prompt, and the model calls the tool again.
+        const { pause, rows } = await readState();
+
+        expect(pause?.from).toBe(ids.messageId);
+        expect(rows.map((row) => row.id)).toStrictEqual([ids.messageId]);
+
+        modelState.model = scriptedModel([toolCallStep("look", "call-again"), textStep("Found it.")]);
+        await run({ resume: String(pause?.id) });
+
+        expect(modelState.stuckCalls).toStrictEqual(["look", "look"]);
+        const { streamStatus } = await readState();
+
+        expect(streamStatus).toBe("done");
+    });
+
+    it("is not resumed when the tool is not safe to repeat", async () => {
+        await startRunThatDiesInTools(["act"]);
+
+        const { toolsInFlight } = await readStream();
+
+        expect(toolsInFlight).toBe(1);
+
+        await patchStream({ beatAt: deadBeat() });
+
+        expect(await inspect()).toMatchObject({ kind: "fail", message: expect.stringContaining("while a tool was running") });
+        expect(enqueued).toHaveLength(0);
+    });
+
+    it("is not resumed when a safe tool and an unsafe one were both open", async () => {
+        await startRunThatDiesInTools(["look", "act"]);
+
+        const { toolsInFlight } = await readStream();
+
+        expect(toolsInFlight).toBe(1);
+
+        await patchStream({ beatAt: deadBeat() });
+
+        expect(await inspect()).toMatchObject({ kind: "fail", message: expect.stringContaining("while a tool was running") });
+        expect(enqueued).toHaveLength(0);
+    });
+});
+
 describe("the beat and the tool marks", () => {
+    it("markToolRun checks a repeatable tool's start without counting it, and refuses it once the stream ended", async () => {
+        const mark = async () =>
+            await harness.run(
+                async (ctx: any) => await ctx.runMutation(markToolRun, { delta: 1, epoch: 0, repeatable: true, streamId: ids.streamId as never }),
+            );
+
+        await mark();
+
+        const { toolsInFlight } = await readStream();
+
+        expect(toolsInFlight).toBeUndefined();
+
+        await patchStream({ status: "done" });
+        await expect(mark()).rejects.toThrow();
+    });
+
     it("beatRun moves the beat of a live, unpaused stream", async () => {
         await patchStream({ beatAt: 1, runClaimedAt: 1 });
         await harness.run(async (ctx: any) => await ctx.runMutation(beatRun, { epoch: 0, streamId: ids.streamId as never }));
@@ -793,7 +925,7 @@ describe("a run the watchdog reads wrongly", () => {
 
         // The resume itself calls the tool again, so its OWN row carries a call to be labelled.
         modelState.model = scriptedModel([toolCallStep("echo", "call-2"), textStep("All done.")]);
-        await run({ resume: pause!.id });
+        await run({ resume: String(pause?.id) });
 
         // The dead invocation never reached its end; the resume's is the only one, and it covers every row of the reply.
         expect(afterRun).toHaveBeenCalledOnce();
@@ -830,7 +962,7 @@ describe("a run the watchdog reads wrongly", () => {
         const { pause } = await readState();
 
         modelState.model = scriptedModel([textStep("All done.")]);
-        await run({ resume: pause!.id });
+        await run({ resume: String(pause?.id) });
 
         const labelled = await harness.run(async (ctx: any) => {
             const rows = await ctx.db
@@ -1204,7 +1336,7 @@ describe("the resume setting and mode of a run", () => {
 
         modelState.threadStateless = true;
         modelState.model = scriptedModel([textStep("All done.")]);
-        await run({ resume: pause!.id });
+        await run({ resume: String(pause?.id) });
 
         const state = await readState();
 

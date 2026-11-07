@@ -32,12 +32,19 @@ if (typeof source["delta"] !== "number" || !Number.isFinite(source["delta"])) re
 if (typeof source["epoch"] !== "number" || !Number.isFinite(source["epoch"])) return DEFER;
 let __has1 = false;
 let __val1;
-if (source["setTo"] !== undefined) {
-if (typeof source["setTo"] !== "number" || !Number.isFinite(source["setTo"])) return DEFER;
-__val1 = source["setTo"];
+if (source["repeatable"] !== undefined) {
+if (typeof source["repeatable"] !== "boolean") return DEFER;
+__val1 = source["repeatable"];
 __has1 = true;
 }
+let __has2 = false;
+let __val2;
+if (source["setTo"] !== undefined) {
+if (typeof source["setTo"] !== "number" || !Number.isFinite(source["setTo"])) return DEFER;
+__val2 = source["setTo"];
+__has2 = true;
+}
 if (typeof source["streamId"] !== "string") return DEFER;
-return { "delta": source["delta"], "epoch": source["epoch"], ...(__has1 ? { "setTo": __val1 } : {}), "streamId": source["streamId"] };
+return { "delta": source["delta"], "epoch": source["epoch"], ...(__has1 ? { "repeatable": __val1 } : {}), ...(__has2 ? { "setTo": __val2 } : {}), "streamId": source["streamId"] };
 });
 export * from "../../chat/streaming/persistent/interrupted.js";

@@ -1,0 +1,62 @@
+#!/usr/bin/env sh
+
+# Fast checks only: the CI failures that cost the most review rounds.
+# Lint, tests and the full `tsc` type check are heavier; run them before opening a
+# pull request and before each push that changes behaviour
+# (docs/agents/review-checklist.md).
+pnpm exec sort-package-json --check packages/*/package.json apps/*/package.json backend/package.json services/*/package.json package.json || exit 1
+
+# Prettier on every file changed since the merge base with main, root files
+# included; Markdown is skipped, as in CI.
+base=$(git merge-base HEAD origin/main 2>/dev/null) || {
+    git fetch --quiet origin main && base=$(git merge-base HEAD origin/main)
+} || {
+    echo "pre-push: cannot find the merge base with origin/main; fetch it, then push again." >&2
+    exit 1
+}
+# NUL-separated through a temp file: keeps non-ASCII and space-containing paths
+# intact, and avoids GNU-only xargs flags.
+list=$(mktemp) || exit 1
+git diff -z --name-only --diff-filter=ACMR "$base" HEAD -- . ':!*.md' ':!*.mdx' >"$list" || { rm -f "$list"; exit 1; }
+if [ -s "$list" ]; then
+    xargs -0 pnpm exec prettier --config=.prettierrc.cjs --ignore-unknown --check -- <"$list"
+    status=$?
+else
+    status=0
+fi
+rm -f "$list"
+[ "$status" -eq 0 ] || exit "$status"
+
+# Type check of the projects affected since the same base, with `tsrs` (TS 7.1
+# semantics, beta). CI still runs `tsc` 6; if the two disagree, CI decides.
+# It reads the working tree, so it describes the push only when every pushed ref
+# is the checked-out commit and the tree is clean; otherwise it is skipped and CI
+# checks. Git lists "<local ref> <local sha> <remote ref> <remote sha>" on stdin
+# for each pushed ref; an all-zero sha is a deletion.
+skip() {
+    printf 'pre-push: type check skipped: %s; CI checks the pushed commit.\n' "$1" >&2
+    exit 0
+}
+head=$(git rev-parse HEAD)
+pushed=
+while read -r _ sha _ _; do
+    case "$sha" in
+        # Peeled: an annotated tag lists the tag object, not its commit.
+        *[!0]*)
+            pushed=1
+            [ "$(git rev-parse --verify --quiet "$sha^{commit}")" = "$head" ] || skip "a pushed ref is not the checked-out commit"
+            ;;
+    esac
+done
+[ -n "$pushed" ] || skip "nothing but deletions is pushed"
+git diff --quiet HEAD -- || skip "the working tree has uncommitted changes"
+[ -z "$(git ls-files --others --exclude-standard -- '*.ts' '*.tsx' '*.mts' '*.cts')" ] || skip "there are untracked TypeScript files"
+# tsrs ships binaries for these platforms only (none for Windows on Arm). Decided by
+# platform, so a missing install or a broken binary still fails the push.
+case "$(node -p 'process.platform + "-" + process.arch')" in
+    darwin-arm64 | darwin-x64 | linux-arm64 | linux-x64 | win32-x64) ;;
+    *) skip "tsrs has no binary for this platform" ;;
+esac
+# Quiet: a failing task still prints its errors; cached ones (the backend codegen
+# replays its whole advisor report) do not.
+pnpm exec vis affected lint:types:fast --base="$base" --output-style=quiet || exit 1

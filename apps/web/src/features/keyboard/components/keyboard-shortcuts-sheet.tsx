@@ -68,10 +68,12 @@ const KeyboardShortcutsSheet = ({ shortcuts }: { shortcuts: Partial<KeyboardShor
     };
 
     const labels: Record<string, string> = {
+        archiveThread: t`Archive open thread`,
         audioRecord: t`Record audio`,
         commandPalette: t`Open command palette`,
         copyLastCodeBlock: t`Copy last code block`,
         decreaseEffort: t`Lower reasoning effort`,
+        deleteThread: t`Delete open thread (asks first)`,
         escape: t`Cancel or close`,
         findInThread: t`Find in thread`,
         firstItem: t`Go to first item`,

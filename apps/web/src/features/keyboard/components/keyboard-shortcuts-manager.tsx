@@ -70,10 +70,12 @@ const KeyboardShortcutsHandler: React.FC<{
     // Memoize converted shortcuts to prevent unnecessary re-registrations
     const convertedShortcuts = useMemo(() => {
         return {
+            archiveThread: convertShortcutToHotkeysHook(shortcuts.archiveThread),
             askAside: convertShortcutToHotkeysHook(shortcuts.askAside),
             audioRecord: convertShortcutToHotkeysHook(shortcuts.audioRecord),
             copyLastCodeBlock: convertShortcutToHotkeysHook(shortcuts.copyLastCodeBlock),
             decreaseEffort: convertRecordedShortcutToHotkeysHook(shortcuts.decreaseEffort),
+            deleteThread: convertShortcutToHotkeysHook(shortcuts.deleteThread),
             escape: convertShortcutToHotkeysHook(shortcuts.escape),
             findInThread: convertShortcutToHotkeysHook(shortcuts.findInThread),
             firstItem: convertShortcutToHotkeysHook(shortcuts.firstItem),
@@ -90,10 +92,12 @@ const KeyboardShortcutsHandler: React.FC<{
             sidebarRight: convertShortcutToHotkeysHook(shortcuts.sidebarRight),
         };
     }, [
+        shortcuts.archiveThread,
         shortcuts.askAside,
         shortcuts.audioRecord,
         shortcuts.copyLastCodeBlock,
         shortcuts.decreaseEffort,
+        shortcuts.deleteThread,
         shortcuts.escape,
         shortcuts.findInThread,
         shortcuts.firstItem,
@@ -142,6 +146,30 @@ const KeyboardShortcutsHandler: React.FC<{
 
             event.preventDefault();
             onShortcut?.("copyLastCodeBlock", event);
+        },
+        [onShortcut],
+    );
+
+    const handleArchiveThread = useCallback(
+        (event: KeyboardEvent) => {
+            if (isTextEntryKeystroke(event)) {
+                return;
+            }
+
+            event.preventDefault();
+            onShortcut?.("archiveThread", event);
+        },
+        [onShortcut],
+    );
+
+    const handleDeleteThread = useCallback(
+        (event: KeyboardEvent) => {
+            if (isTextEntryKeystroke(event)) {
+                return;
+            }
+
+            event.preventDefault();
+            onShortcut?.("deleteThread", event);
         },
         [onShortcut],
     );
@@ -322,6 +350,35 @@ const KeyboardShortcutsHandler: React.FC<{
             preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
         },
         [convertedShortcuts.copyLastCodeBlock, handleCopyLastCodeBlock],
+    );
+
+    useHotkeys(
+        convertedShortcuts.archiveThread,
+        handleArchiveThread,
+        {
+            description: "Archive the open thread",
+            enabled: !!shortcuts.archiveThread && typeof shortcuts.archiveThread === "string",
+            // Never from a text field, modifier chord or not: these two options are what keep it out of the composer (the
+            // keystroke check in the handler lets every modifier chord through).
+            enableOnContentEditable: false,
+            enableOnFormTags: false,
+            preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
+        },
+        [convertedShortcuts.archiveThread, handleArchiveThread],
+    );
+
+    useHotkeys(
+        convertedShortcuts.deleteThread,
+        handleDeleteThread,
+        {
+            description: "Delete the open thread (asks first)",
+            enabled: !!shortcuts.deleteThread && typeof shortcuts.deleteThread === "string",
+            // Never from a text field, as archive: these two options keep it out of the composer.
+            enableOnContentEditable: false,
+            enableOnFormTags: false,
+            preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
+        },
+        [convertedShortcuts.deleteThread, handleDeleteThread],
     );
 
     useHotkeys(

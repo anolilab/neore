@@ -49,6 +49,9 @@ import { useThreadManager } from "@/features/chat/core/hooks/use-thread-manager"
 import { useCurrentThreadId, useThreadMetadata } from "@/features/chat/core/stores/thread-store-hooks";
 import { scrollToMessage } from "@/features/chat/thread/message-list";
 import useThreadHandlers from "@/features/chat/thread-list/hooks/use-thread-handlers";
+import type { ThreadState } from "@/features/chat/thread-list/lib/derived-sections";
+import { nextSnoozeWake, threadStateOf } from "@/features/chat/thread-list/lib/derived-sections";
+import { compareByStateRank, parseStateQuery } from "@/features/chat/thread-list/lib/state-query";
 import { buildMatchSnippet } from "@/features/chat/thread-list/utilities";
 import convertShortcutToHotkeysHook from "@/features/keyboard/lib/shortcut-converter";
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
@@ -62,6 +65,8 @@ import { useCommandDialogActions, useCommandDialogState, useCommandDialogStore }
 const MESSAGE_SEARCH_MIN_CHARS = 2;
 const MESSAGE_SEARCH_DEBOUNCE_MS = 250;
 const MAX_MESSAGE_HITS = 8;
+/** The longest delay setTimeout accepts; a timer capped by it re-arms when it fires (the effect reads `now`). */
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
     const [debounced, setDebounced] = useState(value);
@@ -135,6 +140,7 @@ interface Group {
 interface ThreadItem {
     id: string;
     isPinned?: boolean;
+    state: ThreadState;
     status: "active" | "archived";
     title: string;
 }
@@ -177,7 +183,9 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     // While the input and the debounced query differ, the query is skipped and no hits show.
     const trimmedSearch = searchInput.trim();
     const debouncedSearch = useDebouncedValue(trimmedSearch, MESSAGE_SEARCH_DEBOUNCE_MS);
-    const isMessageSearchCurrent = shouldQuery && trimmedSearch.length >= MESSAGE_SEARCH_MIN_CHARS && trimmedSearch === debouncedSearch;
+    // A state tag narrows to threads and drops message hits, so a tagged input never needs the full-text query.
+    const isStateTagged = parseStateQuery(trimmedSearch).state !== undefined;
+    const isMessageSearchCurrent = shouldQuery && !isStateTagged && trimmedSearch.length >= MESSAGE_SEARCH_MIN_CHARS && trimmedSearch === debouncedSearch;
     const { data: messageSearchResults } = useQuery(
         crpc.chat.functions.searchMessages.queryOptions(
             isMessageSearchCurrent ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS, searchQuery: debouncedSearch } : skipToken,
@@ -195,6 +203,32 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             .filter((id): id is string => typeof id === "string") || [],
     );
 
+    // The clock the states are read against: re-read when the palette opens, and again at each snooze expiry while it stays open.
+    const [now, setNow] = useState(() => Date.now());
+    const snoozeWake = nextSnoozeWake((allThreadsData.lunora ?? []) as { snoozedUntil?: number }[], now);
+
+    useEffect(() => {
+        if (isOpen) {
+            setNow(Date.now());
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen || snoozeWake === undefined) {
+            return undefined;
+        }
+
+        const delay = Math.min(Math.max(snoozeWake - Date.now(), 0) + 25, MAX_TIMEOUT_MS);
+        const timer = setTimeout(() => {
+            setNow(Date.now());
+        }, delay);
+
+        return () => {
+            clearTimeout(timer);
+        };
+        // `now` too: a wake past the timer's cap fires early with the same next wake, and must arm the next timer.
+    }, [isOpen, now, snoozeWake]);
+
     const allThreads: ThreadItem[] = ((): ThreadItem[] => {
         const threads: ThreadItem[] = [];
         const lunoraThreads = allThreadsData.lunora || [];
@@ -210,10 +244,30 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                 const metadata = threadMetadata.get(threadId);
                 const threadStatus = (thread as { status?: "active" | "archived" })?.status;
                 const threadTitle = (thread as { title?: string })?.title;
+                const row = thread as {
+                    awaitingInput?: "approval" | "question";
+                    lastReplyAt?: number;
+                    lastUserMessageAt?: number;
+                    scheduled?: boolean;
+                    snoozedUntil?: number;
+                    status?: string;
+                };
 
                 threads.push({
                     id: threadId,
                     isPinned: pinnedThreadIds.has(threadId),
+                    state: threadStateOf(
+                        {
+                            awaitingInput: row.awaitingInput,
+                            lastReplyAt: row.lastReplyAt,
+                            lastUserMessageAt: row.lastUserMessageAt,
+                            scheduled: row.scheduled,
+                            snoozedUntil: row.snoozedUntil,
+                            // An archived thread counts as archived when its metadata says so, even if the row does not yet.
+                            status: metadata?.status === "archived" || row.status === "archived" ? "archived" : (row.status ?? "active"),
+                        },
+                        now,
+                    ),
                     status: metadata?.status === "archived" || threadStatus === "archived" ? "archived" : "active",
                     title: metadata?.title || threadTitle || t`Untitled Thread`,
                 });
@@ -225,13 +279,16 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                 threads.push({
                     id: threadId,
                     isPinned: pinnedThreadIds.has(threadId),
+                    // Stored metadata carries no run or reply state, so these rows have no state tag.
+                    state: "other",
                     status: metadata.status === "archived" ? "archived" : "active",
                     title: metadata.title || t`Untitled Thread`,
                 });
             }
         }
 
-        return threads;
+        // Working threads first, so a running chat is the first thing the palette shows.
+        return threads.toSorted(compareByStateRank);
     })();
 
     const handleNavigateToSettings = () => {
@@ -342,6 +399,10 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         close();
     };
 
+    // A leading `#state` tag narrows the thread lists to that state; the rest of the input searches their titles.
+    const stateFilter = parseStateQuery(searchInput).state;
+    const visibleThreads = stateFilter === undefined ? allThreads : allThreads.filter((candidate) => candidate.state === stateFilter);
+
     const groupedItems = (() => {
         const groups: Group[] = [];
 
@@ -428,8 +489,8 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         groups.push({ items: threadActions, value: t`Thread Actions` });
 
         if (allThreads.length > 0) {
-            const activeThreads = allThreads.filter((candidate) => candidate.status === "active");
-            const archivedThreads = allThreads.filter((candidate) => candidate.status === "archived");
+            const activeThreads = visibleThreads.filter((candidate) => candidate.status === "active");
+            const archivedThreads = visibleThreads.filter((candidate) => candidate.status === "archived");
 
             if (activeThreads.length > 0) {
                 groups.push({
@@ -484,13 +545,28 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             });
         }
 
-        return groups;
+        // With a state tag the palette lists threads only: actions, navigation and message hits drop out.
+        if (stateFilter === undefined) {
+            return groups;
+        }
+
+        return groups.flatMap((group) => {
+            const items = group.items.filter((item) => item.threadId !== undefined);
+
+            return items.length > 0 ? [{ ...group, items }] : [];
+        });
     })();
 
     // Message hits come from the server's full-text match, which need not contain the
     // typed text verbatim, so only the local items are narrowed by the input.
     const filterItem = (item: unknown, query: string) => {
         const candidate = item as Item;
+        const { state, text } = parseStateQuery(query);
+
+        // With a state tag the input narrows by title only; the tag already picked the threads.
+        if (state !== undefined) {
+            return text === "" || contains(candidate, text, (value) => value.label);
+        }
 
         return candidate.isMessageHit === true || contains(candidate, query, (value) => value.label);
     };
@@ -531,6 +607,12 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                 <Command filter={filterItem} items={groupedItems} onValueChange={setSearchInput}>
                     <CommandInput placeholder={t`Search threads, navigate, or perform actions...`} />
                     <CommandPanel>
+                        {/* A state tag filters the threads loaded here, one page of them: say so when there are more, so an empty or short list is not taken as complete. */}
+                        {stateFilter !== undefined && allThreadsData.hasMore && (
+                            <p className="text-muted-foreground px-3 pt-2 text-xs">
+                                {t`Only the ${allThreadsData.lunora.length} threads loaded here are filtered by state; older ones are not included.`}
+                            </p>
+                        )}
                         <CommandEmpty>{t`No results found.`}</CommandEmpty>
                         <CommandList>
                             {(group: Group, index: number) => (

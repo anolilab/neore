@@ -26,6 +26,11 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
             }
 
             switch (action) {
+                case "archiveThread": {
+                    // The open thread's listener owns the archive state (`thread-shortcuts-listener.tsx`).
+                    globalThis.dispatchEvent(new CustomEvent("archiveThread"));
+                    break;
+                }
                 case "askAside": {
                     // The thread's listener opens the panel (`ask-aside-shortcut-listener.tsx`).
                     globalThis.dispatchEvent(new CustomEvent("askAside"));
@@ -51,6 +56,11 @@ const useKeyboardShortcutHandler = (): ((action: keyof KeyboardShortcuts, event:
                 case "decreaseEffort": {
                     // The composer's effort listener owns the value (`composer-effort-shortcuts.tsx`).
                     globalThis.dispatchEvent(new CustomEvent("composer.decreaseEffort"));
+                    break;
+                }
+                case "deleteThread": {
+                    // The open thread's listener asks for confirmation before it deletes.
+                    globalThis.dispatchEvent(new CustomEvent("deleteThread"));
                     break;
                 }
                 case "escape": {

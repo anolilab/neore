@@ -22,6 +22,7 @@ import { createRunLowRiskCheck } from "./low-risk-check";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import type { MCPServerConfig } from "./mcp-tools";
 import { getMCPTools } from "./mcp-tools";
+import { isSafeToRepeat } from "./repeatable-tools";
 import { connectorTrustId, mcpTrustId } from "./low-risk-trust";
 import type { ToolProgressSink } from "./mcp-progress";
 import type { SearchMode } from "./tool-builder";
@@ -109,6 +110,8 @@ export interface BuildAgentToolsResult {
      * without re-deriving it from the runtime name.
      */
     permissionKeys: Record<string, string>;
+    /** The runtime names of the tools a resume may call again after a worker died inside one (`repeatable-tools.ts`). */
+    repeatable: string[];
     tools: ToolSet;
 }
 
@@ -299,6 +302,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         mcpLabels,
         mcpServerNames: selectedServers.map((s) => s.name),
         permissionKeys,
+        repeatable: Object.keys(tools).filter((name) => isSafeToRepeat(name, describe(name))),
         tools,
     };
 };
