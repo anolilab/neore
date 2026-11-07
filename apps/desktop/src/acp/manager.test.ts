@@ -76,17 +76,22 @@ afterEach(() => {
 
 describe("a session", () => {
     it("closes the session it still runs for a thread when the backend starts the next one in that thread", async () => {
-        const first = await manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-1", threadId: "thread-1" });
+        // The thread's session and one in another thread start together; the next start in the thread then sees both.
+        const [first, other] = await Promise.all([
+            manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-1", threadId: "thread-1" }),
+            manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-3", threadId: "thread-2" }),
+        ]);
 
         await idle(first);
-
-        const second = await manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-2", threadId: "thread-1" });
-        const other = await manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-3", threadId: "thread-2" });
-
-        await idle(second);
         await idle(other);
 
+        const second = await manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-2", threadId: "thread-1" });
+
+        await idle(second);
+
         expect(snapshot(first).status).toBe("ended");
+        // Only the thread's own earlier session is closed.
+        expect(snapshot(other).status).toBe("idle");
         expect(scratch.violations()).toEqual([]);
     });
 
@@ -384,20 +389,21 @@ describe("secrets in variables", () => {
         const stdout = vi.spyOn(process.stdout, "write");
         const stderr = vi.spyOn(process.stderr, "write");
         const target = make({ API_KEY: SENTINEL });
-        const failures: string[] = [];
-
         // A start that fails while the agent echoes its environment to stderr.
         const crashing = make({ API_KEY: SENTINEL, FAKE_AGENT_FAIL_INIT: "1" });
 
-        failures.push(await messageOf(crashing.startSession("fake", "Fake", scratch.work)), await messageOf(crashing.probe("fake")));
+        // The failing start, the failing probe and the session that will crash are independent: they start together.
+        const [startFailure, probeFailure, id] = await Promise.all([
+            messageOf(crashing.startSession("fake", "Fake", scratch.work)),
+            messageOf(crashing.probe("fake")),
+            start(target),
+        ]);
+        const failures = [startFailure, probeFailure];
 
-        // A crash in the middle of a turn, then a normal exit.
-        const id = await start(target);
-
+        // A crash in the middle of a turn, while the session that will exit normally starts.
         target.send(id, "die");
-        await expect.poll(() => snapshot(id, target).status, { timeout: 8000 }).toBe("ended");
 
-        const normal = await start(target);
+        const [normal] = await Promise.all([start(target), expect.poll(() => snapshot(id, target).status, { timeout: 8000 }).toBe("ended")]);
 
         target.send(normal, "hello");
         await idle(normal, target);

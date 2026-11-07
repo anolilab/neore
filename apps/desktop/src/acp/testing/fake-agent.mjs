@@ -9,10 +9,16 @@ import { createRequire } from "node:module";
 import { z } from "zod";
 
 const require = createRequire(import.meta.url);
-const schema = require("@agentclientprotocol/sdk/schema/v1/schema.json");
-const unstable = require("@agentclientprotocol/sdk/schema/v1/schema.unstable.json");
-const check = (name) => z.fromJSONSchema({ $ref: `#/$defs/${name}`, $defs: schema.$defs });
-const checkUnstable = (name) => z.fromJSONSchema({ $ref: `#/$defs/${name}`, $defs: unstable.$defs });
+// Each validator is built the first time a frame needs it, not at start: every test spawns this process, and building all of
+// them up front made each start slow enough to push the tests that start several agents past their time limit.
+const lazy = (build) => {
+    let built;
+
+    return { safeParse: (value) => (built ??= build()).safeParse(value) };
+};
+const check = (name) => lazy(() => z.fromJSONSchema({ $ref: `#/$defs/${name}`, $defs: require("@agentclientprotocol/sdk/schema/v1/schema.json").$defs }));
+const checkUnstable = (name) =>
+    lazy(() => z.fromJSONSchema({ $ref: `#/$defs/${name}`, $defs: require("@agentclientprotocol/sdk/schema/v1/schema.unstable.json").$defs }));
 const REQUEST_SCHEMAS = {
     initialize: check("InitializeRequest"),
     "session/new": check("NewSessionRequest"),
