@@ -25,7 +25,7 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { internalMutation } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authQuery } from "../lib/crpc";
@@ -61,6 +61,9 @@ const RESERVED_SKILL_KEYS = new Set([PROJECT_SKILL_KEY, TOTAL_SKILL_KEY]);
 
 type DbCtx = Pick<MutationCtx, "db">;
 
+/** A context that only reads. */
+type ReadCtx = Pick<MutationCtx | QueryCtx, "db">;
+
 /** Whether the reply keyed `replyKey` is already in the user's rollup. */
 export const isReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: string): Promise<boolean> =>
     (await ctx.db.usageReplies.findFirst({ where: { replyKey, userId } })) !== null;
@@ -71,7 +74,7 @@ export const markReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: st
 };
 
 /** Where a reply in `thread` is filed besides the total: its project, and the organization of that project or else of the thread. */
-export const attributionOf = async (ctx: DbCtx, thread: { organizationId?: string | null; projectId?: string | null } | null): Promise<Attribution> => {
+export const attributionOf = async (ctx: ReadCtx, thread: { organizationId?: string | null; projectId?: string | null } | null): Promise<Attribution> => {
     if (!thread) {
         return {};
     }
@@ -88,13 +91,24 @@ export const attributionOf = async (ctx: DbCtx, thread: { organizationId?: strin
 };
 
 /** The attribution of the user's thread `threadId`, when it is on this shard. */
-const attributionOfThread = async (ctx: DbCtx, threadId: string | undefined): Promise<Attribution> => {
+const attributionOfThread = async (ctx: ReadCtx, threadId: string | undefined): Promise<Attribution> => {
     if (threadId === undefined || threadId.length === 0) {
         return {};
     }
 
     return await attributionOf(ctx, await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } }));
 };
+
+const vAttribution = v.object({ organizationId: v.optional(v.string()), projectInOrganization: v.optional(v.boolean()), projectKey: v.optional(v.string()) });
+
+/**
+ * The project and organization a reply in `threadId` is filed under, read where the caller can read the thread: an
+ * action off the thread's shard (a side question) reads it here and hands it on with the record.
+ */
+export const getThreadAttribution = internalQuery
+    .input({ threadId: v.string() })
+    .output(vAttribution)
+    .query(async ({ args: { threadId }, ctx }) => await attributionOfThread(ctx, threadId));
 
 /**
  * Files a recorded reply under its project (the user's rollup) and its organization (the organization's rollup), each
@@ -251,9 +265,7 @@ export const recordReplyUsage = internalMutation
         skillName: v.optional(v.string()),
         startedAt: v.optional(v.number()),
         // Worked out on the thread's own shard when the reply ran in another user's thread (`forwardReplyUsage`).
-        threadAttribution: v.optional(
-            v.object({ organizationId: v.optional(v.string()), projectInOrganization: v.optional(v.boolean()), projectKey: v.optional(v.string()) }),
-        ),
+        threadAttribution: v.optional(vAttribution),
         threadId: v.optional(v.string()),
         tokens: v.number(),
         userId: v.string(),

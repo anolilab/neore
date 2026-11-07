@@ -162,6 +162,8 @@ export interface ReplyUsageArgs {
     /** When the reply's first row was saved; dates its project row when the backfill already counted the reply. */
     startedAt?: number;
     /** The thread the reply is in; its project, read when the record lands, gets the reply's usage too. */
+    /** The thread's project and organization, read by a caller that can read the thread; the record then reads no thread. */
+    threadAttribution?: Attribution;
     threadId?: string;
     tokens: number;
     userId: string;

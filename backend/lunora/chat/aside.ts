@@ -423,6 +423,8 @@ export const askAside = authAction
             if (chosen.kind === "thread") {
                 const at = Date.now();
                 const cost = sumMessageCosts((result.steps ?? []).map((step: { providerMetadata?: unknown }) => step.providerMetadata));
+                // Read here, where the thread is readable: the record lands on the user's shard, which may not hold it.
+                const threadAttribution = await ctx.runQuery(internal.usage.activity.getThreadAttribution, { threadId });
 
                 scheduleReplyUsage(ctx.scheduler as never, {
                     at,
@@ -430,6 +432,7 @@ export const askAside = authAction
                     date: usageDayOf(at, timezone),
                     replyKey: `aside:${entryId}`,
                     skillKey: DEFAULT_SKILL_KEY,
+                    threadAttribution,
                     threadId,
                     tokens: result.totalUsage?.totalTokens ?? 0,
                     userId,

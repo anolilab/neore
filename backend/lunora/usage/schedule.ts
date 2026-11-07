@@ -28,7 +28,8 @@ export const scheduleReplyUsage = (scheduler: SchedulerLike, usageArgs: ReplyUsa
 
     if (servesUser(usageArgs.userId)) {
         scheduled = scheduler.runAfter(0, target as never, usageArgs as never);
-    } else if (usageArgs.threadId === undefined) {
+    } else if (usageArgs.threadId === undefined || usageArgs.threadAttribution !== undefined) {
+        // No thread to read, or the caller already read it: straight to the user's shard.
         scheduled = runAfterOnShard(scheduler, 0, target, { ...usageArgs }, usageArgs.userId);
     } else {
         // Another user's thread: its project and organization are read here, on its shard, then forwarded.
