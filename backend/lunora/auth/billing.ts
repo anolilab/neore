@@ -58,9 +58,9 @@ export const getBillingInfo = authQuery
     .output(
         v.union(
             v.object({
-                allowedModels: v.array(v.string()),
+                allowedModels: v.optional(v.array(v.string())),
                 baseTier: v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise")),
-                billingEmail: v.union(v.string(), v.null()),
+                billingEmail: v.optional(v.union(v.string(), v.null())),
                 creditsPerUser: v.number(),
                 creemCustomerId: v.optional(v.union(v.string(), v.null())),
                 creemSubscriptionId: v.optional(v.union(v.string(), v.null())),
@@ -89,23 +89,23 @@ export const getBillingInfo = authQuery
         // has or is using name … from external module` errors elsewhere, so the
         // name is kept out of the printed type instead.
         const result: {
-            allowedModels: string[];
+            allowedModels?: string[];
             baseTier: "enterprise" | "free" | "pro";
-            billingEmail: string | null;
+            billingEmail?: string | null;
             creditsPerUser: number;
             creemCustomerId?: string | null;
             creemSubscriptionId?: string | null;
         } = {
-            allowedModels: org.allowedModels ?? DEFAULT_ALLOWED_MODELS[baseTier],
             baseTier,
-            billingEmail: org.billingEmail ?? null,
             creditsPerUser: org.creditsPerUser ?? DEFAULT_CREDITS_PER_USER[baseTier],
         };
 
-        // Only expose the Creem ids to organization owners
+        // Members see the plan and credit allowance only. The contact e-mail, the model list and the Creem ids are for owners.
         const memberRole = context.user.activeOrganization?.role;
 
         if (memberRole === "owner") {
+            result.allowedModels = org.allowedModels ?? DEFAULT_ALLOWED_MODELS[baseTier];
+            result.billingEmail = org.billingEmail ?? null;
             result.creemCustomerId = org.creemCustomerId ?? null;
             result.creemSubscriptionId = org.creemSubscriptionId ?? null;
         }

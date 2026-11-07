@@ -4,13 +4,15 @@
  * start a Team checkout or open the Creem portal for the organization.
  */
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider, skipToken } from "@tanstack/react-query";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => {
     return {
+        billingError: false,
         billingInfo: undefined as { baseTier?: string; creditsPerUser?: number; creemSubscriptionId?: string } | undefined,
         isOwner: false,
         openPortal: vi.fn(),
@@ -70,9 +72,20 @@ vi.mock("@/lib/lunora/crpc", () => {
                 auth: {
                     billing: {
                         getBillingInfo: {
-                            queryOptions: () => {
+                            queryKey: () => ["billing-info"],
+                            // A `skipToken` argument leaves the query idle, as TanStack Query does, so a member test fails if the read is skipped.
+                            queryOptions: (input: unknown) => {
                                 return {
-                                    queryFn: async () => harness.billingInfo ?? null,
+                                    queryFn:
+                                        input === skipToken
+                                            ? skipToken
+                                            : async () => {
+                                                  if (harness.billingError) {
+                                                      throw new Error("billing unavailable");
+                                                  }
+
+                                                  return harness.billingInfo ?? null;
+                                              },
                                     queryKey: ["billing-info"],
                                 };
                             },
@@ -98,6 +111,7 @@ const mount = () => {
 };
 
 afterEach(() => {
+    harness.billingError = false;
     harness.billingInfo = undefined;
     harness.isOwner = false;
     vi.clearAllMocks();
@@ -120,41 +134,67 @@ describe("BillingSettingsCard", () => {
     });
 
     it("offers an owner of a Free organization the Team upgrade, which starts a Team checkout", async () => {
+        const user = userEvent.setup();
+
         harness.isOwner = true;
         harness.billingInfo = { baseTier: "free" };
         mount();
 
-        fireEvent.click(await screen.findByRole("button", { name: "Upgrade organization to Team" }));
+        await user.click(await screen.findByRole("button", { name: "Upgrade organization to Team" }));
 
         expect(harness.startCheckout).toHaveBeenCalledWith("team");
         expect(screen.queryByRole("button", { name: "Manage Team subscription" })).toBeNull();
     });
 
     it("opens the organization portal for an owner whose Team subscription is on Creem", async () => {
+        const user = userEvent.setup();
+
         harness.isOwner = true;
         harness.billingInfo = { baseTier: "enterprise", creemSubscriptionId: "sub_1" };
         mount();
 
-        fireEvent.click(await screen.findByRole("button", { name: "Manage Team subscription" }));
+        await user.click(await screen.findByRole("button", { name: "Manage Team subscription" }));
 
         expect(harness.openPortal).toHaveBeenCalledWith("organization");
         expect(screen.queryByRole("button", { name: "Upgrade organization to Team" })).toBeNull();
     });
 
     it("saves the billing email the owner typed", async () => {
+        const user = userEvent.setup();
+
         harness.isOwner = true;
         harness.billingInfo = { baseTier: "free" };
         harness.updateBillingSettings.mockResolvedValue({});
         mount();
 
-        // The shared form control does not link its label to the input (see sign-in-form.render.test.tsx), so find it by placeholder.
-        fireEvent.change(await screen.findByPlaceholderText("Enter billing email"), { target: { value: "billing@acme.test" } });
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        // The field is found by its label, so this also checks that the label is linked to the input.
+        await user.type(await screen.findByLabelText("Billing Email"), "billing@acme.test");
+        await user.click(screen.getByRole("button", { name: "Save" }));
 
         await waitFor(() => {
             expect(harness.updateBillingSettings).toHaveBeenCalledTimes(1);
         });
         expect(harness.updateBillingSettings.mock.calls[0]?.[0]).toMatchObject({ billingEmail: "billing@acme.test" });
         expect(harness.toast).toHaveBeenCalledWith({ message: "Billing settings updated successfully", variant: "success" });
+    });
+
+    it("shows a member that the organization's billing could not be read, not the Free plan", async () => {
+        harness.isOwner = false;
+        harness.billingError = true;
+        mount();
+
+        expect(await screen.findByText("Could not load your organization's billing details. Try again later.")).toBeTruthy();
+        expect(screen.queryByText("free")).toBeNull();
+        expect(screen.queryByText("100")).toBeNull();
+    });
+
+    it("gives an owner no plan buttons or Save when the organization's billing could not be read", async () => {
+        harness.isOwner = true;
+        harness.billingError = true;
+        mount();
+
+        expect(await screen.findByText("Could not load your organization's billing details. Try again later.")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Upgrade organization to Team" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
     });
 });

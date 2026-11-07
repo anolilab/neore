@@ -7,7 +7,7 @@ import { useAppForm } from "@neore/ui/components/form";
 import { Input } from "@neore/ui/components/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import cn from "@neore/ui/utils/cn";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2Icon, Loader2, Trash2Icon, UploadCloudIcon, XCircleIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -33,6 +33,7 @@ const CreateOrganizationDialog = ({ className: _className, classNames, onOpenCha
     const { authClient, organization, toast } = useAuth();
     const { t } = useLingui();
     const crpc = useCRPC();
+    const queryClient = useQueryClient();
 
     const [logo, setLogo] = useState<string | null>(null);
     const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -102,6 +103,8 @@ const CreateOrganizationDialog = ({ className: _className, classNames, onOpenCha
                     organizationId: createdOrganization.id,
                 });
 
+                // The billing read follows the session's active organization, so drop the previous one's cached plan.
+                await queryClient.invalidateQueries({ queryKey: crpc.auth.billing.getBillingInfo.queryKey({}) });
                 await refetchActiveOrganization?.();
                 await refetchOrganizations?.();
                 onOpenChange?.(false);

@@ -214,7 +214,7 @@ for a schema table that is neither policed nor listed:
 | `auth_admin.unbanUser` | mutation | adminMutation | user | admin role | ok |
 | `auth_admin.updateUserRole` | mutation | adminMutation | user | admin role; row.userId == caller | ok |
 | `auth_api_keys.createScopedApiKey` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
-| `auth_billing.getBillingInfo` | query | authQuery | — | caller-scoped (ctx.user) | ok |
+| `auth_billing.getBillingInfo` | query | authQuery | — | caller-scoped (ctx.user) | **fixed** (low) — members get the plan and credit allowance only; contact e-mail, models and Creem ids are owner-only |
 | `auth_billing.getMemberCredits` | query | authQuery | memberCredits | caller-scoped (ctx.user) | **fixed** (low) — another member's credits need owner/admin |
 | `auth_billing.listMemberCredits` | query | authQuery | member, memberCredits, user | caller-scoped (ctx.user) | ok |
 | `auth_billing.setMemberCreditOverride` | mutation | adminMutation + RL | memberCredits | admin role; org membership/role | **fixed** (medium) — now `adminMutation` (platform admin), org id explicit |

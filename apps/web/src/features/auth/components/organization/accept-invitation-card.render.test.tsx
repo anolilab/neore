@@ -4,7 +4,8 @@
  * leaves the visitor on the card to try again.
  */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Invitation = {
@@ -121,9 +122,11 @@ describe("AcceptInvitationCard", () => {
     });
 
     it("accepts the invitation by its id, then sends the visitor on to where they were going", async () => {
+        const user = userEvent.setup();
+
         render(<AcceptInvitationCard />);
 
-        fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+        await user.click(await screen.findByRole("button", { name: "Accept" }));
 
         await waitFor(() => {
             expect(harness.replace).toHaveBeenCalledWith("/chat");
@@ -133,9 +136,11 @@ describe("AcceptInvitationCard", () => {
     });
 
     it("rejects the invitation without accepting it", async () => {
+        const user = userEvent.setup();
+
         render(<AcceptInvitationCard />);
 
-        fireEvent.click(await screen.findByRole("button", { name: "Reject" }));
+        await user.click(await screen.findByRole("button", { name: "Reject" }));
 
         await waitFor(() => {
             expect(harness.replace).toHaveBeenCalledWith("/chat");
@@ -145,14 +150,25 @@ describe("AcceptInvitationCard", () => {
     });
 
     it("shows why an accept was refused, does not leave, and frees the buttons to retry", async () => {
-        harness.acceptInvitation.mockRejectedValue({ error: { code: "USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION" } });
+        const user = userEvent.setup();
+        // The client reports a refusal by throwing only when `fetchOptions.throw` is set; otherwise it resolves with `error`.
+        const refusal = { error: { code: "USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION" } };
+
+        harness.acceptInvitation.mockImplementation(async (options: { fetchOptions?: { throw?: boolean } }) => {
+            if (options.fetchOptions?.throw) {
+                throw refusal;
+            }
+
+            return refusal;
+        });
         render(<AcceptInvitationCard />);
 
-        fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+        await user.click(await screen.findByRole("button", { name: "Accept" }));
 
         await waitFor(() => {
             expect(harness.toast).toHaveBeenCalledWith({ message: "User is already a member of this organization", variant: "error" });
         });
+        expect(harness.acceptInvitation).toHaveBeenCalledWith(expect.objectContaining({ fetchOptions: { throw: true }, invitationId: "inv_1" }));
         expect(harness.replace).not.toHaveBeenCalled();
         expect(accept().hasAttribute("disabled")).toBe(false);
         expect(reject().hasAttribute("disabled")).toBe(false);

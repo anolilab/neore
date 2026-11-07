@@ -50,7 +50,8 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
 });
 
-const { getMemberCredits, listMemberCredits, setMemberCreditOverride, setOrganizationBillingTier, updateBillingSettings } = await import("./billing");
+const { getBillingInfo, getMemberCredits, listMemberCredits, setMemberCreditOverride, setOrganizationBillingTier, updateBillingSettings } =
+    await import("./billing");
 
 const PLATFORM_ADMIN = "user-platform-admin";
 const OWNER = "user-owner";
@@ -102,6 +103,33 @@ beforeEach(async () => {
 
 afterEach(() => {
     harness.close();
+});
+
+describe("getBillingInfo", () => {
+    beforeEach(async () => {
+        await seed(async (db) => {
+            await db.patch("organization", db.asId("organization", orgId), {
+                allowedModels: ["m1"],
+                billingEmail: "pay@acme.test",
+                creditsPerUser: 500,
+                creemSubscriptionId: "sub_1",
+            });
+        });
+    });
+
+    it.each([MEMBER, ORG_ADMIN])("shows %s the plan and credit allowance, and nothing else about the organization's billing", async (userId) => {
+        await expect(as(userId).query(getBillingInfo as never, {} as never)).resolves.toEqual({ baseTier: "free", creditsPerUser: 500 });
+    });
+
+    it("shows an owner the contact e-mail, the model list and the Creem ids", async () => {
+        await expect(as(OWNER).query(getBillingInfo as never, {} as never)).resolves.toMatchObject({
+            allowedModels: ["m1"],
+            baseTier: "free",
+            billingEmail: "pay@acme.test",
+            creditsPerUser: 500,
+            creemSubscriptionId: "sub_1",
+        });
+    });
 });
 
 describe("setOrganizationBillingTier", () => {

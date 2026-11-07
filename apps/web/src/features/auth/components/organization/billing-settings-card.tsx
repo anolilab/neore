@@ -53,7 +53,13 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
     const isOwner = hasPermission?.success;
 
     // Every member may read the active organization's tier and credits; only an owner gets the editing controls.
-    const { data: billingInfo, isPending: isBillingPending } = useQuery(crpc.auth.billing.getBillingInfo.queryOptions({}));
+    // One-shot (`live: false`): a live subscription answers from its last value, so after an organization switch it would keep the
+    // previous organization's plan and an invalidation would refetch that same value. A plain read follows the session's active organization.
+    const {
+        data: billingInfo,
+        isError: isBillingError,
+        isPending: isBillingPending,
+    } = useQuery(crpc.auth.billing.getBillingInfo.queryOptions({}, { live: false }));
 
     const updateBillingMutation = useMutation(crpc.auth.billing.updateBillingSettings.mutationOptions());
     const { isPending: checkoutPending, openPortal, startCheckout } = useCheckout();
@@ -86,7 +92,7 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
                     billingEmail: value.billingEmail || undefined,
                 });
 
-                await queryClient.invalidateQueries({ queryKey: ["auth", "billing"] });
+                await queryClient.invalidateQueries({ queryKey: crpc.auth.billing.getBillingInfo.queryKey({}) });
 
                 toast({
                     message: t`Billing settings updated successfully`,
@@ -128,6 +134,25 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
 
     const { isSubmitting } = form.state;
     const isPending = isPermissionPending || isBillingPending;
+
+    // A failed read is "unknown", not the Free plan: show the error instead of fallback values or plan buttons.
+    if (isBillingError && !billingInfo && !isPending) {
+        return (
+            <SettingsCard
+                className={className}
+                classNames={classNames}
+                description={t`Billing details for this organization`}
+                title={t`Billing Settings`}
+                {...properties}
+            >
+                <CardContent className={cn("space-y-4", classNames?.content)}>
+                    <p className="text-destructive text-sm" role="alert">
+                        {t`Could not load your organization's billing details. Try again later.`}
+                    </p>
+                </CardContent>
+            </SettingsCard>
+        );
+    }
 
     if (!isOwner && !isPending) {
         return (
@@ -232,18 +257,21 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
                                 <form.AppField name="billingEmail">
                                     {(field) => (
                                         <field.FormItem>
-                                            <Label>{t`Billing Email`}</Label>
-                                            <field.FormControl>
-                                                <Input
-                                                    className={classNames?.input}
-                                                    disabled={isSubmitting || !isOwner}
-                                                    onBlur={field.handleBlur}
-                                                    onChange={(e) => field.handleChange(e.target.value)}
-                                                    placeholder={t`Enter billing email`}
-                                                    type="email"
-                                                    value={field.state.value}
-                                                />
-                                            </field.FormControl>
+                                            <field.FormLabel>{t`Billing Email`}</field.FormLabel>
+                                            {/* `render` puts the id on the input itself; the default wrapper <div> would leave the label pointing at a non-control. */}
+                                            <field.FormControl
+                                                render={
+                                                    <Input
+                                                        className={classNames?.input}
+                                                        disabled={isSubmitting || !isOwner}
+                                                        onBlur={field.handleBlur}
+                                                        onChange={(e) => field.handleChange(e.target.value)}
+                                                        placeholder={t`Enter billing email`}
+                                                        type="email"
+                                                        value={field.state.value}
+                                                    />
+                                                }
+                                            />
                                             <field.FormMessage className={classNames?.error} />
                                         </field.FormItem>
                                     )}

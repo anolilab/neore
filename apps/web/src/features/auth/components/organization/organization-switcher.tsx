@@ -2,6 +2,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import OrgSwitcher from "@neore/chat-ui/org-switcher/org-switcher";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { FC } from "react";
 import { useCallback, useEffect, useState } from "react";
@@ -10,6 +11,7 @@ import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import authViewPaths from "@/features/auth/lib/auth-view-paths";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import type { User } from "@/features/auth/types/auth-core-types";
+import { useCRPC } from "@/lib/lunora/crpc";
 
 import CreateOrganizationDialog from "./create-organization-dialog";
 
@@ -24,6 +26,8 @@ const OrganizationSwitcher: FC<OrganizationSwitcherProps> = ({ className, hidePe
     const authContext = useAuth();
     const { t } = useLingui();
     const navigate = useNavigate();
+    const crpc = useCRPC();
+    const queryClient = useQueryClient();
 
     const [isPending, setIsPending] = useState(false);
     const [isCreateOrgDialogOpen, setIsCreateOrgDialogOpen] = useState(false);
@@ -48,6 +52,8 @@ const OrganizationSwitcher: FC<OrganizationSwitcherProps> = ({ className, hidePe
                     fetchOptions: { throw: true },
                     organizationId,
                 });
+                // The billing read follows the session's active organization, so drop the previous one's cached plan.
+                await queryClient.invalidateQueries({ queryKey: crpc.auth.billing.getBillingInfo.queryKey({}) });
                 await refetchActiveOrganization?.();
             } catch (error) {
                 authContext.toast({
@@ -58,7 +64,7 @@ const OrganizationSwitcher: FC<OrganizationSwitcherProps> = ({ className, hidePe
                 setIsPending(false);
             }
         },
-        [authContext, hidePersonal, onSetActive, refetchActiveOrganization, t],
+        [authContext, crpc, hidePersonal, onSetActive, queryClient, refetchActiveOrganization, t],
     );
 
     // Auto-select first organization when hidePersonal is true and none is active

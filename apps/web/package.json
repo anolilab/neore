@@ -184,6 +184,7 @@
         "@tanstack/eslint-plugin-router": "catalog:tanstack",
         "@testing-library/dom": "catalog:test",
         "@testing-library/react": "catalog:test",
+        "@testing-library/user-event": "catalog:test",
         "@types/json-schema": "catalog:types",
         "@types/react": "catalog:types",
         "@types/react-dom": "catalog:types",
