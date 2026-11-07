@@ -4,7 +4,7 @@ import { isFetchableUrl, originsOf } from "@neore/ui/hooks/use-fetchable-origins
 import cn from "@neore/ui/utils/cn";
 import { latestPdfUrl } from "@neore/ui/utils/pdf-preview-event";
 import { Download, ExternalLink, X } from "lucide-react";
-import type { FC } from "react";
+import type { FC, SyntheticEvent } from "react";
 import { lazy, Suspense, useEffect, useRef } from "react";
 
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -34,6 +34,11 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
     const { t } = useLingui();
     const { closeCanvas } = useCanvasState();
     const { download, failed: downloadFailed } = usePdfDownload(file, PANEL_ORIGINS);
+    const refreshLink = (event: SyntheticEvent<HTMLAnchorElement>) => {
+        const link = event.currentTarget;
+
+        link.href = latestPdfUrl(file.url);
+    };
     const headingReference = useRef<HTMLHeadingElement>(null);
     const openerReference = useRef<HTMLElement | undefined>(undefined);
 
@@ -76,13 +81,14 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
                         <a
                             aria-label={t`Open PDF in a new tab to print`}
                             className={ICON_LINK}
-                            href={file.url}
-                            // The newest signed URL, read at the click: the one the panel opened with may have expired.
-                            onClick={(event) => {
-                                const link = event.currentTarget;
-
-                                link.href = latestPdfUrl(file.url);
-                            }}
+                            // The newest signed URL: the one the panel opened with may have expired. It is read again before
+                            // any use of the link (a click, a middle click, the context menu, the keyboard).
+                            href={latestPdfUrl(file.url)}
+                            onAuxClick={refreshLink}
+                            onClick={refreshLink}
+                            onContextMenu={refreshLink}
+                            onFocus={refreshLink}
+                            onPointerDown={refreshLink}
                             rel="noopener noreferrer"
                             target="_blank"
                         >

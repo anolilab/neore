@@ -22,8 +22,20 @@ const AuthUIProviderTanstack = ({
         return { ...contextHooks, ...hooksProperty };
     }, [contextHooks, hooksProperty]);
     const mutators = useMemo(() => {
-        return { ...contextMutators, ...mutatorsProperty };
-    }, [contextMutators, mutatorsProperty]);
+        const merged = { ...contextMutators, ...mutatorsProperty };
+        const { setActiveSession } = merged;
+
+        // Every account switch (the account menu, the settings dialog) goes through here: state that must not outlive the
+        // old account is let go before the switch starts.
+        return {
+            ...merged,
+            setActiveSession: async (...parameters: Parameters<typeof setActiveSession>) => {
+                onSessionChangeStart?.();
+
+                return await setActiveSession(...parameters);
+            },
+        };
+    }, [contextMutators, mutatorsProperty, onSessionChangeStart]);
 
     const onSessionChangeCallback = useCallback(async () => {
         onSessionChangeStart?.();

@@ -157,6 +157,15 @@ describe("the side panel's opener and links", () => {
         expect(document.activeElement).toBe(thumbnailB);
     });
 
+    it("links the new tab to the file's newest signed URL, so a middle click or a copied link is not the expired one", () => {
+        const resigned = "https://api.example/files/a.pdf?sig=renewed-link";
+
+        rememberPdfUrl(resigned);
+        render(panelFor(DOCUMENT_A));
+
+        expect(screen.getByRole("link", { name: "Open PDF in a new tab to print" }).getAttribute("href")).toBe(resigned);
+    });
+
     it("downloads from the file's newest signed URL, not the one the panel opened with", () => {
         const resigned = "https://api.example/files/a.pdf?sig=renewed";
 
