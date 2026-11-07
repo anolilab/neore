@@ -2,6 +2,7 @@ import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internalQuery } from "../_generated/server";
+import { getMemberByOrganizationAndUser } from "./lib/better-auth-queries";
 import { resolveActiveMembership } from "./lib/organization-helpers";
 
 /**
@@ -37,7 +38,13 @@ export const getSessionOrganizationForCap = internalQuery
             return null;
         }
 
-        const membership = await resolveActiveMembership(ctx, session, userId);
+        if (!session.activeOrganizationId) {
+            return { organizationId: null };
+        }
 
-        return { organizationId: membership?.organizationId ?? null };
+        // Membership is read directly, not through `resolveActiveMembership`: that helper checks expiry again with the
+        // wall clock, so a session expiring between the two checks would read as the personal space and be uncapped.
+        const membership = await getMemberByOrganizationAndUser(ctx, session.activeOrganizationId, userId);
+
+        return { organizationId: membership ? session.activeOrganizationId : null };
     });
