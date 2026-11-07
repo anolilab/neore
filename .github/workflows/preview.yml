@@ -70,25 +70,72 @@ jobs:
                       echo "components=false" >> "$GITHUB_OUTPUT"
                   fi
 
-    deploy:
-        name: "Deploy the preview"
+    # Only Storybook is previewed: `alchemy-storybook.run.ts` declares the Storybook site alone, so the
+    # preview needs the Cloudflare token and account, not the app's secrets or its paid resources.
+    # The build runs first, with no secrets; the deploy step is the only one that sees the token.
+    storybook:
+        name: "Deploy the Storybook preview"
         needs: "changes"
         if: >-
             github.repository == 'anolilab/neore'
             && github.event.pull_request.head.repo.full_name == github.repository
             && github.event.action != 'closed'
             && needs.changes.outputs.components == 'true'
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 30
+        environment: "preview"
         permissions:
             contents: "read"
             deployments: "write"
-        uses: "./.github/workflows/deploy.yml"
-        with:
-            environment: "preview"
-            stage: "pr-${{ github.event.pull_request.number }}"
+        outputs:
+            storybook-url: "${{ steps.alchemy.outputs.storybook-url }}"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
+              with:
+                  persist-credentials: false
+                  ref: "${{ github.event.pull_request.head.sha }}"
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@1f3a7f7e561f7690fe19dea5d2ed225def53c908" # v26.0.6
+              with:
+                  enable-nx-cache: "false" # no Nx in this repo: the cache never hits
+                  node-version: "24.22.1"
+                  npm-version: "11"
+                  skip-playwright: "true"
+
+            - name: "Build the workspace packages"
+              shell: "bash"
+              run: "pnpm run build:packages"
+
+            - name: "Build Storybook"
+              shell: "bash"
+              run: "pnpm --filter @neore/web run build-storybook"
+
+            # The only step with the token: it uploads the built output and runs nothing else from the repo.
+            - name: "Deploy Storybook via Alchemy"
+              id: "alchemy"
+              shell: "bash"
+              env:
+                  CI: "true"
+                  CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"
+                  CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+                  CLOUDFLARE_WORKERS_SUBDOMAIN: "${{ vars.WORKERS_DEV_SUBDOMAIN }}"
+                  DEPLOY_ENV: "${{ env.STAGE }}"
+              run: |
+                  output="$(pnpm exec alchemy deploy alchemy-storybook.run.ts --stage "$DEPLOY_ENV" --yes --log-level info 2>&1)" || { echo "$output"; exit 1; }
+                  echo "$output"
+                  url="$(echo "$output" | grep -oE 'https://[^ '\''"}]*workers\.dev[^ '\''"}]*' | head -1 || true)"
+                  echo "storybook-url=${url}" >> "$GITHUB_OUTPUT"
 
     comment:
         name: "Comment the preview URL"
-        needs: "deploy"
+        needs: "storybook"
         runs-on: "ubuntu-24.04"
         timeout-minutes: 5
         permissions:
@@ -102,8 +149,7 @@ jobs:
             - name: "Post or update the comment"
               uses: "actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3" # v9.0.0
               env:
-                  WEBSITE_URL: "${{ needs.deploy.outputs.website-url }}"
-                  STORYBOOK_URL: "${{ needs.deploy.outputs.storybook-url }}"
+                  STORYBOOK_URL: "${{ needs.storybook.outputs.storybook-url }}"
                   RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
               with:
                   script: |
@@ -111,16 +157,14 @@ jobs:
                       const { owner, repo } = context.repo;
                       const issue_number = context.payload.pull_request.number;
                       const sha = context.payload.pull_request.head.sha.slice(0, 7);
-                      const url = process.env.WEBSITE_URL;
 
                       const body = [
                           marker,
-                          `**Preview** for \`${sha}\`: ${url ? url : "deployed (the run did not report a URL)"}`,
-                          ...(process.env.STORYBOOK_URL ? [`**Storybook**: ${process.env.STORYBOOK_URL} (every component and page on fake data)`] : []),
+                          `**Storybook preview** for \`${sha}\`: ${process.env.STORYBOOK_URL || "deployed (the run did not report a URL)"} (every component and page on fake data)`,
                           "",
-                          "It is a full copy of the stack in the preview account with its own data. Registration is invite-only, so seed an invitation with the preview's admin token (`POST <backend>/admin/seed-invitations`).",
+                          "Only Storybook is previewed here; the app is not deployed to previews.",
                           "",
-                          `[Deploy run](${process.env.RUN_URL}). It is destroyed when this pull request closes or loses the \`preview\` label.`,
+                          `[Deploy run](${process.env.RUN_URL}). It is destroyed when this pull request closes.`,
                       ].join("\n");
 
                       const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
@@ -165,7 +209,17 @@ jobs:
                   node-version: "24.22.1"
                   skip-playwright: "true"
 
-            - name: "Destroy the stage"
+            - name: "Destroy the Storybook preview"
+              env:
+                  CI: "true"
+                  CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"
+                  CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+                  CLOUDFLARE_WORKERS_SUBDOMAIN: "${{ vars.WORKERS_DEV_SUBDOMAIN }}"
+                  DEPLOY_ENV: "${{ env.STAGE }}"
+              run: 'pnpm exec alchemy destroy alchemy-storybook.run.ts --stage "$DEPLOY_ENV" --yes'
+
+            - name: "Destroy the stage (full stack, for earlier previews)"
+              continue-on-error: true
               env:
                   CI: "true"
                   CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"

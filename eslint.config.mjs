@@ -9,6 +9,7 @@ import tseslint from "typescript-eslint";
  */
 const DEPLOY_FILES = [
     "alchemy.run.ts",
+    "alchemy-storybook.run.ts",
     "scripts/worker-bundle.ts",
     "scripts/check-web-size.ts",
     "scripts/check-web-bundle.ts",
