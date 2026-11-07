@@ -822,6 +822,86 @@
                                         }
                                       ]
                                     },
+                                    "fork": {
+                                      "anyOf": [
+                                        {
+                                          "properties": {
+                                            "degradation": {
+                                              "const": "none",
+                                              "type": "string"
+                                            },
+                                            "supported": {
+                                              "const": true
+                                            }
+                                          },
+                                          "required": [
+                                            "degradation",
+                                            "supported"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "properties": {
+                                            "degradation": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "restart",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "synthetic",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "divergent",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            },
+                                            "note": {
+                                              "type": "string"
+                                            },
+                                            "supported": {
+                                              "const": true
+                                            }
+                                          },
+                                          "required": [
+                                            "degradation",
+                                            "note",
+                                            "supported"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "properties": {
+                                            "reason": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "not_offered",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "not_enforced",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "unknown",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            },
+                                            "supported": {
+                                              "const": false
+                                            }
+                                          },
+                                          "required": [
+                                            "reason",
+                                            "supported"
+                                          ],
+                                          "type": "object"
+                                        }
+                                      ]
+                                    },
                                     "listNative": {
                                       "anyOf": [
                                         {
@@ -2599,6 +2679,86 @@
                                     }
                                   ]
                                 },
+                                "fork": {
+                                  "anyOf": [
+                                    {
+                                      "properties": {
+                                        "degradation": {
+                                          "const": "none",
+                                          "type": "string"
+                                        },
+                                        "supported": {
+                                          "const": true
+                                        }
+                                      },
+                                      "required": [
+                                        "degradation",
+                                        "supported"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    {
+                                      "properties": {
+                                        "degradation": {
+                                          "anyOf": [
+                                            {
+                                              "const": "restart",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "synthetic",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "divergent",
+                                              "type": "string"
+                                            }
+                                          ]
+                                        },
+                                        "note": {
+                                          "type": "string"
+                                        },
+                                        "supported": {
+                                          "const": true
+                                        }
+                                      },
+                                      "required": [
+                                        "degradation",
+                                        "note",
+                                        "supported"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    {
+                                      "properties": {
+                                        "reason": {
+                                          "anyOf": [
+                                            {
+                                              "const": "not_offered",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "not_enforced",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "unknown",
+                                              "type": "string"
+                                            }
+                                          ]
+                                        },
+                                        "supported": {
+                                          "const": false
+                                        }
+                                      },
+                                      "required": [
+                                        "reason",
+                                        "supported"
+                                      ],
+                                      "type": "object"
+                                    }
+                                  ]
+                                },
                                 "listNative": {
                                   "anyOf": [
                                     {
@@ -4176,6 +4336,86 @@
                               "sessions": {
                                 "properties": {
                                   "create": {
+                                    "anyOf": [
+                                      {
+                                        "properties": {
+                                          "degradation": {
+                                            "const": "none",
+                                            "type": "string"
+                                          },
+                                          "supported": {
+                                            "const": true
+                                          }
+                                        },
+                                        "required": [
+                                          "degradation",
+                                          "supported"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      {
+                                        "properties": {
+                                          "degradation": {
+                                            "anyOf": [
+                                              {
+                                                "const": "restart",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "synthetic",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "divergent",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          "note": {
+                                            "type": "string"
+                                          },
+                                          "supported": {
+                                            "const": true
+                                          }
+                                        },
+                                        "required": [
+                                          "degradation",
+                                          "note",
+                                          "supported"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      {
+                                        "properties": {
+                                          "reason": {
+                                            "anyOf": [
+                                              {
+                                                "const": "not_offered",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "not_enforced",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "unknown",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          },
+                                          "supported": {
+                                            "const": false
+                                          }
+                                        },
+                                        "required": [
+                                          "reason",
+                                          "supported"
+                                        ],
+                                        "type": "object"
+                                      }
+                                    ]
+                                  },
+                                  "fork": {
                                     "anyOf": [
                                       {
                                         "properties": {

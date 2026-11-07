@@ -21,7 +21,14 @@
                 "expo-audio",
                 {
                     "enableBackgroundPlayback": false,
-                    "microphonePermission": "Neore records your voice while you hold the microphone button. The recording is sent to Neore and a speech-to-text provider to turn it into text for your message, and is not stored."
+                    "microphonePermission": "Neore records your voice while you hold the microphone button, to turn it into text for your message. Unless \"Transcribe on this device\" is on in Settings, the recording is sent to Neore and a speech-to-text provider, and is not stored."
+                }
+            ],
+            [
+                "expo-speech-recognition",
+                {
+                    "microphonePermission": "Neore records your voice while you hold the microphone button, to turn it into text for your message. Unless \"Transcribe on this device\" is on in Settings, the recording is sent to Neore and a speech-to-text provider, and is not stored.",
+                    "speechRecognitionPermission": "With \"Transcribe on this device\" on in Settings, your phone's own speech recognizer turns your voice into text for your message, on the phone."
                 }
             ]
         ],

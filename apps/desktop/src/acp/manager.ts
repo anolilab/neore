@@ -71,6 +71,14 @@ export interface ManagerOptions {
     startupTimeoutMs?: number;
 }
 
+/** The agent session a backend start opens from: one to load again (`nativeSessionId`) or one to fork (`forkSessionId`). */
+const savedSessionFields = (remote: { forkSessionId?: string; nativeSessionId?: string }): { forkSessionId?: string; resumeSessionId?: string } => {
+    return {
+        ...(remote.forkSessionId !== undefined && { forkSessionId: remote.forkSessionId }),
+        ...(remote.nativeSessionId !== undefined && { resumeSessionId: remote.nativeSessionId }),
+    };
+};
+
 export class AcpManager {
     private changeTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -190,7 +198,7 @@ export class AcpManager {
         agentKey: string,
         agentLabel: string,
         folder: string,
-        remote?: { nativeSessionId?: string; sessionId: string; threadId: string },
+        remote?: { forkSessionId?: string; nativeSessionId?: string; sessionId: string; threadId: string },
     ): Promise<string> {
         requireSupported();
 
@@ -221,7 +229,7 @@ export class AcpManager {
         let runner: HookRunner | undefined;
         // The fields only a remote, a resumed or a host-run session has.
         const remoteFields = remote === undefined ? {} : { sessionId: remote.sessionId, threadId: remote.threadId };
-        const resumeFields = remote?.nativeSessionId === undefined ? {} : { resumeSessionId: remote.nativeSessionId };
+        const resumeFields = remote === undefined ? {} : savedSessionFields(remote);
         const { observer } = this.options;
         const hostFields = folderInfo === undefined || observer === undefined ? {} : { hostInfo: { agentKey, agentLabel, ...folderInfo }, observer };
         const session = new AgentSession({

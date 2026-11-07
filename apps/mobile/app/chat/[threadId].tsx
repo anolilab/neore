@@ -30,7 +30,7 @@ import { useOffline, useWriteControl } from "@/offline/offline-context";
 import { settleQuietly } from "@/offline/quietly";
 import type { MessageRow } from "@/offline/types";
 import { requireOnline } from "@/offline/write-gate";
-import { useVoiceInput } from "@/voice/use-voice-input";
+import { useDictation } from "@/voice/use-dictation";
 import { VoiceButton, VoiceStatus } from "@/voice/voice-button";
 import { appendTranscript } from "@/voice/voice-input";
 
@@ -159,7 +159,7 @@ const Chat = () => {
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     // The words land in the draft, after anything typed meanwhile; they are never sent on their own.
-    const voice = useVoiceInput({ onText: (text) => setDraft((current) => appendTranscript(current, text)) });
+    const voice = useDictation({ onText: (text) => setDraft((current) => appendTranscript(current, text)) });
     const listRef = useRef<LegendListRef>(null);
     // Whether the list shows its last message: the jump button shows whenever it does not, and while a reply streams.
     const [isAtEnd, setIsAtEnd] = useState(true);
