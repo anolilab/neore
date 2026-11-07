@@ -869,3 +869,5 @@ trustPolicyExclude:
   - "tsrs@0.23.0-ts7.1.0-beta"
 
 trustPolicyIgnoreAfter: 1440
+patchedDependencies:
+  expo-speech-recognition@58.0.1: patches/expo-speech-recognition@58.0.1.patch
