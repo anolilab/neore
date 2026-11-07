@@ -15,7 +15,7 @@ import type { FC } from "react";
 import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import { composerModelOf, composerModeOf, isAutoRouted, sendsToComparison } from "@/features/chat/core/utils/composer-model";
-import { buildPromptLink, isPromptLinkTooLong } from "@/features/chat/core/utils/prompt-link";
+import { buildPromptLink, isPromptLinkTooLong, promptFromLink } from "@/features/chat/core/utils/prompt-link";
 import { linkModelAppliesOnOpen } from "@/features/chat/core/utils/prompt-link-model";
 import type { UIMessage } from "@/lib/agent";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -128,7 +128,9 @@ const CopyPromptLinkAction: FC<{ message: UIMessage }> = ({ message }) => {
     const copy = async () => {
         const prompt = getVisibleUserText({ parts: [...message.parts], text: message.text });
 
-        if (!prompt.trim()) {
+        // The text the link would carry: hidden characters out, as the link is built and opened. A message with only hidden characters
+        // has no visible text, so it gets the same notice as a blank one, and no link is written.
+        if (promptFromLink(prompt) === "") {
             showWarning(t`This message has no text to copy as a prompt link.`);
 
             return;

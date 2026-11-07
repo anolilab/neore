@@ -318,6 +318,16 @@ describe("CopyPromptLinkAction", () => {
         expect(harness.showSuccess).not.toHaveBeenCalled();
     });
 
+    it("a message whose only content is hidden, with no visible text, shows the no-text notice and writes nothing to the clipboard", async () => {
+        renderAction(undefined, "\u{E0041}\u{E0042}\u{202E}");
+
+        clickCopy();
+
+        await waitFor(() => expect(harness.showWarning).toHaveBeenCalledWith("This message has no text to copy as a prompt link."));
+        expect(writeText).not.toHaveBeenCalled();
+        expect(harness.showSuccess).not.toHaveBeenCalled();
+    });
+
     it("refuses a link for a custom endpoint's model, with a notice, rather than opening it on another model", async () => {
         harness.threadModel = "custom:ollama/llama3.1:8b";
 
