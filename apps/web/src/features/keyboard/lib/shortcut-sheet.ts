@@ -24,6 +24,8 @@ export const SHORTCUT_ENTRIES: ReadonlyArray<ShortcutEntry> = [
     { action: "findInThread", group: "chat", id: "findInThread" },
     { action: "openModelPicker", group: "chat", id: "openModelPicker" },
     { action: "copyLastCodeBlock", group: "chat", id: "copyLastCodeBlock" },
+    { action: "archiveThread", group: "chat", id: "archiveThread" },
+    { action: "deleteThread", group: "chat", id: "deleteThread" },
     { action: "audioRecord", group: "composer", id: "audioRecord" },
     { action: "increaseEffort", group: "composer", id: "increaseEffort" },
     { action: "decreaseEffort", group: "composer", id: "decreaseEffort" },

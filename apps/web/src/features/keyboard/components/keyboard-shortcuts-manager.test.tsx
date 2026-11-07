@@ -119,6 +119,30 @@ describe("KeyboardShortcutsManager", () => {
         expect(notPrevented).toBe(true);
     });
 
+    it.each([
+        ["archiveThread", { code: "KeyA", ctrlKey: true, key: "A", shiftKey: true }],
+        ["deleteThread", { code: "Backspace", ctrlKey: true, key: "Backspace", shiftKey: true }],
+    ] as const)("never runs the %s chord from a text field, though it is a modifier chord", (action, keys) => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ archiveThread: "ctrl+shift+a", deleteThread: "ctrl+shift+backspace" }}>
+                <textarea aria-label="composer" />
+                <div aria-label="editor" contentEditable role="textbox" suppressContentEditableWarning tabIndex={0} />
+            </KeyboardShortcutsManager>,
+        );
+
+        fireEvent.keyDown(screen.getByLabelText("composer"), keys);
+        fireEvent.keyDown(screen.getByLabelText("editor"), keys);
+
+        expect(onShortcut).not.toHaveBeenCalledWith(action, expect.anything());
+
+        // Outside a field the same chord runs.
+        fireEvent.keyDown(document.body, keys);
+
+        expect(onShortcut).toHaveBeenCalledWith(action, expect.anything());
+    });
+
     it("still runs a modifier chord copy binding from the composer", () => {
         const onShortcut = vi.fn();
 

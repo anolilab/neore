@@ -43,6 +43,8 @@ export type AppearanceSettings = {
 };
 
 export type KeyboardShortcuts = {
+    /** Archives the open thread, or restores it when archived (`thread-shortcuts-listener.tsx`). */
+    archiveThread: string;
     /** Opens the side-question panel beside the thread (`askAside`). */
     askAside: string;
     audioRecord: string;
@@ -50,6 +52,8 @@ export type KeyboardShortcuts = {
     copyLastCodeBlock: string;
     /** Steps the composer's reasoning effort down (`composer.decreaseEffort`). Unbound until the user sets it. */
     decreaseEffort?: string;
+    /** Deletes the open thread after the owner confirms (`thread-shortcuts-listener.tsx`). */
+    deleteThread: string;
     escape: string;
     /** Opens the find bar over the open thread's messages. Absent in settings saved before it existed. */
     findInThread: string;
@@ -88,10 +92,12 @@ export type UserPreferences = {
 
 /** What "Reset to Defaults" restores. */
 export const defaultKeyboardShortcuts: KeyboardShortcuts = {
+    archiveThread: `${platformModifier}+shift+a`,
     askAside: `${platformModifier}+shift+e`,
     audioRecord: `${platformModifier}+shift+r`,
     commandPalette: `${platformModifier}+k`,
     copyLastCodeBlock: `${platformModifier}+shift+x`,
+    deleteThread: `${platformModifier}+shift+backspace`,
     escape: "escape",
     findInThread: `${platformModifier}+f`,
     firstItem: "home",
@@ -107,6 +113,47 @@ export const defaultKeyboardShortcuts: KeyboardShortcuts = {
     sidebarRight: `${platformModifier}+shift+b`,
 };
 
+/** The thread actions' old defaults, which sets saved before they were removed still carry. */
+const RETIRED_DEFAULTS: Readonly<Partial<Record<keyof KeyboardShortcuts, string>>> = {
+    archiveThread: `${platformModifier}+a`,
+    deleteThread: `${platformModifier}+d`,
+};
+
+/** `saved` without a binding still equal to its retired default; for sets saved before the thread actions returned (`migrateUIState`). */
+const withoutRetiredDefaults = (saved: Partial<KeyboardShortcuts> | undefined): Partial<KeyboardShortcuts> | undefined => {
+    if (saved === undefined) {
+        return undefined;
+    }
+
+    const kept = { ...saved };
+
+    for (const [key, retired] of Object.entries(RETIRED_DEFAULTS) as [keyof KeyboardShortcuts, string][]) {
+        if (kept[key] === retired) {
+            delete kept[key];
+        }
+    }
+
+    return kept;
+};
+
+/** The persisted UI state's version: 1 since the thread actions returned with new defaults. */
+export const UI_STATE_VERSION = 1;
+
+/**
+ * Brings persisted UI state from an older version up to date. A set saved before version 1 still carries the thread actions'
+ * defaults from before they were removed (Mod+A, Mod+D), which nobody chose: they are dropped, so the new defaults apply instead of
+ * archiving on select-all or deleting on the bookmark key. A binding saved from version 1 on is the person's own, Mod+D included.
+ */
+export const migrateUIState = (persisted: unknown, version: number): unknown => {
+    if (version >= 1 || typeof persisted !== "object" || persisted === null) {
+        return persisted;
+    }
+
+    const state = persisted as { keyboardShortcuts?: Partial<KeyboardShortcuts> };
+
+    return { ...state, keyboardShortcuts: withoutRetiredDefaults(state.keyboardShortcuts) };
+};
+
 /**
  * Saved bindings merged over the defaults. `findInThread` took Mod+F from Focus Search, so a user who
  * never changed Focus Search (still the old default) and has no Find saved moves to the new default;
@@ -115,6 +162,16 @@ export const defaultKeyboardShortcuts: KeyboardShortcuts = {
 export const mergeKeyboardShortcuts = (saved: Partial<KeyboardShortcuts> | undefined): KeyboardShortcuts => {
     // A binding on F6 or Shift+F6 is cleared: those keys move focus, and a saved action on them would run as well.
     const merged = withoutFocusAreaKeys({ ...defaultKeyboardShortcuts, ...saved });
+
+    // The thread actions are newer than many saved sets. A saved binding already on one of their default chords would make
+    // both fire, so the new action stays unbound there; a binding the user saved for it is theirs and stays.
+    for (const key of ["archiveThread", "deleteThread"] as const) {
+        const takenBySaved = Object.values(saved ?? {}).includes(defaultKeyboardShortcuts[key]);
+
+        if (saved?.[key] === undefined && takenBySaved) {
+            merged[key] = "";
+        }
+    }
 
     if (saved?.findInThread === undefined && saved?.focusSearch === `${platformModifier}+f`) {
         merged.focusSearch = defaultKeyboardShortcuts.focusSearch;
@@ -357,7 +414,10 @@ export const useUIStateStore = create<UIStateStore>()(
             };
         },
         {
+            migrate: (persisted, version) => migrateUIState(persisted, version),
             name: "neore-ui-state",
+            // 1: the thread actions' retired defaults are dropped from sets saved before (`migrateUIState`).
+            version: UI_STATE_VERSION,
             // The persisted object replaces the defaults wholesale, so a key added after a
             // user last saved (a new shortcut, a new appearance flag) would be missing.
             merge: (persisted, current) => {
