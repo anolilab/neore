@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultKeyboardShortcuts, mergeKeyboardShortcuts, useUIStateStore } from "./ui-state-store";
+import { defaultKeyboardShortcuts, mergeKeyboardShortcuts, migrateUIState, UI_STATE_VERSION, useUIStateStore } from "./ui-state-store";
 
 describe("default keyboard shortcuts", () => {
     it("carry no binding that nothing registers", () => {
@@ -26,11 +26,23 @@ describe("thread action defaults against saved bindings", () => {
         expect(mergeKeyboardShortcuts({ newChat: "ctrl+j" }).archiveThread).toBe(defaultKeyboardShortcuts.archiveThread);
     });
 
-    it("reads the thread actions' old defaults in a set saved before they were removed as unset, so the new defaults apply", () => {
-        const merged = mergeKeyboardShortcuts({ archiveThread: "ctrl+a", deleteThread: "ctrl+d" });
+    it("drops the thread actions' old defaults from a set saved before version 1, so the new defaults apply", () => {
+        const migrated = migrateUIState({ keyboardShortcuts: { archiveThread: "ctrl+a", deleteThread: "ctrl+d", newChat: "ctrl+j" } }, 0) as {
+            keyboardShortcuts: Record<string, string>;
+        };
+        const merged = mergeKeyboardShortcuts(migrated.keyboardShortcuts);
 
         expect(merged.archiveThread).toBe(defaultKeyboardShortcuts.archiveThread);
         expect(merged.deleteThread).toBe(defaultKeyboardShortcuts.deleteThread);
+        expect(merged.newChat).toBe("ctrl+j");
+    });
+
+    it("keeps Mod+D for delete when the person chose it from version 1 on", () => {
+        const migrated = migrateUIState({ keyboardShortcuts: { deleteThread: "ctrl+d" } }, UI_STATE_VERSION) as {
+            keyboardShortcuts: Record<string, string>;
+        };
+
+        expect(mergeKeyboardShortcuts(migrated.keyboardShortcuts).deleteThread).toBe("ctrl+d");
     });
 
     it("keeps a binding the user saved for the thread action itself", () => {

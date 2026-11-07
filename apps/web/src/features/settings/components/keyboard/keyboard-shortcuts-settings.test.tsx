@@ -171,6 +171,23 @@ describe("KeyboardShortcutsSettings", () => {
         expect(screen.getAllByRole("alert")).toHaveLength(1);
     });
 
+    it("ties a refused field to its error, so the field itself says why it was refused", async () => {
+        act(() => {
+            useUIStateStore.setState({ keyboardShortcuts: { ...defaultKeyboardShortcuts, audioRecord: "ctrl+j" } });
+        });
+        renderSettings();
+
+        recordShortcut("Archive Open Thread", "j");
+
+        const field = screen.getByLabelText("Archive Open Thread");
+
+        await waitFor(() => {
+            expect(field.getAttribute("aria-invalid")).toBe("true");
+        });
+        expect(field.getAttribute("aria-describedby")).toBe("archiveThread-error");
+        expect(screen.getByRole("alert").id).toBe("archiveThread-error");
+    });
+
     it("refuses Save when an archive chord is Cmd+A on a Mac, which the list's select-all answers to as it does Ctrl+A", async () => {
         renderSettings();
 

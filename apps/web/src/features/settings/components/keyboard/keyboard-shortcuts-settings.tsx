@@ -326,7 +326,7 @@ const KeyboardShortcutsSettings: FC = () => {
                                                 <form.Subscribe selector={(state) => isDuplicate(state.fieldMeta[key]?.errors)}>
                                                     {(duplicate) =>
                                                         duplicate && (
-                                                            <p className="text-destructive text-xs" role="alert">
+                                                            <p className="text-destructive text-xs" id={`${key}-error`} role="alert">
                                                                 {t`Another action already uses this key combination. Change or clear one of them to save.`}
                                                             </p>
                                                         )
@@ -337,6 +337,9 @@ const KeyboardShortcutsSettings: FC = () => {
                                                 {(field) => (
                                                     <div className="flex items-center gap-2">
                                                         <Input
+                                                            // The field names its own error, so a person who comes back to it hears why it was refused.
+                                                            aria-describedby={isDuplicate(field.state.meta.errors) ? `${key}-error` : undefined}
+                                                            aria-invalid={isDuplicate(field.state.meta.errors) || undefined}
                                                             className="w-32"
                                                             id={key}
                                                             placeholder={t`Not set`}
