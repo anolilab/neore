@@ -98,7 +98,16 @@ describe("a sub-agent's resumed run", () => {
         };
 
         vi.mocked(getAgent).mockClear();
-        vi.mocked(getAgent).mockResolvedValue({ options: {} } as never);
+        let streamArgs: Record<string, unknown> | undefined;
+
+        vi.mocked(getAgent).mockResolvedValue({
+            approveToolCall: vi.fn(async (_ctx: unknown, _ids: unknown, _approval: unknown, args: Record<string, unknown>) => {
+                streamArgs = args;
+
+                throw new Error("stop here");
+            }),
+            options: {},
+        } as never);
         vi.mocked(buildAgentTools).mockResolvedValueOnce({
             autoApprovals: {},
             mcpClients: [],
@@ -125,7 +134,7 @@ describe("a sub-agent's resumed run", () => {
             .catch((error_: unknown) => error_);
         const maxSteps = (vi.mocked(getAgent).mock.calls[0]?.[1] as { maxSteps?: number } | undefined)?.maxSteps;
 
-        return { error, maxSteps, origin: resumeCtx.dispatchOrigin };
+        return { error, maxSteps, origin: resumeCtx.dispatchOrigin, streamArgs };
     };
 
     it("refuses an approved MCP call whose server url changed while the request waited", async () => {
@@ -150,6 +159,9 @@ describe("a sub-agent's resumed run", () => {
         expect(fresh.maxSteps).toBe(25);
         expect(late.maxSteps).toBe(5);
         expect(spent.maxSteps).toBe(1);
+        // The step a spent budget still gets calls no tool, so it cannot ask for another approval.
+        expect(late.streamArgs).not.toHaveProperty("toolChoice");
+        expect(spent.streamArgs).toMatchObject({ toolChoice: "none" });
     });
 
     it("dispatches with the origin its run was reached by, which the snapshot cannot name", async () => {

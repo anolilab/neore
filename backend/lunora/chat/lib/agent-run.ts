@@ -1239,6 +1239,12 @@ export const resumeApprovedRun = async (
         streamTextArgs.abortSignal = stopping.signal;
         streamTextArgs.stopWhen = stopWhenStopped(ctx, streamId, maxSteps);
 
+        // A sub-agent whose budget is spent gets the one step that answers the approved call, and no tool in it: a call there
+        // could ask for another approval, and each answer would buy one more step.
+        if (config.stepsTaken !== undefined && config.stepsTaken >= getMaxSteps(config.shouldAutoContinue)) {
+            streamTextArgs.toolChoice = "none";
+        }
+
         if (answerFiles) {
             // Every step of the continuation reads the files, so a tool call inside it does not cost the model the
             // images. The saved history never holds them: this shapes only the model's input.

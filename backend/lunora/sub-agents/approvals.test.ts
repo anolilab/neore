@@ -14,6 +14,7 @@ import { PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
 import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
 import { createStreamWithMessage } from "../chat/streaming/index";
+import { stopActiveForThread } from "../chat/streaming/persistent/library";
 import {
     awaitApproval,
     cancelSubAgentRunsForStop,
@@ -527,7 +528,7 @@ describe("answering a request the run does not wait on", () => {
 });
 
 describe("a new message saved into the child", () => {
-    it("ends the run's wait in the write that opens the reply's stream", async () => {
+    it("schedules the end of the run's wait from the write that opens the reply's stream, so ending it never fails the send", async () => {
         await run(async (context) => await markRunAwaiting(context, runId));
 
         await internalCall(createStreamWithMessage, {
@@ -537,6 +538,10 @@ describe("a new message saved into the child", () => {
             userId: OWNER,
         });
 
+        // The harness does not name a function reference: the scheduled end is told apart by its only argument.
+        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: { threadId: childId } }));
+
+        await internalCall(endApprovalWaitForMessage, { threadId: childId });
         expect(await runStatus()).toBe("cancelled");
         expect(await pendingRequests()).toHaveLength(0);
     });
@@ -766,7 +771,28 @@ describe("the reaper of a waiting run", () => {
 
         // The harness does not name a function reference, so the stop is told apart by its arguments: only the stream the
         // answer opened (keyed on the approval id), not every live reply of the child thread.
-        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: { messageId: APPROVAL_ID, threadId: childId } }));
+        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: { messageId: APPROVAL_ID, onlyNamed: true, threadId: childId } }));
+    });
+
+    it("stops nothing when the continuation ended before the scheduled stop ran, not even the owner's own reply", async () => {
+        await internalCall(createStreamWithMessage, {
+            messageId: "owner-prompt",
+            streamingConfig: { contentType: "text", model: "test-model" },
+            threadId: childId,
+            userId: OWNER,
+        });
+
+        expect(await internalCall(stopActiveForThread, { messageId: APPROVAL_ID, onlyNamed: true, threadId: childId })).toBe(false);
+
+        const live = await run(
+            async (context) =>
+                await context.db
+                    .query("persistentStreams")
+                    .withIndex("by_threadId_status", (q: any) => q.eq("threadId", childId).eq("status", "pending"))
+                    .collect(),
+        );
+
+        expect(live.map((stream: { messageId: string }) => stream.messageId)).toStrictEqual(["owner-prompt"]);
     });
 
     it("stops nothing when the run has no continuation streaming: a reply the owner started in the child keeps going", async () => {

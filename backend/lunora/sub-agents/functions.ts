@@ -1303,6 +1303,8 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
         if (continuation !== undefined) {
             await ctx.scheduler.runAfter(0, internal.chat.streaming.persistent.library.stopActiveForThread, {
                 messageId: continuation,
+                // The continuation may end before this runs: then nothing stops, not every live reply of the child.
+                onlyNamed: true,
                 threadId: run.childThreadId,
             });
         }
@@ -1456,6 +1458,13 @@ const closeChildApprovals = async (ctx: MutationCtx, childThreadId: string, runI
     if (!othersOpen) {
         await clearAwaitingInput(ctx.db, childThreadId as Id<"threads">);
     }
+};
+
+/** Whether a sub-agent's request is open on `threadId`: only then does a new message there have a wait to end ({@link endApprovalWaits}). */
+export const hasSubAgentApprovalOpen = async (ctx: Pick<QueryCtx, "db">, threadId: string): Promise<boolean> => {
+    const open = await pendingApprovalRows(ctx, threadId);
+
+    return open.some((row) => row.config.subAgentRunId !== undefined);
 };
 
 /**
