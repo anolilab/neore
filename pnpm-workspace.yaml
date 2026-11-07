@@ -52,43 +52,51 @@ catalogs:
   # `npm view <pkg> dist-tags.alpha`.
 
   ai:
-    "@ai-sdk/amazon-bedrock": 5.0.113
-    "@ai-sdk/anthropic": 4.0.78
-    # Pinned to the release that depends on exactly @ai-sdk/openai 4.0.83 and
-    # provider 4.0.21 / provider-utils 5.0.53 — move with those, or pnpm splits them.
-    # (`@lunora/agent` pins `ai` 7.0.93 exactly, so codegen/testing carry that older
-    # copy of the ai/provider set; nothing of ours imports it.)
-    "@ai-sdk/azure": 4.0.99
-    "@ai-sdk/black-forest-labs": 2.0.59
-    "@ai-sdk/fal": 3.0.59
-    "@ai-sdk/fireworks": 3.0.70
-    "@ai-sdk/google": 4.0.93
-    "@ai-sdk/groq": 4.0.59
-    "@ai-sdk/klingai": 4.0.60
-    "@ai-sdk/luma": 3.0.59
-    "@ai-sdk/mcp": 2.0.73
-    "@ai-sdk/mistral": 4.0.62
-    "@ai-sdk/openai": 4.0.91
-    "@ai-sdk/provider": 4.0.26
-    "@ai-sdk/provider-utils": 5.0.58
-    "@ai-sdk/react": 4.0.140
-    "@ai-sdk/replicate": 3.0.59
+    "@ai-sdk/amazon-bedrock": 5.0.115
+    "@ai-sdk/anthropic": 4.0.79
+    # Depends on exactly one @ai-sdk/openai, provider and provider-utils release —
+    # move it with those, or pnpm splits them. (`@lunora/agent` pins `ai` 7.0.127
+    # exactly, so codegen/testing carry that older copy; nothing of ours imports it.)
+    "@ai-sdk/azure": 4.0.101
+    "@ai-sdk/black-forest-labs": 2.0.60
+    "@ai-sdk/fal": 3.0.60
+    "@ai-sdk/fireworks": 3.0.71
+    "@ai-sdk/google": 4.0.95
+    "@ai-sdk/groq": 4.0.60
+    "@ai-sdk/klingai": 4.0.61
+    "@ai-sdk/luma": 3.0.60
+    "@ai-sdk/mcp": 2.0.74
+    "@ai-sdk/mistral": 4.0.63
+    "@ai-sdk/openai": 4.0.93
+    "@ai-sdk/provider": 4.0.27
+    "@ai-sdk/provider-utils": 5.0.59
+    # Moves with `ai` below: each release depends on exactly one `ai`.
+    "@ai-sdk/react": 4.0.142
+    "@ai-sdk/replicate": 3.0.60
     "@ai-sdk/ui-utils": ^1.2.11
-    "@ai-sdk/xai": 5.0.20
-    "@e2b/code-interpreter": 2.9.0
+    "@ai-sdk/xai": 5.0.21
+    "@e2b/code-interpreter": 2.9.1
     "@openrouter/ai-sdk-provider": 3.1.0
     "@requesty/ai-sdk": 3.6.4
-    ai: 7.0.137
-    e2b: 2.56.0
-    ollama-ai-provider-v2: 4.0.1
-    workers-ai-provider: 4.0.0
+    # Held at 7.0.139: 7.0.140–7.0.164 (gateway 4.0.113+) make the backend's agent
+    # types exceed what tsc can represent (TS2590 in lunora/agent/client and
+    # chat/lib/get-agent.ts). 7.0.165 typechecks clean; take it once it passes
+    # `minimumReleaseAge`. The whole @ai-sdk/* set moves with it: each provider
+    # release depends on exactly one provider/provider-utils (5.0.59 here), and a
+    # second copy of those splits FlexibleSchema/Tool types in lunora/agent/client.
+    # 7.0.16x adds the finish reason "interrupted": add it to `vFinishReason`
+    # (backend/lunora/agent/validators.ts) in the same change.
+    ai: 7.0.139
+    e2b: 2.63.0
+    ollama-ai-provider-v2: 4.1.0
+    workers-ai-provider: 4.0.1
   analytics:
     "@posthog/react": 1.11.3
-    posthog-js: 1.438.12
-    posthog-node: 5.56.2
+    posthog-js: 1.447.3
+    posthog-node: 5.63.1
   animation:
-    "@rive-app/react-webgl2": 4.37.0
-    motion: 14.4.0
+    "@rive-app/react-webgl2": 4.38.1
+    motion: 14.10.1
   auth:
     # `@lunora/auth` (alpha.257) depends on
     # `@better-auth/{api-key,passkey,mcp,scim,oauth-provider}` at EXACTLY 1.7.16,
@@ -96,9 +104,9 @@ catalogs:
     # `@better-fetch/fetch` 1.3.3. Taking 1.7.6 here split api-key and passkey
     # into two copies each. Move the four entries (and the `@better-auth/core`
     # override) when `@lunora/auth` does.
-    "@better-auth/api-key": 1.7.16
-    "@better-auth/passkey": 1.7.16
-    better-auth: 1.7.16
+    "@better-auth/api-key": 1.7.18
+    "@better-auth/passkey": 1.7.18
+    better-auth: 1.7.18
   build:
     # Moves WITH wrangler: each vite-plugin release peer-requires the wrangler
     # of its day (1.62.3 wants ^4.145.0) and `vite dev` refuses to start on a
@@ -106,14 +114,14 @@ catalogs:
     # "Network connection lost.") as one failed request instead of exiting the
     # dev server — the crash the old 4.124.0 pin lived with. The bump ships a new
     # workerd binary; a per-app firewall (OpenSnitch) must allow it once.
-    "@cloudflare/vite-plugin": 1.64.0
+    "@cloudflare/vite-plugin": 1.67.0
     # wrangler peer-requires ^5.<its workerd date> — 4.145.0 wants ^5.20260930.2.
     # Bump with wrangler.
-    "@cloudflare/workers-types": 5.20261019.1
+    "@cloudflare/workers-types": 5.20261106.1
     "@crxjs/vite-plugin": 3.0.0
     "@prosopo/vite-plugin-watch-workspace": 2.6.33
     "@rolldown/plugin-babel": 0.2.4
-    "@tailwindcss/vite": 4.3.3
+    "@tailwindcss/vite": 4.3.5
     # 1.0.2 and 1.0.3 bundle harfbuzzjs without shipping its `hb.wasm`, and its
     # CommonJS loader cannot run in their ESM node build (`Dynamic require of
     # "fs"`, then `__dirname`, then ENOENT hb.wasm) — `scripts/generate-og.mjs`,
@@ -122,15 +130,15 @@ catalogs:
     # `require("fs")` that Node's ESM loader rejects ("Dynamic require of "fs" is not
     # supported"), so `apps/web/scripts/generate-og.mjs` and with it `pnpm build` fail.
     # Re-check on each release by running `node apps/web/scripts/generate-og.mjs`.
-    "@vercel/og": 1.0.1
-    "@visulima/dev-toolbar": 1.1.18
+    "@vercel/og": 1.0.3
+    "@visulima/dev-toolbar": 1.1.19
     "@visulima/vite-overlay": 2.0.41
     "@vite-pwa/assets-generator": ^2.0.0
-    "@vitejs/plugin-react": 6.1.2
+    "@vitejs/plugin-react": 6.2.1
     esbuild: 0.28.2
     sharp: 0.35.5
     svgo: 4.1.0
-    unplugin-fonts: 2.0.0
+    unplugin-fonts: 2.1.0
     unplugin-purge-polyfills: 0.1.0
     vite: 8.3.6
     vite-plugin-image-optimizer: 2.0.3
@@ -139,12 +147,12 @@ catalogs:
     vite-plugin-zip-pack: ^1.2.4
     workbox-build: 7.4.1
     workbox-window: 7.4.1
-    wrangler: 4.151.2
+    wrangler: 4.158.0
   bundler:
     "@swc-node/register": ~1.12.1
-    "@swc/cli": 0.8.1
-    "@swc/core": 1.16.18
-    "@swc/helpers": 0.5.23
+    "@swc/cli": 0.8.2
+    "@swc/core": 1.16.22
+    "@swc/helpers": 0.5.24
     "@visulima/packem": 2.1.0
     # Required (non-optional) peer of packem, pinned exactly by it — move with
     # packem. Declared since `autoInstallPeers: false`; without it every
@@ -155,22 +163,22 @@ catalogs:
     # happened to sit in the tree and `pnpm dedupe` flipped between "with" and
     # "without" on every run, so `pnpm dedupe --check` (part of `pnpm lint`)
     # could never pass.
-    rollup: 4.64.12
-    tslib: ^2.8.1
+    rollup: 4.68.0
+    tslib: ^2.9.1
   canvas-spreadsheet:
-    "@univerjs/preset-sheets-core": 1.1.0
-    "@univerjs/preset-sheets-filter": 1.1.0
-    "@univerjs/preset-sheets-find-replace": 1.1.0
-    "@univerjs/preset-sheets-sort": 1.1.0
-    "@univerjs/presets": 1.1.0
+    "@univerjs/preset-sheets-core": 1.3.1
+    "@univerjs/preset-sheets-filter": 1.3.1
+    "@univerjs/preset-sheets-find-replace": 1.3.1
+    "@univerjs/preset-sheets-sort": 1.3.1
+    "@univerjs/presets": 1.3.1
     papaparse: ^5.7.0
-    read-excel-file: 9.3.12
+    read-excel-file: 9.3.14
     rxjs: ^7.8.2
   charts:
-    "@xyflow/react": 12.12.0
+    "@xyflow/react": 12.12.1
     recharts: 3.10.1
   cli:
-    "@visulima/vis": 6.5.4
+    "@visulima/vis": 6.6.0
     commitizen: ^4.3.2
     jiti: 2.7.0
     plop: 4.0.5
@@ -205,44 +213,44 @@ catalogs:
     slate-dom: 0.146.1
     slate-react: 0.146.1
   file-renderers:
-    hls.js: 1.7.3
+    hls.js: 1.7.4
     mammoth: 1.13.0
     # EXACTLY the pdfjs-dist react-pdf depends on (11.0.0 -> 6.3.289): the viewer
     # imports the worker from it as a `?url` asset, and a second pdfjs-dist copy
     # makes the API and the worker disagree ("API version does not match Worker
     # version"). Move with react-pdf.
-    pdfjs-dist: 6.4.299
+    pdfjs-dist: 6.5.438
     react-pdf: 11.0.0
-    wavesurfer.js: 8.0.3
+    wavesurfer.js: 8.0.5
   forms:
     emblor: ^1.4.8
     react-day-picker: 10.0.2
     react-dropzone: 20.1.4
     react-number-format: 5.4.5
   fumadocs:
-    fumadocs-core: 16.17.7
-    fumadocs-mdx: 15.4.8
-    fumadocs-ui: 16.17.7
+    fumadocs-core: 16.18.1
+    fumadocs-mdx: 15.5.0
+    fumadocs-ui: 16.18.1
   i18n:
-    "@lingui/babel-plugin-lingui-macro": 6.10.0
-    "@lingui/cli": 6.10.0
-    "@lingui/core": 6.10.0
-    "@lingui/detect-locale": 6.10.0
-    "@lingui/react": 6.10.0
-    "@lingui/vite-plugin": 6.10.0
+    "@lingui/babel-plugin-lingui-macro": 6.12.0
+    "@lingui/cli": 6.12.0
+    "@lingui/core": 6.12.0
+    "@lingui/detect-locale": 6.12.0
+    "@lingui/react": 6.12.0
+    "@lingui/vite-plugin": 6.12.0
     "@visulima/iso-locale": ^1.0.1
   iac:
     # 2.0 is an Effect-based rewrite. The beta ships roughly weekly and each release can
     # move APIs, so the version is EXACT. beta.82 and .83 are younger than
     # `minimumReleaseAge`; take a newer one once it is a day old and a preview deploy
     # passes. Peers: `effect` ^4 and, for the CLI, `@effect/platform-node`.
-    alchemy: 2.0.0-beta.81
-    "@effect/platform-node": 4.0.5
-    effect: 4.0.5
+    alchemy: 2.0.0-beta.85
+    "@effect/platform-node": 4.1.2
+    effect: 4.1.2
     tsx: 4.23.15
   icons:
     "@lobehub/icons": 5.23.0
-    lucide-react: 1.60.0
+    lucide-react: 1.70.0
   lint:
     "@anolilab/commitlint-config": 10.1.5
     "@anolilab/eslint-config": 30.0.7
@@ -298,7 +306,7 @@ catalogs:
     "@streamdown/cjk": 1.0.4
     "@streamdown/math": 1.0.3
     "@streamdown/mermaid": 1.0.3
-    "@tanstack/highlight": 1.1.0
+    "@tanstack/highlight": 1.2.11
     rehype-parse: 9.0.1
     rehype-remark: 10.0.1
     remark-directive: ^4.0.0
@@ -310,11 +318,11 @@ catalogs:
     unified: 11.0.5
   mcp:
     "@mcp-ui/client": 7.1.1
-    "@modelcontextprotocol/sdk": 1.32.1
+    "@modelcontextprotocol/sdk": 1.32.2
   node:
     "@t3-oss/env-core": 0.13.11
-    dotenv: 18.0.8
-    rimraf: 6.1.3
+    dotenv: 18.0.9
+    rimraf: 6.1.4
   onboarding:
     "@onboardjs/core": 1.0.0-rc.4
     "@onboardjs/posthog-plugin": 1.0.6
@@ -326,52 +334,52 @@ catalogs:
     react-dom: 19.3.1
   security:
     "@hcaptcha/react-hcaptcha": 2.2.0
-    "@marsidev/react-turnstile": 1.6.2
+    "@marsidev/react-turnstile": 1.6.3
     "@visulima/content-safety": 1.0.1
     dompurify: 3.4.17
-    tldts: 7.4.18
+    tldts: 7.4.19
   server:
-    "@aws-sdk/client-s3": 3.1153.0
-    "@hono/swagger-ui": 0.6.1
+    "@aws-sdk/client-s3": 3.1163.0
+    "@hono/swagger-ui": 0.6.2
     "@hono/zod-openapi": 1.6.3
     "@visulima/health-check": 6.0.0
     creem: 1.13.0
     cookie-es: 3.1.1
-    hono: 4.13.13
+    hono: 4.13.16
   state:
-    zustand: 5.0.15
+    zustand: 5.1.0
   style:
     "@fontsource-variable/geist": 5.3.0
     "@fontsource-variable/geist-mono": 5.3.0
     "@tailwindcss/typography": 0.5.20
-    geist: 1.8.1
-    tailwindcss: 4.3.3
+    geist: 1.9.2
+    tailwindcss: 4.3.5
     tw-animate-css: 1.4.0
   # Storybook — component and page states with mocked data (apps/web/.storybook).
   storybook:
-    "@storybook/addon-a11y": 10.6.5
-    "@storybook/addon-docs": 10.6.5
-    "@storybook/addon-vitest": 10.6.5
-    "@storybook/react-vite": 10.6.5
+    "@storybook/addon-a11y": 10.6.6
+    "@storybook/addon-docs": 10.6.6
+    "@storybook/addon-vitest": 10.6.6
+    "@storybook/react-vite": 10.6.6
     eslint-plugin-storybook: 10.6.5
     msw-storybook-addon: 3.0.3
-    storybook: 10.6.5
+    storybook: 10.6.6
   syntax:
-    katex: 0.19.0
+    katex: 0.19.1
     # HELD AT 11 — 12.1.0 is out. `@streamdown/mermaid` (1.0.3) depends on `mermaid ^11`,
     # and `apps/web/vite.config.ts` aliases every `mermaid` import to this copy's
     # `dist/mermaid.esm.min.mjs` — which 12 makes unparseable for Vite's
     # es-module-lexer. 12 also re-lays-out and recolours existing diagrams.
-    mermaid: 12.2.0
+    mermaid: 12.3.0
   tanstack:
     "@tanstack/eslint-plugin-query": 5.104.5
     "@tanstack/eslint-plugin-router": 1.162.0
     "@tanstack/form-core": 1.33.5
     # Travels with @tanstack/react-table below.
     "@tanstack/match-sorter-utils": 9.2.6
-    "@tanstack/query-core": 5.104.5
+    "@tanstack/query-core": 5.106.1
     "@tanstack/react-form": 1.33.5
-    "@tanstack/react-query": 5.104.5
+    "@tanstack/react-query": 5.106.1
     # MOVE AS A SET. react-router 1.170.27 / react-start 1.168.44 /
     # router-plugin 1.168.30 once broke hydration: SSR emitted a
     # `<script type="module">` inside the __root__ match that the client render
@@ -382,58 +390,58 @@ catalogs:
     # and Vite at 8.2.1 it does not. Later releases fixed it. Router and Start ship
     # in lockstep — move them together, and load a page in a browser before
     # believing it works.
-    "@tanstack/react-router": 1.170.45
+    "@tanstack/react-router": 1.170.46
     "@tanstack/react-router-ssr-query": 1.167.3
-    "@tanstack/react-start": 1.169.3
+    "@tanstack/react-start": 1.169.4
     "@tanstack/react-table": 9.3.1
-    "@tanstack/react-virtual": 3.14.21
+    "@tanstack/react-virtual": 3.14.26
     "@tanstack/store": 0.11.2
   test:
-    "@playwright/test": 1.64.1
+    "@playwright/test": 1.65.0
     "@testing-library/dom": ^10.4.2
     "@testing-library/react": ^16.3.3
     "@testing-library/user-event": ^14.6.8
-    "@vitest/browser": 5.0.5
-    "@vitest/browser-playwright": 5.0.5
-    "@vitest/coverage-v8": 5.0.5
-    "@vitest/ui": 5.0.5
+    "@vitest/browser": 5.1.0
+    "@vitest/browser-playwright": 5.1.0
+    "@vitest/coverage-v8": 5.1.0
+    "@vitest/ui": 5.1.0
     axe-core: 4.14.0
     jsdom: 30.1.3
-    msw: 3.0.3
-    playwright: 1.64.1
-    vitest: 5.0.5
+    msw: 3.0.4
+    playwright: 1.65.0
+    vitest: 5.1.0
     vitest-browser-react: 2.3.0
   tiptap:
-    "@tiptap/core": 3.32.0
-    "@tiptap/extension-character-count": 3.32.0
-    "@tiptap/extension-code-block-lowlight": 3.32.0
-    "@tiptap/extension-color": 3.32.0
-    "@tiptap/extension-document": 3.32.0
-    "@tiptap/extension-floating-menu": 3.32.0
-    "@tiptap/extension-hard-break": 3.32.0
-    "@tiptap/extension-highlight": 3.32.0
-    "@tiptap/extension-image": 3.32.0
-    "@tiptap/extension-link": 3.32.0
-    "@tiptap/extension-list": 3.32.0
-    "@tiptap/extension-paragraph": 3.32.0
-    "@tiptap/extension-placeholder": 3.32.0
-    "@tiptap/extension-subscript": 3.32.0
-    "@tiptap/extension-superscript": 3.32.0
-    "@tiptap/extension-table": 3.32.0
-    "@tiptap/extension-table-cell": 3.32.0
-    "@tiptap/extension-table-header": 3.32.0
-    "@tiptap/extension-table-row": 3.32.0
-    "@tiptap/extension-task-item": 3.32.0
-    "@tiptap/extension-task-list": 3.32.0
-    "@tiptap/extension-text": 3.32.0
-    "@tiptap/extension-text-align": 3.32.0
-    "@tiptap/extension-text-style": 3.32.0
-    "@tiptap/extension-typography": 3.32.0
-    "@tiptap/extension-underline": 3.32.0
-    "@tiptap/extensions": 3.32.0
-    "@tiptap/pm": 3.32.0
-    "@tiptap/react": 3.32.0
-    "@tiptap/starter-kit": 3.32.0
+    "@tiptap/core": 3.33.0
+    "@tiptap/extension-character-count": 3.33.0
+    "@tiptap/extension-code-block-lowlight": 3.33.0
+    "@tiptap/extension-color": 3.33.0
+    "@tiptap/extension-document": 3.33.0
+    "@tiptap/extension-floating-menu": 3.33.0
+    "@tiptap/extension-hard-break": 3.33.0
+    "@tiptap/extension-highlight": 3.33.0
+    "@tiptap/extension-image": 3.33.0
+    "@tiptap/extension-link": 3.33.0
+    "@tiptap/extension-list": 3.33.0
+    "@tiptap/extension-paragraph": 3.33.0
+    "@tiptap/extension-placeholder": 3.33.0
+    "@tiptap/extension-subscript": 3.33.0
+    "@tiptap/extension-superscript": 3.33.0
+    "@tiptap/extension-table": 3.33.0
+    "@tiptap/extension-table-cell": 3.33.0
+    "@tiptap/extension-table-header": 3.33.0
+    "@tiptap/extension-table-row": 3.33.0
+    "@tiptap/extension-task-item": 3.33.0
+    "@tiptap/extension-task-list": 3.33.0
+    "@tiptap/extension-text": 3.33.0
+    "@tiptap/extension-text-align": 3.33.0
+    "@tiptap/extension-text-style": 3.33.0
+    "@tiptap/extension-typography": 3.33.0
+    "@tiptap/extension-underline": 3.33.0
+    "@tiptap/extensions": 3.33.0
+    "@tiptap/pm": 3.33.0
+    "@tiptap/react": 3.33.0
+    "@tiptap/starter-kit": 3.33.0
     lowlight: ^3.3.0
     reactjs-tiptap-editor: 1.0.46
   tsc:
@@ -447,9 +455,9 @@ catalogs:
     # (the pre-push hook). CI and `lint:types` stay on `typescript` above.
     tsrs: 0.23.0-ts7.1.0-beta
   types:
-    "@types/chrome": 0.3.5
+    "@types/chrome": 0.3.7
     "@types/json-schema": ^7.0.15
-    "@types/node": 26.6.5
+    "@types/node": 26.6.6
     "@types/papaparse": 5.5.2
     "@types/react": 19.3.0
     "@types/react-dom": 19.3.0
@@ -464,8 +472,8 @@ catalogs:
     facehash: 0.1.0
     input-otp: 1.5.0
     next-themes: 0.4.6
-    react-resizable-panels: 4.14.7
-    shadcn: 4.22.1
+    react-resizable-panels: 4.19.1
+    shadcn: 4.23.0
     sonner: 2.0.8
     tailwind-merge: 3.7.0
     vaul: 1.1.2
@@ -490,8 +498,8 @@ catalogs:
     jsonrepair: 3.15.0
     jspdf: 4.2.1
     jszip: ^3.10.2
-    media-chrome: 4.19.3
-    mediabunny: 1.61.6
+    media-chrome: 4.19.4
+    mediabunny: 1.65.2
     my-ua-parser: ^2.0.4
     nanoid: 6.0.2
     pptxgenjs: 4.0.1
@@ -614,7 +622,7 @@ overrides:
   # crashes with "Cannot destructure property ... as it is null". The data grid
   # was the visible casualty. One copy only.
   "@babel/types": 8.0.6
-  "@better-auth/core": 1.7.16
+  "@better-auth/core": 1.7.18
   "@eslint/plugin-kit@<0.3.3": ">=0.5.0"
   "@grpc/grpc-js@<1.14.5": ">=1.14.5"
   "@hono/node-server@<1.19.10": ">=1.19.10"
@@ -638,30 +646,30 @@ overrides:
   # `^3.29.2` and so was satisfied by whatever the lockfile already held
   # (3.30.0/3.30.1). 3.30.4 is inside its range — this only forces the
   # re-resolve pnpm had no reason to do on its own.
-  "@tiptap/extension-blockquote": 3.32.0
-  "@tiptap/extension-bold": 3.32.0
-  "@tiptap/extension-bubble-menu": 3.32.0
-  "@tiptap/extension-bullet-list": 3.32.0
-  "@tiptap/extension-code": 3.32.0
-  "@tiptap/extension-code-block": 3.32.0
-  "@tiptap/extension-collaboration": 3.32.0
-  "@tiptap/extension-collaboration-caret": 3.32.0
-  "@tiptap/extension-details": 3.32.0
-  "@tiptap/extension-drag-handle": 3.32.0
-  "@tiptap/extension-drag-handle-react": 3.32.0
-  "@tiptap/extension-emoji": 3.32.0
-  "@tiptap/extension-floating-menu": 3.32.0
-  "@tiptap/extension-heading": 3.32.0
-  "@tiptap/extension-horizontal-rule": 3.32.0
-  "@tiptap/extension-italic": 3.32.0
-  "@tiptap/extension-list-item": 3.32.0
-  "@tiptap/extension-mention": 3.32.0
-  "@tiptap/extension-node-range": 3.32.0
-  "@tiptap/extension-ordered-list": 3.32.0
-  "@tiptap/extension-strike": 3.32.0
-  "@tiptap/extension-table-of-contents": 3.32.0
-  "@tiptap/markdown": 3.32.0
-  "@tiptap/suggestion": 3.32.0
+  "@tiptap/extension-blockquote": 3.33.0
+  "@tiptap/extension-bold": 3.33.0
+  "@tiptap/extension-bubble-menu": 3.33.0
+  "@tiptap/extension-bullet-list": 3.33.0
+  "@tiptap/extension-code": 3.33.0
+  "@tiptap/extension-code-block": 3.33.0
+  "@tiptap/extension-collaboration": 3.33.0
+  "@tiptap/extension-collaboration-caret": 3.33.0
+  "@tiptap/extension-details": 3.33.0
+  "@tiptap/extension-drag-handle": 3.33.0
+  "@tiptap/extension-drag-handle-react": 3.33.0
+  "@tiptap/extension-emoji": 3.33.0
+  "@tiptap/extension-floating-menu": 3.33.0
+  "@tiptap/extension-heading": 3.33.0
+  "@tiptap/extension-horizontal-rule": 3.33.0
+  "@tiptap/extension-italic": 3.33.0
+  "@tiptap/extension-list-item": 3.33.0
+  "@tiptap/extension-mention": 3.33.0
+  "@tiptap/extension-node-range": 3.33.0
+  "@tiptap/extension-ordered-list": 3.33.0
+  "@tiptap/extension-strike": 3.33.0
+  "@tiptap/extension-table-of-contents": 3.33.0
+  "@tiptap/markdown": 3.33.0
+  "@tiptap/suggestion": 3.33.0
   "@tootallnate/once@<3.0.1": ">=3.0.1"
   "@vitest/browser@<4.1.10": ">=4.1.10"
   "@xhmikosr/decompress@<11.1.3": ">=11.1.3"
@@ -676,6 +684,9 @@ overrides:
   # to the 0.9 line; this override sends the old range there, with the security pin intact.
   "plist@<3.1.1": "3.1.1"
   ai@<6.0.35: ">=6.0.35"
+  # @visulima/error asks for `ai >=7.0.14` and would resolve the newest; keep it on the
+  # catalog's copy (see the `ai` hold in the catalog) so one `ai` serves our code.
+  "@visulima/error>ai": 7.0.139
   ajv@>=7.0.0-alpha.0 <8.18.0: ">=8.18.0"
   axios@>=1.0.0 <=1.13.4: ">=1.13.5"
   # ...but NOT for the React Compiler. It declares `@babel/types@^7.26.0`;
@@ -736,7 +747,7 @@ overrides:
   http-cache-semantics@<=4.2.0: ">=4.3.0"
   # One copy, in step with the `server` catalog: `@lunora/*` pins hono exactly, and
   # `@visulima/pail`'s middleware typed against another copy fails `app.use` (TS2769).
-  hono: 4.13.13
+  hono: 4.13.16
   immutable: ">=5.1.8"
   immutable@>=4.0.0-rc.1 <4.3.8: ">=4.3.8"
   immutable@>=5.0.0-beta.1 <5.1.8: ">=5.1.8"
@@ -757,7 +768,7 @@ overrides:
   # instances, so every plugin passed to `createAuth` stops typechecking. That is
   # exactly what a dependency bump did here: `better-auth`'s core resolved
   # jose 6.2.5 while `@better-auth/api-key`'s resolved 6.2.8. One copy only.
-  jose: 6.2.13
+  jose: 6.2.15
   js-cookie@<=3.0.5: ">=3.0.7"
   js-yaml@<3.14.2: ">=4.1.1"
   js-yaml@>=4.0.0 <4.3.2: ">=4.3.2 <5.0.0"
