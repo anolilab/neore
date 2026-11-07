@@ -947,9 +947,14 @@ const runChatStartOnShard = async (
     }
 
     // A message (or a regenerated reply) moves a child thread past the request its sub-agent waits on, so that wait ends. A
-    // text send ends it in the write that opens its stream (`createStreamWithMessage`); a media send opens none, so it ends here.
+    // text send ends it in the write that opens its stream (`createStreamWithMessage`); a media send opens none, so it ends here,
+    // and only into a thread that is paused (`awaitingInput`): most threads never are, so they pay no write.
     if (contentType !== "text" && validThreadId) {
-        await endApprovalWaitsAfterSave(context, validThreadId);
+        const sentInto = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: validThreadId as Id<"threads"> });
+
+        if (sentInto?.awaitingInput !== undefined) {
+            await endApprovalWaitsAfterSave(context, validThreadId);
+        }
     }
 
     // Create persistent stream + schedule agent (text content only)
