@@ -411,7 +411,7 @@ export const getProjectBreakdown = authQuery
         const projectsFrom = rows.page.length >= PROJECT_ROW_LIMIT ? rows.page.at(-1)?.date : undefined;
         const coveredFrom = [totals.coveredFrom, projectsFrom]
             .filter((date) => date !== undefined)
-            .toSorted()
+            .toSorted((a, b) => a!.localeCompare(b!))
             .at(-1);
         const projects = foldProjectTotals(coveredFrom === undefined ? rows.page : rows.page.filter((row) => row.date >= coveredFrom));
         const total = coveredFrom === undefined ? totals.total : sumRows(totals.rows.filter((row) => row.date >= coveredFrom));

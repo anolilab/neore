@@ -251,7 +251,9 @@ describe("organization usage rows", () => {
             [ADMIN, 10],
             [MEMBER, 25],
         ]);
-        expect((await read()).result.total.costMicrodollars).toBe(35);
+        const { result } = await read();
+
+        expect(result.total.costMicrodollars).toBe(35);
     });
 
     it("erases a member's share with their account, and exports it to them, a page at a time", async () => {
@@ -264,14 +266,20 @@ describe("organization usage rows", () => {
 
         expect(exported).toMatchObject([{ costMicrodollars: 20, organization: ORG }]);
         await harness.run(async (ctx: any) => await eraseUsageForUser(ctx, MEMBER));
-        expect((await read()).result.total.costMicrodollars).toBe(0);
+
+        const { result } = await read();
+
+        expect(result.total.costMicrodollars).toBe(0);
     });
 
     it("erases a deleted organization's usage", async () => {
         await record(MEMBER, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER }), 20);
 
         expect(await harness.run(async (ctx: any) => await ctx.runMutation(eraseOrganizationUsage, { organizationId: ORG }))).toBe(1);
-        expect((await read()).result.total.costMicrodollars).toBe(0);
+
+        const { result } = await read();
+
+        expect(result.total.costMicrodollars).toBe(0);
     });
 
     it("says when projects with no usage are left out, without calling the period incomplete", async () => {

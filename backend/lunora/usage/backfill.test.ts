@@ -858,12 +858,12 @@ describe("project backfill", () => {
         await lateRecord();
 
         const filed = await harness.run(async (ctx: any) => {
-            const { page: projectRows } = await ctx.db.usageDaily.findMany({ where: { skillKey: PROJECT_SKILL_KEY, userId: USER } });
+            const { page: filedProjects } = await ctx.db.usageDaily.findMany({ where: { skillKey: PROJECT_SKILL_KEY, userId: USER } });
             const { page: organizationRows } = await ctx.db.usageOrganizationDaily.findMany({ where: { organizationId: "org_1" } });
 
             return {
                 organization: organizationRows.map((row: any) => [row.projectKey === orgProject ? "project" : row.projectKey, row.costMicrodollars]),
-                project: projectRows.map((row: any) => row.costMicrodollars),
+                project: filedProjects.map((row: any) => row.costMicrodollars),
             };
         });
 
@@ -879,7 +879,9 @@ describe("project backfill", () => {
         vi.setSystemTime(STARTED);
         await start();
 
-        expect((await state()).timeZone).toBe("UTC");
+        const started = await state();
+
+        expect(started.timeZone).toBe("UTC");
     });
 
     it("leaves a reply that may have still been running when the first walk passed it until its live record lands", async () => {

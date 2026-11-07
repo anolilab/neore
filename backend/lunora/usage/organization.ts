@@ -103,11 +103,11 @@ export const organizationProjectTitles = internalQuery
         const listed = await systemDb(ctx).projects.findMany({ limit: MAX_PROJECTS + 1, where: { organizationId } });
 
         return {
+            // Past the bound, the projects with no usage are not listed: the result says it was cut.
+            moreUnused: listed.page.length > MAX_PROJECTS,
             owned: found.flatMap((project) =>
                 project && project.organizationId === organizationId ? [{ projectId: project._id as string, title: project.title }] : [],
             ),
-            // Past the bound, the projects with no usage are not listed: the result says it was cut.
-            moreUnused: listed.page.length > MAX_PROJECTS,
             unused: listed.page.slice(0, MAX_PROJECTS).map((project) => {
                 return { projectId: project._id as string, title: project.title };
             }),
@@ -207,8 +207,8 @@ export const getOrganizationProjectUsage = authAction
         return {
             result: {
                 noProject: remainderOf(total, listed),
-                projectsCut,
                 projects: listed.toSorted((a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.title.localeCompare(b.title)),
+                projectsCut,
                 total,
                 truncated,
             },

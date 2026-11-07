@@ -126,11 +126,11 @@ export const ensureBackfill = async (ctx: MutationCtx, userId: string, now: numb
             runId,
             startedAt: now,
             status: "running",
-            updatedAt: now,
-            userId,
             // Both walks date a reply in this zone, so a later change of zone cannot put a reply's project row and its
             // total on different days. No zone yet is UTC, recorded as such so a zone set later changes nothing.
             timeZone: settings?.timezone || "UTC",
+            updatedAt: now,
+            userId,
         });
     }
 

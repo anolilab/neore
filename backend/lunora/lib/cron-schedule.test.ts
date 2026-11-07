@@ -65,9 +65,9 @@ describe("the single cron trigger", () => {
             dispatchShardHousekeeping: { everyMinutes: 10, kind: "interval" },
             handleGdprRequestTimeouts: { hourUTC: 0, kind: "daily", minuteUTC: 0 },
             keepAlive: { everyMinutes: 10, kind: "interval" },
+            pruneOrganizationUsage: { everyMinutes: 360, kind: "interval" },
             purgeActionCache: { everyMinutes: 60, kind: "interval" },
             purgeIdempotencyClaims: { everyMinutes: 60, kind: "interval" },
-            pruneOrganizationUsage: { everyMinutes: 360, kind: "interval" },
             sweepOrphanedOrganizationPolicies: { hourUTC: 4, kind: "daily", minuteUTC: 15 },
             vacuumDocumentHistory: { hourUTC: 3, kind: "daily", minuteUTC: 30 },
         });

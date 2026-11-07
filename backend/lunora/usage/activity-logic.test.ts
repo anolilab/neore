@@ -260,12 +260,18 @@ describe("project rows", () => {
     });
 
     it("folds an organization's rows into its total and its projects, costliest first", () => {
-        const row = (projectKey: string, costMicrodollars: number) => {
+        const organizationRow = (projectKey: string, costMicrodollars: number) => {
             return { costMicrodollars, date: "2026-09-20", projectKey, replies: 1, tokens: 1 };
         };
 
         expect(
-            foldOrganizationUsage([row(ORGANIZATION_TOTAL_KEY, 30), row("p_a", 10), row("p_b", 15), row(ORGANIZATION_TOTAL_KEY, 5), row("p_a", 1)]),
+            foldOrganizationUsage([
+                organizationRow(ORGANIZATION_TOTAL_KEY, 30),
+                organizationRow("p_a", 10),
+                organizationRow("p_b", 15),
+                organizationRow(ORGANIZATION_TOTAL_KEY, 5),
+                organizationRow("p_a", 1),
+            ]),
         ).toStrictEqual({
             projects: [
                 { costMicrodollars: 15, projectKey: "p_b", replies: 1, tokens: 1 },
