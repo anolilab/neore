@@ -153,6 +153,14 @@ export const createStreamWithMessage = internalMutation
         // A reply paused on a request that this message moves the conversation past is abandoned: drop what it kept through the pause.
         await discardPausedThreadSecrets(context, { threadId: threadId as Id<"threads"> });
 
+        // Likewise a sub-agent this child thread's message (or regenerated reply) moves past: its request can no longer be
+        // answered, so its wait ends. Here, after the message is saved and in the write the send makes anyway, so a failed
+        // save never ends the run, and a thread with no waiting sub-agent costs one indexed read. Loaded lazily, like
+        // every reader of the sub-agent module from the chat path.
+        const { endApprovalWaits } = await import("../../sub-agents/functions");
+
+        await endApprovalWaits(context, threadId);
+
         const streamId = await persistentTextStreaming.createStream(context, {
             messageId,
             streamingConfig,

@@ -391,6 +391,22 @@ const workerThreadResponse = (): Response =>
     Response.json({ error: "This is a worker's thread. Message the worker from its thread instead of starting a chat turn here." }, { status: 400 });
 
 /** The answer to a request that writes into a locked thread without a valid proof. */
+/**
+ * Ends the waits of sub-agents whose request a saved message moved the child thread past (`endApprovalWaitForMessage`).
+ * The message is saved and charged already, so a failed write must not fail the request (a retry would save and charge
+ * it again): it is logged and handed to the scheduler instead.
+ */
+const endApprovalWaitsAfterSave = async (context: HttpActionCtx, threadId: string): Promise<void> => {
+    try {
+        await context.runMutation(internal.sub_agents.functions.endApprovalWaitForMessage, { threadId });
+    } catch (error) {
+        chatLogger.error("[chat] Could not end a sub-agent's approval wait; scheduling it", error);
+        await httpScheduler(context)
+            .runAfter(0, internal.sub_agents.functions.endApprovalWaitForMessage, { threadId })
+            .catch((scheduleError: unknown) => chatLogger.error("[chat] Could not schedule the end of a sub-agent's approval wait", scheduleError));
+    }
+};
+
 const threadLockedResponse = (): Response => Response.json({ code: THREAD_LOCKED_CODE, error: "This chat is locked." }, { status: 403 });
 
 /**
@@ -853,10 +869,6 @@ const runChatStartOnShard = async (
             threadId: validThreadId as Id<"threads">,
         });
 
-        // The leaf now points at the prompt, so a request the child was waiting on is off the displayed path and can no longer be
-        // answered: its wait ends, as a new message's does.
-        await context.runMutation(internal.sub_agents.functions.endApprovalWaitForMessage, { threadId: validThreadId });
-
         threadId = validThreadId;
         messageId = prompt._id;
     } else if (validThreadId) {
@@ -882,12 +894,6 @@ const runChatStartOnShard = async (
             promptMessageId: body.parentId,
             threadId: validThreadId,
         });
-
-        // A new message into a child that waits on an approval request ends that wait, once the message is saved: a failed save
-        // must not end the run first.
-        if (!isRegenerate) {
-            await context.runMutation(internal.sub_agents.functions.endApprovalWaitForMessage, { threadId: validThreadId });
-        }
 
         threadId = validThreadId;
         messageId = result.messageId;
@@ -920,6 +926,12 @@ const runChatStartOnShard = async (
 
         // Title + category generation — scheduled after the agent run below.
         scheduleTitleJobs(threadId, true);
+    }
+
+    // A message (or a regenerated reply) moves a child thread past the request its sub-agent waits on, so that wait ends. A
+    // text send ends it in the write that opens its stream (`createStreamWithMessage`); a media send opens none, so it ends here.
+    if (contentType !== "text" && validThreadId) {
+        await endApprovalWaitsAfterSave(context, validThreadId);
     }
 
     // Create persistent stream + schedule agent (text content only)
@@ -1266,6 +1278,9 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
             originalMessageId: messageId as Id<"messages">,
             userId,
         });
+
+        // The edit is now the displayed path, so a request a sub-agent waits on in this child thread can no longer be answered.
+        await endApprovalWaitsAfterSave(context, threadId);
 
         // Get thread settings for generation
         const appThread = await context.runQuery(internal.chat.functions.getThreadSettings, {
