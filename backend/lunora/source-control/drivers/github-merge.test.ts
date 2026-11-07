@@ -645,3 +645,17 @@ describe("reading past the first page", () => {
         expect(reviews.items.at(-1)?.body).toBe("r101");
     });
 });
+
+describe("the review count", () => {
+    it("leaves a draft out of the total as well as the list", async () => {
+        const request: HostRequest = async () =>
+            Response.json([
+                { body: "seen", id: 1, state: "APPROVED", submitted_at: "2026-01-01T00:00:00Z", user: { login: "a" } },
+                { body: "mine, not sent", id: 2, state: "PENDING", submitted_at: null, user: { login: "me" } },
+            ]);
+
+        const reviews = await githubDriver.listReviews(request, REF);
+
+        expect(reviews).toMatchObject({ items: [{ body: "seen" }], total: 1 });
+    });
+});

@@ -390,7 +390,7 @@ export const rerunFailedForAgent = async (
     dependencies: PullRequestAgentDependencies,
     wanted: WantedPullRequest,
     checkIds: string[] | undefined,
-): Promise<AgentWriteOutcome<{ notRerun: string[]; rerun: RerunResult[]; skipped: string[] }>> => {
+): Promise<AgentWriteOutcome<{ notRerun: string[]; rerun: RerunResult[]; skipped: string[] }> | { status: "head_moved" }> => {
     const picked = await target(dependencies, wanted);
 
     if (picked.status !== "ok") {
@@ -407,7 +407,8 @@ export const rerunFailedForAgent = async (
     const listed = await readFromHost(driver, token, async (request) => {
         const detail = await driver.getPullRequest(request, picked.ref);
 
-        return await driver.listChecks(request, picked.ref, detail.headSha);
+        // The same pages the failing-checks read lists, so a check it named can be re-run.
+        return { headSha: detail.headSha, ...(await driver.listChecks(request, picked.ref, detail.headSha, AGENT_MAX_CHECK_PAGES)) };
     });
 
     if (listed.status !== "ok") {
@@ -421,6 +422,17 @@ export const rerunFailedForAgent = async (
     // Past the cap, a check is named back rather than dropped: the agent can ask for it in a second call.
     const notRerun = chosen.slice(AGENT_MAX_RERUNS).map((check) => check.id);
     const rerun: RerunResult[] = [];
+
+    // A push since the checks were listed makes them the old commit's: re-running those is not what was approved.
+    const current = chosen.length === 0 ? null : await readFromHost(driver, token, async (request) => await driver.getPullRequest(request, picked.ref));
+
+    if (current !== null && current.status !== "ok") {
+        return current;
+    }
+
+    if (current !== null && current.headSha !== listed.headSha) {
+        return { status: "head_moved" };
+    }
 
     for (const check of chosen.slice(0, AGENT_MAX_RERUNS)) {
         const outcome = await writeToHost(driver, token, async (request) => {

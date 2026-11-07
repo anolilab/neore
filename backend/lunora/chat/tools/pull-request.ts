@@ -41,7 +41,7 @@ const MESSAGES: Record<string, string> = {
     choose: "Several pull requests are linked to this thread: name one by repository and number.",
     empty_reply: "A reply needs some text.",
     forbidden: "The connected account cannot see that pull request.",
-    head_moved: "The pull request has new commits since the head named: read it again and ask the person before merging.",
+    head_moved: "The pull request has new commits since it was read: read it again and ask the person again before acting.",
     headless: "A merge needs the person here to approve it.",
     host_error: "The host did not answer as expected. Try again later.",
     method_not_allowed: "The repository does not allow that merge method.",

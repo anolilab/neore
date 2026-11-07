@@ -754,7 +754,11 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<{
     });
 
     // Newest first: the latest verdict is what a reader acts on.
-    return { items: items.toSorted((left, right) => right.submittedAt - left.submittedAt), total };
+    // The total counts what the host listed; drafts and entries that could not be read on the pages read are not reviews
+    // anyone sees, so they leave the count. Pages not read may hold more of them: the count is then an upper bound.
+    const dropped = values.length - items.length;
+
+    return { items: items.toSorted((left, right) => right.submittedAt - left.submittedAt), total: Math.max(items.length, total - dropped) };
 };
 
 const RESOLVE_MUTATION = `mutation ($threadId: ID!) { resolveReviewThread(input: { threadId: $threadId }) { thread { id isResolved } } }`;

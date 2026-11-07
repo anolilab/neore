@@ -424,6 +424,45 @@ describe("re-running checks of a linked pull request", () => {
         expect(named).toMatchObject({ rerun: [{ id: "2", status: "ok" }], skipped: ["3"], status: "ok" });
     });
 
+    it("re-runs nothing when the pull request moved since its checks were listed", async () => {
+        let reads = 0;
+        const seen = stubHost({
+            ...routes([run(1, "failure")]),
+            [`GET ${API}/pulls/7`]: () => {
+                reads += 1;
+
+                return Response.json(reads === 1 ? pull : { ...pull, head: { ...pull.head, sha: "c".repeat(40) } });
+            },
+        });
+
+        await expect(rerunFailedForAgent(dependencies(), {}, undefined)).resolves.toStrictEqual({ status: "head_moved" });
+        expect(seen.some((call) => call.method === "POST")).toBe(false);
+    });
+
+    it("re-runs a failed check the host lists past its first page", async () => {
+        const first = Array.from({ length: 100 }, (_, index) => run(index + 1, "success"));
+        const later = run(150, "failure");
+
+        stubHost({
+            ...routes([...first, later]),
+            [`GET ${API}/commits/${SHA}/check-runs`]: () => Response.json({ check_runs: first, total_count: 101 }),
+        });
+        // The stub answers by path alone; the second page is told apart by the request's page number.
+        vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+            const url = new URL(input instanceof Request ? input.url : String(input));
+            const key = `${init.method ?? "GET"} ${url.origin}${url.pathname}`;
+            const table: Record<string, () => Response> = {
+                ...routes([...first, later]),
+                [`GET ${API}/commits/${SHA}/check-runs`]: () =>
+                    Response.json({ check_runs: url.searchParams.get("page") === "2" ? [later] : first, total_count: 101 }),
+            };
+
+            return table[key]?.() ?? Response.json({ message: "Not Found" }, { status: 404 });
+        });
+
+        await expect(rerunFailedForAgent(dependencies(), {}, ["150"])).resolves.toMatchObject({ rerun: [{ id: "150", status: "ok" }], skipped: [] });
+    });
+
     it("names back the failed checks past the cap instead of dropping them", async () => {
         stubHost(routes(Array.from({ length: 12 }, (_, index) => run(index + 1, "failure"))));
 
