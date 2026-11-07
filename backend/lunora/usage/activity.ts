@@ -40,7 +40,6 @@ import {
     foldSkillTotals,
     HEATMAP_DAYS,
     isDayKey,
-    LAST_TRY_AFTER_MS,
     PROJECT_SKILL_KEY,
     projectFiledKey,
     TOTAL_SKILL_KEY,
@@ -136,33 +135,6 @@ export const readableAttribution = async (ctx: MutationCtx | QueryCtx, attributi
 /** What `userId`'s reply in `threadId` is filed under: the thread's (or its lead's) project, when they can open it. */
 const attributionFor = async (ctx: MutationCtx | QueryCtx, threadId: string | undefined, userId: string): Promise<Attribution> =>
     threadId === undefined || threadId.length === 0 ? {} : await readableAttribution(ctx, await threadProject(ctx, threadId), userId);
-
-/**
- * `read`, or — once the record's retries are spent ({@link LAST_TRY_AFTER_MS} after the reply was recorded) — no
- * project, so a project that cannot be read never costs the reply its total.
- */
-const attributionOrNone = async (
-    ctx: Pick<MutationCtx, "now">,
-    reply: { at: number; replyKey: string; threadId?: string; userId: string },
-    read: () => Promise<Attribution>,
-): Promise<Attribution> => {
-    try {
-        return await read();
-    } catch (error) {
-        if (ctx.now - reply.at < LAST_TRY_AFTER_MS) {
-            throw error;
-        }
-
-        usageLogger.warn("[usage] the thread's project could not be read; recording the reply without one", {
-            error,
-            replyKey: reply.replyKey,
-            threadId: reply.threadId,
-            userId: reply.userId,
-        });
-
-        return {};
-    }
-};
 
 const vAttribution = v.object({ projectKey: v.optional(v.string()) });
 
@@ -263,6 +235,8 @@ export const recordReplyUsage = internalMutation
         at: v.number(),
         costMicrodollars: v.number(),
         date: v.string(),
+        /** The reply's fallback record (`usage/schedule.ts`): it lands only when every try of the record failed. */
+        fallback: v.optional(v.boolean()),
         replyKey: v.string(),
         skillKey: v.string(),
         skillName: v.optional(v.string()),
@@ -287,13 +261,12 @@ export const recordReplyUsage = internalMutation
         const costMicrodollars = Math.max(0, Math.round(args.costMicrodollars));
         const tokens = Math.max(0, Math.round(args.tokens));
         const recorded = await ctx.db.usageReplies.findFirst({ where: { replyKey: args.replyKey, userId: args.userId } });
-        // A project read by the caller is checked again here: access revoked since that read files none.
+        // A project read by the caller is checked again here: access revoked since that read files none. A failed read
+        // throws, and the record is retried (`RECORD_RETRY`); its fallback files the reply without one.
         const attribution = async (): Promise<Attribution> =>
-            await attributionOrNone(ctx, args, async () =>
-                args.threadAttribution === undefined
-                    ? await attributionFor(ctx, args.threadId, args.userId)
-                    : await readableAttribution(ctx, args.threadAttribution, args.userId),
-            );
+            args.threadAttribution === undefined
+                ? await attributionFor(ctx, args.threadId, args.userId)
+                : await readableAttribution(ctx, args.threadAttribution, args.userId);
 
         // A redelivered job (already filed), or a reply the backfill reached first: the first walk files no project, so
         // the project is filed here, once — at what the walk counted (`counted`: a run it passed while paused holds less
@@ -314,6 +287,14 @@ export const recordReplyUsage = internalMutation
             }
 
             return null;
+        }
+
+        if (args.fallback === true) {
+            usageLogger.warn("[usage] the reply's record never landed; its fallback records it without a project", {
+                replyKey: args.replyKey,
+                threadId: args.threadId,
+                userId: args.userId,
+            });
         }
 
         await markReplyRecorded(ctx, args.userId, args.replyKey, args.at, { projectFiled: true });
@@ -359,9 +340,9 @@ export const forwardReplyUsage = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        // A failed read throws, and the scheduler runs this again (`RECORD_RETRY`); the last try forwards without a
-        // project, so the reply's total and skill rows still land.
-        const threadAttribution = await attributionOrNone(ctx, args, async () => await attributionFor(ctx, args.threadId, args.userId));
+        // A failed read throws, and the scheduler runs this again (`RECORD_RETRY`); if every try fails, the reply's fallback
+        // record (`usage/schedule.ts`) still lands its total and skill rows.
+        const threadAttribution = await attributionFor(ctx, args.threadId, args.userId);
         const record: ReplyUsageArgs & { threadAttribution: Attribution } = { ...args, threadAttribution };
 
         await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...record }, args.userId);

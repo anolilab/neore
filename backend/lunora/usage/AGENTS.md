@@ -19,8 +19,9 @@
   user can open: no access files none, a failed read throws). A caller off the
   thread's shard passes `threadAttribution` (`getThreadAttribution`); a shared
   thread's record goes through `forwardReplyUsage`. Reading jobs are scheduled
-  with `RECORD_RETRY`; past `LAST_TRY_AFTER_MS` a failed read records the
-  reply without a project, so the total always lands. Replies outside a project
+  with `RECORD_RETRY` (a failed read fails the try); each also gets a fallback
+  record (`RECORD_FALLBACK_MS`, no project) that adds nothing once the record
+  landed, so the total always lands. Replies outside a project
   write none: "No project" is total − projects.
 - **Project history cutoff** — the project walk (`runUsageProjectBackfillStep`)
   reconstructs nothing. It runs after the first walk, and files a reply only

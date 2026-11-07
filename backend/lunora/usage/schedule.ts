@@ -13,7 +13,7 @@ import { streamLogger } from "../lib/logger";
 import { servesUser } from "../lib/shard-context";
 import { runAfterOnShard, runAfterWithRetry } from "../lib/shard-scheduler";
 import type { ReplyUsageArgs } from "./activity-logic";
-import { RECORD_RETRY } from "./activity-logic";
+import { RECORD_FALLBACK_MS, RECORD_RETRY } from "./activity-logic";
 
 interface SchedulerLike {
     runAfter: (delayMs: number, target: never, args: never) => Promise<unknown>;
@@ -27,8 +27,7 @@ export const scheduleReplyUsage = (scheduler: SchedulerLike, usageArgs: ReplyUsa
     const target = internal.usage.activity.recordReplyUsage;
     let scheduled: Promise<unknown>;
 
-    // A job that reads the thread's project fails when that read fails, and is retried (`RECORD_RETRY`); its last try
-    // records the reply without a project, so one failed read never loses the reply's total.
+    // A job that reads the thread's project fails when that read fails, and is retried (`RECORD_RETRY`).
     if (servesUser(usageArgs.userId)) {
         scheduled = runAfterWithRetry(scheduler, 0, target, { ...usageArgs }, RECORD_RETRY);
     } else if (usageArgs.threadId === undefined || usageArgs.threadAttribution !== undefined) {
@@ -37,6 +36,16 @@ export const scheduleReplyUsage = (scheduler: SchedulerLike, usageArgs: ReplyUsa
     } else {
         // Another user's thread: its project is read here, on its shard, then forwarded.
         scheduled = runAfterWithRetry(scheduler, 0, internal.usage.activity.forwardReplyUsage, { ...usageArgs, threadId: usageArgs.threadId }, RECORD_RETRY);
+    }
+
+    // A record that reads a project can fail every try: its fallback, well after the last one, lands the reply's total
+    // and skill rows without a project. The reply's key makes it add nothing when the record landed.
+    if (usageArgs.threadId !== undefined) {
+        const fallback = runAfterOnShard(scheduler, RECORD_FALLBACK_MS, target, { ...usageArgs, fallback: true, threadAttribution: {} }, usageArgs.userId);
+
+        void fallback.catch((error: unknown) => {
+            streamLogger.warn("[usage] fallback record not scheduled", error);
+        });
     }
 
     void scheduled.catch((error: unknown) => {

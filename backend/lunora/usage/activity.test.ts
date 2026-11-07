@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import { forwardReplyUsage, getActivityHeatmap, getSkillBreakdown, getThreadAttribution, recordReplyUsage } from "./activity";
-import { DEFAULT_SKILL_KEY, LAST_TRY_AFTER_MS } from "./activity-logic";
+import { DEFAULT_SKILL_KEY } from "./activity-logic";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -305,11 +305,11 @@ describe("recording usage by project", () => {
 
     it("fails a forward whose project read fails so it is retried, then forwards with the project once the read works", async () => {
         const alpha = await insertThread(USER, "Alpha");
-        const forward = async (at: number) =>
+        const forward = async () =>
             await harness.run(
                 async (ctx: any) =>
                     await ctx.runMutation(forwardReplyUsage, {
-                        at,
+                        at: 1,
                         costMicrodollars: 100,
                         date: "2026-09-20",
                         replyKey: "shared-reply",
@@ -324,21 +324,32 @@ describe("recording usage by project", () => {
         projectReadFails.value = true;
 
         try {
-            // The first try fails, so the scheduler runs it again (`RECORD_RETRY`); nothing is forwarded yet.
-            await expect(forward(Date.now())).rejects.toThrow("project read failed");
+            // Every try whose read fails fails, however late it runs, so the scheduler runs it again (`RECORD_RETRY`).
+            await expect(forward()).rejects.toThrow("project read failed");
             expect(forwarded).toStrictEqual([]);
-
-            // The last try, once the retries are spent, forwards without the project: the total still lands.
-            await forward(Date.now() - LAST_TRY_AFTER_MS - 1);
-            expect(forwarded).toMatchObject([{ costMicrodollars: 100, replyKey: "shared-reply", threadAttribution: {} }]);
         } finally {
             projectReadFails.value = false;
         }
 
         // A retry whose read works forwards the reply with its project.
-        forwarded.length = 0;
-        await forward(Date.now());
+        await forward();
         expect(forwarded).toMatchObject([{ threadAttribution: { projectKey: alpha.projectId } }]);
+    });
+
+    it("lands a reply's total through its fallback when every try failed, and adds nothing when the record landed", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+        const fallback = async (replyKey: string) => await record({ fallback: true, replyKey, threadAttribution: {}, threadId: alpha.threadId });
+
+        // The record never landed: the fallback counts the reply, without a project.
+        await fallback("never-landed");
+        // The record landed first: its fallback, later, adds nothing.
+        await record({ replyKey: "landed", threadId: alpha.threadId });
+        await fallback("landed");
+
+        const totals = await heatmap(USER, "2026-09-25");
+
+        expect(totals.days).toMatchObject([{ costMicrodollars: 200, replies: 2 }]);
+        expect(await projectTotals(USER)).toStrictEqual({ [alpha.projectId!]: { costMicrodollars: 100, replies: 1, tokens: 10 } });
     });
 
     it("files no project once the user's membership in the project's organization is revoked", async () => {

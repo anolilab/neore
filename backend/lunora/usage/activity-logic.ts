@@ -146,6 +146,8 @@ export interface ReplyUsageArgs {
     costMicrodollars: number;
     date: string;
     /** What makes the record idempotent: the reply's first row id, or a key of the run's own. */
+    /** Set on a reply's fallback record (`usage/schedule.ts`). */
+    fallback?: boolean;
     replyKey: string;
     skillKey: string;
     skillName?: string;
@@ -197,11 +199,11 @@ export const replyUsageArgs = (
 export const RECORD_RETRY = { backoff: "exponential", baseMs: 10_000, maxAttempts: 4, maxMs: 60_000 } as const;
 
 /**
- * Past this long after the reply was recorded, a record whose project read fails again files the reply without a
- * project instead of failing: only the last try (+130 s) is that late, so every earlier retry still gets to read the
- * project, and the total and skill rows land either way.
+ * When the fallback record of a reply runs: well after the record's last retry (+130 s), so it only ever lands when every
+ * try of the record that reads the project failed. It carries no project, and the reply's key makes it add nothing
+ * when the record landed (`usage/schedule.ts`).
  */
-export const LAST_TRY_AFTER_MS = 120_000;
+export const RECORD_FALLBACK_MS = 15 * 60_000;
 
 /** The key `usageReplies` holds once a reply (keyed `replyKey`) has been filed under its project. */
 export const projectFiledKey = (replyKey: string): string => `project:${replyKey}`;

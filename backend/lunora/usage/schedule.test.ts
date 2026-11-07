@@ -13,7 +13,7 @@ vi.mock("../lib/shard-scheduler", () => {
 
 const { internal } = await import("../_generated/internal");
 const { scheduleReplyUsage } = await import("./schedule");
-const { RECORD_RETRY } = await import("./activity-logic");
+const { RECORD_FALLBACK_MS, RECORD_RETRY } = await import("./activity-logic");
 
 const ARGS = { at: 1, costMicrodollars: 5, date: "2026-09-20", replyKey: "aside:1", skillKey: "__assistant__", threadId: "t1", tokens: 1, userId: "u1" };
 
@@ -39,6 +39,13 @@ describe("scheduleReplyUsage off the user's shard", () => {
         scheduleReplyUsage({ runAfter } as never, ARGS);
 
         expect(runAfterWithRetry).toHaveBeenCalledWith(expect.anything(), 0, internal.usage.activity.forwardReplyUsage, ARGS, RECORD_RETRY);
-        expect(runAfterOnShard).not.toHaveBeenCalled();
+        // Should every try fail, the fallback lands the reply's total without a project, well after the last one.
+        expect(runAfterOnShard).toHaveBeenCalledExactlyOnceWith(
+            expect.anything(),
+            RECORD_FALLBACK_MS,
+            internal.usage.activity.recordReplyUsage,
+            { ...ARGS, fallback: true, threadAttribution: {} },
+            "u1",
+        );
     });
 });
