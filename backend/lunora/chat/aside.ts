@@ -57,6 +57,7 @@ import { chatLogger } from "../lib/logger";
 import { gatewayFetch } from "../lib/services";
 import { MAX_LENGTH } from "../lib/validators";
 import { isWorkerThread } from "../sub-agents/functions";
+import type { Attribution } from "../usage/activity-logic";
 import { DEFAULT_SKILL_KEY, usageDayOf } from "../usage/activity-logic";
 import { scheduleReplyUsage } from "../usage/schedule";
 import { isAgentRunError, loadUserProviderKeys, resolveRunModel } from "./lib/agent-run";
@@ -355,9 +356,12 @@ export const askAside = authAction
 
         let model: LanguageModel;
         let timezone: string | undefined;
+        let threadAttribution: Attribution | undefined;
 
         if (chosen.kind === "thread") {
-            const [prefs, userProviderKeys, modelFilterRules, runModel] = await Promise.all([
+            // The thread's project is read here, before the call is charged: a failed read refuses the question rather
+            // than dropping an answer already paid for.
+            const [prefs, userProviderKeys, modelFilterRules, runModel, attribution] = await Promise.all([
                 ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }),
                 loadUserProviderKeys(ctx, userId),
                 // An unreadable rules read answers like a refusal, not an internal error.
@@ -365,6 +369,7 @@ export const askAside = authAction
                     throw error instanceof ModelFilterRulesUnavailableError ? new LunoraError("BAD_REQUEST", MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE) : error;
                 }),
                 resolveRunModel(ctx, chosen.model, userId),
+                ctx.runQuery(internal.usage.activity.getThreadAttribution, { threadId, userId }),
             ]);
             // A thread on the Workers AI default under a region rule asks a default the rules allow.
             const runModelId =
@@ -382,6 +387,7 @@ export const askAside = authAction
 
             model = agent.options.languageModel as LanguageModel;
             timezone = prefs.timezone;
+            threadAttribution = attribution;
         } else {
             // The thread's messages are the owner's, so the owner's filters pick the model for a collaborator's question too; the call is metered to, and graded by the plan of, the caller.
             model = await getUtilityModelForUser(ctx, gateway, { filterUserId: thread?.userId, threadId, userId });
@@ -430,6 +436,8 @@ export const askAside = authAction
                     date: usageDayOf(at, timezone),
                     replyKey: `aside:${entryId}`,
                     skillKey: DEFAULT_SKILL_KEY,
+                    threadAttribution,
+                    threadId,
                     tokens: result.totalUsage?.totalTokens ?? 0,
                     userId,
                 });

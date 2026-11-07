@@ -813,6 +813,7 @@ export interface ApiTypes {
         };
         backfill: {
             getUsageBackfillStatus: FunctionReference<"query", {}, "idle" | "running" | "done">;
+            getUsageBackfillStatuses: FunctionReference<"query", {}, { projects: "idle" | "running" | "done"; replies: "idle" | "running" | "done" }>;
             startUsageBackfill: FunctionReference<"mutation", {}, "idle" | "running" | "done">;
         };
     };
@@ -1692,6 +1693,7 @@ export const api: ApiTypes = {
         },
         backfill: {
             getUsageBackfillStatus: { __lunoraRef: "usage_backfill:getUsageBackfillStatus" },
+            getUsageBackfillStatuses: { __lunoraRef: "usage_backfill:getUsageBackfillStatuses" },
             startUsageBackfill: { __lunoraRef: "usage_backfill:startUsageBackfill" },
         },
     },

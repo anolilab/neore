@@ -15529,26 +15529,61 @@
                   "unique": false,
                   "refined": true
                 },
+                "fork": {
+                  "kind": "object",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "fields": {
+                    "forked": {
+                      "kind": "boolean",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false
+                    },
+                    "reason": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false,
+                      "refined": true
+                    }
+                  }
+                },
                 "kind": {
                   "kind": "literal",
                   "nullable": false,
                   "optional": false,
                   "unique": false,
-                  "literal": "\"import_open\""
+                  "literal": "\"session_open\""
                 },
                 "nativeSessionId": {
-                  "kind": "string",
-                  "nullable": false,
-                  "optional": false,
-                  "unique": false,
-                  "refined": true
-                },
-                "title": {
                   "kind": "string",
                   "nullable": false,
                   "optional": true,
                   "unique": false,
                   "refined": true
+                },
+                "reattach": {
+                  "kind": "object",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "fields": {
+                    "loaded": {
+                      "kind": "boolean",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false
+                    },
+                    "reason": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false,
+                      "refined": true
+                    }
+                  }
                 }
               }
             },
@@ -18173,61 +18208,26 @@
                   "unique": false,
                   "refined": true
                 },
-                "fork": {
-                  "kind": "object",
-                  "nullable": false,
-                  "optional": true,
-                  "unique": false,
-                  "fields": {
-                    "forked": {
-                      "kind": "boolean",
-                      "nullable": false,
-                      "optional": false,
-                      "unique": false
-                    },
-                    "reason": {
-                      "kind": "string",
-                      "nullable": false,
-                      "optional": true,
-                      "unique": false,
-                      "refined": true
-                    }
-                  }
-                },
                 "kind": {
                   "kind": "literal",
                   "nullable": false,
                   "optional": false,
                   "unique": false,
-                  "literal": "\"session_open\""
+                  "literal": "\"import_open\""
                 },
                 "nativeSessionId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "title": {
                   "kind": "string",
                   "nullable": false,
                   "optional": true,
                   "unique": false,
                   "refined": true
-                },
-                "reattach": {
-                  "kind": "object",
-                  "nullable": false,
-                  "optional": true,
-                  "unique": false,
-                  "fields": {
-                    "loaded": {
-                      "kind": "boolean",
-                      "nullable": false,
-                      "optional": false,
-                      "unique": false
-                    },
-                    "reason": {
-                      "kind": "string",
-                      "nullable": false,
-                      "optional": true,
-                      "unique": false,
-                      "refined": true
-                    }
-                  }
                 }
               }
             },
@@ -28302,6 +28302,90 @@
           "optional": false,
           "unique": false
         },
+        "projects": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "finishedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "lastOrder": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "leaseUntil": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "replies": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "runId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "startedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "status": {
+              "kind": "union",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"done\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"running\""
+                }
+              ]
+            },
+            "threadCursor": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "threadId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "threadProjectKey": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            }
+          }
+        },
         "replies": {
           "kind": "number",
           "nullable": false,
@@ -28354,6 +28438,12 @@
           "optional": true,
           "unique": false
         },
+        "timeZone": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "updatedAt": {
           "kind": "number",
           "nullable": false,
@@ -28392,6 +28482,12 @@
           "kind": "string",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "projectKey": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "replies": {
@@ -28445,6 +28541,14 @@
           ],
           "unique": false
         },
+        "by_user_project_date": {
+          "fields": [
+            "userId",
+            "projectKey",
+            "date"
+          ],
+          "unique": false
+        },
         "by_user_skill_date": {
           "fields": [
             "userId",
@@ -28461,6 +28565,38 @@
     "usageReplies": {
       "commitOrdered": false,
       "fields": {
+        "counted": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "costMicrodollars": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "date": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "tokens": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          }
+        },
+        "projectFiled": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "recordedAt": {
           "kind": "number",
           "nullable": false,

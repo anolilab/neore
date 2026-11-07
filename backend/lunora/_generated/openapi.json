@@ -56186,6 +56186,99 @@
         "x-lunora-function-kind": "query"
       }
     },
+    "/_lunora/rpc#usage_backfill:getUsageBackfillStatuses": {
+      "post": {
+        "description": "Invoke the `query` `usage_backfill:getUsageBackfillStatuses` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "usage_backfill:getUsageBackfillStatuses",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "usage_backfill:getUsageBackfillStatuses",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "projects": {
+                      "anyOf": [
+                        {
+                          "const": "idle",
+                          "type": "string"
+                        },
+                        {
+                          "const": "running",
+                          "type": "string"
+                        },
+                        {
+                          "const": "done",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "replies": {
+                      "anyOf": [
+                        {
+                          "const": "idle",
+                          "type": "string"
+                        },
+                        {
+                          "const": "running",
+                          "type": "string"
+                        },
+                        {
+                          "const": "done",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "projects",
+                    "replies"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: usage_backfill:getUsageBackfillStatuses",
+        "tags": [
+          "usage"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
     "/_lunora/rpc#usage_backfill:startUsageBackfill": {
       "post": {
         "description": "Invoke the `mutation` `usage_backfill:startUsageBackfill` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -60033,7 +60126,7 @@
       "name": "triggers"
     },
     {
-      "description": "The usage page's daily rollup (usageDaily), recorded once per reply, plus its one-shot backfill.",
+      "description": "The usage page's daily rollup (usageDaily), recorded once per reply with its skill and project, plus its one-shot backfill.",
       "name": "usage"
     },
     {

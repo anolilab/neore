@@ -1994,12 +1994,14 @@ export interface Doc_usageBackfill {
     finishedAt?: number;
     lastOrder?: number;
     leaseUntil: number;
+    projects?: { finishedAt?: number; lastOrder?: number; leaseUntil: number; replies: number; runId: string; startedAt: number; status: "running" | "done"; threadCursor?: string; threadId?: string; threadProjectKey?: string };
     replies: number;
     runId: string;
     startedAt: number;
     status: "running" | "done";
     threadCursor?: string;
     threadId?: string;
+    timeZone?: string;
     updatedAt: number;
     userId: string;
 }
@@ -2009,6 +2011,7 @@ export interface Doc_usageDaily {
     _creationTime: number;
     costMicrodollars: number;
     date: string;
+    projectKey?: string;
     replies: number;
     skillKey: string;
     skillName?: string;
@@ -2020,6 +2023,8 @@ export interface Doc_usageDaily {
 export interface Doc_usageReplies {
     _id: Id<"usageReplies">;
     _creationTime: number;
+    counted?: { costMicrodollars: number; date: string; tokens: number };
+    projectFiled?: boolean;
     recordedAt: number;
     replyKey: string;
     userId: string;
@@ -2554,7 +2559,7 @@ export interface IndexNamesByTable {
     triggers: "by_userId_organizationId" | "by_type_enabled" | "by_enabled_nextTriggerAt" | "by_userId_type_enabled" | "by_type_enabled_nextTriggerAt";
     twoFactor: "userId";
     usageBackfill: "by_userId";
-    usageDaily: "by_user_skill_date" | "by_user_date" | "by_date";
+    usageDaily: "by_user_skill_date" | "by_user_date" | "by_user_project_date" | "by_date";
     usageReplies: "by_user_reply" | "by_recordedAt";
     user: "email_name" | "name" | "role" | "userId" | "by_isAnonymous";
     userConnectors: "by_user_and_definition" | "by_organization" | "by_status" | "by_connectorDefinitionId";
@@ -5003,12 +5008,14 @@ export interface Insert_usageBackfill {
     finishedAt?: number;
     lastOrder?: number;
     leaseUntil: number;
+    projects?: { finishedAt?: number; lastOrder?: number; leaseUntil: number; replies: number; runId: string; startedAt: number; status: "running" | "done"; threadCursor?: string; threadId?: string; threadProjectKey?: string };
     replies: number;
     runId: string;
     startedAt: number;
     status: "running" | "done";
     threadCursor?: string;
     threadId?: string;
+    timeZone?: string;
     updatedAt: number;
     userId: string;
 }
@@ -5018,6 +5025,7 @@ export interface Insert_usageDaily {
     _creationTime?: number;
     costMicrodollars: number;
     date: string;
+    projectKey?: string;
     replies: number;
     skillKey: string;
     skillName?: string;
@@ -5029,6 +5037,8 @@ export interface Insert_usageDaily {
 export interface Insert_usageReplies {
     _id?: Id<"usageReplies">;
     _creationTime?: number;
+    counted?: { costMicrodollars: number; date: string; tokens: number };
+    projectFiled?: boolean;
     recordedAt: number;
     replyKey: string;
     userId: string;

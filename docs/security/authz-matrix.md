@@ -670,6 +670,7 @@ for a schema table that is neither policed nor listed:
 | `usage_activity.getActivityHeatmap` | query | authQuery | usageDaily | caller-scoped (ctx.user) | ok — new; at most 378 rows via `(userId, skillKey, date)` |
 | `usage_activity.getSkillBreakdown` | query | authQuery | usageDaily | caller-scoped (ctx.user) | ok — new; at most 4000 rows via `(userId, date)` |
 | `usage_backfill.getUsageBackfillStatus` | query | authQuery | usageBackfill | caller-scoped (ctx.user) | ok — new; one row via `by_userId` |
+| `usage_backfill.getUsageBackfillStatuses` | query | authQuery | usageBackfill | caller-scoped (ctx.user) | ok — new; one row via `by_userId`; each walk's status |
 | `usage_backfill.startUsageBackfill` | mutation | authMutation | usageBackfill | caller-scoped (ctx.user); no args | ok — new; idempotent — schedules at most one step chain per 5-minute lease, the walk reads only the caller's own shard |
 | `vault_functions.deleteAttachments` | mutation | authMutation + RL | — | row.userId == caller | **fixed** (medium) — uploader-only; org members could delete each other's files |
 | `vault_functions.findAttachmentByKey` | query | authQuery | — | file access | **fixed** (medium) — owner or a grant on the file's chat |

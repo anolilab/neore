@@ -149,3 +149,100 @@ describe("getSkillBreakdown", () => {
         ]);
     });
 });
+
+describe("recording usage by project", () => {
+    interface Totals {
+        costMicrodollars: number;
+        replies: number;
+        tokens: number;
+    }
+
+    /** The user's project rows, summed per project. */
+    const projectTotals = async (userId: string): Promise<Record<string, Totals>> =>
+        await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.usageDaily.findMany({ where: { skillKey: "__project__", userId } });
+            const totals: Record<string, Totals> = {};
+
+            for (const row of page as (Totals & { projectKey: string })[]) {
+                const current = totals[row.projectKey] ?? { costMicrodollars: 0, replies: 0, tokens: 0 };
+
+                totals[row.projectKey] = {
+                    costMicrodollars: current.costMicrodollars + row.costMicrodollars,
+                    replies: current.replies + row.replies,
+                    tokens: current.tokens + row.tokens,
+                };
+            }
+
+            return totals;
+        });
+
+    /** A project of `userId`'s and a thread of theirs in it (or in none). */
+    const insertThread = async (userId: string, title?: string): Promise<{ projectId?: string; threadId: string }> =>
+        await harness.run(async (ctx: any) => {
+            const projectId = title === undefined ? undefined : await ctx.db.insert("projects", { createdAt: 1, title, userId });
+            const threadId = await ctx.db.insert("threads", { status: "active", title: "T", userId, ...(projectId !== undefined && { projectId }) });
+
+            return { projectId, threadId };
+        });
+
+    it("files each reply under its thread's project, and nothing for a reply outside one", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+        const beta = await insertThread(USER, "Beta");
+        const loose = await insertThread(USER);
+
+        await record({ costMicrodollars: 300, threadId: alpha.threadId, tokens: 30 });
+        await record({ costMicrodollars: 200, skillKey: "sk_1", skillName: "/writer", threadId: alpha.threadId, tokens: 20 });
+        await record({ costMicrodollars: 100, date: "2026-09-21", threadId: beta.threadId, tokens: 10 });
+        await record({ costMicrodollars: 7, threadId: loose.threadId, tokens: 1 });
+        await record({ costMicrodollars: 3, tokens: 1 });
+
+        expect(await projectTotals(USER)).toStrictEqual({
+            [alpha.projectId!]: { costMicrodollars: 500, replies: 2, tokens: 50 },
+            [beta.projectId!]: { costMicrodollars: 100, replies: 1, tokens: 10 },
+        });
+
+        // The heatmap and the skill breakdown are unchanged by the project rows.
+        const skills = await breakdown(USER, "2026-09-01");
+
+        expect(skills.skills.reduce((total, skill) => total + skill.costMicrodollars, 0)).toBe(610);
+    });
+
+    it("keeps a moved thread's past usage with the project it was recorded under", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+        const beta = await insertThread(USER, "Beta");
+
+        await record({ costMicrodollars: 100, replyKey: "before-move", threadId: alpha.threadId, tokens: 10 });
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", alpha.threadId, { projectId: beta.projectId });
+        });
+        await record({ costMicrodollars: 40, replyKey: "after-move", threadId: alpha.threadId, tokens: 4 });
+
+        expect(await projectTotals(USER)).toStrictEqual({
+            [alpha.projectId!]: { costMicrodollars: 100, replies: 1, tokens: 10 },
+            [beta.projectId!]: { costMicrodollars: 40, replies: 1, tokens: 4 },
+        });
+    });
+
+    it("files a redelivered record under its project once", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+
+        await record({ replyKey: "run-1", threadId: alpha.threadId });
+        await record({ replyKey: "run-1", threadId: alpha.threadId });
+
+        expect(await projectTotals(USER)).toStrictEqual({ [alpha.projectId!]: { costMicrodollars: 100, replies: 1, tokens: 10 } });
+    });
+
+    it("writes no marker rows beyond the reply's own key when it records a reply first", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+
+        await record({ replyKey: "first-record", threadId: alpha.threadId });
+
+        const keys = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.usageReplies.findMany({ where: { userId: USER } });
+
+            return page.map((row: { replyKey: string }) => row.replyKey);
+        });
+
+        expect(keys).toStrictEqual(["first-record"]);
+    });
+});

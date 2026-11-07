@@ -80,6 +80,7 @@ beforeAll(async () => {
     registerModule(registry, "chat_custom_providers", await import("./custom-providers"));
     registerModule(registry, "chat_aside", await import("./aside"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "usage_activity", await import("../usage/activity"));
     registerModule(registry, "chat_streaming_persistent_library", await import("./streaming/persistent/library"));
 });
 
@@ -425,6 +426,15 @@ describe("askAside", () => {
 
         expect(scheduleReplyUsage).toHaveBeenCalledOnce();
         expect(scheduleReplyUsage.mock.calls[0]![1]).toMatchObject({ replyKey: `aside:${lastEntryId()}`, skillKey: "__assistant__", userId: OWNER });
+    });
+
+    it("hands the record the thread's project, read where the action can read the thread", async () => {
+        const projectId = await harness.run(async (ctx: any) => await ctx.db.insert("projects", { createdAt: 1, title: "Alpha", userId: OWNER }));
+
+        await patchThread({ projectId });
+        await ask();
+
+        expect(scheduleReplyUsage.mock.calls[0]![1]).toMatchObject({ threadAttribution: { projectKey: projectId }, threadId });
     });
 
     it("records nothing for an aside on the utility model", async () => {

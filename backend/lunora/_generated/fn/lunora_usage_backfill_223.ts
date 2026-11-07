@@ -12,4 +12,11 @@ if (typeof source["runId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "runId": source["runId"], "userId": source["userId"] };
 });
+installCompiledValidatorMap(lunora_usage_backfill_223.runUsageProjectBackfillStep.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["runId"] !== "string") return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "runId": source["runId"], "userId": source["userId"] };
+});
 export * from "../../usage/backfill.js";
