@@ -34,14 +34,21 @@ export const signOutOnDevice = async ({ clearCache, forgetLastChat, revokeGrant,
 };
 
 /**
- * Runs whenever the app finds nobody signed in (at launch, or when a refresh finds no grant): empties the offline cache
- * again, so a wipe that failed at sign-out (a locked or full disk) cannot leave the last account's chats in the file
- * until someone signs in. Never blocks: a failure only warns, and the next signed-out start tries again.
+ * Runs whenever the app finds nobody signed in (at launch, or when a refresh finds no grant or the server rejects it):
+ * empties the offline cache and forgets the saved chat again, so a wipe that failed at sign-out (a locked or full disk),
+ * or a session that ended without one, cannot leave the last account's chats on the device until someone signs in.
+ * Never blocks: a failure only warns, and the next signed-out start tries again.
  */
-export const emptyCacheWhileSignedOut = async ({ clearCache, warn }: Pick<SignOutSteps, "clearCache" | "warn">): Promise<void> => {
+export const emptyCacheWhileSignedOut = async ({ clearCache, forgetLastChat, warn }: Omit<SignOutSteps, "revokeGrant">): Promise<void> => {
     try {
         await clearCache();
     } catch (error) {
         warn("Could not empty the offline cache.", error);
+    }
+
+    try {
+        await forgetLastChat();
+    } catch (error) {
+        warn("Could not forget the last viewed chat.", error);
     }
 };

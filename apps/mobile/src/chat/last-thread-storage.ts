@@ -12,20 +12,31 @@ export interface KeyValueStore {
 export const LAST_THREAD_KEY = "neore.mobile.last-thread";
 export const REOPEN_KEY = "neore.mobile.reopen-last-chat";
 
+export interface LastThreadStore {
+    /** Forgets the saved chat of every account, whatever it is: used once nobody is signed in. */
+    clearLastThread: () => Promise<void>;
+    /** Forgets the saved chat, but only while it is `target`: a chat saved since then, or by another account, is not the refused one. */
+    forgetLastThread: (target: LastThread) => Promise<void>;
+    /** The chat to open at launch for `userId`, if any. A store that cannot be read opens nothing. */
+    lastChatToReopen: (userId: string) => Promise<string | undefined>;
+    readReopenLastChat: () => Promise<boolean>;
+    /** Saves the chat this account has read. */
+    rememberLastThread: (last: LastThread) => Promise<void>;
+    writeReopenLastChat: (isOn: boolean) => Promise<void>;
+}
+
 /** Reads and writes the last viewed chat and the reopen setting in `store`. */
-export const createLastThreadStore = (store: KeyValueStore) => {
+export const createLastThreadStore = (store: KeyValueStore): LastThreadStore => {
     // Saves and forgets run one after another, so a forget asked after a save always lands after it.
     const inOrder = createSerialQueue();
 
     return {
-        /** Forgets the saved chat of every account, whatever it is: used at sign-out. */
         clearLastThread: async (): Promise<void> => {
             await inOrder(async () => {
                 await store.deleteItem(LAST_THREAD_KEY);
             });
         },
 
-        /** Forgets the saved chat, but only while it is `target`: a chat saved since then, or by another account, is not the refused one. */
         forgetLastThread: async (target: LastThread): Promise<void> => {
             await inOrder(async () => {
                 if (isSavedThread(parseLastThread(await store.getItem(LAST_THREAD_KEY)), target)) {
@@ -34,7 +45,6 @@ export const createLastThreadStore = (store: KeyValueStore) => {
             });
         },
 
-        /** The chat to open at launch for `userId`, if any. A store that cannot be read opens nothing. */
         lastChatToReopen: async (userId: string): Promise<string | undefined> => {
             try {
                 const isOn = isReopenOn(await store.getItem(REOPEN_KEY));
@@ -48,7 +58,6 @@ export const createLastThreadStore = (store: KeyValueStore) => {
 
         readReopenLastChat: async (): Promise<boolean> => isReopenOn(await store.getItem(REOPEN_KEY)),
 
-        /** Saves the chat this account has read. */
         rememberLastThread: async (last: LastThread): Promise<void> => {
             await inOrder(async () => {
                 await store.setItem(LAST_THREAD_KEY, JSON.stringify(last));

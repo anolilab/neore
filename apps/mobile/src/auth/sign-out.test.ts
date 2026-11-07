@@ -60,12 +60,28 @@ describe("signOutOnDevice", () => {
 });
 
 describe("emptyCacheWhileSignedOut", () => {
-    it("empties the cache whenever nobody is signed in, so a wipe that failed at sign-out is retried", async () => {
+    it("empties the cache and forgets the saved chat whenever nobody is signed in, so an ended session leaves neither", async () => {
         const clearCache = vi.fn(async () => undefined);
+        const forgetLastChat = vi.fn(async () => undefined);
 
-        await emptyCacheWhileSignedOut({ clearCache, warn: vi.fn() });
+        await emptyCacheWhileSignedOut({ clearCache, forgetLastChat, warn: vi.fn() });
 
         expect(clearCache).toHaveBeenCalledTimes(1);
+        expect(forgetLastChat).toHaveBeenCalledTimes(1);
+    });
+
+    it("still forgets the saved chat when the cache cannot be emptied", async () => {
+        const forgetLastChat = vi.fn(async () => undefined);
+
+        await emptyCacheWhileSignedOut({
+            clearCache: async () => {
+                throw new Error("disk I/O error");
+            },
+            forgetLastChat,
+            warn: vi.fn(),
+        });
+
+        expect(forgetLastChat).toHaveBeenCalledTimes(1);
     });
 
     it("only warns when the cache cannot be emptied", async () => {
@@ -76,6 +92,7 @@ describe("emptyCacheWhileSignedOut", () => {
                 clearCache: async () => {
                     throw new Error("disk I/O error");
                 },
+                forgetLastChat: async () => undefined,
                 warn,
             }),
         ).resolves.toBeUndefined();

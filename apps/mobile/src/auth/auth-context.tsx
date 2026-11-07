@@ -76,7 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUser(null);
                 setStatus("signed-out");
                 // Retries a cache wipe that failed at sign-out; the credential side never waits on it.
-                await emptyCacheWhileSignedOut({ clearCache: () => getOfflineCache().clear(), warn: console.warn });
+                await emptyCacheWhileSignedOut({ clearCache: () => getOfflineCache().clear(), forgetLastChat: clearLastThread, warn: console.warn });
 
                 return;
             }
