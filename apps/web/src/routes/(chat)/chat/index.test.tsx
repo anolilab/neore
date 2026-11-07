@@ -6,7 +6,7 @@ import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { MODEL_REGISTRY } from "@neore/ai/models";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { defaultParseSearch } from "@tanstack/react-router";
-import { render, waitFor } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import type { ComponentType, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -64,6 +64,11 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
     };
 });
 
+// The saved-prompt loader's variable catalogue is built with `msg` at load time, which only the compiler can run.
+vi.mock("@lingui/core/macro", () => {
+    return { msg: (strings: TemplateStringsArray) => strings[0], plural: String };
+});
+
 vi.mock("@lingui/react/macro", () => {
     return {
         useLingui: () => {
@@ -72,14 +77,18 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
-vi.mock("@/features/chat/assistant", () => {
-    return {
-        default: (props: { initialMessage?: string }) => {
-            harness.assistantProps = props;
+vi.mock("@/features/chat/assistant", async () => {
+    // The real saved-prompt loader runs inside the mocked assistant, as it does in the chat, so the draft a saved prompt gives is the one tested.
+    const { default: usePromptLoader } = await import("@/features/prompts/hooks/use-prompt-loader");
 
-            return null;
-        },
+    const AssistantStub = ({ initialMessage, promptId }: { initialMessage?: string; promptId?: string }) => {
+        harness.assistantProps = { initialMessage };
+        usePromptLoader(promptId);
+
+        return null;
     };
+
+    return { default: AssistantStub };
 });
 
 vi.mock("@/components/error-boundaries/route-error-boundary", () => {
@@ -469,16 +478,45 @@ describe("chat index route", () => {
     });
 
     describe("a saved prompt named in the same URL", () => {
-        it("keeps the saved prompt's draft and refuses the link", async () => {
+        it("keeps the saved prompt's draft, never an empty one, and refuses the link", async () => {
             harness.savedPrompt = { content: "saved text", enabledFeatures: undefined, model: DEFAULT_CHAT_MODEL, reasoningEffort: undefined };
             openUrl(linkWith({ promptId: "saved-1" }));
 
             mountPage();
 
             await waitFor(() => expect(harness.navigate).toHaveBeenCalledTimes(1));
-            expect(useChatUIStore.getState().composerText).toBe("");
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("saved text"));
             expect(harness.showWarning).toHaveBeenCalledWith("This chat already has a prompt. The prompt from the link was not added.");
             expect(selectedModel()).toBe(DEFAULT_CHAT_MODEL);
+        });
+
+        it("a blank saved prompt owns no draft, so the link's text is the draft, and nothing is refused", async () => {
+            harness.savedPrompt = { content: " ".repeat(3), enabledFeatures: undefined, model: DEFAULT_CHAT_MODEL, reasoningEffort: undefined };
+            openUrl(linkWith({ promptId: "saved-1" }));
+
+            mountPage();
+
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("from the link"));
+            expect(harness.showWarning).not.toHaveBeenCalled();
+        });
+
+        it("a blank saved prompt with no link leaves the chat's draft in place", async () => {
+            useChatUIStore.getState().setComposerText("my draft");
+            harness.savedPrompt = { content: "", enabledFeatures: undefined, model: DEFAULT_CHAT_MODEL, reasoningEffort: undefined };
+            openUrl("https://app.example.com/chat?promptId=saved-1");
+
+            mountPage();
+
+            // The saved prompt's query answers after mount: let it resolve and its effects run before the draft is read.
+            await act(async () => {
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 50);
+                });
+            });
+
+            expect(harness.navigate).not.toHaveBeenCalled();
+            expect(useChatUIStore.getState().composerText).toBe("my draft");
+            expect(harness.showWarning).not.toHaveBeenCalled();
         });
     });
 

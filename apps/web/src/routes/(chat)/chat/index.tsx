@@ -15,6 +15,7 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
+import { savedPromptDraft } from "@/features/prompts/lib/prompt-draft";
 import validatePromptSettings from "@/features/prompts/lib/prompt-validation";
 import { useComposerModelEntries, useLinkWaitOver } from "@/hooks/use-composer-models";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
@@ -113,10 +114,16 @@ const ChatPage = () => {
     // The link waits for the saved prompt, the session and the model decision, each bounded: past `LINK_WAIT_MS` it applies (`useLinkWaitOver`).
     const linkWaitOver = useLinkWaitOver();
     const savedPromptPending = Boolean(promptId) && savedPrompt.isPending && !linkWaitOver;
+    // A saved prompt that is blank writes no text (the loader keeps the draft), so it does not own the draft either: the link's text applies.
     const savedPromptApplies =
         Boolean(promptId) &&
         savedPrompt.data !== undefined &&
         savedPrompt.data !== null &&
+        savedPromptDraft(savedPrompt.data, {
+            email: sessionData?.user?.email,
+            name: sessionData?.user?.name,
+            organization: activeOrganization?.name,
+        }).trim() !== "" &&
         validatePromptSettings(savedPrompt.data.model, savedPrompt.data.reasoningEffort, savedPrompt.data.enabledFeatures, pickerModels).isValid;
 
     usePromptLinkDraft({
