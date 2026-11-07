@@ -5,7 +5,9 @@
  *
  * A step that finished is saved, so it is never run again. The step that was in flight is lost: its model call may have
  * been billed (the gateway records usage per call), and the re-run is a new call. A TOOL in flight is different: it may
- * have paid or changed something and leaves no row, so a run that died inside one is never resumed.
+ * have paid or changed something and leaves no row, so a run that died inside one is never resumed. The exception is a
+ * tool that is safe to repeat (`repeatable-tools.ts`): it is never counted in `toolsInFlight`, so a death inside it is
+ * resumed like a death in a model call, and the model calls it again. One unsafe tool open beside it still refuses.
  */
 
 /** A reply is resumed at most this many times after its worker died; the next interruption fails the run. */
