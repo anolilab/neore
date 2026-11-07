@@ -17,6 +17,12 @@ const PAGE_WAIT = { timeout: 5000 } as const;
 // The state a story names (a stream's text, a pause, a banner) follows the page's first load and its polling.
 const STATE_WAIT = { timeout: 15_000 } as const;
 
+// The composer fades in over a few hundred milliseconds; axe must read settled colours, not mid-fade.
+const settle = () =>
+    new Promise<void>((resolve) => {
+        setTimeout(resolve, 1000);
+    });
+
 /** The chat: the real `(chat)` layout (sidebar, header, command palette) and the thread page. */
 const meta = {
     args: {
@@ -160,6 +166,9 @@ export const Offline: Story = {
 
 /** A fresh chat, before the first message. */
 export const NewChat: Story = {
+    play: async () => {
+        await settle();
+    },
     args: {
         levels: [
             { id: "/(chat)", route: ChatLayoutRoute },
@@ -169,9 +178,17 @@ export const NewChat: Story = {
     },
 };
 
-export const Guest: Story = { parameters: { persona: "guest" } };
+export const Guest: Story = {
+    parameters: { persona: "guest" },
+    play: async () => {
+        await settle();
+    },
+};
 
 export const FreeUser: Story = {
+    play: async () => {
+        await settle();
+    },
     parameters: {
         msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...shellFixtures({ tier: "free" }), ...chatFixtures()) } },
         persona: "free",
