@@ -284,23 +284,23 @@ catalogs:
     tailwind-csstree: 0.4.1
     typescript-eslint: 8.72.0
   lunora:
-    "@lunora/auth": 1.0.0-alpha.257
+    "@lunora/auth": 1.0.0-alpha.258
     "@lunora/bindings": 1.0.0-alpha.151
-    "@lunora/client": 1.0.0-alpha.286
-    "@lunora/cli": 1.0.0-alpha.482
-    "@lunora/d1": 1.0.0-alpha.233
-    "@lunora/mail": 1.0.0-alpha.138
-    "@lunora/notify": 1.0.0-alpha.110
-    "@lunora/payment": 1.0.0-alpha.269
+    "@lunora/client": 1.0.0-alpha.288
+    "@lunora/cli": 1.0.0-alpha.489
+    "@lunora/d1": 1.0.0-alpha.235
+    "@lunora/mail": 1.0.0-alpha.139
+    "@lunora/notify": 1.0.0-alpha.113
+    "@lunora/payment": 1.0.0-alpha.270
     "@lunora/queue": 1.0.0-alpha.143
     "@lunora/ratelimit": 1.0.0-alpha.196
-    "@lunora/react": 1.0.0-alpha.296
+    "@lunora/react": 1.0.0-alpha.297
     "@lunora/scheduler": 1.0.0-alpha.169
     "@lunora/seed": 1.0.0-alpha.282
-    "@lunora/server": 1.0.0-alpha.268
+    "@lunora/server": 1.0.0-alpha.273
     "@lunora/storage": 1.0.0-alpha.171
-    "@lunora/studio": 1.0.0-alpha.377
-    "@lunora/testing": 1.0.0-alpha.333
+    "@lunora/studio": 1.0.0-alpha.379
+    "@lunora/testing": 1.0.0-alpha.335
     "@lunora/workflow": 1.0.0-alpha.111
     "@lunora/wire": 1.0.0-alpha.6
     lunorash: 1.0.0-alpha.478
