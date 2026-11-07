@@ -5,6 +5,7 @@
  * Only the main process holds this: the window gets snapshots and sends commands through the local channels.
  */
 import { rm } from "node:fs/promises";
+import { setTimeout as delay } from "node:timers/promises";
 
 import type { CapabilityReport } from "@neore/ai/capabilities";
 
@@ -29,6 +30,9 @@ import type { AcpView, ProbeResult, SessionSnapshot, SessionStatus, SessionSumma
 /** The window is told about changes at most this often; streamed text would otherwise re-render per chunk. */
 const CHANGE_INTERVAL_MS = 50;
 const MAX_SESSIONS = 8;
+
+/** How long a failed handshake waits for the agent process to settle before its stderr is read. */
+const SPAWN_SETTLE_MS = 200;
 
 const requireSupported = (): void => {
     if (!acpSupported) {
@@ -101,7 +105,14 @@ export class AcpManager {
         agentKey: string,
         folder: string | null,
         handlers: { notification?: (method: string, params: unknown) => void },
-        use: (agent: { connection: JsonRpcConnection; handshake: Handshake; plan: SpawnPlan; report: CapabilityReport; scrub: (text: string) => string; secretLength: number }) => Promise<Result>,
+        use: (agent: {
+            connection: JsonRpcConnection;
+            handshake: Handshake;
+            plan: SpawnPlan;
+            report: CapabilityReport;
+            scrub: (text: string) => string;
+            secretLength: number;
+        }) => Promise<Result>,
     ): Promise<Result> {
         requireSupported();
 
@@ -132,6 +143,10 @@ export class AcpManager {
             try {
                 handshake = await initialize(connection, this.options.appVersion, this.options.startupTimeoutMs);
             } catch (error) {
+                // A stdin write to a missing command fails with EPIPE, and its spawn error can arrive a tick later.
+                // Wait briefly for the process to settle (`exited` also resolves on a spawn error), so the stderr
+                // tail names the cause rather than only the broken pipe.
+                await Promise.race([child.exited, delay(SPAWN_SETTLE_MS)]);
                 const stderr = child.stderrTail().trim();
 
                 // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
@@ -171,7 +186,12 @@ export class AcpManager {
     }
 
     /** `remote` is set for a session the backend started (`acp_start`): it goes by the id and thread the backend made. */
-    public async startSession(agentKey: string, agentLabel: string, folder: string, remote?: { nativeSessionId?: string; sessionId: string; threadId: string }): Promise<string> {
+    public async startSession(
+        agentKey: string,
+        agentLabel: string,
+        folder: string,
+        remote?: { nativeSessionId?: string; sessionId: string; threadId: string },
+    ): Promise<string> {
         requireSupported();
 
         if (this.summaries().filter((session) => session.status !== "ended").length >= MAX_SESSIONS) {
@@ -185,6 +205,11 @@ export class AcpManager {
         const { hooks } = this.options;
         // The runner needs the session to prompt and the session needs the runner to say when its turns start and end.
         let runner: HookRunner | undefined;
+        // The fields only a remote, a resumed or a host-run session has.
+        const remoteFields = remote === undefined ? {} : { sessionId: remote.sessionId, threadId: remote.threadId };
+        const resumeFields = remote?.nativeSessionId === undefined ? {} : { resumeSessionId: remote.nativeSessionId };
+        const { observer } = this.options;
+        const hostFields = folderInfo === undefined || observer === undefined ? {} : { hostInfo: { agentKey, agentLabel, ...folderInfo }, observer };
         const session = new AgentSession({
             agentKey,
             agentLabel,
@@ -193,14 +218,17 @@ export class AcpManager {
             folder: plan.cwd,
             folderIsRemote: this.options.folderIsRemote,
             gate: this.options.gate ?? declineGate,
-            lifecycle: hooks === undefined ? undefined : { ended: () => runner?.stop(), turnEnded: () => runner?.turnEnded(), turnStarted: () => runner?.turnStarted() },
+            lifecycle:
+                hooks === undefined
+                    ? undefined
+                    : { ended: () => runner?.stop(), turnEnded: () => runner?.turnEnded(), turnStarted: () => runner?.turnStarted() },
             log: this.options.log,
             onChange: () => this.changed(),
             process: child,
             startupTimeoutMs: this.options.startupTimeoutMs,
-            ...remote !== undefined && { sessionId: remote.sessionId, threadId: remote.threadId },
-            ...remote?.nativeSessionId !== undefined && { resumeSessionId: remote.nativeSessionId },
-            ...folderInfo !== undefined && this.options.observer !== undefined && { hostInfo: { agentKey, agentLabel, ...folderInfo }, observer: this.options.observer },
+            ...remoteFields,
+            ...resumeFields,
+            ...hostFields,
         });
 
         this.sessions.set(session.id, session);
@@ -278,9 +306,11 @@ export class AcpManager {
      * approval is gone (revoked, or dropped because the agent's command or `PATH` changed).
      */
     public async closeUnapproved(view: Pick<AcpView, "agents" | "consents">): Promise<void> {
-        const covered = (agentKey: string, folder: string): boolean =>
-            view.agents.some((agent) => agent.key === agentKey)
-            && view.consents.some((consent) => consent.agentKey === agentKey && consent.folderPath === folder);
+        const covered = (agentKey: string, folder: string): boolean => {
+            const hasAgent = view.agents.some((agent) => agent.key === agentKey);
+
+            return hasAgent && view.consents.some((consent) => consent.agentKey === agentKey && consent.folderPath === folder);
+        };
 
         const closing: Promise<void>[] = [];
 

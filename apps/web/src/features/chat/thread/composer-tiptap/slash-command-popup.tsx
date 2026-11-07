@@ -20,10 +20,12 @@ import { createPortal } from "react-dom";
 
 import { useModelPickerPopupActions } from "@/components/model-picker/model-picker-popup-store";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import useCompactThread from "@/features/chat/compaction/use-compact-thread";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 import type { SlashCommandMatch } from "./extensions/slash-command";
+import { isBareCompact } from "./extensions/slash-command";
 
 ("use client");
 
@@ -34,6 +36,8 @@ import type { SlashCommandMatch } from "./extensions/slash-command";
 type MenuType = "commands" | "models" | "prompts" | "skills" | undefined;
 
 interface SlashCommandPopupProps {
+    /** The chat the composer belongs to; passed in, since a signed-out page has no chat provider to read it from. */
+    currentThreadId?: string;
     /** Rect of the editor element for positioning */
     editorRect: DOMRect | null;
     favoriteModelIds: string[];
@@ -45,10 +49,13 @@ interface SlashCommandPopupProps {
     onReplace: (from: number, to: number, replacement: string) => void;
 }
 
+// `/model` stays first: the list is not filtered for a partial command, so Enter on a bare `/` picks the first entry,
+// and a paid compaction must not be what it picks.
 const COMMANDS = [
     { description: msg`Switch AI model`, id: "model", label: "model" },
     { description: msg`Insert a saved prompt`, id: "prompt", label: "prompt" },
     { description: msg`Invoke a skill`, id: "skill", label: "skill" },
+    { description: msg`Condense older messages for the model`, id: "compact", label: "compact" },
 ] as const;
 
 const MENU_WIDTH = 300;
@@ -123,11 +130,12 @@ const filterSkills = (skills: Doc<"skills">[], query: string): Doc<"skills">[] =
 // Main Component
 // ============================================================================
 
-const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ editorRect, favoriteModelIds, match, models, onDismiss, onReplace }) => {
+const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editorRect, favoriteModelIds, match, models, onDismiss, onReplace }) => {
     const { i18n } = useLingui();
     const selectedModel = useModelStore((state) => state.selectedModel);
     const setSelectedModelStore = useModelStore((state) => state.setSelectedModel);
     const { open: openModelPickerPopup } = useModelPickerPopupActions();
+    const { compact } = useCompactThread(currentThreadId);
 
     const { hooks } = useAuth();
     const { data: sessionData } = hooks.useSession();
@@ -186,6 +194,12 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ editorRect, favoriteMod
             return { items: COMMANDS, type: "commands" };
         }
 
+        // `/compact` takes no argument: once typed in full it is the one entry, so Enter runs it instead of sending the text.
+        // With text after it the menu stays closed, and Enter sends that text.
+        if (match.command === "compact") {
+            return isBareCompact(match) ? { items: COMMANDS.filter((command) => command.id === "compact"), type: "commands" } : { items: [], type: undefined };
+        }
+
         if (match.command === "model") {
             return { items: filterModels(models, match.query, favoriteModelIds, isProUser), type: "models" };
         }
@@ -218,9 +232,9 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ editorRect, favoriteMod
     // Helpers
     const setSelectedModel = useCallback(
         (modelId: string) => {
-            const currentThreadId = useModelStore.getState().selectedModelThreadId;
+            const modelThreadId = useModelStore.getState().selectedModelThreadId;
 
-            setSelectedModelStore(modelId, currentThreadId);
+            setSelectedModelStore(modelId, modelThreadId);
         },
         [setSelectedModelStore],
     );
@@ -232,7 +246,16 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ editorRect, favoriteMod
                 return;
             }
 
-            if (commandId === "model") {
+            if (commandId === "compact") {
+                // Never drop typed text: the menu runs a bare `/compact` only.
+                if (match.query !== "") {
+                    return;
+                }
+
+                onReplace(match.from, match.to, "");
+                onDismiss();
+                void compact();
+            } else if (commandId === "model") {
                 openModelPickerPopup({
                     initialModelId: selectedModel,
                     onSelect: (modelId) => {
@@ -247,7 +270,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ editorRect, favoriteMod
                 onReplace(match.from, match.to, `/${commandId} `);
             }
         },
-        [match, onReplace, onDismiss, openModelPickerPopup, selectedModel, setSelectedModel],
+        [compact, match, onReplace, onDismiss, openModelPickerPopup, selectedModel, setSelectedModel],
     );
 
     const handleSelectModel = useCallback(

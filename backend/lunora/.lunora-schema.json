@@ -24949,6 +24949,13 @@
           "optional": false,
           "unique": false
         },
+        "kind": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "\"compact\""
+        },
         "summary": {
           "kind": "string",
           "nullable": false,
@@ -28613,6 +28620,12 @@
           "unique": false
         },
         "autoArchiveAfterDays": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "autoCompactThreshold": {
           "kind": "number",
           "nullable": false,
           "optional": true,

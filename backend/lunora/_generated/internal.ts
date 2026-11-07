@@ -172,16 +172,19 @@ export interface InternalApiTypes {
             resetThreadStatusToActive: FunctionReference<"mutation", { threadId: Id<"threads"> }, null>;
             timeoutStream: FunctionReference<"mutation", { streamId: Id<"streamingMessages"> }, null>;
         };
+        thread_compaction: {
+            prepareThreadCompaction: FunctionReference<"mutation", { anchorMessageId?: Id<"messages">; minTokens?: number; threadId: Id<"threads">; userId: string }, { job?: { coveredCount: number; coveredUpToMessageId: Id<"messages">; cutClaimedAt: number; epoch: number; foldClaimedAt: number; previousSummary?: string; previousSummaryId?: Id<"threadContextSummaries">; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; transcript: string; userId: string }; reason?: "busy" | "failed" | "nothing" | "not_owner" | "too_long" | "unavailable" | "within_threshold" }>;
+        };
         thread_lock: {
             dropThreadPasscodeRows: FunctionReference<"mutation", { threadId: Id<"threads"> }, null>;
             inheritThreadPasscode: FunctionReference<"mutation", { sourceThreadId: Id<"threads">; targetThreadId: Id<"threads"> }, null>;
         };
         thread_summaries: {
             eraseUserThreadSummaries: FunctionReference<"mutation", { batch?: number; before: number; userId: string }, boolean>;
-            finishThreadSummary: FunctionReference<"mutation", { coveredCount: number; coveredUpToMessageId: Id<"messages">; epoch: number; previousSummaryId?: Id<"threadContextSummaries">; summary?: string; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: Id<"threads"> }, boolean>;
-            getThreadSummaryForContext: FunctionReference<"query", { promptMessageId?: Id<"messages">; threadId: Id<"threads"> }, string | null>;
-            listThreadSummariesForExport: FunctionReference<"query", { threadId: Id<"threads"> }, Array<{ coveredCount: number; coveredUpToMessageId: string; createdAt: number; summary: string }>>;
-            prepareThreadSummary: FunctionReference<"mutation", { afterMessageId: Id<"messages">; threadId: Id<"threads"> }, { coveredCount: number; coveredUpToMessageId: Id<"messages">; epoch: number; previousSummary?: string; previousSummaryId?: Id<"threadContextSummaries">; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; transcript: string; userId: string } | null>;
+            finishThreadSummary: FunctionReference<"mutation", { coveredCount: number; coveredUpToMessageId: Id<"messages">; cutClaimedAt?: number; epoch: number; foldClaimedAt?: number; kind?: "compact"; previousSummaryId?: Id<"threadContextSummaries">; summary?: string; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; threadId: Id<"threads"> }, boolean>;
+            getThreadSummaryForContext: FunctionReference<"query", { promptMessageId?: Id<"messages">; threadId: Id<"threads"> }, { boundary?: { messageId: string; order: number; stepOrder: number }; branched: boolean; summary: string } | null>;
+            listThreadSummariesForExport: FunctionReference<"query", { threadId: Id<"threads"> }, Array<{ coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string }>>;
+            prepareThreadSummary: FunctionReference<"mutation", { afterMessageId: Id<"messages">; threadId: Id<"threads"> }, { coveredCount: number; coveredUpToMessageId: Id<"messages">; cutClaimedAt: number; epoch: number; foldClaimedAt: number; previousSummary?: string; previousSummaryId?: Id<"threadContextSummaries">; taintedBy: Array<"web" | "knowledge" | "mcp" | "device" | "files">; transcript: string; userId: string } | null>;
             runThreadSummary: FunctionReference<"action", { afterMessageId: Id<"messages">; threadId: Id<"threads"> }, null>;
         };
         threads: {
@@ -252,7 +255,7 @@ export interface InternalApiTypes {
         };
         functions: {
             getActiveOrganizationQuery: FunctionReference<"query", { organizationId: string; userId: string }, { id: string; name: string; role: string; slug: string | null } | null>;
-            getAgentModulePreferencesQuery: FunctionReference<"query", { userId: string }, { autoDetectComplexity: boolean; autoMediaEnrichment: boolean; enableDatasource: boolean; enableKnowledge: boolean; enablePlanner: boolean; modelFilterRules?: { allowedModels?: Array<string>; allowedProviders?: Array<string>; allowedRegions?: Array<string>; blockedCreators?: Array<string>; blockedModels?: Array<string>; blockedProviders?: Array<string>; blockedRegions?: Array<string>; denyDataCollection?: boolean; requireZDR?: boolean }; readFailed?: boolean }>;
+            getAgentModulePreferencesQuery: FunctionReference<"query", { userId: string }, { autoCompactThreshold?: number; autoDetectComplexity: boolean; autoMediaEnrichment: boolean; enableDatasource: boolean; enableKnowledge: boolean; enablePlanner: boolean; modelFilterRules?: { allowedModels?: Array<string>; allowedProviders?: Array<string>; allowedRegions?: Array<string>; blockedCreators?: Array<string>; blockedModels?: Array<string>; blockedProviders?: Array<string>; blockedRegions?: Array<string>; denyDataCollection?: boolean; requireZDR?: boolean }; readFailed?: boolean }>;
             getDecryptedMessengerKeysQuery: FunctionReference<"query", { userId: string }, Record<string, string>>;
             getDecryptedProviderKeysQuery: FunctionReference<"query", { userId: string }, Record<string, string>>;
             getDecryptedToolKeysQuery: FunctionReference<"query", { userId: string }, Record<string, string>>;
@@ -260,7 +263,7 @@ export interface InternalApiTypes {
             getMCPServersQuery: FunctionReference<"query", { userId: string }, Array<{ enabled: boolean; headers?: Array<{ key: string; value: string }>; icon?: string; name: string; protocol: "sse" | "http"; url: string }>>;
             getSearchDomainBlocklistQuery: FunctionReference<"query", { userId: string }, Array<string>>;
             getUserAuthFlagsQuery: FunctionReference<"query", { sessionId?: string; userId: string }, { isAnonymous: boolean; plan: "premium" | null; role: string | null }>;
-            getUserPreferencesQuery: FunctionReference<"query", { userId: string }, { aboutMe?: string; backupModel?: string; customInstructions?: string; dictationLanguage?: string; language?: string; location?: string; memoryEnabled: boolean; nickname?: string; profession?: string; resumeInterruptedRuns?: boolean; threadSummariesEnabled: boolean; threadTitleInstructions?: string; timezone?: string }>;
+            getUserPreferencesQuery: FunctionReference<"query", { userId: string }, { aboutMe?: string; autoCompactThreshold?: number; backupModel?: string; customInstructions?: string; dictationLanguage?: string; language?: string; location?: string; memoryEnabled: boolean; nickname?: string; profession?: string; resumeInterruptedRuns?: boolean; threadSummariesEnabled: boolean; threadTitleInstructions?: string; timezone?: string }>;
             getUserRunPlanQuery: FunctionReference<"query", { userId: string }, { isAdmin: boolean; plan: "premium" | null }>;
             rotateKeys: FunctionReference<"action", {}, unknown>;
         };
@@ -674,7 +677,7 @@ export interface InternalApiTypes {
         };
         steps: {
             collectActivityForExport: FunctionReference<"query", { userId: string }, { knowledgeCollections: Array<unknown>; subAgentRuns: Array<unknown>; usageDaily: Array<unknown> }>;
-            collectConversations: FunctionReference<"action", { userId: string }, { contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; summary: string; }[]; messages: { _id: string; createdAt: number; model?: string; order?: number; parentMessageId?: string; role?: string; status?: string; stepOrder?: number; text?: string; tool?: boolean; }[]; thread: { _id: string; activeLeafMessageId?: string; category?: string; createdAt: number; model?: string; summary?: string; tags?: string[]; title?: string; updatedAt?: number; userTags: string[]; }; }[]>;
+            collectConversations: FunctionReference<"action", { userId: string }, { contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string; }[]; messages: { _id: string; createdAt: number; model?: string; order?: number; parentMessageId?: string; role?: string; status?: string; stepOrder?: number; text?: string; tool?: boolean; }[]; thread: { _id: string; activeLeafMessageId?: string; category?: string; createdAt: number; model?: string; summary?: string; tags?: string[]; title?: string; updatedAt?: number; userTags: string[]; }; }[]>;
             collectFiles: FunctionReference<"query", { userId: string }, { files: Array<{ _id: Id<"files">; createdAt: number; name: string; size: number; tags?: Array<string>; type: string; updatedAt: number }>; folders: Array<{ _id: Id<"folders">; createdAt: number; name: string; updatedAt: number }> }>;
             collectProfile: FunctionReference<"query", { userId: string }, { createdAt: number; email: string; emailVerified: boolean; id: string; image: string; name: string } | null>;
             collectPrompts: FunctionReference<"query", { userId: string }, { promptHistory: { _id: Id<"promptHistory">; changeType: string; content: string; createdAt: number; promptId: Id<"prompts">; version: number; }[]; prompts: { _id: Id<"prompts">; content: string; createdAt: number; description: string | undefined; isFavorite: boolean | undefined; lastUsedAt: number | undefined; name: string; tags: string[] | undefined; updatedAt: number | undefined; usageCount: number | undefined; }[]; }>;
@@ -715,6 +718,7 @@ export interface InternalApiTypes {
                 deleteUserKnowledge: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
                 deleteUserStreamingMessages: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
                 deleteUserSubAgentRuns: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
+                deleteUserThreadSummaries: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
                 deleteUserUsageDaily: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
                 deleteUserWorkflowData: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
                 deregisterMessengerWebhooks: FunctionReference<"action", { userId: string }, null>;
@@ -1391,6 +1395,9 @@ export const internal: InternalApiTypes = {
             resetThreadStatusToActive: { __lunoraRef: "agent_streams:resetThreadStatusToActive" },
             timeoutStream: { __lunoraRef: "agent_streams:timeoutStream" },
         },
+        thread_compaction: {
+            prepareThreadCompaction: { __lunoraRef: "agent_thread_compaction:prepareThreadCompaction" },
+        },
         thread_lock: {
             dropThreadPasscodeRows: { __lunoraRef: "agent_thread_lock:dropThreadPasscodeRows" },
             inheritThreadPasscode: { __lunoraRef: "agent_thread_lock:inheritThreadPasscode" },
@@ -1934,6 +1941,7 @@ export const internal: InternalApiTypes = {
                 deleteUserKnowledge: { __lunoraRef: "gdpr_steps_residual_deletion_steps:deleteUserKnowledge" },
                 deleteUserStreamingMessages: { __lunoraRef: "gdpr_steps_residual_deletion_steps:deleteUserStreamingMessages" },
                 deleteUserSubAgentRuns: { __lunoraRef: "gdpr_steps_residual_deletion_steps:deleteUserSubAgentRuns" },
+                deleteUserThreadSummaries: { __lunoraRef: "gdpr_steps_residual_deletion_steps:deleteUserThreadSummaries" },
                 deleteUserUsageDaily: { __lunoraRef: "gdpr_steps_residual_deletion_steps:deleteUserUsageDaily" },
                 deleteUserWorkflowData: { __lunoraRef: "gdpr_steps_residual_deletion_steps:deleteUserWorkflowData" },
                 deregisterMessengerWebhooks: { __lunoraRef: "gdpr_steps_residual_deletion_steps:deregisterMessengerWebhooks" },
