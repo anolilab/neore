@@ -54,6 +54,12 @@ const readBody = async (response: Response, restartDeadline: () => void): Promis
     return new Blob(chunks, { type: response.headers.get("content-type") ?? "application/pdf" });
 };
 
+/**
+ * The last saved download, one per tab: a new download releases it, so neither repeated clicks nor reopening the panel keeps
+ * more than one PDF's bytes alive for the minute each would otherwise be held.
+ */
+const savedFile: { current: { release: () => void } | null } = { current: null };
+
 /** How long a downloaded PDF's object URL stays valid: long enough for the browser to start the download. */
 const DOWNLOAD_URL_LIFETIME_MS = 60_000;
 
@@ -105,7 +111,6 @@ const PdfPreviewPanel: FC<PdfPreviewPanelProps> = ({ className, file }) => {
     // A download belongs to the document it started for. Showing another document, or closing the panel, abandons it: its fetch is
     // aborted, and a late answer saves nothing, so the reader never gets a PDF they have left.
     const pendingDownload = useRef<AbortController | null>(null);
-    const savedFile = useRef<{ release: () => void } | null>(null);
 
     useEffect(
         () => () => {

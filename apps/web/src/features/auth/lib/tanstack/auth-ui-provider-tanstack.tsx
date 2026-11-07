@@ -10,8 +10,12 @@ const AuthUIProviderTanstack = ({
     hooks: hooksProperty,
     mutators: mutatorsProperty,
     onSessionChange: onSessionChangeProperty,
+    onSessionChangeStart,
     ...properties
-}: AuthUIProviderProps) => {
+}: AuthUIProviderProps & {
+    /** Runs at once when the session changes, before the session is read again: for state that must not outlive the old account. */
+    onSessionChangeStart?: () => void;
+}) => {
     const { hooks: contextHooks, mutators: contextMutators, onSessionChange, optimistic } = useTanstackOptions({ authClient });
 
     const hooks = useMemo(() => {
@@ -22,9 +26,10 @@ const AuthUIProviderTanstack = ({
     }, [contextMutators, mutatorsProperty]);
 
     const onSessionChangeCallback = useCallback(async () => {
+        onSessionChangeStart?.();
         await onSessionChange();
         await onSessionChangeProperty?.();
-    }, [onSessionChangeProperty, onSessionChange]);
+    }, [onSessionChangeProperty, onSessionChange, onSessionChangeStart]);
 
     return (
         <AuthUIProvider

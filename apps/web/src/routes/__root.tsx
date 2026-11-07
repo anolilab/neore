@@ -405,6 +405,12 @@ const RootComponent = () => {
         [router],
     );
 
+    // The side panel may show the previous account's document or PDF, with its signed link: it closes the moment the session
+    // changes, before the new session is read.
+    const closeSidePanel = useCallback(() => {
+        useChatUIStore.getState().closeCanvas();
+    }, []);
+
     const handleSessionChange = useCallback(async () => {
         console.log("[Root] Session changed - invalidating router");
 
@@ -415,9 +421,6 @@ const RootComponent = () => {
         } catch {
             forgetClientPostHog();
         }
-
-        // The side panel may show the previous account's document or PDF, with its signed link: it does not carry over.
-        useChatUIStore.getState().closeCanvas();
 
         await router.invalidate();
     }, [router]);
@@ -446,6 +449,7 @@ const RootComponent = () => {
                                             captcha={CAPTCHA_CONFIG}
                                             navigate={handleNavigate}
                                             onSessionChange={handleSessionChange}
+                                            onSessionChangeStart={closeSidePanel}
                                             persistClient={false}
                                             replace={handleReplace}
                                             twoFactor={TWO_FACTOR_METHODS}

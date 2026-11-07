@@ -228,19 +228,24 @@ describe("the side panel's failures", () => {
         expect(createObjectUrl).not.toHaveBeenCalled();
     });
 
-    it("lets the previous saved file go when the next download is saved", async () => {
+    it("lets the previous saved file go when the next download is saved, also from a reopened panel", async () => {
         const revoke = vi.fn();
 
         // The first block restores the real object URL functions after it; this test stands them in again.
-        Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectUrl, writable: true });
-        Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revoke, writable: true });
+        Object.defineProperties(URL, {
+            createObjectURL: { configurable: true, value: createObjectUrl, writable: true },
+            revokeObjectURL: { configurable: true, value: revoke, writable: true },
+        });
         vi.stubGlobal("fetch", async () => new Response("pdf", { status: 200 }));
-        render(panelFor(DOCUMENT_A));
+        const { unmount } = render(panelFor(DOCUMENT_A));
 
         clickDownload();
         await waitFor(() => {
             expect(createObjectUrl).toHaveBeenCalledTimes(1);
         });
+        // The panel is closed and opened again before the next download.
+        unmount();
+        render(panelFor(DOCUMENT_A));
         clickDownload();
         await waitFor(() => {
             expect(createObjectUrl).toHaveBeenCalledTimes(2);
