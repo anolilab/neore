@@ -650,6 +650,28 @@ describe("project backfill", () => {
         ]);
     });
 
+    it("starts the project walk only once the first walk is done, from the first walk's cutoff", async () => {
+        const { alpha, beta } = await insertProjectFixture();
+
+        vi.setSystemTime(STARTED);
+        await start();
+
+        const walking = await state();
+
+        // While the totals are still being added, no project row can be filed ahead of its reply's total.
+        expect(walking.projects).toBeUndefined();
+
+        for (let current = walking; current.status !== "done"; current = await state()) {
+            await step(current.runId);
+        }
+
+        const finished = await state();
+
+        expect(finished.projects).toMatchObject({ startedAt: finished.startedAt, status: "running" });
+        await drain();
+        expect(await projectRows()).toStrictEqual(EXPECTED_PROJECTS(alpha, beta));
+    });
+
     it("starts for a user whose first walk finished before projects were filed", async () => {
         const { alpha, beta } = await insertProjectFixture();
 

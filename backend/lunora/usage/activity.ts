@@ -99,6 +99,20 @@ const attributionOfThread = async (ctx: ReadCtx, threadId: string | undefined): 
     return await attributionOf(ctx, await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } }));
 };
 
+/**
+ * What `userId`'s reply in a thread they may not own is filed under: the thread's attribution, without a project the
+ * replier cannot open — a teammate's personal project shared through one thread is not theirs to see in their usage.
+ */
+const attributionForReplier = async (ctx: MutationCtx | QueryCtx, threadId: string, userId: string): Promise<Attribution> => {
+    const attribution = await attributionOfThread(ctx, threadId);
+
+    if (attribution.projectKey === undefined || (await readableProject(ctx, attribution.projectKey as Id<"projects">, userId).catch(() => null))) {
+        return attribution;
+    }
+
+    return attribution.organizationId === undefined ? {} : { organizationId: attribution.organizationId };
+};
+
 const vAttribution = v.object({ organizationId: v.optional(v.string()), projectInOrganization: v.optional(v.boolean()), projectKey: v.optional(v.string()) });
 
 /**
@@ -106,9 +120,9 @@ const vAttribution = v.object({ organizationId: v.optional(v.string()), projectI
  * action off the thread's shard (a side question) reads it here and hands it on with the record.
  */
 export const getThreadAttribution = internalQuery
-    .input({ threadId: v.string() })
+    .input({ threadId: v.string(), userId: v.string() })
     .output(vAttribution)
-    .query(async ({ args: { threadId }, ctx }) => await attributionOfThread(ctx, threadId));
+    .query(async ({ args: { threadId, userId }, ctx }) => await attributionForReplier(ctx, threadId, userId));
 
 /**
  * Files a recorded reply under its project (the user's rollup) and its organization (the organization's rollup), each
@@ -352,7 +366,7 @@ export const forwardReplyUsage = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const threadAttribution = await attributionOfThread(ctx, args.threadId);
+        const threadAttribution = await attributionForReplier(ctx, args.threadId, args.userId);
         const record: ReplyUsageArgs & { threadAttribution: Attribution } = { ...args, threadAttribution };
 
         await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...record }, args.userId);

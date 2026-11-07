@@ -549,6 +549,30 @@ describe("organization usage of shared threads and former members", () => {
         expect(result.projects).toMatchObject([{ costMicrodollars: 40, projectKey: project }]);
     });
 
+    it("files no project for a reply in a teammate's thread that sits in the teammate's personal project", async () => {
+        const personal = await insert("projects", { createdAt: 0, title: "Admin's own", userId: ADMIN });
+        const thread = await insert("threads", { organizationId: ORG, projectId: personal, status: "active", title: "T", userId: ADMIN });
+
+        await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(forwardReplyUsage, {
+                    at: AT,
+                    costMicrodollars: 40,
+                    date: "2026-09-20",
+                    replyKey: "personal-shared",
+                    skillKey: DEFAULT_SKILL_KEY,
+                    threadId: thread,
+                    tokens: 1,
+                    userId: MEMBER,
+                }),
+        );
+
+        // The member cannot open the admin's personal project: the record carries the organization alone.
+        expect(harnessRef.forwarded).toMatchObject([{ threadAttribution: { organizationId: ORG } }]);
+        expect(harnessRef.forwarded[0]!.threadAttribution).not.toHaveProperty("projectKey");
+    });
+
     it("files nothing under an organization for someone who is no longer its member", async () => {
         const membership = await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
         const thread = await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER });

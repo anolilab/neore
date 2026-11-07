@@ -138,5 +138,9 @@ describe("dayKeyInZone", () => {
         expect(dayKeyInZone(instant, "Pacific/Kiritimati")).toBe("2026-09-21");
         expect(dayKeyInZone(instant, "America/Los_Angeles")).toBe("2026-09-20");
         expect(dayKeyInZone(instant, undefined)).toBe("2026-09-20");
+        // A zone the backend cannot use either reads as UTC on both sides, never as the browser's day.
+        const lateUtc = new Date(Date.UTC(2026, 8, 20, 22));
+
+        expect(dayKeyInZone(lateUtc, "Mars/Base")).toBe("2026-09-20");
     });
 });

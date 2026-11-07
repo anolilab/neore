@@ -153,6 +153,12 @@ export const ensureProjectBackfill = async (ctx: MutationCtx, userId: string, no
         return "done";
     }
 
+    // Not before the first walk is done: a project row filed for a reply it has not counted yet would put the projects
+    // above the total until it has.
+    if (!walk && state.status !== "done") {
+        return "running";
+    }
+
     if (walk && walk.leaseUntil > now) {
         return "running";
     }
@@ -162,7 +168,8 @@ export const ensureProjectBackfill = async (ctx: MutationCtx, userId: string, no
     await ctx.db.patch("usageBackfill", state._id, {
         projects: walk
             ? { ...walk, leaseUntil: now + BACKFILL_LEASE_MS, runId }
-            : { leaseUntil: now + BACKFILL_LEASE_MS, replies: 0, runId, startedAt: now, status: "running" as const },
+            : // Started with the first walk's cutoff: everything after it is the live path's, which files projects itself.
+              { leaseUntil: now + BACKFILL_LEASE_MS, replies: 0, runId, startedAt: state.startedAt, status: "running" as const },
         updatedAt: now,
     });
     await ctx.scheduler.runAfter(0, internal.usage.backfill.runUsageProjectBackfillStep, { runId, userId });
@@ -427,7 +434,10 @@ export const runUsageBackfillStep = internalMutation
             ...(step.done && { finishedAt: now, status: "done" as const }),
         });
 
-        if (!step.done) {
+        if (step.done) {
+            // The project walk waits for this one; it starts here rather than at the next sweep.
+            await ensureProjectBackfill(ctx, userId, now);
+        } else {
             await ctx.scheduler.runAfter(0, internal.usage.backfill.runUsageBackfillStep, { runId, userId });
         }
 

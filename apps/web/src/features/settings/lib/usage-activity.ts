@@ -62,15 +62,17 @@ const pad = (value: number): string => String(value).padStart(2, "0");
 /** The browser's local calendar day of `date`. */
 export const localDayKey = (date: Date): string => `${String(date.getFullYear())}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
+const dayFormat = (timeZone: string): Intl.DateTimeFormat => new Intl.DateTimeFormat("en-CA", { day: "2-digit", month: "2-digit", timeZone, year: "numeric" });
+
 /**
- * `date`'s calendar day in `timeZone`, the zone the backend dates usage rows in (the user's setting, else UTC); the
- * browser's own day when the zone is not one `Intl` knows.
+ * `date`'s calendar day in `timeZone`, the zone the backend dates usage rows in (the user's setting, else UTC). A zone
+ * `Intl` does not know reads as UTC, as it does on the backend, so both agree on which day it is.
  */
 export const dayKeyInZone = (date: Date, timeZone: string | null | undefined): string => {
     try {
-        return new Intl.DateTimeFormat("en-CA", { day: "2-digit", month: "2-digit", timeZone: timeZone || "UTC", year: "numeric" }).format(date);
+        return dayFormat(timeZone || "UTC").format(date);
     } catch {
-        return localDayKey(date);
+        return dayFormat("UTC").format(date);
     }
 };
 
