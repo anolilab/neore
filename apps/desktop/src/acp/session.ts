@@ -866,35 +866,38 @@ export class AgentSession {
 
     // ─── From the agent ────────────────────────────────────────────────────
 
+    /** An option update read before the session's id is known here (`withEarlyUpdates` applies it once the answer is handled). */
+    private keepEarly(sessionId: unknown, update: Record<string, unknown>): void {
+        const kind = update.sessionUpdate;
+
+        // Coalesced per session (`keepEarlyUpdate`), so nothing that matters is lost however many arrive. At most a few sessions
+        // are kept, the newest: a slow load's replay cannot crowd out a fallback session's own updates.
+        if (typeof sessionId === "string" && (kind === "config_option_update" || kind === "current_mode_update")) {
+            const before = this.earlyOptionUpdates.get(sessionId) ?? [];
+            const kept = keepEarlyUpdate(before, update, this.options.process.scrub);
+
+            // An update that changes nothing leaves the map alone: it must not push out a session that holds real updates.
+            if (kept === before) {
+                return;
+            }
+
+            this.earlyOptionUpdates.delete(sessionId);
+            this.earlyOptionUpdates.set(sessionId, kept);
+
+            // A map keeps insertion order, and deleting while iterating is safe: the oldest go first.
+            for (const key of this.earlyOptionUpdates.keys()) {
+                if (this.earlyOptionUpdates.size <= 4) {
+                    break;
+                }
+
+                this.earlyOptionUpdates.delete(key);
+            }
+        }
+    }
+
     private onNotification(method: string, params: unknown): void {
         if (method === METHOD.sessionUpdate && this.agentSessionId === "" && isRecord(params) && isRecord(params.update)) {
-            const kind = params.update.sessionUpdate;
-
-            // Coalesced per session (`keepEarlyUpdate`), so nothing that matters is lost however many arrive. At most a few sessions
-            // are kept, the newest: a slow load's replay cannot crowd out a fallback session's own updates.
-            const { sessionId } = params;
-
-            if (typeof sessionId === "string" && (kind === "config_option_update" || kind === "current_mode_update")) {
-                const before = this.earlyOptionUpdates.get(sessionId) ?? [];
-                const kept = keepEarlyUpdate(before, params.update, this.options.process.scrub);
-
-                // An update that changes nothing leaves the map alone: it must not push out a session that holds real updates.
-                if (kept === before) {
-                    return;
-                }
-
-                this.earlyOptionUpdates.delete(sessionId);
-                this.earlyOptionUpdates.set(sessionId, kept);
-
-                // A map keeps insertion order, and deleting while iterating is safe: the oldest go first.
-                for (const key of this.earlyOptionUpdates.keys()) {
-                    if (this.earlyOptionUpdates.size <= 4) {
-                        break;
-                    }
-
-                    this.earlyOptionUpdates.delete(key);
-                }
-            }
+            this.keepEarly(params.sessionId, params.update);
 
             return;
         }
