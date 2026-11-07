@@ -679,11 +679,11 @@ export const Website = Cloudflare.Worker("website", {
 // Storybook – the static build of apps/web's Storybook, on preview stages only
 // ---------------------------------------------------------------------------
 //
-// Every story runs on MSW fixtures in the browser, so the build needs no backend and
-// holds no secrets. `build-storybook` needs `packages/*/dist`, which the deploy job's
-// package build has written by the time Alchemy runs.
+// The build runs in the deploy workflow's `build-storybook` job, which holds no secrets, and the
+// output is in `outdir` before Alchemy starts. The command is a no-op, so no Storybook code, addon
+// or story module runs in the job that holds the deploy secrets.
 const Storybook = Cloudflare.Website.StaticSite("storybook", {
-    command: "pnpm --filter @neore/web run build-storybook",
+    command: "true",
     compatibility: { date: COMPATIBILITY_DATE },
     name: named("neore-storybook"),
     observability: WORKER_OBSERVABILITY,
