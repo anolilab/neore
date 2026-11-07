@@ -705,10 +705,15 @@ const createTray = (): void => {
 
         // Without a tray, closing the window quits the app and stops its agents (see `canHideOnClose`). macOS hides regardless, so it needs no notice.
         if (process.platform !== "darwin") {
-            showNotification(
-                "Neore has no tray icon",
-                "Closing the window will quit Neore and stop any running agent. Your desktop needs a system tray for Neore to keep running in the background.",
-            );
+            try {
+                showNotification(
+                    "Neore has no tray icon",
+                    "Closing the window will quit Neore and stop any running agent. Your desktop needs a system tray for Neore to keep running in the background.",
+                );
+            } catch (noticeError) {
+                // A failed notice must not abort start-up: the shortcuts, dictation and update checks still have to run.
+                log(`could not show the tray notice: ${String(noticeError)}`);
+            }
         }
     }
 };

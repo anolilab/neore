@@ -36,6 +36,7 @@ interface FakeWindow {
 interface Fake {
     appHandlers: Map<string, (...args: unknown[]) => void>;
     ipc: Map<string, (event: unknown, payload?: unknown) => unknown>;
+    notificationFails: boolean;
     notifications: { body?: string; title: string }[];
     opened: string[];
     permissionCheck?: (wc: unknown, permission: string, requestingOrigin: string, details?: unknown) => boolean;
@@ -50,6 +51,7 @@ vi.mock("electron", () => {
     const fakeElectron: Fake = {
         appHandlers: new Map(),
         ipc: new Map(),
+        notificationFails: false,
         notifications: [],
         opened: [],
         shortcuts: new Map(),
@@ -141,6 +143,10 @@ vi.mock("electron", () => {
     };
 
     const FakeNotification = function FakeNotification(options: { body?: string; title: string }) {
+        if (fakeElectron.notificationFails) {
+            throw new Error("notifications are unavailable");
+        }
+
         fakeElectron.notifications.push(options);
 
         return { show: () => {} };
@@ -621,12 +627,13 @@ describe("browser sign-in", () => {
  * Starts the app again with the tray unable to be created, as `platform`, and returns the notice titles that start raised.
  * Re-importing `main.js` gives a fresh start; the electron mock is the same object, so its handlers are the new ones.
  */
-const startWithoutTray = async (platform: NodeJS.Platform): Promise<string[]> => {
+const startWithoutTray = async (platform: NodeJS.Platform, notificationsFail = false): Promise<string[]> => {
     const before = fake().notifications.length;
     const original = Object.getOwnPropertyDescriptor(process, "platform");
 
     Object.defineProperty(process, "platform", { value: platform });
     fake().trayFails = true;
+    fake().notificationFails = notificationsFail;
 
     try {
         vi.resetModules();
@@ -634,6 +641,7 @@ const startWithoutTray = async (platform: NodeJS.Platform): Promise<string[]> =>
         fake().appHandlers.get("ready")?.();
     } finally {
         fake().trayFails = false;
+        fake().notificationFails = false;
 
         if (original) {
             Object.defineProperty(process, "platform", original);
@@ -650,5 +658,13 @@ describe("tray failure", () => {
 
     it("says nothing on macOS, where the window hides on close without a tray", async () => {
         expect(await startWithoutTray("darwin")).not.toContain("Neore has no tray icon");
+    });
+
+    it("still finishes starting when the notice itself cannot be shown", async () => {
+        // The composer shortcut is registered after the tray, so a start that aborted at the tray leaves it unregistered.
+        fake().shortcuts.delete(COMPOSER_SHORTCUT);
+
+        await expect(startWithoutTray("linux", true)).resolves.toEqual([]);
+        expect(fake().shortcuts.has(COMPOSER_SHORTCUT)).toBe(true);
     });
 });
