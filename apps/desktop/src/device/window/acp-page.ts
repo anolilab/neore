@@ -133,7 +133,7 @@ const startIn = (key: string, folder: string) =>
     guarded(async () => {
         const id = await globalThis.neoreDevice.acpStart(key, folder);
 
-        state.selected = id;
+        selectSession(id);
         await refreshSessions();
     });
 
@@ -717,11 +717,115 @@ const renderHooks = async (snapshot: SessionSnapshot, force = false, review = fa
     }
 };
 
+/** How often the open session's listening ports are read again; a server can start without any session event. */
+const PORTS_POLL_MS = 5000;
+const MAX_QUIET_SKIPS = 5;
+
+/** The newest port read. A read that finishes after a newer one is dropped, so an older answer never replaces a newer one. */
+const portsRead = { busy: false, latest: 0, quiet: 0, shown: undefined as string | undefined, skip: 0 };
+
+/**
+ * The one place the open session changes. The previous session's ports must not stay on screen under the new one:
+ * pending reads are dropped, the rows go, and the new session's ports are read at once.
+ */
+const selectSession = (id: string | undefined): void => {
+    state.selected = id;
+    portsRead.latest += 1;
+    portsRead.quiet = 0;
+    portsRead.shown = undefined;
+    portsRead.skip = 0;
+    $("acp-ports-status").textContent = id === undefined ? "" : "Loading ports…";
+    $("acp-ports-list").replaceChildren(...id === undefined ? [item("None.")] : []);
+
+    if (id === undefined) {
+        portsRead.busy = false;
+    } else {
+        refreshPorts();
+    }
+};
+
+/** Writes the ports status only when its words change, so the live region does not announce the same text again. */
+const setPortsStatus = (text: string): void => {
+    const status = $("acp-ports-status");
+
+    if (status.textContent !== text) {
+        status.textContent = text;
+    }
+};
+
+/** One more read with nothing to show: the next reads are spaced out, up to every 30 s. A server or an Open starts over. */
+const portsQuiet = (quiet: boolean): void => {
+    portsRead.quiet = quiet ? portsRead.quiet + 1 : 0;
+    portsRead.skip = Math.min(portsRead.quiet, MAX_QUIET_SKIPS);
+};
+
+const showPorts = (selected: string | undefined, ports: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPorts>>): void => {
+    portsQuiet(ports.length === 0);
+    setPortsStatus("");
+
+    // The same ports for the same session are already on screen: leave the rows alone.
+    const shownKey = JSON.stringify([selected, ports]);
+
+    if (shownKey === portsRead.shown) {
+        return;
+    }
+
+    portsRead.shown = shownKey;
+    $("acp-ports-list").replaceChildren(
+        ...ports.length === 0
+            ? [item("None.")]
+            : ports.map((port) => item(`Port ${String(port.port)} on ${port.address} — ${port.name} (process ${String(port.pid)})`)),
+    );
+};
+
+/**
+ * A read that fails (a tool missing, a timeout) is said where the list is. It backs off like an empty read, so a
+ * computer without the tools is not re-read every 5 s, and the same failure is not announced again.
+ */
+const showPortsFailure = (error: unknown): void => {
+    portsQuiet(true);
+    setPortsStatus(`Ports cannot be read: ${error instanceof Error ? error.message : String(error)}`);
+    portsRead.shown = undefined;
+    $("acp-ports-list").replaceChildren();
+};
+
+const refreshPorts = async (): Promise<void> => {
+    const { selected } = state;
+
+    portsRead.latest += 1;
+    portsRead.busy = true;
+    const read = portsRead.latest;
+    let outcome: { error: unknown } | { ports: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPorts>> };
+
+    try {
+        outcome = { ports: selected === undefined ? [] : await globalThis.neoreDevice.acpPorts(selected) };
+    } catch (error: unknown) {
+        outcome = { error };
+    }
+
+    // A newer read started, or another session was opened while this one was read: its answer is dropped.
+    if (read !== portsRead.latest) {
+        return;
+    }
+
+    portsRead.busy = false;
+
+    if (state.selected !== selected) {
+        return;
+    }
+
+    if ("ports" in outcome) {
+        showPorts(selected, outcome.ports);
+    } else {
+        showPortsFailure(outcome.error);
+    }
+};
+
 const refreshSessions = async (): Promise<void> => {
     state.sessions = await globalThis.neoreDevice.acpSessions();
 
     if (state.selected !== undefined && state.sessions.every((session) => session.id !== state.selected)) {
-        state.selected = undefined;
+        selectSession(undefined);
     }
 
     $("acp-sessions").replaceChildren(
@@ -733,7 +837,7 @@ const refreshSessions = async (): Promise<void> => {
                 return item(
                     label,
                     button(state.selected === session.id ? "Showing" : "Open", `Open the session with ${session.agentLabel} in ${session.folder}`, () => {
-                        state.selected = session.id;
+                        selectSession(session.id);
                         refreshSessions();
                     }),
                 );
@@ -860,6 +964,19 @@ export const initAcp = async (): Promise<void> => {
         state.importing = undefined;
         renderImport();
     });
+
+    setInterval(() => {
+        // A slow read is let finish: a new one every poll would supersede it each time and nothing would ever show.
+        if (portsRead.skip > 0) {
+            portsRead.skip -= 1;
+
+            return;
+        }
+
+        if (state.selected !== undefined && !document.hidden && !portsRead.busy) {
+            refreshPorts();
+        }
+    }, PORTS_POLL_MS);
 
     globalThis.neoreDevice.onAcpChanged(async () => {
         try {

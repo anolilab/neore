@@ -375,6 +375,11 @@ export class AgentSession {
         await this.stopping;
     }
 
+    /** The agent's pid on this computer while the session is live; undefined for a server's agent or an ended session. */
+    public get agentPid(): number | undefined {
+        return this.status === "ended" ? undefined : this.options.process.pid;
+    }
+
     /** The thread a session the backend started runs in; `undefined` for one started on this computer. */
     public get threadId(): string | undefined {
         return this.options.threadId;

@@ -827,6 +827,9 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     local(LOCAL_CHANNEL.acpSessions, () => requireAcp().summaries());
 
+    // Local window only, like the approvals: no page, backend call or ACP command can list a session's servers.
+    local(LOCAL_CHANNEL.acpPorts, (id) => requireAcp().ports(readSessionId(id)));
+
     local(LOCAL_CHANNEL.acpSession, (id) => requireAcp().snapshot(readSessionId(id)));
 
     local(LOCAL_CHANNEL.acpSend, (id, prompt) => requireAcp().send(readSessionId(id), readPrompt(prompt)));
