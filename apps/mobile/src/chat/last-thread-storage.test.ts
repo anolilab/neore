@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { KeyValueStore, LastThreadStore } from "./last-thread-storage";
 import { createLastThreadStore, LAST_THREAD_KEY } from "./last-thread-storage";
 
 /** A Map-backed store. `writeDelays` holds each successive write for that many ms, so writes can finish out of order. */
 const memoryStore = (values = new Map<string, string>(), writeDelays: number[] = []) => {
+    const started: string[] = [];
     const writes: string[] = [];
     const store: KeyValueStore = {
         deleteItem: async (key) => {
@@ -14,6 +15,8 @@ const memoryStore = (values = new Map<string, string>(), writeDelays: number[] =
         setItem: async (key, value) => {
             const delay = writeDelays.shift() ?? 0;
 
+            started.push(value);
+
             await new Promise((resolve) => {
                 setTimeout(resolve, delay);
             });
@@ -22,7 +25,7 @@ const memoryStore = (values = new Map<string, string>(), writeDelays: number[] =
         },
     };
 
-    return { store, values, writes };
+    return { started, store, values, writes };
 };
 
 /** A store with `userId` signed in, as the app binds it at sign-in. */
@@ -83,10 +86,16 @@ describe("last thread storage", () => {
     });
 
     it("forgets the saved chat at sign-out, after any save still writing", async () => {
-        const { store, values } = memoryStore(new Map(), [20]);
+        const { started, store, values } = memoryStore(new Map(), [20]);
         const lastThread = signedIn(store);
+        const saving = lastThread.rememberLastThread({ threadId: "t-1", userId: "u-1" });
 
-        await Promise.all([lastThread.rememberLastThread({ threadId: "t-1", userId: "u-1" }), lastThread.clearLastThread()]);
+        // Sign-out comes while the save is already writing: the clear must wait for it, then delete.
+        await vi.waitFor(() => {
+            expect(started).toHaveLength(1);
+        });
+        await lastThread.clearLastThread();
+        await saving;
 
         expect(values.has(LAST_THREAD_KEY)).toBe(false);
         await expect(lastThread.lastChatToReopen("u-1")).resolves.toBeUndefined();
