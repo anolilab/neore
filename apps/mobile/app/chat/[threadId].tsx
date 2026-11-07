@@ -453,8 +453,7 @@ const Chat = () => {
                     fetch,
                     gatewayUrl: config.gatewayUrl,
                     jwt,
-                }),
-            );
+                }));
 
             setThreadId(started.threadId);
             // The prompt is complete once the server has accepted it, whether or not the screen's next read succeeds.
@@ -541,8 +540,10 @@ const Chat = () => {
         updateIsAtEnd();
     };
 
-    const olderHeader =
-        olderCursor === null ? undefined : (
+    const olderHeader
+        = olderCursor === null
+            ? undefined
+            : (
             <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ busy: isLoadingOlder, disabled: isLoadingOlder }}
@@ -552,7 +553,7 @@ const Chat = () => {
             >
                 <Text style={{ textAlign: "center" }}>{isLoadingOlder ? "Loading older messages..." : "Load older messages"}</Text>
             </Pressable>
-        );
+            );
 
     /** Opens the system share sheet. Cancelling resolves normally, so a rejection is a failure to open it. */
     const shareRow = async (text: string): Promise<void> => {
@@ -627,7 +628,8 @@ const Chat = () => {
                             );
                         }}
                     />
-                    {shouldShowScrollToLatest({ isScrolledToEnd: isAtEnd, isStreaming: sending }) ? (
+                    {shouldShowScrollToLatest({ isScrolledToEnd: isAtEnd, isStreaming: sending })
+                        ? (
                         <Pressable
                             accessibilityLabel={scrollToLatestLabel(sending)}
                             accessibilityRole="button"
@@ -649,13 +651,16 @@ const Chat = () => {
                         >
                             <Text style={{ fontWeight: "600" }}>{scrollToLatestText(sending)}</Text>
                         </Pressable>
-                    ) : null}
+                        )
+                        : null}
                 </View>
-                {error ? (
+                {error
+                    ? (
                     <Text accessibilityRole="alert" style={{ color: "#b00020", padding: 12 }}>
                         {error}
                     </Text>
-                ) : null}
+                    )
+                    : null}
                 <View style={{ flexDirection: "row", gap: 8, padding: 12, paddingBottom: sendReason ? 12 : 12 + safeBottom }}>
                     <TextInput
                         accessibilityHint={composer.reason}
