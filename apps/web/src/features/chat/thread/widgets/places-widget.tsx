@@ -142,7 +142,7 @@ export const NearbyPlacesWidget: FC<NearbyPlacesWidgetProps> = ({ output }) => {
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
                                     <a
-                                        className="hover:text-primary truncate text-sm font-medium transition-colors"
+                                        className="hover:text-primary-text truncate text-sm font-medium transition-colors"
                                         href={mapsUrl}
                                         rel="noreferrer"
                                         target="_blank"

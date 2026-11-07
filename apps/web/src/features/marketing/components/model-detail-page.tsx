@@ -31,7 +31,7 @@ const fadeIn = {
 const TIER_CONFIG = {
     budget: { className: "border-amber-400/30 bg-amber-400/10 text-amber-400", label: msg`Budget` },
     fast: { className: "border-sky-400/30 bg-sky-400/10 text-sky-400", label: msg`Fast` },
-    frontier: { className: "border-primary/30 bg-primary/10 text-primary", label: msg`Frontier` },
+    frontier: { className: "border-primary/30 bg-primary/10 text-primary-text", label: msg`Frontier` },
     "high-quality": { className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-400", label: msg`High Quality` },
     medium: { className: "border-white/20 bg-white/5 text-white/50", label: msg`Standard` },
 } satisfies Record<MarketingModel["tier"], { className: string; label: MessageDescriptor }>;
@@ -119,7 +119,7 @@ const ModelDetailPage = ({ model }: ModelDetailPageProps) => {
 
                             {/* Mode + Tier badges */}
                             <div className="mb-4 flex flex-wrap items-center gap-2">
-                                <span className="text-primary inline-flex items-center gap-1.5 font-mono text-xs font-medium tracking-widest uppercase">
+                                <span className="text-primary-text inline-flex items-center gap-1.5 font-mono text-xs font-medium tracking-widest uppercase">
                                     <ModeIcon className="size-3" />
                                     {modeCopy.heading}
                                 </span>
@@ -176,7 +176,7 @@ const ModelDetailPage = ({ model }: ModelDetailPageProps) => {
                             <ul className="space-y-4">
                                 {model.strengths.map((strength) => (
                                     <li className="flex items-start gap-3" key={strength.id}>
-                                        <CheckCircle2 className="text-primary mt-0.5 size-4 shrink-0" />
+                                        <CheckCircle2 className="text-primary-text mt-0.5 size-4 shrink-0" />
                                         <span className="text-sm leading-relaxed text-white/70">{i18n._(strength)}</span>
                                     </li>
                                 ))}
@@ -280,7 +280,7 @@ const ModelDetailPage = ({ model }: ModelDetailPageProps) => {
                         <motion.div initial="hidden" variants={fadeIn} viewport={{ once: true }} whileInView="visible">
                             <h2 className="mb-3 text-2xl font-bold sm:text-3xl">
                                 <Trans>
-                                    Generate with <span className="text-primary">{model.name}</span>
+                                    Generate with <span className="text-primary-text">{model.name}</span>
                                 </Trans>
                             </h2>
                             <p className="mx-auto mb-8 max-w-sm text-sm text-white/40">{t`Available on Neore — free to start, no credit card required.`}</p>

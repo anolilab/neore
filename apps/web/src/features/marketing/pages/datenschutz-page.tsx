@@ -12,7 +12,7 @@ const DatenschutzPage: FC = () => (
 
         <main className="border-brand-silver container mx-auto border-x">
             <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-24 lg:px-10">
-                <p className="text-primary mb-4 font-mono text-xs font-medium tracking-widest uppercase">Rechtliches</p>
+                <p className="text-primary-text mb-4 font-mono text-xs font-medium tracking-widest uppercase">Rechtliches</p>
                 <h1 className="mb-4 text-4xl font-bold tracking-tight sm:text-5xl">Datenschutzerklärung</h1>
                 <p className="text-brand-graphite mb-10 text-sm">Stand: 27. September 2026</p>
 
@@ -22,82 +22,82 @@ const DatenschutzPage: FC = () => (
                         <h2 className="text-brand-obsidian mb-3 text-sm font-semibold tracking-wider uppercase">Inhaltsübersicht</h2>
                         <ol className="list-inside list-decimal space-y-1.5 text-sm">
                             <li>
-                                <a className="text-primary hover:underline" href="#verantwortlicher">
+                                <a className="text-primary-text hover:underline" href="#verantwortlicher">
                                     Verantwortlicher
                                 </a>
                             </li>
                             <li>
-                                <a className="text-primary hover:underline" href="#datenschutzbeauftragter">
+                                <a className="text-primary-text hover:underline" href="#datenschutzbeauftragter">
                                     Datenschutzbeauftragter
                                 </a>
                             </li>
                             <li>
-                                <a className="text-primary hover:underline" href="#uebersicht">
+                                <a className="text-primary-text hover:underline" href="#uebersicht">
                                     Übersicht der Verarbeitungen
                                 </a>
                             </li>
                             <li>
-                                <a className="text-primary hover:underline" href="#rechtsgrundlagen">
+                                <a className="text-primary-text hover:underline" href="#rechtsgrundlagen">
                                     Rechtsgrundlagen
                                 </a>
                             </li>
                             <li>
-                                <a className="text-primary hover:underline" href="#sicherheit">
+                                <a className="text-primary-text hover:underline" href="#sicherheit">
                                     Sicherheitsmaßnahmen
                                 </a>
                             </li>
                             <li>
-                                <a className="text-primary hover:underline" href="#hosting">
+                                <a className="text-primary-text hover:underline" href="#hosting">
                                     Bereitstellung des Onlineangebotes und Webhosting
                                 </a>
                             </li>
                             <li>
-                                <a className="text-primary hover:underline" href="#registrierung">
+                                <a className="text-primary-text hover:underline" href="#registrierung">
                                     Registrierung, Anmeldung und Nutzerkonto
                                 </a>
                             </li>
                             <li>
-                                <a className="text-primary hover:underline" href="#kontakt">
+                                <a className="text-primary-text hover:underline" href="#kontakt">
                                     Kontaktaufnahme
                                 </a>
                             </li>
                             <li>
-                                <a className="text-primary hover:underline" href="#webanalyse">
+                                <a className="text-primary-text hover:underline" href="#webanalyse">
                                     Webanalyse und Optimierung
                                 </a>
                             </li>
                             <li>
-                                <a className="text-primary hover:underline" href="#ki">
+                                <a className="text-primary-text hover:underline" href="#ki">
                                     Einsatz von KI-Modellen
                                 </a>
                             </li>
                             <li>
-                                <a className="text-primary hover:underline" href="#auftragsverarbeiter">
+                                <a className="text-primary-text hover:underline" href="#auftragsverarbeiter">
                                     Auftragsverarbeiter
                                 </a>
                             </li>
                             <li>
-                                <a className="text-primary hover:underline" href="#drittland">
+                                <a className="text-primary-text hover:underline" href="#drittland">
                                     Internationale Datentransfers
                                 </a>
                             </li>
                             <li>
-                                <a className="text-primary hover:underline" href="#cookies">
+                                <a className="text-primary-text hover:underline" href="#cookies">
                                     Cookies und Speichertechnologien
                                 </a>
                             </li>
                             <li>
-                                <a className="text-primary hover:underline" href="#rechte">
+                                <a className="text-primary-text hover:underline" href="#rechte">
                                     Rechte der betroffenen Personen
                                 </a>
                             </li>
                             <li>
-                                <a className="text-primary hover:underline" href="#loeschung">
+                                <a className="text-primary-text hover:underline" href="#loeschung">
                                     Löschung von Daten
                                 </a>
                             </li>
                             <li>
-                                <a className="text-primary hover:underline" href="#aenderungen">
+                                <a className="text-primary-text hover:underline" href="#aenderungen">
                                     Änderung dieser Datenschutzerklärung
                                 </a>
                             </li>
@@ -122,7 +122,7 @@ const DatenschutzPage: FC = () => (
                             Telefon: +49 (0) 175 7322833
                         </p>
                         <p className="mt-2">
-                            <Link className="text-primary underline underline-offset-2 hover:opacity-80" to="/impressum">
+                            <Link className="text-primary-text underline underline-offset-2 hover:opacity-80" to="/impressum">
                                 Impressum
                             </Link>
                         </p>
@@ -135,7 +135,7 @@ const DatenschutzPage: FC = () => (
                             Daniel Bannert
                             <br />
                             E-Mail:{" "}
-                            <a className="text-primary underline underline-offset-2 hover:opacity-80" href="mailto:security@neore.ai">
+                            <a className="text-primary-text underline underline-offset-2 hover:opacity-80" href="mailto:security@neore.ai">
                                 security@neore.ai
                             </a>
                         </p>
@@ -257,7 +257,7 @@ const DatenschutzPage: FC = () => (
                             <p className="mt-2 text-sm">
                                 Weitere Informationen:{" "}
                                 <a
-                                    className="text-primary underline underline-offset-2 hover:opacity-80"
+                                    className="text-primary-text underline underline-offset-2 hover:opacity-80"
                                     href="https://www.cloudflare.com/privacypolicy/"
                                     rel="noopener noreferrer"
                                     target="_blank"
@@ -337,7 +337,7 @@ const DatenschutzPage: FC = () => (
                             <p className="mt-2 text-sm">
                                 Weitere Informationen:{" "}
                                 <a
-                                    className="text-primary underline underline-offset-2 hover:opacity-80"
+                                    className="text-primary-text underline underline-offset-2 hover:opacity-80"
                                     href="https://posthog.com/privacy"
                                     rel="noopener noreferrer"
                                     target="_blank"
@@ -767,7 +767,7 @@ const DatenschutzPage: FC = () => (
 
                     {/* Navigation */}
                     <div className="border-brand-silver border-t pt-8">
-                        <Link className="text-primary text-sm font-medium underline underline-offset-2 hover:opacity-80" to="/impressum">
+                        <Link className="text-primary-text text-sm font-medium underline underline-offset-2 hover:opacity-80" to="/impressum">
                             Impressum ansehen →
                         </Link>
                     </div>

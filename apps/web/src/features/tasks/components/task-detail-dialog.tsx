@@ -165,7 +165,7 @@ const RunHistory = ({ task }: { task: BoardTask }) => {
                                     </span>
                                     {run.threadId && (
                                         <Link
-                                            className="text-primary ml-auto inline-flex items-center gap-1 hover:underline"
+                                            className="text-primary-text ml-auto inline-flex items-center gap-1 hover:underline"
                                             params={{ threadId: run.threadId }}
                                             to="/chat/$threadId"
                                         >

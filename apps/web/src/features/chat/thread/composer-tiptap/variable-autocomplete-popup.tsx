@@ -250,7 +250,7 @@ const VariableAutocompletePopup: FC<VariableAutocompletePopupProps> = ({
                                         }}
                                         value={variable.name}
                                     >
-                                        <code className="text-primary shrink-0 font-mono text-sm">{`{{${variable.name}}}`}</code>
+                                        <code className="text-primary-text shrink-0 font-mono text-sm">{`{{${variable.name}}}`}</code>
                                         {variable.description && <span className="text-muted-foreground ml-2 truncate text-xs">{variable.description}</span>}
                                     </CommandItem>
                                 ))}
@@ -281,7 +281,7 @@ const VariableAutocompletePopup: FC<VariableAutocompletePopupProps> = ({
                                             }}
                                             value={variable.name}
                                         >
-                                            <code className="text-primary shrink-0 font-mono text-sm">{`{{${variable.name}}}`}</code>
+                                            <code className="text-primary-text shrink-0 font-mono text-sm">{`{{${variable.name}}}`}</code>
                                             {variable.description && (
                                                 <span className="text-muted-foreground ml-2 truncate text-xs">{variable.description}</span>
                                             )}

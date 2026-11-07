@@ -96,19 +96,20 @@ const catppuccinMocha = fromPalette("catppuccin-mocha", "dark", {
     variable: "#cdd6f4",
 });
 
+// Darker than Shiki's min-light on purpose: each token must reach 4.5:1 on the page's #f2f2f2 (axe `color-contrast`).
 const minLight = fromPalette("min-light", "light", {
     background: "#ffffff",
     comment: "#6a737d",
     foreground: "#24292e",
     function: "#6f42c1",
-    keyword: "#d32f2f",
-    number: "#1976d2",
-    operator: "#d32f2f",
-    property: "#1976d2",
+    keyword: "#c62828",
+    number: "#1565c0",
+    operator: "#c62828",
+    property: "#1565c0",
     string: "#2b5581",
     tag: "#22863a",
-    type: "#1976d2",
-    variable: "#e36209",
+    type: "#1565c0",
+    variable: "#a14800",
 });
 
 const minDark = fromPalette("min-dark", "dark", {

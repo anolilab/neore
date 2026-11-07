@@ -148,7 +148,7 @@ const VariableFillDialog = ({ existingValues, onCancel, onUse, onUseAnyway, open
                                 return (
                                     <div className="space-y-1.5" key={name}>
                                         <Label className="flex items-center gap-2" htmlFor={`var-${name}`}>
-                                            <code className="bg-primary/10 text-primary rounded px-1.5 py-0.5 text-xs">{`{{${name}}}`}</code>
+                                            <code className="bg-primary/10 text-primary-text rounded px-1.5 py-0.5 text-xs">{`{{${name}}}`}</code>
                                             {isRequired && (
                                                 <Badge className="text-[10px]" variant="destructive">
                                                     {t`Required`}

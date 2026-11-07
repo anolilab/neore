@@ -11,6 +11,13 @@ describe("composerEditorAttributes", () => {
         expect(attributes).not.toHaveProperty("aria-invalid");
     });
 
+    it("names the field when given a label", () => {
+        const attributes = composerEditorAttributes({ label: "Message" });
+
+        expect(attributes["aria-label"]).toBe("Message");
+        expect(attributes["aria-multiline"]).toBe("true");
+    });
+
     it("names the notice and flags the field invalid", () => {
         const attributes = composerEditorAttributes({ describedBy: "notice-1", invalid: true });
 

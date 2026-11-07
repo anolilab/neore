@@ -17,6 +17,8 @@ interface SortableThreadItemProperties {
     handleThreadToggle: (threadId: string, index: number, isShiftClick: boolean) => void;
     handleUnpinThread: (threadId: string) => void;
     index?: number;
+    // Passed down by the list for its keyboard navigation; the sortable row does not read them.
+    // eslint-disable-next-line react/no-unused-prop-types
     isKeyboardNavigating: boolean;
     isKeyboardSelected: boolean;
     isSelected: boolean;
@@ -27,6 +29,7 @@ interface SortableThreadItemProperties {
     node: BranchNode;
     searchQuery: string;
     selectedThreadIds: Set<string>;
+    // eslint-disable-next-line react/no-unused-prop-types
     selectedThreadIndex: number;
     toggleExpanded: (threadId: string) => void;
     updateThread: (threadId: string, model: string, status: "archived" | "active") => void;
@@ -63,9 +66,11 @@ const SortableThreadItem: FC<SortableThreadItemProperties> = ({
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} onMouseEnter={handleMouseEnter}>
+        <div onMouseEnter={handleMouseEnter} ref={setNodeRef} style={style}>
             <ThreadNode
                 currentThreadId={currentThreadId}
+                // The drag handle is the only focusable part of the sortable item: the row holds buttons and a link.
+                dragAttributes={attributes}
                 dragListeners={listeners}
                 expandedThreads={expandedThreads}
                 handleCreateBranch={handleCreateBranch}

@@ -57,3 +57,5 @@ apps/web/worker-configuration.d.ts
 # seven cases, and `lint:prettier:fix` would do it silently. They are generated
 # by `render()`, so their formatting is react-email's to choose, not ours.
 backend/lunora/email/templates/__fixtures__/
+# MSW's service worker, copied in by `msw init`: a vendored script, so it is not reformatted.
+**/.storybook/public/mockServiceWorker.js

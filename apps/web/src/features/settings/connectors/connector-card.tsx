@@ -92,7 +92,7 @@ const ConnectorCard: FC<{ entry: ConnectorCatalogEntry }> = ({ entry }) => {
             <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-3">
-                        <Icon aria-hidden className="text-primary size-6 shrink-0" />
+                        <Icon aria-hidden className="text-primary-text size-6 shrink-0" />
                         <div>
                             <CardTitle className="text-base">{entry.name}</CardTitle>
                             <div className="mt-1 flex flex-wrap items-center gap-2">

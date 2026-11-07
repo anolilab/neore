@@ -87,6 +87,7 @@ the files from the root down to their working directory, so **read the file for 
 | AI model registry, prompt optimizer, multi-reference images                         | `packages/ai/AGENTS.md`                                 |
 | LLM gateway, video render queue, FAL media                                          | `services/llm-gateway/AGENTS.md`                        |
 | Web app, frontend lessons, accessibility                                            | `apps/web/AGENTS.md`, `apps/web/src/AGENTS.md`           |
+| Storybook: stories, MSW fixtures, page stories, a11y in CI                          | `apps/web/src/storybook/AGENTS.md`                      |
 | Web auth (session reads), chat UI, local models                                     | `apps/web/src/features/{auth,chat,local-models}/AGENTS.md` |
 | Desktop shell, dictation, ACP registry installs; mobile app; UI components          | `apps/desktop/AGENTS.md`, `apps/mobile/AGENTS.md`, `packages/ui/AGENTS.md` |
 | Device execution, sandbox, SSH servers, `neore-host`                                | `packages/device-core/AGENTS.md`                        |

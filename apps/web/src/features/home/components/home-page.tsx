@@ -241,7 +241,7 @@ const HomePage: FC = () => {
 
                     <Section
                         action={
-                            <Link className="text-primary text-xs font-medium hover:underline" to="/chat">
+                            <Link className="text-primary-text text-xs font-medium hover:underline" to="/chat">
                                 {t`All chats`}
                             </Link>
                         }

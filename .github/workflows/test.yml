@@ -152,6 +152,77 @@ jobs:
     # The Rust Worker is the one project with a `test` target and no `test:coverage`
     # (cargo test has no v8 coverage), so the coverage run in `test` skips it. Its own
     # job, in parallel: it needs no workspace build and was the tail of `test`.
+    storybook:
+        name: "Storybook (stories, a11y)"
+        if: "needs.files-changed.outputs.packages == 'true'"
+        needs: "files-changed"
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 20
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
+              with:
+                  # `vis affected` diffs against the base.
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@1f3a7f7e561f7690fe19dea5d2ed225def53c908" # v26.0.6
+              with:
+                  enable-nx-cache: "false" # no Nx in this repo: the cache never hits
+                  node-version: "24.22.1"
+                  npm-version: "11"
+                  # The browsers come from the cache below (or its miss install), not from setup.
+                  skip-playwright: "true"
+
+            # Stories import `@neore/ai`, whose `dist` is gitignored; without it Vite cannot resolve
+            # `@neore/ai/models` and every story that touches a model fails to load.
+            - name: "Build workspace packages"
+              shell: "bash"
+              run: "pnpm run build:packages"
+
+            - name: "Resolve the Playwright version"
+              id: "playwright"
+              shell: "bash"
+              # Captured first: a failing `playwright --version` must fail the step, not key the cache on an empty version.
+              run: |
+                  version="$(pnpm --filter @neore/web exec playwright --version | awk '{print $2}')"
+                  if [ -z "${version}" ]; then
+                      echo "could not read the Playwright version" >&2
+                      exit 1
+                  fi
+                  echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+            - name: "Cache Playwright browsers"
+              id: "playwright-cache"
+              uses: "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9" # v6.1.0
+              with:
+                  path: "~/.cache/ms-playwright"
+                  key: "playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}"
+
+            - name: "Install Chromium"
+              if: "steps.playwright-cache.outputs.cache-hit != 'true'"
+              shell: "bash"
+              run: "bash .github/scripts/apt-retry.sh pnpm --filter @neore/web exec playwright install --with-deps chromium"
+
+            - name: "Install Chromium system dependencies (browsers cached)"
+              if: "steps.playwright-cache.outputs.cache-hit == 'true'"
+              shell: "bash"
+              run: "bash .github/scripts/apt-retry.sh pnpm --filter @neore/web exec playwright install-deps chromium"
+
+            # Every story of the web app, packages/ui and packages/chat-ui, in light, dark and the
+            # violet accent (`apps/web/vitest.storybook.config.ts`). A story fails on a render error,
+            # a failing `play` function or an axe violation; one that cannot meet axe yet is marked
+            # `a11y: { test: "todo" }` in its file, with the reason.
+            - name: "Run the stories (affected)"
+              shell: "bash"
+              run: 'pnpm exec vis affected test:storybook --if-present --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
+
     rust-worker:
         name: "Rust Worker tests"
         if: "needs.files-changed.outputs.packages == 'true'"
@@ -778,7 +849,7 @@ jobs:
               run: "pnpm --filter @neore/desktop exec playwright test --grep terminal"
 
     test-required-check:
-        needs: ["files-changed", "test", "rust-worker", "e2e", "device-core", "desktop-package", "desktop-macos-check", "desktop-windows-check"]
+        needs: ["files-changed", "test", "storybook", "rust-worker", "e2e", "device-core", "desktop-package", "desktop-macos-check", "desktop-windows-check"]
         name: "Check Test Run"
         # `always()` and nothing else: a job skipped by its own `if:` reports
         # success to a ruleset, so gating this one on its needs' results made the

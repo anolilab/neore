@@ -188,7 +188,11 @@ const useThreadListKeyboard = ({
                 break;
             }
             case "Enter": {
-                if (isKeyboardNavigating) {
+                // A focused link or button keeps its own Enter: a thread title opens its thread, not the arrow-key cursor's.
+                // The drag handle is a `role="button"` too: Enter on it must not open the arrow-key thread.
+                const isFocusedControl = Boolean(target?.closest?.("a[href], button, [role='button']"));
+
+                if (isKeyboardNavigating && !isFocusedControl) {
                     event.preventDefault();
                     handleEnter();
                 }

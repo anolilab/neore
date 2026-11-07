@@ -564,7 +564,7 @@ const StreamingMetricsBar: FC<StreamingMetricsBarProps> = ({ firstTokenTimeRef, 
 
     if (isReconnecting) {
         return (
-            <div aria-live="polite" className="mt-1 flex items-center gap-2 text-xs text-amber-500 dark:text-amber-400" role="status">
+            <div aria-live="polite" className="mt-1 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400" role="status">
                 <span aria-hidden="true" className="size-2 animate-pulse rounded-full bg-amber-500" />
                 <span>{t`Reconnecting…`}</span>
             </div>
@@ -573,7 +573,7 @@ const StreamingMetricsBar: FC<StreamingMetricsBarProps> = ({ firstTokenTimeRef, 
 
     if (isStreaming && ttftMs !== null) {
         return (
-            <div className="mt-1 flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+            <div className="text-muted-foreground mt-1 flex items-center gap-2 text-xs">
                 {tokPerSec !== null && <span>{t`${tokPerSec.toFixed(1)} tokens/s`}</span>}
                 {approxTokenCount > 0 && <span>{t`~${approxTokenCount} tokens`}</span>}
                 <span>{t`First token ${formatDuration(ttftMs)}`}</span>
@@ -583,7 +583,7 @@ const StreamingMetricsBar: FC<StreamingMetricsBarProps> = ({ firstTokenTimeRef, 
 
     if (isStreaming) {
         return (
-            <div className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+            <div className="text-muted-foreground mt-1 text-xs">
                 <span>{t`${formatDuration(elapsedMs)} elapsed`}</span>
             </div>
         );

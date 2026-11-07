@@ -989,7 +989,7 @@ const TriggerSettings: FC = () => {
                                                                 )}
                                                                 {exec.threadId && (
                                                                     <a
-                                                                        className="text-primary flex items-center gap-0.5 hover:underline"
+                                                                        className="text-primary-text flex items-center gap-0.5 hover:underline"
                                                                         href={`/chat/${exec.threadId}`}
                                                                     >
                                                                         <ExternalLink aria-hidden="true" className="size-3" />

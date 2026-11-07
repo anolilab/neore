@@ -81,14 +81,13 @@ const ProviderSidebarButton = memo<{
     showBorder?: boolean;
 }>(({ icon, isSelected, label, onClick, showBorder = false }) => (
     <button
-        aria-label={label}
         aria-pressed={isSelected}
         className={cn(
             "relative flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors duration-150",
             showBorder && "mb-0.5 border-b pb-2",
             isSelected
                 ? "text-foreground before:bg-primary-text before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full"
-                : "text-muted-foreground/70 hover:text-foreground",
+                : "text-muted-foreground hover:text-foreground",
         )}
         onClick={onClick}
         type="button"
@@ -121,12 +120,10 @@ ProviderSidebarItem.displayName = "ProviderSidebarItem";
 // ─── Model item content ────────────────────────────────────────────────────────
 
 const ModelItemContent = memo<{
-    isFavorite: boolean;
     isSelected: boolean;
     model: GatewayModel;
-    onToggleFavorite?: (modelId: string) => void;
     showCheckmark?: boolean;
-}>(({ isFavorite, isSelected, model, onToggleFavorite, showCheckmark = false }) => {
+}>(({ isSelected, model, showCheckmark = false }) => {
     const { i18n, t } = useLingui();
     const capabilities = getModelCapabilities(model);
 
@@ -137,12 +134,12 @@ const ModelItemContent = memo<{
                 <div className="flex min-w-0 items-baseline gap-1.5">
                     <span className="truncate text-[13px] leading-none font-medium">{stripProviderPrefix(model.name ?? model.id)}</span>
                     {requiresPaidPlan(model) ? (
-                        <span className="shrink-0 rounded-[3px] bg-amber-500/15 px-1 py-0 text-[9px] font-semibold tracking-wide text-amber-600 uppercase dark:bg-amber-400/15 dark:text-amber-400">
+                        <span className="shrink-0 rounded-[3px] bg-amber-500/15 px-1 py-0 text-[9px] font-semibold tracking-wide text-amber-800 uppercase dark:bg-amber-400/15 dark:text-amber-400">
                             {t`Pro`}
                         </span>
                     ) : null}
                     {(model as any).isNew ? (
-                        <span className="shrink-0 rounded-[3px] bg-emerald-500/12 px-1 py-0 text-[9px] font-semibold tracking-wide text-emerald-600 uppercase dark:bg-emerald-400/15 dark:text-emerald-400">
+                        <span className="shrink-0 rounded-[3px] bg-emerald-500/12 px-1 py-0 text-[9px] font-semibold tracking-wide text-emerald-800 uppercase dark:bg-emerald-400/15 dark:text-emerald-400">
                             {t`New`}
                         </span>
                     ) : null}
@@ -151,7 +148,7 @@ const ModelItemContent = memo<{
                     <div className="mt-0.5 flex flex-wrap gap-1">
                         {capabilities.slice(0, 3).map((cap) => (
                             <span
-                                className="border-border/40 text-muted-foreground/60 bg-muted/50 inline-flex h-4 items-center rounded px-1 text-[9px] font-medium"
+                                className="border-border/40 text-muted-foreground bg-muted/50 inline-flex h-4 items-center rounded px-1 text-[9px] font-medium"
                                 key={cap.id}
                             >
                                 {i18n._(cap.label)}
@@ -161,36 +158,43 @@ const ModelItemContent = memo<{
                 ) : null}
             </div>
 
-            {/* Actions */}
-            <div className="flex shrink-0 items-center gap-0.5">
-                {onToggleFavorite ? (
-                    <button
-                        aria-label={isFavorite ? t`Remove from starred` : t`Add to starred`}
-                        className={cn(
-                            "rounded p-1 transition-all duration-100",
-                            isFavorite ? "text-amber-400 opacity-100" : "text-muted-foreground/30 opacity-0 group-hover/row:opacity-100 hover:text-amber-400",
-                        )}
-                        onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            onToggleFavorite(model.id);
-                        }}
-                        type="button"
-                    >
-                        <Star aria-hidden="true" className={cn("size-3.5", isFavorite && "fill-current")} />
-                    </button>
-                ) : null}
-                {showCheckmark ? (
-                    <span className="ml-0.5 flex size-3.5 shrink-0 items-center justify-center">
-                        {isSelected ? <CheckIcon aria-hidden="true" className="text-primary-text size-3.5" /> : null}
-                    </span>
-                ) : null}
-            </div>
+            {showCheckmark ? (
+                <span className="ml-0.5 flex size-3.5 shrink-0 items-center justify-center">
+                    {isSelected ? <CheckIcon aria-hidden="true" className="text-primary-text size-3.5" /> : null}
+                </span>
+            ) : null}
         </div>
     );
 });
 
 ModelItemContent.displayName = "ModelItemContent";
+
+// ─── Model item favorite toggle ────────────────────────────────────────────────
+// Rendered beside the option, not inside it: an option may not hold focusable controls (axe nested-interactive).
+
+const ModelItemFavoriteToggle = memo<{
+    isFavorite: boolean;
+    modelId: string;
+    onToggleFavorite: (modelId: string) => void;
+}>(({ isFavorite, modelId, onToggleFavorite }) => {
+    const { t } = useLingui();
+
+    return (
+        <button
+            aria-label={isFavorite ? t`Remove from starred` : t`Add to starred`}
+            className={cn(
+                "absolute top-1/2 right-2 -translate-y-1/2 rounded p-1 transition-all duration-100",
+                isFavorite ? "text-amber-400 opacity-100" : "text-muted-foreground/30 opacity-0 group-hover/row:opacity-100 hover:text-amber-400",
+            )}
+            onClick={() => onToggleFavorite(modelId)}
+            type="button"
+        >
+            <Star aria-hidden="true" className={cn("size-3.5", isFavorite && "fill-current")} />
+        </button>
+    );
+});
+
+ModelItemFavoriteToggle.displayName = "ModelItemFavoriteToggle";
 
 // ─── Model group renderer ──────────────────────────────────────────────────────
 
@@ -225,7 +229,7 @@ const ModelGroupRenderer = memo<{
         return (
             <CommandGroup items={group.items}>
                 {showGroupLabel ? (
-                    <CommandGroupLabel className="text-muted-foreground/40 px-3 pt-3 pb-0.5 text-[10px] font-semibold tracking-widest uppercase">
+                    <CommandGroupLabel className="text-muted-foreground px-3 pt-3 pb-0.5 text-[10px] font-semibold tracking-widest uppercase">
                         {group.value}
                     </CommandGroupLabel>
                 ) : null}
@@ -261,55 +265,58 @@ const ModelGroupRenderer = memo<{
                         }
 
                         return (
-                            <CommandItem
-                                className={cn(
-                                    "group/row mx-1.5 flex-row !items-center rounded-md px-2 py-2 transition-colors duration-100",
-                                    isSelected && selectionMode === "single" ? "bg-accent/60" : "",
-                                    isParallelSelected && selectionMode === "parallel" ? "bg-accent/40" : "",
-                                    unavailableClassName,
-                                )}
-                                key={item.value}
-                                onClick={(event: React.MouseEvent & { preventBaseUIHandler?: () => void }) => {
-                                    event.preventBaseUIHandler?.();
+                            <div className={cn("group/row relative mx-1.5", unavailableClassName)} key={item.value}>
+                                <CommandItem
+                                    aria-disabled={isDisabled || undefined}
+                                    className={cn(
+                                        "flex-row !items-center rounded-md py-2 pl-2 transition-colors duration-100",
+                                        onToggleFavorite ? "pr-8" : "pr-2",
+                                        isSelected && selectionMode === "single" ? "bg-accent/60" : "",
+                                        isParallelSelected && selectionMode === "parallel" ? "bg-accent/40" : "",
+                                    )}
+                                    onClick={(event: React.MouseEvent & { preventBaseUIHandler?: () => void }) => {
+                                        event.preventBaseUIHandler?.();
 
-                                    if (!isDisabled) {
-                                        item.onSelect();
-                                    }
-                                }}
-                                title={unavailableTitle}
-                                value={item.value}
-                            >
-                                {/* Anonymous lock */}
-                                {isLockedForAnonymous ? (
-                                    <span aria-hidden="true" className="mr-2 flex shrink-0 items-center justify-center">
-                                        <Lock className="text-muted-foreground/30 size-4" />
-                                    </span>
-                                ) : null}
+                                        if (!isDisabled) {
+                                            item.onSelect();
+                                        }
+                                    }}
+                                    title={unavailableTitle}
+                                    value={item.value}
+                                >
+                                    {/* Anonymous lock */}
+                                    {isLockedForAnonymous ? (
+                                        <span aria-hidden="true" className="mr-2 flex shrink-0 items-center justify-center">
+                                            <Lock className="text-muted-foreground/30 size-4" />
+                                        </span>
+                                    ) : null}
 
-                                {/* Parallel selection checkbox */}
-                                {!isLockedForAnonymous && selectionMode === "parallel" ? (
-                                    <span aria-hidden="true" className="mr-2 flex shrink-0 items-center justify-center">
-                                        {parallelCheckbox}
-                                    </span>
-                                ) : null}
+                                    {/* Parallel selection checkbox */}
+                                    {!isLockedForAnonymous && selectionMode === "parallel" ? (
+                                        <span aria-hidden="true" className="mr-2 flex shrink-0 items-center justify-center">
+                                            {parallelCheckbox}
+                                        </span>
+                                    ) : null}
 
-                                {/* Provider icon — shown on starred tab */}
-                                {showProviderIcon ? (
-                                    <ProviderIcon
-                                        className="mr-2 size-5 shrink-0"
-                                        provider={item.model.provider || item.model.displayProvider || ""}
-                                        providerIcon={item.model.id.split("/", 1)[0] || item.model.displayProvider || ""}
+                                    {/* Provider icon — shown on starred tab */}
+                                    {showProviderIcon ? (
+                                        <ProviderIcon
+                                            className="mr-2 size-5 shrink-0"
+                                            provider={item.model.provider || item.model.displayProvider || ""}
+                                            providerIcon={item.model.id.split("/", 1)[0] || item.model.displayProvider || ""}
+                                        />
+                                    ) : null}
+
+                                    <ModelItemContent isSelected={isSelected} model={item.model} showCheckmark={selectionMode === "single"} />
+                                </CommandItem>
+                                {onToggleFavorite ? (
+                                    <ModelItemFavoriteToggle
+                                        isFavorite={favorites.has(item.model.id)}
+                                        modelId={item.model.id}
+                                        onToggleFavorite={onToggleFavorite}
                                     />
                                 ) : null}
-
-                                <ModelItemContent
-                                    isFavorite={favorites.has(item.model.id)}
-                                    isSelected={isSelected}
-                                    model={item.model}
-                                    onToggleFavorite={onToggleFavorite}
-                                    showCheckmark={selectionMode === "single"}
-                                />
-                            </CommandItem>
+                            </div>
                         );
                     }}
                 </CommandCollection>
@@ -532,7 +539,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                                     "flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[12.5px] font-medium transition-colors duration-150",
                                     activeTab === "starred"
                                         ? "text-foreground border-foreground -mb-px"
-                                        : "text-muted-foreground/60 hover:text-foreground border-transparent",
+                                        : "text-muted-foreground hover:text-foreground border-transparent",
                                 )}
                                 onClick={() => handleTabChange("starred")}
                                 role="tab"
@@ -548,7 +555,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                                 "flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[12.5px] font-medium transition-colors duration-150",
                                 activeTab === "all"
                                     ? "text-foreground border-foreground -mb-px"
-                                    : "text-muted-foreground/60 hover:text-foreground border-transparent",
+                                    : "text-muted-foreground hover:text-foreground border-transparent",
                             )}
                             onClick={() => handleTabChange("all")}
                             role="tab"
@@ -569,7 +576,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                                         "rounded-[5px] px-2.5 py-1 text-[11.5px] font-medium transition-all duration-150",
                                         selectionMode === "single"
                                             ? "bg-background text-foreground shadow-sm"
-                                            : "text-muted-foreground/50 hover:text-muted-foreground",
+                                            : "text-muted-foreground hover:text-muted-foreground",
                                     )}
                                     onClick={() => handleSelectionModeChange("single")}
                                     type="button"
@@ -582,7 +589,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                                         "rounded-[5px] px-2.5 py-1 text-[11.5px] font-medium transition-all duration-150",
                                         selectionMode === "parallel"
                                             ? "bg-background text-foreground shadow-sm"
-                                            : "text-muted-foreground/50 hover:text-muted-foreground",
+                                            : "text-muted-foreground hover:text-muted-foreground",
                                     )}
                                     onClick={() => handleSelectionModeChange("parallel")}
                                     type="button"
@@ -597,14 +604,14 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                 {/* Mode filter row */}
                 {hideModeFilter ? null : (
                     <div aria-label={t`Filter by mode`} className="flex items-center gap-1 border-t px-2 py-1.5" role="group">
-                        <span className="text-muted-foreground/50 mr-1 text-[10px] font-medium tracking-wider uppercase" id="mode-filter-label">
+                        <span className="text-muted-foreground mr-1 text-[10px] font-medium tracking-wider uppercase" id="mode-filter-label">
                             {t`Type`}
                         </span>
                         <button
                             aria-pressed={modeFilter === null}
                             className={cn(
                                 "rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                modeFilter === null ? "bg-primary/10 text-primary-text" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                modeFilter === null ? "bg-primary/10 text-primary-text" : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                             )}
                             onClick={() => setModeFilter(null)}
                             type="button"
@@ -615,7 +622,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                             aria-pressed={modeFilter === "text"}
                             className={cn(
                                 "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                modeFilter === "text" ? "bg-primary/10 text-primary-text" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                modeFilter === "text" ? "bg-primary/10 text-primary-text" : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                             )}
                             onClick={() => setModeFilter("text")}
                             type="button"
@@ -627,7 +634,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                             aria-pressed={modeFilter === "image"}
                             className={cn(
                                 "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                modeFilter === "image" ? "bg-primary/10 text-primary-text" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                modeFilter === "image" ? "bg-primary/10 text-primary-text" : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                             )}
                             onClick={() => setModeFilter("image")}
                             type="button"
@@ -639,7 +646,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                             aria-pressed={modeFilter === "video"}
                             className={cn(
                                 "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                modeFilter === "video" ? "bg-primary/10 text-primary-text" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                modeFilter === "video" ? "bg-primary/10 text-primary-text" : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                             )}
                             onClick={() => setModeFilter("video")}
                             type="button"
@@ -653,7 +660,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                                 "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                 modeFilter === "speech-to-text"
                                     ? "bg-primary/10 text-primary-text"
-                                    : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                             )}
                             onClick={() => setModeFilter("speech-to-text")}
                             type="button"
@@ -696,7 +703,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                                 </div>
                                 <div>
                                     <p className="text-foreground/80 text-sm font-medium">{t`No starred models`}</p>
-                                    <p className="text-muted-foreground/40 mt-1 text-[11.5px] leading-relaxed">
+                                    <p className="text-muted-foreground mt-1 text-[11.5px] leading-relaxed">
                                         {t`Click the star on any model in All models to add it here.`}
                                     </p>
                                 </div>
@@ -733,13 +740,13 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                         <div className="flex flex-col gap-0.5">
                             <span
                                 aria-live="polite"
-                                className={cn("text-[11.5px]", isParallelMaxReached ? "text-amber-500 dark:text-amber-400" : "text-muted-foreground/50")}
+                                className={cn("text-[11.5px]", isParallelMaxReached ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}
                                 role="status"
                             >
                                 {isParallelMaxReached ? t`Maximum ${MAX_PARALLEL} models reached` : t`${selectedCount} of ${MAX_PARALLEL} selected`}
                             </span>
                             {anchorMode ? (
-                                <span className="text-muted-foreground/40 flex items-center gap-1 text-[10px]">
+                                <span className="text-muted-foreground flex items-center gap-1 text-[10px]">
                                     <Lock aria-hidden="true" className="size-2.5" />
                                     {t`Locked to ${anchorModeName} models`}
                                 </span>
@@ -751,7 +758,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                                 "rounded-md px-3 py-1 text-[12px] font-medium transition-colors duration-100",
                                 parallelSelectedIds.size > 0
                                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                                    : "text-muted-foreground/30 cursor-not-allowed",
+                                    : "text-muted-foreground cursor-not-allowed",
                             )}
                             disabled={parallelSelectedIds.size === 0}
                             onClick={() => {

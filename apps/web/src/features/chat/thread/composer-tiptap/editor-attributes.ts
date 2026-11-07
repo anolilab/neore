@@ -5,10 +5,12 @@ interface EditorAttributeOptions {
     describedBy?: string;
     /** The text in the field is not acceptable as it is. */
     invalid?: boolean;
+    /** The field's accessible name: a `contenteditable` has no label of its own, and the placeholder is not one. */
+    label?: string;
 }
 
 /** The attributes of the editable element. Rebuilt whenever the description or validity changes. */
-export const composerEditorAttributes = ({ describedBy, invalid = false }: EditorAttributeOptions = {}): Record<string, string> => {
+export const composerEditorAttributes = ({ describedBy, invalid = false, label }: EditorAttributeOptions = {}): Record<string, string> => {
     const attributes: Record<string, string> = {
         // The editable element is the composer's focus area for F6: the editor itself takes the focus.
         "data-focus-area": "composer",
@@ -17,6 +19,11 @@ export const composerEditorAttributes = ({ describedBy, invalid = false }: Edito
         // first strong character decides), not per paragraph.
         dir: "auto",
     };
+
+    if (label) {
+        attributes["aria-label"] = label;
+        attributes["aria-multiline"] = "true";
+    }
 
     if (describedBy) {
         attributes["aria-describedby"] = describedBy;

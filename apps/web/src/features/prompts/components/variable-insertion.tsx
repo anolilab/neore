@@ -79,7 +79,7 @@ const VariableInsertion = ({ customVariables = EMPTY_CUSTOM_VARIABLES, onInsert 
                                     <CommandGroupLabel>{t`Current Prompt Variables`}</CommandGroupLabel>
                                     {customVariables.map((variable) => (
                                         <CommandItem key={variable.name} onSelect={() => handleSelect(variable.name)} value={variable.name}>
-                                            <code className="text-primary mr-2 font-mono text-sm">{`{{${variable.name}}}`}</code>
+                                            <code className="text-primary-text mr-2 font-mono text-sm">{`{{${variable.name}}}`}</code>
                                             {variable.description && <span className="text-muted-foreground text-xs">{variable.description}</span>}
                                         </CommandItem>
                                     ))}
@@ -94,7 +94,7 @@ const VariableInsertion = ({ customVariables = EMPTY_CUSTOM_VARIABLES, onInsert 
                                 <CommandGroupLabel>{category.description}</CommandGroupLabel>
                                 {category.variables.map((variable) => (
                                     <CommandItem key={variable.name} onSelect={() => handleSelect(variable.name)} value={variable.name}>
-                                        <code className="text-primary mr-2 font-mono text-sm">{`{{${variable.name}}}`}</code>
+                                        <code className="text-primary-text mr-2 font-mono text-sm">{`{{${variable.name}}}`}</code>
                                         <span className="text-muted-foreground text-xs">{variable.description}</span>
                                     </CommandItem>
                                 ))}

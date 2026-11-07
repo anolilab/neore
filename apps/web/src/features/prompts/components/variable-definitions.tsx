@@ -82,7 +82,7 @@ const VariableDefinitions = ({ onChange, variables }: VariableDefinitionsProps) 
                 {variables.map((variable, index) => (
                     <div className="bg-muted/50 grid gap-3 rounded-lg border p-3" key={variable.name}>
                         <div className="flex items-center justify-between">
-                            <code className="bg-primary/10 text-primary rounded px-2 py-1 font-mono text-sm">{`{{${variable.name}}}`}</code>
+                            <code className="bg-primary/10 text-primary-text rounded px-2 py-1 font-mono text-sm">{`{{${variable.name}}}`}</code>
                             <div className="flex items-center gap-2">
                                 <div className="flex items-center gap-1.5">
                                     <Switch

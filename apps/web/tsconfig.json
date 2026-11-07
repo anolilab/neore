@@ -18,6 +18,16 @@
         "emitDeclarationOnly": false,
         "noEmit": true
     },
-    "include": ["**/*.ts", "**/*.tsx", "eslint.config.js", "prettier.config.js", "vite.config.js", "@vitest/browser/providers/webdriverio", ".source/**/*.ts"],
+    "include": [
+        "**/*.ts",
+        "**/*.tsx",
+        ".storybook/**/*.ts",
+        ".storybook/**/*.tsx",
+        "eslint.config.js",
+        "prettier.config.js",
+        "vite.config.js",
+        "@vitest/browser/providers/webdriverio",
+        ".source/**/*.ts"
+    ],
     "exclude": ["**/*.md", "**/*.json"]
 }
