@@ -33,7 +33,8 @@ The most common gap is a change that works on the path you tested and is missing
   model (titles, summaries, handoffs), not to a phone, not to another participant, not to anyone else's export. The
   owner's own data export still includes it. Check the lock at
   the moment of use, not only when something is saved; a lock can arrive later.
-- **Deleted, archived or no-longer-shared threads** behave like locked ones for anything sent after the fact.
+- **Deleted or no-longer-shared threads** behave like locked ones for anything sent to someone other than the owner
+  after the fact. An archived thread stays the owner's: their own task runs may still continue it.
 - **Organizations.** Every query for organization data filters by the caller's organization taken from the session on
   the server, never from client input. A person's own data outside any organization stays visible to them. Totals include members who have left. An admin view shows organization projects
   only, never a member's personal projects by name, and never narrows to one person.
@@ -41,7 +42,8 @@ The most common gap is a change that works on the path you tested and is missing
   time that the run is the owner's own run, whatever path added the tool (skill, app, approval, extra tools).
 - **Account switch and sign-out** clear cached data of the previous account on every client (web, desktop, mobile,
   extension storage, keychain).
-- **Authz matrix.** A new owner-facing function gets its row in `backend/lunora/auth/AGENTS.md`.
+- **Authz matrix.** Every new client-reachable procedure gets a reviewed row in `docs/security/authz-matrix.md`
+  (`lunora/authz-matrix.guard.test.ts`, rules in `backend/lunora/auth/AGENTS.md`).
 
 ## Data lifecycle
 

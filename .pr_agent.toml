@@ -35,8 +35,9 @@ translation catalogs) and `CHANGELOG.md` as generated: review the source that
 produces them, not the output. Hold changes to `docs/agents/review-checklist.md`
 and to the `AGENTS.md` next to the changed code. Hold tests to
 `docs/agents/testing.md`: ask only for fewer or smaller tests there, never for
-more coverage. Review only lines this pull request changes; do not repeat a
-finding the author has answered with a file and line unless the code changed. `backend/` and
+more coverage. Review only lines this pull request changes. Repeat a finding
+the author has answered with a file and line only when the code changed or the
+cited code does not support the answer. `backend/` and
 `services/` run on Cloudflare Workers / Durable Objects, so flag Node-only
 APIs and anything that assumes a filesystem or long-lived process.
 """

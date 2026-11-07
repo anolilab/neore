@@ -6,7 +6,14 @@
 pnpm exec sort-package-json --check packages/*/package.json apps/*/package.json backend/package.json services/*/package.json package.json || exit 1
 
 # Prettier on every file changed since the merge base with main, root files
-# included; Markdown is skipped, as in CI.
-base=$(git merge-base HEAD origin/main 2>/dev/null) || exit 0
-git diff --name-only --diff-filter=ACMR -z "$base" HEAD -- . ':!*.md' ':!*.mdx' \
-    | xargs -0 -r pnpm exec prettier --config=.prettierrc.cjs --ignore-unknown --check || exit 1
+# included; Markdown is skipped, as in CI. Portable: no GNU-only xargs flags.
+base=$(git merge-base HEAD origin/main 2>/dev/null) || {
+    git fetch --quiet origin main && base=$(git merge-base HEAD origin/main)
+} || {
+    echo "pre-push: cannot find the merge base with origin/main; fetch it, then push again." >&2
+    exit 1
+}
+files=$(git diff --name-only --diff-filter=ACMR "$base" HEAD -- . ':!*.md' ':!*.mdx')
+[ -z "$files" ] && exit 0
+# shellcheck disable=SC2086 # one path per line, no spaces in tracked paths
+printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 pnpm exec prettier --config=.prettierrc.cjs --ignore-unknown --check || exit 1
