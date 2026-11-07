@@ -211,25 +211,31 @@ export const createRegistrationRetry = (attempt: () => Promise<boolean>) => {
 export const isAccountSwitch = (previous: string | undefined, next: string | undefined): boolean =>
     previous !== undefined && next !== undefined && previous !== next;
 
-/** The account last signed in on this phone, kept across launches so a switch after a relaunch is seen too. */
+/** A one-way digest of the account last signed in on this phone, kept across launches so a switch after a relaunch is seen too. */
 export const LAST_ACCOUNT_KEY = "neore.mobile.last-push-account";
 
 /**
- * Records `userId` as the account signed in on this phone and resolves whether it
- * replaced another one: then the alerts still on the phone are the previous person's.
- * Kept on the device, not in memory, so it holds across a relaunch.
+ * Records the account signed in on this phone and resolves whether it replaced another
+ * one: then the alerts still on the phone are the previous person's. Kept on the device,
+ * not in memory, so it holds across a relaunch; only a digest of the id is kept, so
+ * nothing that names the account stays behind after it signs out.
  */
 export const noteAccountOnPhone = async (
     userId: string,
-    store: { read: (key: string) => Promise<string | null>; writeInPlace: (key: string, value: string) => Promise<void> },
+    store: {
+        digest: (value: string) => Promise<string>;
+        read: (key: string) => Promise<string | null>;
+        writeInPlace: (key: string, value: string) => Promise<void>;
+    },
 ): Promise<boolean> => {
+    const current = await store.digest(userId);
     const previous = await store.read(LAST_ACCOUNT_KEY) ?? undefined;
 
-    if (previous !== userId) {
-        await store.writeInPlace(LAST_ACCOUNT_KEY, userId);
+    if (previous !== current) {
+        await store.writeInPlace(LAST_ACCOUNT_KEY, current);
     }
 
-    return isAccountSwitch(previous, userId);
+    return isAccountSwitch(previous, current);
 };
 
 /** The opaque ids a phone push carries; never any text. */

@@ -1,3 +1,4 @@
+import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto";
 import { addPushTokenListener, DEFAULT_ACTION_IDENTIFIER, dismissAllNotificationsAsync, useLastNotificationResponse } from "expo-notifications";
 import { useRouter, useSegments } from "expo-router";
 import { useEffect, useRef } from "react";
@@ -95,7 +96,12 @@ export const usePhonePush = (): void => {
 
         // Another person signed in on this phone, now or before a relaunch: the alerts still on it are the previous account's.
         quietly("Could not remove the previous account's notifications.", async () => {
-            if (!await noteAccountOnPhone(userId, sharedKeychainOps)) {
+            const isSwitch = await noteAccountOnPhone(userId, {
+                ...sharedKeychainOps,
+                digest: async (value) => await digestStringAsync(CryptoDigestAlgorithm.SHA256, value),
+            });
+
+            if (!isSwitch) {
                 return;
             }
 
@@ -153,7 +159,7 @@ export const usePhonePush = (): void => {
             handled.current = request.identifier;
             // A launch from a notification opens its chat, not the one the launch would reopen.
             canClaimLaunchReopen();
-            holdTapRoute(routeForPush(pushIdsFromNotification(request)));
+            holdTapRoute(routeForPush(pushIdsFromNotification(request)), { whileSignedOut: status === "signed-out" });
         }
 
         // Still signing in (or on the sign-in screen): the sign-in gate goes there instead of the chat list.

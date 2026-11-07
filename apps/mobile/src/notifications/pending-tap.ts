@@ -7,10 +7,15 @@
 
 export type TapRoute = `/chat/${string}` | "/";
 
-const pending: { route?: TapRoute } = {};
+const pending: { route?: TapRoute; whileSignedOut?: boolean } = {};
 
-export const holdTapRoute = (route: TapRoute): void => {
+/**
+ * Holds a tapped notification's destination. `whileSignedOut`: nobody was signed in when it was tapped, so nothing
+ * says it is the account that signs in next; it is not followed after sign-in (`routeAfterSignIn`).
+ */
+export const holdTapRoute = (route: TapRoute, { whileSignedOut = false }: { whileSignedOut?: boolean } = {}): void => {
     pending.route = route;
+    pending.whileSignedOut = whileSignedOut;
 };
 
 /** The held destination, once: whoever navigates takes it. */
@@ -18,12 +23,22 @@ export const takeTapRoute = (): TapRoute | undefined => {
     const { route } = pending;
 
     pending.route = undefined;
+    pending.whileSignedOut = undefined;
 
     return route;
 };
 
-/** Where the sign-in gate sends a person who just signed in: a tapped notification's chat, else the chat list. */
-export const routeAfterSignIn = (): TapRoute => takeTapRoute() ?? "/";
+/**
+ * Where the sign-in gate sends a person who just signed in: a tapped notification's chat when it was tapped with a
+ * session on the phone (the cold start of a signed-in account), else the chat list. A tap from the sign-in screen
+ * may be the previous account's: following it would hand its chat id to whoever signs in.
+ */
+export const routeAfterSignIn = (): TapRoute => {
+    const { whileSignedOut } = pending;
+    const route = takeTapRoute();
+
+    return whileSignedOut === true ? "/" : route ?? "/";
+};
 
 /** Whether the hook may go to a held tap now; otherwise the sign-in gate takes it once signed in. */
 export const canNavigateToTap = (input: { isOnSignIn: boolean; status: "loading" | "signed-in" | "signed-out" }): boolean =>
@@ -35,4 +50,5 @@ export const canNavigateToTap = (input: { isOnSignIn: boolean; status: "loading"
  */
 export const clearTapRoute = (): void => {
     pending.route = undefined;
+    pending.whileSignedOut = undefined;
 };

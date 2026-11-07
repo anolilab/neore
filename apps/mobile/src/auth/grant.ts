@@ -320,36 +320,6 @@ export const revokeSessionToken = async (input: { fetch: Fetch; lunoraUrl: strin
     await response.body?.cancel();
 };
 
-/** Forget the session on the phone, then revoke it server-side; a failed revoke still leaves it forgotten. */
-export const signOutGrant = async (input: { fetch: Fetch; lunoraUrl: string; store: GrantStore }): Promise<void> => {
-    let token: string | undefined;
-    let notCleared: StoredGrantNotClearedError | undefined;
-
-    try {
-        token = await takeStoredGrant(input.store);
-    } catch (error) {
-        if (!(error instanceof StoredGrantNotClearedError)) {
-            throw error;
-        }
-
-        notCleared = error;
-        ({ token } = error);
-    }
-
-    if (token !== undefined) {
-        try {
-            await revokeSessionToken({ fetch: input.fetch, lunoraUrl: input.lunoraUrl, token });
-        } catch {
-            // Offline: the session expires on its own.
-        }
-    }
-
-    // A grant still in the keychain is the caller's to report; the session it held is revoked above.
-    if (notCleared) {
-        throw notCleared;
-    }
-};
-
 /**
  * The stored user, or null when there is none or the store cannot be read. A failed read must not
  * stop the caller: the access token is already valid, so the session carries on without a profile.

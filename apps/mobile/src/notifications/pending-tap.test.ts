@@ -36,4 +36,10 @@ describe("a tapped notification's destination", () => {
 
         expect(routeAfterSignIn()).toBe("/");
     });
+
+    it("is not followed after sign-in when it was tapped with nobody signed in: it may be the previous account's", () => {
+        holdTapRoute("/chat/previous-account-chat", { whileSignedOut: true });
+
+        expect(routeAfterSignIn()).toBe("/");
+    });
 });

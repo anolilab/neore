@@ -259,6 +259,7 @@ describe("noteAccountOnPhone", () => {
         return {
             items,
             store: {
+                digest: async (value: string) => `sha256:${value}`,
                 read: async (key: string) => items[key] ?? null,
                 writeInPlace: vi.fn(async (key: string, value: string) => {
                     items[key] = value;
@@ -268,20 +269,21 @@ describe("noteAccountOnPhone", () => {
     };
 
     it("sees another person signing in even after a relaunch, because the last account is kept on the phone", async () => {
-        const { items, store } = device("u1");
+        const { items, store } = device("sha256:u1");
 
         expect(await noteAccountOnPhone("u2", store)).toBe(true);
-        expect(items[LAST_ACCOUNT_KEY]).toBe("u2");
+        // Only a digest is kept: nothing naming the account stays on the phone.
+        expect(items[LAST_ACCOUNT_KEY]).toBe("sha256:u2");
     });
 
     it("is no switch for the same person, or the first sign-in on the phone, and writes only on a change", async () => {
-        const same = device("u1");
+        const same = device("sha256:u1");
         const first = device();
 
         expect(await noteAccountOnPhone("u1", same.store)).toBe(false);
         expect(same.store.writeInPlace).not.toHaveBeenCalled();
         expect(await noteAccountOnPhone("u1", first.store)).toBe(false);
-        expect(first.items[LAST_ACCOUNT_KEY]).toBe("u1");
+        expect(first.items[LAST_ACCOUNT_KEY]).toBe("sha256:u1");
     });
 });
 
