@@ -27,6 +27,21 @@ vi.mock(import("@/lib/upload/upload-file"), () => {
     return { uploadFile };
 });
 
+const { heicToJpegBlob, isSafariUserAgent } = vi.hoisted(() => {
+    return {
+        heicToJpegBlob: vi.fn(async () => new Blob(["jpeg bytes"], { type: "image/jpeg" })),
+        isSafariUserAgent: vi.fn(() => true),
+    };
+});
+
+vi.mock("@/lib/upload/heic-decode", () => {
+    return { heicToJpegBlob };
+});
+
+vi.mock("@/features/local-models/lib/local-errors", () => {
+    return { isSafariUserAgent };
+});
+
 const MB = 1024 * 1024;
 const UPLOAD_ID = "upload-1";
 
@@ -53,6 +68,7 @@ beforeEach(() => {
 
         return UPLOAD_ID;
     });
+    isSafariUserAgent.mockReturnValue(true);
 });
 
 describe(uploadChatAttachment, () => {
@@ -152,6 +168,66 @@ describe(createLunoraAttachmentAdapter, () => {
         await expect(adapter.upload({ file })).rejects.toBeInstanceOf(AttachmentTooLargeError);
         expect(uploadFile).not.toHaveBeenCalled();
         expect(action).not.toHaveBeenCalled();
+    });
+
+    it("converts a HEIC photo to JPEG before it is decoded and uploaded, in Safari", async () => {
+        isSafariUserAgent.mockReturnValue(true);
+        const adapter = createLunoraAttachmentAdapter(client().lunora);
+        const file = new File(["heic"], "IMG_9.HEIC", { type: "image/heic" });
+
+        await adapter.upload({ file });
+
+        expect(heicToJpegBlob).toHaveBeenCalledWith(file, 0.92);
+        expect(downscaleOversizedImage).toHaveBeenCalledWith(expect.objectContaining({ name: "IMG_9.jpg", type: "image/jpeg" }));
+        expect(uploadFile).toHaveBeenCalledWith(expect.objectContaining({ name: "IMG_9.jpg", type: "image/jpeg" }), expect.anything());
+    });
+
+    it("downscales a converted photo that is over the cap, rather than refusing its JPEG before the downscaler runs", async () => {
+        isSafariUserAgent.mockReturnValue(true);
+        heicToJpegBlob.mockResolvedValueOnce(new Blob([new Uint8Array(21 * MB)], { type: "image/jpeg" }));
+        downscaleOversizedImage.mockResolvedValueOnce(new File(["small"], "IMG_11.jpg", { type: "image/jpeg" }));
+        const adapter = createLunoraAttachmentAdapter(client().lunora);
+        const file = new File(["heic"], "IMG_11.HEIC", { type: "image/heic" });
+
+        await expect(adapter.upload({ file })).resolves.toBeDefined();
+        expect(downscaleOversizedImage).toHaveBeenCalledWith(expect.objectContaining({ name: "IMG_11.jpg" }));
+    });
+
+    it("sends a HEIC photo unchanged in a browser that cannot decode it, and the server's refusal rejects the upload", async () => {
+        isSafariUserAgent.mockReturnValue(false);
+        heicToJpegBlob.mockClear();
+        const { lunora } = client({
+            finalize: async () => {
+                throw serverError("CHAT_UPLOAD_UNSUPPORTED_TYPE");
+            },
+        });
+        const adapter = createLunoraAttachmentAdapter(lunora);
+        const file = new File(["heic"], "IMG_10.HEIC", { type: "image/heic" });
+
+        const error = await adapter.upload({ file }).catch((error_: unknown) => error_);
+
+        expect(error).toBeInstanceOf(AttachmentUploadError);
+        expect(error).toMatchObject({ fileName: "IMG_10.HEIC", reason: "unsupported" });
+        expect(heicToJpegBlob).not.toHaveBeenCalled();
+        expect(uploadFile).toHaveBeenCalledWith(file, expect.objectContaining({ contentType: "image/heic" }));
+    });
+
+    it("refuses a HEIC photo over the source ceiling before it is decoded", async () => {
+        heicToJpegBlob.mockClear();
+        const adapter = createLunoraAttachmentAdapter(client().lunora);
+        const file = new File(["heic"], "huge.heic", { type: "image/heic" });
+
+        Object.defineProperty(file, "size", { value: 60 * MB });
+
+        await expect(adapter.upload({ file })).rejects.toBeInstanceOf(AttachmentTooLargeError);
+        expect(heicToJpegBlob).not.toHaveBeenCalled();
+    });
+
+    it("refuses a HEIC photo the decoder cannot read as an unsupported attachment", async () => {
+        heicToJpegBlob.mockRejectedValueOnce(new Error("broken"));
+        const adapter = createLunoraAttachmentAdapter(client().lunora);
+
+        await expect(adapter.upload({ file: new File(["x"], "broken.heic", { type: "image/heic" }) })).rejects.toBeInstanceOf(AttachmentUploadError);
     });
 
     it("refuses an image over the cap before it is decoded", async () => {
