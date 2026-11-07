@@ -418,6 +418,52 @@ describe("useUpdateUserSettings.updateLatest with failFast", () => {
         expect(queryClient.getQueryData(QUERY_KEY)).toEqual({ threadTitleInstructions: "First" });
     });
 
+    it("leaves a later edit of the same field alone when it is refused, even when that edit set the same value", async () => {
+        const { queryClient, result } = setup();
+
+        let outcome: Promise<void> | undefined;
+
+        act(() => {
+            void result.current.updateLatest(() => {
+                return { threadTitleInstructions: "First" };
+            });
+            outcome = result.current.updateLatest(
+                () => {
+                    return { threadTitleInstructions: "Second" };
+                },
+                { failFast: true },
+            );
+            // A later edit sets the same value again.
+            void result.current.updateLatest(() => {
+                return { threadTitleInstructions: "Second" };
+            });
+        });
+        await flush();
+
+        act(() => {
+            onlineManager.setOnline(false);
+        });
+
+        await expect(outcome).rejects.toThrow("no connection");
+        expect(queryClient.getQueryData(QUERY_KEY)).toEqual({ threadTitleInstructions: "Second" });
+
+        // Let the queue drain, so the next test starts with no write in flight.
+        act(() => {
+            onlineManager.setOnline(true);
+        });
+        await act(async () => {
+            harness.sent[0]?.release();
+            await Promise.resolve();
+        });
+        await flush();
+
+        for (const request of harness.sent) {
+            request.release();
+        }
+
+        await flush();
+    });
+
     it("waits its turn behind a save already in flight, so two writes never run at once", async () => {
         const { result } = setup();
 

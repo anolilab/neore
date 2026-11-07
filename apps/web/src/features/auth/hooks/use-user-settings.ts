@@ -24,6 +24,9 @@ export const useUserSettings = () => {
  */
 const settingsWrites = { pending: 0, tail: Promise.resolve() as Promise<unknown> };
 
+/** Which `updateLatest` call last edited each field in this tab: a refused write restores only the fields still its own. */
+const lastFieldEdit = new Map<string, symbol>();
+
 /** Why a fail-fast write was not sent: there is no connection, so it would wait for one. */
 const OFFLINE_ERROR = "The setting was not saved: there is no connection.";
 
@@ -156,10 +159,16 @@ export const useUpdateUserSettings = () => {
 
         settingsWrites.pending += 1;
 
+        const edit = Symbol("settings edit");
+
+        for (const field of fields) {
+            lastFieldEdit.set(field as string, edit);
+        }
+
         const previous = settingsWrites.tail;
 
-        // A fail-fast write refused before its turn restores its own fields, as long as no later edit changed them: the
-        // writes queued around it keep theirs.
+        // A fail-fast write refused before its turn restores its own fields, as long as no later edit touched them (even
+        // to the same value): the writes queued around it keep theirs.
         const restoreOwnFields = () => {
             const cached = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
             const sameEntry = queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey }) === cacheEntry;
@@ -168,7 +177,7 @@ export const useUpdateUserSettings = () => {
                 return;
             }
 
-            const unchanged = fields.filter((field) => cached[field] === (patch as Partial<NonNullable<UserSettingsRow>>)[field]);
+            const unchanged = fields.filter((field) => lastFieldEdit.get(field as string) === edit);
 
             queryClient.setQueryData(queryOptions.queryKey, { ...cached, ...Object.fromEntries(unchanged.map((field) => [field, before[field]])) });
         };
