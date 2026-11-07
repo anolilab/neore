@@ -12,10 +12,12 @@ const FULL_BOX_BYTES = 4;
 const META_MAX_BYTES = 4 * 1024 * 1024;
 
 /**
- * Header bytes the top-level scan may read. A box is passed by its length, so only headers are read and a photo may carry
- * any number of boxes before `meta`; this budget only stops a file made of endless tiny boxes.
+ * Top-level boxes the scan may pass before `meta`. A box is passed by its length, so only headers are read; a photo has a
+ * handful (`ftyp`, `meta`, `mdat`), and this budget stops a file of endless tiny boxes after as many small reads.
  */
-const MAX_HEADER_SCAN_BYTES = 1024 * 1024;
+const MAX_TOP_LEVEL_BOXES = 1024;
+/** Boxes read from one container. A photo's property list holds tens; this stops a `meta` box packed with empty boxes. */
+const MAX_CHILD_BOXES = 4096;
 
 const ascii = (bytes: Uint8Array, offset: number): string => String.fromCodePoint(...bytes.subarray(offset, offset + 4));
 
@@ -24,14 +26,12 @@ const viewOf = (bytes: Uint8Array): DataView => new DataView(bytes.buffer, bytes
 /** The `meta` box's body, found by reading only box headers: every other box is skipped by its length, never read. */
 const metaBody = async (file: Blob): Promise<Uint8Array | undefined> => {
     let offset = 0;
-    let scanned = 0;
 
     // Each box is at least a header long, so `offset` always advances and the walk ends at the end of the file or the budget.
-    while (offset + BOX_HEADER_BYTES <= file.size && scanned < MAX_HEADER_SCAN_BYTES) {
+    for (let scanned = 0; offset + BOX_HEADER_BYTES <= file.size && scanned < MAX_TOP_LEVEL_BOXES; scanned += 1) {
         const head = new Uint8Array(await file.slice(offset, offset + LARGE_BOX_HEADER_BYTES).arrayBuffer());
         const view = viewOf(head);
 
-        scanned += head.length;
         let size = view.getUint32(0);
         let header = BOX_HEADER_BYTES;
 
@@ -71,8 +71,8 @@ const boxesIn = (bytes: Uint8Array): Box[] => {
     const view = viewOf(bytes);
     let offset = 0;
 
-    // Each box is at least a header long, so `offset` always advances; the list is bounded by the bytes it was given.
-    while (offset + BOX_HEADER_BYTES <= bytes.length) {
+    // Each box is at least a header long, so `offset` always advances; the list is bounded by its bytes and the box budget.
+    while (offset + BOX_HEADER_BYTES <= bytes.length && boxes.length < MAX_CHILD_BOXES) {
         let size = view.getUint32(offset);
         let header = BOX_HEADER_BYTES;
 
@@ -163,15 +163,17 @@ const primarySize = (meta: Uint8Array): HeicSize | undefined => {
     const itemId = wideId ? pitmView.getUint32(FULL_BOX_BYTES) : pitmView.getUint16(FULL_BOX_BYTES);
     const inner = boxesIn(iprp.body);
     const ipco = inner.find((box) => box.type === "ipco");
-    const ipma = inner.find((box) => box.type === "ipma");
+    // There may be several `ipma` boxes (one per version and flags pair); the primary item's associations can be in any.
+    const ipmas = inner.filter((box) => box.type === "ipma");
 
-    if (!ipco || !ipma) {
+    if (!ipco || ipmas.length === 0) {
         return undefined;
     }
 
     const properties = boxesIn(ipco.body);
+    const indexes = ipmas.flatMap((ipma) => associatedIndexes(ipma.body, itemId));
 
-    for (const index of associatedIndexes(ipma.body, itemId)) {
+    for (const index of indexes) {
         const property = properties[index - 1];
 
         // `ispe` is a full box: its width and height follow the 4 version and flag bytes.

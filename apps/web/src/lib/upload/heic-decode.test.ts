@@ -65,6 +65,15 @@ describe(heicSize, () => {
         await expect(heicSize(photo)).resolves.toStrictEqual({ height: 3024, width: 4032 });
     });
 
+    it("reads the primary item's size from a second `ipma` box", async () => {
+        const properties = box("ipco", ispe(100, 100), ispe(4032, 3024));
+        const thumbnail = box("ipma", FULL_BOX, u32(1), u16(2), [1, 1]);
+        const primary = box("ipma", [1, 0, 0, 0], u32(1), u32(1), [1, 2]);
+        const photo = photoFile(box("meta", FULL_BOX, pitm(1), box("iprp", properties, thumbnail, primary)));
+
+        await expect(heicSize(photo)).resolves.toStrictEqual({ height: 3024, width: 4032 });
+    });
+
     it("answers nothing for bytes that are not a box structure", async () => {
         const photo = new File(["not a photo at all"], "notes.heic");
 
@@ -104,6 +113,15 @@ describe(heicSize, () => {
         await expect(heicSize(photo)).resolves.toStrictEqual({ height: 3024, width: 4032 });
     });
 
+    it("reads no more than 4096 properties, so a size listed after them is not found", async () => {
+        const leading = Array.from({ length: 4100 }, () => box("free"));
+        const properties = box("ipco", ...leading, ispe(4032, 3024));
+        const associations = box("ipma", [0, 0, 0, 1], u32(1), u16(1), [1], u16(4101));
+        const photo = photoFile(box("meta", FULL_BOX, pitm(1), box("iprp", properties, associations)));
+
+        await expect(heicSize(photo)).resolves.toBeUndefined();
+    });
+
     it("answers nothing for a box whose declared size is smaller than its own header", async () => {
         const photo = photoFile([0, 0, 0, 4, ...text("meta"), ...FULL_BOX]);
 
@@ -121,8 +139,8 @@ describe(heicSize, () => {
     });
 
     it("stops scanning a file of endless tiny boxes rather than walking it to the end", async () => {
-        // 70,000 boxes of 8 bytes: more header bytes than the scan budget reads, so the walk ends before `meta`.
-        const endless = Array.from({ length: 70_000 }, () => box("free")).flat();
+        // 2,000 boxes of 8 bytes: more than the scan passes, so the walk ends before `meta` after a bounded number of reads.
+        const endless = Array.from({ length: 2000 }, () => box("free")).flat();
         const photo = photoFile([...endless, ...primaryMeta(4032, 3024)]);
 
         await expect(heicSize(photo)).resolves.toBeUndefined();
