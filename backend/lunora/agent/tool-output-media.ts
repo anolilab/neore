@@ -25,7 +25,7 @@
 import { storageLogger } from "../lib/logger";
 import { STORAGE_REF_PREFIX, toStorageRef } from "../lib/storage-ref";
 import { isRecord } from "../lib/storage-sign";
-import { MAX_FILE_SIZE } from "./client/files";
+import { MAX_FILE_SIZE, STORE_MAX_BYTES } from "./client/files";
 
 /**
  * Stores base64 media as a chat file owned by the run's user; returns its file id and storage key. Given the same
@@ -171,6 +171,13 @@ export const offloadToolOutputMedia = async (
             inline.smallChars -= value.length;
 
             return { kind: "kept" };
+        }
+
+        if (size > STORE_MAX_BYTES) {
+            // Storage refuses it anyway, and decoding and hashing it first would only spend the Worker's memory.
+            unsaved += 1;
+
+            return { kind: "dropped" };
         }
 
         try {

@@ -325,6 +325,17 @@ describe(offloadToolOutputMedia, () => {
         expect(second.output).toStrictEqual({ screenshotFormat: "png", unsavedMedia: 1 });
     });
 
+    it("drops media past the storage cap without trying to store it", async () => {
+        const { STORE_MAX_BYTES } = await import("./client/files");
+        const store = fakeStore();
+        const huge = base64Of(STORE_MAX_BYTES + 3);
+
+        const result = await offloadToolOutputMedia(BROWSER_TOOL, { screenshot: huge, screenshotFormat: "png" }, store, stepInlineBudget(), BUDGET);
+
+        expect(result.output).toStrictEqual({ screenshotFormat: "png", unsavedMedia: 1 });
+        expect(store).not.toHaveBeenCalled();
+    });
+
     it("leaves text and non-object outputs alone", async () => {
         const store = fakeStore();
 
