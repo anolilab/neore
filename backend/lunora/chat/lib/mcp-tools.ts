@@ -282,8 +282,6 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
 
             clients.push(client);
 
-            const firstPrints = new Map<string, Promise<string>>();
-
             // What a tool of this server is, hashed from the tool as its server listed it (`mcp-tool-fingerprint.ts`).
             const identify = async (toolName: string, tool: Tool): Promise<string> => {
                 const annotations = readMcpAnnotations(tool);
@@ -296,6 +294,16 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
                     toolName,
                     url: server.url,
                 });
+            };
+
+            // The hash of each tool as FIRST listed, made once: the listing records it and a reconnect compares against it.
+            const firstPrints = new Map<string, Promise<string>>();
+            const firstPrint = async (toolName: string, tool: Tool): Promise<string> => {
+                const known = firstPrints.get(toolName) ?? identify(toolName, tool);
+
+                firstPrints.set(toolName, known);
+
+                return await known;
             };
 
             // Mid-run 401 → one refresh and one fresh client for the whole
@@ -311,14 +319,7 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
 
                     return retry;
                 },
-                async (toolName, first, relisted) => {
-                    // The first listing is hashed once per tool; every call after a reconnect is checked against it.
-                    const firstPrint = firstPrints.get(toolName) ?? identify(toolName, first);
-
-                    firstPrints.set(toolName, firstPrint);
-
-                    return (await identify(toolName, relisted)) === (await firstPrint);
-                },
+                async (toolName, first, relisted) => (await identify(toolName, relisted)) === (await firstPrint(toolName, first)),
             );
 
             for (const [toolName, tool] of Object.entries(serverTools)) {
@@ -329,7 +330,7 @@ export const getMCPTools = async (servers: MCPServerConfig[], { progress }: GetM
 
                 tools[runtimeName] = progress ? withProgress(wrapped, { serverName: server.name, toolName }, progress) : wrapped;
                 listed.push({
-                    fingerprint: async () => await identify(toolName, tool),
+                    fingerprint: async () => await firstPrint(toolName, tool),
                     runtimeName,
                     source: {
                         ...(annotations && { annotations }),
