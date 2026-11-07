@@ -515,6 +515,27 @@ describe("the coding-agent composer", () => {
         expect(second).toBe(first);
     });
 
+    it("offers no Send now that would stop a turn a queued message's lost send may have started", async () => {
+        harness.sendResults = [{ error: "unreachable", ok: false }];
+        mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "lost answer" } });
+        fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+        await screen.findByText("lost answer");
+        await endTurn();
+        await waitFor(() => expect(sendCalls()).toHaveLength(1));
+
+        // The send's turn shows up after all: stopping it and sending again under the same id would never run the message.
+        harness.data = { ...harness.data, "chat.streaming.getActiveStreamForThread": { streamId: "stream-2" } };
+        await harness.client?.invalidateQueries();
+
+        const sendNow = await screen.findByRole("button", { name: "Send queued message 1 now" });
+
+        expect((sendNow as HTMLButtonElement).disabled).toBe(true);
+    });
+
     it("keeps the interrupting text queued and paused when the reply did not stop", async () => {
         mount({ ...session(), "acp.remote.cancelHostTurn:result": { cancelled: false }, "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
 

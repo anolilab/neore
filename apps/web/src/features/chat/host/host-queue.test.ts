@@ -286,7 +286,7 @@ describe("an accepted send that names its turn", () => {
         const running = run([observed("stream-1")], IDLE).state;
         const step = run([{ duplicate: true, itemId: undefined, streamId: "stream-1", type: "accepted" }], {
             ...running,
-            phase: { endedDuring: false, firstTry: true, itemId: undefined, kind: "sending", requestId: undefined, seenLive: [] },
+            phase: { endedDuring: false, itemId: undefined, kind: "sending", seenLive: [] },
         });
 
         expect(step.state.phase).toEqual({ kind: "awaiting-turn-end", streamId: "stream-1" });
@@ -567,8 +567,8 @@ describe("editing a queued message", () => {
 
 describe("Send now", () => {
     it("interrupts a running turn, and sends next with no turn running", () => {
-        expect(sendNowAction(RUNNING, { itemId: "b", running: true })).toBe("interrupt");
-        expect(sendNowAction(IDLE, { itemId: "b", running: false })).toBe("release");
+        expect(sendNowAction(RUNNING, { itemId: "b", running: true, tried: false })).toBe("interrupt");
+        expect(sendNowAction(IDLE, { itemId: "b", running: false, tried: false })).toBe("release");
     });
 
     it("waits while a send or a stop is in flight, before the reads answer, and while an accepted send's turn has not shown", () => {
@@ -576,57 +576,16 @@ describe("Send now", () => {
         const unseen = run([{ itemId: "a", type: "accepted" }], sending).state;
         const stopping = run([{ itemId: "a", streamId: "stream-1", type: "interrupt", wasPaused: false }], RUNNING).state;
 
-        expect(sendNowAction(INITIAL_HOST_QUEUE, { itemId: "b", running: false })).toBeUndefined();
-        expect(sendNowAction(sending, { itemId: "b", running: false })).toBeUndefined();
-        expect(sendNowAction(unseen, { itemId: "b", running: false })).toBeUndefined();
-        expect(sendNowAction(stopping, { itemId: "b", running: true })).toBeUndefined();
+        expect(sendNowAction(INITIAL_HOST_QUEUE, { itemId: "b", running: false, tried: false })).toBeUndefined();
+        expect(sendNowAction(sending, { itemId: "b", running: false, tried: false })).toBeUndefined();
+        expect(sendNowAction(unseen, { itemId: "b", running: false, tried: false })).toBeUndefined();
+        expect(sendNowAction(stopping, { itemId: "b", running: true, tried: false })).toBeUndefined();
     });
 
-    it("does not stop a turn for a message already tried, since that turn may be its own lost-answer send", () => {
-        const lost = run(
-            [{ itemId: "a", type: "send" }, { error: "unreachable", itemId: "a", live: undefined, type: "refused" }, observed("stream-a")],
-            IDLE,
-        ).state;
-
-        expect(sendNowAction(lost, { itemId: "a", running: true })).toBeUndefined();
-        expect(sendNowAction(lost, { itemId: "b", running: true })).toBe("interrupt");
-        // Once that turn has ended it goes under its own id, which the backend answers as a duplicate if it took it.
-        const ended = run([observed(undefined, ["stream-a", "finished"])], lost).state;
-
-        expect(sendNowAction(ended, { itemId: "a", running: false })).toBe("release");
-    });
-
-    it("does not stop a turn for a queued retry of a direct send whose answer was lost", () => {
-        // The retry is queued under the direct send's request id, which may be the turn running now.
-        const lost = run(
-            [
-                { itemId: undefined, requestId: "r1", type: "send" },
-                { error: "unreachable", itemId: undefined, live: undefined, type: "refused" },
-                observed("stream-r"),
-            ],
-            IDLE,
-        ).state;
-
-        expect(sendNowAction(lost, { itemId: "r1", running: true })).toBeUndefined();
-    });
-
-    it("does not stop a turn for a message queued before the composer mounted, since it may have been sent already", () => {
-        const inherited = run([{ itemIds: ["a"], type: "inherited" }], RUNNING).state;
-
-        expect(sendNowAction(inherited, { itemId: "a", running: true })).toBeUndefined();
-        expect(sendNowAction(inherited, { itemId: "b", running: true })).toBe("interrupt");
-    });
-
-    it("stops a turn for a message whose send was refused as a running turn, since that send was never taken", () => {
-        const refused = run(
-            [
-                { itemId: "a", type: "send" },
-                { error: "turn_running", itemId: "a", live: "stream-other", type: "refused" },
-            ],
-            IDLE,
-        ).state;
-
-        expect(sendNowAction(refused, { itemId: "a", running: true })).toBe("interrupt");
+    it("does not stop a turn for a message whose send may have been taken, and sends it next once no turn runs", () => {
+        // That turn may be its own lost-answer send: a resend under its id would be a duplicate of the stopped turn.
+        expect(sendNowAction(RUNNING, { itemId: "a", running: true, tried: true })).toBeUndefined();
+        expect(sendNowAction(IDLE, { itemId: "a", running: false, tried: true })).toBe("release");
     });
 
     it("holds a released message again when a turn from elsewhere starts before it went", () => {
@@ -650,7 +609,7 @@ describe("Send now", () => {
 
         expect(sent.phase.kind).toBe("idle");
         expect(canSendQueueHead(sent, paused)).toBe(false);
-        expect(sendNowAction(sent, { itemId: "b", running: false })).toBeUndefined();
+        expect(sendNowAction(sent, { itemId: "b", running: false, tried: false })).toBeUndefined();
         expect(run([{ itemId: "b", type: "released" }], sent).state.released).toBeUndefined();
     });
 });

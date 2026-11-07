@@ -171,7 +171,8 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     const refusals = useRef(0);
     // The box's text as the last change left it, read by a send that finishes after the person has typed.
     const boxText = useRef("");
-    const attempt = useRef<{ id: string; text: string } | undefined>(undefined);
+    // `mayBeTaken`: a send under the id failed in a way that does not say the backend refused it, so it may have started a turn.
+    const attempt = useRef<{ id: string; mayBeTaken?: boolean; text: string } | undefined>(undefined);
     const {
         data: session,
         dataUpdatedAt: sessionAt,
@@ -307,13 +308,6 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         }
     };
 
-    // Messages already queued when the composer mounts (restored after a reload, or left by an earlier visit) may have been sent
-    // under their ids, and this machine never saw it: they count as tried.
-    useEffect(() => {
-        dispatch({ itemIds: usePromptQueueStore.getState().queues[threadId]?.items.map((item) => item.id) ?? [], type: "inherited" });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [threadId]);
-
     const { phase } = machine;
     const sending = phase.kind === "sending";
     const interrupting = phase.kind === "awaiting-stop";
@@ -411,11 +405,16 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
 
         const before = machineRef.current;
 
-        dispatch({ itemId: queuedId, requestId, type: "send" });
+        dispatch({ itemId: queuedId, type: "send" });
 
         // The machine refused it (another send is in flight, or the queue moved on since this send was decided): nothing is posted.
         if (machineRef.current === before) {
             return;
+        }
+
+        // Until the answer is in, the backend may take this send: the message's own turn could then be the one running.
+        if (queuedId !== undefined) {
+            usePromptQueueStore.getState().setTried(threadId, queuedId, true);
         }
 
         const refusalsBefore = refusals.current;
@@ -454,6 +453,15 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
             const [freshSession, freshLive] = await Promise.all([refetchSession(), refetchLive()]);
 
             liveNow = freshSession.data?.liveStreamId ?? freshLive.data?.streamId ?? undefined;
+        }
+
+        // The backend checks for a repeat before it checks for a running turn, so `turn_running` means this id was never taken.
+        const taken = result.error !== "turn_running";
+
+        if (queuedId !== undefined) {
+            usePromptQueueStore.getState().setTried(threadId, queuedId, taken);
+        } else if (attempt.current?.id === requestId) {
+            attempt.current = { ...attempt.current, mayBeTaken: taken };
         }
 
         dispatch({ error: result.error, itemId: queuedId, live: liveNow, type: "refused" });
@@ -536,13 +544,13 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         if (queueing) {
             // A draft whose direct send failed is retried, not new: the first queued retry keeps that send's id, so a send the
             // backend already took is recognised as the same message. The id is handed over once; a later submission is new.
-            const retryId = attempt.current?.text === prompt ? attempt.current.id : undefined;
+            const retry = attempt.current?.text === prompt ? attempt.current : undefined;
 
-            if (retryId !== undefined) {
+            if (retry !== undefined) {
                 attempt.current = undefined;
             }
 
-            enqueue(threadId, { attachments: [], id: retryId, text: prompt });
+            enqueue(threadId, { attachments: [], id: retry?.id, text: prompt, ...(retry?.mayBeTaken === true && { tried: true }) });
 
             if (draft !== undefined && boxText.current === draft) {
                 boxText.current = "";
@@ -594,14 +602,17 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         }
     };
 
-    const sendNowFor = (itemId: string, state: HostQueueState) =>
-        cancel.isPending || blocked || starting ? undefined : sendNowAction(state, { itemId, running: isTurnLive(state, liveStreamId) });
+    const sendNowFor = (itemId: string, state: HostQueueState) => {
+        const tried = usePromptQueueStore.getState().queues[threadId]?.items.some((item) => item.id === itemId && item.tried === true) === true;
+
+        return cancel.isPending || blocked || starting ? undefined : sendNowAction(state, { itemId, running: isTurnLive(state, liveStreamId), tried });
+    };
 
     /**
      * Send now: the queued message moves to the head and goes next, through the same machine as everything else. With a turn
      * running it is Interrupt and send for that message; with none, it goes past a paused queue, which stays paused behind
      * it. It keeps its id, so a send of it the backend already took comes back as a duplicate and starts nothing; for the same
-     * reason, a message tried before never stops a turn (`sendNowAction`).
+     * reason, a message whose send may have been taken never stops a turn (`sendNowAction`).
      */
     const sendNow = (itemId: string) => {
         const action = sendNowFor(itemId, machineRef.current);

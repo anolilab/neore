@@ -117,6 +117,13 @@ describe("prompt queue persistence", () => {
         });
     });
 
+    it("keeps whether a send may have been taken across a reload, and an edit, a new message, drops it", () => {
+        const tried: PromptQueueState<never> = { items: [{ attachments: [], id: "a", text: "go", tried: true }], paused: false };
+
+        expect(restorePromptQueue(serializePromptQueue(tried))?.items[0]?.tried).toBe(true);
+        expect(editQueuedPrompt(tried, "a", "go further", "b").items[0]).toStrictEqual({ attachments: [], id: "b", text: "go further" });
+    });
+
     it("leaves out attachment-only prompts and stores nothing for an empty queue", () => {
         expect(serializePromptQueue({ items: [{ attachments: ["file"], id: "a", text: "  " }], paused: false })).toBeUndefined();
         expect(serializePromptQueue(EMPTY_PROMPT_QUEUE)).toBeUndefined();

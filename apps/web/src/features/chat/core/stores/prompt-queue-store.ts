@@ -53,6 +53,8 @@ interface PromptQueueStore {
     setPaused: (threadId: string, paused: boolean) => void;
     /** `steerRun` answered: keeps the steer (`accepted`) or makes it an ordinary queued message (`refused`). */
     settleSteer: (threadId: string, steerId: string, outcome: "accepted" | "refused") => void;
+    /** Marks whether a send was made under a queued message's id whose answer may have been lost. */
+    setTried: (threadId: string, id: string, tried: boolean) => void;
     /** Removes and returns the oldest queued prompt. */
     shift: (threadId: string) => QueuedChatPrompt | undefined;
 }
@@ -135,6 +137,16 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
         queues: {},
         remove: (threadId, id) => update(threadId, (queue) => removeQueuedPrompt(queue, id)),
         setPaused: (threadId, paused) => update(threadId, (queue) => (queue.paused === paused ? queue : { ...queue, paused })),
+        setTried: (threadId, id, tried) =>
+            update(threadId, (queue) => {
+                const target = queue.items.find((item) => item.id === id);
+
+                if (!target || Boolean(target.tried) === tried) {
+                    return queue;
+                }
+
+                return { ...queue, items: queue.items.map((item) => (item === target ? { ...item, tried } : item)) };
+            }),
         settleSteer: (threadId, steerId, outcome) => update(threadId, (queue) => settleQueuedSteer(queue, steerId, outcome)),
         shift: (threadId) => {
             const { next, state } = dequeuePrompt(get().queues[threadId] ?? EMPTY_PROMPT_QUEUE);

@@ -28,6 +28,8 @@ export interface QueuedPrompt<A> {
     /** Sent into the running reply (`chat/steering.ts`): its id on that run's stream. */
     steer?: QueuedSteer;
     text: string;
+    /** A send was made under its id whose answer may have been lost, so the turn running now may be its own. Kept across a reload. */
+    tried?: boolean;
 }
 
 export interface QueuedSteer {
@@ -82,7 +84,11 @@ export const editQueuedPrompt = <A>(state: PromptQueueState<A>, id: string, text
             }
 
             // A changed text is a new message: its send id must not be one an earlier, lost-answer send already used.
-            return withoutHidden({ ...item, id: newId, text });
+            const renamed: QueuedPrompt<A> = { ...item, id: newId, text };
+
+            delete renamed.tried;
+
+            return withoutHidden(renamed);
         }),
     };
 };
@@ -195,7 +201,7 @@ export const decideAutoSend = ({
 
 /** What a queue looks like in sessionStorage: text only. */
 interface StoredPromptQueue {
-    items: { droppedAttachments: number; id: string; steer?: QueuedSteer; text: string }[];
+    items: { droppedAttachments: number; id: string; steer?: QueuedSteer; text: string; tried?: true }[];
 }
 
 /**
@@ -212,6 +218,7 @@ export const serializePromptQueue = <A>(state: PromptQueueState<A>): string | un
                 id: item.id,
                 ...(item.steer && { steer: { id: item.steer.id, streamId: item.steer.streamId } }),
                 text: item.text,
+                ...(item.tried && { tried: true as const }),
             };
         });
 
@@ -333,7 +340,13 @@ export const restorePromptQueue = (raw: string | null | undefined): PromptQueueS
     const items: QueuedPrompt<never>[] = [];
 
     for (const candidate of rawItems as unknown[]) {
-        const { droppedAttachments, id, steer, text } = (candidate ?? {}) as { droppedAttachments?: unknown; id?: unknown; steer?: unknown; text?: unknown };
+        const { droppedAttachments, id, steer, text, tried } = (candidate ?? {}) as {
+            droppedAttachments?: unknown;
+            id?: unknown;
+            steer?: unknown;
+            text?: unknown;
+            tried?: unknown;
+        };
 
         if (typeof id !== "string" || typeof text !== "string") {
             continue;
@@ -355,6 +368,7 @@ export const restorePromptQueue = (raw: string | null | undefined): PromptQueueS
             id,
             ...(restoredSteer && { steer: restoredSteer }),
             text: clean,
+            ...(tried === true && { tried: true }),
         });
     }
 
