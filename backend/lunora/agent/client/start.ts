@@ -287,10 +287,11 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
         shouldCreatePendingMessage?: boolean,
     ) => {
         if (threadId && saveMessages !== "none") {
+            const mediaOwner = userId ? { threadId, userId } : undefined;
             const serialized =
                 "object" in toSave
                     ? await serializeObjectResult(context_, toSave.object, activeModel)
-                    : await serializeNewMessagesInStep(context_, toSave.step, activeModel);
+                    : await serializeNewMessagesInStep(context_, toSave.step, activeModel, mediaOwner);
             const embeddings = await embedMessages(
                 context_,
                 { threadId, ...options, userId },

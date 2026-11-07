@@ -44,6 +44,7 @@ import { MAX_FILE_SIZE, storeFile } from "./client/files";
 import type { ActionCtx as ActionContext, RunnerCtx as RunnerContext } from "./client/types";
 import type { MutationCtx as MutationContext } from "./client/types";
 import { extractText, getModelName, getProviderName, type ModelOrMetadata } from "./shared";
+import { offloadToolOutputMedia } from "./tool-output-media";
 import type { vAssistantContent, vToolApprovalRequest, vToolApprovalResponse, vToolContent } from "./validators";
 import {
     type Message,
@@ -224,6 +225,7 @@ export const serializeNewMessagesInStep = async <TOOLS extends ToolSet>(
     context: ActionContext,
     step: StepResult<TOOLS>,
     model: ModelOrMetadata | undefined,
+    owner?: ToolMediaOwner,
 ): Promise<{ messages: MessageWithMetadata[] }> => {
     // ref: https://github.com/vercel/ai/blob/main/packages/ai/core/generate-text/to-response-messages.ts
     const toolResultIndex = step.content.findIndex((c) => (c.type === "tool-result" || c.type === "tool-error") && !c.providerExecuted);
@@ -256,7 +258,7 @@ export const serializeNewMessagesInStep = async <TOOLS extends ToolSet>(
 
     if (hasToolResults) {
         const toolContent = step.content.slice(toolResultIndex);
-        const { messageFileIds: toolFileIds, partContent: toolPartContent } = await serializeStepContent(context, toolContent);
+        const { messageFileIds: toolFileIds, partContent: toolPartContent } = await serializeStepContent(context, toolContent, owner);
         const toolMessage = {
             content: toolPartContent as Infer<typeof vToolContent>,
             providerOptions: step.response.messages.at(-1)?.providerOptions,
@@ -307,9 +309,16 @@ export const serializeObjectResult = async (
 
 const getMediaType = (part: { mediaType?: string }) => part.mediaType;
 
+/** Whose run saved a step: the chat files its tool results' inline media move to are theirs (`agent/tool-output-media.ts`). */
+export interface ToolMediaOwner {
+    threadId: string;
+    userId: string;
+}
+
 export const serializeStepContent = async (
     context: ActionContext,
     content: StepResult<ToolSet>["content"],
+    owner?: ToolMediaOwner,
 ): Promise<{ messageFileIds?: string[]; partContent: SerializedContent }> => {
     const fileIds: string[] = [];
     const serialized = await Promise.all(
@@ -397,9 +406,22 @@ export const serializeStepContent = async (
                     } satisfies Infer<typeof vToolResultPart>;
                 }
                 case "tool-result": {
-                    const rawOutput = part.output;
+                    let rawOutput: unknown = part.output;
+
+                    // Without an owner the stored file would be nobody's, and its reference would never be signed.
+                    if (owner) {
+                        const offloaded = await offloadToolOutputMedia(part.toolName, rawOutput, async (bytes, mediaType) => {
+                            const { file } = await storeFile(context, new Blob([bytes], { type: mediaType }), owner);
+
+                            return { fileId: file.fileId, storageId: file.storageId };
+                        });
+
+                        rawOutput = offloaded.output;
+                        fileIds.push(...offloaded.fileIds);
+                    }
+
                     const output: ToolResultOutput =
-                        typeof rawOutput === "string" ? { type: "text", value: rawOutput } : { type: "json", value: part.output ?? null };
+                        typeof rawOutput === "string" ? { type: "text", value: rawOutput } : { type: "json", value: (rawOutput ?? null) as JSONValue };
 
                     return {
                         ...pick(part, ["type", "toolCallId", "toolName", "dynamic", "preliminary", "providerExecuted"]),

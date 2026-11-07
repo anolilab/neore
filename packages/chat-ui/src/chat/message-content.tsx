@@ -34,6 +34,7 @@ import { isHostRunText } from "../utils/host-run-text";
 import { mcpToolMetaKey, resolveMcpToolName } from "../utils/mcp-tool-name";
 import { getPageContextInfo } from "../utils/page-context";
 import { SANDBOX_FILE_TOOL_TYPES, sandboxOutputsOf } from "../utils/sandbox-files";
+import { toolImageSource } from "../utils/tool-image-source";
 import PageContextChip from "./page-context-chip";
 import ToolGroup from "./tool-group";
 import type { ToolGroupSegment } from "./turn-summary";
@@ -490,6 +491,8 @@ interface CodeExecutionOutput {
     results: {
         format?: string;
         type: "error" | "image" | "text";
+        /** A stored image's signed link, written by the server in place of `value`. */
+        url?: string;
         value: string;
     }[];
     stderr: string;
@@ -558,18 +561,17 @@ const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                     )}
 
                     {/* Results (images, text, errors) */}
-                    {output.results.map((result) => {
-                        // Content-based key: stable across re-renders for immutable execution output
-                        const resultKey = `${result.type}-${result.value?.slice(0, 20) ?? ""}`;
+                    {output.results.map((result, index) => {
+                        // Position and content: stable across re-renders for immutable execution output, and distinct for
+                        // stored images, whose `value` is empty.
+                        const resultKey = `${result.type}-${String(index)}-${result.value?.slice(0, 20) ?? ""}`;
 
                         if (result.type === "image") {
-                            return (
+                            const source = toolImageSource({ inline: result.value, mediaType: `image/${result.format || "png"}`, url: result.url });
+
+                            return source === undefined ? null : (
                                 <div className="flex justify-center border-b border-gray-100 p-3 last:border-b-0 dark:border-gray-800" key={resultKey}>
-                                    <img
-                                        alt={t`Code output`}
-                                        className="max-w-full rounded"
-                                        src={`data:image/${result.format || "png"};base64,${result.value}`}
-                                    />
+                                    <img alt={t`Code output`} className="max-w-full rounded" src={source} />
                                 </div>
                             );
                         }
@@ -658,14 +660,20 @@ const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
               error?: string;
               screenshot?: string;
               screenshotFormat?: string;
+              /** A stored screenshot's signed link, written by the server in place of `screenshot`. */
+              screenshotUrl?: string;
               success?: boolean;
               title?: string;
               url?: string;
           }
         | undefined;
 
+    const screenshotSource = output?.screenshotFormat
+        ? toolImageSource({ inline: output.screenshot, mediaType: `image/${output.screenshotFormat}`, url: output.screenshotUrl })
+        : undefined;
+
     // If we have a screenshot, show it prominently
-    if (output?.screenshot && output.screenshotFormat) {
+    if (output && screenshotSource) {
         return (
             <div className="mb-4 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
                 {/* Header */}
@@ -681,7 +689,7 @@ const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                     )}
                 </div>
                 {/* Screenshot */}
-                <img alt={output.title || t`Browser screenshot`} className="w-full" src={`data:image/${output.screenshotFormat};base64,${output.screenshot}`} />
+                <img alt={output.title || t`Browser screenshot`} className="w-full" src={screenshotSource} />
             </div>
         );
     }

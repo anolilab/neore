@@ -125,10 +125,15 @@ export async function saveStepFor<CustomContext extends object, AgentTools exten
         userId?: string;
     },
 ): Promise<{ messages: MessageDoc[] }> {
-    const { messages } = await serializeNewMessagesInStep(ctx, args.step, {
-        model: args.model ?? getModelName(agent.options.languageModel),
-        provider: args.provider ?? getProviderName(agent.options.languageModel),
-    });
+    const { messages } = await serializeNewMessagesInStep(
+        ctx,
+        args.step,
+        {
+            model: args.model ?? getModelName(agent.options.languageModel),
+            provider: args.provider ?? getProviderName(agent.options.languageModel),
+        },
+        args.userId ? { threadId: args.threadId, userId: args.userId } : undefined,
+    );
     const embeddings = await agent.generateEmbeddings(
         ctx,
         { threadId: args.threadId, userId: args.userId },
