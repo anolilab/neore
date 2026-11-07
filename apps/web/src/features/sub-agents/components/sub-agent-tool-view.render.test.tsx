@@ -107,7 +107,11 @@ vi.mock("@/lib/toast", () => {
 });
 
 vi.mock("@neore/client-runtime", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("@neore/client-runtime")>()), useUnlockProof: () => "proof-1" };
+    return {
+        ...(await importOriginal<typeof import("@neore/client-runtime")>()),
+        // Each chat has its own proof: the parent's reads the list, the child's answers its request.
+        useUnlockProof: (threadId: string | undefined) => ({ "child-1": "proof-child", "parent-1": "proof-1" })[threadId ?? ""],
+    };
 });
 
 const part = { input: { task: "Tidy up" }, state: "output-available", toolCallId: "call-1", type: "tool-delegateToSubAgent" } as unknown as ToolPart;
@@ -118,6 +122,8 @@ const WANTS_TO_RUN = /wants to run "mcp_Files__delete"/u;
 const ALWAYS_ALLOW = /Always allow/u;
 const FOR_AN_HOUR = /for 1 hour/u;
 const OTHER_TOOL = /webSearch/u;
+const CUT_NOTICE = /500 more characters not shown; approving runs the whole call/u;
+const EXPIRED = /request for approval was not answered in time/u;
 
 afterEach(() => {
     state.approvals = [];
@@ -134,12 +140,22 @@ describe("sub-agent card", () => {
                 approvalId: "approval-1",
                 childThreadId: "child-1",
                 input: '{"path":"/tmp/old.txt"}',
+                omittedCharacters: 0,
                 runId: "run-1",
                 skillSlug: null,
                 task: "Tidy up",
                 toolName: "mcp_Files__delete",
             },
-            { approvalId: "approval-other", childThreadId: "child-2", input: "{}", runId: "run-2", skillSlug: null, task: "Other", toolName: "webSearch" },
+            {
+                approvalId: "approval-other",
+                childThreadId: "child-2",
+                input: "{}",
+                omittedCharacters: 0,
+                runId: "run-2",
+                skillSlug: null,
+                task: "Other",
+                toolName: "webSearch",
+            },
         ];
 
         render(<SubAgentToolView part={part} />);
@@ -155,7 +171,41 @@ describe("sub-agent card", () => {
 
         fireEvent.click(screen.getByRole("button", { name: ALWAYS_ALLOW }));
 
-        expect(state.mutate).toHaveBeenCalledWith({ approvalId: "approval-1", decision: "always", threadId: "child-1" }, expect.anything());
+        // Answered with the child's proof, so a locked child's request can be answered once its owner unlocks it.
+        expect(state.mutate).toHaveBeenCalledWith(
+            { approvalId: "approval-1", decision: "always", threadId: "child-1", unlockProof: "proof-child" },
+            expect.anything(),
+        );
+    });
+
+    it("says in the reader's language that a cut preview leaves part of the call out", () => {
+        state.run = { ...RUN, status: "awaiting" };
+        state.approvals = [
+            {
+                approvalId: "approval-1",
+                childThreadId: "child-1",
+                input: "x".repeat(10),
+                omittedCharacters: 500,
+                runId: "run-1",
+                server: null,
+                skillSlug: null,
+                task: "Tidy up",
+                toolName: "mcp_Files__delete",
+            },
+        ];
+
+        render(<SubAgentToolView part={part} />);
+
+        expect(screen.getByText(CUT_NOTICE)).toBeTruthy();
+    });
+
+    it("words an expired request from its code, not the stored English error", () => {
+        state.run = { ...RUN, error: "stored text", errorCode: "approval-expired", status: "failed" };
+
+        render(<SubAgentToolView part={part} />);
+
+        expect(screen.getByText(EXPIRED)).toBeTruthy();
+        expect(screen.queryByText("stored text")).toBeNull();
     });
 
     it("reads no approvals while the child is working", () => {

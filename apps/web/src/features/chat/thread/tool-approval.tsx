@@ -23,6 +23,7 @@ import type { Id } from "@neore/backend/dataModel";
 import type { ToolPart } from "@neore/chat-ui/types";
 import { resolveDeviceToolName } from "@neore/chat-ui/utils/device-tool-name";
 import { resolveMcpToolName } from "@neore/chat-ui/utils/mcp-tool-name";
+import { useUnlockProof } from "@neore/client-runtime";
 import { Button } from "@neore/ui/components/button";
 import { useMutation } from "@tanstack/react-query";
 import { Check, Clock, ShieldAlert, ShieldCheck, X } from "lucide-react";
@@ -59,6 +60,8 @@ export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({ approvalId, canAll
     const headingId = useId();
     const [submitted, setSubmitted] = useState<Decision | null>(null);
     const { isPending, mutate } = useMutation(crpc.chat.tool_permissions.respondToToolApproval.mutationOptions());
+    // A locked chat's answer resumes its run only with the proof of its unlock: the proof of the thread the request is on.
+    const unlockProof = useUnlockProof(threadId);
     const isDisabled = !approvalId || !threadId || isPending || submitted !== null;
 
     const respond = (decision: Decision) => {
@@ -68,10 +71,18 @@ export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({ approvalId, canAll
 
         setSubmitted(decision);
         mutate(
-            { approvalId, decision, threadId: threadId as Id<"threads"> },
+            { approvalId, decision, threadId: threadId as Id<"threads">, ...(unlockProof !== undefined && { unlockProof }) },
             {
                 onError: (error) => {
                     setSubmitted(null);
+
+                    // A sub-agent between two steps takes no answer yet; the request stays open for when it waits again.
+                    if ((error as { data?: { code?: string } }).data?.code === "SUB_AGENT_STILL_WORKING") {
+                        showError(t`The sub-agent is still working. Answer this request once it waits for you.`);
+
+                        return;
+                    }
+
                     showError(error instanceof Error ? error : t`Could not send your answer. Please try again.`);
                 },
             },

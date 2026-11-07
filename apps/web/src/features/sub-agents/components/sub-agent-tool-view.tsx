@@ -50,6 +50,9 @@ const SubAgentApprovals: FC<{ parentThreadId: string; runId: string }> = ({ pare
     return requests.map((request) => {
         const name = request.skillSlug ? `/${request.skillSlug}` : t`The sub-agent`;
         const tool = request.toolName ?? t`a tool`;
+        const omitted = request.omittedCharacters;
+        // A cut preview says so: approving runs the whole call, so the owner must see that more is not shown.
+        const input = omitted > 0 ? `${request.input}\n${t`… (${omitted} more characters not shown; approving runs the whole call)`}` : request.input;
 
         return (
             <div className="mt-2" key={request.approvalId}>
@@ -58,7 +61,7 @@ const SubAgentApprovals: FC<{ parentThreadId: string; runId: string }> = ({ pare
                     approvalId={request.approvalId}
                     canAllowForAPeriod={false}
                     heading={t`${name} wants to run "${tool}"`}
-                    input={request.input}
+                    input={input}
                     isOwner
                     threadId={request.childThreadId}
                     tool={tool}
@@ -113,7 +116,7 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     let notice: string | undefined;
 
     if (run) {
-        notice = run.error ?? undefined;
+        notice = run.errorCode === "approval-expired" ? t`The sub-agent's request for approval was not answered in time.` : (run.error ?? undefined);
     } else if (isDenied) {
         notice = t`Sub-agent was not approved.`;
     } else if (output?.error) {

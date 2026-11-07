@@ -37,6 +37,10 @@ msgstr "-- NORMAL --"
 msgid ", unread"
 msgstr ", ungelesen"
 
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
+msgid "… ({omitted} more characters not shown; approving runs the whole call)"
+msgstr ""
+
 #. placeholder {0}: state.conversations.length - 10
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:373
 msgid "...and {0} more"
@@ -1176,7 +1180,7 @@ msgstr "{name} pausiert"
 msgid "{name} resumed"
 msgstr "{name} fortgesetzt"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:63
 msgid "{name} wants to run \"{tool}\""
 msgstr "{name} möchte \"{tool}\" ausführen"
 
@@ -3084,27 +3088,27 @@ msgstr "Alle Typen"
 msgid "All Users"
 msgstr "Alle Benutzer"
 
-#: src/features/chat/thread/tool-approval.tsx:172
+#: src/features/chat/thread/tool-approval.tsx:183
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "\"{tool}\" von {server} erlauben?"
 
-#: src/features/chat/thread/tool-approval.tsx:172
+#: src/features/chat/thread/tool-approval.tsx:183
 msgid "Allow \"{tool}\"?"
 msgstr "\"{tool}\" erlauben?"
 
-#: src/features/chat/thread/tool-approval.tsx:140
+#: src/features/chat/thread/tool-approval.tsx:151
 msgid "Allow {tool} for 1 hour"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:144
+#: src/features/chat/thread/tool-approval.tsx:155
 msgid "Allow {tool} for today"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:142
+#: src/features/chat/thread/tool-approval.tsx:153
 msgid "Allow for 1 hour"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:146
+#: src/features/chat/thread/tool-approval.tsx:157
 msgid "Allow for today"
 msgstr ""
 
@@ -3155,11 +3159,11 @@ msgstr ""
 msgid "Also viewing"
 msgstr "Sehen sich das auch an"
 
-#: src/features/chat/thread/tool-approval.tsx:136
+#: src/features/chat/thread/tool-approval.tsx:147
 msgid "Always allow"
 msgstr "Immer erlauben"
 
-#: src/features/chat/thread/tool-approval.tsx:134
+#: src/features/chat/thread/tool-approval.tsx:145
 msgid "Always allow {tool}"
 msgstr "{tool} immer erlauben"
 
@@ -3565,17 +3569,17 @@ msgstr ""
 msgid "Approval"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:128
+#: src/features/chat/thread/tool-approval.tsx:139
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:103
 msgid "Approve"
 msgstr "Genehmigen"
 
-#: src/features/chat/thread/tool-approval.tsx:126
+#: src/features/chat/thread/tool-approval.tsx:137
 msgid "Approve {tool} once"
 msgstr "{tool} einmal genehmigen"
 
-#: src/features/chat/thread/tool-approval.tsx:86
+#: src/features/chat/thread/tool-approval.tsx:97
 msgid "Approved — running tool"
 msgstr "Genehmigt – Tool wird ausgeführt"
 
@@ -8113,7 +8117,7 @@ msgid "Could not send your answer."
 msgstr ""
 
 #: src/features/chat/thread/ask-user-prompt.tsx:116
-#: src/features/chat/thread/tool-approval.tsx:75
+#: src/features/chat/thread/tool-approval.tsx:86
 msgid "Could not send your answer. Please try again."
 msgstr "Deine Antwort konnte nicht gesendet werden. Bitte versuche es erneut."
 
@@ -8155,7 +8159,7 @@ msgstr ""
 msgid "Could not stop the reply. Your message is queued; send it next when you are ready."
 msgstr "Die Antwort konnte nicht gestoppt werden. Deine Nachricht steht in der Warteschlange; sende sie als Nächstes, wenn du bereit bist."
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:95
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:98
 msgid "Could not stop the sub-agent."
 msgstr ""
 
@@ -9521,7 +9525,7 @@ msgstr "Anspruchsvolle Aufgaben, bei denen maximale KI-Leistung und verfeinertes
 msgid "Denied"
 msgstr "Abgelehnt"
 
-#: src/features/chat/thread/tool-approval.tsx:84
+#: src/features/chat/thread/tool-approval.tsx:95
 msgid "Denied — continuing without it"
 msgstr "Abgelehnt – es geht ohne weiter"
 
@@ -9541,11 +9545,11 @@ msgstr ""
 msgid "Density updated"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:132
+#: src/features/chat/thread/tool-approval.tsx:143
 msgid "Deny"
 msgstr "Ablehnen"
 
-#: src/features/chat/thread/tool-approval.tsx:130
+#: src/features/chat/thread/tool-approval.tsx:141
 msgid "Deny {tool}"
 msgstr "{tool} ablehnen"
 
@@ -10112,7 +10116,7 @@ msgstr "Noch kein Konto?"
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
 #: src/features/devices/components/devices-settings.tsx:255
 #: src/features/skills/components/bundle-import-dialog.tsx:248
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:109
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:112
 #: src/features/sub-agents/components/worker-run-log.tsx:34
 #: src/features/tasks/components/task-status.tsx:16
 msgid "Done"
@@ -12220,7 +12224,7 @@ msgstr "fehlgeschlagen"
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:175
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:106
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:109
 #: src/features/sub-agents/components/worker-run-log.tsx:31
 #: src/features/tasks/components/task-status.tsx:17
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:64
@@ -20065,7 +20069,7 @@ msgid "Needs you"
 msgstr "Braucht dich"
 
 #: src/features/home/components/home-page.tsx:113
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:104
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:107
 #: src/features/sub-agents/components/worker-run-log.tsx:29
 msgid "Needs your approval"
 msgstr "Ihre Genehmigung erforderlich"
@@ -21339,7 +21343,7 @@ msgstr "Nicht festgelegt"
 msgid "Not shown to this model: {0}"
 msgstr "Diesem Modell nicht gezeigt: {0}"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:130
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:133
 msgid "Not started"
 msgstr "Nicht gestartet"
 
@@ -22089,7 +22093,7 @@ msgstr "Unterhaltung des Durchlaufs öffnen"
 msgid "Open the side-question panel without interrupting a running reply ({0})"
 msgstr ""
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:175
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:178
 msgid "Open the sub-agent's thread"
 msgstr "Thread des Sub-Agenten öffnen"
 
@@ -24649,7 +24653,7 @@ msgstr "Nachricht einreihen – wird gesendet, wenn die aktuelle Antwort fertig 
 
 #: src/features/home/components/home-page.tsx:110
 #: src/features/home/components/home-page.tsx:183
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:107
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:110
 #: src/features/sub-agents/components/worker-list.tsx:80
 #: src/features/sub-agents/components/worker-run-log.tsx:32
 #: src/features/tasks/components/task-status.tsx:19
@@ -28106,7 +28110,7 @@ msgstr "Zeitstempel anzeigen"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "Bis zu {rowLimit} Zeilen anzeigen ({byteCount} Bytes)"
 
-#: src/features/chat/thread/tool-approval.tsx:117
+#: src/features/chat/thread/tool-approval.tsx:128
 msgid "Show what it will send"
 msgstr "Anzeigen, was gesendet wird"
 
@@ -29267,7 +29271,7 @@ msgstr "planmäßig gestartet"
 msgid "started when its dependencies finished"
 msgstr "gestartet, als die Abhängigkeiten fertig waren"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:135
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:138
 msgid "Starting"
 msgstr "Wird gestartet"
 
@@ -29409,7 +29413,7 @@ msgstr "Aktien"
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:316
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:329
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:164
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:167
 #: src/features/sub-agents/components/worker-stop-bar.tsx:56
 #: src/features/workflow/components/canvas/workflow-controls.tsx:618
 msgid "Stop"
@@ -29468,7 +29472,7 @@ msgid "Stop watching {0}"
 msgstr ""
 
 #: src/features/chat/goal/goal-notes.tsx:65
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:105
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:108
 #: src/features/sub-agents/components/worker-run-log.tsx:30
 msgid "Stopped"
 msgstr ""
@@ -29885,7 +29889,7 @@ msgstr "Stilisiertes Ergebnis"
 msgid "stylized animation"
 msgstr "stilisierte Animation"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:146
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:149
 msgid "Sub-agent"
 msgstr "Sub-Agent"
 
@@ -29897,7 +29901,7 @@ msgstr "Sub-Agent fehlgeschlagen"
 msgid "Sub-agent finished"
 msgstr "Sub-Agent abgeschlossen"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:118
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:121
 msgid "Sub-agent was not approved."
 msgstr "Der Sub-Agent wurde nicht genehmigt."
 
@@ -31379,9 +31383,17 @@ msgstr "Der Skill konnte nicht importiert werden."
 msgid "The sub-agent"
 msgstr "Der Unteragent"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:122
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:125
 msgid "The sub-agent could not start."
 msgstr "Der Sub-Agent konnte nicht gestartet werden."
+
+#: src/features/chat/thread/tool-approval.tsx:81
+msgid "The sub-agent is still working. Answer this request once it waits for you."
+msgstr ""
+
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:119
+msgid "The sub-agent's request for approval was not answered in time."
+msgstr ""
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:254
 msgid "The tag \"{pendingDeleteName}\" will be removed from every chat that has it. The chats themselves are not deleted."
@@ -32015,7 +32027,7 @@ msgstr "Dieser Slug ist verfügbar"
 msgid "This spreadsheet appears to be empty or could not be parsed."
 msgstr "Diese Tabelle scheint leer zu sein oder konnte nicht gelesen werden."
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:124
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:127
 msgid "This sub-agent run is no longer available."
 msgstr "Dieser Sub-Agent-Lauf ist nicht mehr verfügbar."
 
@@ -34752,7 +34764,7 @@ msgstr ""
 msgid "Waiting for the owner to answer"
 msgstr "Wartet auf die Antwort des Eigentümers"
 
-#: src/features/chat/thread/tool-approval.tsx:81
+#: src/features/chat/thread/tool-approval.tsx:92
 msgid "Waiting for the owner to approve"
 msgstr "Wartet auf die Genehmigung des Eigentümers"
 
@@ -34780,7 +34792,7 @@ msgstr "Wartet auf deine Antwort in {0}"
 
 #: src/features/chat/thread-list/thread-node.tsx:550
 #: src/features/chat/thread-list/thread-node.tsx:557
-#: src/features/chat/thread/tool-approval.tsx:81
+#: src/features/chat/thread/tool-approval.tsx:92
 msgid "Waiting for your approval"
 msgstr "Wartet auf deine Genehmigung"
 
@@ -35279,7 +35291,7 @@ msgid "Workflows"
 msgstr "Workflows"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:466
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:108
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
 #: src/features/sub-agents/components/worker-list.tsx:80
 #: src/features/sub-agents/components/worker-run-log.tsx:33
 msgid "Working"
