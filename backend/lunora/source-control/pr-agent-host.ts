@@ -225,6 +225,9 @@ export const readPullRequestForAgent = async (dependencies: PullRequestAgentDepe
     return outcome;
 };
 
+/** The marker for comments left out of a thread with pages unread and no total: never a count of zero, since some are missing. */
+const unreadCount = (counted: number): string => (counted > 0 ? `truncated, at least ${String(counted)} more` : "truncated, more were not read");
+
 /** One review thread as an agent reads it: its first comment and its latest ones, each cut short, the rest counted. */
 const threadForAgent = (thread: ReviewThread) => {
     const [first, ...rest] = thread.comments;
@@ -237,8 +240,11 @@ const threadForAgent = (thread: ReviewThread) => {
 
                 return { authorLogin: comment.authorLogin, body: shown.text, ...(shown.truncated && { bodyTruncated: true }), id: comment.id };
             }),
-            // Counted against the thread's own total: comments past the pages read are left out too.
-            ...truncatedMarker((thread.commentCount ?? thread.comments.length) - kept.length),
+            // Counted against the thread's own total: comments past the pages read are left out too. Without a total and
+            // with pages unread, the count is of the comments read only: said so ("at least").
+            ...(thread.commentCount === undefined && thread.commentsComplete === false
+                ? { truncated: unreadCount(thread.comments.length - kept.length) }
+                : truncatedMarker((thread.commentCount ?? thread.comments.length) - kept.length)),
             // Longer than the pages read: the comments shown are the latest READ, and the thread's very latest are not among them.
             ...(((thread.commentCount ?? 0) > thread.comments.length || thread.commentsComplete === false) && { latestUnread: true }),
         },

@@ -659,3 +659,59 @@ describe("the review count", () => {
         expect(reviews).toMatchObject({ items: [{ body: "seen" }], total: 1 });
     });
 });
+
+describe("a check log read inside a time budget", () => {
+    it("gives every request of the read no more than the budget it was handed", async () => {
+        const timeouts: (number | undefined)[] = [];
+        const request: HostRequest = async (path, options: HostRequestOptions = {}) => {
+            timeouts.push(options.timeoutMs);
+
+            if (path.endsWith("/check-runs/11")) {
+                return Response.json({ app: { slug: "github-actions" }, output: { summary: "1 failed", title: "Tests" } });
+            }
+
+            // The log answer: refused, so the read falls back to the check's own output.
+            throw new HostApiError("Forbidden", 403);
+        };
+
+        const log = await githubDriver.readCheckLog(request, REF, "11", 1000, 3000);
+
+        expect(log.source).toBe("check_output");
+        expect(timeouts).toHaveLength(2);
+        expect(timeouts.every((timeout) => timeout !== undefined && timeout <= 3000)).toBe(true);
+    });
+});
+
+describe("a check log read that runs out of time", () => {
+    it("falls back to the check's own output when the log request times out", async () => {
+        const request: HostRequest = async (path) => {
+            if (path.endsWith("/check-runs/11")) {
+                return Response.json({ app: { slug: "github-actions" }, output: { summary: "1 failed", title: "Tests" } });
+            }
+
+            // The log request's deadline fired: the requester reports a request that did not complete.
+            throw new HostApiError("The host could not be reached", 0);
+        };
+
+        await expect(githubDriver.readCheckLog(request, REF, "11", 1000, 50)).resolves.toMatchObject({ source: "check_output" });
+    });
+
+    it("falls back to the check's own output when a log answered in place is cut off before its first byte", async () => {
+        const request: HostRequest = async (path) => {
+            if (path.endsWith("/check-runs/11")) {
+                return Response.json({ app: { slug: "github-actions" }, output: { summary: "1 failed", title: "Tests" } });
+            }
+
+            // The log answered in place, its body cut off by the deadline before a byte arrived.
+            return new Response(
+                new ReadableStream({
+                    pull(controller) {
+                        controller.error(new DOMException("The operation timed out", "TimeoutError"));
+                    },
+                }),
+            );
+        };
+
+        await expect(githubDriver.readCheckLog(request, REF, "11", 1000, 50)).resolves.toMatchObject({ source: "check_output" });
+    });
+});

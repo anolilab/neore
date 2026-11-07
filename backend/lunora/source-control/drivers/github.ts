@@ -12,7 +12,7 @@ import { excerptLog, excerptRead, isLogAddress, readTail } from "../check-log";
 import { requirementOf } from "../checks-logic";
 import type { CreatePullRequestInput, CreatedPullRequest, HostDriver } from "../driver";
 import { graphqlRequest } from "../graphql";
-import { FETCH_TIMEOUT_LONG_MS, fetchWithDeadline } from "../../lib/fetch-timeout";
+import { FETCH_TIMEOUT_LONG_MS, FETCH_TIMEOUT_MS, fetchWithDeadline } from "../../lib/fetch-timeout";
 import { HostApiError } from "../origin-fetch";
 import type { HostRequest } from "../origin-fetch";
 import { discard, parse, readJson } from "../response";
@@ -1264,10 +1264,10 @@ const checkOutputSchema = z.object({
 });
 
 /** The job's log answer: `undefined` when the host has none to give (expired, not written yet, gone), `refused` on a 403. */
-const jobLogAnswer = async (request: HostRequest, ref: PullRequestRef, checkId: string): Promise<Response | "refused" | undefined> => {
+const jobLogAnswer = async (request: HostRequest, ref: PullRequestRef, checkId: string, timeoutMs: number): Promise<Response | "refused" | undefined> => {
     try {
         // An Actions job has the id of its check run, so the check's id names the job.
-        return await request(`${repoPath(ref)}/actions/jobs/${checkId}/logs`, { redirect: "return" });
+        return await request(`${repoPath(ref)}/actions/jobs/${checkId}/logs`, { redirect: "return", timeoutMs });
     } catch (error) {
         // Gone, never written, or refused to this account (403 that is not a rate limit): the check's own output is next.
         if (error instanceof HostApiError && !error.rateLimited && [404, 410].includes(error.status)) {
@@ -1290,7 +1290,9 @@ const jobLog = async (
     maxChars: number,
     timeoutMs: number,
 ): Promise<CheckLog | "refused" | undefined> => {
-    const answer = await jobLogAnswer(request, ref, checkId);
+    // One deadline for the whole log read: the API's answer, then the download, each gets only what is left of it.
+    const deadline = Date.now() + timeoutMs;
+    const answer = await jobLogAnswer(request, ref, checkId, Math.min(timeoutMs, FETCH_TIMEOUT_MS));
 
     if (answer === undefined || answer === "refused") {
         return answer;
@@ -1300,7 +1302,12 @@ const jobLog = async (
 
     if (answer.status < 300 || answer.status >= 400) {
         // A host that answers the log in place: read it here, it came from the API's own origin.
-        return excerptRead(await readTail(answer), maxChars);
+        const read = await readTail(answer).catch(() => {
+            // Cut off before any byte (its deadline, the connection): a host failure, so the check's own output is next.
+            throw new HostApiError("The log could not be read", 0);
+        });
+
+        return excerptRead(read, maxChars);
     }
 
     if (location === null || !isLogAddress(location)) {
@@ -1309,7 +1316,7 @@ const jobLog = async (
 
     // Not followed: the signed address is the log itself, and a redirect from it leads nowhere this reads.
     // A log is a large download: the longer deadline, and what arrived before it fires is still read (`readTail`).
-    const response = await fetchWithDeadline(location, { redirect: "manual", timeoutMs }).catch(() => {
+    const response = await fetchWithDeadline(location, { redirect: "manual", timeoutMs: Math.max(1, deadline - Date.now()) }).catch(() => {
         throw new HostApiError("The log could not be fetched", 0);
     });
 
@@ -1338,9 +1345,26 @@ const readCheckLog = async (
         throw new HostApiError("Not a check id", 404);
     }
 
-    const run = parse(checkOutputSchema, await readJson(await request(`${repoPath(ref)}/check-runs/${checkId}`)));
+    // The caller's time budget covers every request of this read, not the download alone.
+    const deadline = Date.now() + timeoutMs;
+    const left = (): number => Math.max(1, deadline - Date.now());
+    const run = parse(
+        checkOutputSchema,
+        await readJson(await request(`${repoPath(ref)}/check-runs/${checkId}`, { timeoutMs: Math.min(left(), FETCH_TIMEOUT_MS) })),
+    );
 
-    const log = run.app?.slug === ACTIONS_APP ? await jobLog(request, ref, checkId, maxChars, timeoutMs) : undefined;
+    // A log that could not be had in the time left (or the host could not be reached for it) is no log: the check's own
+    // output, already read, is the excerpt then. A rate limit is the host's answer, and stays one.
+    const log =
+        run.app?.slug === ACTIONS_APP
+            ? await jobLog(request, ref, checkId, maxChars, left()).catch((error: unknown) => {
+                  if (error instanceof HostApiError && !error.rateLimited && error.status === 0) {
+                      return undefined;
+                  }
+
+                  throw error;
+              })
+            : undefined;
 
     if (log !== undefined && log !== "refused" && log.excerpt !== "") {
         return log;

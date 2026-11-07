@@ -73,6 +73,8 @@ export interface HostRequestOptions {
      * itself, without the token. Unset, a redirect is followed on the origin only.
      */
     redirect?: "return";
+    /** This request's deadline, when it must be shorter than the requester's own: a caller with a time budget of its own. */
+    timeoutMs?: number;
 }
 
 /** Resolves with an OK response, or throws {@link HostApiError}. */
@@ -134,6 +136,9 @@ export const createBoundRequester = ({
             url.searchParams.set(name, String(value));
         }
 
+        // A request's own deadline covers all of it, redirects included, not each hop afresh.
+        const until = options.timeoutMs === undefined ? undefined : Date.now() + options.timeoutMs;
+
         for (let hop = 0; ; hop += 1) {
             if (url.origin !== boundOrigin) {
                 throw new HostApiError("The request left the host's origin", 0);
@@ -150,7 +155,7 @@ export const createBoundRequester = ({
                 method,
                 // Followed by hand below, so a Location header cannot carry the token elsewhere.
                 redirect: "manual",
-                timeoutMs,
+                timeoutMs: until === undefined ? timeoutMs : Math.max(1, until - Date.now()),
                 via,
             }).catch(() => {
                 throw new HostApiError("The host could not be reached", 0, false, { unconfirmed: method !== "GET" });

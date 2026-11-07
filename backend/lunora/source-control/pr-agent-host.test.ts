@@ -344,6 +344,41 @@ describe(readThreadsWithin, () => {
         expect(read.items[0]?.comments).toMatchObject({ latestUnread: true, truncated: "truncated, 498 more" });
     });
 
+    it("counts the comments left out as a lower bound when there is no total and pages went unread", async () => {
+        const read = await readThreadsWithin(
+            async () => {
+                return {
+                    endCursor: null,
+                    hasMore: false,
+                    items: [
+                        {
+                            ...thread(
+                                "t",
+                                Array.from({ length: 30 }, (_, index) => comment(index)),
+                            ),
+                            commentsComplete: false as const,
+                        },
+                    ],
+                    total: 1,
+                };
+            },
+            { page: null, skip: 0 },
+        );
+
+        expect(read.items[0]?.comments).toMatchObject({ latestUnread: true, truncated: "truncated, at least 20 more" });
+    });
+
+    it("never says 'at least 0 more' for a short thread whose pages went unread", async () => {
+        const read = await readThreadsWithin(
+            async () => {
+                return { endCursor: null, hasMore: false, items: [{ ...thread("t", [comment(1)]), commentsComplete: false as const }], total: 1 };
+            },
+            { page: null, skip: 0 },
+        );
+
+        expect(read.items[0]?.comments).toMatchObject({ truncated: "truncated, more were not read" });
+    });
+
     it("says the latest were not read when the comment pages stopped early, even without a total", async () => {
         const read = await readThreadsWithin(
             async () => {
