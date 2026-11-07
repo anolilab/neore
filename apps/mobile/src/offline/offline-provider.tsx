@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { AccessibilityInfo, Platform } from "react-native";
 
 import { useAuth } from "../auth/auth-state";
+import { bindLastThreadOwner } from "../chat/last-thread-store";
 import { getClient } from "../lib/lunora";
 import type { ScopedCache } from "./cache";
 import { canWrite, INITIAL_CONNECTIVITY, isOffline as isOfflineState, isReachable, reduceConnectivity } from "./connectivity";
@@ -110,6 +111,8 @@ export const OfflineProvider = ({ children }: { children: ReactNode }) => {
                 if (status === "signed-out") {
                     await offlineCache.clear();
                 } else if (status === "signed-in" && userId !== undefined) {
+                    // Like the cache, the saved chat to reopen accepts saves from this account only.
+                    bindLastThreadOwner(userId);
                     await offlineCache.bindOwner(userId);
 
                     if (!isCancelled) {

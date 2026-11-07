@@ -13,6 +13,8 @@ export const LAST_THREAD_KEY = "neore.mobile.last-thread";
 export const REOPEN_KEY = "neore.mobile.reopen-last-chat";
 
 export interface LastThreadStore {
+    /** Accepts saves for `userId` only, from now until the next clear. Called when an account is signed in. */
+    bindOwner: (userId: string) => void;
     /** Forgets the saved chat of every account, whatever it is: used once nobody is signed in. */
     clearLastThread: () => Promise<void>;
     /** Forgets the saved chat, but only while it is `target`: a chat saved since then, or by another account, is not the refused one. */
@@ -20,7 +22,7 @@ export interface LastThreadStore {
     /** The chat to open at launch for `userId`, if any. A store that cannot be read opens nothing. */
     lastChatToReopen: (userId: string) => Promise<string | undefined>;
     readReopenLastChat: () => Promise<boolean>;
-    /** Saves the chat this account has read. */
+    /** Saves the chat this account has read, unless that account is no longer the signed-in one. */
     rememberLastThread: (last: LastThread) => Promise<void>;
     writeReopenLastChat: (isOn: boolean) => Promise<void>;
 }
@@ -29,9 +31,18 @@ export interface LastThreadStore {
 export const createLastThreadStore = (store: KeyValueStore): LastThreadStore => {
     // Saves and forgets run one after another, so a forget asked after a save always lands after it.
     const inOrder = createSerialQueue();
+    // The signed-in account. A read that outlives its session must not save that session's chat back after the clear.
+    let owner: string | undefined;
 
     return {
+        bindOwner: (userId: string): void => {
+            owner = userId;
+        },
+
         clearLastThread: async (): Promise<void> => {
+            // Unbound at once, so a save already on its way from a screen of the old account finds nobody to save for.
+            owner = undefined;
+
             await inOrder(async () => {
                 await store.deleteItem(LAST_THREAD_KEY);
             });
@@ -60,7 +71,9 @@ export const createLastThreadStore = (store: KeyValueStore): LastThreadStore => 
 
         rememberLastThread: async (last: LastThread): Promise<void> => {
             await inOrder(async () => {
-                await store.setItem(LAST_THREAD_KEY, JSON.stringify(last));
+                if (owner === last.userId) {
+                    await store.setItem(LAST_THREAD_KEY, JSON.stringify(last));
+                }
             });
         },
 
