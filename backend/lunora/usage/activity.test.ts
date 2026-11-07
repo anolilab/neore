@@ -6,7 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { getActivityHeatmap, getSkillBreakdown, getThreadAttribution, recordReplyUsage } from "./activity";
+import { forwardReplyUsage, getActivityHeatmap, getSkillBreakdown, getThreadAttribution, recordReplyUsage } from "./activity";
 import { DEFAULT_SKILL_KEY } from "./activity-logic";
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -16,8 +16,19 @@ const { sessionFrom } = vi.hoisted(() => {
     };
 });
 
-const { projectReadFails } = vi.hoisted(() => {
-    return { projectReadFails: { value: false } };
+const { forwarded, projectReadFails } = vi.hoisted(() => {
+    return { forwarded: [] as Record<string, unknown>[], projectReadFails: { value: false } };
+});
+
+vi.mock("../lib/shard-scheduler", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/shard-scheduler")>()),
+        runAfterOnShard: async (_scheduler: unknown, _delay: number, _target: unknown, args: Record<string, unknown>) => {
+            forwarded.push(args);
+
+            return null;
+        },
+    };
 });
 
 vi.mock("../projects/functions", async (importOriginal) => {
@@ -226,6 +237,33 @@ describe("recording usage by project", () => {
         expect(skills.skills.reduce((total, skill) => total + skill.costMicrodollars, 0)).toBe(610);
     });
 
+    it("files a nested sub-agent's reply under the lead thread's project", async () => {
+        const lead = await insertThread(USER, "Alpha");
+        const child = await insertThread(USER);
+        const grandchild = await insertThread(USER);
+
+        await harness.run(async (ctx: any) => {
+            for (const [childThreadId, parentThreadId, depth] of [
+                [child.threadId, lead.threadId, 1],
+                [grandchild.threadId, child.threadId, 2],
+            ] as const) {
+                await ctx.db.insert("subAgentRuns", {
+                    childThreadId,
+                    createdAt: 1,
+                    depth,
+                    parentThreadId,
+                    status: "succeeded",
+                    task: "T",
+                    updatedAt: 1,
+                    userId: USER,
+                });
+            }
+        });
+        await record({ costMicrodollars: 70, threadId: grandchild.threadId, tokens: 7 });
+
+        expect(await projectTotals(USER)).toStrictEqual({ [lead.projectId!]: { costMicrodollars: 70, replies: 1, tokens: 7 } });
+    });
+
     it("keeps a moved thread's past usage with the project it was recorded under", async () => {
         const alpha = await insertThread(USER, "Alpha");
         const beta = await insertThread(USER, "Beta");
@@ -260,6 +298,40 @@ describe("recording usage by project", () => {
             await expect(
                 harness.run(async (ctx: any) => await ctx.runQuery(getThreadAttribution, { threadId: alpha.threadId, userId: OTHER })),
             ).rejects.toThrow("project read failed");
+        } finally {
+            projectReadFails.value = false;
+        }
+    });
+
+    it("forwards a shared thread's reply after its project read keeps failing, without the project but with its total", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+        const forward = async (failedReads: number) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(forwardReplyUsage, {
+                        at: 1,
+                        costMicrodollars: 100,
+                        date: "2026-09-20",
+                        failedReads,
+                        replyKey: "shared-reply",
+                        skillKey: DEFAULT_SKILL_KEY,
+                        threadId: alpha.threadId,
+                        tokens: 10,
+                        userId: OTHER,
+                    }),
+            );
+
+        forwarded.length = 0;
+        projectReadFails.value = true;
+
+        try {
+            // An early failure tries again later and forwards nothing yet.
+            await forward(0);
+            expect(forwarded).toStrictEqual([]);
+
+            // The last try records the reply, so its total is never lost.
+            await forward(2);
+            expect(forwarded).toMatchObject([{ costMicrodollars: 100, replyKey: "shared-reply", threadAttribution: {}, userId: OTHER }]);
         } finally {
             projectReadFails.value = false;
         }

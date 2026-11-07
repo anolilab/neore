@@ -103,13 +103,7 @@ describe("a worker's runs", () => {
         await execute(second._id);
 
         expect(runs).toHaveLength(2);
-        // The child thread is in no project: its spend is filed under the lead thread's.
-        expect(runs[0]).toMatchObject({
-            prompt: expect.stringContaining("Look into it"),
-            system: WORKER_SYSTEM,
-            thread: { threadId: first.childThreadId },
-            usageThreadId: leadId,
-        });
+        expect(runs[0]).toMatchObject({ prompt: expect.stringContaining("Look into it"), system: WORKER_SYSTEM, thread: { threadId: first.childThreadId } });
         expect(runs[0]!.prompt).not.toBe("Look into it");
         expect(runs[1]).toMatchObject({ prompt: "What about the second part?", system: WORKER_SYSTEM, thread: { threadId: first.childThreadId } });
         expect(second.childThreadId).toBe(first.childThreadId);

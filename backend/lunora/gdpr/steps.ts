@@ -418,15 +418,10 @@ export const collectActivityForExport = internalQuery
                 };
             }),
             usageDaily: usageDaily.map((row) => {
-                return {
-                    costMicrodollars: row.costMicrodollars,
-                    date: row.date,
-                    replies: row.replies,
-                    skill: row.skillName ?? row.skillKey,
-                    tokens: row.tokens,
-                    // A project row (`__project__`) names its project; summing skills alone leaves these out.
-                    ...(row.projectKey !== undefined && { project: row.projectKey }),
-                };
+                // A project row is the day's usage in one project, not one more skill: it names the project instead.
+                const breakdown = row.projectKey === undefined ? { skill: row.skillName ?? row.skillKey } : { project: row.projectKey };
+
+                return { costMicrodollars: row.costMicrodollars, date: row.date, replies: row.replies, tokens: row.tokens, ...breakdown };
             }),
         };
     });

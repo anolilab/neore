@@ -708,6 +708,32 @@ describe("project backfill", () => {
         expect(await totalAndProjects()).toStrictEqual({ projects: 10, total: 10 });
     });
 
+    it("files a sub-agent's history under its lead thread's project, as the live record does", async () => {
+        const alpha = await insertProject("Alpha");
+        const lead = await insertThread(DAY_1, [[prompt(), reply(1, 10)]], "active", alpha);
+        const child = await insertThread(DAY_1, [[prompt(), reply(2, 20)]]);
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("subAgentRuns", {
+                childThreadId: child.threadId,
+                createdAt: DAY_1,
+                depth: 1,
+                parentThreadId: lead.threadId,
+                status: "succeeded",
+                task: "Look into it",
+                updatedAt: DAY_1,
+                userId: USER,
+            });
+        });
+        vi.setSystemTime(STARTED);
+        await start();
+        await drain();
+
+        expect(await projectRows()).toStrictEqual([
+            { costMicrodollars: 30, date: "2026-09-20", projectKey: alpha, replies: 2, skillKey: PROJECT_SKILL_KEY, tokens: 3 },
+        ]);
+    });
+
     it("starts the project walk only once the first walk is done, from the first walk's cutoff", async () => {
         const { alpha, beta } = await insertProjectFixture();
 

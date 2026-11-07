@@ -27,8 +27,10 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authQuery } from "../lib/crpc";
+import { logger } from "../lib/logger";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { readableProject } from "../projects/functions";
+import { leadThreadOf } from "../sub-agents/worker-thread";
 import type { Attribution, AttributionIncrement, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
 import {
     addDays,
@@ -44,6 +46,8 @@ import {
     usageDayOf,
     withDayTotals,
 } from "./activity-logic";
+
+const usageLogger = logger.scope("usage");
 
 /** A `YYYY-MM-DD` argument, refused at the boundary when it is anything else. */
 const vDayKey = () => v.string().check(isDayKey, { message: "Expected a YYYY-MM-DD date", schema: { maxLength: 10, minLength: 10 } });
@@ -90,14 +94,35 @@ export const markReplyRecorded = async (
 /** Where a reply in `thread` is filed besides the total: its project. */
 export const attributionOf = (thread: { projectId?: string | null } | null): Attribution => (thread?.projectId ? { projectKey: thread.projectId } : {});
 
-/** The attribution of the user's thread `threadId`, when it is on this shard. */
-const attributionOfThread = async (ctx: ReadCtx, threadId: string | undefined): Promise<Attribution> => {
-    if (threadId === undefined || threadId.length === 0) {
-        return {};
+/** Sub-agent threads started from sub-agent threads followed up to a lead with a project, at most. */
+const LEAD_HOPS = 4;
+
+/**
+ * What replies in `threadId` are filed under: its project, or — for a sub-agent's or worker's thread, which is in no
+ * project — its lead thread's, followed through nested runs. The live record and the project walk both read it here.
+ * A run whose link has been pruned (`subAgentRuns` retention) has no lead to follow, and counts under no project.
+ */
+export const threadProject = async (ctx: ReadCtx, threadId: string, known?: { projectId?: string | null }): Promise<Attribution> => {
+    let current: { projectId?: string | null } | null = known ?? (await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } }));
+    let currentId = threadId;
+
+    for (let hop = 0; hop < LEAD_HOPS && current && !current.projectId; hop += 1) {
+        const lead = await leadThreadOf(ctx, currentId);
+
+        if (lead === undefined) {
+            break;
+        }
+
+        currentId = lead;
+        current = await ctx.db.threads.findFirst({ where: { _id: lead as Id<"threads"> } });
     }
 
-    return attributionOf(await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } }));
+    return attributionOf(current);
 };
+
+/** The attribution of the user's thread `threadId`, when it is on this shard. */
+const attributionOfThread = async (ctx: ReadCtx, threadId: string | undefined): Promise<Attribution> =>
+    threadId === undefined || threadId.length === 0 ? {} : await threadProject(ctx, threadId);
 
 /**
  * What `userId`'s reply in a thread they may not own is filed under: the thread's attribution, without a project the
@@ -106,8 +131,8 @@ const attributionOfThread = async (ctx: ReadCtx, threadId: string | undefined): 
 const attributionForReplier = async (ctx: MutationCtx | QueryCtx, threadId: string, userId: string): Promise<Attribution> => {
     const attribution = await attributionOfThread(ctx, threadId);
 
-    // A failed read throws: the record is retried (or the side question refused before it is charged), never filed as
-    // if the replier could not open the project.
+    // A failed read throws: the forward tries again (`forwardReplyUsage`), and a side question is refused before it is
+    // charged, never filed as if the replier could not open the project.
     if (attribution.projectKey === undefined || (await readableProject(ctx, attribution.projectKey as Id<"projects">, userId))) {
         return attribution;
     }
@@ -306,6 +331,12 @@ export const recordReplyUsage = internalMutation
         return null;
     });
 
+/** Tries a forward makes at reading the thread's project before it records the reply without one. */
+const FORWARD_READ_TRIES = 3;
+
+/** The first retry's delay; each later one doubles it. */
+const FORWARD_RETRY_MS = 30_000;
+
 /**
  * A reply that ran in another user's thread (shared with the replier) is recorded on the replier's own shard, where the
  * thread is not stored. This runs first on the thread's shard, works out the thread's project, and forwards the
@@ -316,6 +347,8 @@ export const forwardReplyUsage = internalMutation
         at: v.number(),
         costMicrodollars: v.number(),
         date: v.string(),
+        /** Reads of the thread's project that failed so far. */
+        failedReads: v.optional(v.number()),
         replyKey: v.string(),
         skillKey: v.string(),
         skillName: v.optional(v.string()),
@@ -326,10 +359,30 @@ export const forwardReplyUsage = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const threadAttribution = await attributionForReplier(ctx, args.threadId, args.userId);
-        const record: ReplyUsageArgs & { threadAttribution: Attribution } = { ...args, threadAttribution };
+        const { failedReads = 0, ...usage } = args;
+        let threadAttribution: Attribution;
 
-        await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...record }, args.userId);
+        try {
+            threadAttribution = await attributionForReplier(ctx, usage.threadId, usage.userId);
+        } catch (error) {
+            // Nothing retries a scheduled job: this one tries again itself, and after the last try records the reply
+            // without a project rather than lose its total.
+            if (failedReads + 1 < FORWARD_READ_TRIES) {
+                await ctx.scheduler.runAfter(FORWARD_RETRY_MS * 2 ** failedReads, internal.usage.activity.forwardReplyUsage, {
+                    ...usage,
+                    failedReads: failedReads + 1,
+                });
+
+                return null;
+            }
+
+            usageLogger.warn("[usage] the thread's project could not be read; recording the reply without one", { error });
+            threadAttribution = {};
+        }
+
+        const record: ReplyUsageArgs & { threadAttribution: Attribution } = { ...usage, threadAttribution };
+
+        await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...record }, usage.userId);
 
         return null;
     });

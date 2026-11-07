@@ -48,7 +48,7 @@ import { patchRow } from "../lib/patch";
 import { currentUserShard } from "../lib/shard-context";
 import type { Attribution, AttributionIncrement, RollupIncrement } from "./activity-logic";
 import { pendingKey, projectFiledKey } from "./activity-logic";
-import { addToAttributionRollup, addToRollup, attributionOf, isReplyRecorded, markReplyRecorded } from "./activity";
+import { addToAttributionRollup, addToRollup, isReplyRecorded, markReplyRecorded, threadProject } from "./activity";
 import type { BackfillRow, BackfillWindow, ReplyGroup } from "./backfill-logic";
 import { backfillIncrement, completeOrders, groupReplies } from "./backfill-logic";
 
@@ -287,10 +287,7 @@ const walk = async <I>(ctx: DbCtx, userId: string, position: Position, pass: Wal
 
     if (threadId !== undefined && pass.skipThread) {
         // A position saved before the project was kept with it reads the thread's project now.
-        thread =
-            position.threadProjectKey === undefined
-                ? attributionOf(await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } }))
-                : { projectKey: position.threadProjectKey };
+        thread = position.threadProjectKey === undefined ? await threadProject(ctx, threadId) : { projectKey: position.threadProjectKey };
     }
 
     while (budget > 0) {
@@ -306,7 +303,7 @@ const walk = async <I>(ctx: DbCtx, userId: string, position: Position, pass: Wal
             }
 
             ({ threadCursor, threadId } = next);
-            thread = pass.skipThread ? attributionOf(next) : {};
+            thread = pass.skipThread ? await threadProject(ctx, threadId, next) : {};
             lastOrder = undefined;
             threadsStarted += 1;
 

@@ -87,7 +87,7 @@ describe("collectActivityForExport", () => {
         // A project row names its project, so it is not read as one more skill.
         expect(exported.usageDaily).toEqual([
             expect.objectContaining({ date: "2026-02-01", tokens: 5 }),
-            expect.objectContaining({ date: "2026-02-02", project: "p_alpha" }),
+            { costMicrodollars: 10, date: "2026-02-02", project: "p_alpha", replies: 1, tokens: 5 },
         ]);
         expect(exported.subAgentRuns).toEqual([expect.objectContaining({ result: "answer", status: "succeeded", task: "task 0" })]);
         expect(exported.knowledgeCollections.map((collection: { name: string }) => collection.name)).toEqual(["Handbook"]);
