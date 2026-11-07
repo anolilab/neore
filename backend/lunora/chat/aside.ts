@@ -48,6 +48,7 @@ import { resolveLeafRow } from "../agent/branch-rows";
 import { listActivePathPage } from "../agent/branches";
 import { sumMessageCosts } from "../agent/message-cost";
 import { addMessagesHandler, getMaxMessage, listMessagesByThreadIdHandler } from "../agent/messages";
+import { isContextResetRow } from "../agent/context-reset-shape";
 import { extractText } from "../agent/shared";
 import { patchThread } from "../agent/table-writes";
 import { ASIDE_ADD_CLAIM_TTL_MS, ASIDE_ADD_SCOPE, claimOnce } from "../lib/claim-once";
@@ -152,7 +153,7 @@ const usableRowOf = (row: Doc<"messages">): AsideRow | undefined => {
 /**
  * The newest usable rows of the thread's active path, newest first. A branched walk returns every row of the path, tool
  * steps and unfinished ones included, so a page can hold few usable rows: it keeps walking, to a hard cap, until there
- * are enough.
+ * are enough. It stops at a context reset (`/clear`): the turns above it are not sent to a model.
  */
 const readPathRows = async (ctx: QueryCtx, thread: Doc<"threads">, unlockProof: string | undefined): Promise<AsideRow[]> => {
     const paging = (cursor: string | null) => {
@@ -174,9 +175,15 @@ const readPathRows = async (ctx: QueryCtx, thread: Doc<"threads">, unlockProof: 
     let chars = 0;
     let walked = 0;
     let page = branched ?? (await readPage(null));
+    let reachedReset = false;
 
-    while (page) {
+    while (page && !reachedReset) {
         for (const row of page.page) {
+            if (isContextResetRow(row)) {
+                reachedReset = true;
+                break;
+            }
+
             const usable = usableRowOf(row);
 
             walked += 1;
@@ -187,7 +194,7 @@ const readPathRows = async (ctx: QueryCtx, thread: Doc<"threads">, unlockProof: 
             }
         }
 
-        if (page.isDone || newestFirst.length >= ASIDE_CONTEXT_ROWS || chars >= ASIDE_CONTEXT_CHARS || walked >= ASIDE_MAX_WALKED_ROWS) {
+        if (reachedReset || page.isDone || newestFirst.length >= ASIDE_CONTEXT_ROWS || chars >= ASIDE_CONTEXT_CHARS || walked >= ASIDE_MAX_WALKED_ROWS) {
             break;
         }
 

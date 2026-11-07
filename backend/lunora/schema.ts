@@ -3001,6 +3001,9 @@ export const schema = defineSchema({
         // instructions are read live on each run (`chat/lib/agent-run.ts`).
         botId: v.optional(v.id("bots")),
         category: v.optional(v.string()),
+        // The newest context reset on the ACTIVE path, kept by `syncActiveAgent` and the clear writers so a reply reads it in
+        // one lookup (`agent/context-reset.ts#resetForTip`). "" = none on the path; unset = not known (walk the path).
+        contextResetMessageId: v.optional(v.string()),
         // Creation time in ms, the sidebar's sort key. `_creationTime` is system-set and
         // cannot carry an imported chat's source time; unset on rows from before this column.
         createdAt: v.optional(v.number()),
@@ -3014,6 +3017,9 @@ export const schema = defineSchema({
         // Multi-agent group chat: participants (skill ids) and who-speaks mode.
         // Written only by `chat/group/functions.ts`, which checks access.
         groupChat: v.optional(vGroupChat),
+        // Set once `/clear` writes a context reset on this thread (`chat/context-reset.ts`): unset, a reply never
+        // reads the thread's pointer (`agent/context-reset.ts#resetForTip`).
+        hasContextReset: v.optional(v.boolean()),
         // Set once a switch on this thread stores a handoff (`chat/agent-switch.ts`): unset, a reply never
         // walks the path looking for one (`agent/agent-switch.ts#handoffAboveOf`).
         hasHandoff: v.optional(v.boolean()),

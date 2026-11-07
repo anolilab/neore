@@ -12,14 +12,20 @@ import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 
 export interface SlashCommandMatch {
-    command: "compact" | "model" | "prompt" | "skill" | undefined;
+    command: "clear" | "compact" | "model" | "prompt" | "skill" | undefined;
     /** Range in ProseMirror doc positions for the full slash text */
     from: number;
     query: string;
     /** Character offset in the text where the slash starts */
     startOffset: number;
+    /** The slash text as typed (`/c`, `/clear`): two drafts with the same command, query and range can still differ in it. */
+    text: string;
     to: number;
-    /** Whether the whole draft is this slash text: `/compact` only counts as the command when it is the entire message. */
+
+    /**
+     * Whether the whole draft is this slash text (a partial `/c` included): `/compact` and `/clear` only count as commands,
+     * and the menu only runs them, when they are the entire message.
+     */
     wholeDraft: boolean;
 }
 
@@ -29,15 +35,47 @@ export interface SlashCommandOptions {
 }
 
 /**
- * Whether `match` is a bare `/compact`, the only form the menu runs. The command takes no argument: with text after it,
- * the composer sends that text as a message, as submitting it directly does.
+ * Whether `match` is a bare `command` (`/compact`, `/clear`), the only form the menu runs. These take no argument: with
+ * text after them, the composer sends that text as a message, as submitting it directly does.
  */
-export const isBareCompact = (match: Pick<SlashCommandMatch, "command" | "query" | "wholeDraft">): boolean =>
-    match.command === "compact" && match.query === "" && match.wholeDraft;
+export const isBareCommand = (match: Pick<SlashCommandMatch, "command" | "query" | "wholeDraft">, command: "clear" | "compact"): boolean =>
+    match.command === command && match.query === "" && match.wholeDraft;
+
+/** Whether the slash text from `slashStartOffset` to `slashEndOffset` is the whole of `fullText`, around blank space. */
+export const isWholeDraft = (fullText: string, slashStartOffset: number, slashEndOffset: number): boolean =>
+    slashStartOffset === 0 && fullText.trim() === fullText.slice(0, slashEndOffset).trim();
+
+/** A slash match with the thread whose composer holds it. */
+export interface ComposerSlashState {
+    match: SlashCommandMatch | null;
+    threadId: string | undefined;
+}
+
+/**
+ * Where a finished `/clear` is removed from the draft: the range the menu ran it from, while the same thread's composer
+ * still holds that same standalone text. `draft` is the editor's whole text read when the clear finished, so a keystroke
+ * the menu has not been told of yet counts too. `null` once the draft changed or another thread is shown, so nothing
+ * typed meanwhile, and no other chat's draft, is cut.
+ */
+export const clearedCommandRange = (selected: ComposerSlashState, now: ComposerSlashState & { draft: string }): { from: number; to: number } | null => {
+    const was = selected.match;
+    const is = now.match;
+    const sameDraft = was !== null && now.draft.trim().toLowerCase() === was.text.trim().toLowerCase();
+
+    return was && is?.wholeDraft === true && sameDraft && now.threadId === selected.threadId && is.text === was.text && is.from === was.from && is.to === was.to
+        ? { from: is.from, to: is.to }
+        : null;
+};
+
+/** Whether the slash text typed so far (`/c`, `/cle`) can be the start of `/command`: Clear is not run from `/m`. */
+export const isPrefixOfCommand = (typed: string, command: "clear" | "compact"): boolean => `/${command}`.startsWith(typed.trim().toLowerCase());
+
+/** Whether `match` is a bare `/compact`. */
+export const isBareCompact = (match: Pick<SlashCommandMatch, "command" | "query" | "wholeDraft">): boolean => isBareCommand(match, "compact");
 
 const slashCommandPluginKey = new PluginKey("slashCommand");
 
-const KNOWN_COMMANDS = ["compact", "model", "prompt", "skill"] as const;
+const KNOWN_COMMANDS = ["clear", "compact", "model", "prompt", "skill"] as const;
 
 // Hoisted RegExp to avoid re-creation on every keystroke (js-hoist-regexp)
 const WHITESPACE_RE = /\s/;
@@ -222,9 +260,10 @@ const SlashCommand = Extension.create<SlashCommandOptions>({
                                 const newMatch: SlashCommandMatch = {
                                     command: parsed.command,
                                     from,
-                                    wholeDraft: parsed.slashStartOffset === 0 && fullText.trim() === "/compact",
+                                    wholeDraft: isWholeDraft(fullText, parsed.slashStartOffset, parsed.slashEndOffset),
                                     query: parsed.query,
                                     startOffset: parsed.slashStartOffset,
+                                    text: fullText.slice(parsed.slashStartOffset, parsed.slashEndOffset),
                                     to,
                                 };
 
@@ -233,7 +272,10 @@ const SlashCommand = Extension.create<SlashCommandOptions>({
                                     !lastMatch ||
                                     lastMatch.command !== newMatch.command ||
                                     lastMatch.query !== newMatch.query ||
-                                    lastMatch.from !== newMatch.from
+                                    lastMatch.from !== newMatch.from ||
+                                    lastMatch.to !== newMatch.to ||
+                                    lastMatch.wholeDraft !== newMatch.wholeDraft ||
+                                    lastMatch.text !== newMatch.text
                                 ) {
                                     lastMatch = newMatch;
                                     extensionThis.options.onStateChange(newMatch);

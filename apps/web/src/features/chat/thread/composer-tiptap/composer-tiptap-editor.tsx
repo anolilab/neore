@@ -554,6 +554,10 @@ const ComposerTiptapEditor = ({
         [editor],
     );
 
+    // The editor's text now, for a `/clear` that finished while the person may have kept typing. A destroyed editor (the
+    // chat changed) reads as empty, which no command matches.
+    const readDraft = useCallback(() => (editor && !editor.isDestroyed ? editor.getText() : ""), [editor]);
+
     // Dismiss popups
     const handleDismissSlash = useCallback(() => {
         setSlashMatch(null);
@@ -613,6 +617,7 @@ const ComposerTiptapEditor = ({
                 models={models}
                 onDismiss={handleDismissSlash}
                 onReplace={handleReplace}
+                readDraft={readDraft}
             />
 
             {/* File mention popup */}

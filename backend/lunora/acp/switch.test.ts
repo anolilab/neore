@@ -89,6 +89,7 @@ const TEMPORARY_CHAT = /temporary chat cannot be handed/u;
 const SOMEONE_ELSES_TEXT = /messages someone else wrote/u;
 const SHARED_OR_PUBLIC = /shared, public/u;
 const OMITTED_NOTE = /earlier turns? (is|are) not included/u;
+const CLEAR_REFUSED = /already made|Wait for the agent/u;
 
 const as = (userId: string) => harness.withIdentity({ userId } as never);
 const run = async <T>(read: (ctx: any) => Promise<T>): Promise<T> => (await harness.run(read)) as T;
@@ -1023,6 +1024,48 @@ describe("native reattach (S4)", () => {
         expect((await acpSends()).at(-1)).toBe("carry on");
     });
 
+    it("never reloads a session from before a /clear: that session holds the turns that were cleared", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await loadableHostThread(device);
+
+        await switchAway(device, threadId);
+        await run(
+            async (ctx) => await switchModule.clearHostSessionHandler(ctx, { clientId: "clear-then-back", threadId: threadId as never, userId: ownerId }),
+        );
+        await openStartedSession(device, threadId);
+        await switchTo(threadId, hostTarget(device, CLAUDE));
+
+        const start = await lastStart();
+
+        expect(start).toMatchObject({ agentKey: "claude", folderId: "f1" });
+        expect(start?.nativeSessionId).toBeUndefined();
+        expect((await dividers(threadId)).at(-1)).toMatchObject({ mode: "portable", to: { agentKey: "claude", kind: "host" } });
+    });
+
+    it("reloads the session a /clear started, which holds nothing from before it", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await loadableHostThread(device);
+
+        await run(
+            async (ctx) => await switchModule.clearHostSessionHandler(ctx, { clientId: "clear-then-away", threadId: threadId as never, userId: ownerId }),
+        );
+        await openStartedSession(device, threadId, undefined, "native-2", CAN_LOAD);
+        expect((await sendText(threadId, "after the clear")).outcome).toBe("sent");
+        await finishSentTurn(device, threadId);
+        // The computer took the calls so far: the open-call budget is free for the switches.
+        await run(async (ctx) => {
+            const { page } = await ctx.db.deviceCalls.findMany({ where: {} });
+
+            for (const call of page) {
+                await ctx.db.patch("deviceCalls", call._id, { status: "completed" });
+            }
+        });
+        await switchAway(device, threadId);
+        await switchTo(threadId, hostTarget(device, CLAUDE));
+
+        expect(await lastStart()).toMatchObject({ agentKey: "claude", nativeSessionId: "native-2" });
+    });
+
     it("goes portable and never reattaches for another folder, another computer, or an agent that cannot load", async () => {
         const device = await pairedDevice(ownerId, [CLAUDE, CODEX, CLAUDE_OTHER_FOLDER]);
         const other = await pairedDevice(ownerId, [CLAUDE]);
@@ -1678,5 +1721,74 @@ describe("a load report that cannot be checked", () => {
         expect(reattachFailureOf("native-1", { reattach: { loaded: true } })).toBeDefined();
         expect(reattachFailureOf("native-1", { nativeSessionId: "native-1", reattach: { loaded: true } })).toBeUndefined();
         expect(reattachFailureOf("native-1", { nativeSessionId: "other", reattach: { loaded: true } })).toBe("other_session");
+    });
+});
+
+describe("/clear on a coding agent's thread", () => {
+    const sessionsOf = async (threadId: string): Promise<Row[]> =>
+        (await rows("acpSessions", { threadId })).toSorted((a, b) => b.createdAt - a.createdAt || b._creationTime - a._creationTime);
+
+    it("opens a new session for the same agent in the same thread, and ends the one it cleared", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await hostThread(device, 2);
+        const sessionsBefore = await sessionsOf(threadId);
+        const before = sessionsBefore[0] as Row;
+
+        const result = await run(
+            async (ctx) => await switchModule.clearHostSessionHandler(ctx, { clientId: "clear-1", threadId: threadId as never, userId: ownerId }),
+        );
+        const sessions = await sessionsOf(threadId);
+        const after = sessions[0] as Row;
+
+        // A new session row, with its own id, for the same agent, folder and computer.
+        expect(sessions).toHaveLength(2);
+        expect(after._id).not.toBe(before._id);
+        expect(after.hostSessionId).not.toBe(before.hostSessionId);
+        expect(after).toMatchObject({ agentKey: CLAUDE.agentKey, deviceId: device.deviceId, folderId: CLAUDE.folderId, threadId });
+        expect(after.status).not.toBe("ended");
+        // The session it cleared is over.
+        expect(await row(before._id)).toMatchObject({ status: "ended" });
+
+        // The reset row marks the point in the thread, and the new session is owed nothing from before it.
+        const messages = await rows("messages", { threadId });
+        const reset = messages.find((message) => message._id === result.messageId);
+
+        expect(reset).toMatchObject({ message: { content: "", role: "system" } });
+        expect(await run(async (ctx) => await pendingHandoffOf(ctx, await ctx.db.get("threads", threadId as never)))).toBeUndefined();
+    });
+
+    it("refuses a chat that may not run on a computer, and starts no session", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await hostThread(device, 1);
+
+        await run(async (ctx) => await ctx.db.patch("threads", threadId as never, { groupChat: { mode: "round-robin", participants: [] } }));
+
+        await expect(
+            run(async (ctx) => await switchModule.clearHostSessionHandler(ctx, { clientId: "clear-group", threadId: threadId as never, userId: ownerId })),
+        ).rejects.toThrow("cannot be handed to a computer");
+        expect(await sessionsOf(threadId)).toHaveLength(1);
+    });
+
+    it("gives a repeated click no second session", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await hostThread(device, 1);
+        const args = { clientId: "clear-repeat", threadId: threadId as never, userId: ownerId };
+
+        await run(async (ctx) => await switchModule.clearHostSessionHandler(ctx, args));
+        // The new session is still starting, so the repeat is refused for that; either refusal means no second session.
+        await expect(run(async (ctx) => await switchModule.clearHostSessionHandler(ctx, args))).rejects.toThrow(CLEAR_REFUSED);
+        expect(await sessionsOf(threadId)).toHaveLength(2);
+
+        // The refusal says the agent is not ready yet, so the app can say so instead of blaming a reply.
+        await expect(run(async (ctx) => await switchModule.clearHostSessionHandler(ctx, args))).rejects.toMatchObject({
+            data: { code: "CONTEXT_CLEAR_AGENT_STARTING" },
+        });
+
+        // Once the new session is ready, the same click is still refused, by its claim, and says so.
+        await openStartedSession(device, threadId);
+        await expect(run(async (ctx) => await switchModule.clearHostSessionHandler(ctx, args))).rejects.toMatchObject({
+            data: { code: "CONTEXT_CLEAR_ALREADY_MADE" },
+        });
+        expect(await sessionsOf(threadId)).toHaveLength(2);
     });
 });

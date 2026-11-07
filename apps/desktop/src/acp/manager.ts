@@ -194,6 +194,20 @@ export class AcpManager {
     ): Promise<string> {
         requireSupported();
 
+        // The backend ends a thread's session when it starts the next one in that thread (an agent switch, `/clear`): the
+        // one this computer still runs for it is closed, or every switch or clear would leave an agent process behind.
+        if (remote !== undefined) {
+            const superseded: AgentSession[] = [];
+
+            for (const session of this.sessions.values()) {
+                if (session.threadId === remote.threadId && session.summary().status !== "ended") {
+                    superseded.push(session);
+                }
+            }
+
+            await Promise.all(superseded.map(async (session) => await session.close()));
+        }
+
         if (this.summaries().filter((session) => session.status !== "ended").length >= MAX_SESSIONS) {
             throw new Error(`at most ${String(MAX_SESSIONS)} agents at once; close one first`);
         }

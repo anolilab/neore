@@ -15,6 +15,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type { FC } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { afterLastContextReset, isClearDivider } from "@/features/chat/core/context/chat-action-shared";
 import { useChatIsRunning, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
@@ -52,35 +53,42 @@ const ComposerFollowupSuggestions: FC = () => {
     const previousThreadIdRef = useRef<string | undefined>(undefined);
     const isFetchingRef = useRef(false);
 
+    // Only the messages after the last `/clear` divider: a reply from before it is no longer what the chat continues from.
+    const inContext = useMemo(() => afterLastContextReset(messages), [messages]);
     // A switch divider is a system row below the reply the suggestions are for; the server's cache skips it too.
-    const lastMessage = messages.findLast((message) => message.role !== "system") ?? null;
+    const lastMessage = inContext.findLast((message) => message.role !== "system") ?? null;
     const lastMessageRole = useMemo(() => lastMessage?.role, [lastMessage]);
 
-    const hasUserMessage = useMemo(() => messages.some((message) => message.role === "user"), [messages]);
+    const hasUserMessage = useMemo(() => inContext.some((message) => message.role === "user"), [inContext]);
 
     // Conditions for when we should show/fetch suggestions
     const shouldFetchConditions = useMemo(
-        () => validThreadId && !isRunning && messages.length > 0 && lastMessage && lastMessageRole === "assistant" && hasUserMessage,
-        [validThreadId, isRunning, messages.length, lastMessage, lastMessageRole, hasUserMessage],
+        () => validThreadId && !isRunning && inContext.length > 0 && lastMessage && lastMessageRole === "assistant" && hasUserMessage,
+        [validThreadId, isRunning, inContext.length, lastMessage, lastMessageRole, hasUserMessage],
     );
 
     // Determine if we should show the suggestions
     const shouldShow = shouldFetchConditions && suggestions.length > 0;
 
-    // Reset state when thread changes
+    // The newest `/clear` divider: suggestions loaded before it are for the context it ended, so they go with it.
+    const lastResetId = useMemo(() => messages.findLast((message) => isClearDivider(message))?.id, [messages]);
+    const previousResetIdRef = useRef(lastResetId);
+
+    // Reset state when the thread changes, or when a `/clear` starts a new context in it
     useEffect(() => {
-        if (previousThreadIdRef.current === threadId) {
+        if (previousThreadIdRef.current === threadId && previousResetIdRef.current === lastResetId) {
             return;
         }
 
         previousThreadIdRef.current = threadId;
+        previousResetIdRef.current = lastResetId;
         isFirstLoadRef.current = true;
         userManuallyClosedRef.current = false;
         userManuallyOpenedRef.current = false;
         previousSuggestionsRef.current = [];
         setSuggestions([]);
         setIsOpen(false);
-    }, [threadId]);
+    }, [threadId, lastResetId]);
 
     // Fetch suggestions via action when conditions are met
     useEffect(() => {

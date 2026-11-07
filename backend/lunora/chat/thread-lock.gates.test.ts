@@ -42,6 +42,7 @@ beforeAll(async () => {
     registerModule(registry, "agent_messages", await import("../agent/messages"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
     registerModule(registry, "agent_branches", await import("../agent/branches"));
+    registerModule(registry, "agent_context_reset_read", await import("../agent/context-reset-read"));
     registerModule(registry, "agent_thread_lock", await import("../agent/thread-lock"));
     registerModule(registry, "lib_document_history", await import("../lib/document-history"));
 }, 30_000);

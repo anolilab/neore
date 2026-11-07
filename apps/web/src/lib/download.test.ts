@@ -4,7 +4,7 @@ import type { Doc } from "@neore/backend/dataModel";
 import JsZip from "jszip";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { formatAsMarkdown, handleDownload } from "./download";
+import { CONTEXT_RESET_NOTE, formatAsMarkdown, handleDownload } from "./download";
 
 const thread = { _creationTime: Date.UTC(2026, 9, 19), title: "Plan" } as Doc<"threads">;
 const toolRow = {
@@ -139,6 +139,23 @@ describe("chat export", () => {
 
         expect(await blob.text()).toContain("Assistant: Let me check.");
         expect(await blob.text()).not.toContain("Tool Output");
+    });
+
+    it("exports a /clear divider as its note, not a blank system line", async () => {
+        expect.assertions(3);
+
+        const cleared = [
+            { _creationTime: 1, message: { content: "hello", role: "user" }, text: "hello" },
+            { _creationTime: 2, message: { content: "", role: "system" }, providerMetadata: { neoreContextReset: { reason: "clear" } }, tool: false },
+            { _creationTime: 3, message: { content: "again", role: "user" }, text: "again" },
+        ] as unknown as Doc<"messages">[];
+        const blob = await exported("txt", cleared);
+        const text = await blob.text();
+        const markdown = formatAsMarkdown(thread, cleared);
+
+        expect(text).toContain(`User: hello\nSystem: ${CONTEXT_RESET_NOTE}\nUser: again`);
+        expect(markdown).toContain(`_${CONTEXT_RESET_NOTE}_`);
+        expect(markdown).not.toContain("### System");
     });
 
     describe("a thread that was switched to another model", () => {

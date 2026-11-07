@@ -207,6 +207,7 @@ let ids: { messageId: string; streamId: string; threadId: string };
 
 beforeAll(async () => {
     registerModule(registry, "agent_branches", await import("../agent/branches"));
+    registerModule(registry, "agent_context_reset_read", await import("../agent/context-reset-read"));
     registerModule(registry, "agent_messages", await import("../agent/messages"));
     registerModule(registry, "agent_streams", await import("../agent/streams"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
