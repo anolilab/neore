@@ -28,8 +28,11 @@ import {
     probeNativeHost,
 } from "@/lib/native/bridge";
 
+import { buildDeviceDiagnostics, routeOf } from "../lib/device-diagnostics";
+import { clearConnectionErrors, clearDeviceErrors, recordDeviceError, useDeviceErrors } from "../lib/device-errors";
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
 import { isDeviceOnline } from "../lib/device-relay";
+import { createLatestRead } from "../lib/latest-read";
 import DeviceScope from "./device-scope";
 
 interface DeviceView {
@@ -114,15 +117,63 @@ export const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ devic
     );
 };
 
-const DeviceRow: FC<{
+export const DeviceRow: FC<{
     connected?: boolean;
     device: DeviceView;
     isThisComputer: boolean;
     now: number;
     onConnectionChange: () => void;
     reconnect?: NativeHostReconnect;
-}> = ({ connected, device, isThisComputer, now, onConnectionChange, reconnect }) => {
+    viaName?: string;
+}> = ({ connected, device, isThisComputer, now, onConnectionChange, reconnect, viaName }) => {
     const { t } = useLingui();
+    const errors = useDeviceErrors(device._id);
+    const lastError = errors.at(-1);
+    const copyDiagnostics = (): void => {
+        const text = buildDeviceDiagnostics({
+            clientAgent: navigator.userAgent,
+            clockOffset: errors.findLast((error) => error.clockOffset !== undefined)?.clockOffset,
+            errors,
+            lastSeenAt: device.lastSeenAt,
+            name: device.name,
+            route: routeOf(device.transport, isThisComputer),
+            viaName,
+        });
+        const { clipboard }: { clipboard?: Clipboard } = navigator;
+        const failed = () => {
+            toast.error(t`Could not copy to the clipboard`);
+        };
+
+        if (!clipboard) {
+            failed();
+
+            return;
+        }
+
+        clipboard
+            .writeText(text)
+            .then(() => {
+                toast.success(t`Diagnostics copied`);
+
+                return undefined;
+            })
+            .catch(failed);
+    };
+    const failureReason = reconnect?.reason;
+
+    // The reason a server gave up stays on its row through "Retry" and the attempts after it, until it connects.
+    useEffect(() => {
+        if (failureReason && !connected) {
+            recordDeviceError(device._id, failureReason, { kind: "connection" });
+        }
+    }, [connected, device._id, failureReason]);
+
+    useEffect(() => {
+        if (connected) {
+            clearConnectionErrors(device._id);
+        }
+    }, [connected, device._id]);
+
     const crpc = useCRPC();
     const [name, setName] = useState(device.name);
     const [confirming, setConfirming] = useState(false);
@@ -140,12 +191,20 @@ const DeviceRow: FC<{
         buttonLabel = t`Retry`;
     }
 
-    const connection = (action: () => Promise<unknown>) => {
+    const connection = (action: () => Promise<unknown>, { disconnecting = false }: { disconnecting?: boolean } = {}) => {
         void (async () => {
             try {
-                await action();
+                const result = await action();
+
+                // A server let go on purpose has nothing left to explain; a disconnect that did not happen keeps what was said.
+                if (disconnecting && result === true) {
+                    clearDeviceErrors(device._id);
+                }
             } catch (error) {
-                toast.error(error instanceof Error ? error.message : t`Could not connect to the server.`);
+                const message = error instanceof Error ? error.message : t`Could not connect to the server.`;
+
+                recordDeviceError(device._id, message, { kind: "connection" });
+                toast.error(message);
             } finally {
                 onConnectionChange();
             }
@@ -181,8 +240,13 @@ const DeviceRow: FC<{
                         {t`Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on.`}
                     </p>
                 )}
+                {lastError && (
+                    <p className="text-destructive text-xs" role="status">
+                        {lastError.message}
+                    </p>
+                )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
                 {isThisComputer && <Badge variant="outline">{t`This computer`}</Badge>}
                 {device.transport === "ssh" && <Badge variant="outline">{t`Server over SSH`}</Badge>}
                 <Badge variant={online ? "default" : "secondary"}>{online ? t`Online` : t`Offline`}</Badge>
@@ -190,7 +254,9 @@ const DeviceRow: FC<{
                 {(reconnect?.phase === "waiting" || reconnect?.phase === "connecting") && <Badge variant="secondary">{t`Reconnecting`}</Badge>}
                 {connected !== undefined && (
                     <Button
-                        onClick={() => connection(() => (stoppable ? disconnectNativeHost(device._id) : connectNativeHost(device._id)))}
+                        onClick={() =>
+                            connection(() => (stoppable ? disconnectNativeHost(device._id) : connectNativeHost(device._id)), { disconnecting: stoppable })
+                        }
                         size="sm"
                         variant="outline"
                     >
@@ -198,10 +264,13 @@ const DeviceRow: FC<{
                     </Button>
                 )}
                 {reconnect?.phase === "gaveUp" && (
-                    <Button onClick={() => connection(() => disconnectNativeHost(device._id))} size="sm" variant="outline">
+                    <Button onClick={() => connection(() => disconnectNativeHost(device._id), { disconnecting: true })} size="sm" variant="outline">
                         {t`Dismiss`}
                     </Button>
                 )}
+                <Button aria-label={t`Copy diagnostics for ${device.name}`} onClick={copyDiagnostics} size="sm" variant="outline">
+                    {t`Copy diagnostics`}
+                </Button>
                 <Button onClick={() => setConfirming(true)} size="sm" variant="outline">
                     {t`Remove`}
                 </Button>
@@ -395,18 +464,14 @@ const DevicesSettings: FC = () => {
     const register = useMutation(crpc.devices.functions.registerDevice.mutationOptions());
     const revoke = useMutation(crpc.devices.functions.revokeDevice.mutationOptions());
 
+    const [readStatus] = useState(() => createLatestRead(getNativeDeviceStatus, setNative));
+
     // Once, and again on each change of the shell (a reconnect in the background, say): the buttons follow it.
-    useEffect(
-        () =>
-            onNativeDeviceChanged(() => {
-                void getNativeDeviceStatus().then(setNative);
-            }),
-        [],
-    );
+    useEffect(() => onNativeDeviceChanged(readStatus), [readStatus]);
 
     const pairedHere = native?.deviceId ? devices?.find((device) => device._id === native.deviceId) : undefined;
     const refreshNative = (): void => {
-        void getNativeDeviceStatus().then(setNative);
+        readStatus();
         globalThis.dispatchEvent(new Event(DEVICE_PAIRED_EVENT));
     };
     const defaultName: Record<NativeDevicePlatform, string> = { linux: t`My Linux computer`, macos: t`My Mac`, windows: t`My Windows PC` };
@@ -492,6 +557,7 @@ const DevicesSettings: FC = () => {
                                     now={now}
                                     onConnectionChange={refreshNative}
                                     reconnect={native?.hosts?.find((host) => host.deviceId === device._id)?.reconnect}
+                                    viaName={devices.find((other) => other._id === device.viaDeviceId)?.name}
                                 />
                             ))}
                         </ul>

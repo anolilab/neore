@@ -16,6 +16,8 @@ import {
     onNativeDeviceProgress,
 } from "@/lib/native/bridge";
 
+import type { ClockOffset } from "../lib/device-errors";
+import { clearServiceErrors, recordDeviceError } from "../lib/device-errors";
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
 import type { DeviceRelayPorts } from "../lib/device-relay";
 import { createDeviceRelay, DEVICE_HEARTBEAT_MS, viaDeviceFor } from "../lib/device-relay";
@@ -39,6 +41,20 @@ const clockSkewText = (error: Error & { data?: { direction?: unknown; minutes?: 
     }
 
     return error.message;
+};
+
+/** Keeps the text a connection's row shows, with the size of a clock refusal when the error carried one. */
+const rememberDeviceFailure = (id: string, error: unknown): void => {
+    if (!(error instanceof Error) || !error.message) {
+        return;
+    }
+
+    const { data } = error as { data?: { code?: unknown; direction?: unknown; minutes?: unknown } };
+    const minutes = data?.minutes;
+    const clock: ClockOffset | undefined =
+        data?.code === "DEVICE_CLOCK_SKEW" && typeof minutes === "number" ? { direction: data.direction === "ahead" ? "ahead" : "behind", minutes } : undefined;
+
+    recordDeviceError(id, clock ? clockSkewText(error) : error.message, { clockOffset: clock });
 };
 
 /** A wrong clock is the one refusal cause a person can fix, so it is said; any other failure is ignored. */
@@ -81,6 +97,8 @@ const DeviceRelay: FC = () => {
     const reportProgress = useMutation(crpc.devices.functions.reportDeviceCallProgress.mutationOptions());
 
     // The mutation functions, read at call time: the relay outlives renders.
+    // Shared by every run of the manifest effect, so a send from an earlier run is never the latest of a later one.
+    const sendGenerations = useRef(new Map<string, number>());
     const mutations = useRef({
         claim: claim.mutateAsync,
         complete: complete.mutateAsync,
@@ -173,24 +191,53 @@ const DeviceRelay: FC = () => {
             return undefined;
         }
 
+        // Sends can overlap (the shell changes again while one is in flight). Only the newest one per device may touch the
+        // remembered errors: an older send refused as stale after a newer one went through is not a failure.
+        const generations = sendGenerations.current;
+        const isLatest = (id: string, generation: number): boolean => generations.get(id) === generation;
         const send = async (id: string): Promise<void> => {
-            const manifest = await getNativeDeviceManifest(id === deviceId ? undefined : id);
+            const generation = (generations.get(id) ?? 0) + 1;
 
-            if (manifest) {
-                await mutations.current.updateManifest({
-                    deviceId: id as Id<"devices">,
-                    viaDeviceId: viaDeviceFor(deviceId, id) as Id<"devices"> | undefined,
-                    ...manifest,
-                });
+            generations.set(id, generation);
+
+            try {
+                // The shell refusing to read a manifest (a server just disconnected, say) is not a refusal worth showing.
+                const manifest = await getNativeDeviceManifest(id === deviceId ? undefined : id).catch(() => undefined);
+
+                if (manifest) {
+                    await mutations.current.updateManifest({
+                        deviceId: id as Id<"devices">,
+                        viaDeviceId: viaDeviceFor(deviceId, id) as Id<"devices"> | undefined,
+                        ...manifest,
+                    });
+
+                    if (isLatest(id, generation)) {
+                        clearServiceErrors(id);
+                    }
+                }
+            } catch (error) {
+                if (isLatest(id, generation)) {
+                    rememberDeviceFailure(id, error);
+                    toastClockSkew(error);
+                }
             }
         };
 
-        return onNativeDeviceChanged(() => {
-            // A refused manifest leaves the previous tool set in place. A wrong clock is the one cause a person can fix, so it is said.
+        const stopListening = onNativeDeviceChanged(() => {
+            // A refused manifest leaves the previous tool set in place. The reason is kept for the device's row, and a wrong clock, the one cause a person can fix, is said.
             for (const id of [deviceId, ...idsOf(hostKey)]) {
-                send(id).catch(toastClockSkew);
+                void send(id);
             }
         });
+
+        return () => {
+            stopListening();
+
+            // A send still in flight belongs to a run that is over: its answer must not touch the row any more.
+            for (const [id, generation] of generations) {
+                generations.set(id, generation + 1);
+            }
+        };
     }, [deviceId, hostKey, paired]);
 
     // The shell's signed "approval showing" / "running" reports, relayed as-is.

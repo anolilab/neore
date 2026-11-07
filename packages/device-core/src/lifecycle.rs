@@ -105,15 +105,31 @@ pub enum Phase {
 #[derive(Debug)]
 pub struct Keep {
     backoff: Backoff,
+    /// Why the last attempt failed (or the link was lost), kept through the waits and attempts after it and dropped
+    /// once the link is seen alive. Capped, so a long message from the server cannot grow the state.
+    last_failure: Option<String>,
     phase: Phase,
+}
+
+/// The longest failure text kept for a server.
+const MAX_FAILURE_CHARS: usize = 300;
+
+fn capped(reason: &str) -> String {
+    reason.chars().take(MAX_FAILURE_CHARS).collect()
 }
 
 impl Keep {
     pub fn connected() -> Self {
         Keep {
             backoff: Backoff::default(),
+            last_failure: None,
             phase: Phase::Connected,
         }
+    }
+
+    /// Why the connection last failed, while it has not been seen alive since.
+    pub fn last_failure(&self) -> Option<&str> {
+        self.last_failure.as_deref()
     }
 
     pub fn phase(&self) -> &Phase {
@@ -123,6 +139,7 @@ impl Keep {
     /// The link was seen alive.
     pub fn up(&mut self) {
         self.backoff.up();
+        self.last_failure = None;
         self.phase = Phase::Connected;
     }
 
@@ -152,6 +169,7 @@ impl Keep {
             return false;
         }
 
+        self.last_failure = Some("the connection was lost".to_owned());
         self.schedule(now, "the connection was lost");
 
         true
@@ -190,6 +208,8 @@ impl Keep {
         if !matches!(self.phase, Phase::Connecting { .. }) {
             return;
         }
+
+        self.last_failure = Some(capped(reason));
 
         if retryable {
             self.schedule(now, reason);
@@ -390,5 +410,59 @@ mod tests {
 
         assert_eq!(launches.len(), MAX_LAUNCHES);
         assert_eq!(launches.last().unwrap(), &format!("id{}", MAX_LAUNCHES + 2));
+    }
+
+    #[test]
+    fn a_failure_is_kept_through_the_waits_and_dropped_when_the_link_is_up() {
+        let (mut keep, now) = (Keep::connected(), Instant::now());
+
+        assert_eq!(keep.last_failure(), None);
+
+        keep.lost(now);
+
+        assert_eq!(keep.last_failure(), Some("the connection was lost"));
+
+        let Phase::Waiting { attempt, at } = keep.phase().clone() else {
+            panic!("not waiting: {:?}", keep.phase());
+        };
+
+        assert_eq!(keep.due(at), Some(attempt));
+        assert_eq!(
+            keep.last_failure(),
+            Some("the connection was lost"),
+            "kept while connecting"
+        );
+
+        keep.failed(at, true, "Connection timed out");
+
+        assert!(matches!(keep.phase(), Phase::Waiting { .. }));
+        assert_eq!(
+            keep.last_failure(),
+            Some("Connection timed out"),
+            "kept across the next wait"
+        );
+
+        keep.up();
+
+        assert_eq!(keep.last_failure(), None);
+    }
+
+    #[test]
+    fn a_long_failure_text_is_cut() {
+        let (mut keep, now) = (Keep::connected(), Instant::now());
+
+        keep.lost(now);
+
+        let Phase::Waiting { at, .. } = keep.phase().clone() else {
+            panic!("not waiting");
+        };
+
+        keep.due(at);
+        keep.failed(at, true, &"x".repeat(10_000));
+
+        assert_eq!(
+            keep.last_failure().map(|text| text.chars().count()),
+            Some(MAX_FAILURE_CHARS)
+        );
     }
 }
