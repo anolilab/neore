@@ -185,3 +185,29 @@ export const applyOptionsUpdate = (options: AgentOptions, update: Record<string,
         }),
     };
 };
+
+/** The most mode changes one session keeps while its id is not known yet. */
+const MAX_EARLY_MODE_CHANGES = 16;
+
+/**
+ * One session's option updates that came before its id was known, with `update` added, kept so that applying them in order
+ * gives what applying every update would: an option list that parses replaces everything before it (one that does not would
+ * change nothing, so it changes nothing here either); a mode change only moves the mode, so of each mode id only its last
+ * change is kept, in the order of those last changes, after the newest list.
+ */
+export const keepEarlyUpdate = (kept: Record<string, unknown>[], update: Record<string, unknown>, scrub: Scrub): Record<string, unknown>[] => {
+    if (update.sessionUpdate === "config_option_update") {
+        return configOptionsOf(update.configOptions, scrub) === undefined ? kept : [update];
+    }
+
+    const id = update.sessionUpdate === "current_mode_update" ? idOf(update.currentModeId, scrub) : undefined;
+
+    if (id === undefined) {
+        return kept;
+    }
+
+    const list = kept.filter((early) => early.sessionUpdate === "config_option_update");
+    const modes = kept.filter((early) => early.sessionUpdate === "current_mode_update" && early.currentModeId !== id);
+
+    return [...list, ...[...modes, update].slice(-MAX_EARLY_MODE_CHANGES)];
+};

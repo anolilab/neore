@@ -286,15 +286,31 @@ describe("the agent's options", () => {
         await transcriptPlayer(agent).play(steps);
         // The answer and the update in one read: the update is handled before the code that awaited the answer runs.
         (agent.process.stdout as PassThrough).write(
-            `${JSON.stringify({ id: agent.written.at(-1)?.id, jsonrpc: "2.0", result: { configOptions: [mode], sessionId: "sess_1" } })}\n${JSON.stringify({
-                jsonrpc: "2.0",
-                method: "session/update",
-                params: { sessionId: "sess_1", update: { currentModeId: "plan", sessionUpdate: "current_mode_update" } },
-            })}\n`,
+            [
+                { id: agent.written.at(-1)?.id, jsonrpc: "2.0", result: { configOptions: [mode], sessionId: "sess_1" } },
+                // A list that adds a mode, then more mode changes than are ever kept one by one: the list and the last change count.
+                {
+                    jsonrpc: "2.0",
+                    method: "session/update",
+                    params: {
+                        sessionId: "sess_1",
+                        update: { configOptions: [{ ...mode, options: [...mode.options, { name: "Ask", value: "ask" }] }], sessionUpdate: "config_option_update" },
+                    },
+                },
+                ...Array.from({ length: 12 }, (_, index) => {
+                    return {
+                        jsonrpc: "2.0",
+                        method: "session/update",
+                        params: { sessionId: "sess_1", update: { currentModeId: index % 2 === 0 ? "plan" : "ask", sessionUpdate: "current_mode_update" } },
+                    };
+                }),
+            ]
+                .map((frame) => `${JSON.stringify(frame)}\n`)
+                .join(""),
         );
         await started;
 
-        expect((calls[0]?.[1] as HostSessionInfo).options?.configOptions?.[0]?.currentValue).toBe("plan");
+        expect((calls[0]?.[1] as HostSessionInfo).options?.configOptions?.[0]?.currentValue).toBe("ask");
     });
 
     it.each([

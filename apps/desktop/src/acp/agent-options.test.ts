@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyOptionsUpdate, MAX_CHOICES, MAX_OPTIONS, optionsOf } from "./agent-options";
+import { applyOptionsUpdate, keepEarlyUpdate, MAX_CHOICES, MAX_OPTIONS, optionsOf } from "./agent-options";
 import { acpSchema } from "./testing/harness";
 
 const keep = (text: string): string => text;
@@ -172,5 +172,49 @@ describe("applyOptionsUpdate", () => {
 
     it("ignores every other update", () => {
         expect(applyOptionsUpdate(start, { content: { text: "x", type: "text" }, sessionUpdate: "agent_message_chunk" }, keep)).toBeUndefined();
+    });
+});
+
+describe("keepEarlyUpdate", () => {
+    const list = (...values: string[]) => {
+        return {
+            configOptions: [{ ...MODE, options: values.map((value) => { return { name: value, value }; }) }],
+            sessionUpdate: "config_option_update",
+        };
+    };
+    const switchTo = (currentModeId: string) => {
+        return { currentModeId, sessionUpdate: "current_mode_update" };
+    };
+    const base = optionsOf({ configOptions: [MODE], sessionId: "s" }, keep);
+    const applyAll = (updates: Record<string, unknown>[]) => {
+        let options = base;
+
+        for (const update of updates) {
+            options = applyOptionsUpdate(options, update, keep) ?? options;
+        }
+
+        return options;
+    };
+    const keepAll = (updates: Record<string, unknown>[]) => {
+        let kept: Record<string, unknown>[] = [];
+
+        for (const update of updates) {
+            kept = keepEarlyUpdate(kept, update, keep);
+        }
+
+        return kept;
+    };
+    const cycle = ["nowhere", "plan", "ask"];
+
+    it.each([
+        ["a list, then a list that does not parse", [list("plan", "build", "ask"), { configOptions: [{ id: 3 }], sessionUpdate: "config_option_update" }, switchTo("ask")]],
+        ["a switch, then a switch to an unknown or the same mode", [switchTo("plan"), switchTo("nowhere"), switchTo("plan")]],
+        ["a list, then more switches than are kept one by one", [list("plan", "build", "ask"), ...Array.from({ length: 31 }, (_, index) => switchTo(cycle[index % 3] ?? "plan"))]],
+        ["a switch, then a list that replaces it", [switchTo("plan"), list("build", "ask")]],
+    ])("keeps what applying every update gives: %s", (_name, updates) => {
+        const kept = keepAll(updates);
+
+        expect(applyAll(kept)).toEqual(applyAll(updates));
+        expect(kept.length).toBeLessThanOrEqual(17);
     });
 });
