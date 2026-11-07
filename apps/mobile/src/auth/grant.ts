@@ -279,20 +279,48 @@ export const fetchAccessToken = async (input: { fetch: Fetch; lunoraUrl: string;
     return token;
 };
 
-/** Revoke the session server-side, then forget it even if the revoke fails. */
-export const signOutGrant = async (input: { fetch: Fetch; lunoraUrl: string; store: GrantStore }): Promise<void> => {
+/**
+ * Takes the session off the phone FIRST, before the server is asked anything: the stored grant is read and cleared at
+ * once, so nothing on the phone can sign in with it from here on, the iOS notification extension included (it reads
+ * the same keychain item to fetch a push's text). Resolves the session token, for {@link revokeSessionToken}, or
+ * `undefined` when none was stored or it could not be read. A store that cannot be cleared rejects, so the caller can still
+ * sign out in memory.
+ */
+export const takeStoredGrant = async (store: GrantStore): Promise<string | undefined> => {
+    let token: string | undefined;
+
     try {
-        const grant = await input.store.get();
+        const grant = await store.get();
 
-        if (grant) {
-            const response = await postJson(input.fetch, `${input.lunoraUrl}/extension/auth/revoke`, { token: grant.token });
-
-            await response.body?.cancel();
-        }
+        token = grant?.token;
     } catch {
-        // Offline, or the stored grant could not be read: the session expires on its own, and the local copy is cleared below.
-    } finally {
-        await input.store.clear();
+        // Unreadable: nothing to revoke, and the item is still cleared below.
+    }
+
+    await store.clear();
+
+    return token;
+};
+
+/** Revokes a session server-side. Offline, it throws; the session then expires on its own. */
+export const revokeSessionToken = async (input: { fetch: Fetch; lunoraUrl: string; token: string }): Promise<void> => {
+    const response = await postJson(input.fetch, `${input.lunoraUrl}/extension/auth/revoke`, { token: input.token });
+
+    await response.body?.cancel();
+};
+
+/** Forget the session on the phone, then revoke it server-side; a failed revoke still leaves it forgotten. */
+export const signOutGrant = async (input: { fetch: Fetch; lunoraUrl: string; store: GrantStore }): Promise<void> => {
+    const token = await takeStoredGrant(input.store);
+
+    if (token === undefined) {
+        return;
+    }
+
+    try {
+        await revokeSessionToken({ fetch: input.fetch, lunoraUrl: input.lunoraUrl, token });
+    } catch {
+        // Offline: the session expires on its own, and the local copy is already gone.
     }
 };
 

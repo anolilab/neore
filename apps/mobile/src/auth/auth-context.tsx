@@ -1,15 +1,19 @@
 import { tokenRefreshDelayMs } from "@neore/client-runtime";
+import { dismissAllNotificationsAsync } from "expo-notifications";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { clearLastThread } from "../chat/last-thread-store";
 import { loadConfig } from "../lib/config";
 import { getClient } from "../lib/lunora";
+import { clearTapRoute } from "../notifications/pending-tap";
+import { backendPushServer, devicePushPlatform, pushRegistrations } from "../notifications/phone-push";
+import { releasePhonePush } from "../notifications/push-registration";
 import { getOfflineCache } from "../offline/database";
 import type { AuthStatus } from "./auth-state";
 import { AuthContext } from "./auth-state";
 import type { GrantUser } from "./grant";
-import { fetchAccessToken, readStoredUser, signOutGrant } from "./grant";
+import { fetchAccessToken, readStoredUser, revokeSessionToken, takeStoredGrant } from "./grant";
 import { secureGrantStore } from "./secure-store";
 import { signInWithBrowser } from "./sign-in";
 import { emptyCacheWhileSignedOut, signOutOnDevice } from "./sign-out";
@@ -126,7 +130,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await signOutOnDevice({
                 clearCache: () => getOfflineCache().clear(),
                 forgetLastChat: clearLastThread,
-                revokeGrant: () => signOutGrant({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore }),
+                dismissNotifications: async () => {
+                    // The previous account's chat, held from a tap, is not where the next person should land.
+                    clearTapRoute();
+                    await dismissAllNotificationsAsync();
+                },
+                releasePush: async () => {
+                    // No registration may send the token from here on; one already on its way finishes first, so it
+                    // cannot land after the release and give the phone back to this account.
+                    const isSigningOut = pushRegistrations.close();
+
+                    await pushRegistrations.settle();
+                    await releasePhonePush({ isCurrent: isSigningOut, platform: devicePushPlatform, server: backendPushServer(client) });
+                },
+                revokeSession: async (token) => await revokeSessionToken({ fetch, lunoraUrl: config.lunoraUrl, token }),
+                takeCredential: async () => await takeStoredGrant(secureGrantStore),
                 // eslint-disable-next-line no-console -- no logger in the app; a failed clear must not be silent
                 warn: console.warn,
             });
