@@ -44,14 +44,17 @@ export const TITLE_CHARGE_TTL_MS = 24 * 60 * 60 * 1000;
 export const TITLE_DISPATCH_SCOPE = "title-dispatch";
 export const TITLE_DISPATCH_TTL_MS = 2 * 60 * 1000;
 
-/**
- * How long before its claim lapses a request may still leave. A request whose claim was taken longer ago than
- * `TITLE_DISPATCH_TTL_MS - TITLE_DISPATCH_MARGIN_MS` is not sent (`dispatchStillHeld`): the lock check no longer sees a lapsed claim.
- */
-export const TITLE_DISPATCH_MARGIN_MS = 30 * 1000;
+/** How long before its dispatch claim lapses a title request is aborted: the request has ended, and released its claim, before the lapse. */
+export const TITLE_DISPATCH_MARGIN_MS = 15 * 1000;
 
-/** Whether a request whose dispatch claim was taken at `claimedAt` may still leave at `now`: its claim holds well past the send. */
-export const dispatchStillHeld = (claimedAt: number, now: number = Date.now()): boolean => now < claimedAt + TITLE_DISPATCH_TTL_MS - TITLE_DISPATCH_MARGIN_MS;
+/** The least time a title request is given: one with less left before its deadline is not sent. */
+export const TITLE_REQUEST_MIN_MS = 15 * 1000;
+
+/** When a title request whose dispatch claim was taken at `claimedAt` is aborted: before the claim can lapse, so the claim covers the whole request. */
+export const titleRequestDeadline = (claimedAt: number): number => claimedAt + TITLE_DISPATCH_TTL_MS - TITLE_DISPATCH_MARGIN_MS;
+
+/** Whether a request whose dispatch claim was taken at `claimedAt` may still be sent at `now`: it has at least {@link TITLE_REQUEST_MIN_MS} before its deadline. */
+export const dispatchStillHeld = (claimedAt: number, now: number = Date.now()): boolean => titleRequestDeadline(claimedAt) - now >= TITLE_REQUEST_MIN_MS;
 
 /** The row the thread view ends at: the stored leaf (or the path it falls back to when that row is gone), else the latest row. */
 const leafOf = async (context: Reader, thread: Doc<"threads">): Promise<Doc<"messages"> | null> =>

@@ -280,6 +280,44 @@ describe("the gateway a title's model call is sent through", () => {
         await expect(harness.run(async (context: any) => await titleDispatchInFlight(context, cloud as never))).resolves.toBe(false);
     });
 
+    it("aborts a request still pending at its deadline, before its claim lapses, and releases the claim", async () => {
+        const cloud = await insertCloud();
+        let signal: AbortSignal | undefined;
+
+        vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+
+        try {
+            const gateway = titleDispatchGateway(actionContext(), cloud, async (_input, init) => {
+                signal = init?.signal ?? undefined;
+
+                // The provider never answers: only the deadline ends the request.
+                return await new Promise<Response>((_resolve, reject) => {
+                    signal?.addEventListener("abort", () => reject(signal?.reason));
+                });
+            });
+            // Settled as soon as the deadline aborts it, which happens while the clock is advanced below.
+            const pending = gateway
+                .fetch("https://gateway/chat")
+                .then(() => "answered")
+                .catch((error: unknown) => error);
+
+            for (let step = 0; step < 50 && signal === undefined; step += 1) {
+                await vi.advanceTimersByTimeAsync(1);
+            }
+
+            expect(signal?.aborted).toBe(false);
+
+            await vi.advanceTimersByTimeAsync(TITLE_DISPATCH_TTL_MS - 1);
+
+            await expect(pending).resolves.toMatchObject({ code: "TIMEOUT" });
+            expect(signal?.aborted).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
+
+        await expect(harness.run(async (context: any) => await titleDispatchInFlight(context, cloud as never))).resolves.toBe(false);
+    });
+
     it("releases its dispatch when the request fails, so the chat can still be locked", async () => {
         const cloud = await insertCloud();
 

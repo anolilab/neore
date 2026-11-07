@@ -49,7 +49,7 @@ import type { UIMessage } from "../agent/ui-messages";
 import { docsToModelMessages, listMessagesByThreadIdHandler, storeFile, toUIMessages } from "../agent/client";
 import { autoRepairJsonMiddleware } from "../agent/client/middleware";
 import { listActivePathPage, withBranchInfo } from "../agent/branches";
-import { dispatchStillHeld, TITLE_CHARGE_SCOPE } from "../agent/thread-title";
+import { dispatchStillHeld, TITLE_CHARGE_SCOPE, titleRequestDeadline } from "../agent/thread-title";
 import { candidatesOnActivePath } from "../agent/branch-rows";
 import {
     redactThreadForPublicViewer,
@@ -1844,7 +1844,8 @@ const writeGeneratedTitle = async (
 
 /**
  * The gateway for one title run's model requests. Each request takes a dispatch claim in the same transaction that checks the thread is
- * not locked (`beginTitleDispatch`), and holds it until the request is answered; locking the chat refuses while one is held. So either
+ * not locked (`beginTitleDispatch`), and holds it until the request has ended; locking the chat refuses while one is held. The request is
+ * aborted at its deadline (`titleRequestDeadline`), before the claim can lapse, so the claim covers the whole request. So either
  * the lock commits first and the request is never sent (the call throws, and `refused` says so, to tell it from a model error), or the
  * request is sent first and the lock waits for it. A claim whose release fails lapses after its short TTL, and the log says so.
  */
@@ -1862,6 +1863,8 @@ export const titleDispatchGateway = (context: ActionContext, threadId: string, i
                 throw new LunoraError("CONFLICT", "The chat was locked before its title request was sent.");
             }
 
+            let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+
             try {
                 // The claim must still be held when the request leaves: one taken so long ago that it may have lapsed no longer keeps a
                 // lock waiting, so the request is not sent.
@@ -1871,8 +1874,20 @@ export const titleDispatchGateway = (context: ActionContext, threadId: string, i
                     throw new LunoraError("CONFLICT", "The title request was not sent in time; it was dropped.");
                 }
 
-                return await inner(input, init);
+                // The request is aborted at its deadline, before its claim can lapse: a lock never commits while it is still pending.
+                const deadline = new AbortController();
+
+                deadlineTimer = setTimeout(
+                    () => {
+                        deadline.abort(new LunoraError("TIMEOUT", "The title request ran past its deadline."));
+                    },
+                    titleRequestDeadline(claimedAt) - Date.now(),
+                );
+
+                return await inner(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, deadline.signal]) : deadline.signal });
             } finally {
+                clearTimeout(deadlineTimer);
+
                 if (!(await tryTimes(3, () => context.runMutation(internal.agent.thread_title.endTitleDispatch, { ...dispatch, claimedAt })))) {
                     context.log.event("chat.thread_title", { skipped: "dispatch-release-failed" });
                 }

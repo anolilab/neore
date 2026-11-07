@@ -22,8 +22,10 @@ import {
     TITLE_DISPATCH_SCOPE,
     TITLE_DISPATCH_TTL_MS,
     TITLE_READ_WINDOW,
+    TITLE_REQUEST_MIN_MS,
     titleDispatchInFlight,
     titlePromptIn,
+    titleRequestDeadline,
     writeTitleIfUnchanged,
 } from "./thread-title";
 
@@ -394,12 +396,15 @@ describe("letting a title's model request leave", () => {
 });
 
 describe("a title request's dispatch claim", () => {
-    it("lets a request leave only while its claim still holds well past the send", () => {
+    it("aborts a request before its claim lapses, and sends one only while it has time left before that", () => {
         const claimedAt = 1_000_000;
+        const deadline = titleRequestDeadline(claimedAt);
 
+        expect(deadline).toBe(claimedAt + TITLE_DISPATCH_TTL_MS - TITLE_DISPATCH_MARGIN_MS);
+        expect(deadline).toBeLessThan(claimedAt + TITLE_DISPATCH_TTL_MS);
         expect(dispatchStillHeld(claimedAt, claimedAt)).toBe(true);
-        expect(dispatchStillHeld(claimedAt, claimedAt + TITLE_DISPATCH_TTL_MS - TITLE_DISPATCH_MARGIN_MS - 1)).toBe(true);
-        expect(dispatchStillHeld(claimedAt, claimedAt + TITLE_DISPATCH_TTL_MS - TITLE_DISPATCH_MARGIN_MS)).toBe(false);
+        expect(dispatchStillHeld(claimedAt, deadline - TITLE_REQUEST_MIN_MS)).toBe(true);
+        expect(dispatchStillHeld(claimedAt, deadline - TITLE_REQUEST_MIN_MS + 1)).toBe(false);
     });
 
     it("finds a request being sent behind more than a page of expired claims, and a new dispatch clears expired ones", async () => {
