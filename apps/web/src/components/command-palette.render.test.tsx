@@ -158,6 +158,20 @@ const renderPalette = () => {
     return render(createElement(QueryClientProvider, { client: queryClient }, createElement(GlobalCommandPalette)));
 };
 
+/** The scroll area under the list needs a constructible observer; the setup's mock is an arrow function. */
+const stubResizeObserver = () => {
+    vi.stubGlobal(
+        "ResizeObserver",
+        class {
+            disconnect = vi.fn();
+
+            observe = vi.fn();
+
+            unobserve = vi.fn();
+        },
+    );
+};
+
 const openPalette = async () => {
     act(() => {
         useCommandDialogStore.getState().openCommandPalette();
@@ -171,16 +185,7 @@ describe("command palette message search", () => {
         // The scroll area under the list needs a constructible observer and jsdom lacks getAnimations; the setup's mock is an arrow function
         // and is re-installed before every test.
         Element.prototype.getAnimations = () => [];
-        vi.stubGlobal(
-            "ResizeObserver",
-            class {
-                disconnect = vi.fn();
-
-                observe = vi.fn();
-
-                unobserve = vi.fn();
-            },
-        );
+        stubResizeObserver();
         harness.searchArgs.length = 0;
         harness.navigate.mockClear();
         harness.scrollToMessage.mockClear();
@@ -311,16 +316,7 @@ describe("command palette state tags", () => {
 
     beforeEach(() => {
         Element.prototype.getAnimations = () => [];
-        vi.stubGlobal(
-            "ResizeObserver",
-            class {
-                disconnect = vi.fn();
-
-                observe = vi.fn();
-
-                unobserve = vi.fn();
-            },
-        );
+        stubResizeObserver();
     });
 
     afterEach(() => {
