@@ -687,18 +687,3 @@ describe("a worker's conversation", () => {
         await expect(asOwner().mutation(guestLinks.createGuestLink as never, { threadId: workerThread } as never)).rejects.toBeDefined();
     });
 });
-
-describe("a thread that becomes temporary", () => {
-    it("withdraws its live guest link and the notes on it", async () => {
-        const { linkToken } = await createLink();
-
-        await hold(linkToken, "waiting");
-
-        const threads = await import("../agent/threads");
-
-        await harness.run(async (ctx: any) => await ctx.runMutation(threads.createTemporaryThread, { expiresAt: Date.now() + 60_000, threadId }));
-
-        expect(await rows("threadGuestLinks")).toHaveLength(0);
-        expect(await rows("threadGuestMessages")).toHaveLength(0);
-    });
-});

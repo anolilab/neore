@@ -22,6 +22,9 @@ export const GUEST_MAX_HELD_PER_LINK = 20;
 /** Rows (held and sent) one link keeps; the cap above leaves room for the owner's sent ones. */
 export const GUEST_MAX_ROWS_PER_LINK = 100;
 
+/** The most links of one thread a removal reads: a thread has one live link at a time, and lapsed ones go with the sweep. */
+export const GUEST_LINK_REMOVAL_CAP = 50;
+
 /** Tokens are two UUIDs without dashes: 64 characters. Anything much longer is not one. */
 export const GUEST_TOKEN_MAX_LENGTH = 128;
 
@@ -69,7 +72,7 @@ export const deleteGuestLink = async (ctx: Pick<MutationCtx, "db">, link: LinkRo
     const messages = await ctx.db
         .query("threadGuestMessages")
         .withIndex("by_link", (q) => q.eq("linkId", link._id))
-        .collect();
+        .take(GUEST_MAX_ROWS_PER_LINK);
 
     for (const message of messages) {
         await ctx.db.delete("threadGuestMessages", message._id);
@@ -89,13 +92,13 @@ export const removeGuestLinkRows = async (ctx: Pick<MutationCtx, "db">, threadId
     const links = await ctx.db
         .query("threadGuestLinks")
         .withIndex("by_thread", (q) => q.eq("threadId", threadId))
-        .collect();
+        .take(GUEST_LINK_REMOVAL_CAP);
 
     for (const link of links) {
         const messages = await ctx.db
             .query("threadGuestMessages")
             .withIndex("by_link", (q) => q.eq("linkId", link._id))
-            .collect();
+            .take(GUEST_MAX_ROWS_PER_LINK);
 
         for (const message of messages) {
             await ctx.db.delete("threadGuestMessages", message._id);
