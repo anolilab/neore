@@ -1196,8 +1196,15 @@ const stopHostTurnOf = async (ctx: MutationCtx, run: RunDoc, now: number): Promi
 
 export type SubAgentOutcome = { error: string; kind: "failed" } | { kind: "cancelled" } | { kind: "succeeded"; result: string };
 
-/** How often a result for a parent that waits on an approval checks again whether the wait is over. */
+/**
+ * The first check of a result held for a parent that waits on an approval. The wait's end posts it at once
+ * ({@link releaseResultsHeldFor}); this poll only covers a wait that ended without that, so it backs off.
+ */
 const SUB_AGENT_AWAITING_POST_RETRY_MS = 5 * 60_000;
+const SUB_AGENT_AWAITING_POST_RETRY_MAX_MS = 60 * 60_000;
+
+/** The wait before the `waits`-th check of a held result: doubling from {@link SUB_AGENT_AWAITING_POST_RETRY_MS}, capped at an hour. */
+const awaitingPostRetryDelayMs = (waits: number): number => Math.min(SUB_AGENT_AWAITING_POST_RETRY_MS * 2 ** waits, SUB_AGENT_AWAITING_POST_RETRY_MAX_MS);
 
 /** Whether `threadId` is the child thread of a one-shot run that waits on an approval request. */
 const waitsOnApproval = async (ctx: Pick<QueryCtx, "db">, threadId: string): Promise<boolean> =>
@@ -1205,6 +1212,28 @@ const waitsOnApproval = async (ctx: Pick<QueryCtx, "db">, threadId: string): Pro
         .query("subAgentRuns")
         .withIndex("by_childThreadId_and_status", (q) => q.eq("childThreadId", threadId).eq("status", "awaiting"))
         .first()) !== null;
+
+/** Runs of one parent thread read per status when a wait ends; a wait holds a handful of nested results, so the poll covers any beyond it. */
+const HELD_RESULTS_RELEASED = 20;
+
+/**
+ * A run that leaves `awaiting` releases the results its child holds back: each ended, unposted nested run of `childThreadId`
+ * is posted now, once its parent is no longer waiting ({@link postRunResult} checks that again).
+ */
+const releaseResultsHeldFor = async (ctx: MutationCtx, childThreadId: string): Promise<void> => {
+    for (const status of ["succeeded", "failed", "cancelled"] as const) {
+        const nested = await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", childThreadId).eq("status", status))
+            .take(HELD_RESULTS_RELEASED);
+
+        for (const row of nested) {
+            if (row.resultPostedAt === undefined && row.postFailed === undefined && postsBack(row)) {
+                await ctx.scheduler.runAfter(0, internal.sub_agents.functions.postResult, { attempt: 0, runId: row._id });
+            }
+        }
+    }
+};
 
 /**
  * Posts an ended run's result to the parent thread, once, if the lead asked for it
@@ -1216,10 +1245,10 @@ const waitsOnApproval = async (ctx: Pick<QueryCtx, "db">, threadId: string): Pro
  * `resultPostedAt` is set only with the message write. A locked parent leaves it unset and
  * the post is retried with backoff; after {@link SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS} tries
  * the run ends in `postFailed`, the terminal state the worker row shows, and a deleted or
- * no-longer-owned parent ends there at once. `failures` counts the tries. Returns whether
- * this call posted.
+ * no-longer-owned parent ends there at once. `failures` counts the tries, `waits` the checks made while the parent waits on
+ * an approval. Returns whether this call posted.
  */
-export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, attempt: number, failures = 0): Promise<boolean> => {
+export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, attempt: number, failures = 0, waits = 0): Promise<boolean> => {
     const run = await ctx.db.get("subAgentRuns", runId);
 
     if (!run || isActiveSubAgentStatus(run.status) || run.resultPostedAt !== undefined || run.postFailed !== undefined || !postsBack(run)) {
@@ -1234,9 +1263,15 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
     }
 
     // A parent that is itself a sub-agent waiting on an approval: a post now would be a newer turn than its request, which then
-    // could no longer be answered. The post waits for the wait to end (an answer, a stop, or the request's expiry).
+    // could no longer be answered. The post waits for the wait to end: its end posts it ({@link releaseResultsHeldFor}), and
+    // this check, backing off, covers a wait that ended without that.
     if (await waitsOnApproval(ctx, run.parentThreadId)) {
-        await ctx.scheduler.runAfter(SUB_AGENT_AWAITING_POST_RETRY_MS, internal.sub_agents.functions.postResult, { attempt, failures, runId });
+        await ctx.scheduler.runAfter(awaitingPostRetryDelayMs(waits), internal.sub_agents.functions.postResult, {
+            attempt,
+            failures,
+            runId,
+            waits: waits + 1,
+        });
 
         return false;
     }
@@ -1298,6 +1333,7 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
     // The run the worker's line waits on: the one going, or the head of the queue. Ending one further
     // back changes nothing, the head already has its job. Read before the patch takes it out of the line.
     const wasRunning = run.status === "running";
+    const wasAwaiting = run.status === "awaiting";
     const hostRun = run.runner?.kind === "host";
     const wasHead =
         run.mode === "worker" &&
@@ -1318,6 +1354,10 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
         updatedAt: now,
         ...(loopGone && { loopExitedAt: now }),
     });
+
+    if (wasAwaiting && run.childThreadId !== undefined) {
+        await releaseResultsHeldFor(ctx, run.childThreadId);
+    }
 
     if (run.childThreadId !== undefined) {
         // A request this run still waits on can no longer be answered: it is denied, so no claim can run its tool or
@@ -1382,10 +1422,10 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
 
 /** A deferred {@link postRunResult}, rescheduled while the parent thread streams. */
 export const postResult = internalMutation
-    .input({ attempt: v.number(), failures: v.optional(v.number()), runId: v.id("subAgentRuns") })
+    .input({ attempt: v.number(), failures: v.optional(v.number()), runId: v.id("subAgentRuns"), waits: v.optional(v.number()) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await postRunResult(ctx, args.runId, args.attempt, args.failures);
+        await postRunResult(ctx, args.runId, args.attempt, args.failures, args.waits);
 
         return null;
     });
@@ -1628,6 +1668,10 @@ export const resumeRunForAnswer = async (ctx: MutationCtx, runId: Id<"subAgentRu
 
     await patchById(ctx.db, "subAgentRuns", run._id, { reapAt, status: "running", updatedAt: now });
     await scheduleReaperAt(ctx, run._id, reapAt, now);
+
+    if (run.childThreadId !== undefined) {
+        await releaseResultsHeldFor(ctx, run.childThreadId);
+    }
 
     return true;
 };

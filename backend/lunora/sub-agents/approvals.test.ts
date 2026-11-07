@@ -25,6 +25,7 @@ import {
     endApprovalWaitForMessage,
     listSubAgentApprovals,
     markRunAwaiting,
+    postResult,
     postRunResult,
     reapSubAgentRun,
     resumeAwaitingRun,
@@ -789,11 +790,13 @@ describe("the continuation's end", () => {
 });
 
 describe("a nested result for a child that waits on a request", () => {
-    it("is held back while the child waits, so its request stays on the latest turn, and posted once the wait is over", async () => {
+    /** A finished nested run of the waiting child, whose result the child holds back. */
+    const holdNestedResult = async (): Promise<Id<"subAgentRuns">> => {
         await run(async (context) => await markRunAwaiting(context, runId));
 
         const now = Date.now();
-        const nestedId = await run(
+
+        return await run(
             async (context) =>
                 await context.db.insert("subAgentRuns", {
                     completedAt: now,
@@ -809,21 +812,27 @@ describe("a nested result for a child that waits on a request", () => {
                     userId: OWNER,
                 }),
         );
-        const nestedPosts = async () => {
-            const rows = await run(
-                async (context) =>
-                    await context.db
-                        .query("messages")
-                        .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", childId))
-                        .collect(),
-            );
+    };
+    const nestedPosts = async () => {
+        const rows = await run(
+            async (context) =>
+                await context.db
+                    .query("messages")
+                    .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", childId))
+                    .collect(),
+        );
 
-            return rows.filter((row: { agentName?: string }) => row.agentName === SUB_AGENT_NAME);
-        };
+        return rows.filter((row: { agentName?: string }) => row.agentName === SUB_AGENT_NAME);
+    };
+    /** The pending poll of a held result: its scheduled job, as the harness lists it. */
+    const pendingPoll = (nestedId: Id<"subAgentRuns">) => harness.scheduler.list().find((job) => (job.args as { runId?: string }).runId === nestedId);
+
+    it("is held back while the child waits, so its request stays on the latest turn, and posted once the wait is over", async () => {
+        const nestedId = await holdNestedResult();
 
         expect(await run(async (context) => await postRunResult(context, nestedId, 0))).toBe(false);
         expect(await nestedPosts()).toHaveLength(0);
-        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: { attempt: 0, failures: 0, runId: nestedId } }));
+        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: { attempt: 0, failures: 0, runId: nestedId, waits: 1 } }));
         // The request is still the child's latest turn: the owner can answer it.
         expect(await as(OWNER).query(listSubAgentApprovals as never, { parentThreadId: parentId } as never)).toHaveLength(1);
 
@@ -831,6 +840,68 @@ describe("a nested result for a child that waits on a request", () => {
 
         expect(await run(async (context) => await postRunResult(context, nestedId, 0))).toBe(true);
         expect(await nestedPosts()).toHaveLength(1);
+    });
+
+    it("is posted as soon as the answer ends the wait, without waiting for its poll", async () => {
+        const nestedId = await holdNestedResult();
+
+        expect(await run(async (context) => await postRunResult(context, nestedId, 0))).toBe(false);
+
+        await internalCall(resumeAwaitingRun, { runId });
+
+        // The end of the wait schedules the post itself, at no delay.
+        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: { attempt: 0, runId: nestedId } }));
+
+        await internalCall(postResult, { attempt: 0, runId: nestedId });
+
+        expect(await nestedPosts()).toHaveLength(1);
+        const nested = await run(async (context) => await context.db.get("subAgentRuns", nestedId));
+
+        expect(nested?.resultPostedAt).toBeTypeOf("number");
+    });
+
+    it("is posted when the waiting run ends, and its poll stops once it is posted", async () => {
+        const nestedId = await holdNestedResult();
+
+        await run(async (context) => await postRunResult(context, nestedId, 0));
+        await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER));
+
+        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: { attempt: 0, runId: nestedId } }));
+
+        await internalCall(postResult, { attempt: 0, runId: nestedId });
+
+        expect(await nestedPosts()).toHaveLength(1);
+    });
+
+    it("checks a held result a bounded number of times over the wait, backing off instead of every five minutes", async () => {
+        const nestedId = await holdNestedResult();
+
+        await run(async (context) => await postRunResult(context, nestedId, 0));
+
+        // The harness dispatches only its own function map, so the poll chain is driven here: each queued check's delay
+        // (its `scheduledFor` less its `enqueuedAt`) is spent, then the check runs. Stops just short of the request's expiry.
+        const window = PENDING_APPROVAL_TTL_MS - 60 * 60_000;
+        let elapsed = 0;
+        let checks = 0;
+
+        for (let job = pendingPoll(nestedId); job !== undefined; job = pendingPoll(nestedId)) {
+            const { enqueuedAt, scheduledFor } = job as unknown as { enqueuedAt: number; scheduledFor: number };
+
+            if (elapsed + (scheduledFor - enqueuedAt) > window) {
+                break;
+            }
+
+            elapsed += scheduledFor - enqueuedAt;
+            checks += 1;
+            await run(async (context) => await context.scheduler.cancel(job.id));
+            await internalCall(postResult, job.args);
+        }
+
+        expect(await runStatus()).toBe("awaiting");
+        expect(await nestedPosts()).toHaveLength(0);
+        // A poll every five minutes would be about 2,000 checks in a week; the backoff with its hour cap is about 170.
+        expect(checks).toBeLessThan(200);
+        expect(checks).toBeGreaterThan(10);
     });
 });
 
