@@ -1,0 +1,28 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Foundations/Accessibility" />
+
+# Accessibility
+
+The target is WCAG 2.1 AA. Accessibility is part of each component's contract, not a later pass.
+
+## What CI checks
+
+Every story runs through axe in four modes: light, dark with the violet accent, a 390 px phone, and right-to-left. A violation fails the story. The Accessibility panel of each story shows the same result while you work on it.
+
+A story that cannot pass yet is marked `a11y: { test: "todo" }` in its file, with a comment that names the rule and the issue that tracks it. The global setting is never relaxed.
+
+## What the components do
+
+- **Native elements first.** `button`, `a`, `nav`, `main`, `label` and `input` come before any `role`.
+- **Primitives over hand-rolled widgets.** Overlays, menus, tabs, selects and sliders are built on `@base-ui/react` and Radix, which handle focus, keyboard and ARIA.
+- **Every control has a name.** An icon-only button gets an `aria-label` or visually hidden text. A `label` wraps its control or points at it with `htmlFor`.
+- **Live regions.** Streaming, loading and toast messages use `role="status"` or `aria-live="polite"`. Urgent alerts use `assertive`.
+- **Decoration is hidden.** Icons next to text and decorative images are `aria-hidden` or `role="presentation"`.
+- **Motion is optional.** A global rule in `packages/ui/src/global.css` shortens every animation under `prefers-reduced-motion`. See [Motion](?path=/docs/foundations-motion--docs).
+
+## What you check by hand
+
+- Tab through the page. Focus must be visible on every stop, and no control may be a trap unless it is a modal.
+- Turn on a screen reader for a new surface, at least once. Axe finds missing names; it does not find a confusing order.
+- Look at the phone and right-to-left stories: layouts must not clip text or lose the reading order.

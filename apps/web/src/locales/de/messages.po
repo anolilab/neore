@@ -210,7 +210,7 @@ msgstr "{0, plural, one {# Datei} other {# Dateien}}"
 
 #. placeholder {0}: items.length
 #. placeholder {0}: option.value
-#: ../../packages/ui/src/components/image-gallery.tsx:405
+#: ../../packages/ui/src/components/image-gallery.tsx:407
 #: src/features/chat/thread/composer-image-settings.tsx:227
 msgid "{0, plural, one {# image} other {# images}}"
 msgstr "{0, plural, one {# Bild} other {# Bilder}}"
@@ -599,7 +599,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "{0} von {1} Token verwendet ({2}%)"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1224
+#: src/components/model-picker/model-picker.tsx:1273
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} von {MAX_PARALLEL} ausgewählt"
 
@@ -754,11 +754,11 @@ msgstr "{cellsUpdated, plural, one {# Zelle eingefügt, {cellsSkipped} überspru
 msgid "{cellsUpdated, plural, one {# cell pasted} other {# cells pasted}}"
 msgstr "{cellsUpdated, plural, one {# Zelle eingefügt} other {# Zellen eingefügt}}"
 
-#: ../../packages/ui/src/components/tiptap-editor.tsx:217
+#: ../../packages/ui/src/components/tiptap-editor.tsx:247
 msgid "{characterCount, plural, one {# character} other {# characters}}"
 msgstr "{characterCount, plural, one {# Zeichen} other {# Zeichen}}"
 
-#: ../../packages/ui/src/components/tiptap-editor.tsx:215
+#: ../../packages/ui/src/components/tiptap-editor.tsx:245
 msgid "{characterCount}/{maxLength} characters"
 msgstr "{characterCount}/{maxLength} Zeichen"
 
@@ -1004,16 +1004,28 @@ msgid "{indexedCount} of {totalCount} files indexed"
 msgstr "{indexedCount} von {totalCount} Dateien indexiert"
 
 #: ../../packages/ui/src/components/file-renderers/json-viewer.tsx:151
-msgid "{itemCount, plural, one {{nodeName}: array with # item} other {{nodeName}: array with # items}}"
-msgstr "{itemCount, plural, one {{nodeName}: Array mit # Element} other {{nodeName}: Array mit # Elementen}}"
+msgid "{itemCount, plural, one {{nodeName}: # item, array} other {{nodeName}: # items, array}}"
+msgstr ""
 
 #: ../../packages/ui/src/components/file-renderers/json-viewer.tsx:153
-msgid "{itemCount, plural, one {{nodeName}: object with # item} other {{nodeName}: object with # items}}"
-msgstr "{itemCount, plural, one {{nodeName}: Objekt mit # Element} other {{nodeName}: Objekt mit # Elementen}}"
+msgid "{itemCount, plural, one {{nodeName}: # item, object} other {{nodeName}: # items, object}}"
+msgstr ""
 
-#: ../../packages/ui/src/components/file-renderers/json-viewer.tsx:189
+#: ../../packages/ui/src/components/file-renderers/json-viewer.tsx:151
+#~ msgid "{itemCount, plural, one {{nodeName}: array with # item} other {{nodeName}: array with # items}}"
+#~ msgstr "{itemCount, plural, one {{nodeName}: Array mit # Element} other {{nodeName}: Array mit # Elementen}}"
+
+#: ../../packages/ui/src/components/file-renderers/json-viewer.tsx:153
+#~ msgid "{itemCount, plural, one {{nodeName}: object with # item} other {{nodeName}: object with # items}}"
+#~ msgstr "{itemCount, plural, one {{nodeName}: Objekt mit # Element} other {{nodeName}: Objekt mit # Elementen}}"
+
+#: ../../packages/ui/src/components/file-renderers/json-viewer.tsx:190
 msgid "{itemCount, plural, one {# item} other {# items}}"
 msgstr "{itemCount, plural, one {# Element} other {# Elemente}}"
+
+#: src/components/model-picker/model-picker.tsx:977
+msgid "{label} added to starred"
+msgstr ""
 
 #: src/features/develop/components/failure-notice.tsx:17
 #: src/features/develop/lib/use-review-messages.ts:20
@@ -1047,7 +1059,7 @@ msgid "{label} is not connected."
 msgstr ""
 
 #. placeholder {0}: ids.length
-#: src/components/model-picker/model-picker.tsx:907
+#: src/components/model-picker/model-picker.tsx:917
 msgid "{label} moved to position {position} of {0} in starred"
 msgstr "{label} auf Position {position} von {0} in Markierungen verschoben"
 
@@ -1057,6 +1069,10 @@ msgstr ""
 
 #: src/features/develop/lib/use-review-messages.ts:19
 msgid "{label} refused this. Your account may lack access."
+msgstr ""
+
+#: src/components/model-picker/model-picker.tsx:977
+msgid "{label} removed from starred"
 msgstr ""
 
 #: src/features/chat/goal/composer-goal.tsx:95
@@ -1108,7 +1124,7 @@ msgstr "{modelCount, plural, one {Frag # Modell irgendwas...} other {Frag # Mode
 msgid "{months}mo ago"
 msgstr "vor {months} Mon."
 
-#: ../../packages/ui/src/components/file-renderers/json-viewer.tsx:227
+#: ../../packages/ui/src/components/file-renderers/json-viewer.tsx:221
 msgid "{moreCount, plural, one {# more item} other {# more items}}"
 msgstr "{moreCount, plural, one {# weiteres Element} other {# weitere Elemente}}"
 
@@ -1160,7 +1176,7 @@ msgstr "{name}-Verbindung aktiviert"
 msgid "{name} disconnected"
 msgstr "{name} getrennt"
 
-#: src/components/model-picker/model-picker.tsx:730
+#: src/components/model-picker/model-picker.tsx:737
 msgid "{name} hidden from the model picker"
 msgstr ""
 
@@ -1274,7 +1290,7 @@ msgstr "{selectedCount, plural, one {# Prompt ausgewählt} other {# Prompts ausg
 msgid "{selectedCount, plural, one {# thread selected} other {# threads selected}}"
 msgstr "{selectedCount, plural, one {# Thread ausgewählt} other {# Threads ausgewählt}}"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:746
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:773
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "{selectedCount} von {MAX_PARALLEL} ausgewählt"
 
@@ -1330,7 +1346,7 @@ msgstr "{totalReplies} im letzten Jahr ({activeDays}), {totalCost} ausgegeben."
 msgid "{userName} is editing"
 msgstr "{userName} bearbeitet gerade"
 
-#: ../../packages/ui/src/components/tiptap-editor.tsx:210
+#: ../../packages/ui/src/components/tiptap-editor.tsx:240
 msgid "{wordCount, plural, one {# word} other {# words}}"
 msgstr "{wordCount, plural, one {# Wort} other {# Wörter}}"
 
@@ -1954,7 +1970,7 @@ msgstr "Konten"
 msgid "Action"
 msgstr "Aktion"
 
-#: ../../packages/chat-ui/src/chat/browser-panel.tsx:271
+#: ../../packages/chat-ui/src/chat/browser-panel.tsx:274
 msgid "Action Log"
 msgstr "Aktionsprotokoll"
 
@@ -2052,7 +2068,7 @@ msgstr "Kommentar hinzufügen"
 msgid "Add a member from your organization to <0>{0}</0>"
 msgstr "Füge ein Mitglied aus deiner Organisation zu <0>{0}</0> hinzu"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:283
+#: src/features/auth/components/organization/billing-settings-card.tsx:246
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "Ein Modell hinzufügen..."
@@ -2326,8 +2342,8 @@ msgstr ""
 msgid "Add to review"
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:184
-#: src/components/model-picker/model-picker.tsx:361
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:187
+#: src/components/model-picker/model-picker.tsx:363
 msgid "Add to starred"
 msgstr "Zu Favoriten hinzufügen"
 
@@ -2921,10 +2937,10 @@ msgstr "Vertikal ausrichten"
 msgid "Align vertically (V)"
 msgstr "Vertikal ausrichten (V)"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:619
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:681
-#: src/components/model-picker/model-picker.tsx:1072
-#: src/components/model-picker/model-picker.tsx:1150
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:646
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:708
+#: src/components/model-picker/model-picker.tsx:1121
+#: src/components/model-picker/model-picker.tsx:1199
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:422
@@ -3009,8 +3025,8 @@ msgstr "Alle Installationsprogramme"
 msgid "All MCP servers active"
 msgstr "Alle MCP-Server aktiv"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:565
-#: src/components/model-picker/model-picker.tsx:1020
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:592
+#: src/components/model-picker/model-picker.tsx:1069
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "Alle Modelle"
@@ -3127,7 +3143,7 @@ msgstr ""
 msgid "Allow this site ({0})"
 msgstr "Diese Website erlauben ({0})"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:253
+#: src/features/auth/components/organization/billing-settings-card.tsx:216
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "Erlaubte KI-Modelle"
@@ -3955,8 +3971,8 @@ msgstr "Versuche: {0}"
 msgid "Auckland"
 msgstr "Auckland"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:669
-#: src/components/model-picker/model-picker.tsx:1124
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:696
+#: src/components/model-picker/model-picker.tsx:1173
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:124
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -4589,17 +4605,22 @@ msgstr "Wird über deinen eigenen API-Schlüssel abgerechnet, nicht über deine 
 msgid "Billing"
 msgstr "Abrechnung"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:234
+#: src/features/auth/components/organization/billing-settings-card.tsx:313
+msgid "Billing details for this organization"
+msgstr ""
+
+#: src/features/auth/components/organization/billing-settings-card.tsx:194
 msgid "Billing Email"
 msgstr "Abrechnungs-E-Mail"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:137
-#: src/features/auth/components/organization/billing-settings-card.tsx:168
-#: src/features/auth/components/organization/billing-settings-card.tsx:313
+#: src/features/auth/components/organization/billing-settings-card.tsx:136
+#: src/features/auth/components/organization/billing-settings-card.tsx:274
+#: src/features/auth/components/organization/billing-settings-card.tsx:314
+#: src/features/auth/components/organization/billing-settings-card.tsx:337
 msgid "Billing Settings"
 msgstr "Abrechnungseinstellungen"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:91
+#: src/features/auth/components/organization/billing-settings-card.tsx:83
 msgid "Billing settings updated successfully"
 msgstr "Abrechnungseinstellungen erfolgreich aktualisiert"
 
@@ -4690,6 +4711,8 @@ msgstr "Fließtext"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:382
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:386
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:295
+#: ../../packages/ui/src/components/tiptap-editor.tsx:190
 msgid "Bold"
 msgstr "Fett"
 
@@ -4889,12 +4912,12 @@ msgstr "Browser-Fehler"
 msgid "Browser notes"
 msgstr "Browser-Hinweise"
 
-#: ../../packages/chat-ui/src/chat/browser-panel.tsx:259
+#: ../../packages/chat-ui/src/chat/browser-panel.tsx:262
 #: ../../packages/chat-ui/src/chat/message-content.tsx:712
 msgid "Browser screenshot"
 msgstr "Browser-Screenshot"
 
-#: ../../packages/chat-ui/src/chat/browser-panel.tsx:195
+#: ../../packages/chat-ui/src/chat/browser-panel.tsx:198
 msgid "Browser Session"
 msgstr "Browser-Sitzung"
 
@@ -5009,6 +5032,11 @@ msgstr "Bulgarisch (Bulgarien)"
 msgid "Bulk actions"
 msgstr "Massenaktionen"
 
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:318
+#: ../../packages/ui/src/components/tiptap-editor.tsx:220
+msgid "Bulleted list"
+msgstr ""
+
 #: src/features/skills/components/bundle-import-dialog.tsx:223
 msgid "Bundle imported"
 msgstr ""
@@ -5121,7 +5149,7 @@ msgstr ""
 msgid "BZIP2 compressed"
 msgstr "BZIP2-komprimiert"
 
-#: ../../packages/ui/src/components/ai-elements/context.tsx:354
+#: ../../packages/ui/src/components/ai-elements/context.tsx:355
 msgid "Cache"
 msgstr "Cache"
 
@@ -5195,7 +5223,7 @@ msgstr "Kanada"
 #: ../../packages/ui/src/components/confirm-dialog.tsx:28
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:129
 #: ../../packages/ui/src/components/inline-edit.tsx:112
-#: ../../packages/ui/src/components/media-preview-dialog.tsx:255
+#: ../../packages/ui/src/components/media-preview-dialog.tsx:261
 #: src/components/delete-confirmation-dialog.tsx:56
 #: src/components/settings/session-freshness-dialog.tsx:113
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:121
@@ -5204,7 +5232,7 @@ msgstr "Kanada"
 #: src/features/admin/components/ban-user-dialog.tsx:146
 #: src/features/admin/components/impersonate-user-dialog.tsx:79
 #: src/features/admin/components/update-user-role-dialog.tsx:60
-#: src/features/auth/components/organization/create-organization-dialog.tsx:336
+#: src/features/auth/components/organization/create-organization-dialog.tsx:339
 #: src/features/auth/components/organization/delete-organization-dialog.tsx:144
 #: src/features/auth/components/organization/leave-organization-dialog.tsx:91
 #: src/features/auth/components/organization/remove-member-dialog.tsx:83
@@ -5466,7 +5494,7 @@ msgstr "Central Time (USA & Kanada)"
 msgid "CFG Scale"
 msgstr "CFG Scale"
 
-#: ../../packages/ui/src/components/ai-elements/chain-of-thought.tsx:70
+#: ../../packages/ui/src/components/ai-elements/chain-of-thought.tsx:72
 msgid "Chain of Thought"
 msgstr "Gedankenkette"
 
@@ -6123,7 +6151,7 @@ msgstr "Klick"
 msgid "Click \"{selector}\""
 msgstr "Klick auf \"{selector}\""
 
-#: src/components/model-picker/model-picker.tsx:1182
+#: src/components/model-picker/model-picker.tsx:1232
 msgid "Click ★ on any model in All models to add it here."
 msgstr "Klicke auf ★ bei einem Modell unter Alle Modelle, um es hier hinzuzufügen."
 
@@ -6152,7 +6180,7 @@ msgstr "Klicke auf die Schaltfläche unten, um einen neuen Passkey mit deinem Ge
 msgid "Click the pin icon on any message to save it here."
 msgstr "Klicke auf das Pin-Symbol bei einer Nachricht, um sie hier zu speichern."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:707
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:735
 msgid "Click the star on any model in All models to add it here."
 msgstr "Klicke bei einem beliebigen Modell unter Alle Modelle auf den Stern, um es hier hinzuzufügen."
 
@@ -6286,6 +6314,8 @@ msgid "Cloudflare Workers AI models run wherever Cloudflare has capacity, so any
 msgstr "Cloudflare-Workers-AI-Modelle laufen dort, wo Cloudflare gerade Kapazität hat, daher blendet jede Regionsregel sie aus."
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:40
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:307
+#: ../../packages/ui/src/components/tiptap-editor.tsx:202
 #: src/features/canvas/canvas-panel.tsx:754
 #: src/features/chat/thread/composer-search-mode.tsx:56
 #: src/features/code/components/code-workspace.tsx:219
@@ -6298,6 +6328,7 @@ msgid "Code"
 msgstr "Code"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:127
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:331
 msgid "Code block"
 msgstr ""
 
@@ -6457,11 +6488,11 @@ msgstr "{title} einklappen"
 msgid "Collapse branches"
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/browser-panel.tsx:233
+#: ../../packages/chat-ui/src/chat/browser-panel.tsx:236
 msgid "Collapse browser panel"
 msgstr "Browser-Panel einklappen"
 
-#: ../../packages/ui/src/components/ai-elements/chain-of-thought.tsx:65
+#: ../../packages/ui/src/components/ai-elements/chain-of-thought.tsx:61
 msgid "Collapse chain of thought"
 msgstr "Gedankenkette einklappen"
 
@@ -6531,6 +6562,7 @@ msgstr "Tage einfärben nach"
 msgid "Column {index}"
 msgstr "Spalte {index}"
 
+#: ../../packages/ui/src/components/data-grid/data-grid-view-menu.tsx:43
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:247
 #: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:572
 msgid "Columns"
@@ -6967,8 +6999,8 @@ msgstr "Einstellungen für Team \"{teamName}\" konfigurieren"
 msgid "Configure team settings"
 msgstr "Teameinstellungen konfigurieren"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:165
-#: src/features/auth/components/organization/billing-settings-card.tsx:311
+#: src/features/auth/components/organization/billing-settings-card.tsx:135
+#: src/features/auth/components/organization/billing-settings-card.tsx:272
 msgid "Configure the billing contact and available AI models"
 msgstr "Rechnungskontakt und verfügbare KI-Modelle konfigurieren"
 
@@ -6997,9 +7029,9 @@ msgstr "Anwendungseinstellungen konfigurieren"
 msgid "Configured"
 msgstr "Konfiguriert"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:769
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:796
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1246
+#: src/components/model-picker/model-picker.tsx:1295
 msgid "Confirm"
 msgstr "Bestätigen"
 
@@ -7305,7 +7337,7 @@ msgstr "Konsistenter Stil und Charaktertreue"
 msgid "Consistent, reliable output quality"
 msgstr "Konsistente, zuverlässige Ausgabequalität"
 
-#: ../../packages/ui/src/components/ai-elements/web-preview.tsx:188
+#: ../../packages/ui/src/components/ai-elements/web-preview.tsx:190
 msgid "Console"
 msgstr "Konsole"
 
@@ -7678,7 +7710,7 @@ msgstr ""
 msgid "Copy message"
 msgstr "Nachricht kopieren"
 
-#: ../../packages/ui/src/components/file-renderers/json-viewer.tsx:198
+#: ../../packages/ui/src/components/file-renderers/json-viewer.tsx:199
 msgid "Copy object"
 msgstr "Objekt kopieren"
 
@@ -8033,6 +8065,10 @@ msgstr "Tools konnten nicht geladen werden: {error}"
 msgid "Could not load your activity."
 msgstr "Deine Aktivität konnte nicht geladen werden."
 
+#: src/features/auth/components/organization/billing-settings-card.tsx:319
+msgid "Could not load your organization's billing details. Try again later."
+msgstr ""
+
 #: src/features/pages/components/pages-sidebar.tsx:108
 msgid "Could not move the page"
 msgstr "Die Seite konnte nicht verschoben werden"
@@ -8128,7 +8164,7 @@ msgstr "Die Einstellung für das Daily Brief konnte nicht gespeichert werden."
 msgid "Could not save the email setting."
 msgstr "Die E-Mail-Einstellung konnte nicht gespeichert werden."
 
-#: src/components/model-picker/model-picker.tsx:910
+#: src/components/model-picker/model-picker.tsx:920
 msgid "Could not save the new order for {label}"
 msgstr "Die neue Reihenfolge für {label} konnte nicht gespeichert werden"
 
@@ -8293,7 +8329,7 @@ msgstr "Einen neuen API-Schlüssel für programmatischen Zugriff auf dein Konto 
 msgid "Create a new branch from this message. Give it a name to help you identify it later."
 msgstr "Einen neuen Branch aus dieser Nachricht erstellen. Gib ihm einen Namen, um ihn später wiederzufinden."
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:171
+#: src/features/auth/components/organization/create-organization-dialog.tsx:174
 msgid "Create a new organization to collaborate with your team"
 msgstr "Eine neue Organisation erstellen, um mit deinem Team zusammenzuarbeiten"
 
@@ -8413,12 +8449,12 @@ msgstr "Neue Zeilen erstellen"
 msgid "Create one on the Evals page."
 msgstr "Erstelle einen auf der Evals-Seite."
 
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:249
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:251
 msgid "Create organization"
 msgstr "Organisation erstellen"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:168
-#: src/features/auth/components/organization/create-organization-dialog.tsx:350
+#: src/features/auth/components/organization/create-organization-dialog.tsx:171
+#: src/features/auth/components/organization/create-organization-dialog.tsx:353
 #: src/features/auth/components/organization/organizations-card.tsx:37
 msgid "Create Organization"
 msgstr "Organisation erstellen"
@@ -8594,8 +8630,8 @@ msgstr "Creator, die Bilder mit einem einzigen Modell in Spitzenqualität sowohl
 msgid "Credits"
 msgstr "Credits"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:145
-#: src/features/auth/components/organization/billing-settings-card.tsx:186
+#: src/features/auth/components/organization/billing-settings-card.tsx:146
+#: src/features/auth/components/organization/billing-settings-card.tsx:345
 msgid "Credits per user:"
 msgstr "Credits pro Benutzer:"
 
@@ -8692,8 +8728,8 @@ msgstr "Aktueller Plan:"
 msgid "Current Prompt Variables"
 msgstr "Aktuelle Prompt-Variablen"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:142
-#: src/features/auth/components/organization/billing-settings-card.tsx:183
+#: src/features/auth/components/organization/billing-settings-card.tsx:143
+#: src/features/auth/components/organization/billing-settings-card.tsx:342
 msgid "Current tier:"
 msgstr "Aktuelle Stufe:"
 
@@ -9202,7 +9238,7 @@ msgstr "Standardmodell aktualisiert"
 msgid "Default Models"
 msgstr "Standardmodelle"
 
-#: src/components/model-picker/model-picker.tsx:1135
+#: src/components/model-picker/model-picker.tsx:1184
 msgid "Default order"
 msgstr ""
 
@@ -9346,6 +9382,10 @@ msgstr "Testfall {0} löschen"
 msgid "Delete collection"
 msgstr "Sammlung löschen"
 
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:49
+msgid "Delete column"
+msgstr ""
+
 #: src/features/evals/components/dataset-panel.tsx:110
 msgid "Delete dataset"
 msgstr "Datensatz löschen"
@@ -9372,7 +9412,7 @@ msgstr "Ziel {title} löschen"
 msgid "Delete group and children"
 msgstr "Gruppe und untergeordnete Elemente löschen"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:246
+#: src/features/auth/components/organization/create-organization-dialog.tsx:249
 #: src/features/auth/components/organization/organization-logo-card.tsx:162
 msgid "Delete Logo"
 msgstr "Logo löschen"
@@ -9435,6 +9475,10 @@ msgstr "Prompts löschen"
 msgid "Delete reply"
 msgstr "Antwort löschen"
 
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:50
+msgid "Delete row"
+msgstr ""
+
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:240
 msgid "Delete rows"
 msgstr "Zeilen löschen"
@@ -9465,6 +9509,10 @@ msgstr "Ausgewählte Zeilen löschen"
 #: src/features/skills/components/skill-list.tsx:314
 msgid "Delete skill?"
 msgstr "Skill löschen?"
+
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:51
+msgid "Delete table"
+msgstr ""
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:263
 msgid "Delete tag"
@@ -9760,7 +9808,7 @@ msgstr "Beschreibung ist erforderlich"
 msgid "Description must be {SKILL_DESCRIPTION_MAX} characters or less"
 msgstr "Die Beschreibung darf höchstens {SKILL_DESCRIPTION_MAX} Zeichen lang sein"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:335
+#: ../../packages/ui/src/components/image-gallery.tsx:337
 msgid "Deselect"
 msgstr "Abwählen"
 
@@ -9769,7 +9817,7 @@ msgstr "Abwählen"
 msgid "Deselect all"
 msgstr "Alle abwählen"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:236
+#: ../../packages/ui/src/components/image-gallery.tsx:238
 msgid "Deselect image"
 msgstr "Bild abwählen"
 
@@ -10126,6 +10174,7 @@ msgstr "Möchtest du weitere Zeilen hinzufügen?"
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
 #: ../../packages/chat-ui/src/chat/message-content.tsx:284
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:182
 msgid "Document"
 msgstr "Dokument"
 
@@ -10209,7 +10258,8 @@ msgstr ""
 msgid "download"
 msgstr ""
 
-#: ../../packages/ui/src/components/media-preview-dialog.tsx:181
+#: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:107
+#: ../../packages/ui/src/components/media-preview-dialog.tsx:187
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
 #: src/features/canvas/canvas-panel.tsx:794
 #: src/features/canvas/canvas-panel.tsx:811
@@ -10225,7 +10275,6 @@ msgid "Download — Neore Desktop"
 msgstr "Download — Neore Desktop"
 
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:42
-#: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:93
 msgid "Download {displayName}"
 msgstr "{displayName} herunterladen"
 
@@ -11330,7 +11379,7 @@ msgstr "Gib eine gültige AWS-Region ein, z. B. us-east-1"
 msgid "Enter an API version such as v1 or 2024-10-21"
 msgstr "Gib eine API-Version wie v1 oder 2024-10-21 ein"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:241
+#: src/features/auth/components/organization/billing-settings-card.tsx:203
 msgid "Enter billing email"
 msgstr "Abrechnungs-E-Mail eingeben"
 
@@ -11364,12 +11413,12 @@ msgstr "Modell-ID eingeben (z. B. \"llama-4-scout\")..."
 msgid "Enter new password"
 msgstr "Neues Passwort eingeben"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:274
+#: src/features/auth/components/organization/create-organization-dialog.tsx:277
 #: src/features/auth/components/organization/organization-name-card.tsx:125
 msgid "Enter organization name"
 msgstr "Organisationsname eingeben"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:299
+#: src/features/auth/components/organization/create-organization-dialog.tsx:302
 #: src/features/auth/components/organization/organization-slug-card.tsx:129
 msgid "Enter organization slug"
 msgstr "Organisations-Slug eingeben"
@@ -11407,7 +11456,7 @@ msgstr "Gib zuerst die Endpunkt-URL ein"
 msgid "Enter to send, Shift+Enter for a new line."
 msgstr "Enter zum Senden, Umschalt+Enter für eine neue Zeile."
 
-#: ../../packages/ui/src/components/ai-elements/web-preview.tsx:131
+#: ../../packages/ui/src/components/ai-elements/web-preview.tsx:133
 msgid "Enter URL..."
 msgstr "URL eingeben..."
 
@@ -11943,7 +11992,7 @@ msgstr "{title} ausklappen"
 msgid "Expand branches"
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/browser-panel.tsx:233
+#: ../../packages/chat-ui/src/chat/browser-panel.tsx:236
 msgid "Expand browser panel"
 msgstr "Browser-Panel ausklappen"
 
@@ -11951,7 +12000,7 @@ msgstr "Browser-Panel ausklappen"
 msgid "Expand canvas"
 msgstr "Canvas erweitern"
 
-#: ../../packages/ui/src/components/ai-elements/chain-of-thought.tsx:65
+#: ../../packages/ui/src/components/ai-elements/chain-of-thought.tsx:61
 msgid "Expand chain of thought"
 msgstr "Gedankenkette ausklappen"
 
@@ -12627,7 +12676,7 @@ msgstr "Analytics konnten nicht geladen werden. Stelle sicher, dass das LLM Gate
 msgid "Failed to load audio"
 msgstr "Audio konnte nicht geladen werden"
 
-#: ../../packages/ui/src/components/media-preview-dialog.tsx:134
+#: ../../packages/ui/src/components/media-preview-dialog.tsx:140
 msgid "Failed to load image"
 msgstr "Bild konnte nicht geladen werden"
 
@@ -12946,8 +12995,8 @@ msgstr "Favorit konnte nicht aktualisiert werden"
 msgid "Failed to update favorite status"
 msgstr "Favoritenstatus konnte nicht aktualisiert werden"
 
-#: src/components/model-picker/model-picker.tsx:725
-#: src/components/model-picker/model-picker.tsx:734
+#: src/components/model-picker/model-picker.tsx:732
+#: src/components/model-picker/model-picker.tsx:741
 #: src/features/settings/components/chat/model-filter-settings.tsx:57
 #: src/features/settings/components/chat/model-filter-settings.tsx:68
 msgid "Failed to update filter rules"
@@ -13602,11 +13651,11 @@ msgstr "Filmemacher, die filmische Videos mit starkem Fokus auf visuelle Erzähl
 msgid "Filter by action"
 msgstr "Nach Aktion filtern"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:606
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:633
 msgid "Filter by mode"
 msgstr "Nach Modus filtern"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:677
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:704
 msgid "Filter by provider"
 msgstr "Nach Anbieter filtern"
 
@@ -14321,7 +14370,7 @@ msgstr "Galicisch"
 msgid "Galician (Spain)"
 msgstr "Galicisch (Spanien)"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:202
+#: ../../packages/ui/src/components/image-gallery.tsx:193
 msgid "Gallery item"
 msgstr "Galerie-Element"
 
@@ -14405,7 +14454,7 @@ msgstr "Allgemeine Aufgaben, die das leistungsstarke GLM-4.5-Sprachmodell von Z.
 msgid "General-purpose video generation using Alibaba's latest-generation Wan model"
 msgstr "Allgemeine Videogenerierung mit Alibabas Wan-Modell der neuesten Generation"
 
-#: ../../packages/ui/src/components/media-preview-dialog.tsx:258
+#: ../../packages/ui/src/components/media-preview-dialog.tsx:264
 #: src/features/chat/sidebar/thread-sidebar.tsx:145
 #: src/features/chat/thread/generation-model-menu.tsx:166
 #: src/features/skills/components/skill-generate-panel.tsx:111
@@ -14556,7 +14605,7 @@ msgstr "Antwort wird generiert"
 msgid "Generating video..."
 msgstr "Video wird generiert..."
 
-#: ../../packages/ui/src/components/media-preview-dialog.tsx:258
+#: ../../packages/ui/src/components/media-preview-dialog.tsx:264
 #: src/features/chat/sidebar/thread-sidebar.tsx:145
 #: src/features/slides/components/presentation-viewer.tsx:369
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:148
@@ -15198,11 +15247,11 @@ msgstr "Gastkonto"
 msgid "Guest accounts"
 msgstr "Gastkonten"
 
-#: src/components/model-picker/model-picker.tsx:978
+#: src/components/model-picker/model-picker.tsx:1023
 msgid "Guest accounts use free models only."
 msgstr "Gastkonten verwenden nur kostenlose Modelle."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:525
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:552
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "Gastkonten nutzen nur kostenlose Modelle. Registriere dich, um alle Modelle freizuschalten."
 
@@ -15300,6 +15349,8 @@ msgstr "Header (optional)"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:185
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:185
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:311
+#: ../../packages/ui/src/components/tiptap-editor.tsx:214
 msgid "Heading"
 msgstr "Überschrift"
 
@@ -15363,7 +15414,7 @@ msgstr ""
 msgid "Hide {fieldLabel}"
 msgstr "{fieldLabel} ausblenden"
 
-#: src/components/model-picker/model-picker.tsx:1159
+#: src/components/model-picker/model-picker.tsx:1208
 msgid "Hide {name} from model picker"
 msgstr ""
 
@@ -15385,6 +15436,7 @@ msgid "Hide output"
 msgstr "Ausgabe ausblenden"
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:106
+#: ../../packages/ui/src/components/form/password-input.tsx:32
 msgid "Hide password"
 msgstr "Passwort verbergen"
 
@@ -15584,6 +15636,11 @@ msgstr "Höherer Reasoning-Aufwand kann durchdachtere Antworten erzeugen, dauert
 msgid "Highest quality output from Black Forest Labs"
 msgstr "Ausgabe in höchster Qualität von Black Forest Labs"
 
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:351
+#: ../../packages/ui/src/components/tiptap-editor.tsx:208
+msgid "Highlight"
+msgstr ""
+
 #: src/features/marketing/data/models-data.ts:102
 msgid "Highly aesthetic visual output"
 msgstr "Visuelle Ausgabe mit hoher Ästhetik"
@@ -15633,6 +15690,10 @@ msgstr "Honduras"
 #: src/features/settings/components/account/account-settings.tsx:112
 msgid "Hong Kong"
 msgstr "Hongkong"
+
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:334
+msgid "Horizontal rule"
+msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:192
 msgid "Horizontal Strips"
@@ -15853,12 +15914,13 @@ msgstr "Illustration"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
 #: ../../packages/chat-ui/src/chat/message-content.tsx:414
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:643
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:670
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: src/components/model-picker/model-picker.tsx:1098
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:341
+#: src/components/model-picker/model-picker.tsx:1147
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:122
 #: src/features/marketing/components/landing-footer.tsx:165
@@ -16401,7 +16463,7 @@ msgstr "Inpaint-Bearbeitung"
 msgid "inpainting"
 msgstr "Inpainting"
 
-#: ../../packages/ui/src/components/ai-elements/context.tsx:237
+#: ../../packages/ui/src/components/ai-elements/context.tsx:238
 #: src/components/model-picker/model-picker.tsx:202
 #: src/features/devices/components/device-tool-call.tsx:168
 #: src/features/evals/components/case-fields.tsx:69
@@ -16453,11 +16515,24 @@ msgstr "Eingabe:"
 msgid "Insert a saved prompt"
 msgstr "Gespeicherten Prompt einfügen"
 
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:45
+msgid "Insert column after"
+msgstr ""
+
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:46
+msgid "Insert column before"
+msgstr ""
+
 #: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:550
 msgid "Insert Prompt"
 msgstr "Prompt einfügen"
 
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:48
+msgid "Insert row above"
+msgstr ""
+
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:190
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:47
 msgid "Insert row below"
 msgstr "Zeile darunter einfügen"
 
@@ -16847,6 +16922,11 @@ msgstr "Italienisch"
 #: src/features/chat/core/utils/language-utilities.ts:189
 msgid "Italian (Switzerland)"
 msgstr "Italienisch (Schweiz)"
+
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:298
+#: ../../packages/ui/src/components/tiptap-editor.tsx:193
+msgid "Italic"
+msgstr ""
 
 #: src/features/chat/core/utils/language-utilities.ts:368
 msgid "Italy"
@@ -17283,7 +17363,7 @@ msgstr "Letzte 90 Tage"
 msgid "Last active {lastActiveDate}"
 msgstr "Zuletzt aktiv {lastActiveDate}"
 
-#: ../../packages/chat-ui/src/chat/browser-panel.tsx:310
+#: ../../packages/chat-ui/src/chat/browser-panel.tsx:313
 msgid "Last activity {lastActivityAgo}"
 msgstr "Letzte Aktivität {lastActivityAgo}"
 
@@ -17559,7 +17639,7 @@ msgstr "Leer lassen, um die Eingabe des verbundenen Knotens zu verwenden"
 
 #: src/features/auth/components/organization/leave-organization-dialog.tsx:72
 #: src/features/auth/components/organization/leave-organization-dialog.tsx:103
-#: src/features/auth/components/organization/organization-cell.tsx:99
+#: src/features/auth/components/organization/organization-cell.tsx:105
 msgid "Leave Organization"
 msgstr "Organisation verlassen"
 
@@ -17762,6 +17842,7 @@ msgstr ""
 msgid "Lines that are not valid JSON"
 msgstr ""
 
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:338
 #: src/features/auth/components/settings/providers/provider-cell.tsx:111
 #: src/features/develop/components/thread-pull-requests.tsx:258
 msgid "Link"
@@ -17996,7 +18077,7 @@ msgstr "Dokument wird geladen…"
 msgid "Loading editor..."
 msgstr "Editor wird geladen..."
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:275
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:278
 #: src/features/canvas/canvas-panel.tsx:132
 #: src/features/pages/components/page-editor.tsx:40
 msgid "Loading editor…"
@@ -18243,11 +18324,11 @@ msgid "Locked chat"
 msgstr ""
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1229
+#: src/components/model-picker/model-picker.tsx:1278
 msgid "Locked to {0} models"
 msgstr "Auf {0}-Modelle beschränkt"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:751
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:778
 msgid "Locked to {anchorModeName} models"
 msgstr "Auf {anchorModeName}-Modelle beschränkt"
 
@@ -18270,7 +18351,7 @@ msgstr "Abmelden"
 msgid "Login"
 msgstr "Anmelden"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:209
+#: src/features/auth/components/organization/create-organization-dialog.tsx:212
 #: src/features/auth/components/organization/organization-logo-card.tsx:136
 #: src/features/auth/components/organization/organization-logo-card.tsx:195
 msgid "Logo"
@@ -18533,7 +18614,7 @@ msgstr "Maltesisch (Malta)"
 msgid "Manage Consent Preferences"
 msgstr "Einwilligungseinstellungen verwalten"
 
-#: src/components/model-picker/model-picker.tsx:737
+#: src/components/model-picker/model-picker.tsx:744
 msgid "Manage hidden labs"
 msgstr ""
 
@@ -18551,7 +18632,7 @@ msgstr "Mitglieder von <0>{0}</0> verwalten"
 msgid "Manage models on {0}"
 msgstr "Modelle auf {0} verwalten"
 
-#: src/features/auth/components/organization/organization-cell.tsx:88
+#: src/features/auth/components/organization/organization-cell.tsx:94
 msgid "Manage Organization"
 msgstr "Organisation verwalten"
 
@@ -18581,7 +18662,7 @@ msgstr "Tags verwalten"
 msgid "Manage tags…"
 msgstr "Tags verwalten…"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:199
+#: src/features/auth/components/organization/billing-settings-card.tsx:159
 msgid "Manage Team subscription"
 msgstr "Team-Abonnement verwalten"
 
@@ -18752,8 +18833,8 @@ msgstr "Max. Größe: {size}"
 msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "Max. Größe: {size} • Max. {maxFiles} Dateien"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:746
-#: src/components/model-picker/model-picker.tsx:1223
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:773
+#: src/components/model-picker/model-picker.tsx:1272
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "Maximale Anzahl von {MAX_PARALLEL} Modellen erreicht"
 
@@ -18999,6 +19080,10 @@ msgstr "Menü"
 #: src/features/develop/components/merge-panel.tsx:131
 #: src/features/develop/components/merge-panel.tsx:141
 msgid "Merge"
+msgstr ""
+
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:52
+msgid "Merge cells"
 msgstr ""
 
 #: src/features/develop/components/merge-panel.tsx:75
@@ -19440,6 +19525,7 @@ msgid "Model Comparison"
 msgstr "Modellvergleich"
 
 #: ../../packages/ui/src/components/ai-elements/context.tsx:72
+#: ../../packages/ui/src/components/ai-elements/context.tsx:153
 msgid "Model context usage"
 msgstr "Kontextnutzung des Modells"
 
@@ -19455,7 +19541,7 @@ msgstr "Modell aktiviert"
 msgid "Model filter"
 msgstr "Modellfilter"
 
-#: src/components/model-picker/model-picker.tsx:398
+#: src/components/model-picker/model-picker.tsx:403
 msgid "Model info"
 msgstr "Modellinfo"
 
@@ -19472,7 +19558,7 @@ msgstr "Modellbeschränkungen"
 msgid "Model server"
 msgstr "Modellserver"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:534
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:561
 msgid "Model tabs"
 msgstr "Modell-Tabs"
 
@@ -19758,11 +19844,11 @@ msgstr "{0} nach unten verschieben"
 msgid "Move {0} up"
 msgstr "{0} nach oben verschieben"
 
-#: src/components/model-picker/model-picker.tsx:385
+#: src/components/model-picker/model-picker.tsx:389
 msgid "Move {label} down in starred"
 msgstr "{label} in Markierungen nach unten verschieben"
 
-#: src/components/model-picker/model-picker.tsx:374
+#: src/components/model-picker/model-picker.tsx:377
 msgid "Move {label} up in starred"
 msgstr "{label} in Markierungen nach oben verschieben"
 
@@ -20002,7 +20088,7 @@ msgstr ""
 msgid "Name"
 msgstr "Name"
 
-#: src/components/model-picker/model-picker.tsx:1136
+#: src/components/model-picker/model-picker.tsx:1185
 msgid "Name (A to Z)"
 msgstr ""
 
@@ -20407,7 +20493,7 @@ msgstr "Neuer Datensatz"
 msgid "New Export"
 msgstr "Neuer Export"
 
-#: src/components/model-picker/model-picker.tsx:1137
+#: src/components/model-picker/model-picker.tsx:1186
 msgid "New first"
 msgstr ""
 
@@ -20728,7 +20814,7 @@ msgstr ""
 msgid "No coding agent run yet."
 msgstr "Noch kein Durchlauf des Coding-Agents."
 
-#: ../../packages/ui/src/components/data-grid/data-grid-view-menu.tsx:47
+#: ../../packages/ui/src/components/data-grid/data-grid-view-menu.tsx:46
 msgid "No columns found."
 msgstr "Keine Spalten gefunden."
 
@@ -20748,7 +20834,7 @@ msgstr "Keine Connectors in dieser Kategorie verfügbar"
 msgid "No connectors found for \"{searchTerm}\""
 msgstr "Keine Connectors für \"{searchTerm}\" gefunden"
 
-#: ../../packages/ui/src/components/ai-elements/web-preview.tsx:199
+#: ../../packages/ui/src/components/ai-elements/web-preview.tsx:203
 msgid "No console output"
 msgstr "Keine Konsolenausgabe"
 
@@ -20880,7 +20966,7 @@ msgstr "Noch keine Bilder"
 msgid "No indexed files available. Files are still being processed."
 msgstr "Keine indexierten Dateien verfügbar. Die Dateien werden noch verarbeitet."
 
-#: ../../packages/ui/src/components/image-gallery.tsx:487
+#: ../../packages/ui/src/components/image-gallery.tsx:489
 msgid "No items"
 msgstr "Keine Einträge"
 
@@ -20936,7 +21022,7 @@ msgstr "Keine Nachrichten gefunden für"
 msgid "No microphone"
 msgstr "Kein Mikrofon"
 
-#: ../../packages/ui/src/components/ai-elements/mic-selector.tsx:171
+#: ../../packages/ui/src/components/ai-elements/mic-selector.tsx:183
 #: src/features/chat/thread/composer-voice-input.tsx:97
 #: src/features/chat/voice-mode/voice-mode-controller.tsx:83
 msgid "No microphone found."
@@ -20950,8 +21036,8 @@ msgstr "Keine Modelle verfügbar"
 msgid "No models found matching your filters."
 msgstr "Keine Modelle gefunden, die deinen Filtern entsprechen."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:713
-#: src/components/model-picker/model-picker.tsx:1188
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:740
+#: src/components/model-picker/model-picker.tsx:1237
 msgid "No models found."
 msgstr "Keine Modelle gefunden."
 
@@ -21039,7 +21125,7 @@ msgstr "Kein Projekt"
 msgid "No projects available. Create a project first."
 msgstr "Keine Projekte verfügbar. Erstelle zuerst ein Projekt."
 
-#: ../../packages/ui/src/components/image-gallery.tsx:398
+#: ../../packages/ui/src/components/image-gallery.tsx:400
 msgid "No prompt"
 msgstr "Kein Prompt"
 
@@ -21168,8 +21254,8 @@ msgstr "Keine Sortierung angewendet"
 msgid "No speech detected. Hands-free mode stopped."
 msgstr "Keine Sprache erkannt. Freihandmodus beendet."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:705
-#: src/components/model-picker/model-picker.tsx:1180
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:733
+#: src/components/model-picker/model-picker.tsx:1230
 msgid "No starred models"
 msgstr "Keine markierten Modelle"
 
@@ -21600,6 +21686,11 @@ msgstr "Anzahl der Bilder"
 msgid "Number of messages"
 msgstr "Anzahl der Nachrichten"
 
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:321
+#: ../../packages/ui/src/components/tiptap-editor.tsx:223
+msgid "Numbered list"
+msgstr ""
+
 #: src/lib/model-descriptions.ts:173
 msgid "NVIDIA's Nemotron 3 on Workers AI"
 msgstr "Nemotron 3 von NVIDIA auf Workers AI"
@@ -21863,7 +21954,7 @@ msgid "Online"
 msgstr "Online"
 
 #. placeholder {0}: getModelModeName(anchorMode!)
-#: src/components/model-picker/model-picker.tsx:483
+#: src/components/model-picker/model-picker.tsx:489
 msgid "Only {0} models can be compared. Clear selection to switch types."
 msgstr "Nur {0}-Modelle können verglichen werden. Auswahl löschen, um Typen zu wechseln."
 
@@ -21875,7 +21966,7 @@ msgstr "Nur 3B aktivierte Parameter pro Token für mehr Effizienz"
 msgid "Only in one run"
 msgstr "Nur in einem Durchlauf"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:136
+#: src/features/auth/components/organization/billing-settings-card.tsx:336
 msgid "Only organization owners can manage billing settings"
 msgstr "Nur Organisationsinhaber können Abrechnungseinstellungen verwalten"
 
@@ -21895,7 +21986,7 @@ msgstr ""
 msgid "Only run when every filter matches the JSON body. Use dotted paths such as pull_request.user.login or labels.0.name. A delivery that does not match is accepted, shown as Skipped in the history, and does not run or count against your quota."
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:254
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:258
 msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "Nur Modelle desselben Typs können verglichen werden. Leere die Auswahl, um den Typ zu wechseln."
 
@@ -22019,7 +22110,7 @@ msgstr ""
 msgid "Open Connectors"
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/browser-panel.tsx:205
+#: ../../packages/chat-ui/src/chat/browser-panel.tsx:208
 msgid "Open current URL"
 msgstr "Aktuelle URL öffnen"
 
@@ -22127,7 +22218,7 @@ msgstr "Thread des Durchlaufs öffnen"
 msgid "Open search"
 msgstr "Suche öffnen"
 
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:199
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:200
 msgid "Open settings"
 msgstr "Einstellungen öffnen"
 
@@ -22692,7 +22783,7 @@ msgstr ""
 msgid "Organization"
 msgstr "Organisation"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:112
+#: src/features/auth/components/organization/create-organization-dialog.tsx:115
 msgid "Organization created successfully"
 msgstr "Organisation erfolgreich erstellt"
 
@@ -22700,13 +22791,13 @@ msgstr "Organisation erfolgreich erstellt"
 msgid "Organization deleted successfully"
 msgstr "Organisation erfolgreich gelöscht"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:266
+#: src/features/auth/components/organization/create-organization-dialog.tsx:269
 #: src/features/auth/components/organization/organization-name-card.tsx:106
 #: src/features/auth/components/organization/organization-name-card.tsx:157
 msgid "Organization Name"
 msgstr "Organisationsname"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:70
+#: src/features/auth/components/organization/create-organization-dialog.tsx:71
 #: src/features/auth/components/organization/organization-name-card.tsx:23
 msgid "Organization name is required"
 msgstr "Organisationsname ist erforderlich"
@@ -22719,18 +22810,18 @@ msgstr "Organisationsname ist derselbe"
 msgid "Organization name updated successfully"
 msgstr "Organisationsname erfolgreich aktualisiert"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:287
+#: src/features/auth/components/organization/create-organization-dialog.tsx:290
 #: src/features/auth/components/organization/organization-slug-card.tsx:111
 #: src/features/auth/components/organization/organization-slug-card.tsx:161
 msgid "Organization Slug"
 msgstr "Organisations-Slug"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:78
+#: src/features/auth/components/organization/create-organization-dialog.tsx:79
 #: src/features/auth/components/organization/organization-slug-card.tsx:28
 msgid "Organization slug is invalid"
 msgstr "Organisations-Slug ist ungültig"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:75
+#: src/features/auth/components/organization/create-organization-dialog.tsx:76
 #: src/features/auth/components/organization/delete-organization-dialog.tsx:30
 #: src/features/auth/components/organization/organization-slug-card.tsx:27
 msgid "Organization slug is required"
@@ -22762,7 +22853,7 @@ msgstr "Original"
 msgid "Original ChatGPT image model"
 msgstr "Ursprüngliches ChatGPT-Bildmodell"
 
-#: ../../packages/ui/src/components/media-preview-dialog.tsx:229
+#: ../../packages/ui/src/components/media-preview-dialog.tsx:235
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:150
 msgid "Original Prompt"
 msgstr "Ursprünglicher Prompt"
@@ -22827,7 +22918,7 @@ msgid "Outpaint"
 msgstr "Outpainting"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:562
-#: ../../packages/ui/src/components/ai-elements/context.tsx:276
+#: ../../packages/ui/src/components/ai-elements/context.tsx:277
 #: src/components/model-picker/model-picker.tsx:206
 #: src/features/devices/components/device-tool-call.tsx:174
 #: src/features/workflow/components/nodes/output-node.tsx:52
@@ -23023,8 +23114,8 @@ msgstr ""
 msgid "Paraguay"
 msgstr "Paraguay"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:597
-#: src/components/model-picker/model-picker.tsx:1050
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:624
+#: src/components/model-picker/model-picker.tsx:1099
 msgid "Parallel"
 msgstr "Parallel"
 
@@ -23248,7 +23339,7 @@ msgid "Path"
 msgstr ""
 
 #: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:93
-#: ../../packages/ui/src/components/media-preview-dialog.tsx:166
+#: ../../packages/ui/src/components/media-preview-dialog.tsx:172
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:233
 msgid "Pause"
 msgstr "Pausieren"
@@ -23261,7 +23352,7 @@ msgstr "Pausiert"
 msgid "Pay for what <0>you use.</0>"
 msgstr "Zahle nur, <0>was du nutzt.</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:223
+#: src/features/auth/components/organization/billing-settings-card.tsx:183
 #: src/features/billing/components/personal-plan-card.tsx:52
 msgid "Pay yearly"
 msgstr "Jährlich bezahlen"
@@ -23389,7 +23480,7 @@ msgid "persona"
 msgstr ""
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:112
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:223
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:225
 msgid "Personal"
 msgstr "Persönlich"
 
@@ -23607,7 +23698,7 @@ msgid "Platform"
 msgstr "Plattform"
 
 #: ../../packages/ui/src/components/file-renderers/audio-waveform-player.tsx:93
-#: ../../packages/ui/src/components/media-preview-dialog.tsx:166
+#: ../../packages/ui/src/components/media-preview-dialog.tsx:172
 msgid "Play"
 msgstr "Abspielen"
 
@@ -24020,8 +24111,9 @@ msgstr "Vortagesschluss"
 msgid "preview"
 msgstr "Vorschau"
 
-#: ../../packages/ui/src/components/ai-elements/web-preview.tsx:161
-#: ../../packages/ui/src/components/media-preview-dialog.tsx:137
+#: ../../packages/ui/src/components/ai-elements/web-preview.tsx:163
+#: ../../packages/ui/src/components/media-preview-dialog.tsx:61
+#: ../../packages/ui/src/components/media-preview-dialog.tsx:143
 #: src/features/canvas/canvas-panel.tsx:762
 #: src/features/canvas/canvas-panel.tsx:767
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:790
@@ -24137,11 +24229,11 @@ msgstr "Vorherige Version"
 msgid "Price per 1M tokens"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1139
+#: src/components/model-picker/model-picker.tsx:1188
 msgid "Price: high to low"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:1138
+#: src/components/model-picker/model-picker.tsx:1187
 msgid "Price: low to high"
 msgstr ""
 
@@ -24446,7 +24538,7 @@ msgstr "Zum Administrator befördern"
 msgid "prompt"
 msgstr ""
 
-#: ../../packages/ui/src/components/image-gallery.tsx:398
+#: ../../packages/ui/src/components/image-gallery.tsx:400
 #: src/features/chat/thread/media-gallery-view.tsx:433
 #: src/features/workflow/templates/index.ts:96
 #: src/features/workflow/templates/index.ts:230
@@ -24835,6 +24927,11 @@ msgstr "Schnelle, günstige Videogenerierung für den Alltag aus ByteDances Seed
 msgid "Quick, affordable video generation using Alibaba's Wan model at a fast, lower-quality tier"
 msgstr "Schnelle, günstige Videogenerierung mit Alibabas Wan-Modell in einer schnellen Stufe mit geringerer Qualität"
 
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:328
+#: ../../packages/ui/src/components/tiptap-editor.tsx:229
+msgid "Quote"
+msgstr ""
+
 #: src/features/canvas/components/design-preset-selector.tsx:125
 msgid "Quote Card"
 msgstr "Zitatkarte"
@@ -25171,7 +25268,7 @@ msgid "reasoning"
 msgstr "Reasoning"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:161
-#: ../../packages/ui/src/components/ai-elements/context.tsx:315
+#: ../../packages/ui/src/components/ai-elements/context.tsx:316
 #: src/features/chat/thread/message-cost-badge.tsx:64
 #: src/features/settings/components/chat/models-settings.tsx:32
 msgid "Reasoning"
@@ -25357,6 +25454,8 @@ msgid "Redirecting to the thread..."
 msgstr "Weiterleitung zum Thread..."
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:607
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:291
+#: ../../packages/ui/src/components/tiptap-editor.tsx:184
 #: src/features/canvas/canvas-panel.tsx:238
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:37
 msgid "Redo"
@@ -25707,7 +25806,7 @@ msgstr "{fileName} entfernen"
 msgid "Remove {label}"
 msgstr "{label} entfernen"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:262
+#: src/features/auth/components/organization/billing-settings-card.tsx:225
 #: src/features/auth/components/team/team-settings-dialog.tsx:177
 msgid "Remove {model}"
 msgstr "{model} entfernen"
@@ -25791,8 +25890,8 @@ msgstr "Aus Favoriten entfernen"
 msgid "Remove from project"
 msgstr "Aus Projekt entfernen"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:184
-#: src/components/model-picker/model-picker.tsx:361
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:187
+#: src/components/model-picker/model-picker.tsx:363
 msgid "Remove from starred"
 msgstr "Aus Markierungen entfernen"
 
@@ -25940,7 +26039,7 @@ msgstr ""
 msgid "Reorder {0}"
 msgstr ""
 
-#: ../../packages/ui/src/components/data-grid/data-grid-sort-menu.tsx:305
+#: ../../packages/ui/src/components/data-grid/data-grid-sort-menu.tsx:306
 msgid "Reorder sort"
 msgstr "Sortierung umordnen"
 
@@ -26194,7 +26293,7 @@ msgstr "Auf Standard zurücksetzen"
 msgid "Reset to Defaults"
 msgstr "Auf Standardwerte zurücksetzen"
 
-#: ../../packages/ui/src/components/zoomable-image.tsx:308
+#: ../../packages/ui/src/components/zoomable-image.tsx:321
 msgid "Reset zoom"
 msgstr ""
 
@@ -26639,6 +26738,7 @@ msgstr "Routen, tracken, <0>optimieren.</0>"
 msgid "Routing Tier Distribution"
 msgstr "Verteilung der Routing-Stufen"
 
+#: ../../packages/ui/src/components/data-grid/data-grid-row-height-menu.tsx:56
 #: ../../packages/ui/src/components/data-grid/data-grid-row-height-menu.tsx:57
 msgid "Row height"
 msgstr "Zeilenhöhe"
@@ -26887,8 +26987,8 @@ msgstr "Saudi-Arabien"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:108
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:118
-#: src/features/auth/components/organization/billing-settings-card.tsx:162
-#: src/features/auth/components/organization/billing-settings-card.tsx:308
+#: src/features/auth/components/organization/billing-settings-card.tsx:132
+#: src/features/auth/components/organization/billing-settings-card.tsx:269
 #: src/features/auth/components/organization/organization-name-card.tsx:99
 #: src/features/auth/components/organization/organization-name-card.tsx:151
 #: src/features/auth/components/organization/organization-slug-card.tsx:104
@@ -26932,8 +27032,8 @@ msgid "Save as eval case"
 msgstr "Als Eval-Testfall speichern"
 
 #: src/features/canvas/canvas-panel.tsx:240
-msgid "Save as new version"
-msgstr "Als neue Version speichern"
+#~ msgid "Save as new version"
+#~ msgstr "Als neue Version speichern"
 
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:425
 msgid "Save as preset"
@@ -27000,6 +27100,10 @@ msgstr "Variablen speichern"
 #: src/features/canvas/canvas-panel.tsx:242
 msgid "Save version"
 msgstr "Version speichern"
+
+#: src/features/canvas/canvas-panel.tsx:240
+msgid "Save version as new"
+msgstr ""
 
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:30
 msgid "Save workflow"
@@ -27248,7 +27352,7 @@ msgstr ""
 msgid "Search messages ({focusSearchShortcut})"
 msgstr ""
 
-#: ../../packages/ui/src/components/ai-elements/mic-selector.tsx:153
+#: ../../packages/ui/src/components/ai-elements/mic-selector.tsx:154
 msgid "Search microphones..."
 msgstr "Mikrofone durchsuchen..."
 
@@ -27272,8 +27376,8 @@ msgstr ""
 msgid "Search models by name, ID, or provider..."
 msgstr "Modelle nach Name, ID oder Anbieter suchen..."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:530
-#: src/components/model-picker/model-picker.tsx:991
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:557
+#: src/components/model-picker/model-picker.tsx:1039
 msgid "Search models..."
 msgstr "Modelle suchen..."
 
@@ -27541,7 +27645,7 @@ msgstr "Wähle ein Objekt aus, um seine Eigenschaften zu bearbeiten"
 msgid "Select an organization to manage teams"
 msgstr "Organisation auswählen, um Teams zu verwalten"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:335
+#: ../../packages/ui/src/components/image-gallery.tsx:337
 msgid "Select as reference"
 msgstr "Als Referenz auswählen"
 
@@ -27565,7 +27669,7 @@ msgstr "Datei auswählen"
 msgid "Select files to upload"
 msgstr "Dateien zum Hochladen auswählen"
 
-#: ../../packages/ui/src/components/image-gallery.tsx:236
+#: ../../packages/ui/src/components/image-gallery.tsx:238
 msgid "Select image as reference"
 msgstr "Bild als Referenz auswählen"
 
@@ -27581,13 +27685,21 @@ msgstr ""
 msgid "Select messages to forward"
 msgstr "Nachrichten zum Weiterleiten auswählen"
 
-#: ../../packages/ui/src/components/ai-elements/mic-selector.tsx:232
+#: ../../packages/ui/src/components/ai-elements/mic-selector.tsx:139
+msgid "Select microphone"
+msgstr ""
+
+#: ../../packages/ui/src/components/ai-elements/mic-selector.tsx:244
 msgid "Select microphone..."
 msgstr "Mikrofon auswählen..."
 
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:209
 msgid "Select mode"
 msgstr "Modus auswählen"
+
+#: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:211
+msgid "Select model"
+msgstr ""
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:173
 #: src/components/model-picker/model-picker-button.tsx:202
@@ -27675,7 +27787,7 @@ msgstr "Bis zur letzten Spalte auswählen"
 msgid "Select to top of table"
 msgstr "Bis zum Anfang der Tabelle auswählen"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:255
+#: src/features/auth/components/organization/billing-settings-card.tsx:218
 msgid "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 msgstr "Wähle aus, welche KI-Modelle Organisationsmitglieder verwenden können. Für Enterprise leer lassen, um alle Modelle zu erlauben."
 
@@ -27707,7 +27819,7 @@ msgstr ""
 msgid "Selection context"
 msgstr "Auswahlkontext"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:572
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:599
 msgid "Selection mode"
 msgstr "Auswahlmodus"
 
@@ -28007,7 +28119,7 @@ msgstr ""
 msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in response to events."
 msgstr "Richte Trigger ein, um Aufgaben nach Zeitplan, über Webhooks oder als Reaktion auf Events zu automatisieren."
 
-#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:255
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:257
 #: src/components/settings/settings-modal.tsx:404
 #: src/components/settings/settings-modal.tsx:502
 #: src/features/layout/components/mobile-section-nav.tsx:59
@@ -28167,6 +28279,10 @@ msgstr "Kurzer Text"
 msgid "shortcut"
 msgstr ""
 
+#: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:345
+msgid "Shortcuts"
+msgstr ""
+
 #: src/features/chat/thread/request-secret-prompt.tsx:434
 msgid "Show {fieldLabel}"
 msgstr "{fieldLabel} anzeigen"
@@ -28254,6 +28370,7 @@ msgid "Show output"
 msgstr "Ausgabe anzeigen"
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:106
+#: ../../packages/ui/src/components/form/password-input.tsx:32
 msgid "Show password"
 msgstr "Passwort anzeigen"
 
@@ -28407,11 +28524,11 @@ msgstr ""
 msgid "Sign in to the Neore desktop app"
 msgstr "Bei der Neore-Desktop-App anmelden"
 
-#: src/components/model-picker/model-picker.tsx:480
+#: src/components/model-picker/model-picker.tsx:486
 msgid "Sign in to unlock all models"
 msgstr "Melde dich an, um alle Modelle freizuschalten"
 
-#: src/components/model-picker/model-picker.tsx:985
+#: src/components/model-picker/model-picker.tsx:1030
 msgid "Sign in to unlock all models."
 msgstr "Melde dich an, um alle Modelle freizuschalten."
 
@@ -28477,8 +28594,8 @@ msgstr "Registriere dich und abonniere für 8 $/Monat, um alle Funktionen freizu
 #~ msgid "Sign up successful"
 #~ msgstr "Registrierung erfolgreich"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:251
-#: src/components/model-picker/model-picker.tsx:480
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:255
+#: src/components/model-picker/model-picker.tsx:486
 msgid "Sign up to unlock all models"
 msgstr "Registriere dich, um alle Modelle freizuschalten"
 
@@ -28551,8 +28668,8 @@ msgstr "inzwischen ersetzt"
 msgid "Singapore"
 msgstr "Singapur"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:584
-#: src/components/model-picker/model-picker.tsx:1038
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:611
+#: src/components/model-picker/model-picker.tsx:1087
 msgid "Single"
 msgstr "Einzeln"
 
@@ -28941,7 +29058,11 @@ msgstr "Daten sortieren"
 msgid "Sort desc"
 msgstr "Absteigend sortieren"
 
-#: src/components/model-picker/model-picker.tsx:1129
+#: ../../packages/ui/src/components/data-grid/data-grid-sort-menu.tsx:282
+msgid "Sort direction"
+msgstr ""
+
+#: src/components/model-picker/model-picker.tsx:1178
 msgid "Sort models"
 msgstr ""
 
@@ -29177,6 +29298,10 @@ msgstr "Ausgaben"
 msgid "Spent {0} of a {1} cap."
 msgstr "{0} von einem Limit von {1} ausgegeben."
 
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:53
+msgid "Split cell"
+msgstr ""
+
 #: src/features/code/components/code-workspace.tsx:135
 #: src/features/code/components/code-workspace.tsx:139
 msgid "Split right"
@@ -29290,8 +29415,8 @@ msgstr ""
 msgid "starred"
 msgstr ""
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:549
-#: src/components/model-picker/model-picker.tsx:1007
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:576
+#: src/components/model-picker/model-picker.tsx:1056
 msgid "Starred"
 msgstr "Markiert"
 
@@ -29422,7 +29547,8 @@ msgstr "Durchlauf starten"
 msgid "Start test drive"
 msgstr "Probelauf starten"
 
-#: ../../packages/ui/src/components/tiptap-editor.tsx:116
+#: ../../packages/ui/src/components/tiptap-editor.tsx:117
+#: ../../packages/ui/src/components/tiptap-editor.tsx:128
 msgid "Start writing..."
 msgstr "Schreib los..."
 
@@ -29434,7 +29560,7 @@ msgstr "Starte deinen ersten Chat"
 msgid "Start your own chat"
 msgstr "Starte deinen eigenen Chat"
 
-#: ../../packages/chat-ui/src/chat/browser-panel.tsx:308
+#: ../../packages/chat-ui/src/chat/browser-panel.tsx:311
 msgid "Started {startedAgo}"
 msgstr "Gestartet {startedAgo}"
 
@@ -29610,7 +29736,7 @@ msgstr "Stockholm"
 msgid "Stocks"
 msgstr "Aktien"
 
-#: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
+#: ../../packages/chat-ui/src/chat/browser-panel.tsx:231
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
 #: src/features/chat/host/host-composer.tsx:997
@@ -29634,6 +29760,10 @@ msgstr "Nach dem aktuellen Sprecher stoppen"
 
 #: src/features/sub-agents/components/worker-stop-bar.tsx:61
 msgid "Stop and clear the queue"
+msgstr ""
+
+#: ../../packages/chat-ui/src/chat/browser-panel.tsx:220
+msgid "Stop browser session"
 msgstr ""
 
 #: src/features/chat/thread-list/thread-node.tsx:602
@@ -29752,6 +29882,11 @@ msgstr "Wird gestreamt..."
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:140
 msgid "Strength"
 msgstr "Stärke"
+
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:304
+#: ../../packages/ui/src/components/tiptap-editor.tsx:199
+msgid "Strikethrough"
+msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:234
 msgid "Strips"
@@ -30127,7 +30262,7 @@ msgstr ""
 msgid "Submitting…"
 msgstr ""
 
-#: src/components/model-picker/model-picker.tsx:981
+#: src/components/model-picker/model-picker.tsx:1026
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "Abonniere für 8 $/Monat, um alle Modelle freizuschalten."
 
@@ -30357,9 +30492,13 @@ msgstr "Wechsle zu einer Organisation, um eine Sammlung mit ihr zu teilen."
 msgid "Switch to an organization to share with it."
 msgstr "Wechsle zu einer Organisation, um den Skill mit ihr zu teilen."
 
+#: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:158
+msgid "Switch workspace: currently"
+msgstr ""
+
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:170
-msgid "Switch workspace: currently {triggerLabel}"
-msgstr "Arbeitsbereich wechseln: aktuell {triggerLabel}"
+#~ msgid "Switch workspace: currently {triggerLabel}"
+#~ msgstr "Arbeitsbereich wechseln: aktuell {triggerLabel}"
 
 #. placeholder {0}: switchAgentName(part.from, nameOf)
 #. placeholder {1}: switchAgentName(part.to, nameOf)
@@ -30440,7 +30579,7 @@ msgstr "System-Prompts"
 msgid "System UI"
 msgstr ""
 
-#: ../../packages/ui/src/components/zoomable-image.tsx:300
+#: ../../packages/ui/src/components/zoomable-image.tsx:313
 msgid "Tab to the zoom buttons, then plus and minus zoom, zero resets, and arrow keys pan when zoomed. Double-click or scroll to zoom, drag to pan."
 msgstr ""
 
@@ -30448,6 +30587,8 @@ msgstr ""
 #: ../../packages/ui/src/components/chat-markdown.tsx:116
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:50
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:67
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:344
+#: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:63
 msgid "Table"
 msgstr ""
 
@@ -30560,6 +30701,11 @@ msgstr "Aufgabe fehlgeschlagen"
 #: src/features/notifications/lib/notification-labels.ts:66
 msgid "Task finished"
 msgstr "Aufgabe abgeschlossen"
+
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:324
+#: ../../packages/ui/src/components/tiptap-editor.tsx:226
+msgid "Task list"
+msgstr ""
 
 #: src/features/tasks/hooks/use-task-notifications.ts:35
 msgid "Task needs your review: {title}"
@@ -30796,8 +30942,8 @@ msgid "Temporary mode enabled ({0})"
 msgstr "Temporärer Modus aktiviert ({0})"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:217
-msgid "Terminate browser session"
-msgstr "Browsersitzung beenden"
+#~ msgid "Terminate browser session"
+#~ msgstr "Browsersitzung beenden"
 
 #: src/features/settings/lib/settings-keywords.ts:109
 msgid "terms"
@@ -30847,10 +30993,10 @@ msgstr "Testen"
 msgid "text"
 msgstr "Text"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:631
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:658
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:1085
+#: src/components/model-picker/model-picker.tsx:1134
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:121
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -30883,8 +31029,14 @@ msgid "Text & chat"
 msgstr "Text & Chat"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:394
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:314
 msgid "Text alignment"
 msgstr "Textausrichtung"
+
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:348
+#: ../../packages/ui/src/components/tiptap-editor.tsx:205
+msgid "Text color"
+msgstr ""
 
 #: src/features/workflow/components/nodes/text-node.tsx:143
 msgid "Text Content"
@@ -31697,7 +31849,7 @@ msgstr "Lade dann ein Modell herunter und nutze diese Basis-URL:"
 msgid "There are no credits left to answer this. Add credits and try again."
 msgstr ""
 
-#: ../../packages/ui/src/components/image-gallery.tsx:488
+#: ../../packages/ui/src/components/image-gallery.tsx:490
 msgid "There are no items to display."
 msgstr "Es gibt keine Einträge zum Anzeigen."
 
@@ -32224,11 +32376,11 @@ msgstr "Dieser Anmeldelink ist unvollständig. Starte die Anmeldung erneut in de
 msgid "This skill is no longer available."
 msgstr "Dieser Skill ist nicht mehr verfügbar."
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:317
+#: src/features/auth/components/organization/create-organization-dialog.tsx:320
 msgid "This slug is already taken"
 msgstr "Dieser Slug ist bereits vergeben"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:321
+#: src/features/auth/components/organization/create-organization-dialog.tsx:324
 msgid "This slug is available"
 msgstr "Dieser Slug ist verfügbar"
 
@@ -32796,7 +32948,7 @@ msgstr "Text-zu-Video-Qualität auf Spitzenniveau"
 msgid "Toronto"
 msgstr "Toronto"
 
-#: ../../packages/ui/src/components/ai-elements/context.tsx:196
+#: ../../packages/ui/src/components/ai-elements/context.tsx:197
 msgid "Total cost"
 msgstr "Gesamtkosten"
 
@@ -33205,8 +33357,8 @@ msgid "Two-factor authentication is currently enabled for your account. This add
 msgstr "Zwei-Faktor-Authentifizierung ist derzeit für dein Konto aktiviert. Dies fügt eine zusätzliche Sicherheitsebene hinzu."
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:608
-#: src/components/model-picker/model-picker.tsx:1061
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:635
+#: src/components/model-picker/model-picker.tsx:1110
 #: src/features/devices/components/device-tool-call.tsx:119
 msgid "Type"
 msgstr "Typ"
@@ -33391,8 +33543,15 @@ msgstr "Unverändert"
 msgid "Under the Hood"
 msgstr "Unter der Haube"
 
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:301
+#: ../../packages/ui/src/components/tiptap-editor.tsx:196
+msgid "Underline"
+msgstr ""
+
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:604
-#: src/components/model-picker/model-picker.tsx:732
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:288
+#: ../../packages/ui/src/components/tiptap-editor.tsx:181
+#: src/components/model-picker/model-picker.tsx:739
 #: src/features/canvas/canvas-panel.tsx:244
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:126
@@ -33748,11 +33907,11 @@ msgstr "Neuigkeiten"
 msgid "Upgrade"
 msgstr "Upgraden"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:211
+#: src/features/auth/components/organization/billing-settings-card.tsx:171
 msgid "Upgrade organization to Team"
 msgstr "Organisation auf Team upgraden"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:211
+#: src/features/auth/components/organization/billing-settings-card.tsx:171
 msgid "Upgrade organization to Team, monthly"
 msgstr "Organisation auf Team upgraden, monatlich"
 
@@ -33770,7 +33929,7 @@ msgid "upload"
 msgstr ""
 
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:465
-#: src/features/auth/components/organization/create-organization-dialog.tsx:255
+#: src/features/auth/components/organization/create-organization-dialog.tsx:258
 #: src/features/vault/components/empty-states.tsx:45
 #: src/features/vault/components/upload-button.tsx:11
 msgid "Upload"
@@ -33848,7 +34007,7 @@ msgstr "Bild hochladen"
 msgid "Upload image / video"
 msgstr "Bild / Video hochladen"
 
-#: src/features/auth/components/organization/create-organization-dialog.tsx:240
+#: src/features/auth/components/organization/create-organization-dialog.tsx:243
 #: src/features/auth/components/organization/organization-logo-card.tsx:157
 msgid "Upload Logo"
 msgstr "Logo hochladen"
@@ -34510,8 +34669,8 @@ msgstr "Sehr niedrige Kosten pro Generierung"
 msgid "video"
 msgstr "Video"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:655
-#: src/components/model-picker/model-picker.tsx:1111
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:682
+#: src/components/model-picker/model-picker.tsx:1160
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:123
 #: src/features/marketing/components/landing-footer.tsx:166
@@ -35596,7 +35755,7 @@ msgstr "Etwas schreiben"
 msgid "Write the guide"
 msgstr ""
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:161
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:163
 msgid "Write, or type '/' for commands…"
 msgstr "Schreib los oder tippe „/“ für Befehle…"
 
@@ -36141,7 +36300,7 @@ msgstr "Deine Seiten"
 msgid "Your plan"
 msgstr "Dein Plan"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:188
+#: src/features/auth/components/organization/billing-settings-card.tsx:148
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "Dein Plan und dein Guthaben richten sich nach deinem Abonnement."
 
@@ -36300,7 +36459,7 @@ msgid "ZIP archive"
 msgstr "ZIP-Archiv"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:143
-#: ../../packages/ui/src/components/zoomable-image.tsx:311
+#: ../../packages/ui/src/components/zoomable-image.tsx:324
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:284
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:290
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:25
@@ -36317,7 +36476,7 @@ msgid "Zoom Lens"
 msgstr "Zoomobjektiv"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:133
-#: ../../packages/ui/src/components/zoomable-image.tsx:305
+#: ../../packages/ui/src/components/zoomable-image.tsx:318
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:250
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:256
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:26
@@ -36329,7 +36488,7 @@ msgstr "Verkleinern"
 msgid "Zoom Out"
 msgstr "Verkleinern"
 
-#: ../../packages/ui/src/components/zoomable-image.tsx:266
+#: ../../packages/ui/src/components/zoomable-image.tsx:279
 msgid "Zoomable image"
 msgstr ""
 

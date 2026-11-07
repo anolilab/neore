@@ -29,10 +29,6 @@ const meta = {
         ),
     ],
     parameters: {
-        // Axe still reports the picker: each model row's star, move and info buttons sit directly in the listbox
-        // (aria-required-children), and the search combobox has no aria-controls while the list is empty (packages/ui).
-        // `todo` reports them in the a11y panel without failing CI until the picker is fixed.
-        a11y: { test: "todo" },
         msw: { handlers: { gateway: gatewayModelsHandler(), lunora: lunoraHandlers(...userFixtures()) } },
     },
     title: "Chat/Model picker",

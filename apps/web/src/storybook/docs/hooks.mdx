@@ -1,0 +1,30 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Hooks" />
+
+# Hooks
+
+The reusable hooks of `@neore/ui`, imported from `@neore/ui/hooks/<name>`. The ones with an observable behaviour have a live demo under **Hooks** in the sidebar.
+
+| Hook                           | What it does                                                                         |
+| ------------------------------ | ------------------------------------------------------------------------------------ |
+| `use-debounced-callback`       | Runs a callback once, after its last call has waited `delay` ms. Demo.               |
+| `use-hydrated`                 | `false` during server rendering and the first client render, `true` after.           |
+| `use-focus-trap`               | Keeps Tab inside a container, for overlays that are not a dialog primitive.          |
+| `use-enter-submit`             | Submits the form when Enter is pressed in a textarea; Shift+Enter adds a line.       |
+| `use-fetched-text`             | Loads a URL for a preview, with a deadline and an abort on unmount.                  |
+| `use-fetchable-origins`        | The origins a preview may fetch besides its own page's.                              |
+| `use-focusable-code-blocks`    | Makes a scrollable code block focusable, so a long line can be scrolled by keyboard. |
+| `use-streamdown-plugins`       | The Markdown plugins of chat messages, with KaTeX and Mermaid loaded on demand.      |
+| `use-streamdown-appearance`    | The code-highlight and Mermaid theme the user picked.                                |
+| `use-badge-overflow`           | How many badges fit in a row, with a `+N` badge for the rest.                        |
+| `use-data-grid`                | The state and keyboard model of the data grid.                                       |
+| `use-as-ref`, `use-to-ref`     | A ref that always holds the latest value of a prop, without re-rendering.            |
+| `use-lazy-ref`                 | A ref whose value is built once, on the first render.                                |
+| `use-callback-ref`             | A stable callback that always calls the latest function passed in.                   |
+| `use-isomorphic-layout-effect` | `useLayoutEffect` in the browser and `useEffect` on the server.                      |
+
+## Rules
+
+- Hooks that call a browser API in render are wrong: read it in an effect, or after `useHydrated` is `true`.
+- A hook that a data grid or chat relies on is tested in its own `.test.ts(x)` file. Keep the demo for the behaviour a reader can see.

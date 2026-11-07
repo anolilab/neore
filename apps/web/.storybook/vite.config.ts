@@ -77,7 +77,21 @@ export default defineConfig({
         exclude: ["@lingui/react/macro", "@lingui/core/macro", "@silvia-odwyer/photon"],
         // Reached only from Storybook's own runtime or a lazy import, which the crawl misses. When a
         // run logs "dependencies optimized: <name>" and then reloads, add <name> here.
-        include: ["@onboardjs/posthog-plugin", "@onboardjs/react", "axe-core", "msw", "msw/browser", "storybook/test"],
+        include: [
+            "@onboardjs/posthog-plugin",
+            "@onboardjs/react",
+            "@rive-app/react-webgl2",
+            "@tanstack/react-table",
+            "@xyflow/react",
+            "axe-core",
+            "embla-carousel-react",
+            "msw",
+            "msw/browser",
+            "react-day-picker",
+            "recharts",
+            "storybook/test",
+            "tokenlens",
+        ],
     },
     plugins: [
         mockServerModules(),
