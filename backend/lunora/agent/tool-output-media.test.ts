@@ -215,6 +215,21 @@ describe(offloadToolOutputMedia, () => {
         expect(store).not.toHaveBeenCalled();
     });
 
+    it("charges markup by its UTF-8 bytes, so multibyte text cannot pass the row's share", async () => {
+        const store = fakeStore();
+        // 100 UTF-16 units, 300 bytes.
+        const svg = "图".repeat(100);
+        const result = await offloadToolOutputMedia(
+            CODE_TOOL,
+            { results: [{ format: "svg", type: "image", value: svg }] },
+            store,
+            { fallbackChars: 0, smallChars: 200 },
+            BUDGET,
+        );
+
+        expect(result.output).toStrictEqual({ results: [{ format: "svg", type: "image", value: "" }], unsavedMedia: 1 });
+    });
+
     it("drops a link field the browser or code tool returned itself, so only a stored image becomes one", async () => {
         const store = fakeStore();
         const tracker = "https://tracker.example/p.png";

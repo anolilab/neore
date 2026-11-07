@@ -88,6 +88,29 @@ const STORED_MEDIA_TYPE = /^(?:image\/(?:png|jpeg|gif|webp|avif)|audio\/[\w.+-]+
 /** Formats the browser and code tools report for a raster image. SVG is markup, not base64: it is never stored. */
 const RASTER_FORMAT = /^(?:png|jpe?g|webp|gif)$/u;
 
+/** Bytes `text` takes in the row as UTF-8: markup or text may hold characters of up to three bytes per UTF-16 unit. */
+const utf8Length = (text: string): number => {
+    let bytes = 0;
+
+    for (let index = 0; index < text.length; index += 1) {
+        const code = text.codePointAt(index) ?? 0;
+
+        if (code < 0x80) {
+            bytes += 1;
+        } else if (code < 0x8_00) {
+            bytes += 2;
+        } else if (code > 0xff_ff) {
+            // A surrogate pair: four bytes for its two units.
+            bytes += 4;
+            index += 1;
+        } else {
+            bytes += 3;
+        }
+    }
+
+    return bytes;
+};
+
 /** Bytes `base64` decodes to: three per four characters, less its `=` padding. */
 const decodedSize = (base64: string): number => {
     let padding = 0;
@@ -144,8 +167,10 @@ export const offloadToolOutputMedia = async (
 
     /** Media that cannot be stored (markup, or text that is not plain base64): kept while the row's share lasts. */
     const keepInline = (value: string): Moved => {
-        if (value.length <= inline.smallChars) {
-            inline.smallChars -= value.length;
+        const bytes = utf8Length(value);
+
+        if (bytes <= inline.smallChars) {
+            inline.smallChars -= bytes;
 
             return { kind: "kept" };
         }
