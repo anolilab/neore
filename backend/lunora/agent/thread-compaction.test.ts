@@ -790,6 +790,27 @@ describe("a long path with no compaction to extend", () => {
 });
 
 describe("what the summariser reads of a row", () => {
+    it("reads an attached document's text and names an image or file, beside the typed text", () => {
+        expect.assertions(1);
+
+        const prompt = {
+            message: {
+                content: [
+                    { text: "What do these say?", type: "text" },
+                    documentTextPart("notes.pdf", "Quarterly numbers"),
+                    { image: "storage:a", type: "image" },
+                    { data: "storage:b", filename: "plan.xlsx", mediaType: "application/vnd.ms-excel", type: "file" },
+                ],
+                role: "user",
+            },
+            text: "What do these say?",
+        };
+
+        expect(transcriptTextOf(prompt as never)).toBe(
+            `What do these say?\n${documentTextPart("notes.pdf", "Quarterly numbers").text}\n[image attached]\n[file attached: plan.xlsx]`,
+        );
+    });
+
     it("names the calls an assistant row made, when it has no text of its own", () => {
         expect.assertions(1);
 

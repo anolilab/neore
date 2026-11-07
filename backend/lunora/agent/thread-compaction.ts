@@ -460,15 +460,50 @@ const toolCallsText = (message: unknown): string | undefined => {
 };
 
 /**
- * The text the summariser reads for one row: a tool row's results, or an assistant row's text with the calls it made
- * (a call row often has no text at all). `undefined` when there is nothing to read.
+ * What a row carried besides its typed text, for the summariser: an attached document's text (a text part of its own,
+ * not in the row's `text`), and a name for each image or file, whose content a text summary cannot hold. `undefined`
+ * when there is none.
+ */
+const attachmentsText = (message: unknown, typed: string | undefined): string | undefined => {
+    const content = (message as { content?: unknown } | undefined)?.content;
+
+    if (!Array.isArray(content)) {
+        return undefined;
+    }
+
+    const parts = content.flatMap((part: { filename?: unknown; mediaType?: unknown; text?: unknown; type?: unknown } | null) => {
+        if (part?.type === "text") {
+            return typeof part.text === "string" && part.text !== "" && !typed?.includes(part.text) ? [part.text] : [];
+        }
+
+        if (part?.type === "image") {
+            return ["[image attached]"];
+        }
+
+        if (part?.type === "file") {
+            const name = [part.filename, part.mediaType].find((value): value is string => typeof value === "string") ?? "a file";
+
+            return [`[file attached: ${name}]`];
+        }
+
+        return [];
+    });
+
+    return parts.length > 0 ? parts.join("\n") : undefined;
+};
+
+/**
+ * The text the summariser reads for one row: a tool row's results, or a row's own text with its attachments and the
+ * calls it made (a call row often has no text at all). `undefined` when there is nothing to read.
  */
 export const transcriptTextOf = (row: { message?: unknown; text?: string }): string | undefined => {
     if (rowRole(row) === "tool") {
         return toolResultsText(row.message);
     }
 
-    return [row.text, toolCallsText(row.message)].filter((part): part is string => Boolean(part)).join("\n") || undefined;
+    return (
+        [row.text, attachmentsText(row.message, row.text), toolCallsText(row.message)].filter((part): part is string => Boolean(part)).join("\n") || undefined
+    );
 };
 
 /**
