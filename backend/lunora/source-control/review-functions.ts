@@ -25,9 +25,12 @@ import { writeToHost } from "./write-host";
 
 const vThreadComment = v.object({ authorLogin: v.string(), body: v.string(), createdAt: v.number(), id: v.string() });
 
-const vThread = v.object({
+/** One review thread as the driver reads it: every key it sends is declared, since `.output()` refuses any other. */
+export const vThread = v.object({
     canResolve: v.boolean(),
     canUnresolve: v.boolean(),
+    commentCount: v.optional(v.number()),
+    commentsComplete: v.optional(v.literal(false)),
     comments: v.array(vThreadComment),
     id: v.string(),
     isOutdated: v.boolean(),
