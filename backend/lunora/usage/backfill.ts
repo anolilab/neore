@@ -25,10 +25,10 @@
  * walk's window and grouping, keeps its own position on the same row, and
  * counts a reply once against the live path: the live record marks its key
  * `projectFiled`, the walk marks `project:<key>`, and each skips what the other
- * marked. A reply from after the first walk's cutoff and inside the
- * key-keeping window is filed only when its key is held: a missing key there
- * means its live record never landed, and so no total.
- * Keys are pruned only once both walks are done.
+ * marked. It takes only replies from before the first walk's cutoff, which the
+ * total provably holds; later history stays under "No project", so the
+ * projects never add up to more than the total. Keys are pruned only once both
+ * walks are done.
  *
  * Threads are paged through `by_userId`, whose key no thread edit changes, so
  * a thread archived, restored or moved mid-walk keeps its place: every thread
@@ -422,7 +422,10 @@ export const runUsageProjectBackfillStep = internalMutation
         }
 
         const { now } = ctx;
-        const window = await windowFor(ctx, userId, position.startedAt, now);
+        // Only replies from before the first walk's cutoff: that walk (or the live record) counted each of them in the
+        // total. A later one is in the total only if its live record landed, which nothing durable says once its key
+        // is pruned, so it stays under "No project" rather than risk projects adding up to more than the total.
+        const window = await windowFor(ctx, userId, Math.min(state.startedAt, position.startedAt), now);
         const step = await walk<ProjectIncrement>(
             ctx,
             userId,
@@ -437,17 +440,6 @@ export const runUsageProjectBackfillStep = internalMutation
                     }
 
                     if ((await isReplyRecorded(ctx, userId, projectFiledKey(key))) || (await anyProjectFiled(ctx, userId, group.rows))) {
-                        return undefined;
-                    }
-
-                    // Before the first walk's cutoff, that walk counts every reply this one takes. After it only the live
-                    // record does, and a record that never landed left no total. Inside the key-keeping window a missing
-                    // key means exactly that, so such a reply is left out; an older one's key was pruned on schedule, so
-                    // its absence proves nothing and the reply is filed.
-                    const createdAt = group.rows[0]!._creationTime;
-                    const keysKept = createdAt >= position.startedAt - REPLY_KEY_KEEP_MS;
-
-                    if (createdAt >= state.startedAt && keysKept && !(await anyRecorded(ctx, userId, group.rows))) {
                         return undefined;
                     }
 

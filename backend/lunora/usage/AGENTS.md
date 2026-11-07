@@ -17,6 +17,8 @@
   `recordReplyUsage` lands (pass `threadId`; rows carry it via `SavedRowLike`).
   Replies outside a project write none: "No project" is total − projects, so
   never write a project row for a reply the total does not count. The project
-  walk (`runUsageProjectBackfillStep`) adds only project rows; it skips keys the
+  walk (`runUsageProjectBackfillStep`) adds only project rows, and only for
+  replies from before the first walk's cutoff (the only ones the total provably
+  holds; later history stays "No project"); it skips keys the
   live path marked `projectFiled` and marks its own `project:<key>`, which the
   live path checks. Key pruning waits for both walks.

@@ -684,7 +684,7 @@ describe("project backfill", () => {
         expect(await projectRows()).toStrictEqual([]);
     });
 
-    it("files a reply after the first walk's cutoff whose key was pruned on schedule", async () => {
+    it("leaves a reply after the first walk's cutoff under No project, so projects never exceed the total", async () => {
         vi.setSystemTime(DAY_1);
         await start();
 
@@ -694,15 +694,27 @@ describe("project backfill", () => {
 
         const alpha = await insertProject("Alpha");
 
-        // Recorded live with its total, and its key pruned two days later, before the project walk existed.
+        // Recorded live (or lost) after the first walk began; its key was pruned before the project walk existed.
         await insertThread(DAY_1 + 1000, [[prompt(), reply(10, 100)]], "active", alpha);
         await forgetProjectWalk();
         vi.setSystemTime(DAY_1 + 5 * DAY_MS);
         await start();
         await drain();
 
-        const rows = await projectRows();
+        expect(await projectRows()).toStrictEqual([]);
+    });
 
-        expect(rows).toMatchObject([{ costMicrodollars: 100, projectKey: alpha }]);
+    it("keeps projects plus No project equal to the total after both walks", async () => {
+        await insertProjectFixture();
+        vi.setSystemTime(STARTED);
+        await start();
+        await drain(true);
+
+        const rows = await rollup();
+        const total = rows.filter((row) => row.skillKey === TOTAL_SKILL_KEY).reduce((sum, row) => sum + row.costMicrodollars, 0);
+        const projects = rows.filter((row) => row.skillKey === PROJECT_SKILL_KEY).reduce((sum, row) => sum + row.costMicrodollars, 0);
+
+        // 100 + 40 in projects, 7 in no project.
+        expect([total, projects, total - projects]).toStrictEqual([147, 140, 7]);
     });
 });
