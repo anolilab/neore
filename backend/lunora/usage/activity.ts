@@ -376,7 +376,12 @@ export const forwardReplyUsage = internalMutation
                 return null;
             }
 
-            usageLogger.warn("[usage] the thread's project could not be read; recording the reply without one", { error });
+            usageLogger.warn("[usage] the thread's project could not be read; recording the reply without one", {
+                error,
+                replyKey: usage.replyKey,
+                threadId: usage.threadId,
+                userId: usage.userId,
+            });
             threadAttribution = {};
         }
 
