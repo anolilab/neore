@@ -1,6 +1,9 @@
+import { Editor } from "@tiptap/core";
+import { StarterKit } from "@tiptap/starter-kit";
 import { describe, expect, it } from "vitest";
 
-import { clearedCommandRange, isBareCommand, isBareCompact, isPrefixOfCommand, isWholeDraft } from "./slash-command";
+import QuoteChip from "./quote-chip";
+import { clearedCommandRange, isBareCommand, isBareCompact, isPrefixOfCommand, isWholeDraft, nonTextLength } from "./slash-command";
 
 describe(isBareCompact, () => {
     it("runs `/compact` alone", () => {
@@ -110,5 +113,39 @@ describe(isPrefixOfCommand, () => {
         expect(isPrefixOfCommand("/cle", "clear")).toBe(true);
         expect(isPrefixOfCommand("/m", "clear")).toBe(false);
         expect(isPrefixOfCommand("/co", "clear")).toBe(false);
+    });
+});
+
+describe(nonTextLength, () => {
+    it("counts a quote chip's text, so a command typed after a chip maps to the draft offset it has", () => {
+        const editor = new Editor({
+            content: {
+                content: [
+                    { content: [{ text: "hi", type: "text" }], type: "paragraph" },
+                    { attrs: { messageId: "m", text: "quoted" }, type: "quoteChip" },
+                    { content: [{ text: "/model x", type: "text" }], type: "paragraph" },
+                ],
+                type: "doc",
+            },
+            extensions: [StarterKit.configure({ blockquote: false }), QuoteChip],
+        });
+        const { doc } = editor.state;
+        let offset = 0;
+        let commandOffset = -1;
+
+        doc.descendants((node, pos) => {
+            if (node.isText) {
+                if (node.text?.startsWith("/")) {
+                    commandOffset = offset;
+                }
+
+                offset += node.text?.length ?? 0;
+            } else {
+                offset += nonTextLength(node, pos);
+            }
+        });
+
+        expect(commandOffset).toBe(doc.textBetween(0, doc.content.size, "\n").indexOf("/model"));
+        editor.destroy();
     });
 });

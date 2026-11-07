@@ -1,5 +1,5 @@
 import { setupI18n } from "@lingui/core";
-import { Editor } from "@tiptap/core";
+import { Editor, Extension } from "@tiptap/core";
 import { StarterKit } from "@tiptap/starter-kit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -61,6 +61,8 @@ describe("insertQuoteChip", () => {
 
         expect(instance.getJSON().content?.map((node) => node.type)).toEqual(["paragraph", "quoteChip", "paragraph"]);
         expect(instance.getText({ blockSeparator: "\n" })).toBe(`Before the quote\n${quotedDraft}\n`);
+        // Cursor and paste offsets come from `textBetween`, so it has to count the chip's text the same way.
+        expect(instance.state.doc.textBetween(0, instance.state.doc.content.size, "\n")).toBe(instance.getText({ blockSeparator: "\n" }));
     });
 });
 
@@ -178,6 +180,26 @@ describe("the link back to the quoted reply", () => {
 
         expect(document.activeElement).toBe(reply);
     });
+
+    it("keeps Enter on the focused link from reaching the editor, so it does not send the draft", () => {
+        const submit = vi.fn(() => true);
+        const SubmitOnEnter = Extension.create({
+            addKeyboardShortcuts() {
+                return { Enter: submit };
+            },
+        });
+
+        editor = new Editor({
+            content: { content: [{ attrs: { messageId: "msg-7", text: "A line" }, type: "quoteChip" }], type: "doc" },
+            extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels }), SubmitOnEnter],
+        });
+
+        const link = editor.view.dom.querySelector<HTMLButtonElement>(":scope [data-quote-chip] button");
+
+        link?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }));
+
+        expect(submit).not.toHaveBeenCalled();
+    });
 });
 
 describe("quoteRestoreDraft when the draft changed before the editor synced", () => {
@@ -220,10 +242,12 @@ describe("quoteRestoreDraft when the draft changed before the editor synced", ()
 describe("the quote chip's labels after an in-place locale switch", () => {
     let editor: Editor | undefined;
     const i18n = setupI18n({ locale: "en", messages: {} });
+    // Through an alias, so the catalog extractor does not take these test-only ids into the app's catalogs.
+    const translate = (id: string, message: string): string => i18n.t({ id, message });
     const translated = () => {
         return {
-            goToReply: i18n._({ id: "quote.goToReply", message: "Go to reply" }),
-            notOnScreen: i18n._({ id: "quote.notOnScreen", message: "The quoted reply is not on screen" }),
+            goToReply: translate("quote.goToReply", "Go to reply"),
+            notOnScreen: translate("quote.notOnScreen", "The quoted reply is not on screen"),
         };
     };
     const german = {

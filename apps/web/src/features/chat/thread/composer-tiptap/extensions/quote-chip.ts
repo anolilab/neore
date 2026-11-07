@@ -8,6 +8,7 @@
  */
 import type { Editor } from "@tiptap/core";
 import { mergeAttributes, Node } from "@tiptap/core";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 
 import { textAfterRestore } from "@/features/chat/core/utils/composer-restore";
 import { formatQuote } from "@/features/chat/core/utils/quote-selection";
@@ -99,8 +100,15 @@ const QuoteChip = Node.create<QuoteChipOptions>({
             dom.appendChild(source);
             repaints.set(dom, paint);
 
-            return { dom };
+            // Keys and clicks on the link are the button's own: without this, Enter on the focused link reaches the
+            // editor's keymap and sends the draft instead of following the link.
+            return { dom, stopEvent: (event: Event) => event.target instanceof globalThis.Node && source.contains(event.target) };
         };
+    },
+
+    /** The quote as leaf text, so `doc.textBetween` (cursor and paste offsets) counts the same text the draft holds. */
+    extendNodeSchema(extension) {
+        return extension.name === "quoteChip" ? { leafText: (node: ProseMirrorNode) => formatQuote(String(node.attrs.text ?? "")) } : {};
     },
 
     atom: true,
