@@ -180,6 +180,41 @@ describe(offloadToolOutputMedia, () => {
         expect(store).not.toHaveBeenCalled();
     });
 
+    it("stores base64 sent with line breaks or as a data URL, from its plain bytes", async () => {
+        const store = fakeStore();
+        const wrapped = LARGE.replaceAll(/(.{76})/gu, "$1\r\n");
+        const output = {
+            content: [
+                { data: wrapped, mimeType: "image/png", type: "image" },
+                { data: `data:image/png;base64,${LARGE}`, mimeType: "image/png", type: "image" },
+            ],
+        };
+
+        const result = await offloadToolOutputMedia(MCP_TOOL, output, store, stepInlineBudget(), BUDGET);
+
+        expect(store.mock.calls).toStrictEqual([
+            [LARGE, "image/png"],
+            [LARGE, "image/png"],
+        ]);
+        expect(result.output).toStrictEqual({
+            content: [
+                { data: `storage:${keyOf(1)}`, mimeType: "image/png", type: "image" },
+                { data: `storage:${keyOf(2)}`, mimeType: "image/png", type: "image" },
+            ],
+        });
+    });
+
+    it("charges a reference-shaped string to the row like any text, so an oversized one is dropped", async () => {
+        const store = fakeStore();
+        const oversized = `storage:${"x".repeat(BUDGET * 4)}`;
+        const step = { fallbackChars: 0, smallChars: BUDGET };
+
+        const result = await offloadToolOutputMedia(MCP_TOOL, { content: [{ data: oversized, mimeType: "image/png", type: "image" }] }, store, step, BUDGET);
+
+        expect(result.output).toStrictEqual({ content: [{ data: "", mimeType: "image/png", type: "image" }], unsavedMedia: 1 });
+        expect(store).not.toHaveBeenCalled();
+    });
+
     it("drops a link field the browser or code tool returned itself, so only a stored image becomes one", async () => {
         const store = fakeStore();
         const tracker = "https://tracker.example/p.png";

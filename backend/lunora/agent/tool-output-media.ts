@@ -70,6 +70,18 @@ export const UNSAVED_MEDIA_FIELD = "unsavedMedia";
 
 const BASE64 = /^[\d+/A-Za-z]+={0,2}$/u;
 
+/** A `data:` URL's head, which some tools put in front of the base64. */
+const DATA_URL_HEAD = /^data:[\w.+-]{1,64}\/[\w.+-]{1,64};base64,/u;
+
+const WHITESPACE = /\s+/gu;
+
+/** `value` as plain base64, without a `data:` head or MIME line breaks; `undefined` when it is not base64 at all. */
+const plainBase64 = (value: string): string | undefined => {
+    const body = value.replace(DATA_URL_HEAD, "").replaceAll(WHITESPACE, "");
+
+    return BASE64.test(body) ? body : undefined;
+};
+
 /** Passive types storage may serve inline (`lib/signed-storage.ts`); anything else is kept as opaque bytes. */
 const STORED_MEDIA_TYPE = /^(?:image\/(?:png|jpeg|gif|webp|avif)|audio\/[\w.+-]+|video\/[\w.+-]+|application\/pdf)$/u;
 
@@ -142,16 +154,18 @@ export const offloadToolOutputMedia = async (
     };
 
     const move = async (value: unknown, mediaType: string): Promise<Moved> => {
-        // Already a reference (a tool may echo one): never stored or decoded again.
-        if (typeof value !== "string" || value.startsWith(STORAGE_REF_PREFIX)) {
+        if (typeof value !== "string") {
             return { kind: "kept" };
         }
 
-        const size = decodedSize(value);
+        // A reference (a tool may echo one) is never stored or decoded again, but it takes room in the row like any text.
+        const base64 = value.startsWith(STORAGE_REF_PREFIX) ? undefined : plainBase64(value);
 
-        if (!BASE64.test(value)) {
+        if (base64 === undefined) {
             return keepInline(value);
         }
+
+        const size = decodedSize(base64);
 
         if (size <= budgetBytes && value.length <= inline.smallChars) {
             inline.smallChars -= value.length;
@@ -160,7 +174,7 @@ export const offloadToolOutputMedia = async (
         }
 
         try {
-            const { fileId, storageId } = await store(value, mediaType);
+            const { fileId, storageId } = await store(base64, mediaType);
 
             fileIds.push(fileId);
 
