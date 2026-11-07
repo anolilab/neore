@@ -626,8 +626,13 @@ describe("project backfill", () => {
             await step(current.runId);
         }
 
-        await projectStep((await state()).projects.runId);
-        expect((await state()).projects.threadId).toBe(long.threadId);
+        const walking = await state();
+
+        await projectStep(walking.projects.runId);
+
+        const stopped = await state();
+
+        expect(stopped.projects.threadId).toBe(long.threadId);
         await harness.run(async (ctx: any) => {
             await ctx.db.patch("threads", long.threadId, { projectId: beta });
         });

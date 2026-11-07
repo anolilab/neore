@@ -250,11 +250,11 @@ export const recordReplyUsage = internalMutation
         skillKey: v.string(),
         skillName: v.optional(v.string()),
         startedAt: v.optional(v.number()),
-        threadId: v.optional(v.string()),
         // Worked out on the thread's own shard when the reply ran in another user's thread (`forwardReplyUsage`).
         threadAttribution: v.optional(
             v.object({ organizationId: v.optional(v.string()), projectInOrganization: v.optional(v.boolean()), projectKey: v.optional(v.string()) }),
         ),
+        threadId: v.optional(v.string()),
         tokens: v.number(),
         userId: v.string(),
     })

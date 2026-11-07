@@ -296,7 +296,11 @@ export const foldOrganizationUsage = (rows: ReadonlyArray<OrganizationReply>): {
         projects: [...projects.values()].toSorted(
             (a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.projectKey.localeCompare(b.projectKey),
         ),
-        total: sumRows(rows.map((row) => ({ costMicrodollars: row.costMicrodollars, replies: 1, tokens: row.tokens }))),
+        total: sumRows(
+            rows.map((row) => {
+                return { costMicrodollars: row.costMicrodollars, replies: 1, tokens: row.tokens };
+            }),
+        ),
     };
 };
 

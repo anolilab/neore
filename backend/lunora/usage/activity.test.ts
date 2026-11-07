@@ -159,10 +159,10 @@ describe("usage by project", () => {
 
     interface ProjectBreakdown {
         noProject: Totals;
-        unfiled?: { from: string; to: string };
         projects: (Totals & { projectKey: string; title?: string })[];
         total: Totals;
         truncated: boolean;
+        unfiled?: { from: string; to: string };
     }
 
     const projectBreakdown = async (userId: string, fromDate: string): Promise<ProjectBreakdown> =>
@@ -361,7 +361,10 @@ describe("usage by project", () => {
             });
         });
 
-        expect((await projectBreakdown(USER, "2026-09-05")).unfiled).toStrictEqual({ from: "2026-09-05", to: "2026-09-11" });
-        expect((await projectBreakdown(USER, "2026-09-12")).unfiled).toBeUndefined();
+        const spanning = await projectBreakdown(USER, "2026-09-05");
+        const after = await projectBreakdown(USER, "2026-09-12");
+
+        expect(spanning.unfiled).toStrictEqual({ from: "2026-09-05", to: "2026-09-11" });
+        expect(after.unfiled).toBeUndefined();
     });
 });

@@ -359,7 +359,9 @@ describe("organization usage rows", () => {
                 const counts: Record<string, number> = {};
 
                 for (const table of ["usageDaily", "usageReplies", "usageOrganizationReplies"]) {
-                    counts[table] = (await ctx.db[table].findMany({ where: { userId: MEMBER } })).page.length;
+                    const { page } = await ctx.db[table].findMany({ where: { userId: MEMBER } });
+
+                    counts[table] = page.length;
                 }
 
                 return counts;
