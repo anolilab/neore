@@ -33,8 +33,6 @@ export const Ghost: Story = { args: { variant: "ghost" } };
 
 export const Destructive: Story = {
     args: { children: "Delete", variant: "destructive" },
-    // `text-destructive` on its own 10% tint is 4.1:1 in light mode (AA needs 4.5:1). Found by this story.
-    parameters: { a11y: { test: "todo" } },
 };
 
 export const Disabled: Story = {

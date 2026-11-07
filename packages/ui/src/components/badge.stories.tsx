@@ -24,8 +24,6 @@ export const Outline: Story = { args: { children: "Free", variant: "outline" } }
 
 export const Destructive: Story = {
     args: { children: "Failed", variant: "destructive" },
-    // Same pair as the destructive button: 4.1:1 on its tint in light mode.
-    parameters: { a11y: { test: "todo" } },
 };
 
 export const WithIcon: Story = {
