@@ -194,11 +194,12 @@ export const replyUsageArgs = (
 export const RECORD_RETRY = { backoff: "exponential", baseMs: 10_000, maxAttempts: 4, maxMs: 60_000 } as const;
 
 /**
- * When the fallback record of a reply runs: well after the record's last retry (+130 s), so it only ever lands when every
- * try of the record that reads the project failed. It carries no project, and the reply's key makes it add nothing
- * when the record landed (`usage/schedule.ts`).
+ * When the fallback record of a reply runs: past every retry chain that can still file the reply's project — a
+ * forward's own (`RECORD_RETRY`, to +130 s) followed by its record's, which runs on the scheduler's default policy
+ * (five retries, to about +930 s) — with room for a scheduler lane running behind. It carries no project, and the
+ * reply's key makes it add nothing once the record landed (`usage/schedule.ts`).
  */
-export const RECORD_FALLBACK_MS = 15 * 60_000;
+export const RECORD_FALLBACK_MS = 60 * 60_000;
 
 /** Where a reply is filed besides the total: its thread's project. */
 export interface Attribution {

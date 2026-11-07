@@ -29,7 +29,11 @@ export const scheduleReplyUsage = (scheduler: SchedulerLike, usageArgs: ReplyUsa
 
     // A job that reads the thread's project fails when that read fails, and is retried (`RECORD_RETRY`).
     if (servesUser(usageArgs.userId)) {
-        scheduled = runAfterWithRetry(scheduler, 0, target, { ...usageArgs }, RECORD_RETRY);
+        // Only a record that reads a project fails fast on a failed read; any other keeps the scheduler's default retries.
+        scheduled =
+            usageArgs.threadId === undefined
+                ? scheduler.runAfter(0, target as never, usageArgs as never)
+                : runAfterWithRetry(scheduler, 0, target, { ...usageArgs }, RECORD_RETRY);
     } else if (usageArgs.threadId === undefined || usageArgs.threadAttribution !== undefined) {
         // No thread to read, or the caller already read it: straight to the user's shard.
         scheduled = runAfterOnShard(scheduler, 0, target, { ...usageArgs }, usageArgs.userId);

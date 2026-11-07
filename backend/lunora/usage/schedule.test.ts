@@ -49,3 +49,24 @@ describe("scheduleReplyUsage off the user's shard", () => {
         );
     });
 });
+
+describe("scheduleReplyUsage on the user's shard", () => {
+    const runAfter = vi.fn(async () => null);
+
+    beforeEach(() => {
+        servesUser.mockReturnValue(true);
+        runAfter.mockClear();
+        runAfterOnShard.mockClear();
+        runAfterWithRetry.mockClear();
+    });
+
+    it("keeps the scheduler's default retries, and schedules no fallback, for a record with no project to read", () => {
+        const brief = { at: 1, costMicrodollars: 5, date: "2026-09-20", replyKey: "brief:1", skillKey: "__daily_brief__", tokens: 1, userId: "u1" };
+
+        scheduleReplyUsage({ runAfter } as never, brief);
+
+        expect(runAfter).toHaveBeenCalledWith(0, internal.usage.activity.recordReplyUsage, brief);
+        expect(runAfterWithRetry).not.toHaveBeenCalled();
+        expect(runAfterOnShard).not.toHaveBeenCalled();
+    });
+});

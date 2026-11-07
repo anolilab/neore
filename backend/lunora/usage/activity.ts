@@ -250,7 +250,12 @@ export const recordReplyUsage = internalMutation
         );
 
         if (attribution.projectKey !== undefined) {
-            await addToAttributionRollup(ctx, args.userId, [{ costMicrodollars, date: args.date, projectKey: attribution.projectKey, replies: 1, tokens }], args.at);
+            await addToAttributionRollup(
+                ctx,
+                args.userId,
+                [{ costMicrodollars, date: args.date, projectKey: attribution.projectKey, replies: 1, tokens }],
+                args.at,
+            );
         }
 
         return null;
