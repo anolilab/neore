@@ -1,7 +1,7 @@
 import { capabilityOf, isAvailable } from "@neore/ai/capabilities";
 import { describe, expect, it } from "vitest";
 
-import { reportFromHandshake } from "./capabilities";
+import { reportFromHandshake, withOptionCapabilities } from "./capabilities";
 
 const NOW = 1_700_000_000_000;
 
@@ -34,5 +34,44 @@ describe("reportFromHandshake", () => {
 
         expect(capabilityOf(report, "turns.cancel")).toEqual({ reason: "unknown", supported: false });
         expect(capabilityOf(report, "sessions.create")).toEqual({ reason: "unknown", supported: false });
+    });
+});
+
+describe("withOptionCapabilities", () => {
+    const choice = (value: string) => {
+        return { name: value.toUpperCase(), value };
+    };
+
+    it("reports the model choices and a reasoning-effort option by their category, never by name", () => {
+        const report = withOptionCapabilities(
+            reportFromHandshake({ loadSession: true }, NOW),
+            {
+                configOptions: [
+                    { category: "model", choices: [choice("a"), choice("b")], currentValue: "a", id: "m", name: "Model" },
+                    { category: "thought_level", choices: [choice("low")], currentValue: "low", id: "effort", name: "Effort" },
+                ],
+            },
+            NOW + 1,
+        );
+
+        expect(report.groups.identity).toEqual({
+            models: [
+                { id: "a", name: "A" },
+                { id: "b", name: "B" },
+            ],
+            reasoningEffort: { degradation: "none", supported: true },
+        });
+        expect(report.reportedAt).toBe(NOW + 1);
+        expect(isAvailable(capabilityOf(report, "sessions.load"))).toBe(true);
+    });
+
+    it("reports neither for an agent that offers no such option", () => {
+        const report = withOptionCapabilities(
+            reportFromHandshake({}, NOW),
+            { configOptions: [{ choices: [choice("x")], currentValue: "x", id: "model", name: "Model" }] },
+            NOW,
+        );
+
+        expect(report.groups.identity).toEqual({ models: [], reasoningEffort: { reason: "not_offered", supported: false } });
     });
 });

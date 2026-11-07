@@ -1,6 +1,7 @@
 /** What an agent session reports about its turns, and what the backend is told of them (`ingest.ts`). */
 import type { CapabilityReport } from "@neore/ai/capabilities";
 
+import type { AgentOptions } from "./agent-options";
 import type { ChildEvent } from "./children";
 import type { StopReason } from "./types";
 
@@ -54,8 +55,17 @@ export interface TurnEndEvent {
     summary?: TurnSummary;
 }
 
-export type HostEvent
-    = MediaEvent | PermissionRequestEvent | (HostSessionInfo & { kind: "session_open" }) | TurnEndEvent | { kind: "child_end"; spawnId: string; status: "cancelled" | "completed" | "failed"; text?: string } | { id: string; kind: "child_tool"; spawnId: string; status: string; title: string; toolKind: string } | { field: "reasoning" | "text"; kind: "child_text"; spawnId: string; text: string } | { id: string; kind: "tool"; status: string; title: string; toolKind: string } | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string } | { kind: "reasoning" | "text" | "turn_start"; text: string };
+export type HostEvent =
+    | MediaEvent
+    | PermissionRequestEvent
+    | (HostSessionInfo & { kind: "session_open" })
+    | TurnEndEvent
+    | { kind: "child_end"; spawnId: string; status: "cancelled" | "completed" | "failed"; text?: string }
+    | { id: string; kind: "child_tool"; spawnId: string; status: string; title: string; toolKind: string }
+    | { field: "reasoning" | "text"; kind: "child_text"; spawnId: string; text: string }
+    | { id: string; kind: "tool"; status: string; title: string; toolKind: string }
+    | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string }
+    | { kind: "reasoning" | "text" | "turn_start"; text: string };
 
 export interface HostSessionInfo {
     agentKey: string;
@@ -66,6 +76,8 @@ export interface HostSessionInfo {
     folderLabel: string;
     /** The agent's own id for the session, so an import finds it and a later reattach can use it. */
     nativeSessionId?: string;
+    /** The options the agent offers for the session (`agent-options.ts`), already bounded. */
+    options?: AgentOptions;
     /** For a session the backend started with a saved session id (harness switch S4): whether the agent loaded it, and why not. */
     reattach?: { loaded: boolean; reason?: "load_failed" | "load_unsupported" };
 }
@@ -79,6 +91,8 @@ export interface SessionObserver {
     sessionEnded: (sessionId: string) => void;
     /** `threadId` is known when the backend started the session (`acp_start`); otherwise opening it makes the thread. */
     sessionOpened: (sessionId: string, info: HostSessionInfo, threadId?: string) => void;
+    /** What the session reports changed after it opened (its options, and the report that follows them): the whole info again. */
+    sessionUpdated?: (sessionId: string, info: HostSessionInfo) => void;
     text: (sessionId: string, turnId: string, delta: string) => void;
     thought: (sessionId: string, turnId: string, delta: string) => void;
     tool: (sessionId: string, turnId: string, tool: { id: string; kind: string; status: string; title: string }) => void;
@@ -105,9 +119,14 @@ export const capSessionInfo = (info: HostSessionInfo): HostSessionInfo => {
         agentLabel: info.agentLabel.slice(0, 200),
         folderId: info.folderId.slice(0, 128),
         folderLabel: info.folderLabel.slice(0, 200),
-        ...info.capabilities !== undefined && { capabilities: info.capabilities },
-        ...info.nativeSessionId !== undefined && info.nativeSessionId !== "" && Buffer.byteLength(info.nativeSessionId) <= MAX_NATIVE_ID_BYTES && { nativeSessionId: info.nativeSessionId },
-        ...info.reattach !== undefined && { reattach: { loaded: info.reattach.loaded, ...info.reattach.reason !== undefined && { reason: info.reattach.reason } } },
+        ...(info.capabilities !== undefined && { capabilities: info.capabilities }),
+        ...(info.options !== undefined && { options: info.options }),
+        ...(info.nativeSessionId !== undefined &&
+            info.nativeSessionId !== "" &&
+            Buffer.byteLength(info.nativeSessionId) <= MAX_NATIVE_ID_BYTES && { nativeSessionId: info.nativeSessionId }),
+        ...(info.reattach !== undefined && {
+            reattach: { loaded: info.reattach.loaded, ...(info.reattach.reason !== undefined && { reason: info.reattach.reason }) },
+        }),
     };
 };
 
@@ -123,9 +142,9 @@ export const capPermissionRequest = (request: PermissionRequestEvent): Permissio
         }),
         requestId: capRequestId(request.requestId),
         tool: request.tool.slice(0, 500),
-        ...request.folder !== undefined && { folder: request.folder.slice(0, 500) },
-        ...request.command !== undefined && { command: request.command.slice(0, MAX_COMMAND_CHARS) },
-        ...request.target !== undefined && { target: request.target.slice(0, MAX_TARGET_CHARS) },
+        ...(request.folder !== undefined && { folder: request.folder.slice(0, 500) }),
+        ...(request.command !== undefined && { command: request.command.slice(0, MAX_COMMAND_CHARS) }),
+        ...(request.target !== undefined && { target: request.target.slice(0, MAX_TARGET_CHARS) }),
     };
 };
 
@@ -191,14 +210,14 @@ export const childHostEvents = (spawnId: string, event: ChildEvent): HostEvent[]
         ];
     }
 
-    const text
-        = event.text === undefined
+    const text =
+        event.text === undefined
             ? undefined
             : cutToWire(event.text, MAX_CHILD_END_CHARS, (cut) => {
-                return { kind: "child_end", spawnId: id, status: event.status, text: cut };
-            });
+                  return { kind: "child_end", spawnId: id, status: event.status, text: cut };
+              });
 
-    return [{ kind: "child_end", spawnId: id, status: event.status, ...text !== undefined && text !== "" && { text } }];
+    return [{ kind: "child_end", spawnId: id, status: event.status, ...(text !== undefined && text !== "" && { text }) }];
 };
 
 /** The files a turn may list, and the paths in them (`backend/lunora/acp/validators.ts`). */
@@ -215,13 +234,13 @@ const SEPARATOR = /[/\\]/u;
  * entry the backend refuses refuses the whole post, so it is checked here, on the text that is actually sent.
  */
 export const isSummaryPath = (value: string): boolean =>
-    value.length > 0
-    && value.length <= MAX_SUMMARY_PATH_CHARS
-    && !value.startsWith("/")
-    && !value.startsWith("\\")
-    && !DRIVE_PATH.test(value)
-    && [...value].every((char) => (char.codePointAt(0) ?? 0) > 0x1F)
-    && !value.split(SEPARATOR).includes("..");
+    value.length > 0 &&
+    value.length <= MAX_SUMMARY_PATH_CHARS &&
+    !value.startsWith("/") &&
+    !value.startsWith("\\") &&
+    !DRIVE_PATH.test(value) &&
+    [...value].every((char) => (char.codePointAt(0) ?? 0) > 0x1f) &&
+    !value.split(SEPARATOR).includes("..");
 
 const isCount = (value: number): boolean => Number.isSafeInteger(value) && value >= 0;
 
@@ -231,7 +250,7 @@ const sendableSummary = (summary: TurnSummary): TurnSummary => {
     const { patch } = summary;
     const keep = typeof patch !== "string" || patch.length <= MAX_BACKEND_PATCH_CHARS;
 
-    return { files, ...patch !== undefined && { patch: keep ? patch : { tooLarge: true as const } } };
+    return { files, ...(patch !== undefined && { patch: keep ? patch : { tooLarge: true as const } }) };
 };
 
 /**
@@ -240,7 +259,7 @@ const sendableSummary = (summary: TurnSummary): TurnSummary => {
  * (`{ tooLarge: true }`, the file list and counts stay) and only then the tail of the file list.
  */
 export const turnEndEvent = (reason: TurnEndEvent["reason"], error: string | undefined, summary: TurnSummary | undefined): TurnEndEvent => {
-    const base: TurnEndEvent = { kind: "turn_end", reason, ...error !== undefined && { error: error.slice(0, 1000) } };
+    const base: TurnEndEvent = { kind: "turn_end", reason, ...(error !== undefined && { error: error.slice(0, 1000) }) };
 
     const sendable = summary === undefined ? undefined : sendableSummary(summary);
 
@@ -249,7 +268,7 @@ export const turnEndEvent = (reason: TurnEndEvent["reason"], error: string | und
     }
 
     let { files, patch } = sendable;
-    const fits = (): boolean => wireBytes({ ...base, summary: { files, ...patch !== undefined && { patch } } }) <= MAX_EVENT_BYTES;
+    const fits = (): boolean => wireBytes({ ...base, summary: { files, ...(patch !== undefined && { patch }) } }) <= MAX_EVENT_BYTES;
 
     if (typeof patch === "string" && !fits()) {
         patch = { tooLarge: true };
@@ -259,7 +278,7 @@ export const turnEndEvent = (reason: TurnEndEvent["reason"], error: string | und
         files = files.slice(0, Math.ceil(files.length / 2));
     }
 
-    return { ...base, summary: { files, ...patch !== undefined && { patch } } };
+    return { ...base, summary: { files, ...(patch !== undefined && { patch }) } };
 };
 
 /** How a stop reason is told to the backend. */
@@ -273,11 +292,11 @@ export const endReasonOf = (reason: StopReason | "failed"): "cancelled" | "faile
 };
 
 /** What one post came to: the backend's next `seq`, a request to resend from there, a refusal, or a reason to try again. */
-export type PostResult
-    = | { kind: "gap"; next: number }
-        | { ended: boolean; existing?: boolean; kind: "ok"; next: number; threadId?: string }
-        | { kind: "refused" }
-        | { kind: "retry" };
+export type PostResult =
+    | { kind: "gap"; next: number }
+    | { ended: boolean; existing?: boolean; kind: "ok"; next: number; threadId?: string }
+    | { kind: "refused" }
+    | { kind: "retry" };
 
 const BACKOFF_START_MS = 1000;
 const BACKOFF_MAX_MS = 30_000;

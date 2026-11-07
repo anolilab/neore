@@ -1,4 +1,7 @@
-/** A session's link to its thread on the backend: `session_open` until the backend answers, `close` when the session is over. */
+/**
+ * A session's link to its thread on the backend: `session_open` until the backend answers, again whenever what it reports
+ * changes (the agent's options), and `close` when the session is over.
+ */
 import type { HostSessionInfo, PostResult } from "./host-events";
 import { jitteredBackoff } from "./host-events";
 
@@ -26,6 +29,9 @@ export class SessionLink {
 
     private opening = false;
 
+    /** The info changed while an open was in flight: once it is answered, the open goes out again with the new info. */
+    private stale = false;
+
     /** A `session_open` was sent and the backend may have created the session (its answer was lost, or not yet known). */
     private posted = false;
 
@@ -33,7 +39,7 @@ export class SessionLink {
 
     public constructor(
         private readonly sessionId: string,
-        private readonly info: HostSessionInfo,
+        private info: HostSessionInfo,
         private readonly poster: {
             bound: (sessionId: string, threadId: string) => void;
             deviceId: () => string | undefined;
@@ -90,10 +96,33 @@ export class SessionLink {
         }
 
         this.closeAttempts += 1;
-        this.closeTimer = setTimeout(() => {
-            this.closeTimer = undefined;
-            this.announceClose();
-        }, jitteredBackoff(this.closeAttempts, this.poster.random));
+        this.closeTimer = setTimeout(
+            () => {
+                this.closeTimer = undefined;
+                this.announceClose();
+            },
+            jitteredBackoff(this.closeAttempts, this.poster.random),
+        );
+    }
+
+    /**
+     * The session's info changed. A post in flight or waiting to be retried sends the new info; otherwise it is posted now.
+     * The backend keeps it only when its report is newer than the one stored, so an open that arrives late changes nothing.
+     */
+    public update(info: HostSessionInfo): void {
+        this.info = info;
+
+        if (this.closed || this.threadId === null || this.timer !== undefined) {
+            return;
+        }
+
+        if (this.opening) {
+            this.stale = true;
+
+            return;
+        }
+
+        this.open();
     }
 
     /** The computer was paired after this session opened: tries `session_open` again if it was left local. */
@@ -127,7 +156,10 @@ export class SessionLink {
                 return;
             }
 
-            const payload = JSON.stringify({ deviceId, events: [{ ...this.info, kind: "session_open" }], issuedAt: this.poster.now(), kind: "turn", sessionId: this.sessionId, v: 1 });
+            // The agent's options ride as their own event after the open, in the same post.
+            const { options, ...info } = this.info;
+            const events = [{ ...info, kind: "session_open" }, ...(options === undefined ? [] : [{ kind: "session_options", options }])];
+            const payload = JSON.stringify({ deviceId, events, issuedAt: this.poster.now(), kind: "turn", sessionId: this.sessionId, v: 1 });
 
             this.posted = true;
 
@@ -159,6 +191,14 @@ export class SessionLink {
         } finally {
             this.opening = false;
         }
+
+        const again = this.stale;
+
+        this.stale = false;
+
+        if (again && !this.closed && this.timer === undefined && typeof this.threadId === "string") {
+            this.open();
+        }
     }
 
     private local(): void {
@@ -172,9 +212,12 @@ export class SessionLink {
         }
 
         this.attempts += 1;
-        this.timer = setTimeout(() => {
-            this.timer = undefined;
-            this.open();
-        }, jitteredBackoff(this.attempts, this.poster.random));
+        this.timer = setTimeout(
+            () => {
+                this.timer = undefined;
+                this.open();
+            },
+            jitteredBackoff(this.attempts, this.poster.random),
+        );
     }
 }

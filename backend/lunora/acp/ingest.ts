@@ -76,14 +76,17 @@ const sessionTitle = (event: Extract<Event, { kind: "session_open" }>): string =
 
 /**
  * `session_open`: creates the host thread and its session, or finds them again. The desktop's own session id
- * (`hostSessionId`, indexed with the device) makes a redelivered open the same session, not a second thread.
+ * (`hostSessionId`, indexed with the device) makes a redelivered open the same session, not a second thread. A
+ * `session_options` may follow it in the same post: the options the agent offers, kept with the open's report.
  */
 const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSessionId: string, events: Event[], now: number): Promise<ApplyResult> => {
-    const [received] = events;
+    const [received, optionsEvent] = events;
 
-    if (events.length !== 1 || received?.kind !== "session_open") {
+    if (received?.kind !== "session_open" || events.length > 2 || (optionsEvent !== undefined && optionsEvent.kind !== "session_options")) {
         return REFUSED;
     }
+
+    const options = optionsEvent?.kind === "session_options" ? optionsEvent.options : undefined;
 
     // An id the computer's core would refuse to load again is never stored, so a later switch cannot choose it.
     const open = received.nativeSessionId !== undefined && !nativeIdFits(received.nativeSessionId) ? { ...received, nativeSessionId: undefined } : received;
@@ -104,7 +107,8 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         // can also report more once it has been used; the thread and session stay as they are. A delayed or
         // replayed open carries an older report and must not roll the stored one back: only a strictly newer one
         // replaces it (an equal time keeps what is stored), and a time ahead of this clock is taken as now, so one
-        // future-dated report cannot shut out every later one.
+        // future-dated report cannot shut out every later one. The agent's options ride with the report and follow the same rule:
+        // the desktop sends the open again, with a newer report, whenever they change.
         const reportedAt = open.capabilities ? Math.min(open.capabilities.reportedAt, now) : 0;
         const newerReport = open.capabilities !== undefined && reportedAt > (existing.capabilities?.reportedAt ?? 0);
         const opened = existing.status === "starting";
@@ -139,6 +143,7 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
             await ctx.db.patch("acpSessions", existing._id, {
                 updatedAt: now,
                 ...(newerReport && open.capabilities && { capabilities: { ...open.capabilities, reportedAt } }),
+                ...(newerReport && options && { agentOptions: options }),
                 ...(learnedNativeId !== undefined && { nativeSessionId: learnedNativeId }),
                 ...(opened && { lastEventAt: now, status: opening ? ("busy" as const) : ("idle" as const) }),
             });
@@ -173,6 +178,7 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         updatedAt: now,
         userId: device.userId,
         ...(open.capabilities && { capabilities: { ...open.capabilities, reportedAt: Math.min(open.capabilities.reportedAt, now) } }),
+        ...(options && { agentOptions: options }),
         ...(open.nativeSessionId !== undefined && { nativeSessionId: open.nativeSessionId }),
     });
 
@@ -199,7 +205,8 @@ const closeSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSessio
 };
 
 /** Events that come from the agent itself: the first of them moves a turn to `running`. */
-const isAgentEvent = (event: Event): boolean => event.kind !== "turn_start" && event.kind !== "turn_end" && event.kind !== "session_open";
+const isAgentEvent = (event: Event): boolean =>
+    event.kind !== "turn_start" && event.kind !== "turn_end" && event.kind !== "session_open" && event.kind !== "session_options";
 
 /** The chunk an event leaves. Text and reasoning are the chunk's own fields; anything else rides as `event`. */
 const chunkFor = (event: Event): Pick<Doc<"persistentChunks">, "event" | "reasoning" | "text"> => {
@@ -247,7 +254,7 @@ const applyTurnPost = async (
         firstSeq === undefined ||
         !Number.isSafeInteger(firstSeq) ||
         firstSeq < 0 ||
-        events.some((event) => event.kind === "session_open" || isImportEvent(event))
+        events.some((event) => event.kind === "session_open" || event.kind === "session_options" || isImportEvent(event))
     ) {
         return REFUSED;
     }

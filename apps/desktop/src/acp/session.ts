@@ -15,7 +15,9 @@ import { randomUUID } from "node:crypto";
 import type { CapabilityReport } from "@neore/ai/capabilities";
 import { capabilityOf, isAvailable } from "@neore/ai/capabilities";
 
-import { reportFromHandshake } from "./capabilities";
+import type { AgentOptions } from "./agent-options";
+import { applyOptionsUpdate, optionsOf } from "./agent-options";
+import { reportFromHandshake, withOptionCapabilities } from "./capabilities";
 import { TurnChanges } from "./changes";
 import { childEventOf, childParentOf, completionText, contentText, isRecord, text, toolIdOf } from "./child-updates";
 import type { ChildEvent } from "./children";
@@ -159,6 +161,12 @@ export class AgentSession {
     /** What the agent reported at the handshake. Unset until it has. */
     private report: CapabilityReport | undefined;
 
+    /** The options the agent offers for this session (`agent-options.ts`); empty until it has said. */
+    private agentOptions: AgentOptions = {};
+
+    /** What the backend was told when the session opened, kept so a change of the options can send it again. */
+    private opened: HostSessionInfo | undefined;
+
     /** What happened to the saved session the backend asked to load; unset when it asked for none. */
     private reattach: HostSessionInfo["reattach"];
 
@@ -195,6 +203,7 @@ export class AgentSession {
             this.agent = await initialize(this.connection, this.options.appVersion, this.options.startupTimeoutMs);
             this.report = this.options.capabilityReport?.(this.agent) ?? reportFromHandshake(this.agent.capabilities, Date.now());
             this.agentSessionId = await this.openAgentSession();
+            this.report = withOptionCapabilities(this.report, this.agentOptions, Date.now());
 
             // The agent can exit while the last answer is on its way; that session is over, not ready.
             if (this.status === "ended") {
@@ -224,10 +233,12 @@ export class AgentSession {
             const opened = {
                 ...hostInfo,
                 nativeSessionId: this.agentSessionId,
+                options: this.agentOptions,
                 ...(this.report !== undefined && { capabilities: this.report }),
                 ...(this.reattach !== undefined && { reattach: this.reattach }),
             };
 
+            this.opened = opened;
             this.observe((observer) => observer.sessionOpened(this.id, opened, this.options.threadId));
         }
     }
@@ -379,15 +390,20 @@ export class AgentSession {
     /** The agent's session: the saved one when asked for and loadable, else a new one (`reattach` says which, and why not). */
     private async openAgentSession(): Promise<string> {
         const { folder, resumeSessionId, startupTimeoutMs } = this.options;
+        const { scrub } = this.options.process;
 
         if (resumeSessionId === undefined) {
-            return await newSession(this.connection, folder, startupTimeoutMs);
+            const opened = await newSession(this.connection, folder, startupTimeoutMs);
+
+            this.agentOptions = optionsOf(opened.answer, scrub);
+
+            return opened.sessionId;
         }
 
         // No `session/load` frame goes to an agent that did not say it loads them.
         if (isAvailable(capabilityOf(this.report, "sessions.load"))) {
             try {
-                await loadSession(this.connection, resumeSessionId, folder);
+                this.agentOptions = optionsOf(await loadSession(this.connection, resumeSessionId, folder), scrub);
                 this.reattach = { loaded: true };
 
                 return resumeSessionId;
@@ -399,7 +415,11 @@ export class AgentSession {
             this.reattach = { loaded: false, reason: "load_unsupported" };
         }
 
-        return await newSession(this.connection, folder, startupTimeoutMs);
+        const opened = await newSession(this.connection, folder, startupTimeoutMs);
+
+        this.agentOptions = optionsOf(opened.answer, scrub);
+
+        return opened.sessionId;
     }
 
     /** Drops the prompts still waiting. The ones the backend queued are told their turn was cancelled, so no stream waits on them. */
@@ -619,6 +639,29 @@ export class AgentSession {
         this.options.onChange();
     }
 
+    /** The agent changed its options: kept, and once the backend knows the session, sent to it again with a newer report. */
+    private onOptionsUpdate(update: Record<string, unknown>): void {
+        const next = applyOptionsUpdate(this.agentOptions, update, this.options.process.scrub);
+
+        if (next === undefined) {
+            return;
+        }
+
+        this.agentOptions = next;
+
+        if (this.report === undefined || this.opened === undefined) {
+            return;
+        }
+
+        // Strictly newer than the report before it: the backend keeps a report only over an older one.
+        this.report = withOptionCapabilities(this.report, next, Math.max(Date.now(), this.report.reportedAt + 1));
+
+        const opened: HostSessionInfo = { ...this.opened, capabilities: this.report, options: next };
+
+        this.opened = opened;
+        this.observe((observer) => observer.sessionUpdated?.(this.id, opened));
+    }
+
     // ─── To the observer ───────────────────────────────────────────────────
 
     /** Persistence never changes what the session does: an observer that throws is ignored. */
@@ -777,6 +820,12 @@ export class AgentSession {
                 turn?.append("thought", contentText(update.content));
                 this.observeDelta(turn, "thought", false);
                 break;
+            }
+            case "config_option_update":
+            case "current_mode_update": {
+                this.onOptionsUpdate(update);
+
+                return;
             }
             case "tool_call":
             case "tool_call_update": {

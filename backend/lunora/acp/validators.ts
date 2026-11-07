@@ -30,6 +30,40 @@ export const vHostEndReason = v.union(
     v.literal("stopped"),
 );
 
+/** An id the agent chose, as the computer's core checks it: at most 128 UTF-8 bytes. */
+const fitsIdBytes = (text: string): boolean => text !== "" && new TextEncoder().encode(text).length <= 128;
+
+/**
+ * The options a host agent offers for its session (its model, reasoning effort, mode ...), as the desktop reads them
+ * (`apps/desktop/src/acp/agent-options.ts`, which holds the same bounds): its list options, or, for an agent that sends
+ * none, its legacy mode list. Only shown and reported; the values are the agent's own ids.
+ */
+export const vAgentOptions = v.object({
+    configOptions: v.optional(
+        v
+            .array(
+                v.object({
+                    category: v.optional(v.string().max(64)),
+                    choices: v
+                        .array(v.object({ name: v.string().max(120), value: v.string().check(fitsIdBytes, { message: "An id is 1 to 128 bytes" }) }))
+                        .check((choices) => choices.length <= 64, { message: "Too many choices" }),
+                    currentValue: v.string().check(fitsIdBytes, { message: "An id is 1 to 128 bytes" }),
+                    id: v.string().check(fitsIdBytes, { message: "An id is 1 to 128 bytes" }),
+                    name: v.string().max(120),
+                }),
+            )
+            .check((options) => options.length <= 10, { message: "Too many options" }),
+    ),
+    modes: v.optional(
+        v.object({
+            available: v
+                .array(v.object({ name: v.string().max(120), value: v.string().check(fitsIdBytes, { message: "An id is 1 to 128 bytes" }) }))
+                .check((modes) => modes.length <= 64, { message: "Too many modes" }),
+            current: v.string().check(fitsIdBytes, { message: "An id is 1 to 128 bytes" }),
+        }),
+    ),
+});
+
 export const vAcpSessionStatus = v.union(v.literal("starting"), v.literal("idle"), v.literal("busy"), v.literal("offline"), v.literal("ended"));
 
 /**
@@ -51,6 +85,9 @@ export const vHostEvent = v.union(
         // `load_unsupported` for an agent that does not load saved sessions; any other text is read as `load_failed`).
         reattach: v.optional(v.object({ loaded: v.boolean(), reason: v.optional(v.string().max(500)) })),
     }),
+    // The options the agent offers, posted right after a `session_open` in the same post. Kept with that open's report and
+    // only when it is newer than the stored one (`openSession`). Its own event, so stored turn events keep their shape.
+    v.object({ kind: v.literal("session_options"), options: vAgentOptions }),
     // An import (S6) of an agent's saved session: `import_open` finds or makes the thread, each `import_turn` is one
     // prompt and its reply, `import_end` closes the transcript. Posted as session-level (`import_open`) or turn-level posts.
     v.object({

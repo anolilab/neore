@@ -16,20 +16,25 @@ const HOST_INFO: HostSessionInfo = { agentKey: "example", agentLabel: "Example",
 const OPENED = {
     ...HOST_INFO,
     capabilities: {
-        groups: { sessions: { listNative: { reason: "not_offered", supported: false }, load: { reason: "not_offered", supported: false } } },
+        groups: {
+            // The agent answered `session/new` with no options: no model list, no reasoning effort.
+            identity: { models: [], reasoningEffort: { reason: "not_offered", supported: false } },
+            sessions: { listNative: { reason: "not_offered", supported: false }, load: { reason: "not_offered", supported: false } },
+        },
         reportedAt: expect.any(Number),
         version: 1,
     },
     nativeSessionId: "sess_1",
+    options: {},
 };
 
 const recorder = () => {
     const calls: unknown[][] = [];
-    const record
-        = (name: string) =>
-            (...args: unknown[]): void => {
-                calls.push([name, ...args.slice(1)]);
-            };
+    const record =
+        (name: string) =>
+        (...args: unknown[]): void => {
+            calls.push([name, ...args.slice(1)]);
+        };
     const observer: SessionObserver = {
         permissionRequested: record("permissionRequested"),
         permissionResolved: record("permissionResolved"),
@@ -37,6 +42,7 @@ const recorder = () => {
         sessionOpened: (_sessionId, info, threadId) => {
             calls.push(threadId === undefined ? ["sessionOpened", info] : ["sessionOpened", info, threadId]);
         },
+        sessionUpdated: record("sessionUpdated"),
         text: record("text"),
         thought: record("thought"),
         tool: record("tool"),
@@ -170,9 +176,15 @@ describe("a session's observer", () => {
 
         session.send("say hi");
         await player.play(steps.slice(4, 5));
-        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { content: { text: "token hunt", type: "text" }, sessionUpdate: "agent_message_chunk" } } });
+        agent.say({
+            method: "session/update",
+            params: { sessionId: "sess_1", update: { content: { text: "token hunt", type: "text" }, sessionUpdate: "agent_message_chunk" } },
+        });
         await expect.poll(() => session.snapshot().turns[0]?.text).toBe("token hunt");
-        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { content: { text: "er22 done", type: "text" }, sessionUpdate: "agent_message_chunk" } } });
+        agent.say({
+            method: "session/update",
+            params: { sessionId: "sess_1", update: { content: { text: "er22 done", type: "text" }, sessionUpdate: "agent_message_chunk" } },
+        });
         await expect.poll(() => session.snapshot().turns[0]?.text).toBe("token *** done");
         await player.play(steps.slice(-1));
         await expect.poll(() => session.snapshot().status).toBe("idle");
@@ -196,6 +208,53 @@ describe("a session's observer", () => {
 
         expect(ended[2]).toBe("failed");
         expect(typeof ended[3]).toBe("string");
+    });
+});
+
+describe("the agent's options", () => {
+    it("go out with the open, and again with a newer report each time the agent changes them", async () => {
+        const { calls, observer } = recorder();
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer,
+            onChange: () => {},
+            process: agent.process,
+        });
+        const steps = readTranscript("handshake-and-prompt").slice(0, 4);
+        const mode = {
+            category: "mode",
+            currentValue: "build",
+            id: "mode",
+            name: "Mode",
+            options: [
+                { name: "Plan", value: "plan" },
+                { name: "Build", value: "build" },
+            ],
+            type: "select",
+        };
+
+        steps[3] = { in: { id: "$2", result: { configOptions: [mode], sessionId: "sess_1" } } };
+        await Promise.all([session.start(), transcriptPlayer(agent).play(steps)]);
+
+        const [opened] = calls[0]?.slice(1) as [HostSessionInfo];
+
+        expect(opened.options?.configOptions?.[0]?.currentValue).toBe("build");
+
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { currentModeId: "plan", sessionUpdate: "current_mode_update" } } });
+        await expect.poll(() => calls.length).toBe(2);
+
+        const [updated] = calls[1]?.slice(1) as [HostSessionInfo];
+
+        expect(calls[1]?.[0]).toBe("sessionUpdated");
+        expect(updated.options?.configOptions?.[0]?.currentValue).toBe("plan");
+        expect(updated.capabilities?.reportedAt).toBeGreaterThan(opened.capabilities?.reportedAt ?? Infinity);
+        expect({ ...updated, capabilities: undefined, options: undefined }).toEqual({ ...opened, capabilities: undefined, options: undefined });
     });
 });
 

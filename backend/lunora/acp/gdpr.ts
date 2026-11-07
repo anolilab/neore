@@ -14,12 +14,13 @@ import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { vCapabilityReport } from "../lib/capability-report";
+import type { vAgentOptions } from "./validators";
 import { vAcpSessionStatus, vHostEvent } from "./validators";
 
 const BATCH = 200;
 
-/** Sessions per export page: a row is a few hundred bytes. */
-const SESSION_PAGE = 500;
+/** Sessions per export page: a row is a few hundred bytes, and up to about 8 KB with the agent's options' current values. */
+const SESSION_PAGE = 50;
 
 /** Chunk rows read per query while scanning a stream for events. */
 const CHUNK_PAGE = 200;
@@ -34,6 +35,8 @@ const EVENT_BYTES_BUDGET = 400_000;
 const vExportSession = v.object({
     agentKey: v.string(),
     agentLabel: v.string(),
+    // The value each of the agent's options had (its whole list of choices is the agent's, not the person's).
+    agentOptions: v.optional(v.array(v.object({ id: v.string(), name: v.string(), value: v.string() }))),
     capabilities: v.optional(vCapabilityReport),
     createdAt: v.number(),
     folderLabel: v.string(),
@@ -44,6 +47,14 @@ const vExportSession = v.object({
     status: vAcpSessionStatus,
     threadId: v.string(),
 });
+
+/** The current value of each option the agent offered; for an agent with only the legacy mode list, its mode. */
+const exportedOptions = (options: Infer<typeof vAgentOptions>): { id: string; name: string; value: string }[] => [
+    ...(options.configOptions ?? []).map((option) => {
+        return { id: option.id, name: option.name, value: option.currentValue };
+    }),
+    ...(options.modes === undefined ? [] : [{ id: "mode", name: "Mode", value: options.modes.current }]),
+];
 
 /** Where the next page starts: in the sessions (`page` is the table cursor), or in the host streams' events (`page` is the stream cursor, `seq` the last chunk already read). */
 const vExportCursor = v.object({
@@ -82,6 +93,7 @@ export const collectAcpSessionsForExport = internalQuery
                     ({
                         agentKey,
                         agentLabel,
+                        agentOptions,
                         capabilities,
                         createdAt,
                         folderLabel,
@@ -100,6 +112,7 @@ export const collectAcpSessionsForExport = internalQuery
                             status,
                             threadId: threadId as string,
                             ...(capabilities !== undefined && { capabilities }),
+                            ...(agentOptions !== undefined && { agentOptions: exportedOptions(agentOptions) }),
                             ...(importedTurns !== undefined && { importedTurns }),
                             ...(importState !== undefined && { importState }),
                             ...(lastEventAt !== undefined && { lastEventAt }),

@@ -8,6 +8,7 @@
  */
 import type { CapabilityReport } from "@neore/ai/capabilities";
 
+import type { AgentOptions } from "./agent-options";
 import type { AgentCapabilities } from "./types";
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
@@ -31,5 +32,32 @@ export const reportFromHandshake = (capabilities: AgentCapabilities, now: number
         },
         reportedAt: now,
         version: 1,
+    };
+};
+
+const optionIn = (options: AgentOptions, category: string) => options.configOptions?.find((option) => option.category === category);
+
+/**
+ * The options the agent offers for its session (`agent-options.ts`), added to its handshake report: the models it can run
+ * (`identity.models`) and whether it has a reasoning-effort setting (`identity.reasoningEffort`). Read from the option's
+ * category, never from the agent's or a model's name. Its modes (Plan, Build ...) are not permission modes the runner
+ * enforces, so they are not reported as `permissions.modes`.
+ */
+export const withOptionCapabilities = (report: CapabilityReport, options: AgentOptions, now: number): CapabilityReport => {
+    const models = optionIn(options, "model")?.choices.map((choice) => {
+        return { id: choice.value, name: choice.name };
+    });
+
+    return {
+        ...report,
+        groups: {
+            ...report.groups,
+            identity: {
+                ...report.groups.identity,
+                models: models ?? [],
+                reasoningEffort: optionIn(options, "thought_level") === undefined ? NOT_OFFERED : NATIVE,
+            },
+        },
+        reportedAt: now,
     };
 };

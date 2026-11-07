@@ -14,7 +14,14 @@
  * - **No `authenticate`.** Neore stores no credential for an agent. An agent that needs a login is told so in
  * plain words; the user signs in with the agent's own tool.
  */
-import type { InitializeRequest, InitializeResponse, ListSessionsRequest, LoadSessionRequest, NewSessionRequest, PromptRequest } from "@agentclientprotocol/sdk";
+import type {
+    InitializeRequest,
+    InitializeResponse,
+    ListSessionsRequest,
+    LoadSessionRequest,
+    NewSessionRequest,
+    PromptRequest,
+} from "@agentclientprotocol/sdk";
 
 import type { JsonRpcConnection } from "./jsonrpc";
 import { RpcError } from "./rpc-error";
@@ -79,7 +86,11 @@ export const initialize = async (connection: JsonRpcConnection, appVersion: stri
         clientInfo: { name: "neore-desktop", title: "Neore", version: appVersion },
         protocolVersion: PROTOCOL_VERSION,
     };
-    const response = (await withTimeout(connection.request(METHOD.initialize, params), timeoutMs, "the agent did not answer the handshake")) as Partial<InitializeResponse> | null;
+    const response = (await withTimeout(
+        connection.request(METHOD.initialize, params),
+        timeoutMs,
+        "the agent did not answer the handshake",
+    )) as Partial<InitializeResponse> | null;
     const version = response?.protocolVersion;
 
     if (typeof version !== "number") {
@@ -105,8 +116,12 @@ export const initialize = async (connection: JsonRpcConnection, appVersion: stri
     };
 };
 
-/** Opens a session in `cwd` and returns the agent's session id. */
-export const newSession = async (connection: JsonRpcConnection, cwd: string, timeoutMs = STARTUP_TIMEOUT_MS): Promise<string> => {
+/** Opens a session in `cwd`: the agent's session id, and its whole answer (which carries the options it offers). */
+export const newSession = async (
+    connection: JsonRpcConnection,
+    cwd: string,
+    timeoutMs = STARTUP_TIMEOUT_MS,
+): Promise<{ answer: Record<string, unknown>; sessionId: string }> => {
     const params: NewSessionRequest = { cwd, mcpServers: [] };
 
     try {
@@ -116,7 +131,7 @@ export const newSession = async (connection: JsonRpcConnection, cwd: string, tim
             throw new Error("the agent did not return a session id");
         }
 
-        return response.sessionId;
+        return { answer: response, sessionId: response.sessionId };
     } catch (error) {
         if (error instanceof RpcError && error.code === AUTH_REQUIRED) {
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
@@ -144,7 +159,7 @@ const MAX_LIST_PAGES = 10;
 const MAX_LISTED_SESSIONS = 200;
 const LIST_TIMEOUT_MS = 30_000;
 
-const textOf = (value: unknown): string => typeof value === "string" ? value : "";
+const textOf = (value: unknown): string => (typeof value === "string" ? value : "");
 
 /**
  * `session/list` for one folder, newest first. The agent may ignore the `cwd` filter, and the user approved this folder
@@ -189,11 +204,11 @@ export const listSessions = async (connection: JsonRpcConnection, cwd: string, t
  * collects the notifications. Call only when the agent advertised `loadSession`. A replay is as long as the session, so
  * the deadline is generous.
  */
-export const loadSession = async (connection: JsonRpcConnection, sessionId: string, cwd: string, timeoutMs = LOAD_TIMEOUT_MS): Promise<void> => {
+export const loadSession = async (connection: JsonRpcConnection, sessionId: string, cwd: string, timeoutMs = LOAD_TIMEOUT_MS): Promise<unknown> => {
     const params: LoadSessionRequest = { cwd, mcpServers: [], sessionId };
 
     try {
-        await withTimeout(connection.request(METHOD.loadSession, params), timeoutMs, "the agent did not finish loading the session");
+        return await withTimeout(connection.request(METHOD.loadSession, params), timeoutMs, "the agent did not finish loading the session");
     } catch (error) {
         if (error instanceof RpcError && error.code === AUTH_REQUIRED) {
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
