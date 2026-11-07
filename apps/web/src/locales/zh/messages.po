@@ -3632,16 +3632,16 @@ msgstr ""
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:71
 msgid "Archive open thread"
-msgstr ""
+msgstr "归档当前对话"
 
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:137
 msgid "Archive Open Thread"
-msgstr ""
+msgstr "归档当前对话"
 
 #. placeholder {0}: defaultShortcut("archiveThread")
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:156
 msgid "Archive the open thread, or restore it when it is archived ({0})"
-msgstr ""
+msgstr "归档当前对话；若已归档则取消归档（{0}）"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
 #: src/components/command-palette.tsx:476
@@ -9371,11 +9371,11 @@ msgstr "删除节点"
 
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:142
 msgid "Delete Open Thread"
-msgstr ""
+msgstr "删除当前对话"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:76
 msgid "Delete open thread (asks first)"
-msgstr ""
+msgstr "删除当前对话（会先确认）"
 
 #: src/features/auth/components/organization/delete-organization-card.tsx:37
 #: src/features/auth/components/organization/delete-organization-card.tsx:42
@@ -9467,7 +9467,7 @@ msgstr "删除团队"
 #. placeholder {0}: defaultShortcut("deleteThread")
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:161
 msgid "Delete the open thread after you confirm ({0})"
-msgstr ""
+msgstr "确认后删除当前对话（{0}）"
 
 #: src/features/evals/components/dataset-panel.tsx:328
 msgid "Delete this case?"
@@ -9488,7 +9488,7 @@ msgstr "删除对话"
 
 #: src/features/chat/thread/thread-shortcuts-listener.tsx:80
 msgid "Delete thread?"
-msgstr ""
+msgstr "删除对话？"
 
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:160
 msgid "Delete Threads"

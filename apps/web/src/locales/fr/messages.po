@@ -3632,16 +3632,16 @@ msgstr ""
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:71
 msgid "Archive open thread"
-msgstr ""
+msgstr "Archiver la conversation ouverte"
 
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:137
 msgid "Archive Open Thread"
-msgstr ""
+msgstr "Archiver la conversation ouverte"
 
 #. placeholder {0}: defaultShortcut("archiveThread")
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:156
 msgid "Archive the open thread, or restore it when it is archived ({0})"
-msgstr ""
+msgstr "Archive la conversation ouverte, ou la restaure si elle est archivée ({0})"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
 #: src/components/command-palette.tsx:476
@@ -9371,11 +9371,11 @@ msgstr "Supprimer le nœud"
 
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:142
 msgid "Delete Open Thread"
-msgstr ""
+msgstr "Supprimer la conversation ouverte"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:76
 msgid "Delete open thread (asks first)"
-msgstr ""
+msgstr "Supprimer la conversation ouverte (demande confirmation)"
 
 #: src/features/auth/components/organization/delete-organization-card.tsx:37
 #: src/features/auth/components/organization/delete-organization-card.tsx:42
@@ -9467,7 +9467,7 @@ msgstr "Supprimer l’équipe"
 #. placeholder {0}: defaultShortcut("deleteThread")
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:161
 msgid "Delete the open thread after you confirm ({0})"
-msgstr ""
+msgstr "Supprime la conversation ouverte après confirmation ({0})"
 
 #: src/features/evals/components/dataset-panel.tsx:328
 msgid "Delete this case?"
@@ -9488,7 +9488,7 @@ msgstr "Supprimer la conversation"
 
 #: src/features/chat/thread/thread-shortcuts-listener.tsx:80
 msgid "Delete thread?"
-msgstr ""
+msgstr "Supprimer la conversation ?"
 
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:160
 msgid "Delete Threads"
