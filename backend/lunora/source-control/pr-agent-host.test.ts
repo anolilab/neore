@@ -242,8 +242,10 @@ describe("when a check's log cannot be had", () => {
     it("starts no further log once the read's time budget is spent, and names those checks not read", async () => {
         stubHost({
             ...failingRoutes,
-            [`GET ${API}/check-runs/11`]: () => Response.json({ app: { slug: "other-app" }, id: 11, name: "test", output: { summary: "1 failed", title: "A" } }),
-            [`GET ${API}/check-runs/12`]: () => Response.json({ app: { slug: "other-app" }, id: 12, name: "lint", output: { summary: "2 failed", title: "B" } }),
+            [`GET ${API}/check-runs/11`]: () =>
+                Response.json({ app: { slug: "other-app" }, id: 11, name: "test", output: { summary: "1 failed", title: "A" } }),
+            [`GET ${API}/check-runs/12`]: () =>
+                Response.json({ app: { slug: "other-app" }, id: 12, name: "lint", output: { summary: "2 failed", title: "B" } }),
             [`GET ${API}/commits/${SHA}/check-runs`]: () =>
                 Response.json({
                     check_runs: [
@@ -257,7 +259,9 @@ describe("when a check's log cannot be had", () => {
         // The budget starts at 0; the first log starts at once, and by the second the whole budget is gone.
         const now = vi.spyOn(Date, "now");
 
-        now.mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValue(AGENT_LOG_READ_BUDGET_MS + 1);
+        now.mockReturnValueOnce(0)
+            .mockReturnValueOnce(0)
+            .mockReturnValue(AGENT_LOG_READ_BUDGET_MS + 1);
 
         const outcome = await readFailingChecksForAgent(dependencies(), {});
 
