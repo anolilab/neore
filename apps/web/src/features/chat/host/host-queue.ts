@@ -226,8 +226,9 @@ const onEnd = (state: HostQueueState, end: HostTurnEnd): HostQueueStep => {
             // seen running (named by a send's answer) has not started for the reads, and another turn's end says nothing of it.
             (phase.streamId !== state.live && state.liveSeen.includes(phase.streamId)))
     ) {
-        // The awaited turn ended (or the turn it waited for is no longer live, and only the newest end is reported).
-        return { effects: pauses ? [{ type: "pause" }] : [], state: { ...next, phase: { kind: "idle" } } };
+        // The awaited turn ended (or the turn it waited for is no longer live, and only the newest end is reported). One that
+        // pauses the queue holds a released message too: it was released before that turn ran.
+        return { effects: pauses ? [{ type: "pause" }] : [], state: { ...next, phase: { kind: "idle" }, released: pauses ? undefined : next.released } };
     }
 
     // A send in flight notes the end, unless it is of a turn already known to be over: the send's answer then decides whether

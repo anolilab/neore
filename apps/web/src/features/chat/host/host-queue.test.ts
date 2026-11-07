@@ -604,6 +604,21 @@ describe("Send now", () => {
         expect(step.state.released).toBeUndefined();
     });
 
+    it("holds an interrupting message released behind another tab's turn when that turn fails", () => {
+        // The interrupt finished while another tab's turn ran: the message waits for that turn, which then fails.
+        const behind = run(
+            [
+                { itemId: "x", streamId: "stream-1", type: "interrupt", wasPaused: false },
+                observed("stream-other", ["stream-1", "stopped"]),
+                { outcome: { cancelled: true }, type: "stop-answered" },
+            ],
+            RUNNING,
+        ).state;
+
+        expect(behind.released).toBe("x");
+        expect(run([observed(undefined, ["stream-other", "failed"])], behind).state.released).toBeUndefined();
+    });
+
     it("holds a released message again when a turn from elsewhere starts before it went", () => {
         const released = run([{ itemId: "b", type: "released" }], IDLE).state;
 
