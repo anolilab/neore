@@ -138,8 +138,10 @@ export default defineConfig({
     // 11 projects), so wiring it to pre-commit would block every commit until
     // that debt is paid. Add it once `pnpm lint:eslint` is green.
     staged: {
-        // Markdown is left out: CI does not check its formatting, so the hook would only churn tables.
-        "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,yml,yaml,css,html}": "prettier --config=.prettierrc.cjs --ignore-unknown --write",
+        // oxfmt formats code and data files. Markdown, CSS and HTML stay on Prettier:
+        // oxfmt reflows Markdown lists, and it rejects some CSS and HTML that Prettier takes.
+        "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,yml,yaml}": "pnpm exec oxfmt --no-error-on-unmatched-pattern",
+        "*.{md,css,html}": "prettier --config=.prettierrc.cjs --ignore-unknown --write",
         // CI checks the key order of every package.json (`lint.yml`, "Types").
         "**/package.json": "sort-package-json",
     },
@@ -185,12 +187,12 @@ export default defineConfig({
             inputs: ["default"],
             cache: true,
         },
-        "lint:prettier": {
-            inputs: ["default", "{workspaceRoot}/.prettierrc.cjs"],
+        "lint:oxfmt": {
+            inputs: ["default", "{workspaceRoot}/.prettierrc.cjs", "{workspaceRoot}/oxfmt.config.ts"],
             cache: true,
         },
-        "lint:prettier:fix": {
-            inputs: ["default", "{workspaceRoot}/.prettierrc.cjs"],
+        "lint:oxfmt:fix": {
+            inputs: ["default", "{workspaceRoot}/.prettierrc.cjs", "{workspaceRoot}/oxfmt.config.ts"],
             cache: false,
         },
         "lint:types": {

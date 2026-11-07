@@ -69,7 +69,7 @@ pnpm --filter @neore/ui run test         # vitest run
 pnpm --filter @neore/ui run test:watch
 pnpm --filter @neore/ui run lint:types   # tsc --noEmit
 pnpm --filter @neore/ui run lint:eslint
-pnpm --filter @neore/ui run lint:prettier
+pnpm --filter @neore/ui run lint:oxfmt
 ```
 
 `scripts/generate-icons-data.js` rebuilds `src/data/icons-data.ts`; it clones

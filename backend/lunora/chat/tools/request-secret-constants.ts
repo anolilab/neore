@@ -105,7 +105,9 @@ export const secretFormatProblem = (value: string, format: SecretFormat | undefi
 
 /** What the model reads: references and a status, never the value. A card with `fields` answers with `refs` keyed by field name. */
 export type RequestSecretOutput =
-    { message: string; status: "unavailable" } | { ref: string; status: "saved" } | { refs: Record<string, string>; status: "saved" };
+    | { message: string; status: "unavailable" }
+    | { ref: string; status: "saved" }
+    | { refs: Record<string, string>; status: "saved" };
 
 /** Why a reference could not be used. */
 export type SecretFailure = "abandoned" | "destination_missing" | "expired" | "not_found" | "unreadable" | "used" | "wrong_run" | "wrong_use";
