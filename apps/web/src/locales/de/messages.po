@@ -37,6 +37,10 @@ msgstr "-- NORMAL --"
 msgid ", unread"
 msgstr ", ungelesen"
 
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
+msgid "… ({omitted} more characters not shown; approving runs the whole call)"
+msgstr "… ({omitted} weitere Zeichen nicht angezeigt; Genehmigen führt den gesamten Aufruf aus)"
+
 #. placeholder {0}: state.conversations.length - 10
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:373
 msgid "...and {0} more"
@@ -667,7 +671,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} Tools: {1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:204
+#: src/features/home/components/home-page.tsx:207
 msgid "{0} unread"
 msgstr "{0} ungelesen"
 
@@ -1176,6 +1180,10 @@ msgstr "{name} pausiert"
 msgid "{name} resumed"
 msgstr "{name} fortgesetzt"
 
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:63
+msgid "{name} wants to run \"{tool}\""
+msgstr "{name} möchte \"{tool}\" ausführen"
+
 #: ../../packages/chat-ui/src/chat/tool-group.tsx:29
 msgid "{namesText}, +{more} more"
 msgstr ""
@@ -1626,7 +1634,7 @@ msgstr "99,99 % SLA"
 msgid "a change is waiting to be read"
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:158
+#: src/features/home/components/home-page.tsx:165
 msgid "A chat is waiting for your answer"
 msgstr "Ein Chat wartet auf deine Antwort"
 
@@ -1782,6 +1790,10 @@ msgstr "Eine Vorlage fügt ihre Teilnehmer zu deinen Skills hinzu, wo du sie bea
 #: src/features/settings/components/chat/event-trigger-fields.tsx:57
 msgid "A thread gets a reply"
 msgstr ""
+
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:52
+msgid "a tool"
+msgstr "ein Werkzeug"
 
 #: src/features/notifications/lib/notification-labels.ts:69
 msgid "A tool call needs your approval"
@@ -2967,7 +2979,7 @@ msgstr "Alle Kategorien"
 msgid "All changes saved"
 msgstr "Alle Änderungen gespeichert"
 
-#: src/features/home/components/home-page.tsx:245
+#: src/features/home/components/home-page.tsx:248
 msgid "All chats"
 msgstr "Alle Chats"
 
@@ -3089,27 +3101,27 @@ msgstr "Alle Typen"
 msgid "All Users"
 msgstr "Alle Benutzer"
 
-#: src/features/chat/thread/tool-approval.tsx:100
+#: src/features/chat/thread/tool-approval.tsx:183
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "\"{tool}\" von {server} erlauben?"
 
-#: src/features/chat/thread/tool-approval.tsx:100
+#: src/features/chat/thread/tool-approval.tsx:183
 msgid "Allow \"{tool}\"?"
 msgstr "\"{tool}\" erlauben?"
 
-#: src/features/chat/thread/tool-approval.tsx:133
+#: src/features/chat/thread/tool-approval.tsx:151
 msgid "Allow {tool} for 1 hour"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:137
+#: src/features/chat/thread/tool-approval.tsx:155
 msgid "Allow {tool} for today"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:135
+#: src/features/chat/thread/tool-approval.tsx:153
 msgid "Allow for 1 hour"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:139
+#: src/features/chat/thread/tool-approval.tsx:157
 msgid "Allow for today"
 msgstr ""
 
@@ -3160,11 +3172,11 @@ msgstr ""
 msgid "Also viewing"
 msgstr "Sehen sich das auch an"
 
-#: src/features/chat/thread/tool-approval.tsx:129
+#: src/features/chat/thread/tool-approval.tsx:147
 msgid "Always allow"
 msgstr "Immer erlauben"
 
-#: src/features/chat/thread/tool-approval.tsx:127
+#: src/features/chat/thread/tool-approval.tsx:145
 msgid "Always allow {tool}"
 msgstr "{tool} immer erlauben"
 
@@ -3570,17 +3582,17 @@ msgstr ""
 msgid "Approval"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:121
+#: src/features/chat/thread/tool-approval.tsx:139
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "Genehmigen"
 
-#: src/features/chat/thread/tool-approval.tsx:119
+#: src/features/chat/thread/tool-approval.tsx:137
 msgid "Approve {tool} once"
 msgstr "{tool} einmal genehmigen"
 
-#: src/features/chat/thread/tool-approval.tsx:79
+#: src/features/chat/thread/tool-approval.tsx:97
 msgid "Approved — running tool"
 msgstr "Genehmigt – Tool wird ausgeführt"
 
@@ -8142,7 +8154,7 @@ msgid "Could not send your answer."
 msgstr ""
 
 #: src/features/chat/thread/ask-user-prompt.tsx:116
-#: src/features/chat/thread/tool-approval.tsx:68
+#: src/features/chat/thread/tool-approval.tsx:86
 msgid "Could not send your answer. Please try again."
 msgstr "Deine Antwort konnte nicht gesendet werden. Bitte versuche es erneut."
 
@@ -8188,7 +8200,7 @@ msgstr ""
 msgid "Could not stop the reply. Your message is queued; send it next when you are ready."
 msgstr "Die Antwort konnte nicht gestoppt werden. Deine Nachricht steht in der Warteschlange; sende sie als Nächstes, wenn du bereit bist."
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:42
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:98
 msgid "Could not stop the sub-agent."
 msgstr ""
 
@@ -8201,7 +8213,7 @@ msgstr ""
 msgid "Could not switch the model. Please try again."
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:228
+#: src/features/home/components/home-page.tsx:231
 msgid "Could not turn on the Daily Brief."
 msgstr "Das Daily Brief konnte nicht aktiviert werden."
 
@@ -8842,7 +8854,7 @@ msgstr "Daily Brief"
 msgid "Daily Brief turned off"
 msgstr "Daily Brief deaktiviert"
 
-#: src/features/home/components/home-page.tsx:229
+#: src/features/home/components/home-page.tsx:232
 #: src/features/notifications/components/notification-settings.tsx:112
 msgid "Daily Brief turned on"
 msgstr "Daily Brief aktiviert"
@@ -9527,11 +9539,11 @@ msgstr "{0, plural, one {# Prompt} other {# Prompts}} gelöscht"
 msgid "Deleting..."
 msgstr "Wird gelöscht..."
 
-#: src/features/sub-agents/components/worker-run-log.tsx:36
+#: src/features/sub-agents/components/worker-run-log.tsx:43
 msgid "Delivered to the lead"
 msgstr ""
 
-#: src/features/sub-agents/components/worker-run-log.tsx:36
+#: src/features/sub-agents/components/worker-run-log.tsx:43
 msgid "Delivering"
 msgstr ""
 
@@ -9571,7 +9583,7 @@ msgstr "Anspruchsvolle Aufgaben, bei denen maximale KI-Leistung und verfeinertes
 msgid "Denied"
 msgstr "Abgelehnt"
 
-#: src/features/chat/thread/tool-approval.tsx:77
+#: src/features/chat/thread/tool-approval.tsx:95
 msgid "Denied — continuing without it"
 msgstr "Abgelehnt – es geht ohne weiter"
 
@@ -9591,11 +9603,11 @@ msgstr ""
 msgid "Density updated"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:125
+#: src/features/chat/thread/tool-approval.tsx:143
 msgid "Deny"
 msgstr "Ablehnen"
 
-#: src/features/chat/thread/tool-approval.tsx:123
+#: src/features/chat/thread/tool-approval.tsx:141
 msgid "Deny {tool}"
 msgstr "{tool} ablehnen"
 
@@ -10162,8 +10174,8 @@ msgstr "Noch kein Konto?"
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
 #: src/features/devices/components/devices-settings.tsx:255
 #: src/features/skills/components/bundle-import-dialog.tsx:248
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
-#: src/features/sub-agents/components/worker-run-log.tsx:28
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:112
+#: src/features/sub-agents/components/worker-run-log.tsx:34
 #: src/features/tasks/components/task-status.tsx:16
 msgid "Done"
 msgstr "Fertig"
@@ -12286,8 +12298,8 @@ msgstr "fehlgeschlagen"
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:175
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:52
-#: src/features/sub-agents/components/worker-run-log.tsx:28
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:109
+#: src/features/sub-agents/components/worker-run-log.tsx:31
 #: src/features/tasks/components/task-status.tsx:17
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:64
 #: src/features/workflow/components/canvas/workflow-controls.tsx:52
@@ -14596,7 +14608,7 @@ msgstr "Deutsch (Schweiz)"
 msgid "Germany"
 msgstr "Deutschland"
 
-#: src/features/home/components/home-page.tsx:221
+#: src/features/home/components/home-page.tsx:224
 msgid "Get a short summary here every morning."
 msgstr "Erhalte hier jeden Morgen eine kurze Zusammenfassung."
 
@@ -15597,7 +15609,7 @@ msgid "HLS playback is not supported in this browser."
 msgstr "HLS-Wiedergabe wird in diesem Browser nicht unterstützt."
 
 #: src/components/error-boundaries/route-error-boundary.tsx:118
-#: src/features/home/components/home-page.tsx:120
+#: src/features/home/components/home-page.tsx:127
 #: src/features/layout/components/sidebar-shortcut.tsx:71
 #: src/features/layout/lib/dashboard-page-names.ts:24
 msgid "Home"
@@ -18124,7 +18136,7 @@ msgstr "Workflow wird geladen..."
 msgid "Loading your items…"
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:128
+#: src/features/home/components/home-page.tsx:135
 msgid "Loading your overview…"
 msgstr "Übersicht wird geladen…"
 
@@ -20140,9 +20152,15 @@ msgid "Needs review"
 msgstr "Prüfung nötig"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:492
-#: src/features/home/components/home-page.tsx:151
+#: src/features/home/components/home-page.tsx:158
 msgid "Needs you"
 msgstr "Braucht dich"
+
+#: src/features/home/components/home-page.tsx:113
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:107
+#: src/features/sub-agents/components/worker-run-log.tsx:29
+msgid "Needs your approval"
+msgstr "Ihre Genehmigung erforderlich"
 
 #: src/features/chat/thread/composer-image-settings.tsx:293
 msgid "Negative prompt — what to exclude"
@@ -20676,7 +20694,7 @@ msgstr "Keine Kamera ausgewählt"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "Noch keine Testfälle. Füge einen manuell hinzu, importiere eine CSV- oder JSONL-Datei oder speichere einen Chat-Beitrag mit \"Als Eval-Testfall speichern\"."
 
-#: src/features/home/components/home-page.tsx:252
+#: src/features/home/components/home-page.tsx:255
 msgid "No chats yet. Start one above."
 msgstr "Noch keine Chats. Starte oben einen."
 
@@ -21211,7 +21229,7 @@ msgstr "Keine Tools."
 msgid "No triggers yet"
 msgstr "Noch keine Trigger"
 
-#: src/features/home/components/home-page.tsx:211
+#: src/features/home/components/home-page.tsx:214
 msgid "No unread notifications."
 msgstr "Keine ungelesenen Benachrichtigungen."
 
@@ -21372,7 +21390,7 @@ msgstr ""
 msgid "Not covered by the guide"
 msgstr ""
 
-#: src/features/sub-agents/components/worker-run-log.tsx:36
+#: src/features/sub-agents/components/worker-run-log.tsx:43
 msgid "Not delivered to the lead"
 msgstr ""
 
@@ -21427,7 +21445,7 @@ msgstr "Nicht festgelegt"
 msgid "Not shown to this model: {0}"
 msgstr "Diesem Modell nicht gezeigt: {0}"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:75
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:133
 msgid "Not started"
 msgstr "Nicht gestartet"
 
@@ -21472,7 +21490,7 @@ msgstr ""
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "An dieser Adresse lauscht nichts. Starte Ollama oder den Server von LM Studio, prüfe den Port und stell sicher, dass die URL auf /v1 endet."
 
-#: src/features/home/components/home-page.tsx:172
+#: src/features/home/components/home-page.tsx:179
 msgid "Nothing is running right now."
 msgstr "Gerade läuft nichts."
 
@@ -21480,7 +21498,7 @@ msgstr "Gerade läuft nichts."
 msgid "Nothing is saved, installed or enabled until you choose to save."
 msgstr "Nichts wird gespeichert, installiert oder aktiviert, bis du speicherst."
 
-#: src/features/home/components/home-page.tsx:153
+#: src/features/home/components/home-page.tsx:160
 msgid "Nothing is waiting on you."
 msgstr "Nichts wartet auf dich."
 
@@ -21496,7 +21514,7 @@ msgstr "Benachrichtigung"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "Benachrichtigungs-Workflows, Kanäle und Empfängereinstellungen"
 
-#: src/features/home/components/home-page.tsx:208
+#: src/features/home/components/home-page.tsx:211
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:199
@@ -22186,7 +22204,7 @@ msgstr "Unterhaltung des Durchlaufs öffnen"
 msgid "Open the side-question panel without interrupting a running reply ({0})"
 msgstr ""
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:122
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:178
 msgid "Open the sub-agent's thread"
 msgstr "Thread des Sub-Agenten öffnen"
 
@@ -24748,12 +24766,11 @@ msgstr "Nachricht einreihen"
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Nachricht einreihen – wird gesendet, wenn die aktuelle Antwort fertig ist"
 
-#: src/features/home/components/home-page.tsx:176
-#: src/features/home/components/home-page.tsx:184
-#: src/features/home/components/home-page.tsx:192
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:53
+#: src/features/home/components/home-page.tsx:110
+#: src/features/home/components/home-page.tsx:183
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:110
 #: src/features/sub-agents/components/worker-list.tsx:80
-#: src/features/sub-agents/components/worker-run-log.tsx:28
+#: src/features/sub-agents/components/worker-run-log.tsx:32
 #: src/features/tasks/components/task-status.tsx:19
 msgid "Queued"
 msgstr "In Warteschlange"
@@ -25225,11 +25242,11 @@ msgstr ""
 msgid "Recent"
 msgstr "Neueste"
 
-#: src/features/home/components/home-page.tsx:249
+#: src/features/home/components/home-page.tsx:252
 msgid "Recent chats"
 msgstr "Letzte Chats"
 
-#: src/features/sub-agents/components/worker-run-log.tsx:39
+#: src/features/sub-agents/components/worker-run-log.tsx:46
 msgid "Recent messages"
 msgstr ""
 
@@ -26360,7 +26377,7 @@ msgstr "Mit Notiz erneut versuchen"
 msgid "Retrying now"
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:144
+#: src/features/home/components/home-page.tsx:151
 msgid "Retrying…"
 msgstr "Neuer Versuch…"
 
@@ -26411,7 +26428,7 @@ msgid "Review submitted"
 msgstr ""
 
 #. placeholder {0}: task.title
-#: src/features/home/components/home-page.tsx:163
+#: src/features/home/components/home-page.tsx:170
 msgid "Review task: {0}"
 msgstr "Aufgabe prüfen: {0}"
 
@@ -26702,10 +26719,9 @@ msgstr "Führe deinen Workflow aus, um hier den Ausführungsverlauf zu sehen."
 
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
-#: src/features/home/components/home-page.tsx:170
-#: src/features/home/components/home-page.tsx:176
-#: src/features/home/components/home-page.tsx:184
-#: src/features/home/components/home-page.tsx:192
+#: src/features/home/components/home-page.tsx:113
+#: src/features/home/components/home-page.tsx:177
+#: src/features/home/components/home-page.tsx:183
 #: src/features/settings/components/chat/trigger-settings.tsx:178
 #: src/features/tasks/components/task-detail-dialog.tsx:138
 #: src/features/tasks/components/task-status.tsx:20
@@ -27813,23 +27829,23 @@ msgstr ""
 msgid "Sent"
 msgstr "Gesendet"
 
-#: src/features/sub-agents/components/worker-run-log.tsx:31
+#: src/features/sub-agents/components/worker-run-log.tsx:38
 msgid "Sent by a messenger reply"
 msgstr ""
 
-#: src/features/sub-agents/components/worker-run-log.tsx:32
+#: src/features/sub-agents/components/worker-run-log.tsx:39
 msgid "Sent by an outside agent"
 msgstr ""
 
-#: src/features/sub-agents/components/worker-run-log.tsx:33
+#: src/features/sub-agents/components/worker-run-log.tsx:40
 msgid "Sent by an unattended run"
 msgstr ""
 
-#: src/features/sub-agents/components/worker-run-log.tsx:30
+#: src/features/sub-agents/components/worker-run-log.tsx:37
 msgid "Sent by the lead agent"
 msgstr ""
 
-#: src/features/sub-agents/components/worker-run-log.tsx:34
+#: src/features/sub-agents/components/worker-run-log.tsx:41
 msgid "Sent by you"
 msgstr ""
 
@@ -28249,7 +28265,7 @@ msgstr "Zeitstempel anzeigen"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "Bis zu {rowLimit} Zeilen anzeigen ({byteCount} Bytes)"
 
-#: src/features/chat/thread/tool-approval.tsx:110
+#: src/features/chat/thread/tool-approval.tsx:128
 msgid "Show what it will send"
 msgstr "Anzeigen, was gesendet wird"
 
@@ -29434,7 +29450,7 @@ msgstr "planmäßig gestartet"
 msgid "started when its dependencies finished"
 msgstr "gestartet, als die Abhängigkeiten fertig waren"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:80
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:138
 msgid "Starting"
 msgstr "Wird gestartet"
 
@@ -29576,7 +29592,7 @@ msgstr "Aktien"
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:354
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:167
 #: src/features/sub-agents/components/worker-stop-bar.tsx:56
 #: src/features/workflow/components/canvas/workflow-controls.tsx:618
 msgid "Stop"
@@ -29635,8 +29651,8 @@ msgid "Stop watching {0}"
 msgstr ""
 
 #: src/features/chat/goal/goal-notes.tsx:65
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:51
-#: src/features/sub-agents/components/worker-run-log.tsx:28
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:108
+#: src/features/sub-agents/components/worker-run-log.tsx:30
 msgid "Stopped"
 msgstr ""
 
@@ -30052,7 +30068,7 @@ msgstr "Stilisiertes Ergebnis"
 msgid "stylized animation"
 msgstr "stilisierte Animation"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:95
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:149
 msgid "Sub-agent"
 msgstr "Sub-Agent"
 
@@ -30064,7 +30080,7 @@ msgstr "Sub-Agent fehlgeschlagen"
 msgid "Sub-agent finished"
 msgstr "Sub-Agent abgeschlossen"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:64
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:121
 msgid "Sub-agent was not approved."
 msgstr "Der Sub-Agent wurde nicht genehmigt."
 
@@ -31550,9 +31566,21 @@ msgstr "Der Server listet noch keine Modelle – lade zuerst eines herunter oder
 msgid "The skill could not be imported."
 msgstr "Der Skill konnte nicht importiert werden."
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:68
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:51
+msgid "The sub-agent"
+msgstr "Der Unteragent"
+
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:125
 msgid "The sub-agent could not start."
 msgstr "Der Sub-Agent konnte nicht gestartet werden."
+
+#: src/features/chat/thread/tool-approval.tsx:81
+msgid "The sub-agent is still working. Answer this request once it waits for you."
+msgstr "Der Sub-Agent arbeitet noch. Beantworte diese Anfrage, sobald er auf dich wartet."
+
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:119
+msgid "The sub-agent's request for approval was not answered in time."
+msgstr "Die Genehmigungsanfrage des Sub-Agenten wurde nicht rechtzeitig beantwortet."
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:254
 msgid "The tag \"{pendingDeleteName}\" will be removed from every chat that has it. The chats themselves are not deleted."
@@ -32194,7 +32222,7 @@ msgstr "Dieser Slug ist verfügbar"
 msgid "This spreadsheet appears to be empty or could not be parsed."
 msgstr "Diese Tabelle scheint leer zu sein oder konnte nicht gelesen werden."
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:70
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:127
 msgid "This sub-agent run is no longer available."
 msgstr "Dieser Sub-Agent-Lauf ist nicht mehr verfügbar."
 
@@ -33013,7 +33041,7 @@ msgstr "Versuche, deine Suchbegriffe anzupassen."
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/develop/components/thread-pull-requests.tsx:167
-#: src/features/home/components/home-page.tsx:144
+#: src/features/home/components/home-page.tsx:151
 #: src/features/tasks/components/task-form-dialog.tsx:440
 msgid "Try again"
 msgstr "Erneut versuchen"
@@ -33099,7 +33127,7 @@ msgstr ""
 msgid "Turn off run until done"
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:236
+#: src/features/home/components/home-page.tsx:239
 msgid "Turn on Daily Brief"
 msgstr "Daily Brief aktivieren"
 
@@ -33548,7 +33576,7 @@ msgstr ""
 msgid "Untitled"
 msgstr "Unbenannt"
 
-#: src/features/home/components/home-page.tsx:257
+#: src/features/home/components/home-page.tsx:260
 msgid "Untitled chat"
 msgstr "Unbenannter Chat"
 
@@ -34954,7 +34982,7 @@ msgstr ""
 msgid "Waiting for the owner to answer"
 msgstr "Wartet auf die Antwort des Eigentümers"
 
-#: src/features/chat/thread/tool-approval.tsx:74
+#: src/features/chat/thread/tool-approval.tsx:92
 msgid "Waiting for the owner to approve"
 msgstr "Wartet auf die Genehmigung des Eigentümers"
 
@@ -34976,13 +35004,13 @@ msgid "Waiting for your answer"
 msgstr "Wartet auf deine Antwort"
 
 #. placeholder {0}: approval.threadTitle
-#: src/features/home/components/home-page.tsx:158
+#: src/features/home/components/home-page.tsx:165
 msgid "Waiting for your answer in {0}"
 msgstr "Wartet auf deine Antwort in {0}"
 
 #: src/features/chat/thread-list/thread-node.tsx:567
 #: src/features/chat/thread-list/thread-node.tsx:574
-#: src/features/chat/thread/tool-approval.tsx:74
+#: src/features/chat/thread/tool-approval.tsx:92
 msgid "Waiting for your approval"
 msgstr "Wartet auf deine Genehmigung"
 
@@ -35222,7 +35250,7 @@ msgstr "Was ist die Canvas-Funktion?"
 msgid "What it evaluates"
 msgstr "Was evaluiert wird"
 
-#: src/features/home/components/home-page.tsx:121
+#: src/features/home/components/home-page.tsx:128
 msgid "What needs you, what's running, and where you left off."
 msgstr "Was dich braucht, was läuft und wo du aufgehört hast."
 
@@ -35485,9 +35513,9 @@ msgid "Workflows"
 msgstr "Workflows"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:493
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:54
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
 #: src/features/sub-agents/components/worker-list.tsx:80
-#: src/features/sub-agents/components/worker-run-log.tsx:28
+#: src/features/sub-agents/components/worker-run-log.tsx:33
 msgid "Working"
 msgstr "In Arbeit"
 
@@ -36079,7 +36107,7 @@ msgstr ""
 msgid "Your next message will start a self-destructing chat."
 msgstr "Deine nächste Nachricht startet einen selbstzerstörenden Chat."
 
-#: src/features/home/components/home-page.tsx:134
+#: src/features/home/components/home-page.tsx:141
 msgid "Your overview could not be loaded."
 msgstr "Deine Übersicht konnte nicht geladen werden."
 

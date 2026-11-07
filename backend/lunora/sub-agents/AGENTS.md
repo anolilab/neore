@@ -32,3 +32,8 @@
   `acp_cancel` with `keepQueue` (signed; the core copies it into the command) so the worker's other queued messages
   survive; every other Stop leaves it out and the desktop drops what it queued.
   `functions.ts` and `acp/lib/finish.ts` load each other lazily, never statically.
+- **A one-shot child pauses on an `ask` tool** (`pauseForApproval`; workers never do): the run goes `awaiting`
+  (`markRunAwaiting`) and the parent's card answers on the CHILD's thread. The claim of an answer flips the run back to
+  `running` in its own transaction (`resumeClaimedRun` → `resumeRunForAnswer`), and `claimToolApproval` refuses an answer
+  while the run is not `awaiting` (`SUB_AGENT_STILL_WORKING`), so sibling requests of one step are answered one wait at a
+  time. A continuation gets what is left of the run's step budget (`stepsTaken`) and its run's origin (`continuingRun`).

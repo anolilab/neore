@@ -14,6 +14,7 @@ import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { getConnectorMcpServers, withMcpServerGrants } from "../../connectors/lib/grant-runtime";
+import { sha256Hex } from "../../lib/crypto";
 import { toolsLogger } from "../../lib/logger";
 import type { DeviceToolsResult } from "./device-tools";
 import { buildDeviceTools } from "./device-tools";
@@ -59,6 +60,8 @@ export interface BuildAgentToolsOptions {
     headless?: boolean;
     /** Headless only: built-ins whose `ask` the run inherited an approval for (`ToolPermissionOptions.headlessApproved`). */
     headlessApproved?: ReadonlyArray<string>;
+    /** Headless only: keep `ask` tools for a run that pauses for its owner's answer (`ToolPermissionOptions.headlessCanAsk`). */
+    headlessCanAsk?: boolean;
     /** Interactive runs: where a long MCP call's progress is shown. Omitted, none is relayed. */
     mcpProgress?: ToolProgressSink;
     /** Restrict MCP servers to these names; empty/undefined means every enabled server. */
@@ -114,6 +117,11 @@ export interface BuildAgentToolsResult {
     permissionKeys: Record<string, string>;
     /** The runtime names of the tools a resume may call again after a worker died inside one (`repeatable-tools.ts`). */
     repeatable: string[];
+    /**
+     * Runtime name -> a hash of the url of the MCP server the tool comes from (connectors and other tools have none).
+     * Recorded in approval snapshots, so an approved call never reaches a server whose url changed meanwhile.
+     */
+    toolEndpoints: Record<string, string>;
     tools: ToolSet;
 }
 
@@ -124,6 +132,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         deviceThreadId,
         headless,
         headlessApproved,
+        headlessCanAsk,
         mcpProgress,
         mcpServerNames,
         model,
@@ -287,6 +296,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         ...(headlessApproved && { headlessApproved: new Set(headlessApproved) }),
         ...(quickCheck && { lowRiskCheck: quickCheck.check }),
         ...(trusted && { lowRiskTrusted: trusted }),
+        ...(headlessCanAsk && { headlessCanAsk: true }),
         timedGrants,
     });
 
@@ -317,6 +327,17 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         }
     }
 
+    // Hashed: a server url can carry a token, and the snapshot only needs to tell a changed url apart.
+    const toolEndpoints: Record<string, string> = Object.fromEntries(
+        await Promise.all(
+            Object.keys(tools).flatMap((name) => {
+                const url = mcpResult.descriptors.get(name)?.url;
+
+                return url === undefined ? [] : [sha256Hex(url).then((hash) => [name, hash] as const)];
+            }),
+        ),
+    );
+
     return {
         autoApprovals: quickCheck?.approvals ?? {},
         mcpClients: mcpResult.clients,
@@ -325,6 +346,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         mcpToolFingerprints,
         permissionKeys,
         repeatable: Object.keys(tools).filter((name) => isSafeToRepeat(name, describe(name))),
+        toolEndpoints,
         tools,
     };
 };

@@ -1,6 +1,8 @@
 {
   "jurisdiction": "eu",
-  "migrationIds": [],
+  "migrationIds": [
+    "add-headless-approved"
+  ],
   "tables": {
     "account": {
       "commitOrdered": false,
@@ -23913,6 +23915,12 @@
           "optional": true,
           "unique": false
         },
+        "reapAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "result": {
           "kind": "string",
           "nullable": false,
@@ -23988,6 +23996,13 @@
           "optional": false,
           "unique": false,
           "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"awaiting\""
+            },
             {
               "kind": "literal",
               "nullable": false,
@@ -27270,6 +27285,18 @@
                 }
               }
             },
+            "headlessApproved": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            },
             "instructions": {
               "kind": "string",
               "nullable": false,
@@ -27392,6 +27419,38 @@
               "optional": true,
               "unique": false,
               "refined": true
+            },
+            "stepsTaken": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "subAgentRunId": {
+              "kind": "id",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "ref": "subAgentRuns"
+            },
+            "toolEndpoints": {
+              "kind": "record",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "key": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              }
             },
             "toolNames": {
               "kind": "array",

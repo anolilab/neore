@@ -11,6 +11,7 @@ import { threadForViewer } from "../../agent/threads";
 import { vThreadDoc } from "../../agent/validators";
 import { endActiveGoals } from "../goals/rows";
 import { optionalAuthQuery } from "../../lib/crpc";
+import { streamLogger } from "../../lib/logger";
 import { MAX_LENGTH } from "../../lib/validators";
 import { throwThreadLocked } from "../../lib/thread-lock";
 import { deliveredSteerIds, type SteerEntry } from "../lib/steer-queue";
@@ -152,6 +153,19 @@ export const createStreamWithMessage = internalMutation
 
         // A reply paused on a request that this message moves the conversation past is abandoned: drop what it kept through the pause.
         await discardPausedThreadSecrets(context, { threadId: threadId as Id<"threads"> });
+
+        // Likewise a sub-agent this child thread's message (or regenerated reply) moves past: its request can no longer be
+        // answered, so its wait ends. Here, after the message is saved; only read, and only scheduled when a sub-agent's
+        // request is open, so ending the run can never fail this send (whose prompt is saved and charged) and a thread with
+        // no waiting sub-agent costs one indexed read. Loaded lazily, like every reader of the sub-agent module from the chat path.
+        const { hasSubAgentApprovalOpen } = await import("../../sub-agents/functions");
+
+        if (await hasSubAgentApprovalOpen(context, threadId)) {
+            // A failed schedule must not fail the send either: the run's request expires on its own.
+            await context.scheduler.runAfter(0, internal.sub_agents.functions.endApprovalWaitForMessage, { threadId }).catch((error: unknown) => {
+                streamLogger.error("[chat] Could not schedule the end of a sub-agent's approval wait", error);
+            });
+        }
 
         const streamId = await persistentTextStreaming.createStream(context, {
             messageId,

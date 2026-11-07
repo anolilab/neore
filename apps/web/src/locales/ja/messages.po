@@ -7,7 +7,7 @@ msgstr ""
 "PO-Revision-Date: \n"
 "Last-Translator: \n"
 "Language-Team: \n"
-"Language: ja\n"
+"Language: de\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -36,6 +36,10 @@ msgstr "-- ノーマル --"
 #: src/features/notifications/components/notification-list.tsx:113
 msgid ", unread"
 msgstr "、未読"
+
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
+msgid "… ({omitted} more characters not shown; approving runs the whole call)"
+msgstr "…（さらに{omitted}文字は表示されていません。承認すると呼び出し全体が実行されます）"
 
 #. placeholder {0}: state.conversations.length - 10
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:373
@@ -667,7 +671,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} 個のツール: {1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:204
+#: src/features/home/components/home-page.tsx:207
 msgid "{0} unread"
 msgstr "未読 {0} 件"
 
@@ -1176,6 +1180,10 @@ msgstr "{name} を一時停止しました"
 msgid "{name} resumed"
 msgstr "{name} を再開しました"
 
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:63
+msgid "{name} wants to run \"{tool}\""
+msgstr "{name} が \"{tool}\" の実行を求めています"
+
 #: ../../packages/chat-ui/src/chat/tool-group.tsx:29
 msgid "{namesText}, +{more} more"
 msgstr ""
@@ -1626,7 +1634,7 @@ msgstr "99.99% の SLA"
 msgid "a change is waiting to be read"
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:158
+#: src/features/home/components/home-page.tsx:165
 msgid "A chat is waiting for your answer"
 msgstr "チャットがあなたの回答を待っています"
 
@@ -1782,6 +1790,10 @@ msgstr "テンプレートは参加者をスキルに追加します。スキル
 #: src/features/settings/components/chat/event-trigger-fields.tsx:57
 msgid "A thread gets a reply"
 msgstr ""
+
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:52
+msgid "a tool"
+msgstr "ツール"
 
 #: src/features/notifications/lib/notification-labels.ts:69
 msgid "A tool call needs your approval"
@@ -2967,7 +2979,7 @@ msgstr "すべてのカテゴリ"
 msgid "All changes saved"
 msgstr "すべての変更を保存しました"
 
-#: src/features/home/components/home-page.tsx:245
+#: src/features/home/components/home-page.tsx:248
 msgid "All chats"
 msgstr "すべてのチャット"
 
@@ -3089,27 +3101,27 @@ msgstr "すべての種類"
 msgid "All Users"
 msgstr "すべてのユーザー"
 
-#: src/features/chat/thread/tool-approval.tsx:100
+#: src/features/chat/thread/tool-approval.tsx:183
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "{server} の「{tool}」を許可しますか？"
 
-#: src/features/chat/thread/tool-approval.tsx:100
+#: src/features/chat/thread/tool-approval.tsx:183
 msgid "Allow \"{tool}\"?"
 msgstr "「{tool}」を許可しますか？"
 
-#: src/features/chat/thread/tool-approval.tsx:133
+#: src/features/chat/thread/tool-approval.tsx:151
 msgid "Allow {tool} for 1 hour"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:137
+#: src/features/chat/thread/tool-approval.tsx:155
 msgid "Allow {tool} for today"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:135
+#: src/features/chat/thread/tool-approval.tsx:153
 msgid "Allow for 1 hour"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:139
+#: src/features/chat/thread/tool-approval.tsx:157
 msgid "Allow for today"
 msgstr ""
 
@@ -3160,11 +3172,11 @@ msgstr ""
 msgid "Also viewing"
 msgstr "他の閲覧者"
 
-#: src/features/chat/thread/tool-approval.tsx:129
+#: src/features/chat/thread/tool-approval.tsx:147
 msgid "Always allow"
 msgstr "常に許可"
 
-#: src/features/chat/thread/tool-approval.tsx:127
+#: src/features/chat/thread/tool-approval.tsx:145
 msgid "Always allow {tool}"
 msgstr "{tool} を常に許可"
 
@@ -3570,17 +3582,17 @@ msgstr ""
 msgid "Approval"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:121
+#: src/features/chat/thread/tool-approval.tsx:139
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "承認"
 
-#: src/features/chat/thread/tool-approval.tsx:119
+#: src/features/chat/thread/tool-approval.tsx:137
 msgid "Approve {tool} once"
 msgstr "{tool} を今回のみ承認"
 
-#: src/features/chat/thread/tool-approval.tsx:79
+#: src/features/chat/thread/tool-approval.tsx:97
 msgid "Approved — running tool"
 msgstr "承認済み — ツールを実行中"
 
@@ -8142,7 +8154,7 @@ msgid "Could not send your answer."
 msgstr ""
 
 #: src/features/chat/thread/ask-user-prompt.tsx:116
-#: src/features/chat/thread/tool-approval.tsx:68
+#: src/features/chat/thread/tool-approval.tsx:86
 msgid "Could not send your answer. Please try again."
 msgstr "回答を送信できませんでした。もう一度お試しください。"
 
@@ -8188,7 +8200,7 @@ msgstr ""
 msgid "Could not stop the reply. Your message is queued; send it next when you are ready."
 msgstr "返信を停止できませんでした。メッセージはキューに入っています。準備ができたら次に送信してください。"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:42
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:98
 msgid "Could not stop the sub-agent."
 msgstr ""
 
@@ -8201,7 +8213,7 @@ msgstr ""
 msgid "Could not switch the model. Please try again."
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:228
+#: src/features/home/components/home-page.tsx:231
 msgid "Could not turn on the Daily Brief."
 msgstr "Daily Brief をオンにできませんでした。"
 
@@ -8842,7 +8854,7 @@ msgstr "Daily Brief"
 msgid "Daily Brief turned off"
 msgstr "Daily Brief をオフにしました"
 
-#: src/features/home/components/home-page.tsx:229
+#: src/features/home/components/home-page.tsx:232
 #: src/features/notifications/components/notification-settings.tsx:112
 msgid "Daily Brief turned on"
 msgstr "Daily Brief をオンにしました"
@@ -9527,11 +9539,11 @@ msgstr "{0, plural, other {# 件のプロンプトを削除しました}}"
 msgid "Deleting..."
 msgstr "削除しています..."
 
-#: src/features/sub-agents/components/worker-run-log.tsx:36
+#: src/features/sub-agents/components/worker-run-log.tsx:43
 msgid "Delivered to the lead"
 msgstr ""
 
-#: src/features/sub-agents/components/worker-run-log.tsx:36
+#: src/features/sub-agents/components/worker-run-log.tsx:43
 msgid "Delivering"
 msgstr ""
 
@@ -9571,7 +9583,7 @@ msgstr "最大限の AI 性能と洗練された推論が最も重要となる�
 msgid "Denied"
 msgstr "拒否"
 
-#: src/features/chat/thread/tool-approval.tsx:77
+#: src/features/chat/thread/tool-approval.tsx:95
 msgid "Denied — continuing without it"
 msgstr "拒否されました — ツールなしで続行します"
 
@@ -9591,11 +9603,11 @@ msgstr ""
 msgid "Density updated"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:125
+#: src/features/chat/thread/tool-approval.tsx:143
 msgid "Deny"
 msgstr "拒否"
 
-#: src/features/chat/thread/tool-approval.tsx:123
+#: src/features/chat/thread/tool-approval.tsx:141
 msgid "Deny {tool}"
 msgstr "{tool} を拒否"
 
@@ -10162,8 +10174,8 @@ msgstr "アカウントをお持ちでないですか？"
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
 #: src/features/devices/components/devices-settings.tsx:255
 #: src/features/skills/components/bundle-import-dialog.tsx:248
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
-#: src/features/sub-agents/components/worker-run-log.tsx:28
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:112
+#: src/features/sub-agents/components/worker-run-log.tsx:34
 #: src/features/tasks/components/task-status.tsx:16
 msgid "Done"
 msgstr "完了"
@@ -12286,8 +12298,8 @@ msgstr "不合格"
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:175
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:52
-#: src/features/sub-agents/components/worker-run-log.tsx:28
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:109
+#: src/features/sub-agents/components/worker-run-log.tsx:31
 #: src/features/tasks/components/task-status.tsx:17
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:64
 #: src/features/workflow/components/canvas/workflow-controls.tsx:52
@@ -14596,7 +14608,7 @@ msgstr "ドイツ語（スイス）"
 msgid "Germany"
 msgstr "ドイツ"
 
-#: src/features/home/components/home-page.tsx:221
+#: src/features/home/components/home-page.tsx:224
 msgid "Get a short summary here every morning."
 msgstr "毎朝ここに短いまとめが届きます。"
 
@@ -15597,7 +15609,7 @@ msgid "HLS playback is not supported in this browser."
 msgstr "このブラウザーは HLS 再生に対応していません。"
 
 #: src/components/error-boundaries/route-error-boundary.tsx:118
-#: src/features/home/components/home-page.tsx:120
+#: src/features/home/components/home-page.tsx:127
 #: src/features/layout/components/sidebar-shortcut.tsx:71
 #: src/features/layout/lib/dashboard-page-names.ts:24
 msgid "Home"
@@ -18124,7 +18136,7 @@ msgstr "ワークフローを読み込んでいます..."
 msgid "Loading your items…"
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:128
+#: src/features/home/components/home-page.tsx:135
 msgid "Loading your overview…"
 msgstr "概要を読み込み中…"
 
@@ -20140,9 +20152,15 @@ msgid "Needs review"
 msgstr "要レビュー"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:492
-#: src/features/home/components/home-page.tsx:151
+#: src/features/home/components/home-page.tsx:158
 msgid "Needs you"
 msgstr "対応が必要"
+
+#: src/features/home/components/home-page.tsx:113
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:107
+#: src/features/sub-agents/components/worker-run-log.tsx:29
+msgid "Needs your approval"
+msgstr "承認が必要です"
 
 #: src/features/chat/thread/composer-image-settings.tsx:293
 msgid "Negative prompt — what to exclude"
@@ -20676,7 +20694,7 @@ msgstr "カメラが選択されていません"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "まだケースがありません。手動で追加するか、CSV または JSONL ファイルをインポートするか、チャットのターンを「評価ケースとして保存」で保存してください。"
 
-#: src/features/home/components/home-page.tsx:252
+#: src/features/home/components/home-page.tsx:255
 msgid "No chats yet. Start one above."
 msgstr "まだチャットはありません。上から始めましょう。"
 
@@ -21211,7 +21229,7 @@ msgstr "ツールはありません。"
 msgid "No triggers yet"
 msgstr "トリガーはまだありません"
 
-#: src/features/home/components/home-page.tsx:211
+#: src/features/home/components/home-page.tsx:214
 msgid "No unread notifications."
 msgstr "未読の通知はありません。"
 
@@ -21372,7 +21390,7 @@ msgstr ""
 msgid "Not covered by the guide"
 msgstr ""
 
-#: src/features/sub-agents/components/worker-run-log.tsx:36
+#: src/features/sub-agents/components/worker-run-log.tsx:43
 msgid "Not delivered to the lead"
 msgstr ""
 
@@ -21427,7 +21445,7 @@ msgstr "未設定"
 msgid "Not shown to this model: {0}"
 msgstr "このモデルには表示されていません: {0}"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:75
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:133
 msgid "Not started"
 msgstr "未開始"
 
@@ -21472,7 +21490,7 @@ msgstr ""
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "そのアドレスで待ち受けているサーバーがありません。Ollama または LM Studio のサーバーを起動し、ポートを確認して、URL が /v1 で終わっていることを確認してください。"
 
-#: src/features/home/components/home-page.tsx:172
+#: src/features/home/components/home-page.tsx:179
 msgid "Nothing is running right now."
 msgstr "現在実行中のものはありません。"
 
@@ -21480,7 +21498,7 @@ msgstr "現在実行中のものはありません。"
 msgid "Nothing is saved, installed or enabled until you choose to save."
 msgstr "保存を選択するまで、何も保存、インストール、有効化されません。"
 
-#: src/features/home/components/home-page.tsx:153
+#: src/features/home/components/home-page.tsx:160
 msgid "Nothing is waiting on you."
 msgstr "対応待ちのものはありません。"
 
@@ -21496,7 +21514,7 @@ msgstr "通知"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "通知ワークフロー、チャネル、受信者の設定"
 
-#: src/features/home/components/home-page.tsx:208
+#: src/features/home/components/home-page.tsx:211
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:199
@@ -22186,7 +22204,7 @@ msgstr "実行の会話を開く"
 msgid "Open the side-question panel without interrupting a running reply ({0})"
 msgstr ""
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:122
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:178
 msgid "Open the sub-agent's thread"
 msgstr "サブエージェントのスレッドを開く"
 
@@ -24748,12 +24766,11 @@ msgstr "メッセージを待機列に追加"
 msgid "Queue message — sends when the current reply finishes"
 msgstr "メッセージを待機列に追加 — 現在の返信が終わると送信されます"
 
-#: src/features/home/components/home-page.tsx:176
-#: src/features/home/components/home-page.tsx:184
-#: src/features/home/components/home-page.tsx:192
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:53
+#: src/features/home/components/home-page.tsx:110
+#: src/features/home/components/home-page.tsx:183
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:110
 #: src/features/sub-agents/components/worker-list.tsx:80
-#: src/features/sub-agents/components/worker-run-log.tsx:28
+#: src/features/sub-agents/components/worker-run-log.tsx:32
 #: src/features/tasks/components/task-status.tsx:19
 msgid "Queued"
 msgstr "待機中"
@@ -25225,11 +25242,11 @@ msgstr ""
 msgid "Recent"
 msgstr "最近"
 
-#: src/features/home/components/home-page.tsx:249
+#: src/features/home/components/home-page.tsx:252
 msgid "Recent chats"
 msgstr "最近のチャット"
 
-#: src/features/sub-agents/components/worker-run-log.tsx:39
+#: src/features/sub-agents/components/worker-run-log.tsx:46
 msgid "Recent messages"
 msgstr ""
 
@@ -26360,7 +26377,7 @@ msgstr "メモを付けて再試行"
 msgid "Retrying now"
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:144
+#: src/features/home/components/home-page.tsx:151
 msgid "Retrying…"
 msgstr "再試行しています…"
 
@@ -26411,7 +26428,7 @@ msgid "Review submitted"
 msgstr ""
 
 #. placeholder {0}: task.title
-#: src/features/home/components/home-page.tsx:163
+#: src/features/home/components/home-page.tsx:170
 msgid "Review task: {0}"
 msgstr "タスクを確認：{0}"
 
@@ -26702,10 +26719,9 @@ msgstr "ワークフローを実行すると、ここに実行履歴が表示さ
 
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
-#: src/features/home/components/home-page.tsx:170
-#: src/features/home/components/home-page.tsx:176
-#: src/features/home/components/home-page.tsx:184
-#: src/features/home/components/home-page.tsx:192
+#: src/features/home/components/home-page.tsx:113
+#: src/features/home/components/home-page.tsx:177
+#: src/features/home/components/home-page.tsx:183
 #: src/features/settings/components/chat/trigger-settings.tsx:178
 #: src/features/tasks/components/task-detail-dialog.tsx:138
 #: src/features/tasks/components/task-status.tsx:20
@@ -27813,23 +27829,23 @@ msgstr ""
 msgid "Sent"
 msgstr "送信済み"
 
-#: src/features/sub-agents/components/worker-run-log.tsx:31
+#: src/features/sub-agents/components/worker-run-log.tsx:38
 msgid "Sent by a messenger reply"
 msgstr ""
 
-#: src/features/sub-agents/components/worker-run-log.tsx:32
+#: src/features/sub-agents/components/worker-run-log.tsx:39
 msgid "Sent by an outside agent"
 msgstr ""
 
-#: src/features/sub-agents/components/worker-run-log.tsx:33
+#: src/features/sub-agents/components/worker-run-log.tsx:40
 msgid "Sent by an unattended run"
 msgstr ""
 
-#: src/features/sub-agents/components/worker-run-log.tsx:30
+#: src/features/sub-agents/components/worker-run-log.tsx:37
 msgid "Sent by the lead agent"
 msgstr ""
 
-#: src/features/sub-agents/components/worker-run-log.tsx:34
+#: src/features/sub-agents/components/worker-run-log.tsx:41
 msgid "Sent by you"
 msgstr ""
 
@@ -28249,7 +28265,7 @@ msgstr "タイムスタンプを表示"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "最大 {rowLimit} 行を表示 ({byteCount} バイト)"
 
-#: src/features/chat/thread/tool-approval.tsx:110
+#: src/features/chat/thread/tool-approval.tsx:128
 msgid "Show what it will send"
 msgstr "送信内容を表示"
 
@@ -29434,7 +29450,7 @@ msgstr "スケジュールで開始"
 msgid "started when its dependencies finished"
 msgstr "依存タスクの完了時に開始"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:80
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:138
 msgid "Starting"
 msgstr "開始中"
 
@@ -29576,7 +29592,7 @@ msgstr "株式"
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:354
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:167
 #: src/features/sub-agents/components/worker-stop-bar.tsx:56
 #: src/features/workflow/components/canvas/workflow-controls.tsx:618
 msgid "Stop"
@@ -29635,8 +29651,8 @@ msgid "Stop watching {0}"
 msgstr ""
 
 #: src/features/chat/goal/goal-notes.tsx:65
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:51
-#: src/features/sub-agents/components/worker-run-log.tsx:28
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:108
+#: src/features/sub-agents/components/worker-run-log.tsx:30
 msgid "Stopped"
 msgstr ""
 
@@ -30052,7 +30068,7 @@ msgstr "スタイル適用結果"
 msgid "stylized animation"
 msgstr "スタイライズされたアニメーション"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:95
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:149
 msgid "Sub-agent"
 msgstr "サブエージェント"
 
@@ -30064,7 +30080,7 @@ msgstr "サブエージェントが失敗しました"
 msgid "Sub-agent finished"
 msgstr "サブエージェントが完了しました"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:64
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:121
 msgid "Sub-agent was not approved."
 msgstr "サブエージェントは承認されませんでした。"
 
@@ -31550,9 +31566,21 @@ msgstr "サーバーにはまだモデルがありません — 先にモデル�
 msgid "The skill could not be imported."
 msgstr "スキルをインポートできませんでした。"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:68
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:51
+msgid "The sub-agent"
+msgstr "サブエージェント"
+
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:125
 msgid "The sub-agent could not start."
 msgstr "サブエージェントを開始できませんでした。"
+
+#: src/features/chat/thread/tool-approval.tsx:81
+msgid "The sub-agent is still working. Answer this request once it waits for you."
+msgstr "サブエージェントはまだ作業中です。待機状態になったら、このリクエストに回答してください。"
+
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:119
+msgid "The sub-agent's request for approval was not answered in time."
+msgstr "サブエージェントの承認リクエストに、制限時間内に回答がありませんでした。"
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:254
 msgid "The tag \"{pendingDeleteName}\" will be removed from every chat that has it. The chats themselves are not deleted."
@@ -32194,7 +32222,7 @@ msgstr "このスラッグは利用できます"
 msgid "This spreadsheet appears to be empty or could not be parsed."
 msgstr "このスプレッドシートは空か、解析できませんでした。"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:70
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:127
 msgid "This sub-agent run is no longer available."
 msgstr "このサブエージェントの実行は利用できなくなりました。"
 
@@ -33013,7 +33041,7 @@ msgstr "検索キーワードを変えてみてください。"
 #: src/features/connection/components/offline-screen.tsx:59
 #: src/features/develop/components/files-tab.tsx:275
 #: src/features/develop/components/thread-pull-requests.tsx:167
-#: src/features/home/components/home-page.tsx:144
+#: src/features/home/components/home-page.tsx:151
 #: src/features/tasks/components/task-form-dialog.tsx:440
 msgid "Try again"
 msgstr "再試行"
@@ -33099,7 +33127,7 @@ msgstr ""
 msgid "Turn off run until done"
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:236
+#: src/features/home/components/home-page.tsx:239
 msgid "Turn on Daily Brief"
 msgstr "Daily Brief をオンにする"
 
@@ -33548,7 +33576,7 @@ msgstr ""
 msgid "Untitled"
 msgstr "無題"
 
-#: src/features/home/components/home-page.tsx:257
+#: src/features/home/components/home-page.tsx:260
 msgid "Untitled chat"
 msgstr "無題のチャット"
 
@@ -34954,7 +34982,7 @@ msgstr ""
 msgid "Waiting for the owner to answer"
 msgstr "オーナーの回答を待っています"
 
-#: src/features/chat/thread/tool-approval.tsx:74
+#: src/features/chat/thread/tool-approval.tsx:92
 msgid "Waiting for the owner to approve"
 msgstr "オーナーの承認を待っています"
 
@@ -34976,13 +35004,13 @@ msgid "Waiting for your answer"
 msgstr "あなたの回答を待っています"
 
 #. placeholder {0}: approval.threadTitle
-#: src/features/home/components/home-page.tsx:158
+#: src/features/home/components/home-page.tsx:165
 msgid "Waiting for your answer in {0}"
 msgstr "{0} であなたの回答を待っています"
 
 #: src/features/chat/thread-list/thread-node.tsx:567
 #: src/features/chat/thread-list/thread-node.tsx:574
-#: src/features/chat/thread/tool-approval.tsx:74
+#: src/features/chat/thread/tool-approval.tsx:92
 msgid "Waiting for your approval"
 msgstr "あなたの承認を待っています"
 
@@ -35222,7 +35250,7 @@ msgstr "キャンバス機能とは？"
 msgid "What it evaluates"
 msgstr "評価対象"
 
-#: src/features/home/components/home-page.tsx:121
+#: src/features/home/components/home-page.tsx:128
 msgid "What needs you, what's running, and where you left off."
 msgstr "対応が必要なこと、実行中のこと、前回の続き。"
 
@@ -35485,9 +35513,9 @@ msgid "Workflows"
 msgstr "ワークフロー"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:493
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:54
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:111
 #: src/features/sub-agents/components/worker-list.tsx:80
-#: src/features/sub-agents/components/worker-run-log.tsx:28
+#: src/features/sub-agents/components/worker-run-log.tsx:33
 msgid "Working"
 msgstr "作業中"
 
@@ -36079,7 +36107,7 @@ msgstr ""
 msgid "Your next message will start a self-destructing chat."
 msgstr "次のメッセージから自動で消えるチャットが始まります。"
 
-#: src/features/home/components/home-page.tsx:134
+#: src/features/home/components/home-page.tsx:141
 msgid "Your overview could not be loaded."
 msgstr "概要を読み込めませんでした。"
 

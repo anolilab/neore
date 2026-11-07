@@ -26,7 +26,7 @@ import { saveEditedSiblingHandler } from "../agent/branches";
 import { addMessagesHandler } from "../agent/messages";
 import { insertThread, patchThread } from "../agent/table-writes";
 import { authMutation, rateLimit } from "../lib/crpc";
-import { isWorkerThread } from "../sub-agents/functions";
+import { endApprovalWaits, isWorkerThread } from "../sub-agents/functions";
 import { storedRetentionHours } from "../lib/temporary-retention";
 import { MAX_LENGTH } from "../lib/validators";
 import { endActiveGoals, hasLiveStream } from "./goals/rows";
@@ -129,6 +129,9 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
             ...(giveBack && { status: "active" as const }),
             updatedAt: now,
         });
+
+        // The turn (a new prompt, an edit, or a regenerated reply) moves a child thread past the request its sub-agent waits on.
+        await endApprovalWaits(ctx, threadId);
     } else {
         threadId = (await insertThread(ctx.db, {
             createdBy: userId,

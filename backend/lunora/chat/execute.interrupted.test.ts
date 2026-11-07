@@ -132,6 +132,7 @@ vi.mock("./lib/agent-tools", () => {
                 mcpServerNames: [],
                 permissionKeys: {},
                 repeatable: modelState.repeatable,
+                toolEndpoints: {},
                 tools: {
                     act: tool({
                         description: "Changes something, and never returns",

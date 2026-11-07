@@ -105,6 +105,13 @@ const HomeComposer: FC = () => {
  */
 const HomePage: FC = () => {
     const { i18n, t } = useLingui();
+    const subAgentMeta = (status: "queued" | "running" | "awaiting") => {
+        if (status === "queued") {
+            return t`Queued`;
+        }
+
+        return status === "awaiting" ? t`Needs your approval` : t`Running`;
+    };
     const crpc = useCRPC();
     const { data: overview, isError, isFetching, isLoading, refetch } = useQuery(crpc.home.overview.getHomeOverview.queryOptions({}));
     const { markRead } = useNotificationInbox({ enabled: false });
@@ -179,17 +186,13 @@ const HomePage: FC = () => {
                                     </Row>
                                 ))}
                                 {overview.codingAgents.map((run) => (
-                                    <Row
-                                        key={run._id}
-                                        meta={run.status === "queued" ? t`Queued` : t`Running`}
-                                        to={run.threadId ? `/chat/${run.threadId}` : "/tasks"}
-                                    >
+                                    <Row key={run._id} meta={subAgentMeta(run.status)} to={run.threadId ? `/chat/${run.threadId}` : "/tasks"}>
                                         <Bot aria-hidden="true" className="mr-2 inline size-3.5" />
                                         {`${run.repo} · ${run.prompt}`}
                                     </Row>
                                 ))}
                                 {overview.subAgents.map((run) => (
-                                    <Row key={run._id} meta={run.status === "queued" ? t`Queued` : t`Running`} to={`/chat/${run.parentThreadId}`}>
+                                    <Row key={run._id} meta={subAgentMeta(run.status)} to={`/chat/${run.parentThreadId}`}>
                                         <Workflow aria-hidden="true" className="mr-2 inline size-3.5" />
                                         {run.task}
                                     </Row>

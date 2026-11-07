@@ -15,6 +15,9 @@
  *   source of the current date and time.
  * - `tools`: `"headless"` builds the interactive tool set without anything the
  *   user set to `ask` (nobody is there to approve it); `"none"` runs text-only.
+ * - `pauseForApproval`: a sub-agent child keeps its `ask` tools; a step that
+ *   needs an approval ends the run with `paused: true` and a snapshot on the
+ *   child's thread, answered like any chat approval (`respondToToolApproval`).
  *
  * The user's own provider keys and custom endpoints apply to every headless run.
  */
@@ -46,6 +49,8 @@ import {
     toPersonalization,
 } from "./agent-run";
 import { buildAgentTools } from "./agent-tools";
+import { collectApprovalRequestIds } from "./tool-approval-claim";
+import type { ToolRunConfig } from "./tool-run-config";
 import { getMaxSteps } from "./auto-continue";
 import { gatewayFetch } from "../../lib/services";
 import getAgent from "./get-agent";
@@ -56,6 +61,12 @@ import { applyToolAllowlist, stopWhenRequested } from "../../sub-agents/logic";
 import type { ReplySkill, SavedRowLike } from "../../usage/activity-logic";
 import { replyUsageArgs } from "../../usage/activity-logic";
 import { scheduleReplyUsage } from "../../usage/schedule";
+
+/** No tools, so no permission keys: typed, so the union with the built tools' map stays a plain record. */
+const NO_PERMISSION_KEYS: Record<string, string> = {};
+
+/** Likewise no MCP endpoints. */
+const NO_TOOL_ENDPOINTS: Record<string, string> = {};
 
 /** Autonomous work benefits from search; a skill's own search mode still wins. */
 const DEFAULT_HEADLESS_SEARCH_MODE: SearchMode = "web";
@@ -109,6 +120,13 @@ export interface HeadlessRunOptions {
      * lead's policy decides on it: an unattended cause is refused unless the policy lists it.
      */
     origin: DispatchOrigin;
+    /**
+     * A sub-agent child's run (`sub-agents/execute.ts`): `ask` tools stay in the set, and a step that needs an
+     * approval ends the run. The request is saved on the run's thread with a snapshot of the run
+     * (`recordPendingToolApprovals`), and the result comes back with `paused: true` instead of an answer. Without
+     * it, `ask` tools are removed as for every other headless run.
+     */
+    pauseForApproval?: { subAgentRunId: Id<"subAgentRuns"> };
     /** Whether the user's personalization reaches the prompt — `"none"` when someone else reads the reply. */
     personalization: "full" | "none";
     /** Omitted when continuing a thread: its latest message is the prompt. */
@@ -144,6 +162,11 @@ export interface HeadlessRunOptions {
     /** The skill the usage page files this run under; absent = the plain assistant. */
     usageSkill?: ReplySkill;
     userId: string;
+    /**
+     * Built-ins this run never gets, whatever their permission: a sub-agent at the nesting cap may ask for other tools
+     * ({@link HeadlessRunOptions.pauseForApproval}) but must not ask to delegate further (`sub-agents/execute.ts`).
+     */
+    withheldTools?: ReadonlyArray<string>;
 }
 
 export interface HeadlessRunResult {
@@ -151,6 +174,8 @@ export interface HeadlessRunResult {
     costMicrodollars?: number;
     /** With {@link HeadlessRunOptions.goal}: how the goal ended. */
     goal?: Pick<HeadlessGoalOutcome, "ended" | "reason" | "rounds">;
+    /** With {@link HeadlessRunOptions.pauseForApproval}: the run stopped on an approval request; `text` is not an answer. */
+    paused?: boolean;
     text: string;
     threadId: string;
     /** Tokens across every step, when the provider reported usage. */
@@ -161,14 +186,16 @@ export interface HeadlessRunResult {
 const headlessSkillTools = (
     config: SkillConfig | undefined,
     additionalTools: ReadonlyArray<string> | undefined,
+    withheldTools: ReadonlyArray<string> | undefined,
 ): { additionalTools?: string[]; disabledTools?: string[] } | undefined => {
-    if (!config && !additionalTools?.length) {
+    if (!config && !additionalTools?.length && !withheldTools?.length) {
         return undefined;
     }
 
     const extra = [...(config?.additionalTools ?? []), ...(additionalTools ?? [])];
+    const disabled = [...(config?.disabledTools ?? []), ...(withheldTools ?? [])];
 
-    return { additionalTools: extra.length > 0 ? extra : undefined, disabledTools: config?.disabledTools };
+    return { additionalTools: extra.length > 0 ? extra : undefined, disabledTools: disabled.length > 0 ? disabled : undefined };
 };
 
 /**
@@ -212,12 +239,13 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                   headless: true,
                   ...(continuedThreadId !== undefined && { threadId: continuedThreadId }),
                   ...(options.approvedTools && { headlessApproved: options.approvedTools }),
+                  ...(options.pauseForApproval && { headlessCanAsk: true }),
                   model,
                   searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
-                  skillTools: headlessSkillTools(skill?.config, options.additionalTools),
+                  skillTools: headlessSkillTools(skill?.config, options.additionalTools, options.withheldTools),
                   userId,
               })
-            : { mcpClients: [], mcpLabels: {}, tools: {} };
+            : { mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: NO_PERMISSION_KEYS, toolEndpoints: NO_TOOL_ENDPOINTS, tools: {} };
     const toolAllowlist =
         options.toolAllowlist && options.toolAllowlistKeepsMcp ? [...options.toolAllowlist, ...Object.keys(toolResult.mcpLabels)] : options.toolAllowlist;
 
@@ -251,18 +279,20 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
 
         const memoryContext = extractMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt, options.botId) : undefined;
         const extraParts = [options.system, memoryContext].filter((part): part is string => !!part);
+        // Without extra parts the agent falls back to its own instructions.
+        const system = extraParts.length > 0 ? [agent.options.instructions, ...extraParts].filter(Boolean).join("\n\n") : undefined;
+        const shouldAutoContinue = options.maxSteps === undefined;
         const generateArgs: Record<string, unknown> = {
             ...buildRunStreamArgs({
                 backupModelId,
                 hasTools: Object.keys(runTools).length > 0,
                 model,
                 reasoningEffort: options.reasoningEffort ?? skill?.config?.reasoningEffort,
-                shouldAutoContinue: options.maxSteps === undefined,
+                shouldAutoContinue,
             }),
             ...(prompt !== undefined && { prompt }),
             ...(options.shouldStop && { stopWhen: [stepCountIs(options.maxSteps ?? getMaxSteps(true)), stopWhenRequested(options.shouldStop)] }),
-            // Without extra parts the agent falls back to its own instructions.
-            ...(extraParts.length > 0 && { system: [agent.options.instructions, ...extraParts].filter(Boolean).join("\n\n") }),
+            ...(system !== undefined && { system }),
         };
 
         let threadId: string;
@@ -305,6 +335,54 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const callOptions = options.freshContext ? { contextOptions: { recentMessages: 0 } } : undefined;
         const result = await thread.generateText(generateArgs as never, callOptions);
         const text = result.text ?? "";
+        // Only a run that may pause keeps `ask` tools, so only such a run can have stopped on a request.
+        const approvalIds = options.pauseForApproval
+            ? collectApprovalRequestIds((result as { savedMessages?: Parameters<typeof collectApprovalRequestIds>[0] }).savedMessages)
+            : [];
+        const paused = approvalIds.length > 0;
+
+        if (paused && options.pauseForApproval) {
+            const toolEndpoints = Object.fromEntries(
+                Object.keys(runTools).flatMap((name) => {
+                    const endpoint = toolResult.toolEndpoints[name];
+
+                    return endpoint === undefined ? [] : [[name, endpoint]];
+                }),
+            );
+            // What the continuation rebuilds the run from (`resumeApprovedRun`): the same model, servers, tools after the
+            // allowlist, the final system prompt and what is left of the step budget, so an answer never widens what the
+            // child had. The run's own origin is read from the run when it resumes (`sub_agents.functions.continuingRun`).
+            const snapshot: ToolRunConfig = {
+                autoMediaEnrichment: false,
+                ...(options.origin === "outside_agent" && { dispatchOrigin: "outside_agent" as const }),
+                instructions: system ?? agent.options.instructions,
+                mcpServerNames: toolResult.mcpServerNames,
+                // The pause extracted the prompt; the continuation extracts only what is steered into it, as an interactive run's does.
+                ...(extractMemory && prompt && { memory: { ...(options.botId && { botId: options.botId }) } }),
+                model,
+                ...((options.reasoningEffort ?? skill?.config?.reasoningEffort) !== undefined && {
+                    reasoningEffort: options.reasoningEffort ?? skill?.config?.reasoningEffort,
+                }),
+                researchDepth: "balanced",
+                searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
+                shouldAutoContinue,
+                ...(options.approvedTools && { headlessApproved: [...options.approvedTools] }),
+                startedBy: userId,
+                stepsTaken: result.steps?.length ?? 0,
+                subAgentRunId: options.pauseForApproval.subAgentRunId,
+                ...(Object.keys(toolEndpoints).length > 0 && { toolEndpoints }),
+                toolNames: Object.keys(runTools),
+                toolPermissionKeys: Object.fromEntries(
+                    Object.keys(runTools).flatMap((name) => {
+                        const key = toolResult.permissionKeys[name];
+
+                        return key === undefined ? [] : [[name, key]];
+                    }),
+                ),
+            };
+
+            await ctx.runMutation(internal.chat.tool_permissions.recordPendingToolApprovals, { approvalIds, config: snapshot, threadId, userId });
+        }
 
         const finishedAt = Date.now();
 
@@ -312,7 +390,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // A worker archived mid-run stays archived; every other run brings its thread back to active.
             patch: {
                 ...(!options.keepThreadStatus && { status: "active" as const }),
-                ...(!options.skipUnread && { lastReplyAt: finishedAt }),
+                ...(paused && { awaitingInput: "approval" as const }),
+                ...(!options.skipUnread && !paused && { lastReplyAt: finishedAt }),
                 updatedAt: finishedAt,
             },
             threadId: threadId as Id<"threads">,
@@ -342,6 +421,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             };
         };
         const first = settle(result);
+
         // Memory learns from the answer the run ends on: a goal's interim rounds are not what the user was given.
         const extract = (answer: string): void => {
             if (extractMemory && answer && prompt && servesUser(userId)) {
@@ -354,6 +434,14 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 });
             }
         };
+
+        // No goal is reviewed until the run resumes. The prompt is learned from at the pause, as an interactive run's is: the
+        // continuation does not have it (the snapshot's `memory` flag tells it to extract only what is steered into it).
+        if (paused) {
+            extract(text);
+
+            return { costMicrodollars: first.priced, paused: true, text, threadId, totalTokens: result.totalUsage?.totalTokens };
+        }
 
         if (!options.goal) {
             extract(text);

@@ -134,7 +134,7 @@ vi.mock("../lib/agent-tools", () => {
             // Both the fresh run and the snapshot rebuild get the approval-gated tool.
             const tools = (speakerTools.get("all") ?? {}) as ToolSet;
 
-            return { mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools };
+            return { mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, toolEndpoints: {}, tools };
         },
     };
 });

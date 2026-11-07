@@ -28,6 +28,8 @@ const seen = vi.hoisted(() => {
         prompts: [] as (string | undefined)[],
         providerOptions: [] as unknown[],
         replies: [] as string[],
+        saved: [] as unknown[][],
+        steps: [] as number[],
         system: [] as string[],
         tools: [] as string[][],
     };
@@ -68,7 +70,13 @@ vi.mock("./get-agent", () => {
 
                     seen.system.push(args.system ?? instructions);
 
-                    return { text: seen.replies.shift() ?? "reply" };
+                    return {
+                        savedMessages: seen.saved.shift() ?? [],
+                        steps: Array.from({ length: seen.steps.shift() ?? 0 }, () => {
+                            return {};
+                        }),
+                        text: seen.replies.shift() ?? "reply",
+                    };
                 },
             };
 
@@ -107,6 +115,15 @@ vi.mock("./agent-tools", () => {
             return {
                 mcpClients: [],
                 mcpLabels: { mcp_notes_search: { serverName: "notes", toolName: "search" } },
+                mcpServerNames: ["notes"],
+                permissionKeys: {
+                    browser: "builtin:browser",
+                    dateTime: "builtin:dateTime",
+                    imageGeneration: "builtin:imageGeneration",
+                    mcp_notes_search: "mcp:notes:search",
+                    webSearch: "builtin:webSearch",
+                },
+                toolEndpoints: { mcp_notes_other: "hash-other", mcp_notes_search: "hash-notes" },
                 tools: { browser: {}, dateTime: {}, imageGeneration: {}, mcp_notes_search: {}, webSearch: {} },
             };
         },
@@ -151,7 +168,7 @@ const fakeCtx = (prefs: typeof PREFS = PREFS) =>
 
             throw new Error(`unexpected query ${reference}`);
         }),
-        scheduler: { runAfter: vi.fn() },
+        scheduler: { runAfter: vi.fn(async () => {}) },
     }) as never;
 
 const SECRETS = ["SECRET-ABOUT-ME", "SECRET-NICKNAME", "SECRET-PROFESSION", "SECRET-INSTRUCTIONS", "SECRET-LOCATION"];
@@ -605,5 +622,153 @@ describe("runHeadlessAgent with a goal and memory", () => {
         });
 
         expect(extractions(ctx as never)).toEqual(["only answer"]);
+    });
+});
+
+describe("runHeadlessAgent pauseForApproval", () => {
+    beforeEach(() => {
+        seen.buildOptions = [];
+        seen.saved = [];
+    });
+
+    const RUN_ID = "run-1" as never;
+    const approvalRequest = [
+        {
+            _id: "row-1",
+            message: {
+                content: [
+                    { input: { query: "x" }, toolCallId: "call-1", toolName: "mcp_notes_search", type: "tool-call" },
+                    { approvalId: "approval-1", toolCallId: "call-1", type: "tool-approval-request" },
+                ],
+                role: "assistant",
+            },
+        },
+    ];
+
+    const run = async (ctx: unknown, extra: Partial<Parameters<typeof runHeadlessAgent>[1]> = {}) =>
+        await runHeadlessAgent(ctx as never, {
+            memory: false,
+            model: "test-model",
+            origin: "lead",
+            personalization: "full",
+            prompt: "Do the thing",
+            system: "SUB-AGENT RULES",
+            thread: { threadId: "child-1" },
+            toolAllowlist: ["mcp_notes_search", "webSearch"],
+            toolAllowlistKeepsMcp: false,
+            tools: "headless",
+            userId: "owner",
+            ...extra,
+        });
+
+    const calls = (ctx: unknown, reference: string) =>
+        (ctx as { runMutation: ReturnType<typeof vi.fn> }).runMutation.mock.calls.filter(([ref]) => ref === reference).map(([, args]) => args);
+
+    it("keeps ask tools only for a run that may pause, so triggers and tasks still lose them", async () => {
+        await run(fakeCtx());
+        await run(fakeCtx(), { pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        expect(seen.buildOptions[0]).not.toHaveProperty("headlessCanAsk");
+        expect(seen.buildOptions[1]).toMatchObject({ headless: true, headlessCanAsk: true });
+    });
+
+    it("stops on an approval request: records the run's snapshot on its thread and answers paused, not with text", async () => {
+        seen.saved = [approvalRequest];
+
+        const ctx = fakeCtx();
+        const result = await run(ctx, { pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        expect(result).toMatchObject({ paused: true, threadId: "child-1" });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as {
+            approvalIds: string[];
+            config: Record<string, unknown>;
+            threadId: string;
+            userId: string;
+        }[];
+
+        expect(recorded).toMatchObject({ approvalIds: ["approval-1"], threadId: "child-1", userId: "owner" });
+        // The snapshot is the run as it was: the allowlisted tools, their permission keys (so "Always allow" can write
+        // one), the servers and the final system prompt, and the run it belongs to.
+        expect(recorded!.config).toMatchObject({
+            mcpServerNames: ["notes"],
+            subAgentRunId: RUN_ID,
+            toolNames: ["mcp_notes_search", "webSearch"],
+            toolPermissionKeys: { mcp_notes_search: "mcp:notes:search", webSearch: "builtin:webSearch" },
+        });
+        expect(recorded!.config.instructions).toContain("SUB-AGENT RULES");
+
+        const patches = calls(ctx, "agent_threads:updateThread").map((args) => (args as { patch: Record<string, unknown> }).patch);
+
+        expect(patches.at(-1)).toMatchObject({ awaitingInput: "approval", status: "active" });
+        expect(patches.at(-1)).not.toHaveProperty("lastReplyAt");
+    });
+
+    it("records the steps the run took and the url hash of each kept MCP tool, so a continuation keeps the budget and the endpoint", async () => {
+        seen.saved = [approvalRequest];
+        seen.steps = [7];
+
+        const ctx = fakeCtx();
+
+        await run(ctx, { pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+        expect(recorded!.config).toMatchObject({ stepsTaken: 7, toolEndpoints: { mcp_notes_search: "hash-notes" } });
+        // Only the tools the run kept after its allowlist.
+        expect(recorded!.config.toolEndpoints).not.toHaveProperty("mcp_notes_other");
+    });
+
+    it("learns from the prompt at the pause and tells the continuation so, when the run feeds memory", async () => {
+        seen.saved = [approvalRequest];
+        seen.replies = ["Checking the files first."];
+
+        const ctx = fakeCtx({ ...PREFS, memoryEnabled: true }) as any;
+
+        await run(ctx, { memory: true, pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+        const extracted = ctx.scheduler.runAfter.mock.calls.flatMap((call: unknown[]) =>
+            (call[2] as { assistantResponse?: string } | undefined)?.assistantResponse ? [(call[2] as { userMessage: string }).userMessage] : [],
+        );
+
+        expect(recorded!.config.memory).toStrictEqual({});
+        expect(extracted).toStrictEqual(["Do the thing"]);
+    });
+
+    it("withholds the tools a caller names, whatever their permission", async () => {
+        await run(fakeCtx(), { pauseForApproval: { subAgentRunId: RUN_ID }, withheldTools: ["delegateToSubAgent", "messageWorker"] });
+
+        expect(seen.buildOptions.at(-1)).toMatchObject({ skillTools: { disabledTools: ["delegateToSubAgent", "messageWorker"] } });
+    });
+
+    it("keeps the nested-dispatch consent a child inherited in its snapshot, so the owner's answer does not ask again", async () => {
+        seen.saved = [approvalRequest];
+
+        const ctx = fakeCtx();
+
+        await run(ctx, { approvedTools: ["delegateToSubAgent", "messageWorker"], pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+        expect(recorded!.config.headlessApproved).toEqual(["delegateToSubAgent", "messageWorker"]);
+    });
+
+    it("records nothing for a run that did not stop on a request", async () => {
+        const ctx = fakeCtx();
+        const result = await run(ctx, { pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        expect(result.paused).toBeUndefined();
+        expect(calls(ctx, "chat_tool_permissions:recordPendingToolApprovals")).toHaveLength(0);
+    });
+
+    it("never records a pause for a run without the option", async () => {
+        seen.saved = [approvalRequest];
+
+        const ctx = fakeCtx();
+        const result = await run(ctx);
+
+        expect(result.paused).toBeUndefined();
+        expect(calls(ctx, "chat_tool_permissions:recordPendingToolApprovals")).toHaveLength(0);
     });
 });

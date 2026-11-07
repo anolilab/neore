@@ -61,6 +61,25 @@ export const SUB_AGENT_RESULT_MAX = 12_000;
 export const SUB_AGENT_STALE_MS = 75 * 60_000;
 
 /**
+ * How late a reaper is scheduled past the deadline it owns, so it never finds its own deadline a millisecond in the
+ * future and does nothing (`oneShotReapDue`).
+ */
+export const SUB_AGENT_REAP_SLACK_MS = 1000;
+
+/** What a one-shot run ends with when its approval request was never answered. */
+export const SUB_AGENT_APPROVAL_EXPIRED_MESSAGE = "The sub-agent's request for approval was not answered in time.";
+
+/** The newest rows of a continuation handed to its run's end (`completeResumedRun`), searched for its answer. */
+export const COMPLETION_MESSAGE_IDS_MAX = 50;
+
+/**
+ * Whether a one-shot run's reaper may end it now. A run that waited on an approval carries its own deadline
+ * (`reapAt`), and an earlier reaper (the admission's, or one from before a resume) finds it not yet due. Without one,
+ * the reaper scheduled at admission ends it, as it always did.
+ */
+export const oneShotReapDue = (run: { reapAt?: number }, now: number): boolean => run.reapAt === undefined || now >= run.reapAt;
+
+/**
  * How long a running worker may go without a new message in its thread before the thread shows
  * "No progress" with a Stop control. It must stay below {@link SUB_AGENT_STALE_MS}. Provisional: set
  * from the longest quiet gaps a real run shows, which are not measured yet.
@@ -90,7 +109,7 @@ export const SUB_AGENT_NAME = "Sub-agent";
 
 const TOOL_NAME_RE = /^[\w.:-]{1,128}$/;
 
-export type SubAgentStatus = "cancelled" | "failed" | "queued" | "running" | "succeeded";
+export type SubAgentStatus = "awaiting" | "cancelled" | "failed" | "queued" | "running" | "succeeded";
 
 /**
  * Whether an ended run posts its result to the lead. A worker run the user typed (or created) has no
@@ -98,7 +117,10 @@ export type SubAgentStatus = "cancelled" | "failed" | "queued" | "running" | "su
  */
 export const postsBack = (run: { mode?: "run" | "worker"; toolCallId?: string }): boolean => run.mode !== "worker" || run.toolCallId !== undefined;
 
-export const isActiveSubAgentStatus = (status: SubAgentStatus): boolean => status === "queued" || status === "running";
+const ACTIVE_STATUSES: ReadonlySet<SubAgentStatus> = new Set(["awaiting", "queued", "running"]);
+
+/** A waiting child (`awaiting`) still holds its fan-out slot, and a Stop or the reaper can still end it. */
+export const isActiveSubAgentStatus = (status: SubAgentStatus): boolean => ACTIVE_STATUSES.has(status);
 
 /**
  * Why a new sub-agent may not start under a parent at `parentDepth` that
@@ -327,7 +349,7 @@ export const INTERRUPTED_RUN_MESSAGE =
 
 /** The run a worker is on, from its runs newest first: the one going, else the next in line. A Stop in its thread means this one. */
 export const workerCurrentRun = <T extends { status: SubAgentStatus }>(newestFirst: ReadonlyArray<T>): T | undefined =>
-    newestFirst.find((run) => run.status === "running") ?? newestFirst.findLast((run) => run.status === "queued");
+    newestFirst.find((run) => run.status === "running" || run.status === "awaiting") ?? newestFirst.findLast((run) => run.status === "queued");
 
 /**
  * Why the lead never got the worker's latest result, from its runs newest first: the newest run the

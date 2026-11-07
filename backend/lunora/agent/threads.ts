@@ -486,6 +486,11 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
 
         if (host) {
             await endHostThread(context, host, context.now);
+
+            // A sub-agent waiting on this thread's request, or one this thread delegated, ends with it.
+            const { endSubAgentRunsOfDeletedThread } = await import("../sub-agents/functions");
+
+            await endSubAgentRunsOfDeletedThread(context, args.threadId, host.userId);
         }
 
         // A goal's review queued between pages would read a half-deleted transcript, charge and open another round.

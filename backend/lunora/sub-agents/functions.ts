@@ -11,7 +11,11 @@
  * A run is `queued` → `running` → `succeeded` | `failed` | `cancelled`. Only
  * `claimRun` starts one and only {@link finishRun} ends one, each checking the current
  * status first — so a redelivered job, or a late finish racing the reaper, is a
- * no-op rather than a second run or a second post.
+ * no-op rather than a second run or a second post. A one-shot child that stops on
+ * an approval request goes `running` → `awaiting` ({@link markRunAwaiting}) and back
+ * when its owner answers ({@link resumeAwaitingRun}); the continuation ends it
+ * ({@link completeResumedRun}). The request shows in the parent conversation
+ * through {@link listSubAgentApprovals}.
  *
  * A WORKER (`mode: "worker"`) is a sub-agent thread that outlives one run: its first run creates the
  * child thread, and every later dispatch — the lead's `messageWorker` tool call or the user typing in
@@ -38,7 +42,7 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { resolveLeafRow } from "../agent/branch-rows";
 import { addMessagesHandler, getMaxMessage } from "../agent/messages";
 import { isThreadStreaming } from "../agent/thread-streaming";
-import { insertThread, insertThreadRelationship, patchThread } from "../agent/table-writes";
+import { clearAwaitingInput, insertThread, insertThreadRelationship, patchThread } from "../agent/table-writes";
 import { sessionOfThread } from "../acp/lib/sessions";
 import { startFailureMessage } from "../acp/lib/start";
 import { openHostSession } from "../acp/lib/start-session";
@@ -59,6 +63,9 @@ import { notifyQuietly } from "../notifications/notify";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
 import { threadGateOutcome, throwUnlessGranted } from "../chat/lib/thread-gate";
+import { findPendingRequestOnLatestTurn } from "../chat/lib/tool-approval-claim";
+import { denyToolApprovalRun, PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
+import { admitOwnedThread, requireOwnedThread } from "../agent/thread-read-access";
 import { MAX_LENGTH } from "../lib/validators";
 import { RUN_STALE_MS, RUN_WATCH_RETRY } from "../chat/lib/interrupted-run";
 import { HOST_SESSION_BUSY_RETRY_MS, HOST_START_MAX_ATTEMPTS, hostRunActivity, hostStartRetryDelayMs, sendHostRunTurn } from "./host-runs";
@@ -67,6 +74,7 @@ import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import {
     beatWatchDecision,
     buildResultMessage,
+    COMPLETION_MESSAGE_IDS_MAX,
     resultContent,
     DISPATCH_SOURCES,
     type DispatchSource,
@@ -79,14 +87,19 @@ import {
     isWorkerLoopLive,
     nextQueuedWorkerRun,
     normalizeToolAllowlist,
+    oneShotReapDue,
+    originOfRun,
     postRetryDelayMs,
     postsBack,
     resolveSubAgentModel,
     runDelivery,
+    SUB_AGENT_APPROVAL_EXPIRED_MESSAGE,
     SUB_AGENT_NAME,
     SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS,
     SUB_AGENT_POST_MAX_ATTEMPTS,
+    SUB_AGENT_MAX_CONCURRENT,
     SUB_AGENT_MAX_TOOLS,
+    SUB_AGENT_REAP_SLACK_MS,
     SUB_AGENT_SKILL_SLUG_MAX,
     SUB_AGENT_STALE_MS,
     SUB_AGENT_TASK_MAX,
@@ -132,11 +145,7 @@ const threadDepth = async (ctx: Pick<MutationCtx, "db">, threadId: string): Prom
 /** Enough rows to see the cap is reached; never the whole history. */
 const SUB_AGENT_MAX_SCAN = 10;
 
-const countChildren = async (
-    ctx: Pick<MutationCtx, "db">,
-    parentThreadId: string,
-    statuses: ReadonlyArray<"cancelled" | "failed" | "queued" | "running" | "succeeded">,
-): Promise<number> => {
+const countChildren = async (ctx: Pick<MutationCtx, "db">, parentThreadId: string, statuses: ReadonlyArray<RunDoc["status"]>): Promise<number> => {
     let count = 0;
 
     for (const status of statuses) {
@@ -230,7 +239,7 @@ export const admitSubAgentRun = async (
     const depth = (await threadDepth(ctx, parent._id)) + 1;
     // Every child ever started from the lead counts, a worker once however many runs it had.
     const capProblem = subAgentCapProblem({
-        activeChildren: await countChildren(ctx, parent._id, ["queued", "running"]),
+        activeChildren: await countChildren(ctx, parent._id, ["queued", "running", "awaiting"]),
         parentDepth: depth - 1,
         ...(depth > 1 && { totalChildren: await lifetimeChildren(ctx, parent._id) }),
     });
@@ -482,7 +491,7 @@ const SUB_AGENT_LIFETIME_SCAN = 200;
 const lifetimeChildren = async (ctx: Pick<MutationCtx, "db">, parentThreadId: string): Promise<number> => {
     const runs: RunDoc[] = [];
 
-    for (const status of ["queued", "running", "succeeded", "failed", "cancelled"] as const) {
+    for (const status of ["queued", "running", "awaiting", "succeeded", "failed", "cancelled"] as const) {
         runs.push(
             ...(await ctx.db
                 .query("subAgentRuns")
@@ -510,7 +519,7 @@ const findDispatchedRun = async (ctx: Pick<MutationCtx, "db">, args: WorkerRunAr
     }
 
     // A worker being created has no thread yet: its first run is among the lead's.
-    for (const status of ["queued", "running", "succeeded", "failed", "cancelled"] as const) {
+    for (const status of ["queued", "running", "awaiting", "succeeded", "failed", "cancelled"] as const) {
         const runs = await ctx.db
             .query("subAgentRuns")
             .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", args.parentThreadId).eq("status", status))
@@ -737,7 +746,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
     const depth = origin?.depth ?? (await threadDepth(ctx, parent._id)) + 1;
     // A message to an existing worker starts no new child, so only a new worker meets the lifetime cap.
     const capProblem = subAgentCapProblem({
-        activeChildren: await countChildren(ctx, parent._id, ["queued", "running"]),
+        activeChildren: await countChildren(ctx, parent._id, ["queued", "running", "awaiting"]),
         parentDepth: depth - 1,
         ...(depth > 1 && !origin && { totalChildren: await lifetimeChildren(ctx, parent._id) }),
     });
@@ -1188,6 +1197,45 @@ const stopHostTurnOf = async (ctx: MutationCtx, run: RunDoc, now: number): Promi
 export type SubAgentOutcome = { error: string; kind: "failed" } | { kind: "cancelled" } | { kind: "succeeded"; result: string };
 
 /**
+ * The first check of a result held for a parent that waits on an approval. The wait's end posts it at once
+ * ({@link releaseResultsHeldFor}); this poll only covers a wait that ended without that, so it backs off.
+ */
+const SUB_AGENT_AWAITING_POST_RETRY_MS = 5 * 60_000;
+const SUB_AGENT_AWAITING_POST_RETRY_MAX_MS = 60 * 60_000;
+
+/** The wait before the `waits`-th check of a held result: doubling from {@link SUB_AGENT_AWAITING_POST_RETRY_MS}, capped at an hour. */
+const awaitingPostRetryDelayMs = (waits: number): number => Math.min(SUB_AGENT_AWAITING_POST_RETRY_MS * 2 ** waits, SUB_AGENT_AWAITING_POST_RETRY_MAX_MS);
+
+/** Whether `threadId` is the child thread of a one-shot run that waits on an approval request. */
+const waitsOnApproval = async (ctx: Pick<QueryCtx, "db">, threadId: string): Promise<boolean> =>
+    (await ctx.db
+        .query("subAgentRuns")
+        .withIndex("by_childThreadId_and_status", (q) => q.eq("childThreadId", threadId).eq("status", "awaiting"))
+        .first()) !== null;
+
+/** Runs of one parent thread read per status when a wait ends; a wait holds a handful of nested results, so the poll covers any beyond it. */
+const HELD_RESULTS_RELEASED = 20;
+
+/**
+ * A run that leaves `awaiting` releases the results its child holds back: each ended, unposted nested run of `childThreadId`
+ * is posted now, once its parent is no longer waiting ({@link postRunResult} checks that again).
+ */
+const releaseResultsHeldFor = async (ctx: MutationCtx, childThreadId: string): Promise<void> => {
+    for (const status of ["succeeded", "failed", "cancelled"] as const) {
+        const nested = await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", childThreadId).eq("status", status))
+            .take(HELD_RESULTS_RELEASED);
+
+        for (const row of nested) {
+            if (row.resultPostedAt === undefined && row.postFailed === undefined && postsBack(row)) {
+                await ctx.scheduler.runAfter(0, internal.sub_agents.functions.postResult, { attempt: 0, runId: row._id });
+            }
+        }
+    }
+};
+
+/**
  * Posts an ended run's result to the parent thread, once, if the lead asked for it
  * ({@link postsBack}). While the parent is still streaming — typically the very run
  * whose `delegateToSubAgent` call started this one — the post is rescheduled, so it
@@ -1197,10 +1245,10 @@ export type SubAgentOutcome = { error: string; kind: "failed" } | { kind: "cance
  * `resultPostedAt` is set only with the message write. A locked parent leaves it unset and
  * the post is retried with backoff; after {@link SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS} tries
  * the run ends in `postFailed`, the terminal state the worker row shows, and a deleted or
- * no-longer-owned parent ends there at once. `failures` counts the tries. Returns whether
- * this call posted.
+ * no-longer-owned parent ends there at once. `failures` counts the tries, `waits` the checks made while the parent waits on
+ * an approval. Returns whether this call posted.
  */
-export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, attempt: number, failures = 0): Promise<boolean> => {
+export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, attempt: number, failures = 0, waits = 0): Promise<boolean> => {
     const run = await ctx.db.get("subAgentRuns", runId);
 
     if (!run || isActiveSubAgentStatus(run.status) || run.resultPostedAt !== undefined || run.postFailed !== undefined || !postsBack(run)) {
@@ -1210,6 +1258,20 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
     // A parent that is gone cannot take the post, whatever stream it left behind.
     if (isGoneParent(await ctx.db.get("threads", run.parentThreadId as Id<"threads">), run)) {
         await patchById(ctx.db, "subAgentRuns", run._id, { postFailed: GONE_PARENT_REASON });
+
+        return false;
+    }
+
+    // A parent that is itself a sub-agent waiting on an approval: a post now would be a newer turn than its request, which then
+    // could no longer be answered. The post waits for the wait to end: its end posts it ({@link releaseResultsHeldFor}), and
+    // this check, backing off, covers a wait that ended without that.
+    if (await waitsOnApproval(ctx, run.parentThreadId)) {
+        await ctx.scheduler.runAfter(awaitingPostRetryDelayMs(waits), internal.sub_agents.functions.postResult, {
+            attempt,
+            failures,
+            runId,
+            waits: waits + 1,
+        });
 
         return false;
     }
@@ -1271,6 +1333,7 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
     // The run the worker's line waits on: the one going, or the head of the queue. Ending one further
     // back changes nothing, the head already has its job. Read before the patch takes it out of the line.
     const wasRunning = run.status === "running";
+    const wasAwaiting = run.status === "awaiting";
     const hostRun = run.runner?.kind === "host";
     const wasHead =
         run.mode === "worker" &&
@@ -1291,6 +1354,33 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
         updatedAt: now,
         ...(loopGone && { loopExitedAt: now }),
     });
+
+    if (wasAwaiting && run.childThreadId !== undefined) {
+        await releaseResultsHeldFor(ctx, run.childThreadId);
+    }
+
+    if (run.childThreadId !== undefined) {
+        // A request this run still waits on can no longer be answered: it is denied, so no claim can run its tool or
+        // persist its "always" decision afterwards. Only this run's requests: a worker run reuses its child thread, and a
+        // one-shot child thread can carry an interactive chat with its own approvals.
+        await closeChildApprovals(ctx, run.childThreadId, run._id, now);
+
+        // A resumed child streams on its own thread, which the cancel does not reach: a run that ends without finishing
+        // (stopped, or failed by the reaper) stops that stream, so it does not keep running tools. Only the run's own
+        // continuation: a reply the owner started in a one-shot child meanwhile keeps going. A run paused on a request has
+        // no stream (its loop returned).
+        const streaming = run.status === "running" && run.loopExitedAt === undefined;
+        const continuation = outcome.kind !== "succeeded" && !hostRun && streaming ? await liveContinuationOf(ctx, run.childThreadId, run._id) : undefined;
+
+        if (continuation !== undefined) {
+            await ctx.scheduler.runAfter(0, internal.chat.streaming.persistent.library.stopActiveForThread, {
+                messageId: continuation,
+                // The continuation may end before this runs: then nothing stops, not every live reply of the child.
+                onlyNamed: true,
+                threadId: run.childThreadId,
+            });
+        }
+    }
 
     // A run ended from this side (stopped, reaped) while its turn still runs: the computer is told to stop. A run ended by
     // its turn's own end finds the stream over already.
@@ -1332,10 +1422,10 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
 
 /** A deferred {@link postRunResult}, rescheduled while the parent thread streams. */
 export const postResult = internalMutation
-    .input({ attempt: v.number(), failures: v.optional(v.number()), runId: v.id("subAgentRuns") })
+    .input({ attempt: v.number(), failures: v.optional(v.number()), runId: v.id("subAgentRuns"), waits: v.optional(v.number()) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await postRunResult(ctx, args.runId, args.attempt, args.failures);
+        await postRunResult(ctx, args.runId, args.attempt, args.failures, args.waits);
 
         return null;
     });
@@ -1362,6 +1452,408 @@ export const completeRun = internalMutation
     })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => await finishRunFromLoop(ctx, args.runId, args.outcome));
+
+// ─── Waiting on an approval ──────────────────────────────────────────────────
+
+/** Approval rows read per page of a child thread's open requests. */
+const APPROVAL_ROWS_SCANNED = 50;
+
+/**
+ * The child thread's unanswered approval requests, as `recordPendingToolApprovals` stored them, read page by page to the
+ * end: a run's request behind a page of older open ones must still be listed, waited on and ended. The status is part of
+ * the index, so resolved requests never use up a page, and an open one expires within `PENDING_APPROVAL_TTL_MS`.
+ */
+const pendingApprovalRows = async (ctx: Pick<QueryCtx, "db">, childThreadId: string): Promise<Doc<"toolApprovalRuns">[]> => {
+    const rows: Doc<"toolApprovalRuns">[] = [];
+    let cursor: string | null = null;
+    let done = false;
+
+    while (!done) {
+        const page = await ctx.db
+            .query("toolApprovalRuns")
+            .withIndex("by_threadId_status_createdAt", (q) => q.eq("threadId", childThreadId).eq("status", "pending"))
+            .paginate({ cursor, numItems: APPROVAL_ROWS_SCANNED });
+
+        rows.push(...page.page);
+        cursor = page.continueCursor;
+        done = page.isDone;
+    }
+
+    return rows;
+};
+
+/** Live streams of a child thread checked for a run's continuation: a thread has one or two at a time. */
+const LIVE_STREAMS_CHECKED = 20;
+
+/**
+ * The key of `runId`'s live continuation on its child thread, if one streams: the stream an answer opened is keyed on the
+ * request's approval id (`resumeClaimedRun`), and that request's snapshot names the run. `undefined` when none does.
+ */
+const liveContinuationOf = async (ctx: Pick<QueryCtx, "db">, childThreadId: string, runId: Id<"subAgentRuns">): Promise<string | undefined> => {
+    for (const status of ["pending", "streaming"] as const) {
+        const live = await ctx.db
+            .query("persistentStreams")
+            .withIndex("by_threadId_status", (q) => q.eq("threadId", childThreadId).eq("status", status))
+            .take(LIVE_STREAMS_CHECKED);
+
+        for (const stream of live) {
+            const request = await ctx.db
+                .query("toolApprovalRuns")
+                .withIndex("by_approvalId", (q) => q.eq("approvalId", stream.messageId))
+                .first();
+
+            if (request?.threadId === childThreadId && request.config.subAgentRunId === runId) {
+                return stream.messageId;
+            }
+        }
+    }
+
+    return undefined;
+};
+
+/** Denies a child's unanswered approval requests and clears its waiting state: its run has ended, so nothing will answer them. */
+const closeChildApprovals = async (ctx: MutationCtx, childThreadId: string, runId: Id<"subAgentRuns">, now: number): Promise<void> => {
+    // Every page of the child's open requests, not only the first: a paused turn can record more than one page of them, and a
+    // request left open here could still be answered with "Always allow" after its run ended.
+    let othersOpen = false;
+    const open = await pendingApprovalRows(ctx, childThreadId);
+
+    for (const row of open) {
+        if (row.config.subAgentRunId === runId) {
+            await denyToolApprovalRun(ctx, row._id, { now, resolvedBy: "run-ended" });
+        } else {
+            othersOpen = true;
+        }
+    }
+
+    // The child is awaiting input only while some request of it is still open.
+    if (!othersOpen) {
+        await clearAwaitingInput(ctx.db, childThreadId as Id<"threads">);
+    }
+};
+
+/** Whether a sub-agent's request is open on `threadId`: only then does a new message there have a wait to end ({@link endApprovalWaits}). */
+export const hasSubAgentApprovalOpen = async (ctx: Pick<QueryCtx, "db">, threadId: string): Promise<boolean> => {
+    const open = await pendingApprovalRows(ctx, threadId);
+
+    return open.some((row) => row.config.subAgentRunId !== undefined);
+};
+
+/**
+ * Ends the one-shot runs of `childThreadId` that wait on an approval request: the owner sent a new message into the child, and
+ * nothing will answer the request now. Each run ends as cancelled, so its requests are denied and its parent is told it ended.
+ * Workers never pause on a request (their tools are refused headlessly), so a worker's run is never ended here.
+ */
+export const endApprovalWaits = async (ctx: MutationCtx, childThreadId: string): Promise<number> => {
+    const runIds = new Set<string>();
+    const pending = await pendingApprovalRows(ctx, childThreadId);
+
+    for (const row of pending) {
+        if (row.config.subAgentRunId !== undefined) {
+            runIds.add(row.config.subAgentRunId);
+        }
+    }
+
+    let ended = 0;
+
+    for (const runId of runIds) {
+        const run = await ctx.db.get("subAgentRuns", runId as Id<"subAgentRuns">);
+
+        // Only a run that waits: a running one is past its request (a sibling of the answered one stays open while the
+        // continuation works) and is not waiting on this message. One that has not started waiting yet finds its request
+        // moved past when it would (`markRunAwaiting`).
+        if (!run || run.mode === "worker" || run.childThreadId !== childThreadId || run.status !== "awaiting") {
+            continue;
+        }
+
+        if (await finishRun(ctx, run._id, { kind: "cancelled" })) {
+            ended += 1;
+        }
+    }
+
+    return ended;
+};
+
+/** The owner sent a new message into a child thread: its waiting runs end ({@link endApprovalWaits}). Returns how many ended. */
+export const endApprovalWaitForMessage = internalMutation
+    .input({ threadId: v.string().max(MAX_LENGTH.id) })
+    .output(v.number())
+    .mutation(async ({ args, ctx }) => await endApprovalWaits(ctx, args.threadId));
+
+/** A reaper for `runId` that fires just past `reapAt`, the deadline it now owns. */
+const scheduleReaperAt = async (ctx: Pick<MutationCtx, "scheduler">, runId: Id<"subAgentRuns">, reapAt: number, now: number): Promise<void> => {
+    // A deadline already past (an older request expired during a resumed turn) reaps at once: the scheduler takes no negative delay.
+    await ctx.scheduler.runAfter(Math.max(0, reapAt - now + SUB_AGENT_REAP_SLACK_MS), internal.sub_agents.functions.reapRun, { runId });
+};
+
+/**
+ * `running` → `awaiting`: the child stopped on an approval request recorded on its thread. The run keeps its fan-out
+ * slot and posts nothing; its deadline becomes the request's own expiry. A no-op for a run that is not running (stopped
+ * meanwhile), a worker's run, or one whose requests were already answered from the child's thread (that answer's
+ * continuation ends the run). Returns whether it now waits.
+ */
+export const markRunAwaiting = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<boolean> => {
+    const run = await ctx.db.get("subAgentRuns", runId);
+
+    if (!run || run.mode === "worker" || run.childThreadId === undefined) {
+        return false;
+    }
+
+    // Ended while its step was recording the requests (a stop, a reap): the end closed what was open then, not what the step
+    // recorded after it. Those requests are closed here, so none stays answerable and the child does not show as waiting.
+    if (!isActiveSubAgentStatus(run.status)) {
+        await closeChildApprovals(ctx, run.childThreadId, run._id, Date.now());
+
+        return false;
+    }
+
+    if (run.status !== "running") {
+        return false;
+    }
+
+    // Only this run's own requests: an interactive request of the child's chat neither holds the run nor sets its deadline.
+    const open = await pendingApprovalRows(ctx, run.childThreadId);
+    const own = open.filter((row) => row.config.subAgentRunId === run._id);
+
+    if (own.length === 0) {
+        return false;
+    }
+
+    // Only requests still on the child's latest turn can be answered: a sibling left from an earlier pause is not, and a message
+    // the owner sent before the run started waiting moved past all of them, which ends the run as a message into a waiting child does.
+    const pending: Doc<"toolApprovalRuns">[] = [];
+
+    for (const row of own) {
+        if (await findPendingRequestOnLatestTurn(ctx, run.childThreadId as Id<"threads">, row.approvalId)) {
+            pending.push(row);
+        }
+    }
+
+    if (pending.length === 0) {
+        await finishRun(ctx, run._id, { kind: "cancelled" });
+
+        return false;
+    }
+
+    const now = Date.now();
+    // The wait ends when the first open request expires: a request created before admission must not hold a slot longer.
+    const earliest = Math.min(...pending.map((row) => row.createdAt));
+    const reapAt = earliest + PENDING_APPROVAL_TTL_MS;
+
+    await patchById(ctx.db, "subAgentRuns", run._id, { reapAt, status: "awaiting", updatedAt: now });
+    await scheduleReaperAt(ctx, run._id, reapAt, now);
+
+    return true;
+};
+
+export const awaitApproval = internalMutation
+    .input({ runId: v.id("subAgentRuns") })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => await markRunAwaiting(ctx, args.runId));
+
+/**
+ * `awaiting` → `running`, in the transaction that claims the owner's answer (`chat/lib/tool-approval-resume.ts`), so a
+ * second answer to the same run is refused until the child waits again (`claimToolApproval`). The run gets a fresh run
+ * window, with its reaper. A no-op for a run that is not waiting: stopped, failed by its reaper, or already resumed.
+ */
+export const resumeRunForAnswer = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<boolean> => {
+    const run = await ctx.db.get("subAgentRuns", runId);
+
+    if (run?.status !== "awaiting") {
+        return false;
+    }
+
+    const now = Date.now();
+    const reapAt = now + SUB_AGENT_STALE_MS;
+
+    await patchById(ctx.db, "subAgentRuns", run._id, { reapAt, status: "running", updatedAt: now });
+    await scheduleReaperAt(ctx, run._id, reapAt, now);
+
+    if (run.childThreadId !== undefined) {
+        await releaseResultsHeldFor(ctx, run.childThreadId);
+    }
+
+    return true;
+};
+
+/** {@link resumeRunForAnswer}, as an internal mutation. */
+export const resumeAwaitingRun = internalMutation
+    .input({ runId: v.id("subAgentRuns") })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => await resumeRunForAnswer(ctx, args.runId));
+
+/**
+ * The run a continuation resumes, read when its job starts: `null` once the run is no longer running (stopped or reaped
+ * since the answer), else the origin its nested dispatches carry, as the paused run's did ({@link originOfRun}).
+ */
+export const continuingRun = internalQuery
+    .input({ runId: v.id("subAgentRuns") })
+    .output(v.union(v.null(), v.object({ origin: v.union(v.literal("lead"), v.literal("messenger"), v.literal("outside_agent"), v.literal("trigger")) })))
+    .query(async ({ args, ctx }) => {
+        const run = await ctx.db.get("subAgentRuns", args.runId);
+
+        return run?.status === "running" ? { origin: originOfRun(run.dispatchedBy) } : null;
+    });
+
+/** The text parts of a saved assistant row: what the child answered with. */
+const assistantText = (row: Doc<"messages"> | null): string => {
+    const message = row?.message as { content?: unknown; role?: string } | undefined;
+
+    if (message?.role !== "assistant") {
+        return "";
+    }
+
+    if (typeof message.content === "string") {
+        return message.content;
+    }
+
+    return Array.isArray(message.content)
+        ? (message.content as { text?: unknown; type?: string }[])
+              .flatMap((part) => (part.type === "text" && typeof part.text === "string" ? [part.text] : []))
+              .join("")
+        : "";
+};
+
+/**
+ * The end of a continuation on a sub-agent's child thread: ends the run once ({@link finishRunFromLoop}), with the
+ * newest assistant text among the rows the continuation saved as its answer, so the parent hears of it. A second call,
+ * or a run stopped meanwhile, is a no-op. Only the named rows count, and only those on the run's own child thread: a
+ * reply the owner started in the child meanwhile, or a turn from before the approval, is never the answer.
+ */
+export const completeResumedRun = internalMutation
+    .input({
+        // The continuation's saved rows, oldest first; its last row can be a tool result (the step cap ended right after a tool ran).
+        messageIds: v.optional(
+            v.array(v.string().max(MAX_LENGTH.id)).check((ids) => ids.length <= COMPLETION_MESSAGE_IDS_MAX, { message: "Too many message ids" }),
+        ),
+        outcome: v.union(v.object({ error: v.string().max(MAX_LENGTH.short), kind: v.literal("failed") }), v.object({ kind: v.literal("succeeded") })),
+        runId: v.id("subAgentRuns"),
+    })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        if (args.outcome.kind === "failed") {
+            return await finishRunFromLoop(ctx, args.runId, args.outcome);
+        }
+
+        const run = await ctx.db.get("subAgentRuns", args.runId);
+        let text = "";
+        const newestFirst = (args.messageIds ?? []).toReversed();
+
+        for (const id of newestFirst) {
+            const row = run?.childThreadId === undefined ? null : await ctx.db.get("messages", id as Id<"messages">);
+
+            text = row && row.threadId === run?.childThreadId ? assistantText(row) : "";
+
+            if (text !== "") {
+                break;
+            }
+        }
+
+        return await finishRunFromLoop(ctx, args.runId, { kind: "succeeded", result: text });
+    });
+
+/** Characters of a waiting request's tool input the parent's card shows. */
+const APPROVAL_INPUT_MAX = 4000;
+
+/** The MCP server a tool belongs to, from its permission key (`mcp:<server>:<tool>`); null for a built-in tool. */
+const serverOfPermissionKey = (key: string | undefined): string | null => {
+    if (key === undefined || !key.startsWith("mcp:")) {
+        return null;
+    }
+
+    const rest = key.slice("mcp:".length);
+    const end = rest.indexOf(":");
+
+    return end > 0 ? rest.slice(0, end) : null;
+};
+
+const vSubAgentApproval = v.object({
+    approvalId: v.string(),
+    childThreadId: v.string(),
+    // The tool's input as JSON, cut to `APPROVAL_INPUT_MAX` characters.
+    input: v.string(),
+    // How many characters of the input the cut left out (0: it is whole). The card says so in the reader's language:
+    // approving runs the whole call.
+    omittedCharacters: v.number(),
+    runId: v.id("subAgentRuns"),
+    // The MCP server the tool comes from, so the card can say which server asks; null for a built-in tool.
+    server: v.union(v.string(), v.null()),
+    skillSlug: v.union(v.string(), v.null()),
+    task: v.string(),
+    toolName: v.union(v.string(), v.null()),
+});
+
+/**
+ * The open approval requests of the sub-agents a conversation delegated that wait on them, for the parent's cards:
+ * which child asks, for which tool, with what input. The parent thread's OWNER only (anyone else: NOT_FOUND, as for
+ * a thread that does not exist); a locked child shows nothing. A card answers through `respondToToolApproval` with
+ * the CHILD's thread id, so the request is checked on the child's latest turn.
+ */
+export const listSubAgentApprovals = authQuery
+    .input({ parentThreadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
+    .output(v.array(vSubAgentApproval))
+    .query(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+        // A locked parent shows nothing without its unlock proof, as every read of the chat does.
+        const parent = await requireOwnedThread(ctx, args.parentThreadId, userId, args.unlockProof);
+
+        // A conversation in the trash shows no approvals, as its own pages do.
+        if (parent.deleted === true) {
+            throw new LunoraError("NOT_FOUND", "Thread not found");
+        }
+
+        const runs = await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", parent._id).eq("status", "awaiting"))
+            .take(SUB_AGENT_MAX_CONCURRENT * 2);
+        const approvals: Infer<typeof vSubAgentApproval>[] = [];
+
+        for (const run of runs) {
+            if (run.userId !== userId || run.childThreadId === undefined) {
+                continue;
+            }
+
+            const child = await ctx.db.get("threads", run.childThreadId as Id<"threads">);
+
+            if (!child || child.deleted || child.userId !== userId || isThreadLocked(child)) {
+                continue;
+            }
+
+            // The child's messages are read below; it is the caller's own thread.
+            admitOwnedThread(ctx, child, userId);
+
+            const pending = await pendingApprovalRows(ctx, child._id);
+
+            for (const row of pending) {
+                // Only this run's requests: a request of the child's own interactive chat is not the sub-agent's to show.
+                if (row.userId !== userId || row.config.subAgentRunId !== run._id) {
+                    continue;
+                }
+
+                const request = await findPendingRequestOnLatestTurn(ctx, child._id, row.approvalId);
+
+                if (!request) {
+                    continue;
+                }
+
+                const input = typeof request.input === "string" ? request.input : (JSON.stringify(request.input ?? null, null, 2) ?? "");
+
+                approvals.push({
+                    approvalId: row.approvalId,
+                    childThreadId: child._id,
+                    input: input.slice(0, APPROVAL_INPUT_MAX),
+                    omittedCharacters: Math.max(0, input.length - APPROVAL_INPUT_MAX),
+                    runId: run._id,
+                    server: request.toolName === null ? null : serverOfPermissionKey(row.config.toolPermissionKeys?.[request.toolName]),
+                    skillSlug: run.skillSlug ?? null,
+                    task: run.task.split("\n", 1)[0]!.slice(0, 200),
+                    toolName: request.toolName,
+                });
+            }
+        }
+
+        return approvals;
+    });
 
 /** How many of a thread's top rows {@link workerActivity} reads for the newest one saved. */
 const ACTIVITY_ROWS = 25;
@@ -1408,7 +1900,15 @@ export const reapSubAgentRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
     }
 
     if (run?.mode !== "worker") {
-        await finishRunFromLoop(ctx, runId, { error: "The sub-agent did not finish in time.", kind: "failed" });
+        // A run that waited on an approval owns a later deadline, with a reaper of its own scheduled for it.
+        if (run && !oneShotReapDue(run, now)) {
+            return;
+        }
+
+        await finishRunFromLoop(ctx, runId, {
+            error: run?.status === "awaiting" ? SUB_AGENT_APPROVAL_EXPIRED_MESSAGE : "The sub-agent did not finish in time.",
+            kind: "failed",
+        });
 
         return;
     }
@@ -1521,14 +2021,40 @@ export const cancelQueuedWorkerRuns = async (ctx: MutationCtx, threadId: string)
     }
 };
 
+/**
+ * A thread is being hard-deleted: the runs it is the child of end as cancelled, and so do the runs it delegated, as a
+ * Stop would end them. A waiting run's request goes with the thread, so nothing would answer it: left alone, the run
+ * would hold its fan-out slot until its reaper. The thread's own queued worker runs go first, newest first, so ending
+ * the head does not start the next one on a thread that is going away.
+ */
+export const endSubAgentRunsOfDeletedThread = async (ctx: MutationCtx, threadId: string, userId: string | undefined): Promise<void> => {
+    await cancelQueuedWorkerRuns(ctx, threadId);
+
+    for (const status of ["awaiting", "running"] as const) {
+        const runs = await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_childThreadId_and_status", (q) => q.eq("childThreadId", threadId).eq("status", status))
+            .take(CANCEL_THREAD_MAX);
+
+        for (const run of runs) {
+            await finishRun(ctx, run._id, { kind: "cancelled" });
+        }
+    }
+
+    // Only an owned thread delegates (`delegateToSubAgent` admits runs for the parent's owner alone).
+    if (userId !== undefined) {
+        await cancelSubAgentRunsForStop(ctx, threadId, userId);
+    }
+};
+
 /** Runs read per stop; the fan-out cap keeps real ones to a handful, the bound is for a runaway. */
 const CANCEL_THREAD_MAX = 20;
 
-/** The queued and running runs a thread delegated, `CANCEL_THREAD_MAX` at most per status. */
+/** The queued, running and waiting runs a thread delegated, `CANCEL_THREAD_MAX` at most per status. */
 const activeRunsOf = async (ctx: MutationCtx, parentThreadId: string): Promise<RunDoc[]> => {
     const runs: RunDoc[] = [];
 
-    for (const status of ["queued", "running"] as const) {
+    for (const status of ["queued", "running", "awaiting"] as const) {
         runs.push(
             ...(await ctx.db
                 .query("subAgentRuns")
@@ -1602,6 +2128,8 @@ const vRunView = v.object({
     createdAt: v.number(),
     depth: v.number(),
     error: v.union(v.string(), v.null()),
+    // A known failure the card words in the reader's language; `error` keeps the English text the parent's model is told.
+    errorCode: v.union(v.literal("approval-expired"), v.null()),
     result: v.union(v.string(), v.null()),
     status: vSubAgentRunStatus,
     task: v.string(),
@@ -1628,6 +2156,7 @@ export const getRunByToolCall = authQuery
             createdAt: run.createdAt,
             depth: run.depth,
             error: run.error ?? null,
+            errorCode: run.status === "failed" && run.error === SUB_AGENT_APPROVAL_EXPIRED_MESSAGE ? "approval-expired" : null,
             result: run.result ?? null,
             status: run.status,
             task: run.task,
@@ -1989,7 +2518,7 @@ const progressFields = async (
 /** Workers shown under one lead, most recently dispatched first. */
 const WORKER_LIST_MAX = 20;
 
-const ALL_STATUSES = ["queued", "running", "succeeded", "failed", "cancelled"] as const;
+const ALL_STATUSES = ["queued", "running", "awaiting", "succeeded", "failed", "cancelled"] as const;
 
 /** The workers of one of the caller's threads: name, whether archived, whether working. */
 export const listWorkers = authQuery

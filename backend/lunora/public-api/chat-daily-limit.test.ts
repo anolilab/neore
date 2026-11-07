@@ -62,6 +62,8 @@ registerModule(registry, "agent_threads", await import("../agent/threads"));
 registerModule(registry, "auth_functions", await import("../auth/functions"));
 registerModule(registry, "chat_functions", await import("../chat/functions"));
 registerModule(registry, "chat_streaming", await import("../chat/streaming"));
+// A send into an existing thread ends a waiting sub-agent's wait (`chat/http.ts`), so the module must be reachable.
+registerModule(registry, "sub_agents_functions", await import("../sub-agents/functions"));
 registerModule(registry, "chat_streaming_persistent_library", await import("../chat/streaming/persistent/library"));
 registerModule(registry, "lib_action_cache", await import("../lib/action-cache"));
 registerModule(registry, "lib_claim_once", await import("../lib/claim-once"));

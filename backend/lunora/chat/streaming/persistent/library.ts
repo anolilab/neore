@@ -249,11 +249,20 @@ const liveStreamsOf = async (ctx: MutationCtx, threadId: string): Promise<Doc<"p
  * and the signal its tools get. A tool that ignores that signal still runs to its end, but no further step starts.
  */
 export const stopActiveForThread = internalMutation
-    .input({ messageId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.string().max(MAX_LENGTH.id) })
+    .input({
+        messageId: v.optional(v.string().max(MAX_LENGTH.id)),
+        /** With `messageId`: stop that reply only, and nothing when it is no longer live (a sub-agent's own continuation). */
+        onlyNamed: v.optional(v.boolean()),
+        threadId: v.string().max(MAX_LENGTH.id),
+    })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         // Read the live streams in pages (a thread has one or two; the bound is for a runaway one), then stop them.
         const live = await liveStreamsOf(ctx, args.threadId);
+
+        if (args.onlyNamed === true && live.every((stream) => stream.messageId !== args.messageId)) {
+            return false;
+        }
 
         // A stop that names a prompt ends that prompt's reply only. When no live stream carries the id (a
         // placeholder key, or a reply started from another row), it falls back to the whole thread.

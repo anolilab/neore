@@ -376,7 +376,7 @@ export interface InternalApiTypes {
             failAbandonedEditReply: FunctionReference<"mutation", { claimKey?: string; promptMessageId: Id<"messages">; threadId: Id<"threads"> }, { added: boolean; failed: number }>;
         };
         execute: {
-            continueAfterToolApproval: FunctionReference<"action", { answer?: string; answerFileIds?: Array<string>; answers?: Array<{ note?: string; question: string; selected: Array<string> }>; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
+            continueAfterToolApproval: FunctionReference<"action", { answer?: string; answerFileIds?: Array<string>; answers?: Array<{ note?: string; question: string; selected: Array<string> }>; approvalId: string; approved: boolean; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; headlessApproved?: Array<string>; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; stepsTaken?: number; subAgentRunId?: Id<"subAgentRuns">; toolEndpoints?: Record<string, string>; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }; denyReason?: string; streamId: string; threadId: string; userId: string }, void>;
             runStreamingAgent: FunctionReference<"action", { isAnonymous?: boolean; messageId: string; organizationId?: string; origin?: "lead" | "outside_agent"; resume?: string; skill?: { rawArgs: string; slug: string }; streamId: string; streamingConfig: { contentType: string; customSystemPrompt?: string; enabledFeatures?: Array<string>; imageSize?: string; mcpServerNames?: Array<string>; model: string; reasoningEffort?: number; researchDepth?: string; searchMode?: string; shouldAutoContinue?: boolean; statelessMode?: boolean }; threadId: string; userId: string; userPrompt?: string }, void>;
         };
         functions: {
@@ -512,7 +512,7 @@ export interface InternalApiTypes {
                     retryPausedRunsNow: FunctionReference<"mutation", { threadId: string }, boolean>;
                     setStreamStatus: FunctionReference<"mutation", { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }, void>;
                     settleStoppedRun: FunctionReference<"mutation", { streamId: Id<"persistentStreams"> }, null>;
-                    stopActiveForThread: FunctionReference<"mutation", { messageId?: string; threadId: string }, boolean>;
+                    stopActiveForThread: FunctionReference<"mutation", { messageId?: string; onlyNamed?: boolean; threadId: string }, boolean>;
                 };
                 purge: {
                     purgeFinishedStreams: FunctionReference<"mutation", { budget?: number }, { chunks: number; streams: number }>;
@@ -527,7 +527,7 @@ export interface InternalApiTypes {
             getToolPermissionGrantsQuery: FunctionReference<"query", { userId: string }, Record<string, number>>;
             getToolPermissionsQuery: FunctionReference<"query", { userId: string }, Record<string, "auto" | "ask" | "off">>;
             pruneExpiredToolPermissionGrants: FunctionReference<"mutation", {}, null>;
-            recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }; run?: { epoch: number; streamId: Id<"persistentStreams"> }; secretApprovalIds?: Array<string>; threadId: string; userId: string }, null>;
+            recordPendingToolApprovals: FunctionReference<"mutation", { approvalIds: Array<string>; askUserApprovalIds?: Array<string>; config: { autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; headlessApproved?: Array<string>; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; stepsTaken?: number; subAgentRunId?: Id<"subAgentRuns">; toolEndpoints?: Record<string, string>; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }; run?: { epoch: number; streamId: Id<"persistentStreams"> }; secretApprovalIds?: Array<string>; threadId: string; userId: string }, null>;
         };
         tools: {
             browser_node: {
@@ -1149,14 +1149,19 @@ export interface InternalApiTypes {
         };
         functions: {
             attachChildThread: FunctionReference<"mutation", { childThreadId: string; runId: Id<"subAgentRuns"> }, boolean>;
+            awaitApproval: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, boolean>;
             beatRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
             claimRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, { childThreadId?: string; clientId?: string; depth: number; dispatchedBy?: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; mode?: "run" | "worker"; model?: string; organizationId?: string; parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; userId: string } | null>;
+            completeResumedRun: FunctionReference<"mutation", { messageIds?: Array<string>; outcome: { error: string; kind: "failed" } | { kind: "succeeded" }; runId: Id<"subAgentRuns"> }, boolean>;
             completeRun: FunctionReference<"mutation", { outcome: { error: string; kind: "failed" } | { kind: "succeeded"; result: string }; runId: Id<"subAgentRuns"> }, boolean>;
+            continuingRun: FunctionReference<"query", { runId: Id<"subAgentRuns"> }, null | { origin: "lead" | "messenger" | "outside_agent" | "trigger" }>;
             createRun: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; host?: { agentKey: string; deviceId: string; folderId: string }; leadTools?: Array<string>; model?: string; name?: string; parentModel?: string; parentThreadId: string; persistent?: boolean; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }, { runId: Id<"subAgentRuns">; workerId?: string } | { error: string }>;
+            endApprovalWaitForMessage: FunctionReference<"mutation", { threadId: string }, number>;
             isHostWorker: FunctionReference<"query", { userId: string; workerId: string }, boolean>;
-            messageWorker: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
-            postResult: FunctionReference<"mutation", { attempt: number; failures?: number; runId: Id<"subAgentRuns"> }, null>;
+            messageWorker: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; message: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "awaiting" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
+            postResult: FunctionReference<"mutation", { attempt: number; failures?: number; runId: Id<"subAgentRuns">; waits?: number }, null>;
             reapRun: FunctionReference<"mutation", { claimedAt?: number; runId: Id<"subAgentRuns"> }, null>;
+            resumeAwaitingRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, boolean>;
             retryHostRunStart: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
             shouldRunStop: FunctionReference<"query", { runId: Id<"subAgentRuns"> }, boolean>;
             watchRunBeat: FunctionReference<"mutation", { claimedAt: number; runId: Id<"subAgentRuns"> }, null>;
@@ -2406,14 +2411,19 @@ export const internal: InternalApiTypes = {
         },
         functions: {
             attachChildThread: { __lunoraRef: "sub_agents_functions:attachChildThread" },
+            awaitApproval: { __lunoraRef: "sub_agents_functions:awaitApproval" },
             beatRun: { __lunoraRef: "sub_agents_functions:beatRun" },
             claimRun: { __lunoraRef: "sub_agents_functions:claimRun" },
+            completeResumedRun: { __lunoraRef: "sub_agents_functions:completeResumedRun" },
             completeRun: { __lunoraRef: "sub_agents_functions:completeRun" },
+            continuingRun: { __lunoraRef: "sub_agents_functions:continuingRun" },
             createRun: { __lunoraRef: "sub_agents_functions:createRun" },
+            endApprovalWaitForMessage: { __lunoraRef: "sub_agents_functions:endApprovalWaitForMessage" },
             isHostWorker: { __lunoraRef: "sub_agents_functions:isHostWorker" },
             messageWorker: { __lunoraRef: "sub_agents_functions:messageWorker" },
             postResult: { __lunoraRef: "sub_agents_functions:postResult" },
             reapRun: { __lunoraRef: "sub_agents_functions:reapRun" },
+            resumeAwaitingRun: { __lunoraRef: "sub_agents_functions:resumeAwaitingRun" },
             retryHostRunStart: { __lunoraRef: "sub_agents_functions:retryHostRunStart" },
             shouldRunStop: { __lunoraRef: "sub_agents_functions:shouldRunStop" },
             watchRunBeat: { __lunoraRef: "sub_agents_functions:watchRunBeat" },

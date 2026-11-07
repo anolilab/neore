@@ -8,11 +8,17 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
-import { admitWorkerRun } from "./functions";
-import { WORKER_SYSTEM } from "./logic";
+import { admitSubAgentRun, admitWorkerRun } from "./functions";
+import { SUB_AGENT_TOOL_NAME, WORKER_SYSTEM } from "./logic";
 
 const { contexts, probe, registry, runs } = vi.hoisted(() => {
-    return { contexts: [] as string[][], probe: { on: false }, registry: new Map<string, unknown>(), runs: [] as Record<string, any>[] };
+    return {
+        contexts: [] as string[][],
+        // `pauseIn`: a one-shot run "creates" this thread and stops on an approval request already recorded there.
+        probe: { on: false, pauseIn: undefined as string | undefined },
+        registry: new Map<string, unknown>(),
+        runs: [] as Record<string, any>[],
+    };
 });
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
@@ -22,6 +28,12 @@ vi.mock("../chat/lib/headless-run", () => {
     return {
         runHeadlessAgent: async (ctx: any, options: Record<string, any>) => {
             runs.push(options);
+
+            if (probe.pauseIn !== undefined) {
+                await options.onThread(probe.pauseIn);
+
+                return { paused: true, text: "", threadId: probe.pauseIn };
+            }
 
             const text = `reply ${String(runs.length)}`;
 
@@ -67,6 +79,7 @@ beforeEach(async () => {
     runs.length = 0;
     contexts.length = 0;
     probe.on = false;
+    probe.pauseIn = undefined;
     harness = lunoraTest(schema as never);
     userId = (await harness.run(
         async (ctx: any) => await ctx.db.insert("user", { createdAt: 0, email: "u@example.com", emailVerified: true, name: "U", updatedAt: 0 }),
@@ -146,5 +159,107 @@ describe("a worker's runs", () => {
         await execute(first._id);
 
         expect(runs).toHaveLength(1);
+    });
+
+    it("never pause for an approval: a worker keeps losing its ask tools", async () => {
+        const first = await dispatch({ toolCallId: "call-1" });
+
+        await execute(first._id);
+
+        expect(runs[0]).not.toHaveProperty("pauseForApproval");
+    });
+});
+
+describe("a one-shot sub-agent and its approvals", () => {
+    const admitOneShot = async (parentThreadId = leadId): Promise<string> =>
+        await harness.run(async (ctx: any) => {
+            const result = await admitSubAgentRun(ctx, { parentThreadId, task: "Look into it", toolCallId: `call-${parentThreadId}`, userId });
+
+            if ("error" in result) {
+                throw new Error(result.error);
+            }
+
+            return await ctx.db.insert("subAgentRuns", result.row);
+        });
+
+    const runRow = async (runId: string): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.get("subAgentRuns", runId));
+
+    it("pauses below the depth cap, keeping the delegation consent it inherited and adding none", async () => {
+        const runId = await admitOneShot();
+
+        await execute(runId);
+
+        expect(runs[0]).toMatchObject({ approvedTools: [SUB_AGENT_TOOL_NAME, "messageWorker"], pauseForApproval: { subAgentRunId: runId } });
+        expect(runs[0]).not.toHaveProperty("withheldTools");
+    });
+
+    it("still pauses on its other ask tools at the depth cap, with the dispatch tools withheld rather than asked for", async () => {
+        const level1 = await admitOneShot();
+        const child1 = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "c1", userId }))) as string;
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", level1, { childThreadId: child1 }));
+
+        const level2 = await admitOneShot(child1);
+
+        expect(await runRow(level2)).toMatchObject({ depth: 2 });
+
+        await execute(level2);
+
+        expect(runs[0]).toMatchObject({ pauseForApproval: { subAgentRunId: level2 }, withheldTools: [SUB_AGENT_TOOL_NAME, "messageWorker"] });
+        expect(runs[0]).not.toHaveProperty("approvedTools");
+    });
+
+    it("waits when the child stopped on a request, and posts nothing to the parent yet", async () => {
+        const runId = await admitOneShot();
+        const childId = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "child", userId }))) as string;
+
+        // What the child's step saved: the request on its latest turn, which the run then waits on.
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("messages", {
+                    message: {
+                        content: [
+                            { input: {}, toolCallId: "call-1", toolName: "webSearch", type: "tool-call" },
+                            { approvalId: "approval-1", toolCallId: "call-1", type: "tool-approval-request" },
+                        ],
+                        role: "assistant",
+                    },
+                    order: 1,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId: childId,
+                    tool: true,
+                    userId,
+                }),
+        );
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("toolApprovalRuns", {
+                    approvalId: "approval-1",
+                    config: {
+                        autoMediaEnrichment: false,
+                        mcpServerNames: [],
+                        model: "test-model",
+                        researchDepth: "balanced",
+                        searchMode: "web",
+                        shouldAutoContinue: true,
+                        subAgentRunId: runId,
+                        toolNames: [],
+                    },
+                    createdAt: Date.now(),
+                    status: "pending",
+                    threadId: childId,
+                    userId,
+                }),
+        );
+        probe.pauseIn = childId;
+
+        await execute(runId);
+
+        const row = await runRow(runId);
+
+        expect(row).toMatchObject({ childThreadId: childId, status: "awaiting" });
+        expect(row.resultPostedAt).toBeUndefined();
+        expect(row.completedAt).toBeUndefined();
     });
 });
