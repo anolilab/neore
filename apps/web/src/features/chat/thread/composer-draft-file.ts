@@ -23,6 +23,10 @@ const LINE_BREAK = /\r?\n/u;
 const PATH_SEPARATOR = /[/\\]/u;
 /** A line that is one URL or file URI: what a file manager or a browser's "Copy Image" puts next to the files it copies. */
 const LINK_LINE = /^(?:file|https?):\/\/\S+$/iu;
+/** HTML that holds one image and nothing else (an optional `<meta charset>` first), as a browser's "Copy Image" writes it. */
+const IMAGE_ONLY_HTML = /^\s*(?:<meta\b[^>]*>\s*)?<img\b[^>]*>\s*$/iu;
+/** The wrapper Windows puts around clipboard HTML (`<html><body><!--StartFragment-->…`), and any other comment. */
+const HTML_WRAPPER = /<!--[\s\S]*?-->|<\/?(?:html|body)\b[^>]*>/giu;
 
 /**
  * Whether a paste carries text of its own as well as its files: that text is the editor's to insert, or a file when it is
@@ -31,13 +35,18 @@ const LINK_LINE = /^(?:file|https?):\/\/\S+$/iu;
  */
 export const pasteHasText = (data: Pick<DataTransfer, "getData">, files: ReadonlyArray<Pick<File, "name">>): boolean => {
     const names = new Set(files.map((file) => file.name));
+    // A link line is the files' own address only where nothing else says otherwise: no HTML (a file manager), or HTML that is
+    // just the image (a browser's "Copy Image"). Next to a spreadsheet's table, links are the text that was copied.
+    const html = data.getData("text/html");
+    const fragment = html.replaceAll(HTML_WRAPPER, "");
+    const linksDescribeFiles = fragment.trim() === "" || IMAGE_ONLY_HTML.test(fragment);
     const lines = data
         .getData("text/plain")
         .split(LINE_BREAK)
         .map((line) => line.trim())
         .filter((line) => line !== "");
 
-    return lines.some((line) => !LINK_LINE.test(line) && !names.has(line.split(PATH_SEPARATOR).at(-1) ?? line));
+    return lines.some((line) => !(linksDescribeFiles && LINK_LINE.test(line)) && !names.has(line.split(PATH_SEPARATOR).at(-1) ?? line));
 };
 
 /** The characters a text attachment of `draft` adds to the context: its UTF-8 bytes, as `attachmentTextChars` counts them. */

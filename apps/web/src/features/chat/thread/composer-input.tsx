@@ -1318,7 +1318,8 @@ const ComposerInput = ({
                     // Before the editor exists the quote is kept in the draft as text, so the request is not lost.
                     const editor = inputAreaRef.current?.getEditor()?.getEditor() ?? null;
 
-                    setText(quoteRestoreDraft(editor, payload.quote, getComposerText()));
+                    // A restore that does not append replaces the draft, quote or not.
+                    setText(quoteRestoreDraft(editor, payload.quote, payload.append === true ? getComposerText() : ""));
                 } else {
                     setText(textAfterRestore(getComposerText(), payload));
                 }

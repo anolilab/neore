@@ -129,6 +129,12 @@ describe("the quote chip's clipboard", () => {
             formatQuote("Seen"),
         ],
         [
+            "leaves out text the pasting page hid inside a quoted line",
+            `<div data-quote-chip data-message-id="m"><blockquote><p>Seen<span style="display: none">hidden ask</span></p></blockquote></div>`,
+            "quoteChip",
+            formatQuote("Seen"),
+        ],
+        [
             "pastes a quote past the long-paste limit as quoted lines, not a chip",
             `<div data-quote-chip data-message-id="m"><blockquote><p>${"long ".repeat(120)}</p></blockquote></div>`,
             "paragraph",

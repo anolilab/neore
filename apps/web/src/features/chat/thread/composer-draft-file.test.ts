@@ -229,8 +229,10 @@ describe("undoLongPaste", () => {
 });
 
 describe(pasteHasText, () => {
-    const clipboard = (plain: string) => {
-        return { getData: (type: string) => (type === "text/plain" ? plain : "") };
+    const clipboard = (plain: string, html = "") => {
+        const formats: Record<string, string> = { "text/html": html, "text/plain": plain };
+
+        return { getData: (type: string) => formats[type] ?? "" };
     };
     const picture = [{ name: "image.png" }];
 
@@ -240,8 +242,16 @@ describe(pasteHasText, () => {
         ["a file manager's copy, whose text is the files' names", "report.pdf\nnotes.txt", [{ name: "report.pdf" }, { name: "notes.txt" }], false],
         ["a copy that names the files by path", "/Users/me/report.pdf", [{ name: "report.pdf" }], false],
         ["a file manager's copy as file URIs", "file:///home/me/My%20Report.pdf", [{ name: "My Report.pdf" }], false],
-        ["a browser's image copy, whose text is the image's URL", "https://cdn.example.com/p/photo.jpg?w=800", picture, false],
-    ])("%s: %s", (_label, plain, files, expected) => {
-        expect(pasteHasText(clipboard(plain), files)).toBe(expected);
+        ["a browser's image copy, whose text is the image's URL", "https://cdn.example.com/p/photo.jpg?w=800", picture, false, '<img src="https://cdn.example.com/p/photo.jpg?w=800">'],
+        [
+            "a browser's image copy on Windows, whose HTML is wrapped",
+            "https://cdn.example.com/p/photo.jpg",
+            picture,
+            false,
+            '<html>\r\n<body>\r\n<!--StartFragment--><img src="https://cdn.example.com/p/photo.jpg"><!--EndFragment-->\r\n</body>\r\n</html>',
+        ],
+        ["a spreadsheet's copied links, next to a picture of the cells", "https://a.example\nhttps://b.example", picture, true, "<table><tr><td>https://a.example</td></tr></table>"],
+    ])("%s: %s", (_label, plain, files, expected, html = "") => {
+        expect(pasteHasText(clipboard(plain, html), files)).toBe(expected);
     });
 });

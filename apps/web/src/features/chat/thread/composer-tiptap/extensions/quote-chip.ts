@@ -28,13 +28,23 @@ const MAX_PASTED_QUOTE_LINES = 10;
 /** The quote as the draft keeps it: without the hidden characters the composer strips from every draft. */
 const cleanQuote = (text: string): string => stripHiddenText(text).text;
 
+/** Elements a page can use to put text in the HTML that nobody sees. */
+const HIDDEN = '[hidden], [aria-hidden="true"], [style*="display" i][style*="none" i], [style*="visibility" i][style*="hidden" i], script, style, template';
+
+/** The text a reader sees in one quoted line: hidden descendants are left out. */
+const visibleText = (line: Element): string => {
+    const copy = line.cloneNode(true) as Element;
+
+    for (const hidden of copy.querySelectorAll(HIDDEN)) {
+        hidden.remove();
+    }
+
+    return copy.textContent ?? "";
+};
+
 /** A pasted chip's quote, read from its visible quoted lines, never from an attribute the pasting page could fill unseen. */
 const visibleQuote = (element: HTMLElement): string =>
-    cleanQuote(
-        Array.from(element.querySelectorAll(":scope > blockquote > p"), (line) => line.textContent ?? "")
-            .join("\n")
-            .trim(),
-    );
+    cleanQuote(Array.from(element.querySelectorAll(":scope > blockquote > p"), visibleText).join("\n").trim());
 
 const excerptOf = (text: string): string => {
     const flat = text.replaceAll(/\s+/gu, " ").trim();
@@ -112,7 +122,8 @@ const QuoteChip = Node.create<QuoteChipOptions>({
             fullText.className = "sr-only";
             fullText.textContent = String(node.attrs.text ?? "");
             source.type = "button";
-            source.className = "text-primary shrink-0 underline-offset-2 hover:underline";
+            // 44px on a touch screen (WCAG 2.5.5), the chip's own size on a pointer.
+            source.className = "text-primary inline-flex shrink-0 items-center underline-offset-2 hover:underline pointer-coarse:min-h-11 pointer-coarse:min-w-11";
             paint();
             source.addEventListener("click", () => {
                 if (!scrollToMessage(String(node.attrs.messageId ?? ""))) {
