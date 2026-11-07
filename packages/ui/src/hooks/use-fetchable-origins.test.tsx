@@ -5,7 +5,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { originsOf } from "./use-fetchable-origins";
+import { isFetchableUrl, originsOf } from "./use-fetchable-origins";
 import { useFetchedText } from "./use-fetched-text";
 
 const BACKEND = "https://api.example";
@@ -18,6 +18,51 @@ describe(originsOf, () => {
             BACKEND,
             "http://localhost:8788",
         ]);
+    });
+});
+
+describe(isFetchableUrl, () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    const onPage = (origin: string) => vi.stubGlobal("location", { origin });
+
+    it("allows the page's own non-loopback origin, and the configured origins", () => {
+        onPage("https://app.example");
+
+        expect(isFetchableUrl("https://app.example/a.pdf", [])).toBe(true);
+        expect(isFetchableUrl(`${BACKEND}/files/a.pdf?sig=1`, originsOf(BACKEND))).toBe(true);
+    });
+
+    it.each(["http://localhost:5173", "http://127.0.0.1:5173", "http://[::1]:5173"])(
+        "refuses the page's own loopback origin %s, which is not an approved origin",
+        (origin) => {
+            onPage(origin);
+
+            expect(isFetchableUrl(`${origin}/a.pdf`, [])).toBe(false);
+        },
+    );
+
+    it("allows a configured loopback backend, such as a local one in development", () => {
+        onPage("http://localhost:5173");
+
+        expect(isFetchableUrl("http://localhost:8788/files/a.pdf?sig=1", originsOf("http://localhost:8788"))).toBe(true);
+    });
+
+    it("refuses other origins, other schemes and loopback hosts that were not configured", () => {
+        onPage("https://app.example");
+
+        expect(isFetchableUrl("https://elsewhere.example/a.pdf", originsOf(BACKEND))).toBe(false);
+        expect(isFetchableUrl("http://127.0.0.2:8788/a.pdf", originsOf(BACKEND))).toBe(false);
+        expect(isFetchableUrl("ftp://app.example/a.pdf", [])).toBe(false);
+    });
+
+    it("still allows data: and blob: URLs", () => {
+        onPage("http://localhost:5173");
+
+        expect(isFetchableUrl("data:application/pdf;base64,AA==", [])).toBe(true);
+        expect(isFetchableUrl("blob:http://localhost:5173/1", [])).toBe(true);
     });
 });
 

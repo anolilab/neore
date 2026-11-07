@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
 
 import type { PendingAttachment } from "./chat-ui-store";
-import { useChatUIStore } from "./chat-ui-store";
+import { isDocumentOpen, useChatUIStore } from "./chat-ui-store";
 
 const attachment = { fileId: "file-1", id: "a1", status: "complete" } as PendingAttachment;
 const reference = { id: "r1", url: "https://example.com/r1.png" } as ReferenceSelection;
@@ -101,5 +101,49 @@ describe("setComposerText hidden characters", () => {
         useChatUIStore.getState().setComposerText("abc");
 
         expect(useChatUIStore.getState().composerHiddenRemoved).toBe(1);
+    });
+});
+
+describe("the side-panel PDF preview", () => {
+    const pdf = { filename: "report.pdf", threadId: "thread-1", url: "https://files.example.com/report.pdf" };
+
+    beforeEach(() => {
+        useChatUIStore.getState().reset();
+    });
+
+    it("opens the side panel on the PDF, without a document", () => {
+        useChatUIStore.getState().openPreviewFile(pdf);
+
+        expect(useChatUIStore.getState()).toMatchObject({ isCanvasOpen: true, previewFile: pdf });
+    });
+
+    it("is replaced by a document when one opens", () => {
+        useChatUIStore.getState().openPreviewFile(pdf);
+        useChatUIStore.getState().openCanvas("doc-1");
+
+        expect(useChatUIStore.getState()).toMatchObject({ activeDocumentId: "doc-1", previewFile: null });
+    });
+
+    it("is cleared when the panel closes", () => {
+        useChatUIStore.getState().openPreviewFile(pdf);
+        useChatUIStore.getState().closeCanvas();
+
+        expect(useChatUIStore.getState()).toMatchObject({ isCanvasOpen: false, previewFile: null });
+    });
+
+    it("counts an open document as blocking a PDF, and a PDF preview or a closed panel as not", () => {
+        expect(isDocumentOpen(useChatUIStore.getState())).toBe(false);
+
+        useChatUIStore.getState().openPreviewFile(pdf);
+
+        expect(isDocumentOpen(useChatUIStore.getState())).toBe(false);
+
+        useChatUIStore.getState().openCanvas("doc-1");
+
+        expect(isDocumentOpen(useChatUIStore.getState())).toBe(true);
+
+        useChatUIStore.getState().closeCanvas();
+
+        expect(isDocumentOpen(useChatUIStore.getState())).toBe(false);
     });
 });
