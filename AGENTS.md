@@ -60,13 +60,11 @@ Always `pnpm`. Lint does not include types: run both. Git hooks format on commit
 
 ```bash
 pnpm lint:types                          # vis run lint:types — NOT `pnpm typecheck`
-pnpm lint                                # oxfmt + eslint + dedupe; `lint:eslint:fix`, `lint:oxfmt:fix`
+pnpm lint                                # oxfmt (code/data) + Prettier (md/css/html; root md unchecked) + eslint + dedupe; `lint:eslint:fix`, `lint:oxfmt:fix`; `lint:oxlint` advisory
 pnpm vis run test                        # every test; there is NO root `pnpm test` (`pnpm test` inside a project)
 pnpm build:packages                      # then `pnpm --filter @neore/backend run build` for the Worker
 cd backend && pnpm codegen               # backend codegen
 ```
-
-oxfmt formats code and data, Prettier Markdown, CSS and HTML (root markdown unlinted); `pnpm lint:oxlint` is advisory.
 
 ## SCOPED KNOWLEDGE — READ BEFORE YOU TOUCH
 
