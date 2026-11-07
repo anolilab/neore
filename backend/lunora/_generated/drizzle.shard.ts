@@ -1769,7 +1769,7 @@ export const usageBackfill = sqliteTable("usageBackfill", {
     finishedAt: real("finishedAt"),
     lastOrder: real("lastOrder"),
     leaseUntil: real("leaseUntil").notNull(),
-    projects: text("projects", { mode: "json" }).$type<{ finishedAt?: number; lastOrder?: number; leaseUntil: number; replies: number; runId: string; startedAt: number; status: "running" | "done"; threadCursor?: string; threadId?: string }>(),
+    projects: text("projects", { mode: "json" }).$type<{ finishedAt?: number; lastOrder?: number; leaseUntil: number; replies: number; runId: string; startedAt: number; status: "running" | "done"; threadCursor?: string; threadId?: string; threadProjectKey?: string }>(),
     replies: real("replies").notNull(),
     runId: text("runId").notNull(),
     startedAt: real("startedAt").notNull(),
@@ -1788,7 +1788,6 @@ export const usageDaily = sqliteTable("usageDaily", {
     _creationTime: integer("_creationTime").notNull(),
     costMicrodollars: real("costMicrodollars").notNull(),
     date: text("date").notNull(),
-    organizationId: text("organizationId"),
     projectKey: text("projectKey"),
     replies: real("replies").notNull(),
     skillKey: text("skillKey").notNull(),
@@ -1800,7 +1799,6 @@ export const usageDaily = sqliteTable("usageDaily", {
     by_user_skill_date: index("by_user_skill_date").on(t.userId, t.skillKey, t.date),
     by_user_date: index("by_user_date").on(t.userId, t.date),
     by_user_project_date: index("by_user_project_date").on(t.userId, t.projectKey, t.date),
-    by_user_organization_date: index("by_user_organization_date").on(t.userId, t.organizationId, t.date),
     by_date: index("by_date").on(t.date),
 }));
 

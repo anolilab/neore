@@ -5,6 +5,40 @@ import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash
 import * as lunora_usage_activity_222 from "../../usage/activity.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
+installCompiledValidatorMap(lunora_usage_activity_222.forwardReplyUsage.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["at"] !== "number" || !Number.isFinite(source["at"])) return DEFER;
+if (typeof source["costMicrodollars"] !== "number" || !Number.isFinite(source["costMicrodollars"])) return DEFER;
+if (typeof source["date"] !== "string") return DEFER;
+if (typeof source["replyKey"] !== "string") return DEFER;
+if (typeof source["skillKey"] !== "string") return DEFER;
+let __has1 = false;
+let __val1;
+if (source["skillName"] !== undefined) {
+if (typeof source["skillName"] !== "string") return DEFER;
+__val1 = source["skillName"];
+__has1 = true;
+}
+let __has2 = false;
+let __val2;
+if (source["startedAt"] !== undefined) {
+if (typeof source["startedAt"] !== "number" || !Number.isFinite(source["startedAt"])) return DEFER;
+__val2 = source["startedAt"];
+__has2 = true;
+}
+if (typeof source["threadId"] !== "string") return DEFER;
+if (typeof source["tokens"] !== "number" || !Number.isFinite(source["tokens"])) return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "at": source["at"], "costMicrodollars": source["costMicrodollars"], "date": source["date"], "replyKey": source["replyKey"], "skillKey": source["skillKey"], ...(__has1 ? { "skillName": __val1 } : {}), ...(__has2 ? { "startedAt": __val2 } : {}), "threadId": source["threadId"], "tokens": source["tokens"], "userId": source["userId"] };
+});
+installCompiledValidatorMap(lunora_usage_activity_222.getThreadAttribution.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["threadId"] !== "string") return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "threadId": source["threadId"], "userId": source["userId"] };
+});
 installCompiledValidatorMap(lunora_usage_activity_222.recordReplyUsage.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -27,15 +61,45 @@ if (typeof source["startedAt"] !== "number" || !Number.isFinite(source["startedA
 __val2 = source["startedAt"];
 __has2 = true;
 }
+let __has7 = false;
+let __val7;
+if (source["threadAttribution"] !== undefined) {
+if (typeof source["threadAttribution"] !== "object" || source["threadAttribution"] === null || Array.isArray(source["threadAttribution"])) return DEFER;
+if (Object.getPrototypeOf(source["threadAttribution"]) !== Object.prototype && Object.getPrototypeOf(source["threadAttribution"]) !== null) return DEFER;
 let __has3 = false;
 let __val3;
+if (source["threadAttribution"]["organizationId"] !== undefined) {
+if (typeof source["threadAttribution"]["organizationId"] !== "string") return DEFER;
+__val3 = source["threadAttribution"]["organizationId"];
+__has3 = true;
+}
+let __has4 = false;
+let __val4;
+if (source["threadAttribution"]["projectInOrganization"] !== undefined) {
+if (typeof source["threadAttribution"]["projectInOrganization"] !== "boolean") return DEFER;
+__val4 = source["threadAttribution"]["projectInOrganization"];
+__has4 = true;
+}
+let __has5 = false;
+let __val5;
+if (source["threadAttribution"]["projectKey"] !== undefined) {
+if (typeof source["threadAttribution"]["projectKey"] !== "string") return DEFER;
+__val5 = source["threadAttribution"]["projectKey"];
+__has5 = true;
+}
+const __obj6 = { ...(__has3 ? { "organizationId": __val3 } : {}), ...(__has4 ? { "projectInOrganization": __val4 } : {}), ...(__has5 ? { "projectKey": __val5 } : {}) };
+__val7 = __obj6;
+__has7 = true;
+}
+let __has8 = false;
+let __val8;
 if (source["threadId"] !== undefined) {
 if (typeof source["threadId"] !== "string") return DEFER;
-__val3 = source["threadId"];
-__has3 = true;
+__val8 = source["threadId"];
+__has8 = true;
 }
 if (typeof source["tokens"] !== "number" || !Number.isFinite(source["tokens"])) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
-return { "at": source["at"], "costMicrodollars": source["costMicrodollars"], "date": source["date"], "replyKey": source["replyKey"], "skillKey": source["skillKey"], ...(__has1 ? { "skillName": __val1 } : {}), ...(__has2 ? { "startedAt": __val2 } : {}), ...(__has3 ? { "threadId": __val3 } : {}), "tokens": source["tokens"], "userId": source["userId"] };
+return { "at": source["at"], "costMicrodollars": source["costMicrodollars"], "date": source["date"], "replyKey": source["replyKey"], "skillKey": source["skillKey"], ...(__has1 ? { "skillName": __val1 } : {}), ...(__has2 ? { "startedAt": __val2 } : {}), ...(__has7 ? { "threadAttribution": __val7 } : {}), ...(__has8 ? { "threadId": __val8 } : {}), "tokens": source["tokens"], "userId": source["userId"] };
 });
 export * from "../../usage/activity.js";

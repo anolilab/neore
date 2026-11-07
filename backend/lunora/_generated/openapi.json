@@ -55813,6 +55813,21 @@
                     },
                     "truncated": {
                       "type": "boolean"
+                    },
+                    "unfiled": {
+                      "properties": {
+                        "from": {
+                          "type": "string"
+                        },
+                        "to": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "from",
+                        "to"
+                      ],
+                      "type": "object"
                     }
                   },
                   "required": [
@@ -55897,6 +55912,21 @@
                     },
                     "truncated": {
                       "type": "boolean"
+                    },
+                    "unfiled": {
+                      "properties": {
+                        "from": {
+                          "type": "string"
+                        },
+                        "to": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "from",
+                        "to"
+                      ],
+                      "type": "object"
                     }
                   },
                   "required": [
@@ -56258,10 +56288,10 @@
                 "properties": {
                   "args": {
                     "properties": {
-                      "cursor": {
+                      "fromDate": {
                         "type": "string"
                       },
-                      "fromDate": {
+                      "organizationId": {
                         "type": "string"
                       }
                     },
@@ -56294,14 +56324,8 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "cursor": {
-                      "type": "string"
-                    },
                     "result": {
                       "properties": {
-                        "members": {
-                          "type": "number"
-                        },
                         "noProject": {
                           "properties": {
                             "costMicrodollars": {
@@ -56351,6 +56375,9 @@
                           },
                           "type": "array"
                         },
+                        "projectsCut": {
+                          "type": "boolean"
+                        },
                         "total": {
                           "properties": {
                             "costMicrodollars": {
@@ -56369,22 +56396,20 @@
                             "tokens"
                           ],
                           "type": "object"
-                        },
-                        "truncated": {
-                          "type": "boolean"
                         }
                       },
                       "required": [
-                        "members",
                         "noProject",
                         "projects",
-                        "total",
-                        "truncated"
+                        "projectsCut",
+                        "total"
                       ],
                       "type": "object"
                     }
                   },
-                  "required": [],
+                  "required": [
+                    "result"
+                  ],
                   "type": "object"
                 }
               }

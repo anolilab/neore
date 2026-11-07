@@ -777,6 +777,7 @@ class AppBuilder<Env extends object> {
             ["twoFactor", { mode: { kind: "global" } }],
             ["usageBackfill", { mode: { field: "userId", kind: "shardBy" } }],
             ["usageDaily", { mode: { field: "userId", kind: "shardBy" } }],
+            ["usageOrganizationReplies", { mode: { kind: "global" } }],
             ["usageReplies", { mode: { field: "userId", kind: "shardBy" } }],
             ["user", { mode: { kind: "global" } }],
             ["userConnectors", { mode: { field: "userId", kind: "shardBy" } }],

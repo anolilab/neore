@@ -809,8 +809,8 @@ export interface ApiTypes {
     usage: {
         activity: {
             getActivityHeatmap: FunctionReference<"query", { toDate: unknown }, { days: Array<{ costMicrodollars: number; date: string; replies: number; tokens: number }>; trackingSince?: string }>;
-            getProjectBreakdown: FunctionReference<"query", { fromDate: unknown }, { noProject: { costMicrodollars: number; replies: number; tokens: number }; projects: Array<{ costMicrodollars: number; replies: number; tokens: number; projectKey: string; title?: string }>; total: { costMicrodollars: number; replies: number; tokens: number }; truncated: boolean }>;
-            getProjectUsage: FunctionReference<"query", { fromDate: unknown; projectId: Id<"projects"> }, { costMicrodollars: number; replies: number; tokens: number; truncated: boolean }>;
+            getProjectBreakdown: FunctionReference<"query", { fromDate: unknown }, { noProject: { costMicrodollars: number; replies: number; tokens: number }; projects: Array<{ costMicrodollars: number; replies: number; tokens: number; projectKey: string; title?: string }>; total: { costMicrodollars: number; replies: number; tokens: number }; truncated: boolean; unfiled?: { from: string; to: string } }>;
+            getProjectUsage: FunctionReference<"query", { fromDate: unknown; projectId: Id<"projects"> }, { costMicrodollars: number; replies: number; tokens: number; truncated: boolean; unfiled?: { from: string; to: string } }>;
             getSkillBreakdown: FunctionReference<"query", { fromDate: unknown }, { skills: Array<{ costMicrodollars: number; replies: number; skillKey: string; skillName?: string; tokens: number }>; truncated: boolean }>;
         };
         backfill: {
@@ -819,7 +819,7 @@ export interface ApiTypes {
             startUsageBackfill: FunctionReference<"mutation", {}, "idle" | "running" | "done">;
         };
         organization: {
-            getOrganizationProjectUsage: FunctionReference<"action", { cursor?: string; fromDate: string }, { cursor?: string; result?: { members: number; noProject: { costMicrodollars: number; replies: number; tokens: number }; projects: Array<{ costMicrodollars: number; replies: number; tokens: number; projectKey: string; title: string }>; total: { costMicrodollars: number; replies: number; tokens: number }; truncated: boolean } }>;
+            getOrganizationProjectUsage: FunctionReference<"action", { fromDate: string; organizationId?: string }, { result: { noProject: { costMicrodollars: number; replies: number; tokens: number }; projects: Array<{ costMicrodollars: number; replies: number; tokens: number; projectKey: string; title: string }>; projectsCut: boolean; total: { costMicrodollars: number; replies: number; tokens: number } } }>;
         };
     };
     vault: {
