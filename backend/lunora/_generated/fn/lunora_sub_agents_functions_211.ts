@@ -60,7 +60,14 @@ __val1 = source["failures"];
 __has1 = true;
 }
 if (typeof source["runId"] !== "string") return DEFER;
-return { "attempt": source["attempt"], ...(__has1 ? { "failures": __val1 } : {}), "runId": source["runId"] };
+let __has2 = false;
+let __val2;
+if (source["waits"] !== undefined) {
+if (typeof source["waits"] !== "number" || !Number.isFinite(source["waits"])) return DEFER;
+__val2 = source["waits"];
+__has2 = true;
+}
+return { "attempt": source["attempt"], ...(__has1 ? { "failures": __val1 } : {}), "runId": source["runId"], ...(__has2 ? { "waits": __val2 } : {}) };
 });
 installCompiledValidatorMap(lunora_sub_agents_functions_211.reapRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
