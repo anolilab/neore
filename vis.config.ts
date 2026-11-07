@@ -199,6 +199,17 @@ export default defineConfig({
             inputs: ["default", "^production"],
             cache: true,
         },
+        "lint:types:fast": {
+            // The pre-push check: `tsrs`, a Rust port of the compiler with TS 7.1
+            // semantics, about ten times faster than `lint:types`, which stays the
+            // CI gate. It depends on what it reads, not on `^build`, which would
+            // also build the backend Worker and the N-API addon: the two packages
+            // that export only a built `dist`, and the backend's generated API for
+            // the apps that import it.
+            dependsOn: [{ projects: ["@neore/ai", "@neore/service-sdk"], target: "build" }, "^codegen"],
+            inputs: ["default", "^production"],
+            cache: true,
+        },
         test: {
             inputs: ["default", "^production", "{projectRoot}/vite.config.ts", "{projectRoot}/vitest.config.ts"],
             cache: true,

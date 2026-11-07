@@ -105,6 +105,7 @@
         "react-dropzone": "catalog:forms",
         "sort-package-json": "catalog:utils",
         "tslib": "catalog:bundler",
+        "tsrs": "catalog:tsc",
         "tsx": "catalog:iac",
         "typescript": "catalog:tsc",
         "typescript-eslint": "catalog:lint",
