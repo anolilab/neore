@@ -1,7 +1,7 @@
 import { dynamicTool, jsonSchema, type JSONSchema7, type ToolSet } from "ai";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { fingerprintMcpTool, mcpToolDrift } from "./mcp-tool-fingerprint";
+import { FINGERPRINT_DEADLINE_MS, fingerprintMcpTool, mcpToolDrift } from "./mcp-tool-fingerprint";
 
 /** An MCP tool shaped like the ones the MCP client builds from a `tools/list` entry. */
 const mcpTool = (schema: JSONSchema7 | PromiseLike<JSONSchema7>): ToolSet[string] =>
@@ -71,6 +71,33 @@ describe(fingerprintMcpTool, () => {
         };
 
         expect(await fingerprintMcpTool(mcpTool(withConst(["b", "a"])), SOURCE)).not.toBe(await fingerprintMcpTool(mcpTool(withConst(["a", "b"])), SOURCE));
+    });
+
+    it("sorts the sets of a property whose NAME is a keyword, such as one called default", async () => {
+        const named = (required: string[]): JSONSchema7 => {
+            return {
+                ...SEARCH_SCHEMA,
+                properties: {
+                    default: { properties: { a: { type: "string" }, b: { type: "string" } }, required, type: "object" },
+                },
+            };
+        };
+
+        expect(await fingerprintMcpTool(mcpTool(named(["b", "a"])), SOURCE)).toBe(await fingerprintMcpTool(mcpTool(named(["a", "b"])), SOURCE));
+    });
+
+    it("gives up on a schema that never resolves, instead of holding up the run", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const pending = fingerprintMcpTool(mcpTool(new Promise<JSONSchema7>(() => {})), SOURCE);
+            const settled = expect(pending).rejects.toThrow("did not resolve");
+
+            await vi.advanceTimersByTimeAsync(FINGERPRINT_DEADLINE_MS + 1);
+            await settled;
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("changes when an enum gains a value", async () => {

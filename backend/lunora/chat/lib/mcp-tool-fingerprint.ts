@@ -31,11 +31,15 @@ const UNORDERED_KEYWORDS = new Set(["enum", "required", "type"]);
 /** Keywords whose value is DATA, not schema: an array in it keeps its order whatever its keys are called. */
 const DATA_KEYWORDS = new Set(["const", "default", "enum", "examples"]);
 
+/** Keywords whose value maps NAMES to subschemas: a property called `default` or `enum` is a name, not a keyword. */
+const NAME_MAP_KEYWORDS = new Set(["$defs", "definitions", "dependencies", "dependentRequired", "dependentSchemas", "patternProperties", "properties"]);
+
 /**
  * `value` with every object's keys sorted and, in schema position only, each set keyword's list sorted by its members'
- * canonical JSON. Inside data (`inData`) nothing but key order changes, so two different constants never hash alike.
+ * canonical JSON. Inside data (`inData`) nothing but key order changes, so two different constants never hash alike; in a
+ * name map (`names`) each key is a name whose value is a subschema again.
  */
-const canonical = (value: unknown, inData: boolean): unknown => {
+const canonical = (value: unknown, inData: boolean, names = false): unknown => {
     if (Array.isArray(value)) {
         return value.map((member: unknown) => canonical(member, inData));
     }
@@ -50,7 +54,11 @@ const canonical = (value: unknown, inData: boolean): unknown => {
         Object.keys(object)
             .toSorted(byCodeUnit)
             .map((key) => {
-                const member = canonical(object[key], inData || DATA_KEYWORDS.has(key));
+                if (names) {
+                    return [key, canonical(object[key], inData)];
+                }
+
+                const member = canonical(object[key], inData || DATA_KEYWORDS.has(key), !inData && NAME_MAP_KEYWORDS.has(key));
                 const isSet = !inData && UNORDERED_KEYWORDS.has(key) && Array.isArray(member);
 
                 return [key, isSet ? (member as unknown[]).toSorted((a, b) => byCodeUnit(JSON.stringify(a), JSON.stringify(b))) : member];
@@ -63,9 +71,28 @@ const canonicalJson = (value: unknown): string => JSON.stringify(canonical(value
 
 const toHex = (bytes: ArrayBuffer): string => [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
+/** How long a schema that resolves lazily may take. Past it the tool is not fingerprinted, so it never holds up a run. */
+export const FINGERPRINT_DEADLINE_MS = 2000;
+
 /** The JSON Schema the model is sent for `tool`'s input, or `null` when it declares none. Awaited: a schema may resolve lazily. */
-const inputJsonSchema = async (tool: ToolSet[string]): Promise<unknown> =>
-    tool.inputSchema === undefined ? null : await asSchema(tool.inputSchema).jsonSchema;
+const inputJsonSchema = async (tool: ToolSet[string]): Promise<unknown> => {
+    if (tool.inputSchema === undefined) {
+        return null;
+    }
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        return await Promise.race([
+            Promise.resolve(asSchema(tool.inputSchema).jsonSchema),
+            new Promise<never>((_resolve, reject) => {
+                timer = setTimeout(() => reject(new Error(`Input schema did not resolve within ${FINGERPRINT_DEADLINE_MS}ms`)), FINGERPRINT_DEADLINE_MS);
+            }),
+        ]);
+    } finally {
+        clearTimeout(timer);
+    }
+};
 
 export interface FingerprintedTool {
     annotations?: ToolAnnotationHints;
