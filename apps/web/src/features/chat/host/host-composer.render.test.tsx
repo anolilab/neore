@@ -806,9 +806,16 @@ describe("the coding-agent composer", () => {
     });
 
     it("sends a queued message next on Send now, by stopping the reply, and sends it once", async () => {
-        usePromptQueueStore.getState().enqueue("thread-1", { attachments: [], text: "first" });
-        usePromptQueueStore.getState().enqueue("thread-1", { attachments: [], text: "urgent" });
         mount({ ...session(), "chat.streaming.getActiveStreamForThread": { streamId: "stream-1" } });
+
+        // Queued in this composer: a message queued before it mounted may have been sent already, so it never stops a turn.
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        for (const text of ["first", "urgent"]) {
+            fireEvent.change(box, { target: { value: text } });
+            fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+            await screen.findByText(text);
+        }
 
         const sendNow = await screen.findByRole("button", { name: "Send queued message 2 now" });
 

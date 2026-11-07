@@ -67,7 +67,7 @@ export type HostQueuePhase =
      * A message is being posted (`itemId` is unset for a direct send). `seenLive` holds the turns seen running since it began;
      * `endedDuring` is set when one of THOSE turns ended, so an older turn's late end is never taken for this send's own.
      */
-    | { endedDuring: boolean; itemId: string | undefined; kind: "sending"; seenLive: ReadonlyArray<string> }
+    | { endedDuring: boolean; firstTry: boolean; itemId: string | undefined; kind: "sending"; requestId: string | undefined; seenLive: ReadonlyArray<string> }
     /** A turn runs, or a send was accepted and its turn has not shown yet (`streamId` unset): only that turn's end releases the queue. */
     | { kind: "awaiting-turn-end"; streamId: string | undefined }
 
@@ -97,8 +97,10 @@ export interface HostQueueState {
     sessionSeen: ReadonlyArray<string>;
 
     /**
-     * Send ids a send was made under, queued or direct. A queued message under one of them may be the turn running now (its
-     * answer was lost), so Send now never stops a turn for it.
+     * Send ids a send was made under, queued or direct, and every message already queued when the composer mounted (a reload
+     * or a remount forgets what was sent). A queued message under one of them may be the turn running now (its answer was
+     * lost), so Send now never stops a turn for it; it goes once the turn ends. That holds for any later turn too: which turn
+     * a lost send started is not known.
      */
     tried: ReadonlyArray<string>;
 }
@@ -153,6 +155,8 @@ export type HostQueueEvent =
     | { from: string; to: string; type: "edited" }
     /** Send now with no turn to stop: `itemId`, moved to the head, goes next past a paused queue, which stays paused behind it. */
     | { itemId: string; type: "released" }
+    /** The messages queued when the composer mounted: whether a send of them was made is not known, so they count as tried. */
+    | { itemIds: ReadonlyArray<string>; type: "inherited" }
     /** A wait that has a deadline ran out (`waitDeadline`). */
     | { type: "timed-out" };
 
@@ -397,6 +401,9 @@ export const stepHostQueue = (state: HostQueueState, event: HostQueueEvent): Hos
 
             return { effects: [], state: { ...state, phase: next, released: rename(state.released) } };
         }
+        case "inherited": {
+            return { effects: [], state: { ...state, tried: [...new Set([...state.tried, ...event.itemIds])] } };
+        }
         case "interrupt": {
             // The turn may have ended already, and that end been seen: then only the stop's answer is missing.
             const ended = event.streamId !== undefined && event.streamId === state.lastEnd ? undefined : null;
@@ -418,24 +425,29 @@ export const stepHostQueue = (state: HostQueueState, event: HostQueueEvent): Hos
                 return { effects: [], state };
             }
 
+            // A first send refused as a running turn was never taken, so its id is no longer one whose turn might be running. A
+            // repeat keeps it: an earlier try under the same id may be that turn.
+            const base: HostQueueState =
+                event.error === "turn_running" && phase.firstTry ? { ...state, tried: state.tried.filter((id) => id !== phase.requestId) } : state;
+
             if (event.error === "turn_running") {
                 // Another tab's turn got there first. A queued message waits for that turn's end, without a pause: it is not
                 // posted again before then. A direct send was never queued, so the person is told; the text stays in the box.
-                const live = liveNow(state, event.live);
+                const live = liveNow(base, event.live);
                 const told: HostQueueEffect[] = event.itemId === undefined ? [{ error: event.error, itemId: undefined, type: "send-refused" }] : [];
 
                 if (live !== undefined) {
-                    return { effects: told, state: { ...state, live, phase: waitFor(live) } };
+                    return { effects: told, state: { ...base, live, phase: waitFor(live) } };
                 }
 
                 // That turn has ended since: its end was observed, so the message may go again.
                 if (phase.endedDuring) {
-                    return { effects: told, state: { ...state, phase: { kind: "idle" } } };
+                    return { effects: told, state: { ...base, phase: { kind: "idle" } } };
                 }
             }
 
             // A refused queued message waits at the head for the person: the composer pauses the queue for it, if it is still queued.
-            return { effects: [{ error: event.error, itemId: event.itemId, type: "send-refused" }], state: { ...state, phase: { kind: "idle" } } };
+            return { effects: [{ error: event.error, itemId: event.itemId, type: "send-refused" }], state: { ...base, phase: { kind: "idle" } } };
         }
         case "released": {
             // Only from idle: anything else is a send or a stop in flight, which the message must not overtake.
@@ -452,7 +464,14 @@ export const stepHostQueue = (state: HostQueueState, event: HostQueueEvent): Hos
                 effects: [],
                 state: {
                     ...state,
-                    phase: { endedDuring: false, itemId: event.itemId, kind: "sending", seenLive: [] },
+                    phase: {
+                        endedDuring: false,
+                        firstTry: !state.tried.includes(event.requestId ?? event.itemId ?? ""),
+                        itemId: event.itemId,
+                        kind: "sending",
+                        requestId: event.requestId ?? event.itemId,
+                        seenLive: [],
+                    },
                     tried: remember(state.tried, event.requestId ?? event.itemId),
                     released: event.itemId !== undefined && event.itemId === state.released ? undefined : state.released,
                 },

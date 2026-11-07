@@ -286,7 +286,7 @@ describe("an accepted send that names its turn", () => {
         const running = run([observed("stream-1")], IDLE).state;
         const step = run([{ duplicate: true, itemId: undefined, streamId: "stream-1", type: "accepted" }], {
             ...running,
-            phase: { endedDuring: false, itemId: undefined, kind: "sending", seenLive: [] },
+            phase: { endedDuring: false, firstTry: true, itemId: undefined, kind: "sending", requestId: undefined, seenLive: [] },
         });
 
         expect(step.state.phase).toEqual({ kind: "awaiting-turn-end", streamId: "stream-1" });
@@ -608,6 +608,25 @@ describe("Send now", () => {
         ).state;
 
         expect(sendNowAction(lost, { itemId: "r1", running: true })).toBeUndefined();
+    });
+
+    it("does not stop a turn for a message queued before the composer mounted, since it may have been sent already", () => {
+        const inherited = run([{ itemIds: ["a"], type: "inherited" }], RUNNING).state;
+
+        expect(sendNowAction(inherited, { itemId: "a", running: true })).toBeUndefined();
+        expect(sendNowAction(inherited, { itemId: "b", running: true })).toBe("interrupt");
+    });
+
+    it("stops a turn for a message whose send was refused as a running turn, since that send was never taken", () => {
+        const refused = run(
+            [
+                { itemId: "a", type: "send" },
+                { error: "turn_running", itemId: "a", live: "stream-other", type: "refused" },
+            ],
+            IDLE,
+        ).state;
+
+        expect(sendNowAction(refused, { itemId: "a", running: true })).toBe("interrupt");
     });
 
     it("holds a released message again when a turn from elsewhere starts before it went", () => {

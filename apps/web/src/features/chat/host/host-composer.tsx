@@ -307,6 +307,13 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         }
     };
 
+    // Messages already queued when the composer mounts (restored after a reload, or left by an earlier visit) may have been sent
+    // under their ids, and this machine never saw it: they count as tried.
+    useEffect(() => {
+        dispatch({ itemIds: usePromptQueueStore.getState().queues[threadId]?.items.map((item) => item.id) ?? [], type: "inherited" });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [threadId]);
+
     const { phase } = machine;
     const sending = phase.kind === "sending";
     const interrupting = phase.kind === "awaiting-stop";
