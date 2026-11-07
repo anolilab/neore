@@ -205,3 +205,8 @@
     color: #f2f2f2;
     text-decoration-color: #caff00;
 }
+
+/* An area F6 moved focus to (sidebar, thread, panel): the outline shows where focus went. The composer editor sets its own. */
+[data-focus-area]:not([contenteditable]):focus-visible {
+    @apply outline-ring outline-2 -outline-offset-2 outline-solid;
+}

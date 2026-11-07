@@ -229,12 +229,15 @@ const Sidebar = <T extends string>({
     children,
     className,
     collapsible = "offcanvas",
+    "data-focus-area": focusArea,
     name,
     side = "left",
     variant = "sidebar",
     ...properties
 }: ComponentProps<"div"> & {
     collapsible?: "offcanvas" | "icon" | "none";
+    /** Marks the sidebar as a screen area for F6 focus traversal; set on the element the user sees (the sheet on mobile). */
+    "data-focus-area"?: string;
     name: T;
     side?: "left" | "right";
     variant?: "sidebar" | "floating" | "inset";
@@ -259,6 +262,7 @@ const Sidebar = <T extends string>({
             <Sheet onOpenChange={(open) => setState({ isMobileOpen: open })} open={isMobileOpen} {...properties}>
                 <SheetContent
                     className="dark:bg-sidebar text-brand-black dark:text-brand-white w-(--sidebar-width) p-0 [&>button]:hidden"
+                    data-focus-area={focusArea}
                     data-mobile="true"
                     data-sidebar="sidebar"
                     data-slot="sidebar"
@@ -313,6 +317,7 @@ const Sidebar = <T extends string>({
                     // group-data-[side=left]:border-r
                     className,
                 )}
+                data-focus-area={focusArea}
                 data-slot="sidebar-container"
                 {...properties}
             >

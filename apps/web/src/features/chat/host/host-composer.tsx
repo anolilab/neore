@@ -837,6 +837,8 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                     aria-invalid={limitNote || undefined}
                     aria-label={t`Message to the coding agent`}
                     className="bg-background min-h-11 flex-1 resize-none rounded-lg border px-3 py-2 text-sm disabled:opacity-60"
+                    // The box is the composer's focus area for F6, as the cloud composer's editor is (`composer-tiptap/editor-attributes.ts`).
+                    data-focus-area="composer"
                     disabled={blocked}
                     onChange={(event) => {
                         // Typed and pasted text both come through here, whole: a length limit on the element would cut a paste

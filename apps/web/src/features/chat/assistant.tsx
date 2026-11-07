@@ -2,6 +2,7 @@
  * Assistant - Main chat entry point using ChatProvider
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@neore/ui/components/resizable";
 import { SidebarInset } from "@neore/ui/components/sidebar";
 import type { CSSProperties, FC } from "react";
@@ -52,13 +53,14 @@ const AssistantContent: FC<{
 }> = ({ initialMessage, promptId, threadId }) => {
     // Load prompt if promptId is provided (must be inside ChatProvider)
     usePromptLoader(promptId);
+    const { t } = useLingui();
     const { isCanvasOpen } = useCanvasState();
     const rightSidebarWidth = useUIStateStore((s) => s.rightSidebarWidth);
 
     return (
         <div className="animate-in fade-in flex h-dvh w-full duration-150">
             <AppSidebar content={<ThreadList />} header={<ThreadListHeader />} name="assistant" />
-            <SidebarInset className="dark:bg-brand-obsidian md:peer-data-[variant=inset]:m-1">
+            <SidebarInset className="dark:bg-brand-obsidian md:peer-data-[variant=inset]:m-1" data-focus-area="thread">
                 <ChatSiteHeader threadId={threadId} />
                 {isCanvasOpen ? (
                     <ResizablePanelGroup className="h-[calc(100%-40px)]">
@@ -66,7 +68,7 @@ const AssistantContent: FC<{
                             <Thread className="h-full" initialMessage={initialMessage} />
                         </ResizablePanel>
                         <ResizableHandle withHandle />
-                        <ResizablePanel defaultSize={50} minSize={25}>
+                        <ResizablePanel aria-label={t`Canvas`} data-focus-area="canvas" defaultSize={50} minSize={25} role="region">
                             <CanvasPanel />
                         </ResizablePanel>
                     </ResizablePanelGroup>
@@ -74,7 +76,12 @@ const AssistantContent: FC<{
                     <Thread initialMessage={initialMessage} />
                 )}
             </SidebarInset>
-            <div data-sidebar-right-wrapper="" style={{ "--sidebar-width": `${rightSidebarWidth}px` } as CSSProperties}>
+            <div
+                aria-label={t`Thread details`}
+                data-sidebar-right-wrapper=""
+                role="complementary"
+                style={{ "--sidebar-width": `${rightSidebarWidth}px` } as CSSProperties}
+            >
                 <ThreadSidebar threadId={threadId} />
             </div>
         </div>
