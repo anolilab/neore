@@ -198,9 +198,10 @@ export const RECORD_RETRY = { backoff: "exponential", baseMs: 10_000, maxAttempt
 
 /**
  * Past this long after the reply was recorded, a record whose project read fails again files the reply without a
- * project instead of failing: by then the retries above are spent, and the total and skill rows must land.
+ * project instead of failing: only the last try (+130 s) is that late, so every earlier retry still gets to read the
+ * project, and the total and skill rows land either way.
  */
-export const LAST_TRY_AFTER_MS = 60_000;
+export const LAST_TRY_AFTER_MS = 120_000;
 
 /** The key `usageReplies` holds once a reply (keyed `replyKey`) has been filed under its project. */
 export const projectFiledKey = (replyKey: string): string => `project:${replyKey}`;

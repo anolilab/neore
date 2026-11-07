@@ -757,6 +757,43 @@ describe("project backfill", () => {
         expect(await projectRows()).toStrictEqual(EXPECTED_PROJECTS(alpha, beta));
     });
 
+    it("files nothing more of a thread whose project the user lost access to between two steps", async () => {
+        const orgProject = await harness.run(
+            async (ctx: any) => await ctx.db.insert("projects", { createdAt: DAY_1, organizationId: "org_1", title: "Org", userId: "teammate" }),
+        );
+        const membership = await harness.run(
+            async (ctx: any) => await ctx.db.insert("member", { createdAt: 0, organizationId: "org_1", role: "member", userId: USER }),
+        );
+
+        // Twice what one step reads: the walk stops part-way through the thread.
+        await insertThread(
+            DAY_1,
+            Array.from({ length: BACKFILL_ROWS_PER_STEP }, () => [prompt(), reply(1, 10)]),
+            "active",
+            orgProject,
+        );
+        vi.setSystemTime(STARTED);
+        await start();
+
+        for (let current = await state(); current.status !== "done"; current = await state()) {
+            await step(current.runId);
+        }
+
+        const walking = await state();
+
+        await projectStep(walking.projects.runId);
+
+        const filedWhileMember = await projectRows();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.delete("member", membership);
+        });
+        await drain();
+
+        expect(filedWhileMember.length).toBeGreaterThan(0);
+        expect(await projectRows()).toStrictEqual(filedWhileMember);
+    });
+
     it("starts the project walk only once the first walk is done, from the first walk's cutoff", async () => {
         const { alpha, beta } = await insertProjectFixture();
 
@@ -886,6 +923,11 @@ describe("project backfill", () => {
         const shared = await harness.run(
             async (ctx: any) => await ctx.db.insert("threads", { projectId: orgProject, status: "active", title: "Shared", userId: "teammate" }),
         );
+
+        // The user is a member of the project's organization, so they can open it.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org_1", role: "member", userId: USER });
+        });
 
         // The teammate's shard read the thread's project and forwarded the record to the user's.
         await harness.run(

@@ -311,10 +311,13 @@ const walk = async <I>(ctx: MutationCtx, userId: string, position: Position, pas
 
     if (threadId !== undefined && pass.skipThread) {
         // A position saved before the project was kept with it reads the thread's project now.
-        thread =
-            position.threadProjectKey === undefined
-                ? await readableAttribution(ctx, await threadProject(ctx, threadId), userId)
-                : { projectKey: position.threadProjectKey };
+        // A resumed thread keeps the project it was in when the walk began it, checked again: access revoked since
+        // files none of the rest.
+        thread = await readableAttribution(
+            ctx,
+            position.threadProjectKey === undefined ? await threadProject(ctx, threadId) : { projectKey: position.threadProjectKey },
+            userId,
+        );
     }
 
     while (budget > 0) {
@@ -455,6 +458,9 @@ export const runUsageBackfillStep = internalMutation
         return null;
     });
 
+/** A day's rows of one kind the clamp reads, at most. */
+const CLAMP_DAY_ROWS = 1000;
+
 /**
  * `increments` cut so no day's project rows add up to more than that day's total row: a last guard that the projects
  * and "No project" always add up to the total, whatever a snapshot says.
@@ -469,9 +475,11 @@ const clampToDayTotals = async (ctx: DbCtx, userId: string, increments: Readonly
         if (!left) {
             // Every row of each kind, not the first: a guest-to-account merge can leave a day with two total rows. An
             // unlimited `findMany` returns all matching rows (`backend/AGENTS.md`).
+            // Bounded: a day holds a total row (two after a merge) and one row per project. Past the bound the day's
+            // project rows are not all read, so the room is taken as none and the day's project stays unfiled.
             const sumOf = async (skillKey: string) => {
-                const { page } = await ctx.db.usageDaily.findMany({ where: { date: increment.date, skillKey, userId } });
-                const sum = { costMicrodollars: 0, replies: 0, tokens: 0 };
+                const { page } = await ctx.db.usageDaily.findMany({ limit: CLAMP_DAY_ROWS, where: { date: increment.date, skillKey, userId } });
+                const sum = { costMicrodollars: 0, replies: 0, tokens: 0, unread: page.length >= CLAMP_DAY_ROWS };
 
                 for (const row of page) {
                     sum.costMicrodollars += row.costMicrodollars;
@@ -484,11 +492,13 @@ const clampToDayTotals = async (ctx: DbCtx, userId: string, increments: Readonly
             const total = await sumOf(TOTAL_SKILL_KEY);
             const filed = await sumOf(PROJECT_SKILL_KEY);
 
-            left = {
-                costMicrodollars: total.costMicrodollars - filed.costMicrodollars,
-                replies: total.replies - filed.replies,
-                tokens: total.tokens - filed.tokens,
-            };
+            left = filed.unread
+                ? { costMicrodollars: 0, replies: 0, tokens: 0 }
+                : {
+                      costMicrodollars: total.costMicrodollars - filed.costMicrodollars,
+                      replies: total.replies - filed.replies,
+                      tokens: total.tokens - filed.tokens,
+                  };
             room.set(increment.date, left);
         }
 

@@ -355,8 +355,10 @@ describe("recording usage by project", () => {
             await ctx.db.delete("member", membership);
         });
         await record({ costMicrodollars: 50, replyKey: "after-revoked", threadId, tokens: 5 });
+        // A project a forward or side question read before the revocation is checked again when the record lands.
+        await record({ costMicrodollars: 20, replyKey: "read-before-revoked", threadAttribution: { projectKey: projectId }, threadId, tokens: 2 });
 
-        // Only the reply recorded while a member is under the project; the other counts in the total alone.
+        // Only the reply recorded while a member is under the project; the others count in the total alone.
         expect(await projectTotals(USER)).toStrictEqual({ [projectId]: { costMicrodollars: 30, replies: 1, tokens: 3 } });
     });
 

@@ -287,8 +287,13 @@ export const recordReplyUsage = internalMutation
         const costMicrodollars = Math.max(0, Math.round(args.costMicrodollars));
         const tokens = Math.max(0, Math.round(args.tokens));
         const recorded = await ctx.db.usageReplies.findFirst({ where: { replyKey: args.replyKey, userId: args.userId } });
+        // A project read by the caller is checked again here: access revoked since that read files none.
         const attribution = async (): Promise<Attribution> =>
-            args.threadAttribution ?? (await attributionOrNone(ctx, args, async () => await attributionFor(ctx, args.threadId, args.userId)));
+            await attributionOrNone(ctx, args, async () =>
+                args.threadAttribution === undefined
+                    ? await attributionFor(ctx, args.threadId, args.userId)
+                    : await readableAttribution(ctx, args.threadAttribution, args.userId),
+            );
 
         // A redelivered job (already filed), or a reply the backfill reached first: the first walk files no project, so
         // the project is filed here, once — at what the walk counted (`counted`: a run it passed while paused holds less
