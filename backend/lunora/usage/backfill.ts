@@ -70,6 +70,9 @@ export const BACKFILL_LEASE_MS = 5 * 60 * 1000;
 /** `usageReplies` keys kept past a finished backfill — long enough for any redelivery. */
 export const REPLY_KEY_KEEP_MS = 2 * 24 * 60 * 60 * 1000;
 
+/** How long before the first walk's start a reply may have begun and still been running when that walk passed it. */
+const PENDING_MARGIN_MS = 60 * 60 * 1000;
+
 /** `threadCursor` once the last thread has been taken. */
 const THREADS_END = "end";
 
@@ -126,8 +129,8 @@ export const ensureBackfill = async (ctx: MutationCtx, userId: string, now: numb
             updatedAt: now,
             userId,
             // Both walks date a reply in this zone, so a later change of zone cannot put a reply's project row and its
-            // total on different days.
-            ...(settings?.timezone && { timeZone: settings.timezone }),
+            // total on different days. No zone yet is UTC, recorded as such so a zone set later changes nothing.
+            timeZone: settings?.timezone || "UTC",
         });
     }
 
@@ -451,12 +454,19 @@ export const runUsageProjectBackfillStep = internalMutation
                         return undefined;
                     }
 
+                    // A reply started just before the first walk may have still been running when that walk passed it,
+                    // and then only its live record counts it in the total. File it only once that record has landed
+                    // (its key is held): a record that never landed must not leave a project row with no total.
+                    if (group.rows[0]!._creationTime >= state.startedAt - PENDING_MARGIN_MS && !(await anyRecorded(ctx, userId, group.rows))) {
+                        return undefined;
+                    }
+
                     return {
                         costMicrodollars: increment.costMicrodollars,
                         date: increment.date,
+                        projectKey: thread.projectKey,
                         replies: increment.replies,
                         tokens: increment.tokens,
-                        ...thread,
                     };
                 },
                 skipThread: (thread) => thread.projectKey === undefined,

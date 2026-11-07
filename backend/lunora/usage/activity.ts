@@ -28,7 +28,7 @@ import { internalMutation } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authQuery } from "../lib/crpc";
 import { projectOrganizationOf, readableProject } from "../projects/functions";
-import type { Attribution, AttributionIncrement, ProjectTotal, RollupIncrement } from "./activity-logic";
+import type { Attribution, AttributionIncrement, OrganizationRow, ProjectTotal, RollupIncrement } from "./activity-logic";
 import {
     addDays,
     BREAKDOWN_ROW_LIMIT,
@@ -38,9 +38,9 @@ import {
     HEATMAP_DAYS,
     isDayKey,
     attributionRows,
-    ORGANIZATION_SKILL_KEY,
     PROJECT_ROW_LIMIT,
     organizationFiledKey,
+    organizationRows,
     PROJECT_SKILL_KEY,
     projectFiledKey,
     remainderOf,
@@ -54,7 +54,7 @@ import {
 const vDayKey = () => v.string().check(isDayKey, { message: "Expected a YYYY-MM-DD date", schema: { maxLength: 10, minLength: 10 } });
 
 /** `skillKey`s the rollup keeps for itself; a reply never records under one. */
-const RESERVED_SKILL_KEYS = new Set([ORGANIZATION_SKILL_KEY, PROJECT_SKILL_KEY, TOTAL_SKILL_KEY]);
+const RESERVED_SKILL_KEYS = new Set([PROJECT_SKILL_KEY, TOTAL_SKILL_KEY]);
 
 type DbCtx = Pick<MutationCtx, "db">;
 
@@ -94,10 +94,13 @@ const attributionOfThread = async (ctx: DbCtx, threadId: string | undefined): Pr
 };
 
 /**
- * Files a recorded reply under its project and organization, each part once: the project walk may have filed the
- * project row already (it marks `project:<key>`), but it never files an organization row. A late record marks each part
- * it files; a first record does not need to, since the reply's own key (`projectFiled`) already stops the walk and any
- * redelivery.
+ * Files a recorded reply under its project (the user's rollup) and its organization (the organization's rollup), each
+ * part once: the project walk may have filed the project row already (it marks `project:<key>`), and no walk files an
+ * organization. A first record needs no markers — the reply's own key (`projectFiled`) stops the walk and any
+ * redelivery. A late record (`finalize`) marks both parts whatever it filed, so a later delivery, after the thread has
+ * moved, cannot file the reply again somewhere else.
+ *
+ * The organization's rollup is a `.global()` table, written last: nothing in this transaction can fail after it.
  */
 const fileAttribution = async (
     ctx: DbCtx,
@@ -105,44 +108,35 @@ const fileAttribution = async (
     attribution: Attribution,
     date: string,
     amounts: { costMicrodollars: number; tokens: number },
-    markParts: boolean,
+    finalize: boolean,
 ): Promise<void> => {
     const { at, replyKey, userId } = reply;
-    const fileProject = attribution.projectKey !== undefined && !(await isReplyRecorded(ctx, userId, projectFiledKey(replyKey)));
-    const fileOrganization = attribution.organizationId !== undefined && !(await isReplyRecorded(ctx, userId, organizationFiledKey(replyKey)));
-    const increments: AttributionIncrement[] = [];
+    const projectFiled = await isReplyRecorded(ctx, userId, projectFiledKey(replyKey));
+    const organizationFiled = await isReplyRecorded(ctx, userId, organizationFiledKey(replyKey));
 
-    if (fileProject) {
-        increments.push({ ...amounts, date, replies: 1, ...attribution, organizationRow: false });
-
-        if (markParts) {
+    if (finalize) {
+        if (!projectFiled) {
             await markReplyRecorded(ctx, userId, projectFiledKey(replyKey), at);
         }
-    }
 
-    if (fileOrganization) {
-        increments.push({ ...amounts, date, organizationId: attribution.organizationId, replies: 1 });
-
-        if (markParts) {
+        if (!organizationFiled) {
             await markReplyRecorded(ctx, userId, organizationFiledKey(replyKey), at);
         }
     }
 
-    await addToAttributionRollup(ctx, userId, increments, at);
+    if (attribution.projectKey !== undefined && !projectFiled) {
+        await addToAttributionRollup(ctx, userId, [{ ...amounts, date, projectKey: attribution.projectKey, replies: 1 }], at);
+    }
+
+    if (attribution.organizationId !== undefined && !organizationFiled) {
+        await addToOrganizationRollup(ctx, attribution.organizationId, organizationRows(attribution, { ...amounts, date }), at);
+    }
 };
 
-/** Adds `increments` to the user's per-day project and organization rows. */
+/** Adds `increments` to the user's per-day project rows. */
 export const addToAttributionRollup = async (ctx: DbCtx, userId: string, increments: ReadonlyArray<AttributionIncrement>, at: number): Promise<void> => {
-    for (const row of attributionRows(increments)) {
-        const { costMicrodollars, date, organizationId, projectKey, replies, skillKey, tokens } = row;
-        // The organization is part of a row's key, and an absent one cannot be matched in a query: compare here.
-        const { page: candidates } = await ctx.db.usageDaily.findMany({
-            limit: 50,
-            where: { date, skillKey, userId, ...(projectKey !== undefined && { projectKey }), ...(organizationId !== undefined && { organizationId }) },
-        });
-        const existing = candidates.find(
-            (candidate) => (candidate.organizationId ?? undefined) === organizationId && (candidate.projectKey ?? undefined) === projectKey,
-        );
+    for (const { costMicrodollars, date, projectKey, replies, skillKey, tokens } of attributionRows(increments)) {
+        const existing = await ctx.db.usageDaily.findFirst({ where: { date, projectKey, skillKey, userId } });
 
         if (existing) {
             await ctx.db.patch("usageDaily", existing._id, {
@@ -152,17 +146,25 @@ export const addToAttributionRollup = async (ctx: DbCtx, userId: string, increme
                 updatedAt: at,
             });
         } else {
-            await ctx.db.insert("usageDaily", {
-                costMicrodollars,
-                date,
-                replies,
-                skillKey,
-                tokens,
+            await ctx.db.insert("usageDaily", { costMicrodollars, date, projectKey, replies, skillKey, tokens, updatedAt: at, userId });
+        }
+    }
+};
+
+/** Adds `rows` to the organization's per-day usage, shared by all its members and kept after any of them leaves. */
+const addToOrganizationRollup = async (ctx: DbCtx, organizationId: string, rows: ReadonlyArray<OrganizationRow>, at: number): Promise<void> => {
+    for (const { costMicrodollars, date, projectKey, replies, tokens } of rows) {
+        const existing = await ctx.db.usageOrganizationDaily.findFirst({ where: { date, organizationId, projectKey } });
+
+        if (existing) {
+            await ctx.db.patch("usageOrganizationDaily", existing._id, {
+                costMicrodollars: existing.costMicrodollars + costMicrodollars,
+                replies: existing.replies + replies,
+                tokens: existing.tokens + tokens,
                 updatedAt: at,
-                userId,
-                ...(projectKey !== undefined && { projectKey }),
-                ...(organizationId !== undefined && { organizationId }),
             });
+        } else {
+            await ctx.db.insert("usageOrganizationDaily", { costMicrodollars, date, organizationId, projectKey, replies, tokens, updatedAt: at });
         }
     }
 };
@@ -347,7 +349,7 @@ export const getSkillBreakdown = authQuery
             limit: BREAKDOWN_ROW_LIMIT,
             orderBy: [{ date: "desc" }],
             // Project rows are another breakdown's; they must not use up this read's bound.
-            where: { date: { gte: args.fromDate }, skillKey: { notIn: [PROJECT_SKILL_KEY, ORGANIZATION_SKILL_KEY] }, userId },
+            where: { date: { gte: args.fromDate }, skillKey: { ne: PROJECT_SKILL_KEY }, userId },
         });
 
         return {
@@ -369,7 +371,10 @@ const totalSince = async (ctx: Pick<QueryCtx, "db">, userId: string, fromDate: s
         where: { date: { gte: fromDate }, skillKey: TOTAL_SKILL_KEY, userId },
     });
 
-    return { total: sumRows(page), truncated: page.length >= HEATMAP_DAYS * 2 };
+    const truncated = page.length >= HEATMAP_DAYS * 2;
+
+    // When the read stopped short, the total covers only from its oldest day on: whatever is summed beside it must too.
+    return { coveredFrom: truncated ? page.at(-1)?.date : undefined, total: sumRows(page), truncated };
 };
 
 /**
@@ -398,7 +403,8 @@ export const getProjectBreakdown = authQuery
                 where: { date: { gte: args.fromDate }, skillKey: PROJECT_SKILL_KEY, userId },
             }),
         ]);
-        const projects = foldProjectTotals(rows.page);
+        // The projects cover exactly the days the total does, so they never add up to more than it.
+        const projects = foldProjectTotals(totals.coveredFrom === undefined ? rows.page : rows.page.filter((row) => row.date >= totals.coveredFrom!));
         const titled: (ProjectTotal & { title?: string })[] = [];
 
         // A few lookups at a time: each is up to three reads, and a long history holds many projects.

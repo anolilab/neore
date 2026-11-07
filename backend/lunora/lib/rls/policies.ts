@@ -458,6 +458,8 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     threadKnowledge: "link rows with no owner column; every access follows a thread access check",
     triggerExecutions: "no owner column; every access follows the parent trigger's owner check",
     verification: "better-auth verification tokens",
+    usageOrganizationDaily:
+        "an organization's per-day usage aggregates, no user column; written by the usage record and read only by `usage_organization.getOrganizationProjectUsage` after the org admin check",
 };
 
 export const POLICIES = definePolicies<PolicyCtx>(Object.entries(RULES).flatMap(([table, rules]) => policiesFor(table, rules)));

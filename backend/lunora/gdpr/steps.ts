@@ -1,6 +1,7 @@
 import { LunoraError, v } from "lunorash/server";
 
 import { collectAcpSessionPages } from "../acp/gdpr";
+import { collectUsageDailyPages } from "../usage/gdpr";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalQuery } from "../_generated/server";
@@ -8,7 +9,6 @@ import { gdprLogger } from "../lib/logger";
 import { queueEmail } from "../email/mailer";
 import { SITE_URL } from "../env";
 import { withDependency } from "../lib/dependency";
-import { ORGANIZATION_SKILL_KEY, PROJECT_SKILL_KEY } from "../usage/activity-logic";
 
 const TRAILING_SLASH = /\/$/;
 
@@ -357,62 +357,26 @@ export const collectFiles = internalQuery
 /** Rows of each activity table in the export. Past this the export says so rather than growing without bound. */
 const EXPORT_ACTIVITY_CAP = 5000;
 
-/**
- * Project and organization rows an export always has room for, when it has them. The usage rows together stay within
- * {@link EXPORT_ACTIVITY_CAP} — the collected activity is a workflow step's result, which has a size cap — and day and
- * skill rows take every slot the project and organization rows leave free.
- */
-const EXPORT_ATTRIBUTION_FLOOR = 1000;
-
-/** How many of each kind an export takes from what there is: neither kind can crowd the other out of its floor. */
-export const exportUsageSplit = (dayAndSkill: number, attribution: number): { attribution: number; dayAndSkill: number } => {
-    const attributionTaken = Math.min(attribution, Math.max(EXPORT_ATTRIBUTION_FLOOR, EXPORT_ACTIVITY_CAP - dayAndSkill));
-
-    return { attribution: attributionTaken, dayAndSkill: Math.min(dayAndSkill, EXPORT_ACTIVITY_CAP - attributionTaken) };
-};
-
-/** The usage rollup's project and organization rows, exported within a bound of their own. */
-const ATTRIBUTION_SKILL_KEYS = [ORGANIZATION_SKILL_KEY, PROJECT_SKILL_KEY] as const;
-
 /** The export JSON is built whole in memory before it is stored; this is the largest one we will write. */
 const MAX_EXPORT_BYTES = 32 * 1024 * 1024;
 
 /**
- * Usage history, sub-agent delegations (their task text and results) and
- * knowledge collections — user data the export used to leave out.
+ * Sub-agent delegations (their task text and results) and knowledge
+ * collections — user data the export used to leave out. Usage history is read
+ * by `generateExportFile`, a page at a time (`usage/gdpr.ts`).
  */
 export const collectActivityForExport = internalQuery
     .input({ userId: v.string() })
-    .output(
-        v.object({
-            knowledgeCollections: v.array(v.any()),
-            subAgentRuns: v.array(v.any()),
-            usageDaily: v.array(v.any()),
-            usageDailyTruncated: v.boolean(),
-        }),
-    )
+    .output(v.object({ knowledgeCollections: v.array(v.any()), subAgentRuns: v.array(v.any()) }))
     .query(async ({ args: { userId }, ctx: context }) => {
-        // Day and skill rows, and project and organization rows, each read within their own bound: neither kind can push
-        // the other out, and the export says when either was cut short.
-        const [dayAndSkillRows, attributionRows, subAgentRuns, { page: collections }] = await Promise.all([
-            context.db.usageDaily.findMany({
-                limit: EXPORT_ACTIVITY_CAP + 1,
-                orderBy: [{ date: "desc" }],
-                where: { skillKey: { notIn: [...ATTRIBUTION_SKILL_KEYS] }, userId },
-            }),
-            context.db.usageDaily.findMany({
-                limit: EXPORT_ACTIVITY_CAP + 1,
-                orderBy: [{ date: "desc" }],
-                where: { skillKey: { in: [...ATTRIBUTION_SKILL_KEYS] }, userId },
-            }),
+        // Usage history is not read here: `generateExportFile` reads all of it, a page at a time.
+        const [subAgentRuns, { page: collections }] = await Promise.all([
             context.db
                 .query("subAgentRuns")
                 .withIndex("by_user_and_createdAt", (q) => q.eq("userId", userId))
                 .take(EXPORT_ACTIVITY_CAP),
             context.db.knowledgeCollections.findMany({ where: { userId } }),
         ]);
-
-        const split = exportUsageSplit(dayAndSkillRows.page.length, attributionRows.page.length);
 
         return {
             knowledgeCollections: collections.map((collection) => {
@@ -439,18 +403,6 @@ export const collectActivityForExport = internalQuery
                     task: run.task,
                 };
             }),
-            usageDaily: [...dayAndSkillRows.page.slice(0, split.dayAndSkill), ...attributionRows.page.slice(0, split.attribution)].map((row) => {
-                return {
-                    costMicrodollars: row.costMicrodollars,
-                    date: row.date,
-                    replies: row.replies,
-                    skill: row.skillName ?? row.skillKey,
-                    tokens: row.tokens,
-                    ...(row.projectKey !== undefined && row.projectKey !== null && { project: row.projectKey }),
-                    ...(row.organizationId !== undefined && row.organizationId !== null && { organization: row.organizationId }),
-                };
-            }),
-            usageDailyTruncated: dayAndSkillRows.page.length > split.dayAndSkill || attributionRows.page.length > split.attribution,
         };
     });
 
@@ -505,9 +457,9 @@ export const generateExportFile = internalAction
         // Coding-agent sessions on paired devices (`acp/gdpr.ts`). Read here, a page at a
         // time, unless a workflow already in flight passes them.
         acpSessions: v.optional(v.any()),
-        // Usage history, sub-agent runs and knowledge collections
-        // (`collectActivityForExport`). Optional for the same in-flight-replay
-        // reason as `threadTags`.
+        // Sub-agent runs and knowledge collections (`collectActivityForExport`); usage history is read
+        // here, a page at a time, unless a workflow in flight recorded it with these. Optional for the same
+        // in-flight-replay reason as `threadTags`.
         activity: v.optional(v.any()),
         // Bots, their persona and computer settings (`bots/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
@@ -559,8 +511,7 @@ export const generateExportFile = internalAction
         watchedRepositories: v.optional(v.any()),
     })
     .action(async ({ args, ctx: context }) => {
-        const activity = args.activity as
-            { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[]; usageDailyTruncated?: boolean } | undefined;
+        const activity = args.activity as { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[] } | undefined;
         const exportData = {
             // Read here, a page per query, so no workflow step result or action argument carries the history.
             acpSessions:
@@ -594,8 +545,12 @@ export const generateExportFile = internalAction
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadTags: args.threadTags ?? [],
-            usageDaily: activity?.usageDaily ?? [],
-            usageDailyTruncated: activity?.usageDailyTruncated ?? false,
+            // A workflow already in flight recorded its usage rows with the activity; a new one reads them all here.
+            usageDaily:
+                activity?.usageDaily ??
+                (await collectUsageDailyPages(
+                    async (cursor) => await context.runQuery(internal.usage.gdpr.collectUsageDailyForExport, { cursor, userId: args.userId }),
+                )),
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };
 

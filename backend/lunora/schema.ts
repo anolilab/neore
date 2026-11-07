@@ -3333,9 +3333,6 @@ export const schema = defineSchema({
         costMicrodollars: v.number(),
         // The user's calendar day (their time zone when the reply landed), YYYY-MM-DD.
         date: v.string(),
-        // The organization the reply was filed under: on `__organization__` rows, and on `__project__` rows of an
-        // organization's project.
-        organizationId: v.optional(v.string()),
         // The project the reply's thread was in when it was recorded; set only on `__project__` rows.
         projectKey: v.optional(v.string()),
         replies: v.number(),
@@ -3351,9 +3348,25 @@ export const schema = defineSchema({
         .index("by_user_date", ["userId", "date"])
         // One project's rows (the project settings' totals, and the project rows' upsert).
         .index("by_user_project_date", ["userId", "projectKey", "date"])
-        // One organization's rows of a member (the organization view).
-        .index("by_user_organization_date", ["userId", "organizationId", "date"])
         // The retention sweep (`gdpr/retention.ts`), which serves a whole shard.
+        .index("by_date", ["date"]),
+
+    // An organization's per-day usage, filed when each reply is recorded (`usage/organization.ts`): one row per day
+    // for the whole organization (`projectKey` = `__total__`) and one per day and project the organization owns.
+    // Keyed by organization, not member, so it outlives a member's membership; it holds no user: aggregates only.
+    usageOrganizationDaily: defineTable({
+        costMicrodollars: v.number(),
+        date: v.string(),
+        organizationId: v.string(),
+        projectKey: v.string(),
+        replies: v.number(),
+        tokens: v.number(),
+        updatedAt: v.number(),
+    })
+        .global()
+        .index("by_org_date", ["organizationId", "date"])
+        .index("by_org_project_date", ["organizationId", "projectKey", "date"])
+        // The retention sweep.
         .index("by_date", ["date"]),
 
     // The replies already in `usageDaily`, keyed by the reply's first row id:

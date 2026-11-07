@@ -79,7 +79,7 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
     const fetchOrganization = useAction(api.usage.organization.getOrganizationProjectUsage);
     const organization = useQuery({
         enabled: organizationEnabled,
-        queryFn: async () => await readOrganizationUsage(async (cursor) => await fetchOrganization({ cursor, fromDate })),
+        queryFn: async () => await readOrganizationUsage(async () => await fetchOrganization({ fromDate, organizationId })),
         // Keyed by the signed-in user and the organization: switching either never shows the previous one's totals.
         queryKey: ["usage", "organization-projects", userId, organizationId, fromDate],
         retry: retryOrganizationRead,

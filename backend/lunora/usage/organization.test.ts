@@ -1,8 +1,7 @@
 /**
- * The organization view: a reply is filed under its organization and project at
- * record time, a member's read adds up exactly those rows, and the action hands
- * the client organization-wide totals only — never a sum it could narrow to one
- * member.
+ * The organization view: each reply adds to its organization's rollup when it
+ * is recorded, and the view reads that rollup — every member, past and
+ * present, and only projects the organization owns, totals only.
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,11 +19,8 @@ vi.mock("../_generated/internal", async (importOriginal) => {
     return registeredApi(await importOriginal(), registry);
 });
 
-const { harnessRef, sessionFrom } = vi.hoisted(() => {
-    vi.stubEnv("ENCRYPTION_KEY", btoa(String.fromCodePoint(...Array.from({ length: 32 }, (_, index) => index + 1))));
-
+const { sessionFrom } = vi.hoisted(() => {
     return {
-        harnessRef: { current: undefined as any },
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
             context.auth.userId
                 ? { activeOrganization: { id: "org_1", role: "admin" }, id: context.auth.userId, isAdmin: false, userId: context.auth.userId }
@@ -41,30 +37,13 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     };
 });
 
-// One database serves every shard in the harness: a member's shard call runs right here.
-vi.mock("../lib/cross-shard", () => {
-    return {
-        callOnShard: async (_reference: unknown, args: Record<string, unknown>) => {
-            const { memberOrganizationUsage } = await import("./organization");
-
-            return await harnessRef.current.run(async (ctx: any) => await ctx.runQuery(memberOrganizationUsage, args));
-        },
-    };
-});
-
 const { registerModule } = await import("../../test/registered-api");
 const { default: schema } = await import("../schema");
 const { recordReplyUsage } = await import("./activity");
-const { DEFAULT_SKILL_KEY } = await import("./activity-logic");
-const {
-    getOrganizationProjectUsage,
-    isOrganizationAdminRole,
-    MAX_CURSOR_PROJECTS,
-    memberOrganizationUsage,
-    MEMBERS_PER_CALL,
-    openCursor,
-    organizationUsageScope,
-} = await import("./organization");
+const { DEFAULT_SKILL_KEY, ORGANIZATION_TOTAL_KEY } = await import("./activity-logic");
+const { getOrganizationProjectUsage, isOrganizationAdminRole, ORGANIZATION_ROW_PAGE, pruneOrganizationUsage } = await import("./organization");
+
+registerModule(registry, "usage_organization", await import("./organization"));
 
 const ADMIN = "user-admin";
 const MEMBER = "user-member";
@@ -94,26 +73,26 @@ const record = async (userId: string, threadId: string, costMicrodollars: number
     );
 };
 
-/** For `userId`: a thread in the org's project, one in the org with no project, and one of their own. */
+/** For `userId`: a reply in the org's project, one in the org with no project, and one of their own. */
 const usageOf = async (userId: string, projectId: string, inProject: number, inOrganization: number, own: number) => {
     await record(userId, await insert("threads", { organizationId: ORG, projectId, status: "active", title: "T", userId }), inProject);
     await record(userId, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId }), inOrganization);
     await record(userId, await insert("threads", { status: "active", title: "T", userId }), own);
 };
 
-const asAdmin = () => harness.withIdentity({ userId: ADMIN } as never);
-
-const read = async (cursor?: string) =>
-    (await asAdmin().action(getOrganizationProjectUsage as never, { fromDate: FROM, ...(cursor !== undefined && { cursor }) } as never)) as {
-        cursor?: string;
-        result?: any;
+const read = async (args: Record<string, unknown> = {}) =>
+    (await harness.withIdentity({ userId: ADMIN } as never).action(getOrganizationProjectUsage as never, { fromDate: FROM, ...args } as never)) as {
+        result: {
+            noProject: { costMicrodollars: number };
+            projects: { costMicrodollars: number; projectKey: string; title: string }[];
+            total: { costMicrodollars: number; replies: number };
+            truncated: boolean;
+        };
     };
 
-registerModule(registry, "usage_organization", await import("./organization"));
-
-beforeEach(() => {
+beforeEach(async () => {
     harness = lunoraTest(schema as never);
-    harnessRef.current = harness;
+    await insert("member", { createdAt: 0, organizationId: ORG, role: "owner,member", userId: ADMIN });
 });
 
 afterEach(() => {
@@ -124,7 +103,6 @@ describe("organization usage", () => {
     it("adds every member's usage in the organization up, per project, with No project the rest", async () => {
         const project = await insert("projects", { createdAt: 0, organizationId: ORG, title: "Org project", userId: ADMIN });
 
-        await insert("member", { createdAt: 0, organizationId: ORG, role: "owner,member", userId: ADMIN });
         await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
         await usageOf(ADMIN, project, 100, 10, 1000);
         await usageOf(MEMBER, project, 200, 20, 2000);
@@ -134,17 +112,31 @@ describe("organization usage", () => {
         expect(result.total.costMicrodollars).toBe(330);
         expect(result.projects).toMatchObject([{ costMicrodollars: 300, projectKey: project, title: "Org project" }]);
         expect(result.noProject.costMicrodollars).toBe(30);
-        expect(result.members).toBe(2);
+    });
+
+    it("keeps a member's spend in the organization's totals after they leave", async () => {
+        const project = await insert("projects", { createdAt: 0, organizationId: ORG, title: "Org project", userId: ADMIN });
+        const membership = await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
+
+        await usageOf(MEMBER, project, 200, 20, 2000);
+
+        const before = await read();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.delete("member", membership);
+        });
+
+        const after = await read();
+
+        expect(after.result.total).toStrictEqual(before.result.total);
+        expect(after.result.projects).toStrictEqual(before.result.projects);
+        expect(after.result.total.costMicrodollars).toBe(220);
     });
 
     it("shows an admin only their own organization's usage, never another's", async () => {
         const ours = await insert("projects", { createdAt: 0, organizationId: ORG, title: "Ours", userId: ADMIN });
         const theirs = await insert("projects", { createdAt: 0, organizationId: "org_2", title: "Theirs", userId: MEMBER });
 
-        await insert("member", { createdAt: 0, organizationId: ORG, role: "admin", userId: ADMIN });
-        // MEMBER belongs to both organizations and works in each.
-        await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
-        await insert("member", { createdAt: 0, organizationId: "org_2", role: "admin", userId: MEMBER });
         await record(MEMBER, await insert("threads", { organizationId: ORG, projectId: ours, status: "active", title: "T", userId: MEMBER }), 100);
         await record(MEMBER, await insert("threads", { organizationId: "org_2", projectId: theirs, status: "active", title: "T", userId: MEMBER }), 900);
         await record(MEMBER, await insert("threads", { organizationId: "org_2", status: "active", title: "T", userId: MEMBER }), 90);
@@ -152,15 +144,13 @@ describe("organization usage", () => {
         const { result } = await read();
 
         expect(result.total.costMicrodollars).toBe(100);
-        expect(result.projects.map((project: { title: string }) => project.title)).toStrictEqual(["Ours"]);
+        expect(result.projects.map((project) => project.title)).toStrictEqual(["Ours"]);
         expect(JSON.stringify(result)).not.toContain(theirs);
     });
 
     it("counts a member's own project in an organization thread under No project, without its name or id", async () => {
         const personal = await insert("projects", { createdAt: 0, title: "My diary", userId: MEMBER });
 
-        await insert("member", { createdAt: 0, organizationId: ORG, role: "admin", userId: ADMIN });
-        await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
         await record(MEMBER, await insert("threads", { organizationId: ORG, projectId: personal, status: "active", title: "T", userId: MEMBER }), 50);
 
         const { result } = await read();
@@ -172,10 +162,9 @@ describe("organization usage", () => {
         expect(JSON.stringify(result)).not.toContain("My diary");
     });
 
-    it("moves a project that left the organization into No project, and names projects past the first page", async () => {
+    it("moves a project that left the organization into No project", async () => {
         const moved = await insert("projects", { createdAt: 0, organizationId: ORG, title: "Moved", userId: ADMIN });
 
-        await insert("member", { createdAt: 0, organizationId: ORG, role: "admin", userId: ADMIN });
         await usageOf(ADMIN, moved, 100, 0, 0);
         await harness.run(async (ctx: any) => {
             await ctx.db.patch("projects", moved, { organizationId: "org_other" });
@@ -188,82 +177,49 @@ describe("organization usage", () => {
         expect(result.noProject.costMicrodollars).toBe(100);
     });
 
-    it("never hands the client a partial sum, and refuses a cursor it did not issue to this caller", async () => {
-        const project = await insert("projects", { createdAt: 0, organizationId: ORG, title: "P", userId: ADMIN });
-
-        await insert("member", { createdAt: 0, organizationId: ORG, role: "admin", userId: ADMIN });
-
-        for (let index = 0; index < MEMBERS_PER_CALL; index += 1) {
-            const userId = `user-${String(index).padStart(3, "0")}`;
-
-            await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId });
-            await usageOf(userId, project, 1, 0, 0);
-        }
-
-        const first = await read();
-
-        expect(Object.keys(first)).toStrictEqual(["cursor"]);
-        await expect(openCursor(first.cursor!, { fromDate: FROM, now: Date.now(), organizationId: ORG, requesterId: MEMBER })).rejects.toMatchObject({
-            code: "BAD_REQUEST",
-        });
-        await expect(read("v1:forged")).rejects.toMatchObject({ code: "BAD_REQUEST" });
-
-        const last = await read(first.cursor);
-
-        expect(last.result.total.costMicrodollars).toBe(MEMBERS_PER_CALL);
-        expect(last.cursor).toBeUndefined();
-    });
-
-    it("keeps the cursor bounded when members use more projects than it carries, and says the result was cut", async () => {
-        await insert("member", { createdAt: 0, organizationId: ORG, role: "admin", userId: ADMIN });
-
-        // One more project than a cursor carries, filed under the organization, on a member past the first page.
-        for (let index = 0; index < MEMBERS_PER_CALL; index += 1) {
-            await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: `user-${String(index).padStart(3, "0")}` });
-        }
-
+    it("reads every page of a busy organization's rows", async () => {
         await harness.run(async (ctx: any) => {
-            for (let index = 0; index <= MAX_CURSOR_PROJECTS; index += 1) {
-                await ctx.db.insert("usageDaily", {
-                    costMicrodollars: index + 1,
+            for (let index = 0; index <= ORGANIZATION_ROW_PAGE; index += 1) {
+                await ctx.db.insert("usageOrganizationDaily", {
+                    costMicrodollars: 1,
                     date: "2026-09-20",
                     organizationId: ORG,
-                    projectKey: `project-${String(index)}`,
+                    projectKey: ORGANIZATION_TOTAL_KEY,
                     replies: 1,
-                    skillKey: "__project__",
                     tokens: 1,
-                    updatedAt: 1,
-                    userId: ADMIN,
+                    updatedAt: index,
                 });
             }
         });
 
-        const first = await read();
-        const last = await read(first.cursor);
+        const { result } = await read();
 
-        expect(first.cursor!.length).toBeLessThan(200_000);
-        expect(last.result.truncated).toBe(true);
+        expect(result.total.replies).toBe(ORGANIZATION_ROW_PAGE + 1);
+        expect(result.truncated).toBe(false);
     });
 
-    it("refuses a caller who is not an admin or owner of the organization", async () => {
-        await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: ADMIN });
+    it("refuses a page whose active organization has changed, and a caller who is not an admin or owner", async () => {
+        await expect(read({ organizationId: "org_2" })).rejects.toMatchObject({ code: "CONFLICT" });
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.member.findFirst({ where: { organizationId: ORG, userId: ADMIN } });
 
+            await ctx.db.patch("member", row._id, { role: "member" });
+        });
         await expect(read()).rejects.toMatchObject({ code: "FORBIDDEN" });
-        expect(await harness.run(async (ctx: any) => await ctx.runQuery(organizationUsageScope, { organizationId: ORG, userId: ADMIN }))).toBeNull();
     });
 
-    it("reads a member who has not been active since, from the rows their replies recorded", async () => {
-        await record(MEMBER, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER }), 30);
+    it("prunes organization rows past the usage rollup's retention", async () => {
+        await insert("usageOrganizationDaily", {
+            costMicrodollars: 1,
+            date: "2000-01-01",
+            organizationId: ORG,
+            projectKey: ORGANIZATION_TOTAL_KEY,
+            replies: 1,
+            tokens: 1,
+            updatedAt: 0,
+        });
 
-        const result = await harness.run(
-            async (ctx: any) => await ctx.runQuery(memberOrganizationUsage, { fromDate: FROM, organizationId: ORG, userId: MEMBER }),
-        );
-        const other = await harness.run(
-            async (ctx: any) => await ctx.runQuery(memberOrganizationUsage, { fromDate: FROM, organizationId: "org_2", userId: MEMBER }),
-        );
-
-        expect(result.total.costMicrodollars).toBe(30);
-        expect(other.total.costMicrodollars).toBe(0);
+        expect(await harness.run(async (ctx: any) => await ctx.runMutation(pruneOrganizationUsage, {}))).toBe(1);
     });
 });
 

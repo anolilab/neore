@@ -7,7 +7,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { schemaWithShardedTables } from "../lib/test-schema";
 import { pruneRetainedActivity, RETENTION_BATCH, SUB_AGENT_RUN_RETENTION_DAYS, usageDailyCutoffDate } from "./retention";
-import { collectActivityForExport, exportUsageSplit } from "./steps";
+import { collectUsageDailyForExport, collectUsageDailyPages, USAGE_EXPORT_PAGE } from "../usage/gdpr";
+import { collectActivityForExport } from "./steps";
 import { BATCH, deleteUserSubAgentRuns, deleteUserUsageDaily } from "./steps/residual-deletion-steps";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -73,7 +74,7 @@ describe("account deletion of activity rows", () => {
 });
 
 describe("collectActivityForExport", () => {
-    it("exports the user's usage history, delegations with task and result, and collections — nobody else's", async () => {
+    it("exports the user's delegations with task and result, and collections — nobody else's", async () => {
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("usageDaily", usageRow(A, "2026-02-01"));
             await ctx.db.insert("subAgentRuns", runRow(A, 1, "succeeded"));
@@ -83,9 +84,37 @@ describe("collectActivityForExport", () => {
 
         const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(collectActivityForExport, { userId: A }))) as any;
 
-        expect(exported.usageDaily).toEqual([expect.objectContaining({ date: "2026-02-01", tokens: 5 })]);
         expect(exported.subAgentRuns).toEqual([expect.objectContaining({ result: "answer", status: "succeeded", task: "task 0" })]);
         expect(exported.knowledgeCollections.map((collection: { name: string }) => collection.name)).toEqual(["Handbook"]);
+    });
+});
+
+describe("usage history export", () => {
+    it("exports every usage row of an account with more than one page, and nobody else's, a page at a time", async () => {
+        const rows = USAGE_EXPORT_PAGE + 5;
+
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < rows; index += 1) {
+                await ctx.db.insert("usageDaily", usageRow(A, "2026-02-01", index));
+            }
+
+            await ctx.db.insert("usageDaily", usageRow(B, "2026-02-01"));
+        });
+
+        const pages: number[] = [];
+        const exported = await collectUsageDailyPages(async (cursor) => {
+            const page = (await harness.run(async (ctx: any) => await ctx.runQuery(collectUsageDailyForExport, { cursor, userId: A }))) as {
+                cursor: string | null;
+                rows: { date: string; tokens: number }[];
+            };
+
+            pages.push(page.rows.length);
+
+            return page as never;
+        });
+
+        expect(exported).toHaveLength(rows);
+        expect(pages).toStrictEqual([USAGE_EXPORT_PAGE, 5]);
     });
 });
 
@@ -109,14 +138,5 @@ describe("pruneRetainedActivity", () => {
         expect(await count("subAgentRuns", A)).toBe(2);
         expect(RETENTION_BATCH).toBeGreaterThan(0);
         expect(usageDailyCutoffDate(Date.UTC(2026, 0, 1))).toBe("2024-11-27");
-    });
-});
-
-describe("exportUsageSplit", () => {
-    it("gives day and skill rows every slot project and organization rows leave free, within one bound", () => {
-        expect(exportUsageSplit(5001, 0)).toStrictEqual({ attribution: 0, dayAndSkill: 5000 });
-        expect(exportUsageSplit(4800, 50)).toStrictEqual({ attribution: 50, dayAndSkill: 4800 });
-        expect(exportUsageSplit(5001, 5001)).toStrictEqual({ attribution: 1000, dayAndSkill: 4000 });
-        expect(exportUsageSplit(10, 5001)).toStrictEqual({ attribution: 4990, dayAndSkill: 10 });
     });
 });

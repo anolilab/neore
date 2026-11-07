@@ -15,7 +15,6 @@ export interface UsageTotalsLike {
 }
 
 export interface OrganizationUsage {
-    members: number;
     noProject: UsageTotalsLike;
     projects: (UsageTotalsLike & { projectKey: string; title: string })[];
     total: UsageTotalsLike;

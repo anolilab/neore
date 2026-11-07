@@ -280,4 +280,26 @@ describe("usage by project", () => {
 
         expect(keys).toStrictEqual(["first-record"]);
     });
+
+    it("sums the projects over the days the total covers, so they never exceed it when the total is cut short", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+
+        await harness.run(async (ctx: any) => {
+            const days = 53 * 7 * 2 + 3;
+
+            for (let day = 0; day < days; day += 1) {
+                const date = new Date(Date.UTC(2025, 0, 1) + day * 86_400_000).toISOString().slice(0, 10);
+                const row = { costMicrodollars: 1, date, replies: 1, tokens: 1, updatedAt: 1, userId: USER };
+
+                await ctx.db.insert("usageDaily", { ...row, skillKey: "__total__" });
+                await ctx.db.insert("usageDaily", { ...row, projectKey: alpha.projectId, skillKey: "__project__" });
+            }
+        });
+
+        const result = await projectBreakdown(USER, "2025-01-01");
+
+        expect(result.truncated).toBe(true);
+        expect(result.projects[0]!.costMicrodollars).toBe(result.total.costMicrodollars);
+        expect(result.noProject.costMicrodollars).toBe(0);
+    });
 });

@@ -10,7 +10,9 @@ import {
     foldSkillTotals,
     HEATMAP_DAYS,
     isDayKey,
-    ORGANIZATION_SKILL_KEY,
+    foldOrganizationUsage,
+    ORGANIZATION_TOTAL_KEY,
+    organizationRows,
     PROJECT_SKILL_KEY,
     remainderOf,
     repliesByOrder,
@@ -228,23 +230,48 @@ describe("project rows", () => {
         expect(remainderOf({ costMicrodollars: 100, replies: 1, tokens: 10 }, projects)).toStrictEqual({ costMicrodollars: 0, replies: 0, tokens: 0 });
     });
 
-    it("files a reply in an organization's project under both, and one outside a project under its organization only", () => {
+    it("folds project increments into one row per day and project", () => {
         const one = { costMicrodollars: 1, date: "2026-09-20", replies: 1, tokens: 1 };
 
         expect(
             attributionRows([
-                { ...one, organizationId: "org", projectInOrganization: true, projectKey: "p_a" },
-                { ...one, organizationId: "org", projectInOrganization: true, projectKey: "p_a" },
-                { ...one, organizationId: "org" },
+                { ...one, projectKey: "p_a" },
+                { ...one, projectKey: "p_a" },
                 { ...one, projectKey: "p_b" },
-                // A member's own project in the organization's thread: the organization's total, never its project.
-                { ...one, organizationId: "org", projectKey: "p_own" },
             ]),
         ).toStrictEqual([
-            { ...one, costMicrodollars: 2, organizationId: "org", projectKey: "p_a", replies: 2, skillKey: PROJECT_SKILL_KEY, tokens: 2 },
-            { ...one, costMicrodollars: 4, organizationId: "org", replies: 4, skillKey: ORGANIZATION_SKILL_KEY, tokens: 4 },
+            { ...one, costMicrodollars: 2, projectKey: "p_a", replies: 2, skillKey: PROJECT_SKILL_KEY, tokens: 2 },
             { ...one, projectKey: "p_b", skillKey: PROJECT_SKILL_KEY },
-            { ...one, projectKey: "p_own", skillKey: PROJECT_SKILL_KEY },
         ]);
+    });
+
+    it("files a reply under its organization's total, and under the project only when the organization owns it", () => {
+        const amounts = { costMicrodollars: 5, date: "2026-09-20", tokens: 1 };
+
+        expect(organizationRows({ organizationId: "org", projectInOrganization: true, projectKey: "p_org" }, amounts)).toStrictEqual([
+            { ...amounts, projectKey: ORGANIZATION_TOTAL_KEY, replies: 1 },
+            { ...amounts, projectKey: "p_org", replies: 1 },
+        ]);
+        // A member's own project in an organization thread: the total only, never the project.
+        expect(organizationRows({ organizationId: "org", projectKey: "p_own" }, amounts)).toStrictEqual([
+            { ...amounts, projectKey: ORGANIZATION_TOTAL_KEY, replies: 1 },
+        ]);
+        expect(organizationRows({ projectKey: "p_own" }, amounts)).toStrictEqual([]);
+    });
+
+    it("folds an organization's rows into its total and its projects, costliest first", () => {
+        const row = (projectKey: string, costMicrodollars: number) => {
+            return { costMicrodollars, date: "2026-09-20", projectKey, replies: 1, tokens: 1 };
+        };
+
+        expect(
+            foldOrganizationUsage([row(ORGANIZATION_TOTAL_KEY, 30), row("p_a", 10), row("p_b", 15), row(ORGANIZATION_TOTAL_KEY, 5), row("p_a", 1)]),
+        ).toStrictEqual({
+            projects: [
+                { costMicrodollars: 15, projectKey: "p_b", replies: 1, tokens: 1 },
+                { costMicrodollars: 11, projectKey: "p_a", replies: 2, tokens: 2 },
+            ],
+            total: { costMicrodollars: 35, replies: 2, tokens: 2 },
+        });
     });
 });

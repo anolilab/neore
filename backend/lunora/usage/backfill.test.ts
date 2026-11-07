@@ -857,19 +857,86 @@ describe("project backfill", () => {
         await lateRecord();
         await lateRecord();
 
-        const rows = await harness.run(async (ctx: any) => {
-            const { page } = await ctx.db.usageDaily.findMany({ where: { userId: USER } });
+        const filed = await harness.run(async (ctx: any) => {
+            const { page: projectRows } = await ctx.db.usageDaily.findMany({ where: { skillKey: PROJECT_SKILL_KEY, userId: USER } });
+            const { page: organizationRows } = await ctx.db.usageOrganizationDaily.findMany({ where: { organizationId: "org_1" } });
 
-            return page.filter((row: any) => row.skillKey !== TOTAL_SKILL_KEY && row.skillKey !== DEFAULT_SKILL_KEY);
+            return {
+                organization: organizationRows.map((row: any) => [row.projectKey === orgProject ? "project" : row.projectKey, row.costMicrodollars]),
+                project: projectRows.map((row: any) => row.costMicrodollars),
+            };
         });
 
-        expect(
-            rows
-                .map((row: any) => [row.skillKey, row.organizationId ?? null, row.costMicrodollars])
-                .toSorted((a: string[], b: string[]) => a[0]!.localeCompare(b[0]!)),
-        ).toStrictEqual([
-            ["__organization__", "org_1", 100],
-            ["__project__", null, 100],
+        // The walk filed the project; the late record, delivered twice, files the organization's total and project once.
+        expect(filed.project).toStrictEqual([100]);
+        expect(filed.organization.toSorted((a: unknown[], b: unknown[]) => String(a[0]).localeCompare(String(b[0])))).toStrictEqual([
+            ["__total__", 100],
+            ["project", 100],
         ]);
+    });
+
+    it("records UTC as the first walk's zone when the user has none, so setting one later moves no reply", async () => {
+        vi.setSystemTime(STARTED);
+        await start();
+
+        expect((await state()).timeZone).toBe("UTC");
+    });
+
+    it("leaves a reply that may have still been running when the first walk passed it until its live record lands", async () => {
+        const alpha = await insertProject("Alpha");
+
+        // Started half an hour before the walks and still running as the first walk passed it.
+        const thread = await insertThread(STARTED - 30 * 60 * 1000, [[prompt(), reply(10, 100, { status: "pending" })]], "active", alpha);
+
+        vi.setSystemTime(STARTED);
+        await start();
+
+        for (let current = await state(); current.status !== "done"; current = await state()) {
+            await step(current.runId);
+        }
+
+        // It finished; its live record has not landed (or never will), so the total does not hold it yet.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("messages", thread.rowIds[0]![1]!, { status: "success" });
+        });
+        await drain();
+
+        expect(await projectRows()).toStrictEqual([]);
+    });
+
+    it("finalizes a late record's filing, so a later delivery after the thread moves files nothing elsewhere", async () => {
+        const alpha = await insertProject("Alpha");
+        const beta = await insertProject("Beta");
+        const thread = await insertThread(DAY_1, [[prompt(), reply(10, 100)]], "active");
+        const key = thread.rowIds[0]![1]!;
+
+        vi.setSystemTime(STARTED);
+        await start();
+        await drain();
+
+        const late = async () =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(recordReplyUsage, {
+                        at: STARTED,
+                        costMicrodollars: 100,
+                        date: "2026-09-20",
+                        replyKey: key,
+                        skillKey: DEFAULT_SKILL_KEY,
+                        threadId: thread.threadId,
+                        tokens: 10,
+                        userId: USER,
+                    }),
+            );
+
+        // Recorded late while the thread had no project, then redelivered after it moved into one.
+        await late();
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", thread.threadId, { projectId: beta });
+        });
+        await late();
+
+        expect(await projectRows()).toStrictEqual([]);
+        expect(alpha).toBeDefined();
     });
 });

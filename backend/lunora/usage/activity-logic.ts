@@ -24,15 +24,11 @@ export const TOTAL_SKILL_KEY = "__total__";
 /** `skillKey` of the per-day rows of one project (`projectKey`), what the project breakdown reads. */
 export const PROJECT_SKILL_KEY = "__project__";
 
-/**
- * `skillKey` of the per-day rows of one organization (`organizationId`): every
- * reply in that organization's threads or projects, what the organization view
- * reads as its total.
- */
-export const ORGANIZATION_SKILL_KEY = "__organization__";
-
 /** The `skillKey`s of the rollup's own rows, which no skill breakdown lists. */
-const ROLLUP_SKILL_KEYS: ReadonlySet<string> = new Set([ORGANIZATION_SKILL_KEY, PROJECT_SKILL_KEY, TOTAL_SKILL_KEY]);
+const ROLLUP_SKILL_KEYS: ReadonlySet<string> = new Set([PROJECT_SKILL_KEY, TOTAL_SKILL_KEY]);
+
+/** `projectKey` of an organization's per-day total row in `usageOrganizationDaily`. */
+export const ORGANIZATION_TOTAL_KEY = "__total__";
 
 /** `skillKey` of replies no skill produced — the plain assistant. */
 export const DEFAULT_SKILL_KEY = "__assistant__";
@@ -213,70 +209,96 @@ export interface Attribution {
 /** The key `usageReplies` holds once a reply's organization row has been filed apart from its project row. */
 export const organizationFiledKey = (replyKey: string): string => `organization:${replyKey}`;
 
-/** What some replies of one day add to their project's and organization's rows. */
-export interface AttributionIncrement extends Attribution {
+/** What some replies of one day add to their project's row. */
+export interface AttributionIncrement {
     costMicrodollars: number;
     date: string;
-    /** `false`: file the project row only (the organization row is filed, or will be, on its own). */
-    organizationRow?: boolean;
+    projectKey: string;
     replies: number;
     tokens: number;
 }
 
-/** One project or organization row a write touches. */
+/** One project row a write touches. */
 export interface AttributionRow {
     costMicrodollars: number;
     date: string;
-    /** On an organization row, the organization; on a project row, the organization it was filed under, if any. */
-    organizationId?: string;
-    /** Project rows only. */
-    projectKey?: string;
+    projectKey: string;
     replies: number;
-    skillKey: typeof ORGANIZATION_SKILL_KEY | typeof PROJECT_SKILL_KEY;
+    skillKey: typeof PROJECT_SKILL_KEY;
     tokens: number;
 }
 
-/**
- * The rows some increments touch, each once: a project row per (day, project,
- * organization) and an organization row per (day, organization). A reply in an
- * organization's project lands in both, so the organization's projects never
- * add up to more than its total.
- */
+/** The project rows some increments touch, each once: one per (day, project). */
 export const attributionRows = (increments: ReadonlyArray<AttributionIncrement>): AttributionRow[] => {
     const rows = new Map<string, AttributionRow>();
-    const add = (row: AttributionRow) => {
-        const key = [row.date, row.skillKey, row.projectKey ?? "", row.organizationId ?? ""].join("\u{0}");
+
+    for (const { costMicrodollars, date, projectKey, replies, tokens } of increments) {
+        const key = `${date}\u{0}${projectKey}`;
         const current = rows.get(key);
 
         if (current) {
-            current.costMicrodollars += row.costMicrodollars;
-            current.replies += row.replies;
-            current.tokens += row.tokens;
+            current.costMicrodollars += costMicrodollars;
+            current.replies += replies;
+            current.tokens += tokens;
         } else {
-            rows.set(key, { ...row });
-        }
-    };
-
-    for (const { costMicrodollars, date, organizationId, organizationRow, projectInOrganization, projectKey, replies, tokens } of increments) {
-        const amounts = { costMicrodollars, date, replies, tokens };
-
-        // A member's own project in an organization's thread stays theirs: its row carries no organization, so the
-        // organization's view never lists it (the spend still counts in the organization's total, as "No project").
-        if (projectKey !== undefined) {
-            add({
-                ...amounts,
-                projectKey,
-                skillKey: PROJECT_SKILL_KEY,
-                ...(organizationId !== undefined && projectInOrganization === true && { organizationId }),
-            });
-        }
-
-        if (organizationId !== undefined && organizationRow !== false) {
-            add({ ...amounts, organizationId, skillKey: ORGANIZATION_SKILL_KEY });
+            rows.set(key, { costMicrodollars, date, projectKey, replies, skillKey: PROJECT_SKILL_KEY, tokens });
         }
     }
 
     return [...rows.values()];
+};
+
+/** One row of an organization's per-day usage (`usageOrganizationDaily`) a reply adds to. */
+export interface OrganizationRow {
+    costMicrodollars: number;
+    date: string;
+    /** {@link ORGANIZATION_TOTAL_KEY} for the organization's total, else a project the organization owns. */
+    projectKey: string;
+    replies: number;
+    tokens: number;
+}
+
+/**
+ * The organization rows one reply adds to: the organization's total, and the project's row when the organization owns
+ * the project. A member's own project in an organization's thread adds to the total only, so the organization's view
+ * never names it; the projects never add up to more than the total.
+ */
+export const organizationRows = (attribution: Attribution, amounts: { costMicrodollars: number; date: string; tokens: number }): OrganizationRow[] => {
+    if (attribution.organizationId === undefined) {
+        return [];
+    }
+
+    const reply = { ...amounts, replies: 1 };
+
+    return [
+        { ...reply, projectKey: ORGANIZATION_TOTAL_KEY },
+        ...(attribution.projectKey !== undefined && attribution.projectInOrganization === true ? [{ ...reply, projectKey: attribution.projectKey }] : []),
+    ];
+};
+
+/** An organization's rows folded: its total, and its projects' totals, costliest first. */
+export const foldOrganizationUsage = (rows: ReadonlyArray<OrganizationRow>): { projects: ProjectTotal[]; total: UsageTotals } => {
+    const projects = new Map<string, ProjectTotal>();
+
+    for (const row of rows) {
+        if (row.projectKey === ORGANIZATION_TOTAL_KEY) {
+            continue;
+        }
+
+        const current = projects.get(row.projectKey) ?? { costMicrodollars: 0, projectKey: row.projectKey, replies: 0, tokens: 0 };
+
+        current.costMicrodollars += row.costMicrodollars;
+        current.replies += row.replies;
+        current.tokens += row.tokens;
+        projects.set(row.projectKey, current);
+    }
+
+    return {
+        projects: [...projects.values()].toSorted(
+            (a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.projectKey.localeCompare(b.projectKey),
+        ),
+        total: sumRows(rows.filter((row) => row.projectKey === ORGANIZATION_TOTAL_KEY)),
+    };
 };
 
 /** What some replies of one day and skill add to the rollup. */
@@ -340,7 +362,6 @@ export interface DayTotal {
 interface RollupRowLike {
     costMicrodollars: number;
     date: string;
-    organizationId?: string;
     projectKey?: string;
     replies: number;
     skillKey: string;
@@ -464,30 +485,4 @@ export const remainderOf = (total: UsageTotals, projects: ReadonlyArray<UsageTot
         replies: Math.max(0, total.replies - filed.replies),
         tokens: Math.max(0, total.tokens - filed.tokens),
     };
-};
-
-/**
- * One member's rows filed under an organization, folded: the organization row
- * total, and the project rows per project. Projects come only from rows filed
- * under this organization, so they add up to at most its total.
- */
-export const foldOrganizationRows = (rows: ReadonlyArray<RollupRowLike>, organizationId: string): { projects: ProjectTotal[]; total: UsageTotals } => {
-    const filed = rows.filter((row) => row.organizationId === organizationId);
-
-    return {
-        projects: foldProjectTotals(filed),
-        total: sumRows(filed.filter((row) => row.skillKey === ORGANIZATION_SKILL_KEY)),
-    };
-};
-
-/** Totals added into `into`, per project key. */
-export const addProjectTotals = (into: Map<string, UsageTotals>, projects: ReadonlyArray<ProjectTotal>): void => {
-    for (const project of projects) {
-        const current = into.get(project.projectKey) ?? { costMicrodollars: 0, replies: 0, tokens: 0 };
-
-        current.costMicrodollars += project.costMicrodollars;
-        current.replies += project.replies;
-        current.tokens += project.tokens;
-        into.set(project.projectKey, current);
-    }
 };

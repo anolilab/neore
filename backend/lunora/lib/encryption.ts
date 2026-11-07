@@ -7,10 +7,8 @@
  * - AES-256-GCM with random 12-byte IV per encryption
  * - Backward-compatible: unversioned (v0) ciphertext decrypted with legacy single-key path
  *
- * Purposes: "provider-keys", "tool-keys", "messenger-keys", "custom-providers", "connector-tokens", "usage-cursors"
+ * Purposes: "provider-keys", "tool-keys", "messenger-keys", "custom-providers", "connector-tokens"
  */
-import { bytesToBase64 } from "./crypto";
-
 // Trimmed like `assertEnv()` and the deploy guard check it, so a key that passes
 // them always decodes here (`atob` rejects surrounding whitespace such as U+00A0).
 const ENCRYPTION_KEY = process.env["ENCRYPTION_KEY"]?.trim();
@@ -56,8 +54,7 @@ const getLegacyCryptoKey = async (): Promise<CryptoKey> => {
 // ============================================================================
 
 /** Valid key purposes for HKDF derivation */
-export type KeyPurpose =
-    "connector-tokens" | "custom-providers" | "device-secrets" | "mcp-headers" | "messenger-keys" | "provider-keys" | "tool-keys" | "usage-cursors";
+export type KeyPurpose = "connector-tokens" | "custom-providers" | "device-secrets" | "mcp-headers" | "messenger-keys" | "provider-keys" | "tool-keys";
 
 // Import master key as HKDF base key material (once, cached)
 let hkdfBaseKey: CryptoKey | null = null;
@@ -134,8 +131,7 @@ export const encryptKey = async (plaintext: string, purpose: KeyPurpose = "provi
     combined.set(iv, 0);
     combined.set(encryptedArray, iv.length);
 
-    // Byte by byte: spreading a long ciphertext into one call overruns the argument limit.
-    const b64 = bytesToBase64(combined);
+    const b64 = btoa(String.fromCodePoint(...combined));
 
     return `${CURRENT_VERSION}:${b64}`;
 };
