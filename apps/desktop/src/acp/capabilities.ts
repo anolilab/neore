@@ -35,7 +35,10 @@ export const reportFromHandshake = (capabilities: AgentCapabilities, now: number
     };
 };
 
-const optionIn = (options: AgentOptions, category: string) => options.configOptions?.find((option) => option.category === category);
+const optionsIn = (options: AgentOptions, category: string) => (options.configOptions ?? []).filter((option) => option.category === category);
+
+/** The report's own cap on the model list (`backend/lunora/lib/capability-report.ts`). */
+const MAX_MODELS = 200;
 
 /**
  * The options the agent offers for its session (`agent-options.ts`), added to its handshake report: the models it can run
@@ -44,9 +47,14 @@ const optionIn = (options: AgentOptions, category: string) => options.configOpti
  * enforces, so they are not reported as `permissions.modes`.
  */
 export const withOptionCapabilities = (report: CapabilityReport, options: AgentOptions, now: number): CapabilityReport => {
-    const models = optionIn(options, "model")?.choices.map((choice) => {
-        return { id: choice.value, name: choice.name };
-    });
+    // Every model option's choices, each model once: an agent may file more than one option under `model`.
+    const models = new Map<string, string>();
+
+    for (const choice of optionsIn(options, "model").flatMap((option) => option.choices)) {
+        if (!models.has(choice.value) && models.size < MAX_MODELS) {
+            models.set(choice.value, choice.name);
+        }
+    }
 
     return {
         ...report,
@@ -54,8 +62,10 @@ export const withOptionCapabilities = (report: CapabilityReport, options: AgentO
             ...report.groups,
             identity: {
                 ...report.groups.identity,
-                models: models ?? [],
-                reasoningEffort: optionIn(options, "thought_level") === undefined ? NOT_OFFERED : NATIVE,
+                models: [...models].map(([id, name]) => {
+                    return { id, name };
+                }),
+                reasoningEffort: optionsIn(options, "thought_level").length === 0 ? NOT_OFFERED : NATIVE,
             },
         },
         reportedAt: now,

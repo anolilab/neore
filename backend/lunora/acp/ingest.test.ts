@@ -495,6 +495,16 @@ describe("capability reports", () => {
 
         // Options are a session-level event: never one of a turn, and never anything but the open's follower.
         await expect(ingest(device, { events: [{ kind: "session_options", options: mode("build") }] })).resolves.toMatchObject({ status: 403 });
+
+        // In a turn post, options are refused whether or not they validate: an invalid one is never quietly left out there.
+        await expect(turn(device, threadId, "t-opts", 0, [START(), { kind: "session_options", options: mode("build") }])).resolves.toMatchObject({
+            status: 403,
+        });
+        await expect(
+            turn(device, threadId, "t-bad", 0, [START(), { kind: "session_options", options: { configOptions: [{ id: 3 }] } }]),
+        ).resolves.toMatchObject({
+            status: 400,
+        });
     });
 
     it("keeps a valid stored report when a later open's report is invalid, and lets the next valid one replace the fallback", async () => {

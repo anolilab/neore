@@ -65,6 +65,25 @@ describe("withOptionCapabilities", () => {
         expect(isAvailable(capabilityOf(report, "sessions.load"))).toBe(true);
     });
 
+    it("lists the choices of every option filed under model, each model once", () => {
+        const report = withOptionCapabilities(
+            reportFromHandshake({}, NOW),
+            {
+                configOptions: [
+                    { category: "model", choices: [], currentValue: "a", id: "m1", name: "Model" },
+                    { category: "model", choices: [choice("a"), choice("c")], currentValue: "a", id: "m2", name: "Fallback" },
+                    { category: "model", choices: [choice("c")], currentValue: "c", id: "m3", name: "Small" },
+                ],
+            },
+            NOW,
+        );
+
+        expect(report.groups.identity?.models).toEqual([
+            { id: "a", name: "A" },
+            { id: "c", name: "C" },
+        ]);
+    });
+
     it("reports neither for an agent that offers no such option", () => {
         const report = withOptionCapabilities(
             reportFromHandshake({}, NOW),

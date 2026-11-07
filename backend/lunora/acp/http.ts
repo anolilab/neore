@@ -196,7 +196,10 @@ const withValidReport = (raw: unknown, deviceId: string, logged: { done: boolean
     return { ...raw, capabilities: unknownCapabilityReport(0) };
 };
 
-/** Options the agent offers that do not validate are left out of the post, never the session's open: the options stored before stay. */
+/**
+ * Options that do not validate, where they belong (right after the `session_open` of a session-level post): left out of the
+ * post, never the session's open, and the options stored before stay. Anywhere else the post is refused as malformed.
+ */
 const isInvalidOptions = (raw: unknown): boolean => isRecord(raw) && raw.kind === "session_options" && !vAgentOptions.safeParse(raw.options).ok;
 
 type MediaEvent = Extract<Infer<typeof vHostEvent>, { kind: "media" }>;
@@ -239,7 +242,7 @@ const readPost = (payload: Record<string, unknown>, deviceId: string): Post | nu
     const logged = { done: false };
 
     for (const raw of payload.events) {
-        if (isInvalidOptions(raw)) {
+        if (threadId === undefined && events.length === 1 && events[0]?.kind === "session_open" && isInvalidOptions(raw)) {
             console.warn(`[acp] device ${deviceId} sent options that do not validate; left out`);
             continue;
         }
