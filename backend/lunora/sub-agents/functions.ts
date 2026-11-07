@@ -1487,7 +1487,10 @@ export const endApprovalWaits = async (ctx: MutationCtx, childThreadId: string):
     for (const runId of runIds) {
         const run = await ctx.db.get("subAgentRuns", runId as Id<"subAgentRuns">);
 
-        if (!run || run.mode === "worker" || run.childThreadId !== childThreadId || (run.status !== "running" && run.status !== "awaiting")) {
+        // Only a run that waits: a running one is past its request (a sibling of the answered one stays open while the
+        // continuation works) and is not waiting on this message. One that has not started waiting yet finds its request
+        // moved past when it would (`markRunAwaiting`).
+        if (!run || run.mode === "worker" || run.childThreadId !== childThreadId || run.status !== "awaiting") {
             continue;
         }
 
@@ -1538,9 +1541,25 @@ export const markRunAwaiting = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
 
     // Only this run's own requests: an interactive request of the child's chat neither holds the run nor sets its deadline.
     const open = await pendingApprovalRows(ctx, run.childThreadId);
-    const pending = open.filter((row) => row.config.subAgentRunId === run._id);
+    const own = open.filter((row) => row.config.subAgentRunId === run._id);
+
+    if (own.length === 0) {
+        return false;
+    }
+
+    // Only requests still on the child's latest turn can be answered: a sibling left from an earlier pause is not, and a message
+    // the owner sent before the run started waiting moved past all of them, which ends the run as a message into a waiting child does.
+    const pending: Doc<"toolApprovalRuns">[] = [];
+
+    for (const row of own) {
+        if (await findPendingRequestOnLatestTurn(ctx, run.childThreadId as Id<"threads">, row.approvalId)) {
+            pending.push(row);
+        }
+    }
 
     if (pending.length === 0) {
+        await finishRun(ctx, run._id, { kind: "cancelled" });
+
         return false;
     }
 

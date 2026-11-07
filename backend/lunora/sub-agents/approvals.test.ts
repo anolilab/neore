@@ -376,6 +376,33 @@ describe("a new message into a child that waits on a request", () => {
         expect(rows[0]?.status).toBe("denied");
     });
 
+    it("leaves a working run alone: a sibling request still open while its continuation works waits on no message", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+        await internalCall(resumeAwaitingRun, { runId });
+
+        expect(await internalCall(endApprovalWaitForMessage, { threadId: childId })).toBe(0);
+        expect(await runStatus()).toBe("running");
+    });
+
+    it("ends a run whose request the owner's message moved past before the run started waiting", async () => {
+        await run(
+            async (context) =>
+                await context.db.insert("messages", {
+                    message: { content: "Never mind, I did it myself.", role: "user" },
+                    order: 2,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId: childId,
+                    tool: false,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(await run(async (context) => await markRunAwaiting(context, runId))).toBe(false);
+        expect(await runStatus()).toBe("cancelled");
+        expect(await pendingRequests()).toHaveLength(0);
+    });
+
     it("never ends a worker's run: a worker does not pause on a request", async () => {
         await run(async (context) => await context.db.patch("subAgentRuns", runId, { mode: "worker" }));
 

@@ -391,7 +391,6 @@ export interface ChatStartBody {
 const workerThreadResponse = (): Response =>
     Response.json({ error: "This is a worker's thread. Message the worker from its thread instead of starting a chat turn here." }, { status: 400 });
 
-/** The answer to a request that writes into a locked thread without a valid proof. */
 /**
  * Ends the waits of sub-agents whose request a saved message moved the child thread past (`endApprovalWaitForMessage`).
  * The message is saved and charged already, so a failed write must not fail the request (a retry would save and charge
@@ -408,6 +407,7 @@ const endApprovalWaitsAfterSave = async (context: HttpActionCtx, threadId: strin
     }
 };
 
+/** The answer to a request that writes into a locked thread without a valid proof. */
 const threadLockedResponse = (): Response => Response.json({ code: THREAD_LOCKED_CODE, error: "This chat is locked." }, { status: 403 });
 
 /**

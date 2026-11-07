@@ -213,6 +213,25 @@ describe("a one-shot sub-agent and its approvals", () => {
         const runId = await admitOneShot();
         const childId = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "child", userId }))) as string;
 
+        // What the child's step saved: the request on its latest turn, which the run then waits on.
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("messages", {
+                    message: {
+                        content: [
+                            { input: {}, toolCallId: "call-1", toolName: "webSearch", type: "tool-call" },
+                            { approvalId: "approval-1", toolCallId: "call-1", type: "tool-approval-request" },
+                        ],
+                        role: "assistant",
+                    },
+                    order: 1,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId: childId,
+                    tool: true,
+                    userId,
+                }),
+        );
         await harness.run(
             async (ctx: any) =>
                 await ctx.db.insert("toolApprovalRuns", {
