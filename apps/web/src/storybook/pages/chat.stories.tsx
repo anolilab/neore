@@ -127,6 +127,13 @@ export const FailedReply: Story = {
  * view a share link opens is the public page, asserted in `shared-thread.stories`.
  */
 export const ReadOnlyShare: Story = {
+    play: async ({ canvas }) => {
+        await expect(await canvas.findAllByText("Plan the Q1 product launch", undefined, STATE_WAIT)).not.toHaveLength(0);
+        // The composer fades in over a few hundred milliseconds; axe must read its settled colours, not mid-fade.
+        await new Promise((resolve) => {
+            setTimeout(resolve, 600);
+        });
+    },
     parameters: {
         msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...shellFixtures(), ...chatFixtures({ permission: "read" })) } },
     },
