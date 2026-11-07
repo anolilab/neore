@@ -1,8 +1,9 @@
 #!/usr/bin/env sh
 
 # Fast checks only: the CI failures that cost the most review rounds.
-# Type check and lint are heavier; run them before opening a pull request and
-# before each push that changes behaviour (docs/agents/review-checklist.md).
+# Lint, tests and the full `tsc` type check are heavier; run them before opening a
+# pull request and before each push that changes behaviour
+# (docs/agents/review-checklist.md).
 pnpm exec sort-package-json --check packages/*/package.json apps/*/package.json backend/package.json services/*/package.json package.json || exit 1
 
 # Prettier on every file changed since the merge base with main, root files
@@ -24,4 +25,10 @@ else
     status=0
 fi
 rm -f "$list"
-exit "$status"
+[ "$status" -eq 0 ] || exit "$status"
+
+# Type check of the projects affected since the same base, with `tsrs` (TS 7.1
+# semantics, beta). CI still runs `tsc` 6; if the two disagree, CI decides.
+# Quiet: a failing task still prints its errors; cached ones (the backend codegen
+# replays its whole advisor report) do not.
+pnpm exec vis affected lint:types:fast --base="$base" --output-style=quiet || exit 1

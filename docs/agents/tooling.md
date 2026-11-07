@@ -55,6 +55,12 @@ DEPLOY_ENV=preview pnpm run deploy
 `vis hook install` (run by `postinstall`) points `core.hooksPath` at `.vis/hooks/_`, which runs the scripts in
 `.vis/hooks/`. **pre-commit** runs the secret scan and `vis staged` (Prettier on staged files except Markdown, `sort-package-json` on
 staged `package.json` files, from the `staged` map in `vis.config.ts`). **pre-push** runs the package.json order check
-and Prettier on every file changed since the merge base with `main` (root files included, Markdown skipped as in CI). Type check and lint stay manual: on a change to a
-root config every project is affected and they take many minutes. A new
-worktree needs `pnpm install` before its first commit, or the hooks cannot find `vis`.
+and Prettier on every file changed since the merge base with `main` (root files included, Markdown skipped as in CI),
+then `vis affected lint:types:fast` from that same base. The fast type check runs `tsrs`, a Rust port of the compiler
+with TS 7.1 semantics (beta): about 13 s for every project, against 4.5 min for `lint:types`, plus up to a minute when a
+backend change reruns its `codegen`. CI and
+`pnpm lint:types` stay on `tsc` 6, so the hook can report a difference that only TS 7 sees; the CI result decides.
+`lint:types:fast` depends on the `build` of `@neore/ai` and `@neore/service-sdk` (they export only `dist`) and on the
+backend `codegen`, not on `^build`, which would also build the Worker. Lint, tests and the full `tsc` check stay manual:
+on a change to a root config every project is affected and they take many minutes. A new worktree needs `pnpm install`
+before its first commit, or the hooks cannot find `vis`.
