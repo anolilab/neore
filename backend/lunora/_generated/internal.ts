@@ -946,14 +946,21 @@ export interface InternalApiTypes {
             pruneOldNotifications: FunctionReference<"mutation", {}, null>;
         };
         gdpr: {
-            collectNotificationsForExport: FunctionReference<"query", { userId: string }, { notifications: Array<unknown>; outcomeEmails: Array<unknown>; pushSubscriptions: Array<unknown> }>;
+            collectNotificationsForExport: FunctionReference<"query", { userId: string }, { notifications: Array<unknown>; outcomeEmails: Array<unknown>; pushDevices: Array<unknown>; pushSubscriptions: Array<unknown> }>;
             deleteUserNotifications: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
         };
         locked_redact: {
             redactLockedLinks: FunctionReference<"mutation", { cursor?: string; threadId: Id<"threads">; userId: string }, null>;
         };
+        native_push: {
+            checkPushReceipts: FunctionReference<"action", { attempt?: number; entries: Array<{ deviceId: Id<"pushDevices">; receiptId: string; sentAt: number; userId: string }> }, null>;
+            listPushDevicesForUser: FunctionReference<"query", { userId: string }, Array<{ id: Id<"pushDevices">; platform: "android" | "ios"; token: string }>>;
+            recordPushDeliveries: FunctionReference<"mutation", { gone: Array<{ id: Id<"pushDevices">; sentAt: number; userId: string }> }, null>;
+        };
         push: {
-            loadPushNotification: FunctionReference<"query", { notificationId: Id<"notifications">; userId: string }, null | { body?: string; link?: string; outcome?: "success" | "failure"; title: string; type: string }>;
+            loadPhonePushContent: FunctionReference<"query", { notificationId: Id<"notifications">; userId: string }, null | { generic: true } | { body: string; threadId?: string; title: string }>;
+            loadPushNotification: FunctionReference<"query", { notificationId: Id<"notifications">; userId: string }, null | { body?: string; language?: string; link?: string; outcome?: "success" | "failure"; title: string; type: string }>;
+            readThreadLockState: FunctionReference<"query", { threadId: string; userId: string }, "locked" | "missing" | "open">;
             sendPushForNotification: FunctionReference<"action", { notificationId: Id<"notifications">; userId: string }, null>;
         };
         task_email: {
@@ -2194,8 +2201,15 @@ export const internal: InternalApiTypes = {
         locked_redact: {
             redactLockedLinks: { __lunoraRef: "notifications_locked_redact:redactLockedLinks" },
         },
+        native_push: {
+            checkPushReceipts: { __lunoraRef: "notifications_native_push:checkPushReceipts" },
+            listPushDevicesForUser: { __lunoraRef: "notifications_native_push:listPushDevicesForUser" },
+            recordPushDeliveries: { __lunoraRef: "notifications_native_push:recordPushDeliveries" },
+        },
         push: {
+            loadPhonePushContent: { __lunoraRef: "notifications_push:loadPhonePushContent" },
             loadPushNotification: { __lunoraRef: "notifications_push:loadPushNotification" },
+            readThreadLockState: { __lunoraRef: "notifications_push:readThreadLockState" },
             sendPushForNotification: { __lunoraRef: "notifications_push:sendPushForNotification" },
         },
         task_email: {
