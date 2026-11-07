@@ -13,6 +13,20 @@ pull request body which ones you checked and how.
   rebased onto `main` (`git rebase --onto origin/main <old base head> <branch>`) as soon as its base merges.
 - Push fixes in batches: one push per review round. Every push starts a full re-review.
 
+## Hit every surface
+
+The most common gap is a change that works on the path you tested and is missing elsewhere. Say which of these applied:
+
+- **Entry points.** A behaviour reachable from the chat view is usually also reachable from settings, the command
+  palette, a keyboard shortcut and the thread menu.
+- **Clients.** Web, desktop (wraps web, adds the Electron shell), mobile (separate navigation), the browser extension and
+  the CLI. Shared logic lives in `packages/client-runtime` and `packages/chat-ui`.
+- **Agents.** A capability a person can trigger is usually one an agent should reach through tools, and scheduled tasks,
+  triggers and sub-agents run the same backend paths. Keep it a backend function, not handler or component code.
+- **Reverse states.** A way in needs a way out and a way to see it: snooze and wake, lock and unlock, archive and
+  restore, link and unlink.
+- **Runners.** Cloud runs, host runs on a paired computer, SSH servers and cloud sandboxes differ; decide for each.
+
 ## Access and privacy
 
 - **Locked threads.** A thread locked with a passcode never sends its title, prompts or messages anywhere new: not to a
@@ -48,6 +62,11 @@ pull request body which ones you checked and how.
 - **Large inputs.** Lists past the first page (projects past 100/200, long check lists, big logs, many review threads)
   are paged, kept newest-first where order matters, and marked when cut ("truncated, N more").
 - **Stale results.** A result for an older request (an earlier visit, a reopened dialog) never replaces a newer one.
+
+## Tests
+
+Follow [testing.md](testing.md): the fewest tests that fail on `main` for the reason, at the lowest layer, no real
+waits or retries.
 
 ## Client and copy
 

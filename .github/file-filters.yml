@@ -66,3 +66,20 @@ packages: &packages
     - ".github/workflows/test.yml"
     - ".github/actions/**"
     - ".github/file-filters.yml"
+
+# What the Types and ESLint jobs check: code, its configuration and the lint
+# workflow itself. A change to docs or markdown alone skips both jobs.
+code:
+    - "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"
+    - "**/*.rs"
+    - "**/Cargo.toml"
+    - "Cargo.lock"
+    - "**/tsconfig*.json"
+    - "**/package.json"
+    - "pnpm-lock.yaml"
+    - "pnpm-workspace.yaml"
+    - "vis.config.ts"
+    - "eslint.config.mjs"
+    - ".github/workflows/lint.yml"
+    - ".github/actions/**"
+    - ".github/file-filters.yml"

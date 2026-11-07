@@ -93,7 +93,7 @@ the files from the root down to their working directory, so **read the file for 
 | Desktop shell, dictation, ACP registry installs; mobile app; UI components                                                                                          | `apps/desktop/AGENTS.md`, `apps/mobile/AGENTS.md`, `packages/ui/AGENTS.md`                         |
 | Device execution, sandbox, SSH servers, `neore-host`                                                                                                                | `packages/device-core/AGENTS.md`                                                                   |
 | Dev servers and local failures; build, deploy, Worker size; pnpm and vis                                                                                            | `docs/agents/{local-dev,build-and-deploy,tooling}.md`                                              |
-| Opening or pushing to a pull request: size, access, data lifecycle, local checks                                                                                    | `docs/agents/review-checklist.md`                                                                  |
+| Opening or pushing to a pull request; what to test and how                                                                                                          | `docs/agents/{review-checklist,testing}.md`                                                        |
 
 ## A NOTE TO THE AGENT
 
