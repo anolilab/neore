@@ -559,6 +559,8 @@ describe("the coding-agent composer", () => {
 
         expect(((await screen.findByRole("button", { name: "Send queued message 1 now" })) as HTMLButtonElement).disabled).toBe(true);
         expect((screen.getByRole("button", { name: "Send queued message 2 now" }) as HTMLButtonElement).disabled).toBe(true);
+        // Interrupt and send from the box would stop it too: a message typed now queues instead.
+        expect(screen.queryByRole("button", { name: "Interrupt and send" })).toBeNull();
     });
 
     it("keeps a lost send's mark through a refusal answered before the backend looks for repeats", async () => {

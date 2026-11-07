@@ -212,6 +212,8 @@ export interface StoredAttachment {
 
 /** What a queue looks like in sessionStorage. */
 interface StoredPromptQueue {
+    /** Absent in a queue stored before `tried` was kept: whether its messages were sent is not known. */
+    format?: 2;
     items: { attachments?: StoredAttachment[]; droppedAttachments: number; id: string; steer?: QueuedSteer; text: string; tried?: true }[];
 }
 
@@ -262,7 +264,7 @@ export const serializePromptQueue = <A>(
         ];
     });
 
-    return items.length > 0 ? JSON.stringify({ items } satisfies StoredPromptQueue) : undefined;
+    return items.length > 0 ? JSON.stringify({ format: 2, items } satisfies StoredPromptQueue) : undefined;
 };
 
 const readSteer = (value: unknown): QueuedSteer | undefined => {
@@ -383,6 +385,10 @@ export const restorePromptQueue = <A = never>(
         return undefined;
     }
 
+    // A queue stored before `tried` was kept says nothing of its sends: every message counts as tried, so Send now never stops
+    // a turn one of them may have started.
+    const legacy = (parsed as Partial<StoredPromptQueue> | null)?.format !== 2;
+
     const items: QueuedPrompt<A>[] = [];
 
     for (const candidate of rawItems as unknown[]) {
@@ -419,7 +425,7 @@ export const restorePromptQueue = <A = never>(
             id,
             ...(restoredSteer && { steer: restoredSteer }),
             text: clean,
-            ...(tried === true && { tried: true }),
+            ...((tried === true || legacy) && { tried: true }),
         });
     }
 

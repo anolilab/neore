@@ -110,7 +110,7 @@ describe("prompt queue persistence", () => {
             items: [{ attachments: [], id: "a", steer, text: "go left" }],
             paused: true,
         });
-        expect(restorePromptQueue(JSON.stringify({ items: [{ id: "a", steer: { id: 1 }, text: "go left" }] }))?.items[0]).toStrictEqual({
+        expect(restorePromptQueue(JSON.stringify({ format: 2, items: [{ id: "a", steer: { id: 1 }, text: "go left" }] }))?.items[0]).toStrictEqual({
             attachments: [],
             id: "a",
             text: "go left",
@@ -121,6 +121,9 @@ describe("prompt queue persistence", () => {
         const tried: PromptQueueState<never> = { items: [{ attachments: [], id: "a", text: "go", tried: true }], paused: false };
 
         expect(restorePromptQueue(serializePromptQueue(tried))?.items[0]?.tried).toBe(true);
+        // A queue stored before this was kept says nothing of its sends, so every message counts as tried.
+        expect(restorePromptQueue(JSON.stringify({ items: [{ id: "a", text: "go" }] }))?.items[0]?.tried).toBe(true);
+        expect(restorePromptQueue(JSON.stringify({ format: 2, items: [{ id: "a", text: "go" }] }))?.items[0]?.tried).toBeUndefined();
         expect(editQueuedPrompt(tried, "a", "go further", "b").items[0]).toStrictEqual({ attachments: [], id: "b", text: "go further" });
     });
 

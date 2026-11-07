@@ -619,10 +619,11 @@ describe("Send now", () => {
         expect(run([observed(undefined, ["stream-other", "failed"])], behind).state.released).toBeUndefined();
     });
 
-    it("holds a released message again when a turn from elsewhere starts before it went", () => {
-        const released = run([{ itemId: "b", type: "released" }], IDLE).state;
+    it("lets a released message go after a turn from elsewhere that finished, and holds it after one stopped elsewhere", () => {
+        const behind = run([{ itemId: "b", type: "released" }, observed("stream-other")], IDLE).state;
 
-        expect(run([observed("stream-other")], released).state.released).toBeUndefined();
+        expect(run([observed(undefined, ["stream-other", "finished"])], behind).state.released).toBe("b");
+        expect(run([observed(undefined, ["stream-other", "stopped"])], behind).state.released).toBeUndefined();
     });
 
     it("sends the message past a paused queue once, and keeps the rest paused", () => {

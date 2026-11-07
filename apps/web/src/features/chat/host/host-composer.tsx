@@ -60,11 +60,11 @@ const BEFORE_REPEAT_CHECK: ReadonlySet<string> = new Set(["malformed", "not_auth
  */
 const WAIT_DEADLINE_MS = 5000;
 
-/** Whether a queued message is still waiting in its thread's queue, read from the store rather than from the render that sent it. */
 /** Whether a send under the queued message's id may have been taken (`QueuedPrompt.tried`). */
 const isTried = (threadId: string, id: string): boolean =>
     usePromptQueueStore.getState().queues[threadId]?.items.some((item) => item.id === id && item.tried === true) === true;
 
+/** Whether a queued message is still waiting in its thread's queue, read from the store rather than from the render that sent it. */
 const stillQueued = (threadId: string, id: string): boolean => usePromptQueueStore.getState().queues[threadId]?.items.some((item) => item.id === id) ?? false;
 
 /**
@@ -663,7 +663,9 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
 
     // With the setting on, a message during a turn interrupts it, unless a stop is already pending: a second stop would
     // put a second message ahead of the first one typed.
-    const steering = running && steerOnSend && !cancel.isPending && !interrupting && canInterruptAndSend();
+    // The running turn may be a queued message's lost send: stopping it would lose that message, so the text queues instead.
+    const anyTried = queue.items.some((item) => item.tried === true);
+    const steering = running && steerOnSend && !cancel.isPending && !interrupting && !anyTried && canInterruptAndSend();
     let sendLabel = t`Send`;
 
     if (steering) {
@@ -975,7 +977,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                     rows={2}
                     value={text}
                 />
-                {running && !steerOnSend && !interrupting && canInterruptAndSend() && (
+                {running && !steerOnSend && !interrupting && !anyTried && canInterruptAndSend() && (
                     <Button disabled={cancel.isPending || !canSubmit} onClick={interrupt} type="button" variant="outline">
                         {t`Interrupt and send`}
                     </Button>

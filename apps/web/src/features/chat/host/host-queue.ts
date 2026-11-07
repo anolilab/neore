@@ -262,13 +262,8 @@ const onLive = (step: HostQueueStep, live: string | undefined): HostQueueStep =>
     // A turn that runs is awaited until it ends, whoever started it.
     const awaitsNothing = phase.kind === "idle" || (phase.kind === "awaiting-turn-end" && phase.streamId === undefined);
 
-    if (!awaitsNothing) {
-        return { effects, state: next };
-    }
-
-    // A turn this composer did not start shows up before a released message went: the release was made with no turn
-    // running, so how that turn ends decides again whether the message waits.
-    return { effects, state: { ...next, phase: waitFor(live), released: phase.kind === "idle" ? undefined : next.released } };
+    // A released message waits behind it: a pausing end of that turn holds it (`onEnd`), a finished one lets it go.
+    return { effects, state: awaitsNothing ? { ...next, phase: waitFor(live) } : next };
 };
 
 const onObserved = (state: HostQueueState, event: Extract<HostQueueEvent, { type: "observed" }>): HostQueueStep => {
