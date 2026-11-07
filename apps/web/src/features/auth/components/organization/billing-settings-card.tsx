@@ -1,6 +1,8 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
+import type { ReturnOf } from "@lunora/react";
+import type { api } from "@neore/backend/api";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { CardContent } from "@neore/ui/components/card";
@@ -10,14 +12,14 @@ import { Label } from "@neore/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import cn from "@neore/ui/utils/cn";
-import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { useCallback, useState } from "react";
 import * as z from "zod";
 
 import type { SettingsCardProperties } from "@/components/settings/settings-card";
 import SettingsCard from "@/components/settings/settings-card";
-import { useActiveOrganization, useHasPermission } from "@/features/auth/hooks/organization-management";
+import { useActiveOrganization } from "@/features/auth/hooks/organization-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import useBillingOptions from "@/features/billing/hooks/use-billing-options";
 import useCheckout from "@/features/billing/hooks/use-checkout";
@@ -38,35 +40,25 @@ const AVAILABLE_MODELS = [
     "gpt-4-turbo",
 ];
 
-const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsCardProperties) => {
-    const { authClient, toast } = useAuth();
+type BillingInfo = NonNullable<ReturnOf<typeof api.auth.billing.getBillingInfo>>;
+
+interface BillingSettingsEditorProperties extends SettingsCardProperties {
+    billingInfo: BillingInfo;
+}
+
+// Mounted only once the organization's billing read has loaded, so its fields start from that organization's values.
+const BillingSettingsEditor = ({ billingInfo, className, classNames, ...properties }: BillingSettingsEditorProperties) => {
+    const { toast } = useAuth();
     const { t } = useLingui();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
-
-    const { data: hasPermission, isPending: isPermissionPending } = useHasPermission(authClient, {
-        permissions: {
-            organization: ["update"],
-        },
-    });
-
-    const isOwner = hasPermission?.success;
-
-    const { data: billingInfo, isPending: isBillingPending } = useQuery(crpc.auth.billing.getBillingInfo.queryOptions(isOwner ? {} : skipToken));
 
     const updateBillingMutation = useMutation(crpc.auth.billing.updateBillingSettings.mutationOptions());
     const { isPending: checkoutPending, openPortal, startCheckout } = useCheckout();
     const { yearly } = useBillingOptions();
 
-    const [selectedModels, setSelectedModels] = useState<string[]>(billingInfo?.allowedModels ?? []);
+    const [selectedModels, setSelectedModels] = useState<string[]>(billingInfo.allowedModels ?? []);
     const selectedModelSet = new Set(selectedModels);
-
-    // Update selected models when billing info loads
-    useState(() => {
-        if (billingInfo?.allowedModels) {
-            setSelectedModels(billingInfo.allowedModels);
-        }
-    });
 
     // The tier follows the Creem subscription (or a platform admin), so the owner
     // form only edits contact e-mail and models.
@@ -76,7 +68,7 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
 
     const form = useAppForm({
         defaultValues: {
-            billingEmail: billingInfo?.billingEmail ?? "",
+            billingEmail: billingInfo.billingEmail ?? "",
         },
         onSubmit: async ({ value }) => {
             try {
@@ -85,7 +77,7 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
                     billingEmail: value.billingEmail || undefined,
                 });
 
-                await queryClient.invalidateQueries({ queryKey: ["auth", "billing"] });
+                await queryClient.invalidateQueries({ queryKey: crpc.auth.billing.getBillingInfo.queryKey({}) });
 
                 toast({
                     message: t`Billing settings updated successfully`,
@@ -126,28 +118,6 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
     }, []);
 
     const { isSubmitting } = form.state;
-    const isPending = isPermissionPending || isBillingPending;
-
-    if (!isOwner && !isPending) {
-        return (
-            <SettingsCard
-                className={className}
-                classNames={classNames}
-                description={t`Only organization owners can manage billing settings`}
-                title={t`Billing Settings`}
-                {...properties}
-            >
-                <CardContent className={cn("space-y-4", classNames?.content)}>
-                    <div className="text-muted-foreground text-sm">
-                        {t`Current tier:`} <strong>{billingInfo?.baseTier ?? "free"}</strong>
-                    </div>
-                    <div className="text-muted-foreground text-sm">
-                        {t`Credits per user:`} <strong>{billingInfo?.creditsPerUser ?? 100}</strong>
-                    </div>
-                </CardContent>
-            </SettingsCard>
-        );
-    }
 
     return (
         <form.AppForm>
@@ -163,136 +133,127 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
                     className={className}
                     classNames={classNames}
                     description={t`Configure the billing contact and available AI models`}
-                    disabled={!isOwner}
-                    isPending={isPending}
                     title={t`Billing Settings`}
                     {...properties}
                 >
                     <CardContent className={cn("space-y-4", classNames?.content)}>
-                        {isPending ? (
-                            <>
-                                <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
-                                <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
-                                <Skeleton className={cn("h-20 w-full", classNames?.skeleton)} />
-                            </>
-                        ) : (
-                            <>
-                                {/* Tier and credits: read-only, managed by the platform's billing system */}
-                                <div className="text-muted-foreground space-y-1 text-sm">
-                                    <div>
-                                        {t`Current tier:`} <strong>{billingInfo?.baseTier ?? "free"}</strong>
-                                    </div>
-                                    <div>
-                                        {t`Credits per user:`} <strong>{billingInfo?.creditsPerUser ?? 100}</strong>
-                                    </div>
-                                    <p className="text-xs">{t`Your plan and credit allowance follow your subscription.`}</p>
-                                    {billingInfo?.creemSubscriptionId ? (
+                        {/* Tier and credits: read-only, managed by the platform's billing system */}
+                        <div className="text-muted-foreground space-y-1 text-sm">
+                            <div>
+                                {t`Current tier:`} <strong>{billingInfo.baseTier}</strong>
+                            </div>
+                            <div>
+                                {t`Credits per user:`} <strong>{billingInfo.creditsPerUser}</strong>
+                            </div>
+                            <p className="text-xs">{t`Your plan and credit allowance follow your subscription.`}</p>
+                            {billingInfo.creemSubscriptionId ? (
+                                <Button
+                                    disabled={checkoutPending}
+                                    onClick={() => {
+                                        void openPortal("organization");
+                                    }}
+                                    size="sm"
+                                    type="button"
+                                    variant="outline"
+                                >
+                                    {t`Manage Team subscription`}
+                                </Button>
+                            ) : (
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Button
+                                        disabled={checkoutPending}
+                                        onClick={() => {
+                                            void startCheckout("team");
+                                        }}
+                                        size="sm"
+                                        type="button"
+                                    >
+                                        {yearly.team ? t`Upgrade organization to Team, monthly` : t`Upgrade organization to Team`}
+                                    </Button>
+                                    {yearly.team ? (
                                         <Button
                                             disabled={checkoutPending}
                                             onClick={() => {
-                                                void openPortal("organization");
+                                                void startCheckout("team", "year");
                                             }}
                                             size="sm"
                                             type="button"
                                             variant="outline"
                                         >
-                                            {t`Manage Team subscription`}
+                                            {t`Pay yearly`}
                                         </Button>
-                                    ) : (
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <Button
-                                                disabled={checkoutPending}
-                                                onClick={() => {
-                                                    void startCheckout("team");
-                                                }}
-                                                size="sm"
-                                                type="button"
-                                            >
-                                                {yearly.team ? t`Upgrade organization to Team, monthly` : t`Upgrade organization to Team`}
-                                            </Button>
-                                            {yearly.team ? (
-                                                <Button
-                                                    disabled={checkoutPending}
-                                                    onClick={() => {
-                                                        void startCheckout("team", "year");
-                                                    }}
-                                                    size="sm"
-                                                    type="button"
-                                                    variant="outline"
-                                                >
-                                                    {t`Pay yearly`}
-                                                </Button>
-                                            ) : null}
-                                        </div>
-                                    )}
+                                    ) : null}
                                 </div>
+                            )}
+                        </div>
 
-                                {/* Billing Email */}
-                                <form.AppField name="billingEmail">
-                                    {(field) => (
-                                        <field.FormItem>
-                                            <Label>{t`Billing Email`}</Label>
-                                            <field.FormControl>
-                                                <Input
-                                                    className={classNames?.input}
-                                                    disabled={isSubmitting || !isOwner}
-                                                    onBlur={field.handleBlur}
-                                                    onChange={(e) => field.handleChange(e.target.value)}
-                                                    placeholder={t`Enter billing email`}
-                                                    type="email"
-                                                    value={field.state.value}
-                                                />
-                                            </field.FormControl>
-                                            <field.FormMessage className={classNames?.error} />
-                                        </field.FormItem>
-                                    )}
-                                </form.AppField>
+                        {/* Billing Email */}
+                        <form.AppField name="billingEmail">
+                            {(field) => (
+                                <field.FormItem>
+                                    <field.FormLabel>{t`Billing Email`}</field.FormLabel>
+                                    {/* `render` puts the id on the input itself; the default wrapper <div> would leave the label pointing at a non-control. */}
+                                    <field.FormControl
+                                        render={
+                                            <Input
+                                                className={classNames?.input}
+                                                disabled={isSubmitting}
+                                                onBlur={field.handleBlur}
+                                                onChange={(e) => field.handleChange(e.target.value)}
+                                                placeholder={t`Enter billing email`}
+                                                type="email"
+                                                value={field.state.value}
+                                            />
+                                        }
+                                    />
+                                    <field.FormMessage className={classNames?.error} />
+                                </field.FormItem>
+                            )}
+                        </form.AppField>
 
-                                {/* Allowed Models */}
-                                <div className="space-y-2">
-                                    <Label>{t`Allowed AI Models`}</Label>
-                                    <p className="text-muted-foreground text-xs">
-                                        {t`Select which AI models organization members can use. Leave empty for enterprise to allow all models.`}
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {selectedModels.map((model) => (
-                                            <Badge className="gap-1" key={model} variant="secondary">
-                                                {model}
-                                                <button
-                                                    aria-label={t`Remove ${model}`}
-                                                    className="hover:bg-muted ml-1 rounded-full p-0.5"
-                                                    disabled={isSubmitting || !isOwner}
-                                                    onClick={() => handleRemoveModel(model)}
-                                                    type="button"
-                                                >
-                                                    <X aria-hidden="true" className="h-3 w-3" />
-                                                </button>
-                                            </Badge>
-                                        ))}
-                                    </div>
-                                    <Select
-                                        disabled={isSubmitting || !isOwner}
-                                        onValueChange={(value) => {
-                                            if (value) {
-                                                handleAddModel(value);
-                                            }
-                                        }}
-                                        value=""
-                                    >
-                                        <SelectTrigger className={classNames?.input}>
-                                            <SelectValue placeholder={t`Add a model...`} />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {AVAILABLE_MODELS.filter((m) => !selectedModelSet.has(m)).map((model) => (
-                                                <SelectItem key={model} value={model}>
-                                                    {model}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </>
-                        )}
+                        {/* Allowed Models */}
+                        <div className="space-y-2">
+                            <Label>{t`Allowed AI Models`}</Label>
+                            <p className="text-muted-foreground text-xs">
+                                {t`Select which AI models organization members can use. Leave empty for enterprise to allow all models.`}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                {selectedModels.map((model) => (
+                                    <Badge className="gap-1" key={model} variant="secondary">
+                                        {model}
+                                        <button
+                                            aria-label={t`Remove ${model}`}
+                                            className="hover:bg-muted ml-1 rounded-full p-0.5"
+                                            disabled={isSubmitting}
+                                            onClick={() => handleRemoveModel(model)}
+                                            type="button"
+                                        >
+                                            <X aria-hidden="true" className="h-3 w-3" />
+                                        </button>
+                                    </Badge>
+                                ))}
+                            </div>
+                            <Select
+                                disabled={isSubmitting}
+                                onValueChange={(value) => {
+                                    if (value) {
+                                        handleAddModel(value);
+                                    }
+                                }}
+                                value=""
+                            >
+                                <SelectTrigger className={classNames?.input}>
+                                    <SelectValue placeholder={t`Add a model...`} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {AVAILABLE_MODELS.filter((m) => !selectedModelSet.has(m)).map((model) => (
+                                        <SelectItem key={model} value={model}>
+                                            {model}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </CardContent>
                 </SettingsCard>
             </form>
@@ -320,6 +281,75 @@ const BillingSettingsCardSkeleton = ({ className, classNames, ...properties }: S
             </CardContent>
         </SettingsCard>
     );
+};
+
+const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsCardProperties) => {
+    const { t } = useLingui();
+    const crpc = useCRPC();
+
+    // Every member may read the active organization's tier and credits; only an owner gets the editing controls.
+    // The server decides ownership (`isOwner`), the same rule its billing mutation applies. An organization-update permission is
+    // not enough: admins hold it too.
+    // One-shot (`live: false`): a live subscription answers from its last value, so after an organization switch it would keep the
+    // previous organization's plan. The switch resets this read, so the next read is the new organization's.
+    // With no subscription nothing pushes a plan change (the Creem webhook, a platform admin), so the read is stale at once: it refetches
+    // on mount and when the window regains focus, which is how a return from checkout picks up the new plan.
+    const {
+        data: billingInfo,
+        isError: isBillingError,
+        isPending: isBillingPending,
+    } = useQuery({
+        ...crpc.auth.billing.getBillingInfo.queryOptions({}, { live: false }),
+        staleTime: 0,
+    });
+
+    // A failed read is "unknown", not the Free plan: show the error instead of fallback values or plan buttons. This holds even when
+    // an earlier read is still cached (a failed refetch after an organization switch), and when the read returned nothing.
+    if (!isBillingPending && (isBillingError || billingInfo === null)) {
+        return (
+            <SettingsCard
+                className={className}
+                classNames={classNames}
+                description={t`Billing details for this organization`}
+                title={t`Billing Settings`}
+                {...properties}
+            >
+                <CardContent className={cn("space-y-4", classNames?.content)}>
+                    <p className="text-destructive text-sm" role="alert">
+                        {t`Could not load your organization's billing details. Try again later.`}
+                    </p>
+                </CardContent>
+            </SettingsCard>
+        );
+    }
+
+    // Until the read lands, no field is shown, so none can start with another organization's values.
+    if (!billingInfo) {
+        return <BillingSettingsCardSkeleton className={className} classNames={classNames} {...properties} />;
+    }
+
+    if (billingInfo.isOwner !== true) {
+        return (
+            <SettingsCard
+                className={className}
+                classNames={classNames}
+                description={t`Only organization owners can manage billing settings`}
+                title={t`Billing Settings`}
+                {...properties}
+            >
+                <CardContent className={cn("space-y-4", classNames?.content)}>
+                    <div className="text-muted-foreground text-sm">
+                        {t`Current tier:`} <strong>{billingInfo.baseTier}</strong>
+                    </div>
+                    <div className="text-muted-foreground text-sm">
+                        {t`Credits per user:`} <strong>{billingInfo.creditsPerUser}</strong>
+                    </div>
+                </CardContent>
+            </SettingsCard>
+        );
+    }
+
+    return <BillingSettingsEditor billingInfo={billingInfo} className={className} classNames={classNames} {...properties} />;
 };
 
 const BillingSettingsCard = ({ className, classNames, ...properties }: SettingsCardProperties) => {
