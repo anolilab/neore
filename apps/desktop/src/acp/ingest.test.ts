@@ -93,7 +93,7 @@ class FakeBackend {
     };
 
     public texts(turnId: string): string {
-        return (this.chunks.get(turnId) ?? []).map((event) => "text" in event && event.kind === "text" ? event.text : "").join("");
+        return (this.chunks.get(turnId) ?? []).map((event) => ("text" in event && event.kind === "text" ? event.text : "")).join("");
     }
 }
 
@@ -118,7 +118,7 @@ const poster = (media?: PosterOptions["media"], fetcher: typeof fetch = backend.
         log: (message) => {
             logs.push(message);
         },
-        ...media && { media },
+        ...(media && { media }),
         now: () => clock,
         random: () => 0.5,
         sign: (payload) => `sig:${String(payload.length)}`,
@@ -184,7 +184,7 @@ afterEach(async () => {
 
 describe("a turn's files", () => {
     const UPLOAD_ID = "abcdefghijklmnopqrstu";
-    const PNG = { bytes: new Uint8Array([0x89, 0x50, 0x4E, 0x47, 1]), kind: "image", mime: "image/png", name: "chart.png", size: 5, status: "read" };
+    const PNG = { bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1]), kind: "image", mime: "image/png", name: "chart.png", size: 5, status: "read" };
 
     /** The backend for a poster that also uploads: ingest posts go to the stand-in, upload requests are accepted. */
     const withUploads = () => {
@@ -285,7 +285,9 @@ describe("a turn's files", () => {
     it("posts nothing for a reference the core refuses, and still ends the turn", async () => {
         const { fetcher, uploads } = withUploads();
         const host = poster(
-            media(async () => { return { kind: "", mime: "", name: "", size: 0, status: "refused" }; }),
+            media(async () => {
+                return { kind: "", mime: "", name: "", size: 0, status: "refused" };
+            }),
             fetcher,
         );
 
@@ -369,6 +371,104 @@ describe("opening a session", () => {
         expect(backend.posts[0]?.post.events[0]).not.toHaveProperty("nativeSessionId");
     });
 
+    it("sends the open again when the agent's options change, after an open still in flight is answered", async () => {
+        const host = poster();
+        const options = (current: string) => {
+            return {
+                configOptions: [
+                    {
+                        choices: [
+                            { name: "Plan", value: "plan" },
+                            { name: "Build", value: "build" },
+                        ],
+                        currentValue: current,
+                        id: "mode",
+                        name: "Mode",
+                    },
+                ],
+            };
+        };
+
+        host.sessionOpened("s1", { ...INFO, options: options("build") });
+        // The first open is still in flight: the change rides a second open once it is answered, never a parallel one.
+        host.sessionUpdated("s1", { ...INFO, options: options("plan") });
+        await settle();
+
+        expect(backend.posts.map(({ post }) => (post.events[1] as { options?: ReturnType<typeof options> }).options?.configOptions[0]?.currentValue)).toEqual([
+            "build",
+            "plan",
+        ]);
+
+        host.sessionUpdated("s1", { ...INFO, options: options("build") });
+        await settle();
+
+        expect(backend.posts).toHaveLength(3);
+        expect(backend.posts[2]?.post).toMatchObject({
+            events: [
+                { ...INFO, kind: "session_open" },
+                { kind: "session_options", options: options("build") },
+            ],
+            sessionId: "s1",
+        });
+        expect(backend.posts[2]?.post.events[0]).not.toHaveProperty("options");
+    });
+
+    it("keeps the session on its thread when the backend refuses a re-post of its options", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext = [413];
+        host.sessionUpdated("s1", { ...INFO, options: { configOptions: [] } });
+        await settle();
+
+        // Turns still go to the thread, and the close still reaches the backend.
+        host.turnStarted("s1", "t1", "hello");
+        await settle(1000);
+        expect(backend.posts.some(({ post }) => post.turnId === "t1" && post.threadId === "thread-1")).toBe(true);
+
+        host.turnEnded("s1", "t1", "end_turn");
+        host.sessionEnded("s1");
+        await settle(1000);
+        expect(backend.posts.some(({ post }) => post.close === true)).toBe(true);
+    });
+
+    it("still sends a change made while a refused re-post was in flight", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext = [413];
+        host.sessionUpdated("s1", { ...INFO, options: { configOptions: [] } });
+        host.sessionUpdated("s1", { ...INFO, options: { modes: { available: [{ name: "Ask", value: "ask" }], current: "ask" } } });
+        await settle();
+
+        expect(backend.posts.at(-1)?.post.events[1]).toEqual({
+            kind: "session_options",
+            options: { modes: { available: [{ name: "Ask", value: "ask" }], current: "ask" } },
+        });
+    });
+
+    it("sends nothing more once the poster has stopped, not even an open deferred while one was in flight", async () => {
+        const host = poster();
+
+        host.sessionOpened("s1", INFO);
+        host.sessionUpdated("s1", { ...INFO, options: { configOptions: [] } });
+        host.stop();
+        await settle(60_000);
+
+        expect(backend.posts).toHaveLength(1);
+    });
+
+    it("sends no open for a change of a session that has ended", async () => {
+        const host = poster();
+
+        await open(host);
+        host.sessionEnded("s1");
+        host.sessionUpdated("s1", { ...INFO, options: { configOptions: [] } });
+        await settle();
+
+        expect(backend.posts.filter(({ post }) => post.events[0]?.kind === "session_open")).toHaveLength(1);
+    });
+
     it("posts nothing while the computer is not paired", async () => {
         paired = undefined;
 
@@ -399,7 +499,7 @@ describe("pairing after a session opened", () => {
     });
 
     it("posts no turn into a session the backend answers as ended", async () => {
-        backend.respond = (post) => post.threadId === undefined ? Response.json({ ended: true, next: 0, threadId: "thread-1" }) : undefined;
+        backend.respond = (post) => (post.threadId === undefined ? Response.json({ ended: true, next: 0, threadId: "thread-1" }) : undefined);
 
         const host = poster();
 
@@ -413,7 +513,7 @@ describe("pairing after a session opened", () => {
 
 describe("a session that never gets a thread", () => {
     it("ends a turn that started during session_open when the backend refuses the open", async () => {
-        backend.respond = (post) => post.threadId === undefined ? Response.json({ error: "no" }, { status: 403 }) : undefined;
+        backend.respond = (post) => (post.threadId === undefined ? Response.json({ error: "no" }, { status: 403 }) : undefined);
 
         const host = poster();
 
@@ -422,6 +522,20 @@ describe("a session that never gets a thread", () => {
         await settle(1000);
 
         expect(host.busy).toBe(false);
+    });
+
+    it("leaves a session the backend started local when the backend refuses its first open", async () => {
+        backend.respond = (post) => (post.threadId === undefined ? Response.json({ error: "no" }, { status: 403 }) : undefined);
+
+        const host = poster();
+
+        // The backend named the thread before the first open: a refusal of that open is still the end of the link.
+        host.sessionOpened("s1", INFO, "thread-1");
+        await settle();
+        host.turnStarted("s1", "t1", "hello");
+        await settle(1000);
+
+        expect(backend.posts.some(({ post }) => post.turnId === "t1")).toBe(false);
     });
 
     it("stops retrying session_open once the local session has ended", async () => {
@@ -445,7 +559,7 @@ describe("a session and turns the backend started", () => {
     it("knows the thread already, so a prompt it received is posted at once, before the open is answered", async () => {
         const host = poster();
 
-        backend.respond = (post) => post.threadId === undefined ? Response.json({ error: "slow" }, { status: 503 }) : undefined;
+        backend.respond = (post) => (post.threadId === undefined ? Response.json({ error: "slow" }, { status: 503 }) : undefined);
         host.sessionOpened("s1", INFO, "thread-1");
         host.turnReceived("s1", "t1", "fix it");
         await settle(POST_INTERVAL_MS);
@@ -880,13 +994,13 @@ describe("a turn", () => {
 
         for (let step = 0; step < 40; step += 1) {
             host.text("s1", "t1", "字".repeat(16_000));
-            host.text("s1", "t1", "\"\\".repeat(4000));
+            host.text("s1", "t1", '"\\'.repeat(4000));
         }
 
         await settle(POST_INTERVAL_MS);
         await settle(POST_INTERVAL_MS * 80);
 
-        const turnBodies = backend.posts.flatMap(({ post }, index) => post.turnId === "t1" ? [backend.bodyBytes[index] ?? 0] : []);
+        const turnBodies = backend.posts.flatMap(({ post }, index) => (post.turnId === "t1" ? [backend.bodyBytes[index] ?? 0] : []));
 
         expect(turnBodies.length).toBeGreaterThan(1);
         expect(Math.max(...turnBodies)).toBeLessThan(256 * 1024);
@@ -1003,7 +1117,7 @@ describe("a computer the backend no longer knows", () => {
         const host = poster();
 
         await open(host);
-        backend.respond = (post) => post.turnId === undefined ? undefined : Response.json({ error: "unauthorized" }, { status: 401 });
+        backend.respond = (post) => (post.turnId === undefined ? undefined : Response.json({ error: "unauthorized" }, { status: 401 }));
         host.turnStarted("s1", "t1", "go");
         host.turnStarted("s1", "t2", "again");
         await settleInSteps(180_000);
@@ -1113,7 +1227,7 @@ describe("a session that ends locally", () => {
         const host = poster();
 
         await open(host);
-        backend.respond = (post) => post.close === true ? Response.json({ error: "down" }, { status: 503 }) : undefined;
+        backend.respond = (post) => (post.close === true ? Response.json({ error: "down" }, { status: 503 }) : undefined);
         host.sessionEnded("s1");
         await settleInSteps(600_000);
 
@@ -1156,7 +1270,7 @@ describe("a session that ends locally", () => {
     it("sends no close for a session the backend refused to open", async () => {
         const host = poster();
 
-        backend.respond = (post) => post.close === true ? undefined : Response.json({ error: "no" }, { status: 403 });
+        backend.respond = (post) => (post.close === true ? undefined : Response.json({ error: "no" }, { status: 403 }));
         await open(host);
         host.sessionEnded("s1");
         await settle(60_000);

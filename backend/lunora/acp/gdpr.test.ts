@@ -32,7 +32,7 @@ const insertDevice = async (userId: string) =>
         async (ctx: any) => await ctx.db.insert("devices", { createdAt: 0, encryptedSecret: "x", name: "Laptop", platform: "linux", userId }),
     )) as string;
 
-const insertSession = async (userId: string, deviceId: string, index: number) =>
+const insertSession = async (userId: string, deviceId: string, index: number, fields: Record<string, unknown> = {}) =>
     await harness.run(async (ctx: any) => {
         const threadId = await ctx.db.insert("threads", { runner: "host", status: "active", title: `T${String(index)}`, userId });
 
@@ -48,6 +48,7 @@ const insertSession = async (userId: string, deviceId: string, index: number) =>
             threadId,
             updatedAt: index,
             userId,
+            ...fields,
         });
 
         return threadId as string;
@@ -123,6 +124,31 @@ describe("the export of coding-agent sessions and events", () => {
         expect(new Set(sessions.map((session) => session.threadId)).size).toBe(1100);
         expect(sessions[0]).not.toHaveProperty("deviceId");
         expect(sessions[0]).not.toHaveProperty("folderId");
+    });
+
+    it("carries the value each of the agent's options had, not the agent's lists of choices", async () => {
+        const device = await insertDevice(A);
+        const choices = [
+            { name: "Plan", value: "plan" },
+            { name: "Build", value: "build" },
+        ];
+
+        await insertSession(A, device, 0, {
+            agentOptions: { configOptions: [{ category: "mode", choices, currentValue: "plan", id: "mode", name: "Mode" }] },
+            capabilities: { groups: { identity: { models: [{ id: "m", name: "M" }] } }, reportedAt: 1, version: 1 },
+        });
+        await insertSession(A, device, 1, { agentOptions: { modes: { available: choices, current: "build" } } });
+
+        const pages = await collectAll(A);
+        const sessions = pages.flatMap((page) => page.sessions);
+
+        // The agent's list of models is its offer, not the person's data: it is left out of the export.
+        expect(sessions.some((session) => JSON.stringify(session).includes('"models"'))).toBe(false);
+        // The rows come back in no set order.
+        expect(sessions.map((session) => session.agentOptions)).toHaveLength(2);
+        expect(sessions.map((session) => session.agentOptions)).toEqual(
+            expect.arrayContaining([[{ id: "mode", name: "Mode", value: "plan" }], [{ id: "mode", name: "Mode", value: "build" }]]),
+        );
     });
 
     it("pages a user's tool and permission events across streams, each exactly once and in order", async () => {

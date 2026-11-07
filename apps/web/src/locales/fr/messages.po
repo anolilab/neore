@@ -2679,6 +2679,10 @@ msgstr "Capacités de l’agent"
 msgid "Agent Modules"
 msgstr "Modules de l’agent"
 
+#: src/features/chat/host/host-options.tsx:39
+msgid "Agent options"
+msgstr ""
+
 #: src/features/settings/components/chat/agent-settings.tsx:58
 msgid "Agent settings updated"
 msgstr "Paramètres de l’agent mis à jour"
@@ -3109,7 +3113,7 @@ msgstr ""
 msgid "Allow for today"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:160
+#: src/features/chat/host/host-composer.tsx:161
 msgid "Allow once"
 msgstr ""
 
@@ -5214,7 +5218,7 @@ msgstr "Canada"
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
 #: src/features/chat/host/diff-comment-form.tsx:80
-#: src/features/chat/host/host-composer.tsx:846
+#: src/features/chat/host/host-composer.tsx:847
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
 #: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
 #: src/features/chat/pins/pin-item.tsx:282
@@ -5756,7 +5760,7 @@ msgstr ""
 msgid "Checking image safety..."
 msgstr "Vérification de la sécurité de l’image..."
 
-#: src/features/chat/host/host-composer.tsx:1005
+#: src/features/chat/host/host-composer.tsx:1007
 msgid "Checking whether a message sent now interrupts the reply or waits behind it."
 msgstr "Vérification en cours : un message envoyé maintenant interrompt-il la réponse ou attend-il derrière elle ?"
 
@@ -7409,7 +7413,7 @@ msgid "Context-aware generation"
 msgstr "Génération contextuelle"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
-#: src/features/chat/host/host-composer.tsx:799
+#: src/features/chat/host/host-composer.tsx:800
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "Continuer"
@@ -7422,7 +7426,7 @@ msgstr ""
 msgid "Continue the same thread"
 msgstr "Continuer dans le même fil"
 
-#: src/features/chat/host/host-composer.tsx:793
+#: src/features/chat/host/host-composer.tsx:794
 msgid "Continue where you left off."
 msgstr ""
 
@@ -8133,7 +8137,7 @@ msgstr ""
 msgid "Could not send the message."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:751
+#: src/features/chat/host/host-composer.tsx:752
 msgid "Could not send your answer."
 msgstr ""
 
@@ -8180,7 +8184,7 @@ msgstr "Impossible d’arrêter la conversation"
 msgid "Could not stop the reply. Please try again."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:308
+#: src/features/chat/host/host-composer.tsx:309
 msgid "Could not stop the reply. Your message is queued; send it next when you are ready."
 msgstr "Impossible d'arrêter la réponse. Votre message est en file d'attente ; envoyez-le ensuite quand vous êtes prêt."
 
@@ -8985,7 +8989,7 @@ msgstr ""
 msgid "Debug an error or review my code..."
 msgstr "Déboguer une erreur ou relire mon code..."
 
-#: src/features/chat/host/host-composer.tsx:165
+#: src/features/chat/host/host-composer.tsx:166
 #: src/features/chat/thread/request-secret-prompt.tsx:495
 msgid "Decline"
 msgstr ""
@@ -10625,7 +10629,7 @@ msgstr "Génération guidée par les contours"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:141
 #: src/features/canvas/canvas-panel.tsx:767
-#: src/features/chat/host/host-composer.tsx:889
+#: src/features/chat/host/host-composer.tsx:890
 #: src/features/chat/thread-list/group-header.tsx:145
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
 #: src/features/chat/thread/message-item.tsx:396
@@ -10745,12 +10749,12 @@ msgstr "Modifier le prompt"
 msgid "Edit Provider"
 msgstr "Modifier le fournisseur"
 
-#: src/features/chat/host/host-composer.tsx:814
+#: src/features/chat/host/host-composer.tsx:815
 msgid "Edit queued message"
 msgstr "Modifier le message en file d'attente"
 
 #. placeholder {0}: index + 1
-#: src/features/chat/host/host-composer.tsx:882
+#: src/features/chat/host/host-composer.tsx:883
 msgid "Edit queued message {0}"
 msgstr "Modifier le message en file d'attente {0}"
 
@@ -15329,7 +15333,7 @@ msgstr "Aidez l’IA à mieux vous comprendre en partageant quelques information
 msgid "Here they are: planning, budget and next steps."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:969
+#: src/features/chat/host/host-composer.tsx:971
 msgid "Hidden characters were removed from your message."
 msgstr "Des caractères invisibles ont été retirés de votre message."
 
@@ -16236,7 +16240,7 @@ msgid "in {0, plural, one {# file} other {# files}}"
 msgstr ""
 
 #. placeholder {0}: request.folder
-#: src/features/chat/host/host-composer.tsx:151
+#: src/features/chat/host/host-composer.tsx:152
 msgid "In {0}"
 msgstr ""
 
@@ -16545,8 +16549,8 @@ msgstr ""
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:681
-#: src/features/chat/host/host-composer.tsx:991
+#: src/features/chat/host/host-composer.tsx:682
+#: src/features/chat/host/host-composer.tsx:993
 msgid "Interrupt and send"
 msgstr "Interrompre et envoyer"
 
@@ -19029,7 +19033,7 @@ msgstr "Saisie du message"
 msgid "Message selection"
 msgstr "Sélection de messages"
 
-#: src/features/chat/host/host-composer.tsx:984
+#: src/features/chat/host/host-composer.tsx:986
 msgid "Message the agent on your computer"
 msgstr ""
 
@@ -19041,7 +19045,7 @@ msgstr ""
 msgid "Message the worker..."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:943
+#: src/features/chat/host/host-composer.tsx:945
 msgid "Message to the coding agent"
 msgstr ""
 
@@ -19349,6 +19353,7 @@ msgstr "mois"
 msgid "Mobile app icon"
 msgstr "Icône d’application mobile"
 
+#: src/features/chat/host/host-options.tsx:32
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
 #: src/features/workflow/components/nodes/text-node.tsx:123
@@ -23326,7 +23331,7 @@ msgstr "Supprimer définitivement votre compte et toutes les données associées
 msgid "Permission Level"
 msgstr "Niveau d’autorisation"
 
-#: src/features/chat/host/host-composer.tsx:764
+#: src/features/chat/host/host-composer.tsx:765
 msgid "Permission requests from the agent"
 msgstr ""
 
@@ -24731,7 +24736,7 @@ msgstr "Interroger l’analyse d’utilisation et les coûts"
 msgid "Question"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:683
+#: src/features/chat/host/host-composer.tsx:684
 msgid "Queue"
 msgstr "File d'attente"
 
@@ -24753,16 +24758,16 @@ msgstr "Mettre le message en file d’attente — envoi à la fin de la réponse
 msgid "Queued"
 msgstr "En file d’attente"
 
-#: src/features/chat/host/host-composer.tsx:342
+#: src/features/chat/host/host-composer.tsx:343
 #: src/features/chat/thread/composer-prompt-queue.tsx:597
 msgid "Queued messages"
 msgstr "Messages en file d’attente"
 
-#: src/features/chat/host/host-composer.tsx:933
+#: src/features/chat/host/host-composer.tsx:934
 msgid "Queued messages go out in order once the reply ends."
 msgstr "Les messages en file partent dans l'ordre une fois la réponse terminée."
 
-#: src/features/chat/host/host-composer.tsx:345
+#: src/features/chat/host/host-composer.tsx:346
 msgid "Queued messages: {queuedTotal}"
 msgstr "Messages en file d’attente : {queuedTotal}"
 
@@ -25617,7 +25622,7 @@ msgstr "Se souvenir de moi"
 
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:195
 #: ../../packages/ui/src/components/combobox.tsx:304
-#: src/features/chat/host/host-composer.tsx:907
+#: src/features/chat/host/host-composer.tsx:908
 #: src/features/chat/sharing/thread-share-button.tsx:267
 #: src/features/chat/sharing/thread-share-button.tsx:339
 #: src/features/chat/thread/composer-input.tsx:335
@@ -25804,7 +25809,7 @@ msgid "Remove provider?"
 msgstr "Supprimer le fournisseur ?"
 
 #. placeholder {0}: index + 1
-#: src/features/chat/host/host-composer.tsx:893
+#: src/features/chat/host/host-composer.tsx:894
 msgid "Remove queued message {0}"
 msgstr "Retirer le message en file d'attente {0}"
 
@@ -26312,7 +26317,7 @@ msgstr "Recherche : taux de réussite {0} · MRR {1} · précision {2} · rappel
 msgid "retry"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:922
+#: src/features/chat/host/host-composer.tsx:923
 #: src/features/chat/thread/chat-error.tsx:56
 #: src/features/chat/thread/request-secret-prompt.tsx:476
 #: src/features/chat/translation/message-translation.tsx:88
@@ -26851,7 +26856,7 @@ msgstr "Arabie saoudite"
 #: src/features/auth/components/settings/security/change-email-card.tsx:133
 #: src/features/auth/components/settings/security/change-password-card.tsx:244
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
-#: src/features/chat/host/host-composer.tsx:835
+#: src/features/chat/host/host-composer.tsx:836
 #: src/features/chat/pins/pin-item.tsx:283
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:179
@@ -27681,7 +27686,7 @@ msgstr "Modèle semi-réaliste avec une bonne fidélité au prompt"
 msgid "Semi-realistic visual style"
 msgstr "Style visuel semi-réaliste"
 
-#: src/features/chat/host/host-composer.tsx:678
+#: src/features/chat/host/host-composer.tsx:679
 #: src/features/sub-agents/components/worker-composer.tsx:106
 msgid "Send"
 msgstr ""
@@ -27758,17 +27763,17 @@ msgstr "Comportement d’envoi des messages"
 msgid "Send messages to the AI bot via Telegram. Conversations appear as threads in your chat list."
 msgstr "Envoyez des messages au bot IA via Telegram. Les échanges apparaissent comme des conversations dans votre liste."
 
-#: src/features/chat/host/host-composer.tsx:864
+#: src/features/chat/host/host-composer.tsx:865
 #: src/features/chat/thread/composer-prompt-queue.tsx:616
 msgid "Send next"
 msgstr "Envoyer ensuite"
 
-#: src/features/chat/host/host-composer.tsx:877
+#: src/features/chat/host/host-composer.tsx:878
 msgid "Send now"
 msgstr "Envoyer maintenant"
 
 #. placeholder {0}: index + 1
-#: src/features/chat/host/host-composer.tsx:870
+#: src/features/chat/host/host-composer.tsx:871
 msgid "Send queued message {0} now"
 msgstr "Envoyer maintenant le message en file {0}"
 
@@ -29446,7 +29451,7 @@ msgstr "Démarrage de l’import..."
 msgid "Starting test drive…"
 msgstr "Démarrage de l’essai…"
 
-#: src/features/chat/host/host-composer.tsx:779
+#: src/features/chat/host/host-composer.tsx:780
 msgid "Starting the agent on your computer. A message you send now goes out once it is up."
 msgstr ""
 
@@ -29566,7 +29571,7 @@ msgstr "Bourse"
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:228
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/chat/host/host-composer.tsx:995
+#: src/features/chat/host/host-composer.tsx:997
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:112
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:354
@@ -31006,7 +31011,7 @@ msgstr ""
 msgid "That passcode is not right."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:754
+#: src/features/chat/host/host-composer.tsx:755
 msgid "That request is no longer waiting."
 msgstr ""
 
@@ -31131,7 +31136,7 @@ msgstr "La modification est trop volumineuse pour être affichée en entier."
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "L’agent de chat traite la tâche avec ses outils, en suivant éventuellement une compétence."
 
-#: src/features/chat/host/host-composer.tsx:920
+#: src/features/chat/host/host-composer.tsx:921
 msgid "The chat's state could not be read, so queued messages wait."
 msgstr "L'état du chat n'a pas pu être lu : les messages en file attendent."
 
@@ -31355,7 +31360,7 @@ msgstr "La dernière demande de suppression a échoué. Vous pouvez la renouvele
 msgid "the last time"
 msgstr "la dernière fois"
 
-#: src/features/chat/host/host-composer.tsx:789
+#: src/features/chat/host/host-composer.tsx:790
 msgid "The last turn stopped before it finished."
 msgstr ""
 
@@ -31485,7 +31490,7 @@ msgstr "Le prompt devient l’entrée du cas et cette réponse la réponse atten
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "Le fournisseur vous facture directement ces requêtes. Lorsque nous connaissons le prix du modèle, les frais de plateforme habituels pour vos propres clés sont prélevés en crédits."
 
-#: src/features/chat/host/host-composer.tsx:928
+#: src/features/chat/host/host-composer.tsx:929
 msgid "The queue is paused. Send next to go on with the queued messages."
 msgstr "La file est en pause. Choisissez « Envoyer ensuite » pour reprendre les messages en file."
 
@@ -31509,7 +31514,7 @@ msgstr ""
 msgid "The reply is still running. Try again when it finishes."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:307
+#: src/features/chat/host/host-composer.tsx:308
 msgid "The reply stopped, but the stop did not reach the computer, so the agent may still be running. Send next once it has stopped."
 msgstr "La réponse s'est arrêtée, mais l'arrêt n'a pas atteint l'ordinateur : l'agent peut encore tourner. Utilisez « Envoyer ensuite » une fois qu'il s'est arrêté."
 
@@ -32128,7 +32133,7 @@ msgstr "Cela supprime les fichiers du modèle de votre ordinateur. Vous pourrez 
 msgid "This repository was not found."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:154
+#: src/features/chat/host/host-composer.tsx:155
 msgid "This request was too long to show whole. You can decline it here; to allow it, answer on your computer."
 msgstr ""
 
@@ -32160,7 +32165,7 @@ msgstr ""
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
 msgstr "L’entrée de registre de ce serveur demande les valeurs ci-dessous. Elles complètent l’URL et les en-têtes."
 
-#: src/features/chat/host/host-composer.tsx:784
+#: src/features/chat/host/host-composer.tsx:785
 #: src/features/chat/host/host-send-errors.ts:19
 msgid "This session has ended. Start a new one from the desktop app."
 msgstr ""
@@ -32197,7 +32202,7 @@ msgstr "Cette exécution du sous-agent n'est plus disponible."
 msgid "This task has not run yet."
 msgstr "Cette tâche n’a pas encore été exécutée."
 
-#: src/features/chat/host/host-composer.tsx:824
+#: src/features/chat/host/host-composer.tsx:825
 msgid "This text is only hidden characters, so there is nothing to save."
 msgstr "Ce texte ne contient que des caractères masqués : il n’y a rien à enregistrer."
 

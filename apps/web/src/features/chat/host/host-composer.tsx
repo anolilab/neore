@@ -28,6 +28,7 @@ import { useCRPC } from "@/lib/lunora/crpc";
 import DiffCommentsDraft from "./diff-comments-draft";
 import { caretAfterRemoval } from "./host-caret";
 import { exceedsRawInputLimit } from "./host-input";
+import HostOptions from "./host-options";
 import type { HostQueueEffect, HostQueueEvent, HostQueueState } from "./host-queue";
 import {
     canEditQueued,
@@ -936,6 +937,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                     )}
                 </section>
             )}
+            <HostOptions options={session?.agentOptions} />
             <div className="flex items-end gap-2">
                 <textarea
                     aria-describedby={limitNote ? "host-composer-limit" : undefined}

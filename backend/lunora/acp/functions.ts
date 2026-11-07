@@ -14,7 +14,7 @@ import { vCapabilityReport } from "../lib/capability-report";
 import { MAX_LENGTH } from "../lib/validators";
 import { newestHostStream } from "./lib/host-streams";
 import { isHostRunThread } from "./lib/host-thread";
-import { vAcpSessionStatus, vHostEndReason } from "./validators";
+import { vAcpSessionStatus, vAgentOptions, vHostEndReason } from "./validators";
 
 const MAX_LISTED_SESSIONS = 50;
 
@@ -40,6 +40,8 @@ const vHostSessionDetail = v.object({
     _id: v.string(),
     agentKey: v.string(),
     agentLabel: v.string(),
+    // The options the agent offers, for the composer to show; read here only, never in the session list.
+    agentOptions: v.optional(vAgentOptions),
     capabilities: v.optional(vCapabilityReport),
     createdAt: v.number(),
     deviceId: v.string(),
@@ -139,6 +141,7 @@ export const getHostSession = authQuery
 
         return {
             ...toView(row),
+            ...(row.agentOptions !== undefined && { agentOptions: row.agentOptions }),
             ...(last?.hostEndReason !== undefined && { lastEndReason: last.hostEndReason }),
             ...(ended && { lastEndStreamId: String(ended._id) }),
             ...(ended?.hostEndReason !== undefined && { lastEndedReason: ended.hostEndReason }),
