@@ -31,6 +31,7 @@ import { internalAction, internalMutation, internalQuery } from "../_generated/s
 import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
 import schema from "../schema";
+import { trimPushDevices } from "../notifications/push-device-writes";
 
 /** Rows moved per round trip. */
 export const MERGE_PAGE_SIZE = 100;
@@ -65,6 +66,8 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     projects: ["userId"],
     promptHistory: ["userId"],
     prompts: ["userId"],
+    // The guest's phone keeps getting the account's pushes after the guest signs up.
+    pushDevices: ["userId"],
     shardRoutes: ["ownerId"],
     skillRatings: ["userId"],
     skills: ["userId"],
@@ -171,13 +174,14 @@ export const reassignGlobalRows = internalMutation
     .mutation(async ({ args, ctx }) => {
         const facades = ctx.db as unknown as Record<
             string,
-            { findMany: (options: { where: Record<string, string> }) => Promise<{ page: Record<string, unknown>[] }> }
+            { findMany: (options: { consistency: "primary"; where: Record<string, string> }) => Promise<{ page: Record<string, unknown>[] }> }
         >;
         let reassigned = 0;
 
         for (const [table, columns] of Object.entries(GLOBAL_USER_COLUMNS)) {
             for (const column of columns) {
-                const { page } = await facades[table]!.findMany({ where: { [column]: args.from } });
+                // The primary, not a replica: a row written a moment ago (a phone the guest just registered) must move too.
+                const { page } = await facades[table]!.findMany({ consistency: "primary", where: { [column]: args.from } });
 
                 for (const row of page) {
                     await ctx.db.patch(table as never, row._id as never, { [column]: args.to } as never);
@@ -185,6 +189,9 @@ export const reassignGlobalRows = internalMutation
                 }
             }
         }
+
+        // The guest's phones joined the new user's: keep only the newest the push cap allows.
+        await trimPushDevices(ctx.db, args.to);
 
         const { page: census } = await ctx.db.shardActivity.findMany({ where: { shardKey: args.from } });
 

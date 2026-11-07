@@ -709,6 +709,10 @@ overrides:
   file-type@>=20.0.0 <=21.3.1: ">=21.3.2"
   form-data@>=4.0.0 <4.0.4: ">=4.0.5"
   form-data@>=4.0.0 <4.0.6: ">=4.0.6"
+  # GHSA-3g3m-2fjr-6pw4 (an aborted walk keeps traversing). No 10.x release is patched; the
+  # first fix is 14.0.2. Its one 10.x consumer, `@bacons/apple-targets` (declares ^10.4.2),
+  # calls only `globSync` with `cwd`/`absolute`, unchanged through v14.
+  glob@>=10.0.0 <11.0.0: 14.0.2
   handlebars@>=4.0.0 <=4.7.9: ">=4.7.10"
   http-cache-semantics@<=4.2.0: ">=4.3.0"
   # One copy, in step with the `server` catalog: `@lunora/*` pins hono exactly, and
@@ -750,9 +754,13 @@ overrides:
   # declaring `minimatch: ^3.x` (eslint-plugin-jsx-a11y among them) blows up
   # with `(0, _minimatch.default) is not a function` at rule-run time.
   minimatch@<3.1.4: "^3.1.4"
-  minimatch@>=10.0.0 <10.2.3: ">=10.2.3"
+  # The 9.x and 10.x bumps stop below 11 since glob 14 brought minimatch 11 into the
+  # lockfile: an open-ended bump would hand their consumers 11, which drops the named
+  # `makeRe` export eslint-plugin-import-x imports (`does not provide an export named
+  # 'makeRe'`). Below 11 they land on 10.2.6 as before; "^9" would instead add a 9.x copy.
+  minimatch@>=10.0.0 <10.2.3: ">=10.2.3 <11.0.0"
   minimatch@>=5.0.0 <5.1.8: ">=5.1.8"
-  minimatch@>=9.0.0 <9.0.7: ">=9.0.7"
+  minimatch@>=9.0.0 <9.0.7: ">=9.0.7 <11.0.0"
   moment@>=2.29.2 <2.31.0: ">=2.31.0"
   mysql2@<=3.23.0: ">=3.23.1"
   nanoid@<3.3.17: ">=3.3.17"

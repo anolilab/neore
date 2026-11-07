@@ -2179,6 +2179,22 @@ export const schema = defineSchema({
         .index("by_user_and_repository_number", ["userId", "repository", "number"])
         .index("by_user_and_threadId", ["userId", "threadId"]),
 
+    // A phone's Expo push token (`notifications/native-push.ts`): one row per token, owned by the account signed in on
+    // that phone. Global (D1) and keyed by `token`, so a second account signing in on the same phone moves the row in
+    // one write instead of reaching into the first account's shard. Web Push subscriptions live in `@lunora/notify`'s
+    // store.
+    pushDevices: defineTable({
+        createdAt: v.number(),
+        lastSeenAt: v.number(),
+        platform: v.union(v.literal("android"), v.literal("ios")),
+        token: v.string(),
+        userId: v.string(),
+    })
+        .global()
+        // Unique: two registrations of one phone racing each other must not leave a row for each account.
+        .index("by_token", ["token"], { unique: true })
+        .index("by_userId", ["userId"]),
+
     /**
      * better-auth's own rate-limit store.
      *
