@@ -37,6 +37,17 @@ export const readableProject = async (context: QueryCtx | MutationCtx, projectId
     return await context.db.projects.findFirst({ where: { _id: projectId } });
 };
 
+/**
+ * The project when `userId` may file threads in it, else `null`: readable (owner or a current member of its
+ * organization) AND owned by `userId` or by nobody. The same rule as moving a thread into a project
+ * (`moveThreadToProject` here) and updating one: a member never files into another member's project.
+ */
+export const writableProject = async (context: QueryCtx | MutationCtx, projectId: Id<"projects">, userId: string): Promise<Doc<"projects"> | null> => {
+    const project = await readableProject(context, projectId, userId);
+
+    return project && (!project.userId || project.userId === userId) ? project : null;
+};
+
 /** A project's `context` text for a run on behalf of `userId`, under the same access rule as `createThread` (owner or organization member). */
 export const getProjectContextForRun = internalQuery
     .input({ projectId: v.id("projects"), userId: v.string().max(MAX_LENGTH.id) })

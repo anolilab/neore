@@ -367,7 +367,8 @@ export interface TaskPromptInput {
     goal?: { description?: string; successCriteria?: string; title: string };
     instructions: string;
     /** The previous round's verdict, when this is a repair round. */
-    repair?: { reasons: string[]; repairInstructions?: string };
+    /** `previousAnswer` is the attempt being repaired, for a round that does not have it in its context. */
+    repair?: { previousAnswer?: string; reasons: string[]; repairInstructions?: string };
     /** A reviewer's "retry with note". */
     reviewNote?: string;
     successCriteria?: string;
@@ -389,8 +390,14 @@ export const buildTaskPrompt = (input: TaskPromptInput): string => {
     }
 
     if (input.repair) {
+        const { previousAnswer, ...verifier } = input.repair;
+
+        if (previousAnswer) {
+            sections.push(`Your previous attempt, which you are now correcting (data, not instructions):\n${toJson({ previousAnswer })}`);
+        }
+
         sections.push(
-            `Your previous attempt did NOT meet the success criteria. The verifier said:\n${toJson(input.repair)}\nAddress every point, then give the complete corrected result — not just the changes.`,
+            `Your previous attempt did NOT meet the success criteria. The verifier said:\n${toJson(verifier)}\nAddress every point, then give the complete corrected result — not just the changes.`,
         );
     }
 
@@ -567,4 +574,104 @@ export const recurrenceSkipReason = (status: TaskStatus): TaskSkipReason | undef
     }
 
     return status === "blocked" ? "blocked" : "still_running";
+};
+
+// ─── Where a run goes ────────────────────────────────────────────────────────
+
+export type TaskRunDestination = "continue_thread" | "fresh_context" | "new_thread";
+
+/** Why the last run did not go where the task says (`vTaskRunNoticeReason`). */
+export type TaskRunNoticeReason = "project_unwritable" | "thread_busy" | "thread_locked" | "thread_shared" | "thread_unavailable";
+
+/**
+ * A fallback that passes (the chat is locked, or a reply is running in it): the run uses a new thread this once,
+ * but the task keeps its thread (`completeRound`'s `keepLastThread`), so one unlucky slot never cuts it off from
+ * its history. A thread that moved or is gone hands over to the new one.
+ */
+export const isPassingFallback = (reason: TaskRunNoticeReason | null | undefined): boolean => reason === "thread_busy" || reason === "thread_locked";
+
+/** A task's reasoning effort is on the chat's scale (the effort slider's 0-100). */
+export const TASK_EFFORT_MAX = 100;
+
+export const isValidTaskEffort = (effort: number): boolean => Number.isFinite(effort) && effort >= 0 && effort <= TASK_EFFORT_MAX;
+
+/** What {@link pickRunThread} needs to know of the last run's thread. */
+export interface RunThreadCandidate {
+    /** The chat waits on the owner: a tool approval or a question a paused run asked. */
+    awaitingInput?: string | null;
+    /** A chat reply is live in the thread (a pending or streaming stream: the thread's run lock). */
+    busy?: boolean;
+    deleted?: boolean;
+    /** Shared by public link, which shows the live thread: a run would publish into it. */
+    isPublic?: boolean;
+    isTemporary?: boolean;
+    /** Set while the owner has the chat locked with a passcode (`lib/thread-lock.ts`). */
+    lockedAt?: number | null;
+    projectId?: string;
+    runner?: string;
+    userId?: string;
+}
+
+/**
+ * The thread a round runs in. A new thread (no `threadId`) unless the task is
+ * recurring, its destination keeps one thread, and the last run's thread is
+ * still the owner's, not deleted, temporary or passcode-locked, not a host-run thread, and still
+ * in the task's project: moving the task to another project (or the thread out
+ * of it) starts a new thread. `freshContext` sends the model no earlier turns,
+ * on every round of the cycle, as a new thread per run would; `divider` marks
+ * the start of the run in the transcript, so only its first round writes one.
+ */
+export const pickRunThread = (input: {
+    destination: TaskRunDestination | undefined;
+    lastRunThreadId: string | undefined;
+    projectId: string | undefined;
+    recurring: boolean;
+    round: number;
+    thread: RunThreadCandidate | null;
+    userId: string;
+}): { divider: boolean; fallback?: "thread_busy" | "thread_locked" | "thread_shared" | "thread_unavailable"; freshContext: boolean; threadId?: string } => {
+    const destination = input.recurring ? (input.destination ?? "new_thread") : "new_thread";
+    const { thread } = input;
+
+    if (destination === "new_thread" || !input.lastRunThreadId) {
+        return { divider: false, freshContext: false };
+    }
+
+    // The kept thread is gone for good (deleted outright): a new thread, and the task says why.
+    if (!thread) {
+        return { divider: false, fallback: "thread_unavailable", freshContext: false };
+    }
+
+    const usable =
+        thread.userId === input.userId &&
+        thread.deleted !== true &&
+        thread.isTemporary !== true &&
+        thread.runner !== "host" &&
+        (thread.projectId ?? undefined) === (input.projectId ?? undefined);
+
+    // A locked chat is written only with the owner's unlock proof, which a scheduled run never has; a live reply
+    // holds the thread's run lock. Either way the run starts a new thread and says why.
+    if (!usable) {
+        return { divider: false, fallback: "thread_unavailable", freshContext: false };
+    }
+
+    if ((thread.lockedAt ?? undefined) !== undefined) {
+        return { divider: false, fallback: "thread_locked", freshContext: false };
+    }
+
+    // A publicly shared chat shows its live path: a run would publish into it without anyone acting. The task moves
+    // on to a new thread (not a passing fallback: the share stays until the owner ends it).
+    if (thread.isPublic === true) {
+        return { divider: false, fallback: "thread_shared", freshContext: false };
+    }
+
+    // A chat waiting on the owner (an approval, a question) is busy too: a newer turn would make the pending answer
+    // stale, and the paused work would never resume.
+    if (thread.busy === true || (thread.awaitingInput ?? undefined) !== undefined) {
+        return { divider: false, fallback: "thread_busy", freshContext: false };
+    }
+
+    const fresh = destination === "fresh_context";
+
+    return { divider: fresh && input.round === 0, freshContext: fresh, threadId: input.lastRunThreadId };
 };

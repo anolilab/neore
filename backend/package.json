@@ -16,6 +16,7 @@
         "./agent": "./lunora/agent/client/index.ts",
         "./agent/agent-switch-logic": "./lunora/agent/agent-switch-logic.ts",
         "./agent/agent-switch-shape": "./lunora/agent/agent-switch-shape.ts",
+        "./agent/context-reset-shape": "./lunora/agent/context-reset-shape.ts",
         "./agent/agent-switch-validators": "./lunora/agent/agent-switch-validators.ts",
         "./agent/branch-tree": "./lunora/agent/branch-tree.ts",
         "./agent/deltas": "./lunora/agent/deltas.ts",

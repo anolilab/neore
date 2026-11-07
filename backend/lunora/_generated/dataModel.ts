@@ -1657,6 +1657,7 @@ export interface Doc_tasks {
     goalId?: Id<"goals">;
     instructions: string;
     lastError?: string;
+    lastRunNotice?: { at: number; reason: "project_unwritable" | "thread_locked" | "thread_busy" | "thread_shared" | "thread_unavailable" };
     lastRunThreadId?: string;
     lastSkippedAt?: number;
     lastSkipReason?: "still_running" | "awaiting_review" | "blocked";
@@ -1665,9 +1666,12 @@ export interface Doc_tasks {
     nextRunAt?: number;
     organizationId?: string;
     parentTaskId?: Id<"tasks">;
+    projectId?: Id<"projects">;
+    reasoningEffort?: number;
     recurring: boolean;
     resultSummary?: string;
     reviewNote?: string;
+    runDestination?: "new_thread" | "continue_thread" | "fresh_context";
     skillId?: Id<"skills">;
     status: "todo" | "queued" | "running" | "needs_review" | "done" | "failed" | "blocked";
     successCriteria?: string;
@@ -4659,6 +4663,7 @@ export interface Insert_tasks {
     goalId?: Id<"goals">;
     instructions: string;
     lastError?: string;
+    lastRunNotice?: { at: number; reason: "project_unwritable" | "thread_locked" | "thread_busy" | "thread_shared" | "thread_unavailable" };
     lastRunThreadId?: string;
     lastSkippedAt?: number;
     lastSkipReason?: "still_running" | "awaiting_review" | "blocked";
@@ -4667,9 +4672,12 @@ export interface Insert_tasks {
     nextRunAt?: number;
     organizationId?: string;
     parentTaskId?: Id<"tasks">;
+    projectId?: Id<"projects">;
+    reasoningEffort?: number;
     recurring: boolean;
     resultSummary?: string;
     reviewNote?: string;
+    runDestination?: "new_thread" | "continue_thread" | "fresh_context";
     skillId?: Id<"skills">;
     status: "todo" | "queued" | "running" | "needs_review" | "done" | "failed" | "blocked";
     successCriteria?: string;

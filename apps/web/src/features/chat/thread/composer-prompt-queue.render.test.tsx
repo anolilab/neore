@@ -7,10 +7,32 @@ import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-st
 
 import ComposerPromptQueue from "./composer-prompt-queue";
 
+// The pointer sensor needs layout to pick a drop target, which jsdom has none of. The drop itself is the component's
+// `onDragEnd`, so the mock keeps the real `DndContext` and records the handler it is given, to call with a drop.
+const drag = vi.hoisted(() => {
+    return { onDragEnd: undefined as undefined | ((event: { active: { id: string }; over: { id: string } | null }) => void) };
+});
+
+vi.mock("@dnd-kit/core", async (importOriginal) => {
+    const original = await importOriginal<typeof import("@dnd-kit/core")>();
+
+    return {
+        ...original,
+        DndContext: (props: Parameters<typeof original.DndContext>[0]) => {
+            const { onDragEnd } = props;
+
+            drag.onDragEnd = onDragEnd as typeof drag.onDragEnd;
+
+            return <original.DndContext {...props} />;
+        },
+    };
+});
+
 const chat = vi.hoisted(() => {
     return { error: undefined as Error | undefined, isStreaming: false, sendMessage: vi.fn(), threadId: "thread-1" };
 });
 const withdrawSteer = vi.hoisted(() => vi.fn());
+const MOVED_TO = /Moved to position/u;
 
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -69,8 +91,27 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
     };
 });
 
+const nextFrame = async () => {
+    await act(async () => {
+        await new Promise<void>((resolve) => {
+            globalThis.requestAnimationFrame(() => {
+                resolve();
+            });
+        });
+    });
+};
+
 describe("composer prompt queue", () => {
     beforeEach(() => {
+        // jsdom has none, and the drag-and-drop context observes sizes with it.
+        vi.stubGlobal(
+            "ResizeObserver",
+            // A constructor mock must be a `function`, not an arrow.
+            // eslint-disable-next-line prefer-arrow-callback
+            vi.fn(function ResizeObserverStub() {
+                return { disconnect: vi.fn(), observe: vi.fn(), unobserve: vi.fn() };
+            }),
+        );
         chat.error = new Error("the reply failed");
         chat.isStreaming = false;
         chat.sendMessage.mockReset();
@@ -109,5 +150,141 @@ describe("composer prompt queue", () => {
 
         expect(chat.sendMessage).toHaveBeenCalledTimes(1);
         expect(chat.sendMessage).toHaveBeenCalledWith("queued", []);
+    });
+
+    it("does not repeat a move's announcement in a later queue of the same thread", async () => {
+        const { enqueue, remove, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+        fireEvent.click(screen.getByLabelText("Move queued message 2 up"));
+        await nextFrame();
+        expect(screen.getByText("Moved to position 1")).toBeTruthy();
+
+        // The queue empties, then a new message arrives in the same thread: the old move is not read out again.
+        const queued = usePromptQueueStore.getState().queues[chat.threadId]?.items ?? [];
+
+        for (const item of queued) {
+            remove(chat.threadId, item.id);
+        }
+
+        await nextFrame();
+        enqueue(chat.threadId, { attachments: [], text: "three" });
+
+        expect(screen.queryByText("Moved to position 1")).toBeNull();
+    });
+
+    it("does not read a move's announcement again when the person returns to its thread", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const threadId of ["thread-1", "thread-2"]) {
+            for (const text of ["one", "two"]) {
+                enqueue(threadId, { attachments: [], text });
+            }
+
+            setPaused(threadId, true);
+        }
+
+        const { rerender } = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Move queued message 2 up"));
+        await nextFrame();
+        expect(screen.getByText("Moved to position 1")).toBeTruthy();
+
+        // Another thread with its own queue is shown, then the first thread again: the old move is not read out again.
+        chat.threadId = "thread-2";
+        rerender(<ComposerPromptQueue />);
+        chat.threadId = "thread-1";
+        rerender(<ComposerPromptQueue />);
+
+        expect(screen.queryByText("Moved to position 1")).toBeNull();
+    });
+
+    it("keeps keyboard focus on the moved message's button, so the next move needs no mouse", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two", "three"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        // Focus, then activate it as a keyboard user would: the chip moves in the DOM, and focus must follow it.
+        const up = screen.getByLabelText("Move queued message 3 up");
+
+        act(() => up.focus());
+        fireEvent.click(up);
+
+        // Focus has no Testing Library query: the active element is the only way to read where focus landed.
+        // eslint-disable-next-line testing-library/no-node-access
+        expect(document.activeElement).toBe(screen.getByLabelText("Move queued message 2 up"));
+    });
+
+    it("moves a queued message up and down with its buttons, and sends the moved one first", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two", "three"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        expect((screen.getByLabelText("Move queued message 1 up") as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByLabelText("Move queued message 3 down") as HTMLButtonElement).disabled).toBe(true);
+
+        fireEvent.click(screen.getByLabelText("Move queued message 3 up"));
+        fireEvent.click(screen.getByLabelText("Move queued message 2 up"));
+
+        const order = () => usePromptQueueStore.getState().queues[chat.threadId]?.items.map((item) => item.text);
+
+        expect(order()).toEqual(["three", "one", "two"]);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+        await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("three", []));
+    });
+
+    it("moves a dropped message to where it lands in the queue", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two", "three"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+        const [one, , three] = usePromptQueueStore.getState().queues[chat.threadId]?.items ?? [];
+
+        act(() => {
+            drag.onDragEnd?.({ active: { id: three!.id }, over: { id: one!.id } });
+        });
+
+        await nextFrame();
+
+        expect((usePromptQueueStore.getState().queues[chat.threadId]?.items ?? []).map((item) => item.text)).toStrictEqual(["three", "one", "two"]);
+        expect(screen.getByText("Moved to position 1")).toBeTruthy();
+    });
+
+    it("refuses a drop across a pending steer, and announces no move for it", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        enqueue(chat.threadId, { attachments: [], steer: { id: "steer-1", streamId: "stream-1" }, text: "steered" });
+        enqueue(chat.threadId, { attachments: [], text: "two" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+        const [one, , two] = usePromptQueueStore.getState().queues[chat.threadId]?.items ?? [];
+
+        act(() => {
+            drag.onDragEnd?.({ active: { id: two!.id }, over: { id: one!.id } });
+        });
+
+        expect((usePromptQueueStore.getState().queues[chat.threadId]?.items ?? []).map((item) => item.text)).toStrictEqual(["one", "steered", "two"]);
+        expect(screen.queryByText(MOVED_TO)).toBeNull();
     });
 });

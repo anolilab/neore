@@ -1,5 +1,6 @@
 import { MODEL_LOOKUP } from "@neore/ai/models";
 import { readAgentSwitch, switchAgentName } from "@neore/backend/agent/agent-switch-shape";
+import { contextResetOf } from "@neore/backend/agent/context-reset-shape";
 import type { Doc } from "@neore/backend/dataModel";
 
 import { buildDocx, DOCX_MIME_TYPE } from "./docx";
@@ -91,8 +92,15 @@ const messageText = (message: Message, stored: StoredMessagePayload | undefined)
         .map((part) => part.text)
         .join("\n");
 
-/** The line a divider row stands for ("Switched from X to Y"), or `undefined` for any other row. */
+/**
+ * The line a divider row stands for: an agent switch ("Switched from X to Y"), or the start of a task run that was
+ * sent none of the earlier turns. `undefined` for any other row.
+ */
 const switchNote = (message: Message): string | undefined => {
+    if (contextResetOf(message)) {
+        return "New task run · earlier messages were not sent to the model";
+    }
+
     const part = readAgentSwitch(message);
 
     if (!part) {
