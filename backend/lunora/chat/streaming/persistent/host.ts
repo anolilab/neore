@@ -134,7 +134,8 @@ export const bumpedExpiry = (stream: Pick<Stream, "_creationTime" | "expiresAt">
 
 /**
  * Hands the thread back from `running` unless another live stream or an edit on it still holds it. `failed` says the turn
- * failed, so a snoozed thread wakes (`patchThread`).
+ * failed, so a snoozed thread wakes (`patchThread`). A failed turn wakes its thread whatever else holds it or whatever status it
+ * has now: a snooze must not outlive a failure with no visible run, the same give-back a failed run makes.
  */
 export const releaseThread = async (
     ctx: Pick<MutationCtx, "db">,
@@ -147,8 +148,19 @@ export const releaseThread = async (
         ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId } }),
     ]);
 
-    if (thread?.status === "running" && !live) {
+    if (!thread) {
+        return;
+    }
+
+    if (thread.status === "running" && !live) {
         await patchThread(ctx.db, threadId, { status: "active", updatedAt: now }, { failed });
+
+        return;
+    }
+
+    // The thread stays with whatever holds it; a failed turn still wakes it, and records the wake even when nothing is snoozed.
+    if (failed) {
+        await patchThread(ctx.db, threadId, {}, { failed: true });
     }
 };
 
