@@ -14,7 +14,7 @@
 import { toStorageRef } from "../lib/storage-ref";
 import { agentSwitchOf } from "./agent-switch-logic";
 import { storageRefsForUrls } from "../lib/storage-sign";
-import { convertUint8ArrayToBase64, type ProviderOptions, type ReasoningPart, type ToolResultOutput } from "@ai-sdk/provider-utils";
+import { convertBase64ToUint8Array, convertUint8ArrayToBase64, type ProviderOptions, type ReasoningPart, type ToolResultOutput } from "@ai-sdk/provider-utils";
 import type {
     AssistantContent,
     CallWarning,
@@ -44,6 +44,7 @@ import { MAX_FILE_SIZE, storeFile } from "./client/files";
 import type { ActionCtx as ActionContext, RunnerCtx as RunnerContext } from "./client/types";
 import type { MutationCtx as MutationContext } from "./client/types";
 import { extractText, getModelName, getProviderName, type ModelOrMetadata } from "./shared";
+import { offloadToolOutputMedia, stepInlineBudget, type StoreToolMedia } from "./tool-output-media";
 import type { vAssistantContent, vToolApprovalRequest, vToolApprovalResponse, vToolContent } from "./validators";
 import {
     type Message,
@@ -224,6 +225,7 @@ export const serializeNewMessagesInStep = async <TOOLS extends ToolSet>(
     context: ActionContext,
     step: StepResult<TOOLS>,
     model: ModelOrMetadata | undefined,
+    owner?: ToolMediaOwner,
 ): Promise<{ messages: MessageWithMetadata[] }> => {
     // ref: https://github.com/vercel/ai/blob/main/packages/ai/core/generate-text/to-response-messages.ts
     const toolResultIndex = step.content.findIndex((c) => (c.type === "tool-result" || c.type === "tool-error") && !c.providerExecuted);
@@ -256,7 +258,7 @@ export const serializeNewMessagesInStep = async <TOOLS extends ToolSet>(
 
     if (hasToolResults) {
         const toolContent = step.content.slice(toolResultIndex);
-        const { messageFileIds: toolFileIds, partContent: toolPartContent } = await serializeStepContent(context, toolContent);
+        const { messageFileIds: toolFileIds, partContent: toolPartContent } = await serializeStepContent(context, toolContent, owner);
         const toolMessage = {
             content: toolPartContent as Infer<typeof vToolContent>,
             providerOptions: step.response.messages.at(-1)?.providerOptions,
@@ -307,11 +309,39 @@ export const serializeObjectResult = async (
 
 const getMediaType = (part: { mediaType?: string }) => part.mediaType;
 
+/** Whose run saved a step: the chat files its tool results' inline media move to are theirs (`agent/tool-output-media.ts`). */
+export interface ToolMediaOwner {
+    threadId: string;
+    userId: string;
+}
+
 export const serializeStepContent = async (
     context: ActionContext,
     content: StepResult<ToolSet>["content"],
+    owner?: ToolMediaOwner,
 ): Promise<{ messageFileIds?: string[]; partContent: SerializedContent }> => {
     const fileIds: string[] = [];
+    // Tool media is stored once per distinct blob in the step, and one blob at a time: the parts serialize at once,
+    // and each store holds a decoded copy (up to `STORE_MAX_BYTES`), so several at once could exhaust the Worker.
+    const storedMedia = new Map<string, ReturnType<StoreToolMedia>>();
+    let storing: Promise<unknown> = Promise.resolve();
+    const inlineBudget = stepInlineBudget();
+    const storeToolMedia: StoreToolMedia = async (base64, mediaType) => {
+        let pending = storedMedia.get(base64);
+
+        if (!pending) {
+            pending = storing.then(async () => {
+                const { file } = await storeFile(context, new Blob([convertBase64ToUint8Array(base64)], { type: mediaType }), owner);
+
+                return { fileId: file.fileId, storageId: file.storageId };
+            });
+            // The next store waits for this one, whatever its outcome.
+            storing = pending.catch(() => undefined);
+            storedMedia.set(base64, pending);
+        }
+
+        return await pending;
+    };
     const serialized = await Promise.all(
         content.map(async (part) => {
             const metadata: {
@@ -397,9 +427,18 @@ export const serializeStepContent = async (
                     } satisfies Infer<typeof vToolResultPart>;
                 }
                 case "tool-result": {
-                    const rawOutput = part.output;
+                    let rawOutput: unknown = part.output;
+
+                    // Without an owner the stored file would be nobody's, and its reference would never be signed.
+                    if (owner) {
+                        const offloaded = await offloadToolOutputMedia(part.toolName, rawOutput, storeToolMedia, inlineBudget);
+
+                        rawOutput = offloaded.output;
+                        fileIds.push(...offloaded.fileIds);
+                    }
+
                     const output: ToolResultOutput =
-                        typeof rawOutput === "string" ? { type: "text", value: rawOutput } : { type: "json", value: part.output ?? null };
+                        typeof rawOutput === "string" ? { type: "text", value: rawOutput } : { type: "json", value: (rawOutput ?? null) as JSONValue };
 
                     return {
                         ...pick(part, ["type", "toolCallId", "toolName", "dynamic", "preliminary", "providerExecuted"]),

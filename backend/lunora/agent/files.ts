@@ -93,11 +93,9 @@ export async function addFileHandler(context: MutationContext, args: InferArgs<t
     const existingFile = await findChatFile(context, args.hash, args.filename);
 
     if (existingFile) {
-        // increment the refcount
-        await context.db.patch("chatFiles", existingFile._id, {
-            lastTouchedAt: Date.now(),
-            refcount: existingFile.refcount + 1,
-        });
+        // A store that raced another for the same bytes: the row is shared, and only the messages that save it count
+        // it (`changeRefcount`), as for a new row and for `useExistingFile`. Counting it here too kept it forever.
+        await context.db.patch("chatFiles", existingFile._id, { lastTouchedAt: Date.now() });
         await grantFileAccess(context, existingFile._id, args.userId);
 
         return {
