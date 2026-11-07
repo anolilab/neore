@@ -21160,6 +21160,74 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "pushDevices": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "lastSeenAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "platform": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"android\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"ios\""
+            }
+          ]
+        },
+        "token": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_token": {
+          "fields": [
+            "token"
+          ],
+          "unique": true
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
     "rateLimit": {
       "commitOrdered": false,
       "fields": {

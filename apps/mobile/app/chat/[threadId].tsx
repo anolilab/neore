@@ -22,6 +22,7 @@ import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
 import { getClient } from "@/lib/lunora";
 import { streamingFetch } from "@/lib/streaming-fetch";
+import { offerPhonePush } from "@/notifications/use-phone-push";
 import { isOldestFreshRowOnScreen, withFreshRows } from "@/offline/fresh-rows";
 import { mergeRows } from "@/offline/merge";
 import { createMessageReadGate, readOlderMessages, readThreadMessages } from "@/offline/message-read";
@@ -451,6 +452,8 @@ const Chat = () => {
                 }));
 
             setThreadId(started.threadId);
+            // A reply, a question or an approval may now arrive while the app is in the background.
+            offerPhonePush();
             // The prompt is complete once the server has accepted it, whether or not the screen's next read succeeds.
             writeRows((current) => finishRow(current, userId));
 

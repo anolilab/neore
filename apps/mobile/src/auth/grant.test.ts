@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Fetch, GrantStore, StoredGrant } from "./grant";
-import { buildAuthorizeUrl, createPkce, exchangeGrant, fetchAccessToken, parseAuthorizeResponse, readStoredUser, SignInError, signOutGrant, toBase64Url } from "./grant";
+import { buildAuthorizeUrl, createPkce, exchangeGrant, fetchAccessToken, parseAuthorizeResponse, readStoredUser, SignInError, signOutGrant, takeStoredGrant, toBase64Url } from "./grant";
 
 const REDIRECT = "neore-mobile://auth/callback";
 const LUNORA = "https://backend.example";
@@ -207,6 +207,30 @@ describe("grant storage", () => {
 
         await signOutGrant({ fetch, lunoraUrl: LUNORA, store });
         expect(store.value).toBeNull();
+    });
+});
+
+describe("takeStoredGrant", () => {
+    it("clears the stored grant before the server is asked anything, and hands back the token to revoke", async () => {
+        const store = memoryStore({ token: "session-1", user: USER });
+        let isClearedBeforeRevoke = false;
+        const fetch: Fetch = async () => {
+            isClearedBeforeRevoke = store.value === null;
+
+            return json({});
+        };
+
+        await signOutGrant({ fetch, lunoraUrl: LUNORA, store });
+
+        expect(isClearedBeforeRevoke).toBe(true);
+    });
+
+    it("resolves the session token and leaves nothing stored", async () => {
+        const store = memoryStore({ token: "session-1", user: USER });
+
+        expect(await takeStoredGrant(store)).toBe("session-1");
+        expect(store.value).toBeNull();
+        expect(await takeStoredGrant(store)).toBeUndefined();
     });
 });
 
