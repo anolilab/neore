@@ -11,11 +11,21 @@ import type { VoicePhase } from "./voice-input";
 
 /** One recognizer per app: a second screen's press is refused while this is taken. */
 const recognizerLock = createRecognizerLock();
-const endListener: { subscription?: ReturnType<typeof ExpoSpeechRecognitionModule.addListener> } = {};
+const appListeners: { subscriptions?: { remove: () => void }[] } = {};
 
-/** Hears every recognition's end app-wide, once, so an end whose screen is gone still frees the recognizer. */
-const hearEnds = (): void => {
-    endListener.subscription ??= ExpoSpeechRecognitionModule.addListener("end", recognizerLock.ended);
+/**
+ * Heard app-wide, once: an end whose screen is gone still frees the recognizer, and a recognition that starts after its
+ * press was cut off (iOS starts it later) is aborted, so the microphone never runs without an owner.
+ */
+const hearAppWide = (): void => {
+    appListeners.subscriptions ??= [
+        ExpoSpeechRecognitionModule.addListener("end", recognizerLock.ended),
+        ExpoSpeechRecognitionModule.addListener("start", () => {
+            if (recognizerLock.isStray()) {
+                ExpoSpeechRecognitionModule.abort();
+            }
+        }),
+    ];
 };
 
 /** Listens on the phone's own recognizer; the audio never leaves the phone. */
@@ -41,6 +51,9 @@ const useOnDeviceVoiceInput = ({ onText }: { onText: (text: string) => void }) =
         }),
     );
 
+    useSpeechRecognitionEvent("start", () => {
+        session.handle({ type: "start" });
+    });
     useSpeechRecognitionEvent("result", (event) => {
         session.handle({ isFinal: event.isFinal, transcript: event.results[0]?.transcript ?? "", type: "result" });
     });
@@ -52,7 +65,7 @@ const useOnDeviceVoiceInput = ({ onText }: { onText: (text: string) => void }) =
     });
 
     useEffect(() => {
-        hearEnds();
+        hearAppWide();
         session.attach();
 
         return () => {

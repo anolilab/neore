@@ -33,7 +33,10 @@ export interface OnDeviceRecognizer {
 }
 
 export type OnDeviceEvent
-    = { code: ExpoSpeechRecognitionErrorCode; type: "error" } | { isFinal: boolean; transcript: string; type: "result" } | { type: "end" };
+    = | { code: ExpoSpeechRecognitionErrorCode; type: "error" }
+        | { isFinal: boolean; transcript: string; type: "result" }
+        | { type: "end" }
+        | { type: "start" };
 
 /**
  * Whether recognition can be held to the phone. Below Android 13 an on-device request only prefers offline and may
@@ -80,14 +83,29 @@ export const pickSpeechLocale = (wanted: string, available: string[]): string =>
     return available.find((locale) => normalized(locale) === tag) ?? available.find((locale) => normalized(locale).split("-", 1)[0] === language) ?? wanted;
 };
 
+/** How long a press waits for the recognizer's language list. */
+const LOCALE_DEADLINE_MS = 3000;
+
 /** The locales the on-device recognizer can use: the installed ones where the platform lists them apart. */
 const speechLocales = async (recognizer: OnDeviceRecognizer): Promise<string[]> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
     try {
-        const { installedLocales, locales } = await recognizer.getSupportedLocales({});
+        // Some Android recognition services never answer this: the press goes on with the phone's own tag.
+        const { installedLocales, locales } = await Promise.race([
+            recognizer.getSupportedLocales({}),
+            new Promise<never>((_resolve, reject) => {
+                timer = setTimeout(() => {
+                    reject(new Error("The recognizer did not list its languages in time."));
+                }, LOCALE_DEADLINE_MS);
+            }),
+        ]);
 
         return installedLocales.length > 0 ? installedLocales : locales;
     } catch {
         return [];
+    } finally {
+        clearTimeout(timer);
     }
 };
 
@@ -135,6 +153,8 @@ export const createRecognizerLock = () => {
             clearTimeout(drainTimer);
         },
         isHeldBy: (token: symbol): boolean => owner === token,
+        /** Whether a recognition that just started belongs to no press: one cut off before it was running. */
+        isStray: (): boolean => owner === undefined || owner === draining,
         isTaken: (): boolean => owner !== undefined,
         release: (token: symbol): void => {
             if (owner === token) {
@@ -174,6 +194,11 @@ export const createOnDeviceSession = ({
     let isBusy = false;
     let isHeld = false;
     let isStopping = false;
+    // The recognizer reported this recognition running. Until then a stop or abort would miss it (iOS starts it later).
+    let hasStarted = false;
+    // A real error came for this recognition, so an end before its start is its own and not an earlier one's.
+    let hasErrored = false;
+    let isTooShort = false;
     let startedAt = 0;
     let finals: string[] = [];
     let failure: string | undefined;
@@ -230,23 +255,8 @@ export const createOnDeviceSession = ({
         }, END_DEADLINE_MS);
     };
 
-    const finish = async (): Promise<void> => {
-        isHeld = false;
-
-        if (isStopping || !isListening()) {
-            return;
-        }
-
-        isStopping = true;
-
-        const isTooShort = now() - startedAt < MIN_CLIP_MS;
-
-        if (isTooShort) {
-            failure = TOO_SHORT_MESSAGE;
-        } else {
-            onPhase("transcribing");
-        }
-
+    /** Asks the running recognition to end: an abort for a press too short to keep, else a stop that yields its text. */
+    const askToEnd = (): void => {
         const isAsked = didNativeCall(() => {
             if (isTooShort) {
                 recognizer.abort();
@@ -261,6 +271,30 @@ export const createOnDeviceSession = ({
             onError(failure ?? ON_DEVICE_FAILED_MESSAGE);
             onPhase("idle");
             abandon();
+        }
+    };
+
+    const finish = async (): Promise<void> => {
+        isHeld = false;
+
+        if (isStopping || !isListening()) {
+            return;
+        }
+
+        isStopping = true;
+        isTooShort = now() - startedAt < MIN_CLIP_MS;
+
+        if (isTooShort) {
+            failure = TOO_SHORT_MESSAGE;
+        } else {
+            onPhase("transcribing");
+        }
+
+        if (hasStarted) {
+            askToEnd();
+        } else {
+            // Asked once the recognizer reports it running (see `handle`); the deadline covers a start that never comes.
+            giveUpAfterDeadline();
         }
     };
 
@@ -310,6 +344,8 @@ export const createOnDeviceSession = ({
             lock.claim(token);
             finals = [];
             failure = undefined;
+            hasStarted = false;
+            hasErrored = false;
             // Never `requiresOnDeviceRecognition: false`, and no service package: the system's on-device recognizer only.
             recognizer.start({ addsPunctuation: true, continuous: true, interimResults: false, lang: locale, requiresOnDeviceRecognition: true });
             startedAt = now();
@@ -324,9 +360,36 @@ export const createOnDeviceSession = ({
         }
     };
 
+    /** This recognition ended: its text goes to the draft, or its failure to the composer. */
+    const complete = (): void => {
+        const text = finals.join(" ");
+
+        if (!isAttached) {
+            // The screen is gone: nobody to tell.
+        } else if (failure !== undefined) {
+            onError(failure);
+        } else if (text === "") {
+            onError(NOTHING_HEARD_MESSAGE);
+        } else {
+            onText(text);
+        }
+
+        release();
+    };
+
     const handle = (event: OnDeviceEvent): void => {
         // Another screen's recognition, or this one already given up on.
         if (!isListening()) {
+            return;
+        }
+
+        if (event.type === "start") {
+            hasStarted = true;
+
+            if (isStopping) {
+                askToEnd();
+            }
+
             return;
         }
 
@@ -341,25 +404,18 @@ export const createOnDeviceSession = ({
         if (event.type === "error") {
             // An abort is this session's own doing, and its reason is already set.
             if (event.code !== "aborted") {
+                hasErrored = true;
                 failure ??= ERROR_MESSAGES[event.code] ?? ON_DEVICE_FAILED_MESSAGE;
             }
 
             return;
         }
 
-        const text = finals.join(" ");
-
-        if (!isAttached) {
-            // The screen is gone: nobody to tell.
-        } else if (failure !== undefined) {
-            onError(failure);
-        } else if (text === "") {
-            onError(NOTHING_HEARD_MESSAGE);
-        } else {
-            onText(text);
+        // An end before this recognition started, with no error of its own, is an earlier recognition's (iOS sends one
+        // when a new start resets the recognizer).
+        if (hasStarted || hasErrored) {
+            complete();
         }
-
-        release();
     };
 
     return {

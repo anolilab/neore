@@ -190,4 +190,39 @@ describe(createRecognizerLock, () => {
         expect(recognizer.start).toHaveBeenCalledTimes(2);
         expect(lock.isTaken()).toBe(true);
     });
+
+    it("a release before the recognizer is running stops it once it runs, and an earlier recognition's end does not close it", async () => {
+        const recognizer = fakeRecognizer(true);
+        const lock = createRecognizerLock();
+        const onText = vi.fn();
+        let clock = 0;
+        const session = createOnDeviceSession({
+            lang: "en-US",
+            lock,
+            now: () => clock,
+            onError: () => {},
+            onPhase: () => {},
+            onText,
+            platform: { OS: "ios", Version: "18.0" },
+            recognizer,
+        });
+
+        await session.start();
+        clock = 2000;
+        await session.finish();
+
+        expect(recognizer.stop).not.toHaveBeenCalled();
+
+        // The reset of the previous recognition ends it, before this one has started.
+        session.handle({ type: "end" });
+        session.handle({ type: "start" });
+
+        expect(recognizer.stop).toHaveBeenCalledOnce();
+
+        session.handle({ isFinal: true, transcript: "hello", type: "result" });
+        session.handle({ type: "end" });
+
+        expect(onText).toHaveBeenCalledWith("hello");
+        expect(lock.isTaken()).toBe(false);
+    });
 });
