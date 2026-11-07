@@ -18737,6 +18737,9 @@
                         "const": "host",
                         "type": "string"
                       },
+                      "snoozeChosenAt": {
+                        "type": "number"
+                      },
                       "snoozedUntil": {
                         "type": "number"
                       },
@@ -26222,6 +26225,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "chosenAt": {
+                        "type": "number"
+                      },
                       "threadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",
@@ -26232,6 +26238,7 @@
                       }
                     },
                     "required": [
+                      "chosenAt",
                       "threadId",
                       "until"
                     ],
@@ -26260,7 +26267,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "null"
+                  "properties": {
+                    "applied": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "applied"
+                  ],
+                  "type": "object"
                 }
               }
             },
@@ -26289,6 +26304,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "chosenAt": {
+                        "type": "number"
+                      },
                       "threadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",
@@ -26296,6 +26314,7 @@
                       }
                     },
                     "required": [
+                      "chosenAt",
                       "threadId"
                     ],
                     "type": "object"
@@ -26323,7 +26342,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "null"
+                  "properties": {
+                    "applied": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "applied"
+                  ],
+                  "type": "object"
                 }
               }
             },

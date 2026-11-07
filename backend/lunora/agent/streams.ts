@@ -314,15 +314,25 @@ const updateThreadStatusAfterStreamEnd = async (context: MutationContext, thread
         .query("streamingMessages")
         .withIndex("threadId_state_order_stepOrder", (q) => q.eq("threadId", threadId).eq("stateKind", "streaming"))
         .first();
+    const thread = await context.db.get("threads", threadId);
 
-    if (!hasActiveStream) {
-        const thread = await context.db.get("threads", threadId);
-
-        if (thread) {
-            await context.db.patch("threads", threadId, { status: endStatus, updatedAt: Date.now() });
-            await context.scheduler.runAfter(1000, internal.agent.streams.resetThreadStatusToActive, { threadId });
-        }
+    if (!thread) {
+        return;
     }
+
+    if (hasActiveStream) {
+        // Another stream holds the thread's status, but a failed or timed-out stream still wakes a snoozed thread, and records the wake
+        // even when nothing is snoozed (`patchThread`): a snooze chosen before it must not drain after it.
+        if (endStatus === "error") {
+            await patchThread(context.db, threadId, {}, { failed: true });
+        }
+
+        return;
+    }
+
+    // Through the shared writer: a stream that ends in error wakes a snoozed thread (`patchesWakeSnooze`).
+    await patchThread(context.db, threadId, { status: endStatus, updatedAt: Date.now() });
+    await context.scheduler.runAfter(1000, internal.agent.streams.resetThreadStatusToActive, { threadId });
 };
 
 export const finish = internalMutation

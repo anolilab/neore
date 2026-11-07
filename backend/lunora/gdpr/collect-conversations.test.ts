@@ -9,16 +9,22 @@
  * 36 messages across three threads, deliberately past 25: a 12-row fixture
  * cannot tell a complete read from one capped at a default page size.
  */
+import type { FunctionReference } from "lunorash/client";
 import { lunoraTest } from "@lunora/testing";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import { registeredApi } from "../../test/registered-api";
 
+import type { internal } from "../_generated/internal";
 import { listMessagesByThreadIdAdmitted } from "../agent/messages";
 import { listThreadSummariesForExport } from "../agent/thread-summaries";
 import { getThreadInternal, listThreadsByUserIdInternal } from "../agent/threads";
 import schema from "../schema";
 import { collectConversations, collectThreadTags } from "./steps";
+
+/** The export as the generated `internal` types it, so a field the type drops fails the type check, not only the run. */
+type ExportedConversations =
+    typeof internal.gdpr.steps.collectConversations extends FunctionReference<"action", { userId: string }, infer Output> ? Output : never;
 
 /**
  * The harness's `ctx.runQuery` takes the REGISTERED procedure object, not a
@@ -245,6 +251,38 @@ describe("collectConversations", () => {
             expect(plain?.thread._id).toBe(ids.plain);
             expect(plain?.thread.activeLeafMessageId).toBeUndefined();
             expect(plain?.messages.every((message) => message.parentMessageId === undefined)).toBe(true);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("exports each thread's snooze, with the time the owner chose it", async () => {
+        registry.set("agent_messages:listMessagesByThreadIdAdmitted", listMessagesByThreadIdAdmitted);
+        registry.set("agent_threads:listThreadsByUserIdInternal", listThreadsByUserIdInternal);
+        registry.set("gdpr_steps:collectThreadTags", collectThreadTags);
+        registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
+
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                await context.db.insert("threads", {
+                    snoozeChosenAt: 1_700_000_000_000,
+                    snoozedUntil: 1_800_000_000_000,
+                    status: "active",
+                    title: "Snoozed",
+                    userId: "user-s",
+                });
+            });
+
+            const conversations = await harness.action(async (context: any) => await context.runAction(collectConversations, { userId: "user-s" }));
+            const exported = conversations as ExportedConversations;
+            const snoozed = exported.find((conversation) => conversation.thread.title === "Snoozed");
+
+            expect(snoozed?.thread).toMatchObject({ snoozeChosenAt: 1_700_000_000_000, snoozedUntil: 1_800_000_000_000 });
+            // The export's declared type names both snooze fields (compile-time check, run by the backend type check).
+            expectTypeOf<ExportedConversations[number]["thread"]>().toHaveProperty("snoozeChosenAt");
+            expectTypeOf<ExportedConversations[number]["thread"]>().toHaveProperty("snoozedUntil");
         } finally {
             harness.close();
         }

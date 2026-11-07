@@ -49,6 +49,8 @@ interface ThreadListUIState {
     showProjectFormDialog: boolean;
     // Search state
     showSearch: boolean;
+    /** The thread the snooze dialog is open for, opened from its row. The list renders the dialog, so it survives the row. */
+    snoozeThreadId: string | null;
 }
 
 interface ThreadListUIActions {
@@ -78,6 +80,7 @@ interface ThreadListUIActions {
     setShowProjectFormDialog: (show: boolean) => void;
     // Search actions - supports both direct values and functional updates
     setShowSearch: Dispatch<SetStateAction<boolean>>;
+    setSnoozeThreadId: (threadId: string | null) => void;
     toggleShowKeyboardHelp: () => void;
 
     toggleShowSearch: () => void;
@@ -97,6 +100,7 @@ const initialState: ThreadListUIState = {
     renameThreadId: null,
     selectedThreadIds: new Set(),
     showKeyboardHelp: false,
+    snoozeThreadId: null,
     showManageTagsDialog: false,
     showProjectFormDialog: false,
     showSearch: false,
@@ -133,6 +137,7 @@ export const useThreadListUIStore = create<ThreadListUIStore>()(
                     }),
                 // Reset
                 reset: () => set(initialState),
+                setSnoozeThreadId: (threadId) => set({ snoozeThreadId: threadId }),
                 setOptionsMenuThreadId: (threadId) => set({ optionsMenuThreadId: threadId }),
                 setRenameThreadId: (threadId) => set({ renameThreadId: threadId }),
 

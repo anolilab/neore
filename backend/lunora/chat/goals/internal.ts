@@ -470,7 +470,7 @@ export const failGoalReview = internalMutation
         }
 
         await stopGoalRow(ctx, goal, args.reason);
-        await giveThreadBack(ctx, goal.threadId);
+        await giveThreadBack(ctx, goal.threadId, { failed: true });
 
         return true;
     });
@@ -538,7 +538,7 @@ export const reapStalledGoals = internalMutation
             }
 
             await stopGoalRow(ctx, goal, "error");
-            await giveThreadBack(ctx, goal.threadId);
+            await giveThreadBack(ctx, goal.threadId, { failed: true });
             ended += 1;
         }
 

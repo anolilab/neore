@@ -7,7 +7,7 @@
 import { HOST_STREAM_IDLE_MS, HOST_TURN_MAX_MS } from "../../../acp/lib/constants";
 import type { Doc, Id } from "../../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../../_generated/server";
-import { patchThread } from "../../../agent/table-writes";
+import { clearAwaitingInput, patchThread } from "../../../agent/table-writes";
 import { patchRow, withoutUndefined } from "../../../lib/patch";
 import { noteShardDue } from "../../../lib/shard-housekeeping";
 
@@ -132,15 +132,41 @@ export const bumpedExpiry = (stream: Pick<Stream, "_creationTime" | "expiresAt">
     return next > stream.expiresAt ? next : undefined;
 };
 
-/** Hands the thread back from `running` unless another live stream or an edit on it still holds it. */
-export const releaseThread = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">, now: number): Promise<void> => {
-    const [thread, live] = await Promise.all([
+/**
+ * Hands the thread back from `running` unless another live stream or an edit on it still holds it. `failed` says the turn
+ * failed, so a snoozed thread wakes (`patchThread`). A failed turn wakes its thread whatever else holds it or whatever status it
+ * has now: a snooze must not outlive a failure with no visible run, the same give-back a failed run makes. Used by a host turn's end
+ * and by the expiry of a cloud stream (a timeout is a failure).
+ */
+export const releaseThread = async (
+    ctx: Pick<MutationCtx, "db">,
+    threadId: Id<"threads">,
+    now: number,
+    { failed = false }: { failed?: boolean } = {},
+): Promise<void> => {
+    const [thread, live, liveEdit] = await Promise.all([
         ctx.db.threads.findFirst({ where: { _id: threadId } }),
         ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId } }),
+        // An edit streams through `streamingMessages` instead, and it holds the same running status.
+        ctx.db
+            .query("streamingMessages")
+            .withIndex("threadId_state_order_stepOrder", (q) => q.eq("threadId", threadId).eq("stateKind", "streaming"))
+            .take(1),
     ]);
 
-    if (thread?.status === "running" && !live) {
-        await patchThread(ctx.db, threadId, { status: "active", updatedAt: now });
+    if (!thread) {
+        return;
+    }
+
+    if (thread.status === "running" && !live && liveEdit.length === 0) {
+        await patchThread(ctx.db, threadId, { status: "active", updatedAt: now }, { failed });
+
+        return;
+    }
+
+    // The thread stays with whatever holds it; a failed turn still wakes it, and records the wake even when nothing is snoozed.
+    if (failed) {
+        await patchThread(ctx.db, threadId, {}, { failed: true });
     }
 };
 
@@ -159,13 +185,28 @@ export const endHostStream = async (
         return false;
     }
 
+    const askedPermission = (stream.hostPendingPermissions?.length ?? 0) > 0;
+
     await patchRow(ctx.db, "persistentStreams", stream, {
         hostEndReason: end.reason,
         hostState: "ended",
         status: end.status,
         ...(stream.hostPendingPermissions !== undefined && { hostPendingPermissions: undefined }),
     });
-    await releaseThread(ctx, stream.threadId as Id<"threads">, now);
+
+    // The approval the turn was waiting on ends with the turn, so the thread stops waiting for the owner. Another live run on the
+    // thread may own the approval now; then the thread keeps it.
+    if (askedPermission) {
+        const threadId = stream.threadId as Id<"threads">;
+        const otherRun = await ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId } });
+
+        if (!otherRun) {
+            await clearAwaitingInput(ctx.db, threadId);
+        }
+    }
+
+    // A stop or a finished turn keeps a snooze; an error or a timeout wakes the thread, as a failed run does.
+    await releaseThread(ctx, stream.threadId as Id<"threads">, now, { failed: end.status !== "done" });
 
     return true;
 };

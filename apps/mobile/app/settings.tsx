@@ -189,13 +189,11 @@ const SettingsScreen = () => {
                 On: the speech recognizer built into your phone turns your voice into text, and the recording does not leave your phone. If this phone cannot do
                 that, voice input says so and sends nothing anywhere.
             </Text>
-            {onDeviceFailure
-                ? (
+            {Boolean(onDeviceFailure) && (
                 <Text accessibilityLiveRegion="polite" accessibilityRole="alert" style={{ color: "#b00020", fontSize: 13 }}>
                     {onDeviceFailure}
                 </Text>
-                )
-                : null}
+            )}
             <View style={{ alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" }}>
                 <Text style={{ flex: 1 }}>Reopen the last chat on launch</Text>
                 <Switch
@@ -207,13 +205,11 @@ const SettingsScreen = () => {
                     value={isReopenOn}
                 />
             </View>
-            {reopenFailure
-                ? (
+            {Boolean(reopenFailure) && (
                 <Text accessibilityLiveRegion="polite" accessibilityRole="alert" style={{ color: "#b00020", fontSize: 13 }}>
                     {reopenFailure}
                 </Text>
-                )
-                : null}
+            )}
             <View style={{ alignItems: "center", flexDirection: "row", gap: 12, justifyContent: "space-between" }}>
                 <Text style={{ flex: 1 }}>Send crash reports</Text>
                 <Switch
@@ -231,13 +227,11 @@ const SettingsScreen = () => {
                 chat or the message of the error.
             </Text>
             {isConfigured ? null : <Text style={{ fontSize: 13 }}>Crash reports are not set up in this build.</Text>}
-            {failure
-                ? (
+            {Boolean(failure) && (
                 <Text accessibilityLiveRegion="polite" accessibilityRole="alert" style={{ color: "#b00020", fontSize: 13 }}>
                     {failure}
                 </Text>
-                )
-                : null}
+            )}
         </ScrollView>
     );
 };

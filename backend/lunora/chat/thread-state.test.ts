@@ -4,11 +4,13 @@
 import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { timeoutStream } from "../agent/streams";
 import { patchThread } from "../agent/table-writes";
 import { getThread, updateThread } from "../agent/threads";
 import schema from "../schema";
 import { isSnoozeInRange, SNOOZE_MAX_MS } from "./lib/thread-state-logic";
-import { markThreadViewed, snoozeThread, unsnoozeThread } from "./thread-state";
+import { releaseThread } from "./streaming/persistent/host";
+import { applySnoozeChoice, markThreadViewed, snoozeThread, unsnoozeThread } from "./thread-state";
 
 const OWNER = "user-owner";
 const GRANTEE = "user-grantee";
@@ -121,6 +123,194 @@ describe("awaitingInput leaves with the pause", () => {
     });
 });
 
+describe("a snoozed thread wakes early", () => {
+    const SNOOZED_UNTIL = 9_000_000_000_000;
+
+    const insertSnoozed = async (): Promise<string> =>
+        await harness.run(
+            async (context: any) =>
+                await context.db.insert("threads", {
+                    lastReplyAt: 2000,
+                    snoozedUntil: SNOOZED_UNTIL,
+                    status: "active",
+                    title: "Snoozed",
+                    updatedAt: 111,
+                    userId: OWNER,
+                }),
+        );
+
+    const readThread = async (id: string): Promise<any> => await harness.run(async (context: any) => await context.db.get("threads", id as never));
+
+    it("un-snoozes on a pending approval, in the same write that records it", async () => {
+        const id = await insertSnoozed();
+
+        await harness.run(async (context: any) => {
+            await patchThread(context.db, id as never, { awaitingInput: "approval", status: "active", updatedAt: 9 });
+        });
+
+        const row = await readThread(id);
+
+        expect(row).toMatchObject({ awaitingInput: "approval", status: "active" });
+        expect(row.snoozedUntil).toBeUndefined();
+    });
+
+    it("un-snoozes on a question through updateThread, the path a run's pause takes", async () => {
+        const id = await insertSnoozed();
+
+        await harness.run(
+            async (context: any) =>
+                await context.runMutation(
+                    updateThread as never,
+                    { patch: { awaitingInput: "question", status: "active", updatedAt: 9 }, threadId: id } as never,
+                ),
+        );
+
+        const row = await readThread(id);
+
+        expect(row.awaitingInput).toBe("question");
+        expect(row.snoozedUntil).toBeUndefined();
+    });
+
+    it("un-snoozes on a failed run", async () => {
+        const id = await insertSnoozed();
+
+        await harness.run(async (context: any) => {
+            await patchThread(context.db, id as never, { status: "error", updatedAt: 9 });
+        });
+
+        const row = await readThread(id);
+
+        expect(row.status).toBe("error");
+        expect(row.snoozedUntil).toBeUndefined();
+    });
+
+    it("un-snoozes when a run fails in place, even when the thread goes back to active", async () => {
+        const id = await insertSnoozed();
+
+        await harness.run(
+            async (context: any) =>
+                await context.runMutation(updateThread as never, { failed: true, patch: { status: "active", updatedAt: 9 }, threadId: id } as never),
+        );
+
+        const row = await readThread(id);
+
+        expect(row.snoozedUntil).toBeUndefined();
+    });
+
+    it("un-snoozes when a host turn fails, and keeps the snooze when the owner stopped it", async () => {
+        const insertRunning = async (): Promise<string> =>
+            await harness.run(
+                async (context: any) =>
+                    await context.db.insert("threads", {
+                        snoozedUntil: SNOOZED_UNTIL,
+                        status: "running",
+                        title: "Host",
+                        updatedAt: 111,
+                        userId: OWNER,
+                    }),
+            );
+        const failed = await insertRunning();
+        const stopped = await insertRunning();
+
+        await harness.run(async (context: any) => {
+            await releaseThread(context, failed as never, 10, { failed: true });
+        });
+        await harness.run(async (context: any) => {
+            await releaseThread(context, stopped as never, 10);
+        });
+
+        const failedRow = await readThread(failed);
+        const stoppedRow = await readThread(stopped);
+
+        expect(failedRow.snoozedUntil).toBeUndefined();
+        expect(stoppedRow).toMatchObject({ snoozedUntil: SNOOZED_UNTIL, status: "active" });
+    });
+
+    it("un-snoozes when a stream fails while another stream of the thread still runs", async () => {
+        const id = await insertSnoozed();
+        const streaming = (order: number): Record<string, unknown> => {
+            return { order, state: { kind: "streaming", lastHeartbeat: 1 }, stateKind: "streaming", stepOrder: 0, threadId: id };
+        };
+        const failing = await harness.run(async (context: any) => await context.db.insert("streamingMessages", streaming(1)));
+
+        await harness.run(async (context: any) => await context.db.insert("streamingMessages", streaming(2)));
+        await harness.run(async (context: any) => await context.runMutation(timeoutStream as never, { streamId: failing } as never));
+
+        const row = await readThread(id);
+
+        expect(row.status).toBe("active");
+        expect(row.snoozedUntil).toBeUndefined();
+    });
+
+    it("a failed stream while another stream of the thread still runs keeps the thread's status and time, and records the wake", async () => {
+        const id = await harness.run(
+            async (context: any) => await context.db.insert("threads", { status: "running", title: "Parallel", updatedAt: 111, userId: OWNER }),
+        );
+        const streaming = (order: number): Record<string, unknown> => {
+            return { order, state: { kind: "streaming", lastHeartbeat: 1 }, stateKind: "streaming", stepOrder: 0, threadId: id };
+        };
+        const failing = await harness.run(async (context: any) => await context.db.insert("streamingMessages", streaming(1)));
+
+        await harness.run(async (context: any) => await context.db.insert("streamingMessages", streaming(2)));
+
+        const before = await readThread(id);
+
+        await harness.run(async (context: any) => await context.runMutation(timeoutStream as never, { streamId: failing } as never));
+
+        const after = await readThread(id);
+
+        // The other stream keeps the status, and nothing is snoozed to clear; the wake is recorded as the thread's ordering.
+        expect(after).toMatchObject({ status: before.status, updatedAt: before.updatedAt });
+        expect("snoozedUntil" in after).toBe(false);
+        expect(after.snoozeChosenAt).toBeGreaterThan(0);
+    });
+
+    it("a timed-out stream wakes a snoozed thread, alone or with another stream still running", async () => {
+        const alone = await insertSnoozed();
+        const withAnother = await insertSnoozed();
+        const streaming = (streamThread: string, order: number): Record<string, unknown> => {
+            return { order, state: { kind: "streaming", lastHeartbeat: 1 }, stateKind: "streaming", stepOrder: 0, threadId: streamThread };
+        };
+        const timedOut = await harness.run(async (context: any) => await context.db.insert("streamingMessages", streaming(alone, 1)));
+        const timedOutWithAnother = await harness.run(async (context: any) => await context.db.insert("streamingMessages", streaming(withAnother, 1)));
+
+        await harness.run(async (context: any) => await context.db.insert("streamingMessages", streaming(withAnother, 2)));
+        await harness.run(async (context: any) => await context.runMutation(timeoutStream as never, { streamId: timedOut } as never));
+        await harness.run(async (context: any) => await context.runMutation(timeoutStream as never, { streamId: timedOutWithAnother } as never));
+
+        const aloneRow = await readThread(alone);
+        const withAnotherRow = await readThread(withAnother);
+
+        expect(aloneRow).toMatchObject({ status: "error" });
+        expect(aloneRow.snoozedUntil).toBeUndefined();
+        expect(withAnotherRow.snoozedUntil).toBeUndefined();
+    });
+
+    it("stays snoozed for an ordinary write", async () => {
+        const id = await insertSnoozed();
+
+        await harness.run(async (context: any) => {
+            await patchThread(context.db, id as never, { updatedAt: 9 });
+        });
+
+        const row = await readThread(id);
+
+        expect(row.snoozedUntil).toBe(SNOOZED_UNTIL);
+    });
+
+    it("stays snoozed for a finished reply", async () => {
+        const id = await insertSnoozed();
+
+        await harness.run(async (context: any) => {
+            await patchThread(context.db, id as never, { lastReplyAt: 3000, status: "active", updatedAt: 9 });
+        });
+
+        const row = await readThread(id);
+
+        expect(row.snoozedUntil).toBe(SNOOZED_UNTIL);
+    });
+});
+
 describe("markThreadViewed", () => {
     it("stamps lastViewedAt for the owner without touching updatedAt, and only while a reply is unseen", async () => {
         const first: any = await as(OWNER).mutation(markThreadViewed as never, { threadId } as never);
@@ -161,27 +351,203 @@ describe("snooze and unsnooze", () => {
     it("snoozes for the owner, then removes the column, leaving updatedAt alone", async () => {
         const until = Date.now() + DAY;
 
-        await as(OWNER).mutation(snoozeThread as never, { threadId, until } as never);
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: Date.now(), threadId, until } as never);
         expect(await read()).toMatchObject({ snoozedUntil: until, updatedAt: 111 });
 
-        await as(OWNER).mutation(unsnoozeThread as never, { threadId } as never);
+        await as(OWNER).mutation(unsnoozeThread as never, { chosenAt: Date.now(), threadId } as never);
 
         const row = await read();
 
         expect("snoozedUntil" in row).toBe(false);
         expect(row.updatedAt).toBe(111);
         // Removing it again is quiet.
-        await as(OWNER).mutation(unsnoozeThread as never, { threadId } as never);
+        await as(OWNER).mutation(unsnoozeThread as never, { chosenAt: Date.now(), threadId } as never);
+    });
+
+    // The ordering rule, one row per write: the thread holds a choice made at `now - 1000` until `now + 2 * DAY`, then one write is
+    // sent. A write with an older chosen time is dropped (a queued preset, a second tap or an undo from another device, delivered late);
+    // a newer one applies. `remaining` is the snooze's end after the write, in days from now, or `null` when it is gone.
+    it.each([
+        ["a newer snooze applies", "snooze", -500, 3, true, 3],
+        ["an older snooze is dropped, as a queued preset is when a custom time came first", "snooze", -60_000, 1, false, 2],
+        ["an older snooze is dropped when it arrives after a newer one", "snooze", -2000, 1, false, 2],
+        ["an older unsnooze is dropped, as another device's earlier undo is", "unsnooze", -5000, undefined, false, 2],
+        ["a newer unsnooze applies and clears the snooze", "unsnooze", 0, undefined, true, null],
+    ] as const)("%s", async (_name, kind, offset, untilDays, applied, remaining) => {
+        const now = Date.now();
+
+        await harness.run(async (context: any) => await context.db.replace("threads", threadId, { status: "active", userId: OWNER }));
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + 2 * DAY } as never);
+
+        const chosenAt = now + offset;
+        const sent =
+            kind === "snooze"
+                ? await as(OWNER).mutation(snoozeThread as never, { chosenAt, threadId, until: now + (untilDays ?? 0) * DAY } as never)
+                : await as(OWNER).mutation(unsnoozeThread as never, { chosenAt, threadId } as never);
+
+        expect(sent).toEqual({ applied });
+
+        const row = await read();
+
+        if (remaining === null) {
+            expect(row.snoozedUntil).toBeUndefined();
+        } else {
+            expect(row).toMatchObject({ snoozedUntil: now + remaining * DAY });
+        }
+    });
+
+    it("a stale queued preset whose time has passed is dropped without an error", async () => {
+        const now = Date.now();
+
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + DAY } as never);
+
+        await expect(as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 60_000, threadId, until: now - 1000 } as never)).resolves.toEqual({
+            applied: false,
+        });
+        expect(await read()).toMatchObject({ snoozedUntil: now + DAY });
+    });
+
+    it("a stale unsnooze is reported as not applied, and logged as dropped with its reason", async () => {
+        const now = Date.now();
+
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + 2 * DAY } as never);
+
+        const events: { fields: Record<string, unknown>; name: string }[] = [];
+        const log = {
+            event: (name: string, fields: Record<string, unknown>) => {
+                events.push({ fields, name });
+            },
+        };
+        const stale = await harness.run(
+            async (context: any) =>
+                await applySnoozeChoice(context.db, log, await context.db.get("threads", threadId as never), {
+                    applied: {},
+                    chosenAt: now - 5000,
+                    kind: "unsnooze",
+                    until: undefined,
+                }),
+        );
+
+        expect(stale).toEqual({ applied: false });
+        expect(events).toEqual([{ fields: { reason: "stale_ordering" }, name: "chat.unsnooze_dropped" }]);
+        expect(await read()).toMatchObject({ snoozedUntil: now + 2 * DAY });
+    });
+
+    it("an applied choice is reported as applied, and logged as applied", async () => {
+        const now = Date.now();
+        const events: { fields: Record<string, unknown>; name: string }[] = [];
+        const log = {
+            event: (name: string, fields: Record<string, unknown>) => {
+                events.push({ fields, name });
+            },
+        };
+        const applied = await harness.run(
+            async (context: any) =>
+                await applySnoozeChoice(context.db, log, await context.db.get("threads", threadId as never), {
+                    applied: { snoozedForMs: DAY },
+                    chosenAt: now - 1000,
+                    kind: "snooze",
+                    until: now + DAY,
+                }),
+        );
+
+        expect(applied).toEqual({ applied: true });
+        expect(events).toEqual([{ fields: { snoozedForMs: DAY }, name: "chat.snooze_thread" }]);
+    });
+
+    it("a queued snooze that drains after the thread woke does not hide it again", async () => {
+        // The owner's snooze was made while offline; its run then failed and woke the thread; the queue drains after that.
+        const queuedChosenAt = Date.now() - 60_000;
+
+        await harness.run(
+            async (context: any) =>
+                await context.runMutation(updateThread as never, { failed: true, patch: { status: "active", updatedAt: 9 }, threadId } as never),
+        );
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: queuedChosenAt, threadId, until: Date.now() + DAY } as never);
+
+        expect(await read()).not.toHaveProperty("snoozedUntil");
+    });
+
+    it("an older client's snooze or unsnooze, which sends no choice time, is refused and cannot erase a newer snooze", async () => {
+        const now = Date.now();
+
+        await as(OWNER).mutation(snoozeThread as never, { chosenAt: now - 1000, threadId, until: now + 2 * DAY } as never);
+        // A legacy write is refused outright, so the caller is told it did not happen (no silent success).
+        await expect(as(OWNER).mutation(snoozeThread as never, { threadId, until: now + DAY } as never)).rejects.toThrow();
+        await expect(as(OWNER).mutation(unsnoozeThread as never, { threadId } as never)).rejects.toThrow();
+
+        expect(await read()).toMatchObject({ snoozeChosenAt: now - 1000, snoozedUntil: now + 2 * DAY });
     });
 
     it("rejects a past time or one beyond 366 days, and any non-owner", async () => {
-        await expect(as(OWNER).mutation(snoozeThread as never, { threadId, until: Date.now() - 1000 } as never)).rejects.toThrow();
-        await expect(as(OWNER).mutation(snoozeThread as never, { threadId, until: Date.now() + 400 * DAY } as never)).rejects.toThrow();
-        await expect(as(STRANGER).mutation(snoozeThread as never, { threadId, until: Date.now() + DAY } as never)).rejects.toThrow(NOT_FOUND_PATTERN);
-        await expect(as(STRANGER).mutation(unsnoozeThread as never, { threadId } as never)).rejects.toThrow(NOT_FOUND_PATTERN);
+        await expect(as(OWNER).mutation(snoozeThread as never, { chosenAt: Date.now(), threadId, until: Date.now() - 1000 } as never)).rejects.toThrow();
+        await expect(as(OWNER).mutation(snoozeThread as never, { chosenAt: Date.now(), threadId, until: Date.now() + 400 * DAY } as never)).rejects.toThrow();
+        await expect(as(STRANGER).mutation(snoozeThread as never, { chosenAt: Date.now(), threadId, until: Date.now() + DAY } as never)).rejects.toThrow(
+            NOT_FOUND_PATTERN,
+        );
+        await expect(as(STRANGER).mutation(unsnoozeThread as never, { chosenAt: Date.now(), threadId } as never)).rejects.toThrow(NOT_FOUND_PATTERN);
         const rowAfter169 = await read();
 
         expect(rowAfter169.snoozedUntil).toBeUndefined();
+    });
+});
+
+describe("a failed host turn wakes a snoozed thread", () => {
+    const LATER = 9_000_000_000_000;
+
+    const readThread = async (id: string): Promise<any> => await harness.run(async (context: any) => await context.db.get("threads", id as never));
+
+    const readSnooze = async (id: string): Promise<number | undefined> => {
+        const row = await readThread(id);
+
+        return row.snoozedUntil;
+    };
+
+    const insertThread = async (status: string): Promise<string> =>
+        await harness.run(
+            async (context: any) => await context.db.insert("threads", { snoozedUntil: LATER, status, title: "Host", updatedAt: 111, userId: OWNER }),
+        );
+
+    it("wakes when the turn's thread is no longer running", async () => {
+        const id = await insertThread("active");
+
+        await harness.run(async (context: any) => {
+            await releaseThread(context, id as never, 10, { failed: true });
+        });
+
+        expect(await readSnooze(id)).toBeUndefined();
+    });
+
+    it("wakes when another stream still holds the thread, and leaves the thread running", async () => {
+        const id = await insertThread("running");
+
+        await harness.run(
+            async (context: any) =>
+                await context.db.insert("persistentStreams", {
+                    expiresAt: LATER,
+                    messageId: "m-1",
+                    status: "streaming",
+                    streamingConfig: { contentType: "text", model: "gpt-4o" },
+                    threadId: id,
+                    userId: OWNER,
+                }),
+        );
+        await harness.run(async (context: any) => {
+            await releaseThread(context, id as never, 10, { failed: true });
+        });
+
+        expect(await readThread(id)).toMatchObject({ status: "running" });
+        expect(await readSnooze(id)).toBeUndefined();
+    });
+
+    it("keeps the snooze when the turn ended without failing", async () => {
+        const id = await insertThread("active");
+
+        await harness.run(async (context: any) => {
+            await releaseThread(context, id as never, 10);
+        });
+
+        expect(await readSnooze(id)).toBe(LATER);
     });
 });
 

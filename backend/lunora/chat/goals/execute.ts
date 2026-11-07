@@ -15,7 +15,6 @@ import { internalAction } from "../../_generated/server";
 import { enqueueJob } from "../../lib/job-queue";
 import { streamLogger } from "../../lib/logger";
 import { gatewayFetch } from "../../lib/services";
-import { setThreadStatus } from "../lib/agent-run";
 import { loadModelFilterRules } from "../lib/model-filter-rules";
 import type { GoalVerdict } from "./logic";
 import { reviewRound } from "./review";
@@ -131,10 +130,9 @@ export const reviewGoalRound = internalAction
         } catch (error) {
             streamLogger.error(`[Goal] Review of round ${String(round)} failed:`, error);
 
-            // Only a goal this call ended gives the thread back: one the user stopped, or that a new message superseded, is no longer ours to settle.
-            if (await ctx.runMutation(internal.chat.goals.internal.failGoalReview, { goalId, reason: "review_failed", round })) {
-                await setThreadStatus(ctx, goal.threadId, "active").catch(() => undefined);
-            }
+            // failGoalReview ends the goal and gives the thread back in one write (waking a snooze). It is the only write of the failure:
+            // a second one here would clear a snooze the owner set after the give-back.
+            await ctx.runMutation(internal.chat.goals.internal.failGoalReview, { goalId, reason: "review_failed", round });
 
             return null;
         }
@@ -158,9 +156,7 @@ export const reviewGoalRound = internalAction
             // The round is claimed, so a redelivery would do nothing: end the goal here instead of leaving the chat running.
             streamLogger.error(`[Goal] The verdict on round ${String(round)} could not be recorded:`, error);
 
-            if (await ctx.runMutation(internal.chat.goals.internal.failGoalReview, { goalId, reason: "error", round })) {
-                await setThreadStatus(ctx, goal.threadId, "active").catch(() => undefined);
-            }
+            await ctx.runMutation(internal.chat.goals.internal.failGoalReview, { goalId, reason: "error", round });
 
             return null;
         }
@@ -178,16 +174,12 @@ export const reviewGoalRound = internalAction
             } catch (error) {
                 // The next round's rows exist but nothing will run them: end the goal and close the stream.
                 streamLogger.error(`[Goal] Round ${String(round + 1)} could not be queued:`, error);
-                const failed = await ctx.runMutation(internal.chat.goals.internal.failGoalReview, { goalId, reason: "error", round });
+                await ctx.runMutation(internal.chat.goals.internal.failGoalReview, { goalId, reason: "error", round });
 
                 await ctx.runMutation(internal.chat.streaming.persistent.library.setStreamStatus, {
                     status: "error",
                     streamId: outcome.next.streamId as never,
                 });
-
-                if (failed) {
-                    await setThreadStatus(ctx, goal.threadId, "active").catch(() => undefined);
-                }
             }
         }
 

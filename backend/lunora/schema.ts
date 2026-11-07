@@ -3056,7 +3056,14 @@ export const schema = defineSchema({
         // Where this thread's turns run (`acp/lib/host-thread.ts`): "host" = a coding agent on a paired
         // device. Unset = the cloud. Set at creation, never changed.
         runner: v.optional(v.literal("host")),
-        // Hidden from the owner's active list until then; written only by `chat/thread-state.ts`.
+        // The thread's newest snooze ordering: either the owner's snooze or unsnooze choice time, by the client's clock (capped at the
+        // server's clock when ahead), or the server time of a wake. A wake is a failed run, or one that waits on the owner, and records
+        // its time even with nothing snoozed (`agent/table-writes.ts#patchThread`). A queued write carries the choice time it was made
+        // with, so one chosen earlier than this never replaces it (`agent/table-writes.ts#setThreadSnooze`).
+        snoozeChosenAt: v.optional(v.number()),
+        // Hidden from the owner's active list until then. Written by the owner's snooze and unsnooze (`chat/thread-state.ts`, through
+        // `agent/table-writes.ts#setThreadSnooze`), and cleared by a wake: a pause, a failed run or a timed-out stream
+        // (`agent/table-writes.ts#patchThread`, `chat/streaming/persistent/host.ts#releaseThread`).
         snoozedUntil: v.optional(v.number()),
         source: v.optional(v.string()),
         statelessMode: v.optional(v.boolean()),

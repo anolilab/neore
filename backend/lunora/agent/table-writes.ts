@@ -74,14 +74,48 @@ export const patchesWithoutAwaitingInput = (
     fields: Pick<ThreadPatch, "awaitingInput" | "lastReplyAt" | "status">,
 ): boolean => (fields.status === "running" || fields.lastReplyAt !== undefined) && fields.awaitingInput === undefined && row?.awaitingInput !== undefined;
 
-export const patchThread = async (db: Database, threadId: Id<"threads">, fields: ThreadPatch): Promise<void> => {
-    if (fields.status === "running" || fields.lastReplyAt !== undefined) {
+/**
+ * The one wake rule: a write that pauses for the owner (an approval or a question), or that fails. The owner should not have
+ * to find the thread in Snoozed to answer it, or to learn that it broke. `patchThread` reads the row only for a write this
+ * rule admits, so both of its uses must share this definition.
+ */
+const fieldsWake = (fields: Pick<ThreadPatch, "awaitingInput" | "status">, failed: boolean): boolean =>
+    fields.awaitingInput !== undefined || fields.status === "error" || failed;
+
+export const patchesWakeSnooze = (
+    row: Pick<Doc<"threads">, "snoozedUntil"> | null,
+    fields: Pick<ThreadPatch, "awaitingInput" | "status">,
+    failed = false,
+): boolean => row?.snoozedUntil !== undefined && fieldsWake(fields, failed);
+
+/**
+ * The one writer of a thread's run state. A write that ends a pause or records a reply removes `awaitingInput`
+ * (`patchesWithoutAwaitingInput`); a write that pauses for the owner or fails also removes a snooze
+ * (`patchesWakeSnooze`). Both happen in the same patch, so a thread never shows as snoozed while it waits on a person.
+ */
+export const patchThread = async (db: Database, threadId: Id<"threads">, fields: ThreadPatch, { failed = false }: { failed?: boolean } = {}): Promise<void> => {
+    const endsPause = fields.status === "running" || fields.lastReplyAt !== undefined;
+    const wakes = fieldsWake(fields, failed);
+
+    if (endsPause || wakes) {
         const row = await db.get("threads", threadId);
 
-        if (row && patchesWithoutAwaitingInput(row, fields)) {
-            await patchRow(db, "threads", row, { ...withoutUndefined(fields), awaitingInput: undefined });
+        if (row) {
+            const clearsAwaiting = endsPause && patchesWithoutAwaitingInput(row, fields);
+            const clearsSnooze = patchesWakeSnooze(row, fields, failed);
 
-            return;
+            // A wake is recorded as the thread's ordering even when there is no snooze to clear: a snooze chosen before it is older
+            // than the wake, and must not hide the thread again when it drains (`isStaleSnoozeChoice`).
+            if (clearsAwaiting || clearsSnooze || wakes) {
+                await patchRow(db, "threads", row, {
+                    ...withoutUndefined(fields),
+                    ...(clearsAwaiting && { awaitingInput: undefined }),
+                    ...(clearsSnooze && { snoozedUntil: undefined }),
+                    ...(wakes && { snoozeChosenAt: Date.now() }),
+                });
+
+                return;
+            }
         }
     }
 
@@ -111,17 +145,35 @@ export const markThreadViewedAt = async (db: Database, thread: Doc<"threads">, n
     return true;
 };
 
-/** Snoozes the thread until `until`; `undefined` removes the column. Leaves `updatedAt` alone. */
-export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, until: number | undefined): Promise<void> => {
-    if (until === undefined) {
-        if (thread.snoozedUntil !== undefined) {
-            await patchRow(db, "threads", thread, { snoozedUntil: undefined });
-        }
+/**
+ * Whether a snooze write is stale, so it changes nothing. `chosenAt` is when the owner made the choice, by the client's clock; the
+ * thread's `snoozeChosenAt` is the newest ordering it has seen (a choice, or a wake). Once a thread has an ordering, a choice chosen
+ * before it is stale. So a queued write cannot undo a newer choice or re-hide a thread that has since woken, and another device's
+ * earlier write cannot undo a later one.
+ */
+export const isStaleSnoozeChoice = (thread: Pick<Doc<"threads">, "snoozeChosenAt">, chosenAt: number): boolean =>
+    thread.snoozeChosenAt !== undefined && chosenAt < thread.snoozeChosenAt;
 
-        return;
+/**
+ * Sets the thread's snooze: `until`, or `undefined` to bring it back, and records `chosenAt` as the ordering. Leaves `updatedAt` alone.
+ * Returns whether the write applied: a stale write (`isStaleSnoozeChoice`) changes nothing and returns false.
+ */
+export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, until: number | undefined, chosenAt: number): Promise<boolean> => {
+    if (isStaleSnoozeChoice(thread, chosenAt)) {
+        return false;
     }
 
-    await db.patch("threads", thread._id, { snoozedUntil: until });
+    if (until === undefined) {
+        if (thread.snoozedUntil !== undefined || thread.snoozeChosenAt !== chosenAt) {
+            await patchRow(db, "threads", thread, { snoozeChosenAt: chosenAt, snoozedUntil: undefined });
+        }
+
+        return true;
+    }
+
+    await patchRow(db, "threads", thread, { snoozeChosenAt: chosenAt, snoozedUntil: until });
+
+    return true;
 };
 
 /**

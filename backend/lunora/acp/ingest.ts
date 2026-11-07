@@ -21,7 +21,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { addMessagesHandler } from "../agent/messages";
-import { insertThread } from "../agent/table-writes";
+import { clearAwaitingInput, insertThread, patchThread } from "../agent/table-writes";
 import {
     appendHostChunk,
     bumpedExpiry,
@@ -397,8 +397,28 @@ const applyTurnPost = async (
     }
 
     const expiresAt = bumpedExpiry(stream, now);
-    const pendingChanged = pending.join("\n") !== (stream.hostPendingPermissions ?? []).join("\n");
+    const previousPending = stream.hostPendingPermissions ?? [];
+    const pendingChanged = pending.join("\n") !== previousPending.join("\n");
     const stateChanged = hostState !== stream.hostState;
+
+    // A permission the agent asks for pauses the thread for the owner, as a cloud approval does, so a snoozed thread wakes
+    // (`patchThread`). Once every request is answered the pause is over: only its `awaitingInput` clears. The thread's status is
+    // left alone, so an answer never unarchives a thread the owner archived.
+    if (pending.some((id) => !previousPending.includes(id))) {
+        await patchThread(ctx.db, threadId, { awaitingInput: "approval" });
+    } else if (previousPending.length > 0 && pending.length === 0) {
+        // Another live run on the thread may hold an approval of its own: then the thread keeps waiting for the owner. The
+        // stream this post belongs to is live too, so it is not counted.
+        const { page: liveStreams } = await ctx.db.persistentStreams.findMany({
+            limit: 5,
+            where: { status: { in: ["pending", "streaming"] }, threadId },
+        });
+
+        if (liveStreams.every((other) => other._id === stream._id)) {
+            await clearAwaitingInput(ctx.db, threadId);
+        }
+    }
+
     const startsStreaming = sawContent && stream.status === "pending";
 
     // The stream row is read by a live query, so a plain text post (none of these) writes nothing to it.

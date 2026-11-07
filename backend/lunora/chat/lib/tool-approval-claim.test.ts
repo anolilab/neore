@@ -87,6 +87,36 @@ describe("claimToolApproval", () => {
         expect(await runStatus()).toStrictEqual(["approved"]);
     });
 
+    it("answering the last open approval takes the thread out of waiting for the owner", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId as never, { awaitingInput: "approval" }));
+
+        await claim(OWNER);
+
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId as never));
+
+        expect(thread?.awaitingInput).toBeUndefined();
+    });
+
+    it("answering one of two open approvals keeps the thread waiting for the other", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", threadId as never, { awaitingInput: "approval" });
+            await ctx.db.insert("toolApprovalRuns", {
+                approvalId: "approval-2",
+                config: CONFIG,
+                createdAt: Date.now(),
+                status: "pending",
+                threadId,
+                userId: OWNER,
+            });
+        });
+
+        await claim(OWNER);
+
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId as never));
+
+        expect(thread?.awaitingInput).toBe("approval");
+    });
+
     it("records a denial as denied", async () => {
         await claim(OWNER, "deny");
 

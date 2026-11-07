@@ -34,6 +34,7 @@ import useThreadHandlers from "./hooks/use-thread-handlers";
 import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
 import { renameFocusTarget } from "./rename-focus-target";
 import RenameThreadDialog from "./rename-thread-dialog";
+import SnoozeUntilDialog, { closeSnoozeDialogFor, threadRowFocusTarget } from "./snooze-until-dialog";
 import SortableThreadItem from "./sortable-thread-item";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
 import { isThreadLocked } from "./thread-lock";
@@ -376,6 +377,38 @@ const VirtualizedThreadList: FC<{
 });
 
 VirtualizedThreadList.displayName = "VirtualizedThreadList";
+
+/**
+ * The thread with this id wherever it sits in the groups, including under a collapsed group or a collapsed branch parent.
+ * The flattened keyboard list leaves those out, so it cannot tell a hidden thread from one that left the list.
+ */
+const findThreadNode = (groups: ThreadGroup[], threadId: string): BranchNode | undefined => {
+    const search = (nodes: BranchNode[]): BranchNode | undefined => {
+        for (const node of nodes) {
+            if (node.threadId === threadId) {
+                return node;
+            }
+
+            const found = search(node.children);
+
+            if (found) {
+                return found;
+            }
+        }
+
+        return undefined;
+    };
+
+    for (const group of groups) {
+        const found = search(group.threads);
+
+        if (found) {
+            return found;
+        }
+    }
+
+    return undefined;
+};
 
 const HierarchicalThreadList: FC<
     HierarchicalThreadListProperties & { currentThreadId: string | undefined; threadRelationships: MinimalThreadRelationship[] }
@@ -1059,6 +1092,21 @@ const HierarchicalThreadList: FC<
     // Note: useVirtualizer is incompatible with React Compiler
     // The virtualized rendering is handled in renderThreadGroups below
 
+    // The snooze dialog lives here, not in a row: a row can unmount while the dialog is open (virtualization, a filter).
+    const snoozeThreadId = useThreadListUIStore((state) => state.snoozeThreadId);
+    const setSnoozeThreadId = useThreadListUIStore((state) => state.setSnoozeThreadId);
+    const snoozeThread = useMemo(() => (snoozeThreadId === null ? undefined : findThreadNode(threadGroups, snoozeThreadId)), [snoozeThreadId, threadGroups]);
+
+    // A dialog whose thread left the list is closed, so it cannot reopen when that thread comes back.
+    useEffect(() => {
+        if (snoozeThreadId !== null && snoozeThread === undefined) {
+            setSnoozeThreadId(null);
+        }
+    }, [snoozeThread, snoozeThreadId, setSnoozeThreadId]);
+
+    // The target lives in the store, which outlives the list: leaving the list clears it, so it does not reopen on return.
+    useEffect(() => () => setSnoozeThreadId(null), [setSnoozeThreadId]);
+
     // The rename dialog and the open options menu live here, not in a row: a row can unmount while one is open
     // (virtualization, a filter). Each closes with its thread: when the thread leaves the list, or a rename's thread is locked.
     // The list root: rename returns focus here when the thread's row has unmounted.
@@ -1323,6 +1371,21 @@ const HierarchicalThreadList: FC<
                     open={!!projectToDelete}
                     title={t`Delete Project`}
                 />
+                {snoozeThread && (
+                    <SnoozeUntilDialog
+                        // One dialog instance per thread, so a save still in flight for another thread cannot write into this one's state.
+                        key={snoozeThread.threadId}
+                        onOpenChange={(open) => {
+                            if (!open) {
+                                closeSnoozeDialogFor(snoozeThread.threadId);
+                            }
+                        }}
+                        open
+                        previousUntil={snoozeThread.snoozedUntil}
+                        returnFocusTo={() => threadRowFocusTarget(listRootReference.current, snoozeThread.threadId)}
+                        threadId={snoozeThread.threadId}
+                    />
+                )}
                 {renameThread && !isThreadLocked(renameThread.lockedAt) && (
                     <RenameThreadDialog
                         onOpenChange={(open) => {

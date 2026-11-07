@@ -6,7 +6,9 @@
  */
 import { v } from "lunorash/server";
 
-import { markThreadViewedAt, setThreadSnooze } from "../agent/table-writes";
+import type { MutationCtx } from "../_generated/server";
+import type { Doc } from "../_generated/dataModel";
+import { isStaleSnoozeChoice, markThreadViewedAt, setThreadSnooze } from "../agent/table-writes";
 import { requireOwnedThreadIgnoringLock } from "../agent/thread-read-access";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { throwBadRequest } from "../lib/error-helpers";
@@ -26,39 +28,86 @@ export const markThreadViewed = authMutation
         return { updated };
     });
 
-/** Hides the thread from the owner's active list until `until`. */
+/**
+ * The time the owner chose, by the client's clock, clamped to now: a device whose clock runs ahead cannot lock its later choices out.
+ * A write queued offline carries the time it was made with, so it can arrive after a newer choice; `setThreadSnooze` drops it then.
+ */
+const chosenAtNow = (chosenAt: number, now: number): number => Math.min(chosenAt, now);
+
+/** The event log a snooze choice writes to (the procedure's `ctx.log`). */
+export interface SnoozeLog {
+    event: (name: string, fields: Record<string, unknown>) => void;
+}
+
+/**
+ * Applies one snooze choice and says what became of it. A choice the thread already has a newer one for is dropped: nothing is written,
+ * it is logged as dropped with its reason, and the caller learns it did not apply. Anything applied is logged with `applied`'s fields.
+ */
+export const applySnoozeChoice = async (
+    db: MutationCtx["db"],
+    log: SnoozeLog,
+    thread: Doc<"threads">,
+    choice: { applied: Record<string, unknown>; chosenAt: number; kind: "snooze" | "unsnooze"; until: number | undefined },
+): Promise<{ applied: boolean }> => {
+    const applied = await setThreadSnooze(db, thread, choice.until, choice.chosenAt);
+
+    if (applied) {
+        log.event(choice.kind === "snooze" ? "chat.snooze_thread" : "chat.unsnooze_thread", choice.applied);
+
+        return { applied: true };
+    }
+
+    log.event(choice.kind === "snooze" ? "chat.snooze_dropped" : "chat.unsnooze_dropped", { reason: "stale_ordering" });
+
+    return { applied: false };
+};
+
+/**
+ * Hides the thread from the owner's active list until `until`. The choice time is required: a request without it is refused with a
+ * validation error, rather than applied or silently ignored, so an older client cannot erase a newer choice's ordering unnoticed.
+ * Returns whether the snooze applied; a choice the thread already has a newer one for is dropped, and says so. A wake (a failed run, or one
+ * that waits on the owner) also records its time as the ordering, so a choice made before the wake is dropped too.
+ */
 export const snoozeThread = authMutation
     .use(rateLimit("chat/update"))
     .input({
+        chosenAt: v.number().check((value) => Number.isFinite(value), { message: "Invalid choice time" }),
         threadId: v.id("threads"),
         until: v.number().check((value) => Number.isFinite(value), { message: "Invalid snooze time" }),
     })
-    .output(v.null())
-    .mutation(async ({ args: { threadId, until }, ctx: context }) => {
+    .output(v.object({ applied: v.boolean() }))
+    .mutation(async ({ args: { chosenAt, threadId, until }, ctx: context }) => {
         const thread = await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
+        const choice = chosenAtNow(chosenAt, context.now);
 
-        if (!isSnoozeInRange(until, context.now)) {
+        // A stale write is not a failure: the newer choice stands, so it is dropped before the range check can reject it.
+        if (!isStaleSnoozeChoice(thread, choice) && !isSnoozeInRange(until, context.now)) {
             return throwBadRequest("A snooze must end in the future, within a year");
         }
 
-        await setThreadSnooze(context.db, thread, until);
-
-        context.log.event("chat.snooze_thread", { snoozedForMs: until - context.now });
-
-        return null;
+        return await applySnoozeChoice(context.db, context.log, thread, {
+            applied: { snoozedForMs: until - context.now },
+            chosenAt: choice,
+            kind: "snooze",
+            until,
+        });
     });
 
-/** Brings a snoozed thread back to the active list. */
+/** Brings a snoozed thread back to the active list. Returns whether the unsnooze applied (a stale one does not). */
 export const unsnoozeThread = authMutation
     .use(rateLimit("chat/update"))
-    .input({ threadId: v.id("threads") })
-    .output(v.null())
-    .mutation(async ({ args: { threadId }, ctx: context }) => {
+    .input({
+        chosenAt: v.number().check((value) => Number.isFinite(value), { message: "Invalid choice time" }),
+        threadId: v.id("threads"),
+    })
+    .output(v.object({ applied: v.boolean() }))
+    .mutation(async ({ args: { chosenAt, threadId }, ctx: context }) => {
         const thread = await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
 
-        await setThreadSnooze(context.db, thread, undefined);
-
-        context.log.event("chat.unsnooze_thread", { wasSnoozed: thread.snoozedUntil !== undefined });
-
-        return null;
+        return await applySnoozeChoice(context.db, context.log, thread, {
+            applied: { wasSnoozed: thread.snoozedUntil !== undefined },
+            chosenAt: chosenAtNow(chosenAt, context.now),
+            kind: "unsnooze",
+            until: undefined,
+        });
     });

@@ -126,7 +126,18 @@ const projectMessage = (
 const projectThread = (
     thread: Pick<
         Doc<"threads">,
-        "_creationTime" | "activeLeafMessageId" | "category" | "lastViewedAt" | "model" | "snoozedUntil" | "summary" | "tagIds" | "tags" | "title" | "updatedAt"
+        | "_creationTime"
+        | "activeLeafMessageId"
+        | "category"
+        | "lastViewedAt"
+        | "model"
+        | "snoozeChosenAt"
+        | "snoozedUntil"
+        | "summary"
+        | "tagIds"
+        | "tags"
+        | "title"
+        | "updatedAt"
     > & {
         _id: string;
     },
@@ -141,6 +152,9 @@ const projectThread = (
         createdAt: thread._creationTime,
         lastViewedAt: thread.lastViewedAt,
         model: thread.model,
+        // The thread's newest snooze ordering: the owner's choice time (`chat/thread-state.ts`), or the server time of a wake, which is
+        // recorded even with nothing snoozed (`agent/table-writes.ts#patchThread`). Unset when no ordering was ever recorded.
+        snoozeChosenAt: thread.snoozeChosenAt,
         snoozedUntil: thread.snoozedUntil,
         summary: thread.summary,
         tags: thread.tags,
@@ -201,6 +215,10 @@ export const collectConversations = internalAction.input({ userId: v.string() })
             category?: string;
             createdAt: number;
             model?: string;
+            /** The thread's newest snooze ordering: a choice time or a wake time (see `projectThread`). */
+            snoozeChosenAt?: number;
+            /** The time the thread is snoozed until, if it is. */
+            snoozedUntil?: number;
             summary?: string;
             tags?: string[];
             title?: string;

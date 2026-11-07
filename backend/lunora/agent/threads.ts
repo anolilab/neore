@@ -28,7 +28,7 @@ import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread,
 import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadPatchFields, vThreadStatus } from "./validators";
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
-import { clearAwaitingInput, patchesWithoutAwaitingInput } from "./table-writes";
+import { clearAwaitingInput, patchThread } from "./table-writes";
 import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
 import { deleteThreadSummaries } from "./thread-summaries";
 
@@ -52,7 +52,7 @@ export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
  * Unread, snooze and "needs you" belong to the thread's OWNER; the row is shared with grantees, who must not see
  * (or act on) them. Reads that can reach a grantee return the row through here.
  */
-const OWNER_STATE_KEYS = ["awaitingInput", "lastReplyAt", "lastViewedAt", "snoozedUntil"] as const;
+const OWNER_STATE_KEYS = ["awaitingInput", "lastReplyAt", "lastViewedAt", "snoozedUntil", "snoozeChosenAt"] as const;
 
 export const threadForViewer = (thread: Doc<"threads">, viewerId: string | undefined): ThreadDoc => {
     const isOwner = thread.userId !== undefined && thread.userId === viewerId;
@@ -264,6 +264,8 @@ export type ThreadFieldsSupportingPatch = (typeof threadFieldsSupportingPatch)[n
 
 export const updateThread = internalMutation
     .input({
+        /** The run failed in place: the thread wakes if it was snoozed, in this same write (`patchThread`). */
+        failed: v.optional(v.boolean()),
         patch: v.object({ ...vThreadPatchFields }),
         threadId: v.id("threads"),
     })
@@ -273,12 +275,8 @@ export const updateThread = internalMutation
 
         assert(oldThread, `Thread ${args.threadId} not found`);
 
-        // Back to `running` ends a pause: awaitingInput goes in the same write (see `patchThread`).
-        if (patchesWithoutAwaitingInput(oldThread, args.patch)) {
-            await patchRow(ctx.db, "threads", oldThread, { ...withoutUndefined(args.patch), awaitingInput: undefined });
-        } else {
-            await ctx.db.patch("threads", args.threadId, withoutUndefined(args.patch));
-        }
+        // The run-state rules (a pause ending, a pause or failure waking a snooze) live in `patchThread`.
+        await patchThread(ctx.db, args.threadId, args.patch, { failed: args.failed });
 
         const newThread = (await ctx.db.get("threads", args.threadId))!;
 
