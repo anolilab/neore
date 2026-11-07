@@ -5,12 +5,15 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { contextResetOnPath, rowsAfterContextReset } from "../agent/context-reset";
+import { contextResetOnPath, MAX_RESET_WALK_PAGES, rowsAfterContextReset } from "../agent/context-reset";
 import { isContextResetRow } from "../agent/context-reset-shape";
 import { handoffAboveOf } from "../agent/agent-switch";
 import { docsToModelMessages } from "../agent/mapping";
 import { addMessagesHandler } from "../agent/messages";
 import { insertAgentSwitchRow } from "../agent/table-writes";
+import { THREAD_FOLD_CLAIM_SCOPE } from "../agent/thread-compaction-logic";
+import { SUMMARY_MAX_PATH_ROWS } from "../agent/thread-summary-logic";
+import { claimOnce } from "../lib/claim-once";
 import schema from "../schema";
 import { clearContextRowHandler } from "./context-reset";
 
@@ -151,6 +154,16 @@ describe("/clear on a thread that never branched", () => {
         await expect(clear()).resolves.toMatchObject({ messageId: expect.any(String) });
     });
 
+    it("refuses a reset while a summary or compaction of the thread is being paid for, so its result is not thrown away", async () => {
+        await run(async (ctx) => await claimOnce(ctx, THREAD_FOLD_CLAIM_SCOPE, threadId, 60_000, OWNER));
+
+        await expect(clear()).rejects.toMatchObject({ data: { code: "CONTEXT_CLEAR_SUMMARISING" } });
+
+        const written = await rows();
+
+        expect(written.filter((row) => row.message?.role === "system")).toHaveLength(0);
+    });
+
     it("refuses a reset while the thread is not the requester's own", async () => {
         await expect(clear(COLLABORATOR)).rejects.toThrow();
         expect(await thread()).not.toHaveProperty("hasContextReset", true);
@@ -244,5 +257,11 @@ describe("a stored handoff across a context reset (/clear)", () => {
         expect(await run(async (ctx) => await handoffAboveOf(ctx, { belowMessageId: ids.u4 as never, threadId: threadId as never }))).toStrictEqual([
             "after the clear",
         ]);
+    });
+});
+
+describe("how far a reset is looked for", () => {
+    it("reaches at least as far up a path as an idle summary reads, so a summary never reads past an unfound reset", () => {
+        expect(MAX_RESET_WALK_PAGES * 100).toBeGreaterThanOrEqual(SUMMARY_MAX_PATH_ROWS);
     });
 });

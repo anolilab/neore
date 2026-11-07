@@ -17,7 +17,8 @@ import { refreshContextResetPointer } from "../agent/context-reset";
 import { getMaxMessage } from "../agent/messages";
 import { insertContextResetRow, patchThread } from "../agent/table-writes";
 import { requireThreadPermission } from "../agent/thread-read-access";
-import { claimOnce } from "../lib/claim-once";
+import { THREAD_FOLD_CLAIM_SCOPE } from "../agent/thread-compaction-logic";
+import { claimOnce, hasClaim } from "../lib/claim-once";
 import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { assertNotStreaming, assertReplyStarted } from "./agent-switch";
@@ -58,6 +59,13 @@ export const clearContextRowHandler = async (
     } catch {
         throw new LunoraError("CONFLICT", "Wait for the reply to finish, or stop it, before clearing the context", {
             data: { code: CONTEXT_CLEAR_CONFLICT.replyRunning },
+        });
+    }
+
+    // A summary or compaction being paid for would be made for the context this clear ends and never read: wait for it.
+    if (await hasClaim(ctx, THREAD_FOLD_CLAIM_SCOPE, thread._id)) {
+        throw new LunoraError("CONFLICT", "The conversation is being condensed; try again in a moment", {
+            data: { code: CONTEXT_CLEAR_CONFLICT.summarising },
         });
     }
 

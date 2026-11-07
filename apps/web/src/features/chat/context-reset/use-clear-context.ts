@@ -70,6 +70,7 @@ const useClearContext = (threadId: string | undefined): { clear: () => Promise<b
                 failed: t`Could not start a new context. Try again.`,
                 not_owner: t`Only the owner of a chat can start a new context.`,
                 rate_limited: t`Too many new contexts in a short while. Try again in a minute.`,
+                summarising: t`The conversation is being condensed. Try again in a moment.`,
                 unavailable: t`This chat cannot start a new context.`,
             };
 

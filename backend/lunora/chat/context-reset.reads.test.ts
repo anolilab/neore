@@ -14,9 +14,12 @@ const walks = vi.hoisted(() => {
     return { count: 0 };
 });
 
-// A small page bound lets a test cross it without thousands of rows.
+// A small page bound lets a test cross it without thousands of rows: the reset walk reaches as far as these two do.
 vi.mock("../agent/handoff-source", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../agent/handoff-source")>()), MAX_SEARCH_PAGES: 2 };
+});
+vi.mock("../agent/thread-summary-logic", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("../agent/thread-summary-logic")>()), SUMMARY_MAX_PATH_ROWS: 200 };
 });
 
 vi.mock("../agent/branch-rows", async (importOriginal) => {

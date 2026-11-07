@@ -29,6 +29,7 @@ describe(clearRefusalOf, () => {
         [{ code: "CONFLICT", data: { code: "CONTEXT_CLEAR_AGENT_STARTING" } }, "agent_starting"],
         [{ code: "CONFLICT", data: { code: "CONTEXT_CLEAR_ALREADY_MADE" } }, "already_made"],
         [{ code: "CONFLICT", data: { code: "CONTEXT_CLEAR_REPLY_RUNNING" } }, "busy"],
+        [{ code: "CONFLICT", data: { code: "CONTEXT_CLEAR_SUMMARISING" } }, "summarising"],
         [new Error("offline"), "failed"],
         [undefined, "failed"],
     ])("reads %o as %s", (error, refusal) => {

@@ -31159,6 +31159,10 @@ msgstr "连接未完成：{reason}"
 msgid "The connection was not completed."
 msgstr "连接未完成。"
 
+#: src/features/chat/context-reset/use-clear-context.ts:73
+msgid "The conversation is being condensed. Try again in a moment."
+msgstr "正在压缩对话，请稍后再试。"
+
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:57
 msgid "The Cooke Look, painterly"
 msgstr "Cooke Look，绘画感"
@@ -31816,7 +31820,7 @@ msgstr ""
 msgid "This chat cannot be compacted."
 msgstr "此聊天无法压缩。"
 
-#: src/features/chat/context-reset/use-clear-context.ts:73
+#: src/features/chat/context-reset/use-clear-context.ts:74
 msgid "This chat cannot start a new context."
 msgstr "此聊天无法开始新的上下文。"
 

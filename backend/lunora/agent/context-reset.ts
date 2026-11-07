@@ -10,8 +10,8 @@
  * path changes (`refreshContextResetPointer`, from `syncActiveAgent`) and where a reset is written. A prompt on the
  * active path reads it with one lookup (a branched thread first checks that with a short walk from the leaf); only a
  * prompt on another branch searches its path, and only a thread that has been cleared pays any of it. Every walk is bounded by
- * {@link MAX_RESET_WALK_PAGES}: a reset further up than that is not found, and the rows above it lie far beyond what any
- * reader sends (the window, the summaries' reach).
+ * {@link MAX_RESET_WALK_PAGES}, which reaches as far up the path as any reader of the context does (an idle summary
+ * reads up to `SUMMARY_MAX_PATH_ROWS`): a reset further up than that is not found, and no reader reads the rows above it.
  */
 import { v } from "lunorash/server";
 
@@ -22,6 +22,7 @@ import { isThreadLocked } from "../lib/thread-lock";
 import { getThreadRow, resolveLeafRow, walkPath } from "./branch-rows";
 import { CONTEXT_RESET_KEY, isContextResetRow } from "./context-reset-shape";
 import { MAX_SEARCH_PAGES } from "./handoff-source";
+import { SUMMARY_MAX_PATH_ROWS } from "./thread-summary-logic";
 import { addMessagesHandler } from "./messages";
 import { patchThread } from "./table-writes";
 
@@ -32,8 +33,12 @@ type ResetThread = Pick<Doc<"threads">, "_id" | "activeLeafMessageId" | "context
 /** Rows per path read while looking for a reset. A reset usually sits within the reply window. */
 const WALK_BATCH = 100;
 
-/** Pages of {@link WALK_BATCH} rows one lookup reads at most, the bound every reply-context walk keeps. */
-export const MAX_RESET_WALK_PAGES = MAX_SEARCH_PAGES;
+/**
+ * Pages of {@link WALK_BATCH} rows one lookup reads at most: at least the reply-context bound, and at least the reach of the
+ * longest reader, the idle summary (`SUMMARY_MAX_PATH_ROWS`). A shorter walk could store "no reset" for a path whose reset
+ * an idle summary would still read past, and send the cleared turns as notes.
+ */
+export const MAX_RESET_WALK_PAGES = Math.max(MAX_SEARCH_PAGES, Math.ceil(SUMMARY_MAX_PATH_ROWS / WALK_BATCH));
 
 /**
  * The newest context reset on the path that ends at `tip`, found by walking it, at most {@link MAX_RESET_WALK_PAGES}

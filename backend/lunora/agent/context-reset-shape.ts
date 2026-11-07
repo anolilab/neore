@@ -57,4 +57,6 @@ export const CONTEXT_CLEAR_CONFLICT = {
     alreadyMade: "CONTEXT_CLEAR_ALREADY_MADE",
     /** A reply is running. */
     replyRunning: "CONTEXT_CLEAR_REPLY_RUNNING",
+    /** A paid summary or compaction of the thread is under way; its result would be made for a context the clear ends. */
+    summarising: "CONTEXT_CLEAR_SUMMARISING",
 } as const;

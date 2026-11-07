@@ -31159,6 +31159,10 @@ msgstr "Die Verbindung wurde nicht abgeschlossen: {reason}"
 msgid "The connection was not completed."
 msgstr "Die Verbindung wurde nicht abgeschlossen."
 
+#: src/features/chat/context-reset/use-clear-context.ts:73
+msgid "The conversation is being condensed. Try again in a moment."
+msgstr "Die Unterhaltung wird gerade zusammengefasst. Versuche es gleich noch einmal."
+
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:57
 msgid "The Cooke Look, painterly"
 msgstr "Der Cooke-Look, malerisch"
@@ -31816,7 +31820,7 @@ msgstr ""
 msgid "This chat cannot be compacted."
 msgstr "Dieser Chat kann nicht komprimiert werden."
 
-#: src/features/chat/context-reset/use-clear-context.ts:73
+#: src/features/chat/context-reset/use-clear-context.ts:74
 msgid "This chat cannot start a new context."
 msgstr "In diesem Chat kann kein neuer Kontext gestartet werden."
 
