@@ -389,7 +389,16 @@ const applyTurnPost = async (
     if (pending.some((id) => !previousPending.includes(id))) {
         await patchThread(ctx.db, threadId, { awaitingInput: "approval" });
     } else if (previousPending.length > 0 && pending.length === 0) {
-        await clearAwaitingInput(ctx.db, threadId);
+        // Another live run on the thread may hold an approval of its own: then the thread keeps waiting for the owner. The
+        // stream this post belongs to is live too, so it is not counted.
+        const { page: liveStreams } = await ctx.db.persistentStreams.findMany({
+            limit: 5,
+            where: { status: { in: ["pending", "streaming"] }, threadId },
+        });
+
+        if (liveStreams.every((other) => other._id === stream._id)) {
+            await clearAwaitingInput(ctx.db, threadId);
+        }
     }
 
     const startsStreaming = sawContent && stream.status === "pending";

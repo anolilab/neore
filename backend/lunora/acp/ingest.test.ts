@@ -1164,6 +1164,52 @@ describe("a host turn", () => {
         await turn(device, threadId, "t1", 2, [{ kind: "permission_resolved", outcome: "allowed", requestId: "r1" }]);
         expect(await rowField(threadId, "awaitingInput")).toBeUndefined();
     });
+    it("answering one of two live approvals keeps the thread waiting for the other", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const ask = (requestId: string) => {
+            return {
+                kind: "permission_request",
+                options: [{ kind: "allow_once", name: "Allow", optionId: "o1" }],
+                requestId,
+                tool: "Bash",
+            };
+        };
+
+        await turn(device, threadId, "t1", 0, [START(), ask("r1"), ask("r2")]);
+        await turn(device, threadId, "t1", 3, [{ kind: "permission_resolved", outcome: "allowed", requestId: "r1" }]);
+
+        expect(await rowField(threadId, "awaitingInput")).toBe("approval");
+
+        await turn(device, threadId, "t1", 4, [{ kind: "permission_resolved", outcome: "allowed", requestId: "r2" }]);
+
+        expect(await rowField(threadId, "awaitingInput")).toBeUndefined();
+    });
+
+    it("answering the host's approval keeps the thread waiting while another live run still holds one", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const askForTool = { kind: "permission_request", options: [{ kind: "allow_once", name: "Allow", optionId: "o1" }], requestId: "r1", tool: "Bash" };
+
+        await turn(device, threadId, "t1", 0, [START(), askForTool]);
+
+        // A cloud run on the same thread, still live, with an approval of its own.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("persistentStreams", {
+                expiresAt: Date.now() + 3_600_000,
+                messageId: "cloud-message",
+                status: "streaming",
+                streamingConfig: { contentType: "text", model: "cloud" },
+                threadId,
+                userId: ownerId,
+            });
+        });
+
+        await turn(device, threadId, "t1", 2, [{ kind: "permission_resolved", outcome: "allowed", requestId: "r1" }]);
+
+        expect(await rowField(threadId, "awaitingInput")).toBe("approval");
+    });
+
     it("answering a permission leaves a thread the owner archived while it waited archived", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);
