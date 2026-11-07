@@ -8,6 +8,8 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { focusNextArea } from "@/features/keyboard/lib/focus-areas";
+
 const NAME_0 = /^(Send|Queue)$/;
 
 const harness = vi.hoisted(() => {
@@ -222,6 +224,26 @@ afterEach(() => {
 });
 
 describe("the coding-agent composer", () => {
+    it("is a focus area for F6, as the cloud composer is, so F6 reaches it", async () => {
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        expect(box.dataset.focusArea).toBe("composer");
+
+        // jsdom does no layout: the box is given one, as it has on the page, so F6 can count it as shown.
+        Object.assign(box, {
+            getBoundingClientRect: () => {
+                return { bottom: 40, height: 40, left: 0, right: 300, top: 0, width: 300 };
+            },
+            getClientRects: () => [{}],
+        });
+
+        expect(focusNextArea(1)).toBe(true);
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+        expect(document.activeElement).toBe(box);
+    });
+
     it("sends the message under one request id and clears the box", async () => {
         mount(session());
 
