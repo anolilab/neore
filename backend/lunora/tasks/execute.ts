@@ -1,7 +1,8 @@
 /**
- * One round of a task: a headless agent run in a new thread, then the verifier.
+ * One round of a task: a headless agent run, then the verifier.
  *
- * The run is a `runHeadlessAgent` like a trigger's — a fresh thread per run,
+ * The run is a `runHeadlessAgent` like a trigger's — a new thread per run, or
+ * the last run's thread for a recurring task that keeps one (`pickRunThread`),
  * `generateText` with Deep Work's step budget — plus the interactive run's
  * tool set built `headless`, so a tool the user set to `ask` is simply absent
  * (nobody is there to approve it). The assigned skill contributes its
@@ -24,7 +25,7 @@ import { gatewayFetch, type ServiceFetch } from "../lib/services";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { wrapUntrusted } from "../coding-agents/agent-output";
 import type { VerifierVerdict } from "./logic";
-import { buildTaskPrompt, buildVerifierPrompt, parseVerifierOutput, resolveTaskModel, VERIFIER_SYSTEM_PROMPT } from "./logic";
+import { buildTaskPrompt, buildVerifierPrompt, isPassingFallback, parseVerifierOutput, resolveTaskModel, VERIFIER_SYSTEM_PROMPT } from "./logic";
 import { TaskRunError, taskErrorMessage } from "./run-error";
 import { vTaskRunOrigin } from "./validators";
 
@@ -60,11 +61,17 @@ const verify = async (input: {
 const runAgent = async (
     ctx: ActionCtx,
     claim: {
+        contextDivider?: boolean;
+        continueThreadId?: string;
+        freshContext?: boolean;
         goal?: { description?: string; successCriteria?: string; title: string };
         instructions: string;
+        keepLastThread?: boolean;
         model?: string;
         organizationId?: string;
-        repair?: { reasons: string[]; repairInstructions?: string };
+        projectId?: Id<"projects">;
+        reasoningEffort?: number;
+        repair?: { previousAnswer?: string; reasons: string[]; repairInstructions?: string };
         reviewNote?: string;
         skillId?: Id<"skills">;
         successCriteria?: string;
@@ -73,6 +80,8 @@ const runAgent = async (
     },
     onThread: (threadId: string) => void,
     onModel: (model: string) => void,
+    /** `keepLastThread` is set when this round falls back for a passing reason (`isPassingFallback`). */
+    round: { cycle: string; index: number; keepLastThread: boolean; taskId: Id<"tasks"> },
 ): Promise<{ answer: string; threadId: string }> => {
     const { userId } = claim;
     const skill = claim.skillId
@@ -98,22 +107,70 @@ const runAgent = async (
 
     onModel(model);
 
-    const { text, threadId } = await runHeadlessAgent(ctx, {
-        // An account deletion may have started since the claim; a thread created
+    const ensureAccountLive = async (): Promise<void> => {
+        // An account deletion may have started since the claim; a thread written
         // now would land behind the step that erased the user's threads.
-        beforeThread: async () => {
-            if (!(await ctx.runQuery(internal.tasks.internal.canRunForUser, { userId }))) {
-                throw new TaskRunError("This account is being deleted.");
-            }
-        },
+        if (!(await ctx.runQuery(internal.tasks.internal.canRunForUser, { userId }))) {
+            throw new TaskRunError("This account is being deleted.");
+        }
+    };
+    let thread: { tags: string[]; title: string } | { threadId: string } = { tags: ["task"], title: `Task: ${claim.title}`.slice(0, 120) };
+
+    if (claim.continueThreadId) {
+        await ensureAccountLive();
+
+        // Re-checked right before the first write: since the claim the thread may have been moved out of the
+        // project, locked, or started a chat reply (which holds the thread's run lock). Then a new thread, and why.
+        const place = { cycle: round.cycle, round: round.index, taskId: round.taskId, threadId: claim.continueThreadId };
+        let problem = await ctx.runQuery(internal.tasks.internal.runThreadProblem, place);
+
+        // The divider is written before the run, so it sits between the last run and this one. A refusal means the
+        // thread changed in between, so the reason is asked again.
+        if (
+            problem === null &&
+            claim.contextDivider &&
+            !(await ctx.runMutation(internal.agent.context_reset.appendContextReset, { threadId: claim.continueThreadId as Id<"threads">, userId }))
+        ) {
+            problem = (await ctx.runQuery(internal.tasks.internal.runThreadProblem, place)) ?? "thread_unavailable";
+        }
+
+        if (problem === null) {
+            thread = { threadId: claim.continueThreadId };
+            onThread(claim.continueThreadId);
+        } else {
+            round.keepLastThread = isPassingFallback(problem);
+            await ctx.runMutation(internal.tasks.internal.recordRunNotice, { cycle: round.cycle, reason: problem, taskId: round.taskId });
+        }
+    }
+
+    // Re-read right before the run uses it: access lost since the claim files nothing and gives no instructions.
+    const project = claim.projectId ? await ctx.runQuery(internal.tasks.internal.runProjectFor, { taskId: round.taskId }) : null;
+
+    const { text, threadId } = await runHeadlessAgent(ctx, {
+        beforeThread: ensureAccountLive,
+        ...(claim.freshContext && "threadId" in thread && { freshContext: true }),
         memory: false,
         model,
-        onThread,
+        onThread: async (id) => {
+            onThread(id);
+
+            // A new thread is filed in the task's project as soon as it exists, so a run that fails is
+            // there too and the next run can continue it. A project deleted since the task was saved
+            // leaves the thread outside any project rather than failing the run.
+            if (project) {
+                await ctx
+                    .runMutation(internal.agent.threads.moveThreadToProject, { projectId: project.projectId, threadId: id as Id<"threads"> })
+                    .catch((error: unknown) => console.warn(`[Tasks] Could not file thread ${id} in project ${project.projectId}:`, error));
+            }
+        },
         origin: "trigger",
         personalization: "full",
         prompt: buildTaskPrompt(claim),
+        ...(claim.reasoningEffort !== undefined && { reasoningEffort: claim.reasoningEffort }),
         skill,
-        thread: { tags: ["task"], title: `Task: ${claim.title}`.slice(0, 120) },
+        // The project's own instructions, framed as a chat in the project gets them (`chat/lib/agent-run.ts`).
+        ...(project?.context && { system: `PROJECT CONTEXT:\n${project.context}` }),
+        thread,
         tools: "headless",
         ...(skill && claim.skillId && { usageSkill: { id: claim.skillId, name: `/${skill.slug}` } }),
         userId,
@@ -137,7 +194,7 @@ const startCodingAgentRound = async (
         codingAgent: { agent: "claude_code" | "codex"; branch?: string; openPr?: boolean; repoUrl: string };
         goal?: { description?: string; successCriteria?: string; title: string };
         instructions: string;
-        repair?: { reasons: string[]; repairInstructions?: string };
+        repair?: { previousAnswer?: string; reasons: string[]; repairInstructions?: string };
         reviewNote?: string;
         runId: Id<"taskRuns">;
         successCriteria?: string;
@@ -179,6 +236,7 @@ const verifyAndComplete = async (
     input: {
         answer: string;
         instructions: string;
+        keepLastThread?: boolean;
         runId: Id<"taskRuns">;
         successCriteria?: string;
         taskId: Id<"tasks">;
@@ -199,6 +257,7 @@ const verifyAndComplete = async (
 
     await ctx.runMutation(internal.tasks.internal.completeRound, {
         outcome: verdict ? { finalAnswer: input.answer, kind: "verified", verdict } : { finalAnswer: input.answer, kind: "unverified" },
+        ...(input.keepLastThread && { keepLastThread: true }),
         runId: input.runId,
         threadId: input.threadId,
     });
@@ -269,6 +328,7 @@ export const runTaskRound = internalAction
         let threadId: string | undefined;
         let model: string | undefined;
         let answer: string;
+        const place = { cycle: args.cycle, index: args.round, keepLastThread: claim.keepLastThread === true, taskId: args.taskId };
 
         try {
             const run = await runAgent(
@@ -280,6 +340,7 @@ export const runTaskRound = internalAction
                 (resolved) => {
                     model = resolved;
                 },
+                place,
             );
 
             answer = run.answer.trim();
@@ -290,6 +351,7 @@ export const runTaskRound = internalAction
         } catch (error) {
             console.error(`[Tasks] Round ${String(args.round)} of task ${args.taskId} failed:`, error);
             await ctx.runMutation(internal.tasks.internal.completeRound, {
+                ...(place.keepLastThread && { keepLastThread: true }),
                 outcome: { error: taskErrorMessage(error, model), kind: "error" },
                 runId: claim.runId,
                 threadId,
@@ -301,6 +363,7 @@ export const runTaskRound = internalAction
         await verifyAndComplete(ctx, {
             answer,
             instructions: claim.instructions,
+            keepLastThread: place.keepLastThread,
             runId: claim.runId,
             ...(claim.successCriteria !== undefined && { successCriteria: claim.successCriteria }),
             taskId: args.taskId,

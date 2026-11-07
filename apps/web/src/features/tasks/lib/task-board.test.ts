@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { BoardTask, TaskStatus } from "./task-board";
 import {
+    effortAppliesTo,
     findAnnounceableTransitions,
     getTaskFormDefaults,
     groupByStatus,
@@ -26,6 +27,7 @@ const task = (id: string, overrides: Partial<BoardTask> = {}): BoardTask => {
         goalId: null,
         instructions: "Do it",
         lastError: null,
+        lastRunNotice: null,
         lastRunThreadId: null,
         lastSkipReason: null,
         lastSkippedAt: null,
@@ -33,8 +35,11 @@ const task = (id: string, overrides: Partial<BoardTask> = {}): BoardTask => {
         model: null,
         nextRunAt: null,
         parentTaskId: null,
+        projectId: null,
+        reasoningEffort: null,
         resultSummary: null,
         reviewNote: null,
+        runDestination: null,
         skillId: null,
         status: "todo",
         successCriteria: null,
@@ -104,10 +109,35 @@ describe("task form", () => {
             maxRepairRounds: 2,
             model: undefined,
             parentTaskId: undefined,
+            projectId: undefined,
+            reasoningEffort: undefined,
+            runDestination: undefined,
             skillId: undefined,
             successCriteria: undefined,
             title: "T",
         });
+    });
+
+    it("sends the destination, effort and project a recurring task keeps", () => {
+        const payload = toTaskPayload({
+            ...getTaskFormDefaults(),
+            cronExpression: "0 9 * * 1",
+            instructions: "Report",
+            projectId: "project1" as never,
+            reasoningEffort: 75,
+            runDestination: "fresh_context",
+            title: "T",
+        });
+
+        expect(payload).toMatchObject({ projectId: "project1", reasoningEffort: 75, runDestination: "fresh_context" });
+        // A model that does not reason (or none) sends no effort; one the catalog does not list keeps it.
+        expect(effortAppliesTo(undefined, undefined)).toBe(false);
+        expect(effortAppliesTo("model-a", { filterCapabilities: [] })).toBe(false);
+        expect(effortAppliesTo("model-a", { filterCapabilities: ["reasoning"] })).toBe(true);
+        expect(effortAppliesTo("model-hidden", undefined)).toBe(true);
+        expect(toTaskPayload({ ...getTaskFormDefaults(), reasoningEffort: 75 }, { effortApplies: false }).reasoningEffort).toBeUndefined();
+        expect(getTaskFormDefaults(task("a", { runDestination: "continue_thread" })).runDestination).toBe("continue_thread");
+        expect(getTaskFormDefaults().runDestination).toBe("new_thread");
     });
 
     it("requires a repository for a coding-agent assignee", () => {
@@ -127,7 +157,10 @@ describe("task form", () => {
             instructions: "Fix it",
             model: "some-model",
             openPr: true,
+            projectId: "project1" as never,
+            reasoningEffort: 100,
             repoUrl: " anolilab/neore ",
+            runDestination: "continue_thread",
             skillId: "skill1" as never,
             title: "T",
         });
@@ -135,6 +168,9 @@ describe("task form", () => {
         expect(payload.codingAgent).toStrictEqual({ agent: "codex", branch: undefined, openPr: true, repoUrl: "anolilab/neore" });
         expect(payload.skillId).toBeUndefined();
         expect(payload.model).toBeUndefined();
+        expect(payload.reasoningEffort).toBeUndefined();
+        expect(payload.projectId).toBeUndefined();
+        expect(payload.runDestination).toBeUndefined();
     });
 
     it("recognises schedule presets", () => {

@@ -53739,6 +53739,30 @@
                         "type": "string",
                         "x-lunora-table": "tasks"
                       },
+                      "projectId": {
+                        "description": "Id<\"projects\">",
+                        "type": "string",
+                        "x-lunora-table": "projects"
+                      },
+                      "reasoningEffort": {
+                        "type": "number"
+                      },
+                      "runDestination": {
+                        "anyOf": [
+                          {
+                            "const": "new_thread",
+                            "type": "string"
+                          },
+                          {
+                            "const": "continue_thread",
+                            "type": "string"
+                          },
+                          {
+                            "const": "fresh_context",
+                            "type": "string"
+                          }
+                        ]
+                      },
                       "skillId": {
                         "description": "Id<\"skills\">",
                         "type": "string",
@@ -54407,6 +54431,30 @@
                         "description": "Id<\"tasks\">",
                         "type": "string",
                         "x-lunora-table": "tasks"
+                      },
+                      "projectId": {
+                        "description": "Id<\"projects\">",
+                        "type": "string",
+                        "x-lunora-table": "projects"
+                      },
+                      "reasoningEffort": {
+                        "type": "number"
+                      },
+                      "runDestination": {
+                        "anyOf": [
+                          {
+                            "const": "new_thread",
+                            "type": "string"
+                          },
+                          {
+                            "const": "continue_thread",
+                            "type": "string"
+                          },
+                          {
+                            "const": "fresh_context",
+                            "type": "string"
+                          }
+                        ]
                       },
                       "skillId": {
                         "description": "Id<\"skills\">",
