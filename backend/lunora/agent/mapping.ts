@@ -14,7 +14,7 @@
 import { toStorageRef } from "../lib/storage-ref";
 import { agentSwitchOf } from "./agent-switch-logic";
 import { storageRefsForUrls } from "../lib/storage-sign";
-import { convertUint8ArrayToBase64, type ProviderOptions, type ReasoningPart, type ToolResultOutput } from "@ai-sdk/provider-utils";
+import { convertBase64ToUint8Array, convertUint8ArrayToBase64, type ProviderOptions, type ReasoningPart, type ToolResultOutput } from "@ai-sdk/provider-utils";
 import type {
     AssistantContent,
     CallWarning,
@@ -44,7 +44,7 @@ import { MAX_FILE_SIZE, storeFile } from "./client/files";
 import type { ActionCtx as ActionContext, RunnerCtx as RunnerContext } from "./client/types";
 import type { MutationCtx as MutationContext } from "./client/types";
 import { extractText, getModelName, getProviderName, type ModelOrMetadata } from "./shared";
-import { offloadToolOutputMedia } from "./tool-output-media";
+import { offloadToolOutputMedia, stepInlineBudget, type StoreToolMedia } from "./tool-output-media";
 import type { vAssistantContent, vToolApprovalRequest, vToolApprovalResponse, vToolContent } from "./validators";
 import {
     type Message,
@@ -321,6 +321,22 @@ export const serializeStepContent = async (
     owner?: ToolMediaOwner,
 ): Promise<{ messageFileIds?: string[]; partContent: SerializedContent }> => {
     const fileIds: string[] = [];
+    // One store per distinct blob in the step: parts serialize at once, and two stores of the same new object would
+    // each count it (`addFile` raises the refcount of a row the other just inserted), so it would never be released.
+    const storedMedia = new Map<string, ReturnType<StoreToolMedia>>();
+    const inlineBudget = stepInlineBudget();
+    const storeToolMedia: StoreToolMedia = async (base64, mediaType) => {
+        let pending = storedMedia.get(base64);
+
+        if (!pending) {
+            pending = storeFile(context, new Blob([convertBase64ToUint8Array(base64)], { type: mediaType }), owner).then(({ file }) => {
+                return { fileId: file.fileId, storageId: file.storageId };
+            });
+            storedMedia.set(base64, pending);
+        }
+
+        return await pending;
+    };
     const serialized = await Promise.all(
         content.map(async (part) => {
             const metadata: {
@@ -410,11 +426,7 @@ export const serializeStepContent = async (
 
                     // Without an owner the stored file would be nobody's, and its reference would never be signed.
                     if (owner) {
-                        const offloaded = await offloadToolOutputMedia(part.toolName, rawOutput, async (bytes, mediaType) => {
-                            const { file } = await storeFile(context, new Blob([bytes], { type: mediaType }), owner);
-
-                            return { fileId: file.fileId, storageId: file.storageId };
-                        });
+                        const offloaded = await offloadToolOutputMedia(part.toolName, rawOutput, storeToolMedia, inlineBudget);
 
                         rawOutput = offloaded.output;
                         fileIds.push(...offloaded.fileIds);

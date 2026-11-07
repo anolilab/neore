@@ -20,22 +20,38 @@
  * a result's `url`) that only this module writes, so the transcript loads an image
  * from a URL only when the server put one there, never from a string a tool chose.
  */
-import { convertBase64ToUint8Array } from "@ai-sdk/provider-utils";
-
 import { storageLogger } from "../lib/logger";
-import { isStorageRef, toStorageRef } from "../lib/storage-ref";
+import { STORAGE_REF_PREFIX, toStorageRef } from "../lib/storage-ref";
 import { isRecord } from "../lib/storage-sign";
 import { MAX_FILE_SIZE } from "./client/files";
 
-/** Stores `bytes` as a chat file owned by the run's user; returns its file id and storage key. */
-export type StoreToolMedia = (bytes: Uint8Array<ArrayBuffer>, mediaType: string) => Promise<{ fileId: string; storageId: string }>;
+/**
+ * Stores base64 media as a chat file owned by the run's user; returns its file id and storage key. Given the same
+ * base64 twice, it must return the same file: two stores of one object at once would each count it.
+ */
+export type StoreToolMedia = (base64: string, mediaType: string) => Promise<{ fileId: string; storageId: string }>;
 
 /** The tool names whose own output shapes are known here. MCP tools are always named `mcp_<server>__<tool>`. */
 export const BROWSER_TOOL = "browser";
 export const CODE_TOOL = "codeExecution";
 
-/** When storing fails, a blob up to this size stays inline as before; a larger one would fail the row and is dropped. */
-export const INLINE_FALLBACK_BYTES = 1024 * 1024;
+/**
+ * When storing fails, blobs stay inline as before while the base64 kept in one step's row stays within this many
+ * characters (a row holds at most 2 MB); past it they are dropped and the output's {@link UNSAVED_MEDIA_FIELD} counts them.
+ */
+export const INLINE_FALLBACK_CHARS = 1024 * 1024;
+
+/** The inline fallback left for one step: every tool result of a step is saved in the same row. */
+export interface InlineBudget {
+    chars: number;
+}
+
+export const stepInlineBudget = (): InlineBudget => {
+    return { chars: INLINE_FALLBACK_CHARS };
+};
+
+/** How many media fields could be neither stored nor kept: the model and the transcript see that something is missing. */
+export const UNSAVED_MEDIA_FIELD = "unsavedMedia";
 
 const BASE64 = /^[\d+/A-Za-z]+={0,2}$/u;
 
@@ -67,6 +83,17 @@ const rasterMediaType = (format: string): string => `image/${format === "jpg" ? 
 /** What became of one field: left as it was, stored (its reference), or dropped because it could not be stored. */
 type Moved = { kind: "dropped" } | { kind: "kept" } | { kind: "stored"; ref: string };
 
+/** `items` mapped one at a time, so a step's stores and its inline budget are taken in order. */
+const mapInOrder = async <T>(items: ReadonlyArray<T>, map: (item: T) => Promise<T>): Promise<T[]> => {
+    const mapped: T[] = [];
+
+    for (const item of items) {
+        mapped.push(await map(item));
+    }
+
+    return mapped;
+};
+
 /**
  * `output` with every oversized inline media field replaced by a storage
  * reference, and the chat files those references name. An output with nothing
@@ -76,6 +103,7 @@ export const offloadToolOutputMedia = async (
     toolName: string,
     output: unknown,
     store: StoreToolMedia,
+    inline: InlineBudget = stepInlineBudget(),
     budgetBytes: number = MAX_FILE_SIZE,
 ): Promise<{ fileIds: string[]; output: unknown }> => {
     if (!isRecord(output)) {
@@ -83,9 +111,11 @@ export const offloadToolOutputMedia = async (
     }
 
     const fileIds: string[] = [];
+    let unsaved = 0;
 
     const move = async (value: unknown, mediaType: string): Promise<Moved> => {
-        if (typeof value !== "string" || isStorageRef(value)) {
+        // Already a reference (a tool may echo one): never stored or decoded again.
+        if (typeof value !== "string" || value.startsWith(STORAGE_REF_PREFIX)) {
             return { kind: "kept" };
         }
 
@@ -96,7 +126,7 @@ export const offloadToolOutputMedia = async (
         }
 
         try {
-            const { fileId, storageId } = await store(convertBase64ToUint8Array(value), mediaType);
+            const { fileId, storageId } = await store(value, mediaType);
 
             fileIds.push(fileId);
 
@@ -105,7 +135,15 @@ export const offloadToolOutputMedia = async (
             // The step must still save: a thrown save leaves its row pending for good.
             storageLogger.warn("tool_output_media.store_failed", { error: error instanceof Error ? error.message : String(error), size, toolName });
 
-            return size <= INLINE_FALLBACK_BYTES ? { kind: "kept" } : { kind: "dropped" };
+            if (value.length <= inline.chars) {
+                inline.chars -= value.length;
+
+                return { kind: "kept" };
+            }
+
+            unsaved += 1;
+
+            return { kind: "dropped" };
         }
     };
 
@@ -114,29 +152,27 @@ export const offloadToolOutputMedia = async (
     // MCP `CallToolResult`: `content` items carry `data` (image, audio) or `resource.blob`.
     if (Array.isArray(output["content"])) {
         const items = output["content"] as unknown[];
-        const content = await Promise.all(
-            items.map(async (item) => {
-                if (!isRecord(item)) {
-                    return item;
-                }
-
-                if (item["type"] === "image" || item["type"] === "audio") {
-                    const moved = await move(item["data"], storedMediaType(item["mimeType"]));
-
-                    return moved.kind === "kept" ? item : { ...item, data: moved.kind === "stored" ? moved.ref : "" };
-                }
-
-                const { resource } = item;
-
-                if (item["type"] === "resource" && isRecord(resource)) {
-                    const moved = await move(resource["blob"], storedMediaType(resource["mimeType"]));
-
-                    return moved.kind === "kept" ? item : { ...item, resource: { ...resource, blob: moved.kind === "stored" ? moved.ref : "" } };
-                }
-
+        const content = await mapInOrder(items, async (item) => {
+            if (!isRecord(item)) {
                 return item;
-            }),
-        );
+            }
+
+            if (item["type"] === "image" || item["type"] === "audio") {
+                const moved = await move(item["data"], storedMediaType(item["mimeType"]));
+
+                return moved.kind === "kept" ? item : { ...item, data: moved.kind === "stored" ? moved.ref : "" };
+            }
+
+            const { resource } = item;
+
+            if (item["type"] === "resource" && isRecord(resource)) {
+                const moved = await move(resource["blob"], storedMediaType(resource["mimeType"]));
+
+                return moved.kind === "kept" ? item : { ...item, resource: { ...resource, blob: moved.kind === "stored" ? moved.ref : "" } };
+            }
+
+            return item;
+        });
 
         if (content.some((item, index) => item !== items[index])) {
             next = { ...next, content };
@@ -157,25 +193,27 @@ export const offloadToolOutputMedia = async (
 
     if (toolName === CODE_TOOL && Array.isArray(output["results"])) {
         const items = output["results"] as unknown[];
-        const results = await Promise.all(
-            items.map(async (item) => {
-                if (!isRecord(item) || item["type"] !== "image" || typeof item["format"] !== "string" || !RASTER_FORMAT.test(item["format"])) {
-                    return item;
-                }
+        const results = await mapInOrder(items, async (item) => {
+            if (!isRecord(item) || item["type"] !== "image" || typeof item["format"] !== "string" || !RASTER_FORMAT.test(item["format"])) {
+                return item;
+            }
 
-                const moved = await move(item["value"], rasterMediaType(item["format"]));
+            const moved = await move(item["value"], rasterMediaType(item["format"]));
 
-                if (moved.kind === "kept") {
-                    return item;
-                }
+            if (moved.kind === "kept") {
+                return item;
+            }
 
-                return moved.kind === "stored" ? { ...item, url: moved.ref, value: "" } : { ...item, value: "" };
-            }),
-        );
+            return moved.kind === "stored" ? { ...item, url: moved.ref, value: "" } : { ...item, value: "" };
+        });
 
         if (results.some((item, index) => item !== items[index])) {
             next = { ...next, results };
         }
+    }
+
+    if (unsaved > 0) {
+        next = { ...next, [UNSAVED_MEDIA_FIELD]: unsaved };
     }
 
     return { fileIds, output: next };

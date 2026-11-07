@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { BROWSER_TOOL, CODE_TOOL, INLINE_FALLBACK_BYTES, offloadToolOutputMedia } from "./tool-output-media";
+import { BROWSER_TOOL, CODE_TOOL, INLINE_FALLBACK_CHARS, offloadToolOutputMedia, stepInlineBudget } from "./tool-output-media";
 
 const BUDGET = 64;
 const MCP_TOOL = "mcp_files__render";
@@ -13,7 +13,7 @@ const keyOf = (n: number): string => `agent-files/${String(n).padStart(64, "0")}
 const fakeStore = () => {
     let next = 0;
 
-    return vi.fn(async (_bytes: Uint8Array<ArrayBuffer>, _mediaType: string) => {
+    return vi.fn(async (_base64: string, _mediaType: string) => {
         next += 1;
 
         return { fileId: `file-${String(next)}`, storageId: keyOf(next) };
@@ -33,7 +33,7 @@ describe(offloadToolOutputMedia, () => {
             isError: false,
         };
 
-        const result = await offloadToolOutputMedia(MCP_TOOL, output, store, BUDGET);
+        const result = await offloadToolOutputMedia(MCP_TOOL, output, store, stepInlineBudget(), BUDGET);
 
         expect(result.fileIds).toStrictEqual(["file-1", "file-2", "file-3"]);
         expect(result.output).toStrictEqual({
@@ -45,16 +45,22 @@ describe(offloadToolOutputMedia, () => {
             ],
             isError: false,
         });
-        expect(store.mock.calls.map(([bytes, mediaType]) => [bytes.byteLength, mediaType])).toStrictEqual([
-            [BUDGET * 4, "image/png"],
-            [BUDGET * 4, "audio/wav"],
-            [BUDGET * 4, "application/pdf"],
+        expect(store.mock.calls).toStrictEqual([
+            [LARGE, "image/png"],
+            [LARGE, "audio/wav"],
+            [LARGE, "application/pdf"],
         ]);
     });
 
     it("moves the browser screenshot to a field only the server writes", async () => {
         const store = fakeStore();
-        const result = await offloadToolOutputMedia(BROWSER_TOOL, { screenshot: LARGE, screenshotFormat: "jpeg", title: "Page" }, store, BUDGET);
+        const result = await offloadToolOutputMedia(
+            BROWSER_TOOL,
+            { screenshot: LARGE, screenshotFormat: "jpeg", title: "Page" },
+            store,
+            stepInlineBudget(),
+            BUDGET,
+        );
 
         expect(result.output).toStrictEqual({ screenshotFormat: "jpeg", screenshotUrl: `storage:${keyOf(1)}`, title: "Page" });
         expect(store.mock.calls[0]?.[1]).toBe("image/jpeg");
@@ -75,6 +81,7 @@ describe(offloadToolOutputMedia, () => {
                 stdout: "",
             },
             store,
+            stepInlineBudget(),
             BUDGET,
         );
 
@@ -93,7 +100,7 @@ describe(offloadToolOutputMedia, () => {
         const store = fakeStore();
         const output = { results: [{ format: "png", type: "image", value: LARGE }], screenshot: LARGE, screenshotFormat: "png" };
 
-        const result = await offloadToolOutputMedia(MCP_TOOL, output, store, BUDGET);
+        const result = await offloadToolOutputMedia(MCP_TOOL, output, store, stepInlineBudget(), BUDGET);
 
         expect(result.output).toBe(output);
         expect(store).not.toHaveBeenCalled();
@@ -103,7 +110,7 @@ describe(offloadToolOutputMedia, () => {
         const store = fakeStore();
         const output = { content: [{ data: SMALL, mimeType: "image/png", type: "image" }] };
 
-        const result = await offloadToolOutputMedia(MCP_TOOL, output, store, BUDGET);
+        const result = await offloadToolOutputMedia(MCP_TOOL, output, store, stepInlineBudget(), BUDGET);
 
         expect(result).toStrictEqual({ fileIds: [], output });
         expect(result.output).toBe(output);
@@ -120,7 +127,7 @@ describe(offloadToolOutputMedia, () => {
             ],
         };
 
-        const result = await offloadToolOutputMedia(MCP_TOOL, output, store, BUDGET);
+        const result = await offloadToolOutputMedia(MCP_TOOL, output, store, stepInlineBudget(), BUDGET);
 
         expect(result.output).toBe(output);
         expect(store).not.toHaveBeenCalled();
@@ -132,29 +139,56 @@ describe(offloadToolOutputMedia, () => {
             return { data: LARGE, mimeType, type: "image" };
         };
 
-        await offloadToolOutputMedia(MCP_TOOL, { content: [item("text/html"), item("image/svg+xml"), item("IMAGE/WEBP")] }, store, BUDGET);
+        await offloadToolOutputMedia(MCP_TOOL, { content: [item("text/html"), item("image/svg+xml"), item("IMAGE/WEBP")] }, store, stepInlineBudget(), BUDGET);
 
         expect(store.mock.calls.map(([, mediaType]) => mediaType)).toStrictEqual(["application/octet-stream", "application/octet-stream", "image/webp"]);
     });
 
-    it("keeps a small blob inline when storing fails, and drops one too large for the row", async () => {
+    it("keeps blobs inline within one shared budget when storing fails, and counts the ones dropped", async () => {
         const store = vi.fn(async () => {
             throw new Error("R2 unavailable");
         });
-        const huge = base64Of(INLINE_FALLBACK_BYTES + 3);
+        // 0.8 MiB of base64 each: one fits the inline budget, two do not.
+        const big = base64Of(INLINE_FALLBACK_CHARS * 0.6);
+        const image = (data: string) => {
+            return { data, mimeType: "image/png", type: "image" };
+        };
 
-        const small = await offloadToolOutputMedia(BROWSER_TOOL, { screenshot: LARGE, screenshotFormat: "png" }, store, BUDGET);
-        const large = await offloadToolOutputMedia(BROWSER_TOOL, { screenshot: huge, screenshotFormat: "png", title: "Page" }, store, BUDGET);
+        const small = await offloadToolOutputMedia(BROWSER_TOOL, { screenshot: LARGE, screenshotFormat: "png" }, store, stepInlineBudget(), BUDGET);
+        // Each fits the budget alone; together they would not, so the second is dropped.
+        const two = await offloadToolOutputMedia(MCP_TOOL, { content: [image(big), image(big)] }, store, stepInlineBudget(), BUDGET);
+        const screenshot = await offloadToolOutputMedia(
+            BROWSER_TOOL,
+            { screenshot: base64Of(INLINE_FALLBACK_CHARS), screenshotFormat: "png", title: "Page" },
+            store,
+            stepInlineBudget(),
+            BUDGET,
+        );
 
         expect(small).toStrictEqual({ fileIds: [], output: { screenshot: LARGE, screenshotFormat: "png" } });
-        expect(large).toStrictEqual({ fileIds: [], output: { screenshotFormat: "png", title: "Page" } });
+        expect(two.output).toStrictEqual({ content: [image(big), image("")], unsavedMedia: 1 });
+        expect(screenshot.output).toStrictEqual({ screenshotFormat: "png", title: "Page", unsavedMedia: 1 });
+    });
+
+    it("shares the inline budget across every tool result of a step, which saves them in one row", async () => {
+        const store = vi.fn(async () => {
+            throw new Error("R2 unavailable");
+        });
+        const big = base64Of(INLINE_FALLBACK_CHARS * 0.6);
+        const step = stepInlineBudget();
+
+        const first = await offloadToolOutputMedia(BROWSER_TOOL, { screenshot: big, screenshotFormat: "png" }, store, step, BUDGET);
+        const second = await offloadToolOutputMedia(BROWSER_TOOL, { screenshot: big, screenshotFormat: "png" }, store, step, BUDGET);
+
+        expect(first.output).toStrictEqual({ screenshot: big, screenshotFormat: "png" });
+        expect(second.output).toStrictEqual({ screenshotFormat: "png", unsavedMedia: 1 });
     });
 
     it("leaves text and non-object outputs alone", async () => {
         const store = fakeStore();
 
-        expect(await offloadToolOutputMedia(MCP_TOOL, LARGE, store, BUDGET)).toStrictEqual({ fileIds: [], output: LARGE });
-        expect(await offloadToolOutputMedia(MCP_TOOL, [LARGE], store, BUDGET)).toStrictEqual({ fileIds: [], output: [LARGE] });
+        expect(await offloadToolOutputMedia(MCP_TOOL, LARGE, store, stepInlineBudget(), BUDGET)).toStrictEqual({ fileIds: [], output: LARGE });
+        expect(await offloadToolOutputMedia(MCP_TOOL, [LARGE], store, stepInlineBudget(), BUDGET)).toStrictEqual({ fileIds: [], output: [LARGE] });
         expect(store).not.toHaveBeenCalled();
     });
 });

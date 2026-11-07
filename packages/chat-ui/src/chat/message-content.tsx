@@ -497,6 +497,8 @@ interface CodeExecutionOutput {
     }[];
     stderr: string;
     stdout: string;
+    /** How many images could not be saved with the result (the server could not store them). */
+    unsavedMedia?: number;
 }
 
 const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
@@ -595,6 +597,12 @@ const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                         return null;
                     })}
 
+                    {output.unsavedMedia ? (
+                        <p className="border-b border-gray-100 p-3 text-xs text-gray-500 last:border-b-0 dark:border-gray-800 dark:text-gray-400">
+                            {t`Some images from this run could not be saved.`}
+                        </p>
+                    ) : null}
+
                     {/* Execution error */}
                     {(output.error || isError) && (
                         <div className="flex items-start gap-2 p-3 text-red-600 dark:text-red-400">
@@ -664,6 +672,8 @@ const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
               screenshotUrl?: string;
               success?: boolean;
               title?: string;
+              /** Set by the server when the screenshot could not be saved with the result. */
+              unsavedMedia?: number;
               url?: string;
           }
         | undefined;
@@ -709,6 +719,7 @@ const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                     <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{doneLabel ?? input?.action ?? t`Browser`}</span>
                     {output.title && <span className="min-w-0 truncate text-xs text-gray-500">—{output.title}</span>}
                 </div>
+                {output.unsavedMedia ? <p className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{t`The screenshot could not be saved.`}</p> : null}
                 {output.content && (
                     <div className="max-h-40 overflow-y-auto p-3">
                         <pre className="overflow-x-auto font-mono text-xs whitespace-pre-wrap text-gray-700 dark:text-gray-300">

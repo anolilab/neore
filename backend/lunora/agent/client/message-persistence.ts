@@ -125,6 +125,9 @@ export async function saveStepFor<CustomContext extends object, AgentTools exten
         userId?: string;
     },
 ): Promise<{ messages: MessageDoc[] }> {
+    // The thread's owner when the caller names no user, as a generation does (`start.ts`): stored tool media is theirs.
+    const thread = args.userId ? undefined : await ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: asId<"threads">(args.threadId) });
+    const mediaOwner = args.userId ?? thread?.userId ?? undefined;
     const { messages } = await serializeNewMessagesInStep(
         ctx,
         args.step,
@@ -132,7 +135,7 @@ export async function saveStepFor<CustomContext extends object, AgentTools exten
             model: args.model ?? getModelName(agent.options.languageModel),
             provider: args.provider ?? getProviderName(agent.options.languageModel),
         },
-        args.userId ? { threadId: args.threadId, userId: args.userId } : undefined,
+        mediaOwner ? { threadId: args.threadId, userId: mediaOwner } : undefined,
     );
     const embeddings = await agent.generateEmbeddings(
         ctx,

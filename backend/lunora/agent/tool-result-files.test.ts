@@ -159,12 +159,15 @@ describe("inline media in a tool result", () => {
     /** A browser screenshot the size of a real one: 1.5 MB of PNG bytes, 2 MB as base64 (a shard row holds at most 2 MB). */
     const SCREENSHOT = Buffer.alloc(1.5 * 1024 * 1024, 7).toString("base64");
 
-    const saveStep = async (output: unknown, toolName = "browser") => {
+    /** One step whose tool results are `outputs`, all from `toolName`, saved the way the agent saves a step. */
+    const saveSteps = async (outputs: unknown[], toolName: string) => {
         const { serializeStepContent } = await import("./mapping");
         const { addMessages } = await import("./messages");
         const { messageFileIds, partContent } = await serializeStepContent(
             actionContext() as never,
-            [{ input: { action: "screenshot" }, output, toolCallId: "call-1", toolName, type: "tool-result" }] as never,
+            outputs.map((output, index) => {
+                return { input: {}, output, toolCallId: `call-${String(index)}`, toolName, type: "tool-result" };
+            }) as never,
             { threadId, userId: OWNER },
         );
 
@@ -187,6 +190,8 @@ describe("inline media in a tool result", () => {
 
         return rows.at(-1);
     };
+
+    const saveStep = async (output: unknown, toolName = "browser") => await saveSteps([output], toolName);
 
     /** The row as a later turn reads it: references signed for the message's owner only. */
     const readBack = async (row: any) => {
@@ -219,6 +224,44 @@ describe("inline media in a tool result", () => {
             screenshotUrl: `https://signed.example/${saved.screenshotUrl.slice("storage:".length)}?sig=x`,
             title: "Page",
         });
+    });
+
+    it("stores identical media from parallel tool results once, so its file is released with the message", async () => {
+        const { deleteAllForThreadIdAsync } = await import("./threads");
+        const output = { content: [{ data: SCREENSHOT, mimeType: "image/png", type: "image" }] };
+        // Two results of one step serialize at the same time.
+        const row = await saveSteps([output, output], "mcp_files__render");
+        const [first, second] = row.message.content.map((part: any) => part.output.value.content[0].data);
+
+        expect(first).toMatch(STORED_CHAT_FILE_REF);
+        expect(second).toBe(first);
+        expect(new Set(row.fileIds).size).toBe(1);
+        expect(await fileRow(row.fileIds[0])).toMatchObject({ refcount: 1 });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(deleteAllForThreadIdAsync, { threadId }));
+
+        expect(await fileRow(row.fileIds[0])).toMatchObject({ refcount: 0 });
+    });
+
+    it("does not count a file a racing store added first", async () => {
+        const { addFile } = await import("./files");
+        const add = async () =>
+            (await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(addFile, {
+                        filename: "x.png",
+                        hash: "d".repeat(64),
+                        mediaType: "image/png",
+                        storageId: `agent-files/${"d".repeat(64)}`,
+                        userId: OWNER,
+                    }),
+            )) as { fileId: string };
+
+        const { fileId } = await add();
+        const racing = await add();
+
+        expect(racing.fileId).toBe(fileId);
+        expect(await fileRow(fileId)).toMatchObject({ refcount: 0 });
     });
 
     it("never resolves a look-alike reference to another user's real file", async () => {
