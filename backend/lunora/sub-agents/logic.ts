@@ -321,7 +321,7 @@ export const beatWatchDecision = (input: {
 
 /** The error a run whose loop died ends with; it reaches the lead as a failed run, with a link to the steps it saved. */
 export const INTERRUPTED_RUN_MESSAGE =
-    "The sub-agent was interrupted: the server running it stopped (a deploy or a crash) before it finished. The steps it completed are saved in its thread. Delegate the task again to retry.";
+    "The sub-agent was interrupted: the server running it stopped (a deploy or a crash) before it finished. The steps it completed are saved in its thread. Send the task again to retry.";
 
 /** The run a worker is on, from its runs newest first: the one going, else the next in line. A Stop in its thread means this one. */
 export const workerCurrentRun = <T extends { status: SubAgentStatus }>(newestFirst: ReadonlyArray<T>): T | undefined =>

@@ -52,6 +52,7 @@ import { claimOnce, releaseClaim, WORKER_DISPATCH_CLAIM_TTL_MS, WORKER_DISPATCH_
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { enqueueJob } from "../lib/job-queue";
 import { patchById } from "../lib/patch";
+import { runAfterWithRetry } from "../lib/shard-scheduler";
 import { systemDb } from "../lib/rls/scope";
 import { createRatelimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
@@ -59,7 +60,7 @@ import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount } from "../tasks/acco
 import { isTaskModelAllowed } from "../tasks/logic";
 import { threadGateOutcome, throwUnlessGranted } from "../chat/lib/thread-gate";
 import { MAX_LENGTH } from "../lib/validators";
-import { RUN_STALE_MS } from "../chat/lib/interrupted-run";
+import { RUN_STALE_MS, RUN_WATCH_RETRY } from "../chat/lib/interrupted-run";
 import { HOST_SESSION_BUSY_RETRY_MS, HOST_START_MAX_ATTEMPTS, hostRunActivity, hostStartRetryDelayMs, sendHostRunTurn } from "./host-runs";
 
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
@@ -1042,7 +1043,7 @@ export const claimRun = internalMutation
 
         // This loop beats while it lives (`execute.ts`); the watch ends the run within minutes once it stops.
         if (claimedAt !== undefined) {
-            await ctx.scheduler.runAfter(RUN_STALE_MS, internal.sub_agents.functions.watchRunBeat, { claimedAt, runId: run._id });
+            await runAfterWithRetry(ctx.scheduler, RUN_STALE_MS, internal.sub_agents.functions.watchRunBeat, { claimedAt, runId: run._id }, RUN_WATCH_RETRY);
         }
 
         const worker = run.mode === "worker" && run.childThreadId ? await ctx.db.get("threads", run.childThreadId as Id<"threads">) : null;
@@ -1159,7 +1160,7 @@ const startNextWorkerRun = async (ctx: MutationCtx, childThreadId: string): Prom
 /**
  * Moves a worker's line on after a run that was cancelled while running: its loop stops at the next
  * step boundary, and until then it still writes into the thread, so the worker counts as busy (a new
- * message queues) until the loop exits ({@link completeRun}) or, if it died, the reaper fires. A no-op
+ * message queues) until the loop exits ({@link completeRun}) or, if it died, its beat watch or the reaper fires. A no-op
  * for any other run, and for a stopped one already marked gone.
  */
 const resumeLineAfterStoppedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<void> => {
@@ -1442,7 +1443,8 @@ export const watchSubAgentRunBeat = async (ctx: MutationCtx, runId: Id<"subAgent
     const decision = beatWatchDecision({ now, run });
 
     if (decision.kind === "later") {
-        await ctx.scheduler.runAfter(decision.delayMs, internal.sub_agents.functions.watchRunBeat, { claimedAt, runId });
+        // A look that gave up would leave the run unwatched: nothing else restarts the chain.
+        await runAfterWithRetry(ctx.scheduler, decision.delayMs, internal.sub_agents.functions.watchRunBeat, { claimedAt, runId }, RUN_WATCH_RETRY);
     } else if (decision.kind === "dead") {
         await finishRunFromLoop(ctx, run._id, { error: INTERRUPTED_RUN_MESSAGE, kind: "failed" });
     }

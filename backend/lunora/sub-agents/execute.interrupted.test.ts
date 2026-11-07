@@ -10,7 +10,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { RUN_STALE_MS } from "../chat/lib/interrupted-run";
 import schema from "../schema";
-import { admitSubAgentRun, beatSubAgentRun, claimRun, watchSubAgentRunBeat } from "./functions";
+import { admitSubAgentRun, admitWorkerRun, beatSubAgentRun, claimRun, watchSubAgentRunBeat } from "./functions";
 import { INTERRUPTED_RUN_MESSAGE } from "./logic";
 
 const { agent, registry } = vi.hoisted(() => {
@@ -49,6 +49,7 @@ interface RunRow {
     _id: string;
     beatAt?: number;
     error?: string;
+    loopExitedAt?: number;
     resultPostedAt?: number;
     startedAt?: number;
     status: string;
@@ -60,6 +61,7 @@ let leadId: string;
 
 beforeAll(async () => {
     registerModule(registry, "sub_agents_functions", await import("./functions"));
+    registerModule(registry, "tasks_internal", await import("../tasks/internal"));
 });
 
 beforeEach(async () => {
@@ -160,6 +162,20 @@ describe("a sub-agent run whose worker died", () => {
         expect(await runRow(runId)).toMatchObject({ status: "running" });
     });
 
+    it("is watched from its claim: the claim schedules the look that ends it", async () => {
+        const runId = await admit();
+        const claimedAt = await claimThenDie(runId);
+        // The fake scheduler cannot dispatch a job whose target the registry resolves, so the job is run by hand with its own args.
+        const [job, ...others] = harness.scheduler.list().filter((entry) => entry.args.runId === runId && entry.args.claimedAt === claimedAt);
+
+        expect(others).toHaveLength(0);
+        expect(job!.scheduledFor - job!.enqueuedAt).toBe(RUN_STALE_MS);
+
+        await watch(runId, job!.args.claimedAt as number, claimedAt + RUN_STALE_MS);
+
+        expect(await runRow(runId)).toMatchObject({ error: INTERRUPTED_RUN_MESSAGE, status: "failed" });
+    });
+
     it("ignores a watch from an earlier claim", async () => {
         const runId = await admit();
         const claimedAt = await claimThenDie(runId);
@@ -188,5 +204,60 @@ describe("a sub-agent run whose loop lives", () => {
         await watch(runId, finished.startedAt!, finished.startedAt! + 10 * RUN_STALE_MS);
 
         expect(await runRow(runId)).toMatchObject({ beatAt: finished.beatAt, status: "succeeded" });
+    });
+});
+
+describe("a worker run whose worker died", () => {
+    /** A message to the worker: the first one creates its thread, the next ones queue behind it. */
+    const dispatch = async (extra: Record<string, unknown> = {}) => {
+        const result = await harness.run(
+            async (ctx: any) => await admitWorkerRun(ctx, { name: "Researcher", parentThreadId: leadId, task: "Look into it", userId, ...extra }),
+        );
+
+        if ("error" in result) {
+            throw new Error(result.error);
+        }
+
+        return result.run as { _id: string; childThreadId: string };
+    };
+
+    it("lets the worker's next message run once the dead run is failed", async () => {
+        const first = await dispatch({ toolCallId: "call-1" });
+        const claimedAt = await claimThenDie(first._id);
+        const second = await dispatch({ childThreadId: first.childThreadId, clientId: "client-1", task: "And the second part?" });
+
+        // The worker is busy while the dead loop still counts as live: the next message waits.
+        await execute(second._id);
+
+        expect(agent.calls).toBe(0);
+
+        await watch(first._id, claimedAt, claimedAt + RUN_STALE_MS);
+
+        expect(await runRow(first._id)).toMatchObject({ error: INTERRUPTED_RUN_MESSAGE, status: "failed" });
+
+        await execute(second._id);
+
+        expect(agent.calls).toBe(1);
+        expect(await runRow(second._id)).toMatchObject({ status: "succeeded" });
+    });
+
+    it("marks a stopped run's dead loop gone, so the worker's line moves on", async () => {
+        const first = await dispatch({ toolCallId: "call-1" });
+        const claimedAt = await claimThenDie(first._id);
+        const second = await dispatch({ childThreadId: first.childThreadId, clientId: "client-1", task: "And the second part?" });
+
+        // Stopped while running: the loop would stop at its next step, but it is already dead and never reports.
+        await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", first._id, { completedAt: claimedAt, status: "cancelled" }));
+        await execute(second._id);
+
+        expect(agent.calls).toBe(0);
+
+        await watch(first._id, claimedAt, claimedAt + RUN_STALE_MS);
+
+        expect(await runRow(first._id)).toMatchObject({ loopExitedAt: expect.any(Number), status: "cancelled" });
+
+        await execute(second._id);
+
+        expect(agent.calls).toBe(1);
     });
 });
