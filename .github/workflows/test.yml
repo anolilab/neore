@@ -152,12 +152,14 @@ jobs:
     # The Rust Worker is the one project with a `test` target and no `test:coverage`
     # (cargo test has no v8 coverage), so the coverage run in `test` skips it. Its own
     # job, in parallel: it needs no workspace build and was the tail of `test`.
+    # The run covers every story in four modes. Once the stories grew, it took longer than
+    # the 20-minute limit on the runner and was cancelled mid-suite, so the limit leaves room for it.
     storybook:
         name: "Storybook (stories, a11y)"
         if: "needs.files-changed.outputs.packages == 'true'"
         needs: "files-changed"
         runs-on: "ubuntu-24.04"
-        timeout-minutes: 20
+        timeout-minutes: 35
         steps:
             - name: "Harden Runner"
               uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
