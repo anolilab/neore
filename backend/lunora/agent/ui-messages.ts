@@ -670,7 +670,8 @@ const createAssistantUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataT
                     type RawToolResult = { isError?: boolean; output?: { reason?: string; type: string }; toolCallId: string; type: string };
                     const rawToolResult = Array.isArray(rawContent)
                         ? (rawContent.find((p) => p?.type === "tool-result" && (p as RawToolResult)?.toolCallId === contentPart.toolCallId) as
-                              RawToolResult | undefined)
+                              | RawToolResult
+                              | undefined)
                         : undefined;
                     const isExecutionDenied = typedPart.output?.type === "execution-denied" || rawToolResult?.output?.type === "execution-denied";
 

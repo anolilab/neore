@@ -157,7 +157,8 @@ describe("ComposerTiptapEditor suggestions", () => {
         // Tiptap hangs its editor on the editable element.
         // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the editor has no role to query by
         const element = view.container.querySelector(".ProseMirror") as
-            (HTMLElement & { editor?: { commands: { insertContent: (value: string) => boolean } } }) | null;
+            | (HTMLElement & { editor?: { commands: { insertContent: (value: string) => boolean } } })
+            | null;
 
         await waitFor(() => {
             expect(element?.editor).toBeTruthy();

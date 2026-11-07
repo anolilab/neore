@@ -5,7 +5,7 @@ import { createConfig } from "@anolilab/eslint-config";
  * was the one app `pnpm lint` never covered.
  *
  * React settings and rule calibration mirror `packages/chat-ui`, whose source
- * this app compiles. Prettier owns formatting (`lint:prettier`), as everywhere
+ * this app compiles. Prettier owns formatting (`lint:oxfmt`), as everywhere
  * else in the repo.
  *
  * @type {import("@anolilab/eslint-config").PromiseFlatConfigComposer}

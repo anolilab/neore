@@ -60,13 +60,13 @@ Always `pnpm`. Lint does not include types: run both. Git hooks format on commit
 
 ```bash
 pnpm lint:types                          # vis run lint:types — NOT `pnpm typecheck`
-pnpm lint                                # prettier + eslint + dedupe; `lint:eslint:fix`, `lint:prettier:fix`
+pnpm lint                                # oxfmt + eslint + dedupe; `lint:eslint:fix`, `lint:oxfmt:fix`
 pnpm vis run test                        # every test; there is NO root `pnpm test` (`pnpm test` inside a project)
 pnpm build:packages                      # then `pnpm --filter @neore/backend run build` for the Worker
 cd backend && pnpm codegen               # backend codegen
 ```
 
-Root Prettier covers only `*.{json,yml,yaml,js,mjs,cjs,ts}`: root markdown is not linted.
+Code and data files are formatted by oxfmt (`oxfmt.config.ts`); Markdown, CSS and HTML stay on Prettier, because oxfmt reflows Markdown lists and rejects some CSS and HTML. The root gate covers only `*.{json,yml,js,mjs,cjs,ts}`: root markdown is not linted. `pnpm lint:oxlint` runs oxlint (`.oxlintrc.json`) and is not a CI gate.
 
 ## SCOPED KNOWLEDGE — READ BEFORE YOU TOUCH
 
@@ -74,23 +74,23 @@ Each area's rules live in an `AGENTS.md` next to its code (with a `CLAUDE.md` sy
 reference under `docs/agents/`; their paths are repo-relative unless noted. Claude Code loads a folder's file when it reads files there; other agents load only
 the files from the root down to their working directory, so **read the file for a path before changing code there**.
 
-| Working on                                                                          | Read                                                    |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Anything in `backend/` — Lunora, codegen, modules, validators, `ctx.db`, sharding, queues, crons, service bindings | `backend/AGENTS.md`, `backend/lunora/AGENTS.md`; upstream issues: `docs/agents/lunora-upstream.md` |
-| Auth, invite-only registration, RLS, the authz matrix                               | `backend/lunora/auth/AGENTS.md`                         |
-| Utility models, claim-once and crypto, storage access                               | `backend/lunora/lib/AGENTS.md`                          |
-| Edge streaming, rate-limit pause, approvals, low-risk check, side questions, secrets | `backend/lunora/chat/AGENTS.md`                         |
-| Branches, agent switch, idle-thread summaries                                       | `backend/lunora/agent/AGENTS.md`                        |
-| Tasks: rounds, the recurrence sweep, skipped slots, where a run goes               | `backend/lunora/tasks/AGENTS.md`                        |
-| Host-run threads, coding agents on a paired computer                                | `backend/lunora/acp/AGENTS.md`                          |
-| Messenger, memory, knowledge, usage, triggers, evals, sub-agents, pages, notifications, connectors, coding agents, chat import, source control, public API, devices | `backend/lunora/<folder>/AGENTS.md`                     |
-| AI model registry, prompt optimizer, multi-reference images                         | `packages/ai/AGENTS.md`                                 |
-| LLM gateway, video render queue, FAL media                                          | `services/llm-gateway/AGENTS.md`                        |
-| Web app, frontend lessons, accessibility                                            | `apps/web/AGENTS.md`, `apps/web/src/AGENTS.md`           |
-| Web auth (session reads), chat UI, local models                                     | `apps/web/src/features/{auth,chat,local-models}/AGENTS.md` |
-| Desktop shell, dictation, ACP registry installs; mobile app; UI components          | `apps/desktop/AGENTS.md`, `apps/mobile/AGENTS.md`, `packages/ui/AGENTS.md` |
-| Device execution, sandbox, SSH servers, `neore-host`                                | `packages/device-core/AGENTS.md`                        |
-| Dev servers, build, deploy, pnpm, vis; review checklist and test rules for a PR      | `docs/agents/{local-dev,build-and-deploy,tooling,review-checklist,testing}.md` |
+| Working on                                                                                                                                                          | Read                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Anything in `backend/` — Lunora, codegen, modules, validators, `ctx.db`, sharding, queues, crons, service bindings                                                  | `backend/AGENTS.md`, `backend/lunora/AGENTS.md`; upstream issues: `docs/agents/lunora-upstream.md` |
+| Auth, invite-only registration, RLS, the authz matrix                                                                                                               | `backend/lunora/auth/AGENTS.md`                                                                    |
+| Utility models, claim-once and crypto, storage access                                                                                                               | `backend/lunora/lib/AGENTS.md`                                                                     |
+| Edge streaming, rate-limit pause, approvals, low-risk check, side questions, secrets                                                                                | `backend/lunora/chat/AGENTS.md`                                                                    |
+| Branches, agent switch, idle-thread summaries                                                                                                                       | `backend/lunora/agent/AGENTS.md`                                                                   |
+| Tasks: rounds, the recurrence sweep, skipped slots, where a run goes                                                                                                | `backend/lunora/tasks/AGENTS.md`                                                                   |
+| Host-run threads, coding agents on a paired computer                                                                                                                | `backend/lunora/acp/AGENTS.md`                                                                     |
+| Messenger, memory, knowledge, usage, triggers, evals, sub-agents, pages, notifications, connectors, coding agents, chat import, source control, public API, devices | `backend/lunora/<folder>/AGENTS.md`                                                                |
+| AI model registry, prompt optimizer, multi-reference images                                                                                                         | `packages/ai/AGENTS.md`                                                                            |
+| LLM gateway, video render queue, FAL media                                                                                                                          | `services/llm-gateway/AGENTS.md`                                                                   |
+| Web app, frontend lessons, accessibility                                                                                                                            | `apps/web/AGENTS.md`, `apps/web/src/AGENTS.md`                                                     |
+| Web auth (session reads), chat UI, local models                                                                                                                     | `apps/web/src/features/{auth,chat,local-models}/AGENTS.md`                                         |
+| Desktop shell, dictation, ACP registry installs; mobile app; UI components                                                                                          | `apps/desktop/AGENTS.md`, `apps/mobile/AGENTS.md`, `packages/ui/AGENTS.md`                         |
+| Device execution, sandbox, SSH servers, `neore-host`                                                                                                                | `packages/device-core/AGENTS.md`                                                                   |
+| Dev servers, build, deploy, pnpm, vis; review checklist and test rules for a PR                                                                                     | `docs/agents/{local-dev,build-and-deploy,tooling,review-checklist,testing}.md`                     |
 
 ## A NOTE TO THE AGENT
 

@@ -19,7 +19,8 @@ vi.mock("ai", async (importOriginal) => {
     const mockFullStream = {
         [Symbol.asyncIterator]() {
             const parts: (
-                { finishReason: string; type: "finish"; usage: { completionTokens: number; promptTokens: number } } | { text: string; type: "text-delta" }
+                | { finishReason: string; type: "finish"; usage: { completionTokens: number; promptTokens: number } }
+                | { text: string; type: "text-delta" }
             )[] = [
                 { text: "Hello ", type: "text-delta" },
                 { text: "world!", type: "text-delta" },

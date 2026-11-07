@@ -75,7 +75,7 @@ Notes that bite:
 pnpm --filter @neore/web test               # vitest
 pnpm --filter @neore/web lint:types         # tsc --noEmit
 pnpm --filter @neore/web lint:eslint
-pnpm --filter @neore/web lint:prettier
+pnpm --filter @neore/web lint:oxfmt
 pnpm --filter @neore/web translate:extract  # then translate:compile
 pnpm --filter @neore/web test:e2e           # Playwright
 ```

@@ -18,12 +18,13 @@ Daniel Bannert's work is supported by the community on
 - **Rust toolchain**, needed to start the backend the first time, because the
   `document-parser` Worker is built from Rust:
 
-  ```bash
-  rustup target add wasm32-unknown-unknown
-  cargo install worker-build --version 0.8.7 --locked
-  ```
+    ```bash
+    rustup target add wasm32-unknown-unknown
+    cargo install worker-build --version 0.8.7 --locked
+    ```
 
-  Skip this if `services/document-parser/build/` already exists.
+    Skip this if `services/document-parser/build/` already exists.
+
 - At least one AI provider key (for example an OpenRouter key) to get replies.
 
 ## Repository layout
@@ -55,11 +56,11 @@ pnpm dev:chat      # starts the backend, the web app, and the LLM gateway
 
 Then open http://localhost:5173.
 
-| Service       | URL                    |
-| ------------- | ---------------------- |
-| Web app       | http://localhost:5173  |
-| Backend       | http://localhost:8788  |
-| LLM gateway   | http://localhost:8787  |
+| Service     | URL                   |
+| ----------- | --------------------- |
+| Web app     | http://localhost:5173 |
+| Backend     | http://localhost:8788 |
+| LLM gateway | http://localhost:8787 |
 
 To run one part on its own, use `pnpm dev:app`, `pnpm dev:backend`, or
 `pnpm dev:llm-gateway`. The backend runs as a daemon that outlives its
@@ -82,21 +83,21 @@ development stubs and are optional.
 
 ## Scripts
 
-| Command                       | What it does                                              |
-| ----------------------------- | --------------------------------------------------------- |
-| `pnpm dev:setup`              | First-time setup: keys and env files                      |
-| `pnpm dev:chat`               | Backend, web app, and LLM gateway together                |
-| `pnpm dev:app`                | Web app only                                              |
-| `pnpm dev:backend`            | Backend only                                              |
-| `pnpm build:packages`         | Build all shared packages                                 |
-| `pnpm build:chat`             | Build the web app                                         |
-| `pnpm lint`                   | Prettier, ESLint, and dedupe checks                       |
-| `pnpm lint:types`             | TypeScript checks (run separately; `lint` does not include types) |
-| `pnpm lint:eslint:fix`        | Fix ESLint issues                                         |
-| `pnpm lint:prettier:fix`      | Fix formatting                                            |
-| `pnpm lint:secrets`           | Scan for committed secrets                                |
-| `pnpm env:generate-encryption`| Generate an encryption key                                |
-| `pnpm clean`                  | Remove build artifacts and `node_modules`                 |
+| Command                        | What it does                                                      |
+| ------------------------------ | ----------------------------------------------------------------- |
+| `pnpm dev:setup`               | First-time setup: keys and env files                              |
+| `pnpm dev:chat`                | Backend, web app, and LLM gateway together                        |
+| `pnpm dev:app`                 | Web app only                                                      |
+| `pnpm dev:backend`             | Backend only                                                      |
+| `pnpm build:packages`          | Build all shared packages                                         |
+| `pnpm build:chat`              | Build the web app                                                 |
+| `pnpm lint`                    | Prettier, ESLint, and dedupe checks                               |
+| `pnpm lint:types`              | TypeScript checks (run separately; `lint` does not include types) |
+| `pnpm lint:eslint:fix`         | Fix ESLint issues                                                 |
+| `pnpm lint:oxfmt:fix`          | Fix formatting                                                    |
+| `pnpm lint:secrets`            | Scan for committed secrets                                        |
+| `pnpm env:generate-encryption` | Generate an encryption key                                        |
+| `pnpm clean`                   | Remove build artifacts and `node_modules`                         |
 
 Tests run through the task runner: `pnpm vis run test` for everything, or
 `pnpm test` inside a single project directory.

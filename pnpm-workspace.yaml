@@ -269,6 +269,18 @@ catalogs:
     eslint-plugin-validate-jsx-nesting: ^0.1.1
     eslint-plugin-zod: 5.2.0
     jsonc-eslint-parser: 3.3.0
+    "@anolilab/oxfmt-config": 1.0.8
+    "@anolilab/oxlint-config": 2.0.1
+    # Pinned to the versions @anolilab/oxlint-config uses. oxlint resolves its jsPlugins
+    # from the root node_modules, so the root must carry these exact copies.
+    "@eslint-community/eslint-plugin-eslint-comments": 4.8.1
+    eslint-plugin-no-secrets: 2.3.3
+    eslint-plugin-regexp: 3.3.1
+    eslint-plugin-sonarjs: 4.2.2
+    oxfmt: 0.74.0
+    oxlint: 1.89.0
+    oxlint-plugin-react-doctor: 0.9.18
+    oxlint-tsgolint: 7.0.2004
     prettier: 3.9.10
     prettier-plugin-tailwindcss: 0.8.1
     tailwind-csstree: 0.4.1
