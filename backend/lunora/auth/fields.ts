@@ -30,6 +30,12 @@ export const userSettingsFieldsWithoutUserId = {
             message: "Auto-archive must be off or 7 to 365 days",
         }),
     ),
+    // Compact a thread's model context before a reply once it fills this percentage of the model's window (`agent/thread-compaction.ts`). 0 or absent = off.
+    autoCompactThreshold: v.optional(
+        v.number().check((value) => value === 0 || (Number.isSafeInteger(value) && value >= 50 && value <= 95), {
+            message: "Auto-compact must be off or 50 to 95 percent",
+        }),
+    ),
     autoReadReplies: v.optional(v.boolean()), // Speak every finished assistant reply aloud. OPT-IN: absent means off.
     backupModel: v.optional(v.string().max(MAX_LENGTH.short)), // Model a reply is retried on once when the chosen model fails with an infrastructure error. "" or absent = none. Checked against the registry in `settingsUpsert`.
     // Appearance: cap long chat code blocks at 24 lines with an expand toggle. Absent means ON.

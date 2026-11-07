@@ -2,6 +2,7 @@ import { tokenRefreshDelayMs } from "@neore/client-runtime";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { clearLastThread } from "../chat/last-thread-store";
 import { loadConfig } from "../lib/config";
 import { getClient } from "../lib/lunora";
 import { getOfflineCache } from "../offline/database";
@@ -75,7 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUser(null);
                 setStatus("signed-out");
                 // Retries a cache wipe that failed at sign-out; the credential side never waits on it.
-                await emptyCacheWhileSignedOut({ clearCache: () => getOfflineCache().clear(), warn: console.warn });
+                await emptyCacheWhileSignedOut({ clearCache: () => getOfflineCache().clear(), forgetLastChat: clearLastThread, warn: console.warn });
 
                 return;
             }
@@ -124,6 +125,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // hangs offline cannot leave them behind. Then the server is told and the stored grant cleared.
             await signOutOnDevice({
                 clearCache: () => getOfflineCache().clear(),
+                forgetLastChat: clearLastThread,
                 revokeGrant: () => signOutGrant({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore }),
                 // eslint-disable-next-line no-console -- no logger in the app; a failed clear must not be silent
                 warn: console.warn,

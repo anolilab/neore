@@ -11932,6 +11932,9 @@
                       "autoArchiveAfterDays": {
                         "type": "number"
                       },
+                      "autoCompactThreshold": {
+                        "type": "number"
+                      },
                       "autoReadReplies": {
                         "type": "boolean"
                       },
@@ -15687,6 +15690,196 @@
           "chat"
         ],
         "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#chat_compaction:compactThread": {
+      "post": {
+        "description": "Invoke the `action` `chat_compaction:compactThread` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_compaction:compactThread",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_compaction:compactThread",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "compacted": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "anyOf": [
+                        {
+                          "const": "busy",
+                          "type": "string"
+                        },
+                        {
+                          "const": "failed",
+                          "type": "string"
+                        },
+                        {
+                          "const": "nothing",
+                          "type": "string"
+                        },
+                        {
+                          "const": "not_owner",
+                          "type": "string"
+                        },
+                        {
+                          "const": "too_long",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unavailable",
+                          "type": "string"
+                        },
+                        {
+                          "const": "within_threshold",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "compacted"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: chat_compaction:compactThread",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#chat_compaction:getCompactionStatus": {
+      "post": {
+        "description": "Invoke the `query` `chat_compaction:getCompactionStatus` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_compaction:getCompactionStatus",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "threadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "threadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_compaction:getCompactionStatus",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "canCompact": {
+                      "type": "boolean"
+                    },
+                    "compactedAt": {
+                      "type": "number"
+                    },
+                    "contextTokens": {
+                      "type": "number"
+                    },
+                    "lastActivityAt": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "canCompact",
+                    "contextTokens"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: chat_compaction:getCompactionStatus",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "query"
       }
     },
     "/_lunora/rpc#chat_composite:getThreadListData": {

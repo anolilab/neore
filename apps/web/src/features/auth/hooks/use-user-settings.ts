@@ -2,7 +2,7 @@
 
 import type { ReturnOf } from "@lunora/react";
 import type { api } from "@neore/backend/api";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { onlineManager, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -24,6 +24,33 @@ export const useUserSettings = () => {
  */
 const settingsWrites = { pending: 0, tail: Promise.resolve() as Promise<unknown> };
 
+/** Which `updateLatest` call last edited each field in this tab: a refused write restores only the fields still its own. */
+const lastFieldEdit = new Map<string, symbol>();
+
+/** Why a fail-fast write was not sent: there is no connection, so it would wait for one. */
+const OFFLINE_ERROR = "The setting was not saved: there is no connection.";
+
+/**
+ * Settles when `waitFor` does, or rejects as soon as the connection drops first: a write queued behind one that
+ * paused offline would otherwise wait for the connection with it.
+ */
+const unlessOffline = async (waitFor: Promise<unknown>): Promise<void> =>
+    await new Promise<void>((resolve, reject) => {
+        const unsubscribe = onlineManager.subscribe((online: boolean) => {
+            if (online) {
+                return;
+            }
+
+            unsubscribe();
+            reject(new Error(OFFLINE_ERROR));
+        });
+
+        void waitFor.finally(() => {
+            unsubscribe();
+            resolve();
+        });
+    });
+
 /**
  * Hook to update user settings with optimistic updates.
  *
@@ -34,10 +61,13 @@ export const useUpdateUserSettings = () => {
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     const queryOptions = crpc.auth.functions.getUserSettings.queryOptions({});
+    const writeOptions = crpc.auth.functions.updateUserSettings.mutationOptions();
 
-    const mutation = useMutation({
-        ...crpc.auth.functions.updateUserSettings.mutationOptions(),
-        onMutate: async (args) => {
+    type SettingsPatch = Parameters<NonNullable<typeof writeOptions.mutationFn>>[0];
+
+    // Shared by the queued mutation and the fail-fast one below, so both keep the same optimistic update and rollback.
+    const settingsHandlers = {
+        onMutate: async (args: SettingsPatch) => {
             // Cancel any outgoing refetches
             await queryClient.cancelQueries({ queryKey: queryOptions.queryKey });
 
@@ -55,7 +85,7 @@ export const useUpdateUserSettings = () => {
             // Return a context object with the snapshotted value, and the cache entry it came from
             return { previousSettings, cacheEntry: queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey }) };
         },
-        onError: (_error, _args, context: { cacheEntry?: unknown; previousSettings?: UserSettingsRow } | undefined) => {
+        onError: (_error: unknown, _args: SettingsPatch, context: { cacheEntry?: unknown; previousSettings?: UserSettingsRow } | undefined) => {
             // If the mutation fails, use the context returned from onMutate to roll back. Not while a queued write is behind
             // this one: the snapshot predates the edits it queued, so restoring it would drop them. The last write to settle refetches.
             // Not either when the cache was rebuilt meanwhile (a sign-in clears it): the snapshot is the previous account's row.
@@ -77,6 +107,16 @@ export const useUpdateUserSettings = () => {
 
             await queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
         },
+    };
+
+    const mutation = useMutation({ ...writeOptions, ...settingsHandlers });
+    // Offline, the default network mode pauses a write until the connection returns. This one is sent at once and fails
+    // while offline, so the rollback shows the setting was not saved instead of leaving it pending.
+    const failFastMutation = useMutation({
+        ...crpc.auth.functions.updateUserSettings.mutationOptions(undefined, { onlineOnly: true }),
+        ...settingsHandlers,
+        networkMode: "always",
+        retry: 0,
     });
 
     type Patch = Parameters<typeof mutation.mutateAsync>[0];
@@ -86,8 +126,24 @@ export const useUpdateUserSettings = () => {
      * When its turn comes the write sends the fields' values as the cache holds them then, which
      * include every edit queued before it. A patch that depends on the current value (a list
      * reorder, a map entry) therefore never overwrites another edit made meanwhile.
+     * `failFast` sends the write without the offline pause (see `failFastMutation`) and fails at once when there is no
+     * connection, even while earlier writes are queued: it is never sent ahead of them, and never waits for the
+     * connection behind one that paused.
      */
-    const updateLatest = (build: (current: UserSettingsRow | undefined) => Patch): Promise<void> => {
+    const updateLatest = (build: (current: UserSettingsRow | undefined) => Patch, options?: { failFast?: boolean }): Promise<void> => {
+        const failFast = options?.failFast === true;
+
+        // Offline now: nothing is applied, and the caller reports the failed save at once.
+        if (failFast && !onlineManager.isOnline()) {
+            const refused = Promise.reject(new Error(OFFLINE_ERROR));
+
+            refused.catch(() => {
+                // The caller that awaits it sees the rejection.
+            });
+
+            return refused;
+        }
+
         const before = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
         const patch = build(before);
         const fields = Object.keys(patch) as (keyof UserSettingsRow)[];
@@ -103,7 +159,38 @@ export const useUpdateUserSettings = () => {
 
         settingsWrites.pending += 1;
 
-        const run = settingsWrites.tail.then(async () => {
+        const edit = Symbol("settings edit");
+
+        for (const field of fields) {
+            lastFieldEdit.set(field as string, edit);
+        }
+
+        const previous = settingsWrites.tail;
+
+        // A fail-fast write refused before its turn restores its own fields, as long as no later edit touched them (even
+        // to the same value): the writes queued around it keep theirs.
+        const restoreOwnFields = () => {
+            const cached = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
+            const sameEntry = queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey }) === cacheEntry;
+
+            if (!before || !cached || !sameEntry) {
+                return;
+            }
+
+            const unchanged = fields.filter((field) => lastFieldEdit.get(field as string) === edit);
+
+            queryClient.setQueryData(queryOptions.queryKey, { ...cached, ...Object.fromEntries(unchanged.map((field) => [field, before[field]])) });
+        };
+
+        const turn = failFast
+            ? unlessOffline(previous).catch((error: unknown) => {
+                  restoreOwnFields();
+
+                  throw error;
+              })
+            : previous;
+
+        const run = turn.then(async () => {
             const entryNow = queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey });
             const rebuilt = cacheEntry !== undefined && entryNow !== cacheEntry;
             const cached = queryClient.getQueryData<UserSettingsRow>(queryOptions.queryKey);
@@ -121,12 +208,23 @@ export const useUpdateUserSettings = () => {
             // A rebuilt cache holds the server's row, which lacks this edit: send the edit itself.
             const body = latest && !rebuilt ? Object.fromEntries(fields.map((field) => [field, latest[field]])) : patch;
 
-            return mutation.mutateAsync(body as Patch);
+            // The mutation snapshots the cache after the edit above, so its own rollback restores the unsaved value. Put back
+            // what this edit found, when no write is queued behind it and the cache is still this account's.
+            return (failFast ? failFastMutation : mutation).mutateAsync(body as Patch).catch((error: unknown) => {
+                const sameEntry = queryClient.getQueryCache().find({ exact: true, queryKey: queryOptions.queryKey }) === cacheEntry;
+
+                if (before !== undefined && sameEntry && settingsWrites.pending <= 1) {
+                    queryClient.setQueryData(queryOptions.queryKey, before);
+                }
+
+                throw error;
+            });
         });
 
         // The catch keeps a failed write from stalling the queue and marks `run` handled (`mutate` swallows errors too).
         // The last write to settle refetches, after a success or a failure alike, so the cache matches the server again.
-        settingsWrites.tail = run
+        // The writes queued after this one still wait for every write before it, even when this one was refused early.
+        settingsWrites.tail = Promise.allSettled([previous, run])
             .catch(() => {
                 // Handled by onError; the refetch below covers it.
             })
