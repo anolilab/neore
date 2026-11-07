@@ -98,6 +98,13 @@ const traffic = { inFlight: 0, lastAnswerAt: 0 };
 const storyResets: (() => void)[] = [];
 
 /**
+ * Which story the calls belong to: bumped before each story. A call the previous story started (a poll still in flight
+ * while the next one loads) is answered, but does not count as answered in the new story, so `lunoraAnswered` never
+ * lets a `play` act before its own screen has its data.
+ */
+const story = { generation: 0 };
+
+/**
  * Registers a fixture's reset: stateful rows (a write merges into them) start over before each story, so a story
  * never sees what an earlier story, or an earlier visit to the same one, saved.
  */
@@ -107,6 +114,7 @@ export const onStoryReset = (reset: () => void): void => {
 
 /** Called by a preview loader before each story. */
 export const resetLunoraAnswers = (): void => {
+    story.generation += 1;
     answeredPaths.clear();
 
     for (const reset of storyResets) {
@@ -191,12 +199,17 @@ export const lunoraHandlers = (...fixtures: ReadonlyArray<LunoraFixture>): HttpH
 
         traffic.inFlight += 1;
 
+        const startedIn = story.generation;
+
         try {
             return await fixture.answer(decoded);
         } finally {
             traffic.inFlight -= 1;
             traffic.lastAnswerAt = Date.now();
-            noteAnswered(functionPath);
+
+            if (startedIn === story.generation) {
+                noteAnswered(functionPath);
+            }
         }
     };
 
