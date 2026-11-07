@@ -53,7 +53,7 @@ const OrganizationSwitcher: FC<OrganizationSwitcherProps> = ({ className, hidePe
                     organizationId,
                 });
                 // The billing read follows the session's active organization, so drop the previous one's cached plan.
-                void queryClient.invalidateQueries({ queryKey: crpc.auth.billing.getBillingInfo.queryKey({}) });
+                void queryClient.resetQueries({ queryKey: crpc.auth.billing.getBillingInfo.queryKey({}) });
                 await refetchActiveOrganization?.();
             } catch (error) {
                 authContext.toast({

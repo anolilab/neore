@@ -113,7 +113,7 @@ describe("OrganizationCell", () => {
         await user.click(await screen.findByRole("menuitem", { name: "Manage Organization" }));
 
         await waitFor(() => {
-            expect(queryClient.getQueryState(["billing-info"])?.isInvalidated).toBe(true);
+            expect(queryClient.getQueryData(["billing-info"])).toBeUndefined();
         });
         expect(harness.setActive).toHaveBeenCalledWith(expect.objectContaining({ organizationId: "org_b" }));
     });

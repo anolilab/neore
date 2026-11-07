@@ -104,7 +104,7 @@ const CreateOrganizationDialog = ({ className: _className, classNames, onOpenCha
                 });
 
                 // The billing read follows the session's active organization, so drop the previous one's cached plan.
-                void queryClient.invalidateQueries({ queryKey: crpc.auth.billing.getBillingInfo.queryKey({}) });
+                void queryClient.resetQueries({ queryKey: crpc.auth.billing.getBillingInfo.queryKey({}) });
                 await refetchActiveOrganization?.();
                 await refetchOrganizations?.();
                 onOpenChange?.(false);

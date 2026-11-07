@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const harness = vi.hoisted(() => {
     return {
         billingError: false,
-        billingInfo: undefined as { baseTier?: string; creditsPerUser?: number; creemSubscriptionId?: string } | undefined,
+        billingInfo: undefined as { baseTier?: string; billingEmail?: string; creditsPerUser?: number; creemSubscriptionId?: string } | undefined,
         isOwner: false,
         openPortal: vi.fn(),
         startCheckout: vi.fn(),
@@ -156,6 +156,29 @@ describe("BillingSettingsCard", () => {
         expect(await screen.findByText("Could not load your organization's billing details. Try again later.")).toBeTruthy();
         expect(screen.queryByText("enterprise")).toBeNull();
         expect(screen.queryByText("500")).toBeNull();
+    });
+
+    it("starts the owner's billing email from the organization's saved value", async () => {
+        harness.isOwner = true;
+        harness.billingInfo = { baseTier: "free", billingEmail: "billing@acme.test" };
+        mount();
+
+        expect(await screen.findByLabelText("Billing Email")).toHaveProperty("value", "billing@acme.test");
+    });
+
+    it("shows the new organization's billing email after a switch, not the previous organization's", async () => {
+        harness.isOwner = true;
+        harness.billingInfo = { baseTier: "free", billingEmail: "old@acme.test" };
+        const { queryClient } = mount();
+
+        expect(await screen.findByLabelText("Billing Email")).toHaveProperty("value", "old@acme.test");
+
+        harness.billingInfo = { baseTier: "pro", billingEmail: "new@beta.test" };
+        await queryClient.resetQueries({ queryKey: ["billing-info"] });
+
+        await waitFor(() => {
+            expect(screen.getByLabelText("Billing Email")).toHaveProperty("value", "new@beta.test");
+        });
     });
 
     it("offers an owner of a Free organization the Team upgrade, which starts a Team checkout", async () => {

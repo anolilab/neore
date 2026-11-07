@@ -109,6 +109,6 @@ describe("CreateOrganizationDialog", () => {
         await waitFor(() => {
             expect(harness.setActive).toHaveBeenCalledWith(expect.objectContaining({ organizationId: "org_new" }));
         });
-        expect(queryClient.getQueryState(["billing-info"])?.isInvalidated).toBe(true);
+        expect(queryClient.getQueryData(["billing-info"])).toBeUndefined();
     });
 });

@@ -118,7 +118,7 @@ describe("OrganizationSwitcher", () => {
         await user.click(screen.getByRole("button", { name: "Beta" }));
 
         await waitFor(() => {
-            expect(queryClient.getQueryState(["billing-info"])?.isInvalidated).toBe(true);
+            expect(queryClient.getQueryData(["billing-info"])).toBeUndefined();
         });
         expect(harness.setActive).toHaveBeenCalledWith(expect.objectContaining({ organizationId: "org_b" }));
         expect(queryClient.getQueryState(["other-read"])?.isInvalidated).toBe(false);
