@@ -21,7 +21,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { addMessagesHandler } from "../agent/messages";
-import { insertThread, patchThread } from "../agent/table-writes";
+import { clearAwaitingInput, insertThread, patchThread } from "../agent/table-writes";
 import {
     appendHostChunk,
     bumpedExpiry,
@@ -384,11 +384,12 @@ const applyTurnPost = async (
     const stateChanged = hostState !== stream.hostState;
 
     // A permission the agent asks for pauses the thread for the owner, as a cloud approval does, so a snoozed thread wakes
-    // (`patchThread`). Once every request is answered the run is running again, which clears that pause.
+    // (`patchThread`). Once every request is answered the pause is over: only its `awaitingInput` clears. The thread's status is
+    // left alone, so an answer never unarchives a thread the owner archived.
     if (pending.some((id) => !previousPending.includes(id))) {
         await patchThread(ctx.db, threadId, { awaitingInput: "approval" });
     } else if (previousPending.length > 0 && pending.length === 0) {
-        await patchThread(ctx.db, threadId, { status: "running", updatedAt: now });
+        await clearAwaitingInput(ctx.db, threadId);
     }
 
     const startsStreaming = sawContent && stream.status === "pending";

@@ -1164,6 +1164,23 @@ describe("a host turn", () => {
         await turn(device, threadId, "t1", 2, [{ kind: "permission_resolved", outcome: "allowed", requestId: "r1" }]);
         expect(await rowField(threadId, "awaitingInput")).toBeUndefined();
     });
+    it("answering a permission leaves a thread the owner archived while it waited archived", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const askForTool = { kind: "permission_request", options: [{ kind: "allow_once", name: "Allow", optionId: "o1" }], requestId: "r1", tool: "Bash" };
+
+        await turn(device, threadId, "t1", 0, [START(), askForTool]);
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", ctx.db.normalizeId("threads", threadId), { status: "archived" });
+        });
+
+        await turn(device, threadId, "t1", 2, [{ kind: "permission_resolved", outcome: "allowed", requestId: "r1" }]);
+
+        expect(await rowField(threadId, "status")).toBe("archived");
+        expect(await rowField(threadId, "awaitingInput")).toBeUndefined();
+    });
+
     it("a host turn that ends clears the approval it was waiting on", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);
