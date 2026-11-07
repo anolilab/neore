@@ -717,7 +717,8 @@ export const vThreadDocFields = {
     // The thread's newest snooze ordering: the owner's choice time (`agent/table-writes.ts#setThreadSnooze`), or the server time of a
     // wake, which is recorded even with nothing snoozed (`agent/table-writes.ts#patchThread`).
     snoozeChosenAt: v.optional(v.number()),
-    // Written only by `chat/thread-state.ts` (snooze / unsnooze), which checks the caller owns the thread.
+    // Written by the owner's snooze and unsnooze (`chat/thread-state.ts`, which checks the caller owns the thread, through
+    // `agent/table-writes.ts#setThreadSnooze`), and cleared by a wake (`agent/table-writes.ts#patchThread`).
     snoozedUntil: v.optional(v.number()),
     status: vThreadStatus,
     // Written only by `agent/thread-summaries.ts` and `agent/branches.ts` (the edit bumps the epoch).

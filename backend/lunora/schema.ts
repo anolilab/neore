@@ -3056,7 +3056,9 @@ export const schema = defineSchema({
         // its time even with nothing snoozed (`agent/table-writes.ts#patchThread`). A queued write carries the choice time it was made
         // with, so one chosen earlier than this never replaces it (`agent/table-writes.ts#setThreadSnooze`).
         snoozeChosenAt: v.optional(v.number()),
-        // Hidden from the owner's active list until then; written only by `chat/thread-state.ts`.
+        // Hidden from the owner's active list until then. Written by the owner's snooze and unsnooze (`chat/thread-state.ts`, through
+        // `agent/table-writes.ts#setThreadSnooze`), and cleared by a wake: a pause, a failed run or a timed-out stream
+        // (`agent/table-writes.ts#patchThread`, `chat/streaming/persistent/host.ts#releaseThread`).
         snoozedUntil: v.optional(v.number()),
         source: v.optional(v.string()),
         statelessMode: v.optional(v.boolean()),
