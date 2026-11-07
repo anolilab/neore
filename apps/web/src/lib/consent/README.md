@@ -17,37 +17,13 @@ Contains the core logic for:
 - Determining consent requirements
 - Language preference detection
 
-### `../providers/consent-manager.tsx`
-
-TanStack Start-compatible provider that:
-
-- Uses server-side functions to detect user location
-- Integrates with `@c15t/react` consent management
-- Provides initial data to the client-side consent system
-
 ## Usage
 
-The system is already integrated into the root component (`src/routes/__root.tsx`):
-
-```tsx
-import { ConsentManagerDialog, CookieBanner } from "@c15t/react";
-
-import { ConsentManagerProvider } from "@/providers/consent-manager";
-
-// In your root component
-<ConsentManagerProvider
-    options={{
-        mode: "offline",
-        store: {
-            initialGdprTypes: ["measurement", "necessary"],
-        },
-    }}
->
-    <CookieBanner />
-    <ConsentManagerDialog />
-    {/* Your app content */}
-</ConsentManagerProvider>;
-```
+`src/lib/consent/show-banner.ts` is not wired in. The live setup is in `src/routes/__root.tsx`: c15t 3's
+`ConsentProvider` with `local()` (default) or `hosted({ backendURL })` when `VITE_C15T_MODE=c15t` and
+`VITE_C15T_BACKEND_URL` are set, plus `ConsentBanner` and `ConsentDialog`. `PostHogConsentSync`
+(`src/providers/analytics-provider.tsx`) follows the effective `measurement` permission. The stock components
+render their own styles, so `styles.css` does not import c15t's stylesheet.
 
 ## Key Features
 
