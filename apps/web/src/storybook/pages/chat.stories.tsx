@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect } from "storybook/test";
+import { expect, waitFor } from "storybook/test";
 
 import { Route as ThreadRoute } from "@/routes/(chat)/chat/$threadId";
 import { Route as ChatIndexRoute } from "@/routes/(chat)/chat/index";
@@ -16,6 +16,14 @@ import { StoryPage } from "@/storybook/page";
 const PAGE_WAIT = { timeout: 5000 } as const;
 // The state a story names (a stream's text, a pause, a banner) follows the page's first load and its polling.
 const STATE_WAIT = { timeout: 15_000 } as const;
+
+/**
+ * The connection banner slides and fades in; axe must read its colours at full opacity, not blended mid-fade with what is
+ * behind it.
+ */
+const bannerShown = async (banner: HTMLElement) => {
+    await waitFor(() => expect(getComputedStyle(banner).opacity).toBe("1"), STATE_WAIT);
+};
 
 // The composer fades in over a few hundred milliseconds; axe must read settled colours, not mid-fade.
 const settle = () =>
@@ -148,7 +156,10 @@ export const ReadOnlyShare: Story = {
 /** The connection to the backend dropped: the banner above the composer. */
 export const Reconnecting: Story = {
     play: async ({ canvas }) => {
-        await expect(await canvas.findByText("Reconnecting to the server…", undefined, STATE_WAIT)).toBeInTheDocument();
+        const banner = await canvas.findByText("Reconnecting to the server…", undefined, STATE_WAIT);
+
+        await expect(banner).toBeInTheDocument();
+        await bannerShown(banner);
     },
     // "connecting" reads as online until a socket has opened, and a story's socket never does, so the live status is "offline".
     parameters: { connection: "offline" },
@@ -159,7 +170,10 @@ export const Offline: Story = {
         // The "offline" view comes from the browser's offline event, not the live status: fire it once the page has mounted.
         await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT);
         globalThis.dispatchEvent(new Event("offline"));
-        await expect(await canvas.findByText("You are offline.", undefined, STATE_WAIT)).toBeInTheDocument();
+        const banner = await canvas.findByText("You are offline.", undefined, STATE_WAIT);
+
+        await expect(banner).toBeInTheDocument();
+        await bannerShown(banner);
     },
     parameters: { connection: "offline" },
 };
