@@ -174,3 +174,32 @@ describe("ComposerTiptapEditor suggestions", () => {
         expect(opened(handed.slash) || opened(handed.file) || opened(handed.variable)).toBe(false);
     });
 });
+
+describe("ComposerTiptapEditor paste", () => {
+    const pasteInto = (element: HTMLElement, text: string) => {
+        const event = new Event("paste", { bubbles: true, cancelable: true });
+
+        Object.defineProperty(event, "clipboardData", {
+            value: { files: [], getData: (type: string) => (type === "text/plain" ? text : ""), items: [], types: ["text/plain"] },
+        });
+        act(() => {
+            element.dispatchEvent(event);
+        });
+    };
+
+    it.each([
+        ["inserts a paste the composer leaves alone", () => {}, "pasted"],
+        ["leaves out a paste the composer took (a long text it attaches)", (event: React.ClipboardEvent) => event.preventDefault(), ""],
+    ])("%s", async (_label, onPaste, expected) => {
+        const ref = createRef<ComposerTiptapEditorRef>();
+        const view = render(<ComposerTiptapEditor onChange={() => {}} onPaste={onPaste} onSubmit={() => {}} ref={ref} value="" />);
+
+        await waitFor(() => {
+            expect(ref.current?.getEditor()).toBeTruthy();
+        });
+        // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the editor has no role to query by
+        pasteInto(view.container.querySelector(".ProseMirror") as HTMLElement, "pasted");
+
+        expect(ref.current!.getEditor()!.getText()).toBe(expected);
+    });
+});

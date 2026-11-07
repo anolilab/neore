@@ -265,6 +265,9 @@ const ComposerTiptapEditor = ({
         editable: !disabled,
         editorProps: {
             attributes: composerEditorAttributes({ describedBy, invalid, label: t`Message` }),
+            // The composer's paste handler runs first (capture phase) and prevents a paste it turns into a file; the editor
+            // then leaves that paste alone, so a long text is never both attached and inserted.
+            handlePaste: (_view, event) => event.defaultPrevented,
         },
         extensions: [
             StarterKitExtension.configure({
@@ -596,7 +599,7 @@ const ComposerTiptapEditor = ({
     const maxHeight = lineHeight * maxRows;
 
     return (
-        <div className="relative w-full" onPaste={onPaste} ref={editorContainerRef}>
+        <div className="relative w-full" onPasteCapture={onPaste} ref={editorContainerRef}>
             <div className="w-full overflow-y-auto" style={{ maxHeight: `${maxHeight}px` }}>
                 <EditorContent
                     className={clsx(

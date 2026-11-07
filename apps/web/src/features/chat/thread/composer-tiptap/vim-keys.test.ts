@@ -25,6 +25,28 @@ const breakSchema = new Schema({
     },
 });
 
+/** The composer's schema with a quote chip: a block that holds no text, between paragraphs. */
+const chipSchema = new Schema({
+    nodes: {
+        doc: { content: "block+" },
+        paragraph: { content: "text*", group: "block", toDOM: () => ["p", 0] },
+        quoteChip: { atom: true, group: "block", toDOM: () => ["div"] },
+        text: {},
+    },
+});
+
+/** A paragraph "first", a chip, then a paragraph "last", with the cursor at the start of "last". */
+const aroundChip = (): EditorState => {
+    const doc = chipSchema.node("doc", null, [
+        chipSchema.node("paragraph", null, [chipSchema.text("first")]),
+        chipSchema.node("quoteChip"),
+        chipSchema.node("paragraph", null, [chipSchema.text("last")]),
+    ]);
+    const state = EditorState.create({ doc, schema: chipSchema });
+
+    return state.apply(state.tr.setSelection(TextSelection.create(doc, doc.content.size - 5)));
+};
+
 const NORMAL: VimState = { mode: "normal", pending: "" };
 
 const stateOf = (lines: string[], cursor: number): EditorState => {
@@ -150,6 +172,11 @@ describe("motions", () => {
         expect(down.state.selection.$head.index(0)).toBe(1);
         expect(offsetOf(down.state)).toBe(1);
         expect(press(stateOf(["only"], 2), ["j"]).handled).toBe(true);
+    });
+
+    it("passes over a quote chip with k and after dd, staying on a line it can act on", () => {
+        expect(press(aroundChip(), ["k"]).state.selection.$head.parent.textContent).toBe("first");
+        expect(press(aroundChip(), ["d", "d"]).state.selection.$head.parent.isTextblock).toBe(true);
     });
 });
 

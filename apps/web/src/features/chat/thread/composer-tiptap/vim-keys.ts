@@ -133,17 +133,29 @@ const segmentAt = (doc: ProseMirrorNode, index: number, offset: number): Line =>
     return { index, from, start: paragraphStart(doc, index) + from, text: text.slice(from, to) };
 };
 
+/**
+ * The index of the nearest paragraph from `index` in `step`'s direction (`index` itself included), or -1. Lines live only in
+ * paragraphs: a block without text, such as a quote chip, is passed over.
+ */
+const textblockFrom = (doc: ProseMirrorNode, index: number, step: 1 | -1): number => {
+    for (let at = index; at >= 0 && at < doc.childCount; at += step) {
+        if (doc.child(at).isTextblock) {
+            return at;
+        }
+    }
+
+    return -1;
+};
+
 /** The displayed line before `line`: the one ending at the break before it, or the last one of the paragraph before. */
 const previousLine = (doc: ProseMirrorNode, line: Line): Line | null => {
     if (line.from > 0) {
         return segmentAt(doc, line.index, line.from - 1);
     }
 
-    if (line.index === 0) {
-        return null;
-    }
+    const before = textblockFrom(doc, line.index - 1, -1);
 
-    return segmentAt(doc, line.index - 1, paragraphText(doc.child(line.index - 1)).length);
+    return before === -1 ? null : segmentAt(doc, before, paragraphText(doc.child(before)).length);
 };
 
 /** The displayed line after `line`: the one past the break after it, or the first one of the next paragraph. */
@@ -154,7 +166,9 @@ const nextLine = (doc: ProseMirrorNode, line: Line): Line | null => {
         return segmentAt(doc, line.index, end + 1);
     }
 
-    return line.index + 1 < doc.childCount ? segmentAt(doc, line.index + 1, 0) : null;
+    const after = textblockFrom(doc, line.index + 1, 1);
+
+    return after === -1 ? null : segmentAt(doc, after, 0);
 };
 
 /** The cursor's line and its offset into it, or `null` when the cursor is not inside a paragraph. */
@@ -238,8 +252,18 @@ const deleteLine = (state: EditorState, vim: VimState, line: Line): VimResult =>
     }
 
     const tr = state.tr.delete(from, to);
-    const target = segmentAt(tr.doc, Math.min(line.index, tr.doc.childCount - 1), 0);
+    const nearest = Math.min(line.index, tr.doc.childCount - 1);
+    const after = textblockFrom(tr.doc, nearest, 1);
+    const index = after === -1 ? textblockFrom(tr.doc, nearest, -1) : after;
 
+    // Only blocks without text are left (a quote chip): a paragraph goes after them for the cursor.
+    if (index === -1) {
+        tr.insert(tr.doc.content.size, paragraph!.create());
+
+        return handledAt(vim, tr.setSelection(TextSelection.create(tr.doc, tr.doc.content.size - 1)));
+    }
+
+    const target = segmentAt(tr.doc, index, 0);
     const cursor = target.start + Math.min(firstNonSpace(target.text), lastOffset(target));
 
     return handledAt(vim, tr.setSelection(TextSelection.create(tr.doc, cursor)));

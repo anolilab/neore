@@ -68,7 +68,7 @@ import type { ChatReference } from "./chat-reference";
 import { buildChatTranscript, chatReferenceFileName } from "./chat-reference";
 import CompletionSound from "./completion-sound";
 import type { TextFileResult } from "./composer-draft-file";
-import { attachLongPaste, draftFitsAsFile, moveDraftToFile, undoLongPaste } from "./composer-draft-file";
+import { attachLongPaste, draftFitsAsFile, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
@@ -899,7 +899,12 @@ const ComposerInput = ({
             }
 
             if (files.length > 0) {
-                e.preventDefault();
+                // Office apps put a picture of the copied text next to the text itself: the picture is attached and the
+                // editor still inserts the text. A paste of files alone is the composer's to take.
+                if (!pasteHasText(e.clipboardData)) {
+                    e.preventDefault();
+                }
+
                 handleFileSelect(files);
 
                 return;

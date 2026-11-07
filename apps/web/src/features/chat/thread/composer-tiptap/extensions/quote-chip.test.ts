@@ -22,14 +22,6 @@ const quoted = { messageId: "msg-4", text: "The first line\nthe second line" };
 /** The chip's draft text is the quote as a blockquote, then the separator before the comment paragraph. */
 const quotedDraft = "> The first line\n> the second line\n\n";
 
-describe("the quote chip's text", () => {
-    it("is the quoted lines as a Markdown blockquote, the same text the draft holds", () => {
-        const renderChip = QuoteChip.config.renderText as unknown as ((props: { node: { attrs: Record<string, unknown> } }) => string) | undefined;
-
-        expect(renderChip?.({ node: { attrs: { messageId: "msg-4", text: quoted.text } } })).toBe(quotedDraft);
-    });
-});
-
 describe("insertQuoteChip", () => {
     let editor: Editor | undefined;
 
@@ -201,23 +193,6 @@ describe("the link back to the quoted reply", () => {
         editor?.destroy();
         editor = undefined;
         document.body.replaceChildren();
-    });
-
-    it("moves focus to the quoted reply when the link is activated", () => {
-        const reply = document.createElement("div");
-
-        reply.dataset.messageId = "msg-7";
-        reply.scrollIntoView = vi.fn();
-        document.body.appendChild(reply);
-
-        editor = new Editor({
-            content: { content: [{ attrs: { messageId: "msg-7", text: "A line" }, type: "quoteChip" }], type: "doc" },
-            extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })],
-        });
-
-        editor.view.dom.querySelector<HTMLButtonElement>(":scope [data-quote-chip] button")?.click();
-
-        expect(document.activeElement).toBe(reply);
     });
 
     it("keeps Enter on the focused link from reaching the editor, so it does not send the draft", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, undoLongPaste } from "./composer-draft-file";
+import { attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
 
 describe("attachLongPaste", () => {
     const setup = (result: { attachmentId: string; error?: string }, draft = "before after") => {
@@ -225,5 +225,12 @@ describe("undoLongPaste", () => {
         );
         expect(removeAttachment).not.toHaveBeenCalled();
         expect(setDraft).not.toHaveBeenCalled();
+    });
+});
+
+describe(pasteHasText, () => {
+    it("lets the editor insert the text of a paste that also carries a picture of it, and takes a paste of files alone", () => {
+        expect(pasteHasText({ types: ["Files", "text/plain", "text/html"] })).toBe(true);
+        expect(pasteHasText({ types: ["Files"] })).toBe(false);
     });
 });
