@@ -10,6 +10,9 @@ describe("signOutOnDevice", () => {
             clearCache: async () => {
                 calls.push("clear");
             },
+            forgetLastChat: async () => {
+                calls.push("forget");
+            },
             revokeGrant: async () => {
                 calls.push("revoke");
 
@@ -18,7 +21,7 @@ describe("signOutOnDevice", () => {
             warn: () => undefined,
         });
 
-        expect(calls).toEqual(["clear", "revoke"]);
+        expect(calls).toEqual(["clear", "forget", "revoke"]);
     });
 
     it("still asks the server when the cache could not be emptied, and says so", async () => {
@@ -29,12 +32,30 @@ describe("signOutOnDevice", () => {
             clearCache: async () => {
                 throw new Error("disk I/O error");
             },
+            forgetLastChat: async () => undefined,
             revokeGrant,
             warn,
         });
 
         expect(revokeGrant).toHaveBeenCalledTimes(1);
         expect(warn).toHaveBeenCalledWith("Could not empty the offline cache.", expect.any(Error));
+    });
+
+    it("still asks the server when the saved chat could not be forgotten, and says so", async () => {
+        const revokeGrant = vi.fn(async () => undefined);
+        const warn = vi.fn();
+
+        await signOutOnDevice({
+            clearCache: async () => undefined,
+            forgetLastChat: async () => {
+                throw new Error("keychain locked");
+            },
+            revokeGrant,
+            warn,
+        });
+
+        expect(revokeGrant).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith("Could not forget the last viewed chat.", expect.any(Error));
     });
 });
 
