@@ -183,6 +183,12 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     const boxText = useRef("");
     // `mayBeTaken`: a send under the id failed in a way that does not say the backend refused it, so it may have started a turn.
     const attempt = useRef<{ id: string; mayBeTaken?: boolean; text: string } | undefined>(undefined);
+    // Mirrors `attempt.current?.mayBeTaken` for render: a direct send whose answer was lost may be the turn running now.
+    const [directMayBeTaken, setDirectMayBeTaken] = useState(false);
+    const setAttempt = (next: { id: string; mayBeTaken?: boolean; text: string } | undefined) => {
+        attempt.current = next;
+        setDirectMayBeTaken(next?.mayBeTaken === true);
+    };
     const {
         data: session,
         dataUpdatedAt: sessionAt,
@@ -406,11 +412,13 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         let requestId = queuedId;
 
         if (requestId === undefined) {
-            if (attempt.current?.text !== prompt) {
-                attempt.current = { id: crypto.randomUUID(), text: prompt };
+            const current = attempt.current?.text === prompt ? attempt.current : { id: crypto.randomUUID(), text: prompt };
+
+            if (current !== attempt.current) {
+                setAttempt(current);
             }
 
-            requestId = attempt.current.id;
+            requestId = current.id;
         }
 
         const before = machineRef.current;
@@ -435,7 +443,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         if (result.ok) {
             // A direct send's retry id is spent when it lands; a queued message never used it, so the draft's id is kept.
             if (queuedId === undefined) {
-                attempt.current = undefined;
+                setAttempt(undefined);
             } else {
                 remove(threadId, queuedId);
             }
@@ -474,7 +482,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         if (queuedId !== undefined) {
             usePromptQueueStore.getState().setTried(threadId, queuedId, taken);
         } else if (attempt.current?.id === requestId) {
-            attempt.current = { ...attempt.current, mayBeTaken: taken };
+            setAttempt({ ...attempt.current, mayBeTaken: taken });
         }
 
         dispatch({ error: result.error, itemId: queuedId, live: liveNow, type: "refused" });
@@ -560,7 +568,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
             const retry = attempt.current?.text === prompt ? attempt.current : undefined;
 
             if (retry !== undefined) {
-                attempt.current = undefined;
+                setAttempt(undefined);
             }
 
             enqueue(threadId, { attachments: [], id: retry?.id, text: prompt, ...(retry?.mayBeTaken === true && { tried: true }) });
@@ -601,7 +609,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         // its id would come back as a duplicate of the stopped turn, so the text would never run. The text gets a new id, and
         // the lost send's id is spent, so a later send of the same text is not taken for it either.
         if (attempt.current?.text === trimmed) {
-            attempt.current = undefined;
+            setAttempt(undefined);
         }
 
         enqueueNext(threadId, { attachments: [], text: trimmed });
@@ -617,7 +625,8 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
 
     const sendNowFor = (itemId: string, state: HostQueueState) => {
         // The running turn may be any tried message's lost send, not only this one's: stopping it would lose that message.
-        const tried = usePromptQueueStore.getState().queues[threadId]?.items.some((item) => item.tried === true) === true;
+        // A direct send whose answer was lost may be it too: its text sent again later would reuse its id and never run.
+        const tried = directMayBeTaken || usePromptQueueStore.getState().queues[threadId]?.items.some((item) => item.tried === true) === true;
 
         return cancel.isPending || blocked || starting ? undefined : sendNowAction(state, { itemId, running: isTurnLive(state, liveStreamId), tried });
     };
@@ -652,9 +661,6 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
             return;
         }
 
-        // The turn stopped may be a direct send whose answer was lost: a later send of that text must not reuse its id, or it would
-        // come back as a duplicate of the stopped turn and never run. Its id is spent, as Interrupt and send spends it.
-        attempt.current = undefined;
         stopFor(itemId, wasPaused);
     };
 
