@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@lingui/core/macro";
 import { Plural, useLingui } from "@lingui/react/macro";
 import type { GatewayModel } from "@neore/ai/models";
 import { ProviderIcon } from "@neore/ui/components/ai-elements/provider-icon";
@@ -150,9 +151,13 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
         [onSelectMultiple],
     );
 
+    const singleLabel = model ? getModelLabel(model, nicknames) : placeholder || defaultPlaceholder;
     const triggerButton = isComparisonMode ? (
         // Multi-model comparison trigger
         <Button
+            // Inside `t`: a bare `plural()` compiles to the global i18n, which this app never activates.
+            // eslint-disable-next-line no-restricted-syntax -- the macro compiles this to a message, not a string conversion
+            aria-label={t`${plural(selectedModelIds!.length, { one: "Comparing # model", other: "Comparing # models" })}`}
             className={cn(
                 "justify-between gap-1.5",
                 // When comparison mode is active, remove fixed width so it auto-sizes
@@ -171,8 +176,8 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
             <ChevronsUpDown aria-hidden="true" className="ml-1 h-3.5 w-3.5 shrink-0 opacity-40" />
         </Button>
     ) : (
-        // Single model trigger (default)
-        <Button className={cn("justify-between", className)} disabled={disabled} size={size} variant={variant}>
+        // Single model trigger (default). A combobox is not named by its content, so the label repeats it.
+        <Button aria-label={t`Model: ${singleLabel}`} className={cn("justify-between", className)} disabled={disabled} size={size} variant={variant}>
             <div className="flex min-w-0 flex-1 items-center gap-2">
                 {model && (
                     <ProviderIcon
@@ -181,7 +186,8 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
                         providerIcon={model.id.split("/", 1)[0] || model.displayProvider || ""}
                     />
                 )}
-                <span className="truncate">{model ? getModelLabel(model, nicknames) : placeholder || defaultPlaceholder}</span>
+                {/* The placeholder is muted in full: the button variant's faded text fails contrast on it. */}
+                <span className={cn("truncate", !model && "text-neutral-600 dark:text-neutral-400")}>{singleLabel}</span>
             </div>
             <ChevronsUpDown aria-hidden="true" className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>

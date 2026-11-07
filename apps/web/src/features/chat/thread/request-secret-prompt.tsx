@@ -352,7 +352,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
             tabIndex={-1}
         >
             <div className="flex items-start gap-2">
-                <KeyRound aria-hidden="true" className="text-primary mt-0.5 size-4 shrink-0" />
+                <KeyRound aria-hidden="true" className="text-primary-text mt-0.5 size-4 shrink-0" />
                 <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium" id={headingId}>
                         {label || t`The assistant needs a secret`}

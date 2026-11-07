@@ -96,7 +96,7 @@ const TemplatePicker: React.FC<{
                     onClick={() => onSelectTemplate(template.prompt)}
                     type="button"
                 >
-                    <span className="text-primary shrink-0">{template.icon}</span>
+                    <span className="text-primary-text shrink-0">{template.icon}</span>
                     <span className="font-medium">{template.label}</span>
                 </button>
             ))}
@@ -255,7 +255,7 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
                     <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 px-8 py-12">
                         <motion.div
                             animate={{ opacity: 1, scale: 1 }}
-                            className="bg-primary/10 text-primary flex size-16 items-center justify-center rounded-full"
+                            className="bg-primary/10 text-primary-text flex size-16 items-center justify-center rounded-full"
                             initial={{ opacity: 0, scale: 0.5 }}
                             transition={{ duration: 0.3, ease: "easeOut" }}
                         >
@@ -340,7 +340,7 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
                                 key={currentStep?.id}
                                 transition={{ duration: 0.2, ease: "easeOut" }}
                             >
-                                <div className="bg-primary/10 text-primary flex size-16 items-center justify-center rounded-2xl">
+                                <div className="bg-primary/10 text-primary-text flex size-16 items-center justify-center rounded-2xl">
                                     {STEP_ICONS[payload.icon]}
                                 </div>
                                 <h2 className="font-heading text-xl font-semibold">{title}</h2>

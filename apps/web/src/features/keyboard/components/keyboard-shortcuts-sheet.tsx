@@ -125,7 +125,7 @@ const KeyboardShortcutsSheet = ({ shortcuts }: { shortcuts: Partial<KeyboardShor
                     <DialogDescription>
                         {t`The keys you have set now.`}{" "}
                         <Link
-                            className="text-primary underline-offset-4 hover:underline"
+                            className="text-primary-text underline-offset-4 hover:underline"
                             onClick={() => setOpen(false)}
                             to="/dashboard/settings/app/keyboard-shortcuts"
                         >

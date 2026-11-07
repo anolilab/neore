@@ -165,7 +165,7 @@ const ThreadSummary: FC<{ threadId?: string }> = ({ threadId }) => {
                             {t`Process each message independently with only the system prompt and current input. No chat history context.`}
                         </p>
                     </div>
-                    <Switch checked={statelessMode} onCheckedChange={handleStatelessModeChange} />
+                    <Switch aria-label={t`Stateless Mode`} checked={statelessMode} onCheckedChange={handleStatelessModeChange} />
                 </div>
 
                 <div className="space-y-2">

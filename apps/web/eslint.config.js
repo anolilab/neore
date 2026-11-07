@@ -23,6 +23,9 @@ export default createConfig(
             // Written by the TanStack Router generator. Its blanket
             // `eslint-disable` header and its formatting are not ours to fix.
             "./src/routeTree.gen.ts",
+            // Written by `msw` on install (`package.json#msw.workerDirectory`), not by us.
+            "./.storybook/public/**",
+            "./storybook-static/**",
             // ...globs
         ],
         typescript: {
@@ -393,9 +396,10 @@ export default createConfig(
          * `use-layers` (21): a cascade layer would LOWER these declarations'
          * precedence, so obeying the rule breaks what the file is for.
          * `packages/ui/src/global.css` does use `@layer base` — design system
-         * CSS is the case layers are for.
+         * CSS is the case layers are for. Storybook's `preview.css` only imports
+         * `styles.css`, for the same reason.
          */
-        files: ["**/styles.css"],
+        files: ["**/styles.css", ".storybook/preview.css"],
         rules: {
             "css/no-important": "off",
             "css/use-layers": "off",
@@ -776,6 +780,28 @@ export default createConfig(
         rules: {
             "jsx-a11y/click-events-have-key-events": "off",
             "jsx-a11y/no-noninteractive-element-interactions": "off",
+        },
+    },
+    {
+        /**
+         * Storybook: the stories, their mocks and fixtures (`src/storybook`), and its config.
+         * None of it ships, so dev dependencies are its dependencies. `.storybook/` starts the
+         * mock worker and sets the env at module scope on purpose (`msw.ts`, `vite.config.ts`),
+         * and the console is how a story says which fixture it is missing. A `play` function
+         * runs once, so a regex in a query is not worth hoisting.
+         */
+        files: [".storybook/**/*.{ts,tsx}", "src/storybook/**/*.{ts,tsx}", "**/*.stories.tsx", "vitest.storybook.config.ts"],
+        rules: {
+            "e18e/prefer-static-regex": "off",
+            "import/no-extraneous-dependencies": ["error", { devDependencies: true }],
+            "no-console": "off",
+        },
+    },
+    {
+        files: [".storybook/**/*.{ts,tsx}"],
+        rules: {
+            "unicorn/no-this-outside-of-class": "off",
+            "unicorn/no-top-level-side-effects": "off",
         },
     },
 );

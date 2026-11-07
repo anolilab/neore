@@ -42,7 +42,7 @@ const PageInviteAccept: FC<{ token: string }> = ({ token }) => {
             <div className="p-8 text-sm" role="alert">
                 <p className="font-medium">{t`This invite is not valid`}</p>
                 <p className="text-muted-foreground">{t`It may have expired, been revoked, or already been used. Ask for a new link.`}</p>
-                <Link className="text-primary mt-4 inline-block underline" to="/pages">
+                <Link className="text-primary-text mt-4 inline-block underline" to="/pages">
                     {t`Go to your pages`}
                 </Link>
             </div>

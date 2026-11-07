@@ -74,6 +74,9 @@ on: # yamllint disable-line rule:truthy
             website-url:
                 description: "The deployed web app's URL"
                 value: "${{ jobs.deploy-cloudflare.outputs.website-url }}"
+            storybook-url:
+                description: "The deployed Storybook's URL (preview stages only)"
+                value: "${{ jobs.deploy-cloudflare.outputs.storybook-url }}"
 
 # Keyed on the stage, not the ref: two tags (or a tag and a manual run) would
 # otherwise run two Alchemy deploys against the same state at once, while two pull
@@ -147,9 +150,52 @@ jobs:
     # job of its own.
     # -----------------------------------------------------------------
 
+    # Storybook is built here, in a job that holds no secrets, and handed to the deploy job as an artifact. Built
+    # inside the deploy job, Storybook, its addons and every story module would run with the deploy secrets.
+    build-storybook:
+        name: "Build Storybook"
+        needs: "resolve-env"
+        runs-on: "ubuntu-24.04"
+        timeout-minutes: 20
+        permissions:
+            contents: "read"
+        steps:
+            - name: "Harden Runner"
+              uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
+              with:
+                  egress-policy: "audit"
+
+            - name: "Git checkout"
+              uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
+              with:
+                  persist-credentials: false
+
+            - name: "Setup resources and environment"
+              uses: "anolilab/workflows/step/setup@1f3a7f7e561f7690fe19dea5d2ed225def53c908" # v26.0.6
+              with:
+                  enable-nx-cache: "false"
+                  node-version: "24.22.1"
+                  npm-version: "11"
+                  skip-playwright: "true"
+
+            - name: "Build the workspace packages"
+              shell: "bash"
+              run: "pnpm run build:packages"
+
+            - name: "Build Storybook"
+              shell: "bash"
+              run: "pnpm --filter @neore/web run build-storybook"
+
+            - name: "Upload the Storybook build"
+              uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" # v7.0.2
+              with:
+                  name: "storybook-static"
+                  path: "apps/web/storybook-static"
+                  retention-days: 1
+
     deploy-cloudflare:
         name: "Deploy Cloudflare Workers via Alchemy (${{ needs.resolve-env.outputs.stage }})"
-        needs: "resolve-env"
+        needs: ["resolve-env", "build-storybook"]
         runs-on: "ubuntu-24.04"
         timeout-minutes: 60
         permissions:
@@ -157,6 +203,7 @@ jobs:
             deployments: "write"
         outputs:
             website-url: "${{ steps.alchemy.outputs.website-url }}"
+            storybook-url: "${{ steps.alchemy.outputs.storybook-url }}"
         environment:
             name: "${{ needs.resolve-env.outputs.deploy-env }}"
             url: "${{ steps.alchemy.outputs.website-url }}"
@@ -310,6 +357,13 @@ jobs:
             # second and names the largest modules when the web build crosses its budget.
             - name: "Check the web Worker's upload size"
               run: "pnpm exec tsx scripts/check-web-size.ts"
+
+            # The Storybook build from the job above, ready for Alchemy to upload (its `command` is a no-op).
+            - name: "Fetch the Storybook build"
+              uses: "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333" # v8.0.2
+              with:
+                  name: "storybook-static"
+                  path: "apps/web/storybook-static"
 
             - name: "Deploy all Cloudflare Workers via Alchemy"
               id: "alchemy"
@@ -544,6 +598,8 @@ jobs:
                   # Extract website URL from Alchemy output for GitHub environment
                   url=$(echo "$output" | grep -oP "website: ['\"]?\Khttps?://[^'\"}\s]+" || true)
                   echo "website-url=${url}" >> "$GITHUB_OUTPUT"
+                  storybook=$(echo "$output" | grep -oP "storybook: ['\"]?\Khttps?://[^'\"}\s]+" || true)
+                  echo "storybook-url=${storybook}" >> "$GITHUB_OUTPUT"
 
             # Alchemy bundles every Worker itself (rolldown), so this is the script Cloudflare
             # actually validates; `lunora build`'s bundle is a different one. Kept on failure too,

@@ -49,6 +49,8 @@ vi.mock("@tanstack/react-query", () => {
 
 vi.mock("@tanstack/react-router", () => {
     return {
+        // The thread title is a router link (#548); it renders as a plain anchor here.
+        Link: ({ children, to }: { children: unknown; to: string }) => <a href={to}>{children as never}</a>,
         useLocation: () => {
             return { pathname: "/chat" };
         },

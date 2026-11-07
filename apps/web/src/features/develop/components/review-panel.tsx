@@ -293,7 +293,7 @@ const ReviewPanel = ({
                         <AlertDescription>
                             {t`It is on ${hostLabel} now.`}{" "}
                             {feedback.url && (
-                                <a className="text-primary font-medium underline" href={feedback.url} rel="noopener noreferrer" target="_blank">
+                                <a className="text-primary-text font-medium underline" href={feedback.url} rel="noopener noreferrer" target="_blank">
                                     {t`View it`}
                                 </a>
                             )}

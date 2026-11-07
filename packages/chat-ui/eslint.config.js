@@ -84,4 +84,12 @@ export default createConfig(
             "@stylistic/operator-linebreak": "off",
         },
     },
+    {
+        /** Stories do not ship: dev dependencies are their dependencies, and a `play` regex runs once. */
+        files: ["**/*.stories.tsx"],
+        rules: {
+            "e18e/prefer-static-regex": "off",
+            "import/no-extraneous-dependencies": ["error", { devDependencies: true }],
+        },
+    },
 );

@@ -1,7 +1,5 @@
 "use client";
 
-import type { MessageDescriptor } from "@lingui/core";
-import { msg } from "@lingui/core/macro";
 import { Plural, useLingui } from "@lingui/react/macro";
 import { useControllableState } from "@radix-ui/react-use-controllable-state";
 import { Button } from "@ui/components/button";
@@ -129,21 +127,12 @@ const DefaultThinkingMessage = ({ duration, isStreaming }: { duration?: number; 
 
 const defaultGetThinkingMessage = (isStreaming: boolean, duration?: number) => <DefaultThinkingMessage duration={duration} isStreaming={isStreaming} />;
 
-const getTriggerLabel = (isStreaming: boolean, isOpen: boolean): MessageDescriptor => {
-    if (isStreaming) {
-        return msg`Thinking in progress, collapse to hide`;
-    }
-
-    return isOpen ? msg`Collapse thinking` : msg`Expand thinking`;
-};
-
+// The trigger is named by its visible text (the thinking message), not by a separate label that could drift from it.
 export const ReasoningTrigger = memo(({ children, className, getThinkingMessage = defaultGetThinkingMessage, ...props }: ReasoningTriggerProps) => {
-    const { i18n } = useLingui();
     const { duration, isOpen, isStreaming, triggerId } = useReasoning();
 
     return (
         <CollapsibleTrigger
-            aria-label={i18n._(getTriggerLabel(isStreaming, isOpen))}
             className={cn("text-muted-foreground hover:text-foreground flex w-full items-center gap-2 text-sm transition-colors", className)}
             {...props}
             id={triggerId}

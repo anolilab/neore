@@ -114,7 +114,7 @@ const ResultDetail = ({ result }: { result: EvalResult }) => {
                 </div>
             )}
             {result.threadId && (
-                <Link className="text-primary text-xs underline-offset-4 hover:underline" params={{ threadId: result.threadId }} to="/chat/$threadId">
+                <Link className="text-primary-text text-xs underline-offset-4 hover:underline" params={{ threadId: result.threadId }} to="/chat/$threadId">
                     {t`Open the run's conversation`}
                 </Link>
             )}

@@ -222,6 +222,14 @@ export default defineConfig({
             inputs: ["default", "^production", "{projectRoot}/vite.config.ts", "{projectRoot}/vitest.config.ts"],
             cache: true,
         },
+        // Every story of the project, in Chromium, once per mode (`apps/web/vitest.storybook.config.ts`).
+        // Not cached: `^production` does not hash the `.storybook/` directory, the Vitest config or the stories
+        // of `packages/ui` and `packages/chat-ui`, so a cached pass could outlive the change it was run for.
+        // Packages are built by the caller (`pnpm build:packages`): `^build` would also build the backend Worker.
+        "test:storybook": {
+            inputs: ["default", "^production"],
+            cache: false,
+        },
         "build-storybook": {
             dependsOn: ["^build", "^build-storybook"],
             inputs: [

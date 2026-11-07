@@ -54,9 +54,11 @@
     --muted-foreground: var(--brand-graphite);
     --accent: var(--brand-frost);
     --accent-foreground: var(--brand-obsidian);
-    --destructive: oklch(0.55 0.22 25); /* Red - better contrast */
+    /* Red. At L 0.5 the text is 4.8:1 even on its own 10% tint (AA is 4.5:1); the earlier 0.55 was 4.1:1 there. */
+    --destructive: oklch(0.5 0.22 25);
     --border: var(--brand-silver);
-    --input: var(--brand-silver);
+    /* 3:1 on white for the switch track and input borders (WCAG 1.4.11); the Steel Mist this was is 1.7:1. */
+    --input: #8c8c8c;
     --ring: var(--brand-graphite);
     --chart-1: oklch(0.871 0.15 154.449);
     --chart-2: oklch(0.723 0.219 149.579);
@@ -102,9 +104,10 @@
     --muted-foreground: var(--brand-steel);
     --accent: var(--brand-iron);
     --accent-foreground: var(--brand-frost);
-    --destructive: oklch(0.65 0.2 25); /* Red - optimized for dark mode */
+    /* Red for dark mode. At L 0.78 it is about 5:1 on its 10% tint (the earlier 0.65 was 3.5:1). */
+    --destructive: oklch(0.78 0.17 25);
     --border: oklch(1 0 0 / 6%);
-    --input: oklch(1 0 0 / 12%);
+    --input: oklch(1 0 0 / 30%);
     --ring: #8c8c8c; /* 4.8:1 on --brand-charcoal; graphite was 2.7:1, under WCAG 1.4.11's 3:1. Mirrored in apps/web accent-presets.ts */
     --chart-1: oklch(0.871 0.15 154.449);
     --chart-2: oklch(0.723 0.219 149.579);
@@ -342,7 +345,7 @@
     }
 
     & a:not(.not-prose a) {
-        @apply text-primary font-medium underline underline-offset-4;
+        @apply text-primary-text font-medium underline underline-offset-4;
     }
 
     & blockquote:not(.not-prose blockquote) {
@@ -507,4 +510,10 @@
     & div > p {
         @apply my-0;
     }
+}
+
+/* A code token with no highlight colour inherits the block's colour, so the block itself is the foreground token, not
+   the page's faded text (axe colour-contrast on the chat's code blocks). Highlighted tokens keep their own colour. */
+[data-streamdown="code-block-body"] {
+    color: var(--foreground);
 }

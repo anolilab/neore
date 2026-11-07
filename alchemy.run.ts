@@ -676,6 +676,21 @@ export const Website = Cloudflare.Worker("website", {
 });
 
 // ---------------------------------------------------------------------------
+// Storybook – the static build of apps/web's Storybook, on preview stages only
+// ---------------------------------------------------------------------------
+//
+// The build runs in the deploy workflow's `build-storybook` job, which holds no secrets, and the
+// output is in `outdir` before Alchemy starts. The command is a no-op, so no Storybook code, addon
+// or story module runs in the job that holds the deploy secrets.
+const Storybook = Cloudflare.Website.StaticSite("storybook", {
+    command: "true",
+    compatibility: { date: COMPATIBILITY_DATE },
+    name: named("neore-storybook"),
+    observability: WORKER_OBSERVABILITY,
+    outdir: "./apps/web/storybook-static",
+});
+
+// ---------------------------------------------------------------------------
 // LLM Gateway service – Hono on Cloudflare Workers
 // ---------------------------------------------------------------------------
 // Proxies all LLM API calls with token counting, cost tracking,
@@ -782,6 +797,7 @@ export default Alchemy.Stack(
     },
     Effect.gen(function* () {
         const website = yield* Website;
+        const storybook = stage === "production" ? undefined : yield* Storybook;
 
         const gateway = yield* Cloudflare.Worker("llm-gateway", {
             build: WORKER_BUILD,
@@ -998,6 +1014,7 @@ export default Alchemy.Stack(
             backend: backend.url,
             llmGateway: gateway.url,
             stage,
+            storybook: storybook?.url,
             website: website.url,
         };
     }),
