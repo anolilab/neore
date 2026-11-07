@@ -1866,8 +1866,8 @@ export interface Doc_threads {
     publicAccessToken?: string;
     reasoningEffort?: number;
     runner?: "host";
-    snoozedUntil?: number;
     snoozeChosenAt?: number;
+    snoozedUntil?: number;
     source?: string;
     statelessMode?: boolean;
     status: string;
@@ -4871,8 +4871,8 @@ export interface Insert_threads {
     publicAccessToken?: string;
     reasoningEffort?: number;
     runner?: "host";
-    snoozedUntil?: number;
     snoozeChosenAt?: number;
+    snoozedUntil?: number;
     source?: string;
     statelessMode?: boolean;
     status: string;

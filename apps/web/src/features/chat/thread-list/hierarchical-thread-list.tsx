@@ -32,9 +32,12 @@ import useKeyboardNavigation from "./hooks/use-keyboard-navigation";
 import useThreadGroups from "./hooks/use-thread-groups";
 import useThreadHandlers from "./hooks/use-thread-handlers";
 import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
+import { renameFocusTarget } from "./rename-focus-target";
+import RenameThreadDialog from "./rename-thread-dialog";
 import SnoozeUntilDialog, { closeSnoozeDialogFor, threadRowFocusTarget } from "./snooze-until-dialog";
 import SortableThreadItem from "./sortable-thread-item";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
+import { isThreadLocked } from "./thread-lock";
 import type { BranchNode, GroupType, HierarchicalThreadListProperties, MinimalThreadRelationship, ThreadGroup } from "./types";
 import type { ThreadDateRange } from "./utilities";
 import { getGroupType, isDragBlocked, isGroupFullySelected, selectThreadIdsByDate } from "./utilities";
@@ -241,6 +244,9 @@ const VirtualizedThreadList: FC<{
 }> = memo(({ virtualItems, ...props }) => {
     const parentReference = useRef<HTMLDivElement>(null);
     const { t } = useLingui();
+    // Keyboard selection is an index into the flattened list, which the rows' own indexes (restarting in each group) do not match:
+    // the highlighted row is the one whose thread the selection names, so F2 and the menu key act on what is shown.
+    const keyboardThreadId = props.isKeyboardNavigating ? props.flattenedThreads[props.selectedThreadIndex]?.threadId : undefined;
 
     // Memoize estimateSize callback
     const estimateSize = useCallback(
@@ -348,10 +354,11 @@ const VirtualizedThreadList: FC<{
                                     handleUnpinThread={props.handleUnpinThread}
                                     index={item.index}
                                     isKeyboardNavigating={props.isKeyboardNavigating}
-                                    isKeyboardSelected={props.isKeyboardNavigating && item.index === props.selectedThreadIndex}
+                                    isKeyboardSelected={props.isKeyboardNavigating && item.thread.threadId === keyboardThreadId}
                                     isSelected={props.selectedThreadIds.has(item.thread.threadId)}
                                     isSelectionMode={props.isSelectionMode}
                                     key={item.thread.threadId}
+                                    keyboardThreadId={keyboardThreadId}
                                     loadingStates={props.loadingStates}
                                     node={item.thread}
                                     searchQuery={props.searchQuery}
@@ -638,6 +645,8 @@ const HierarchicalThreadList: FC<
         handleArrowUp,
         handleEnter,
         handleEscape: handleKeyboardEscape,
+        handleOpenSelectedMenu,
+        handleRenameSelected,
         isKeyboardNavigating,
         resetNavigation,
         selectedThreadIndex,
@@ -1043,6 +1052,8 @@ const HierarchicalThreadList: FC<
         handleArrowUp,
         handleEnter,
         handleKeyboardEscape,
+        handleOpenSelectedMenu,
+        handleRenameSelected,
         handleSelectAll,
         isKeyboardNavigating,
         isSelectionMode,
@@ -1085,7 +1096,6 @@ const HierarchicalThreadList: FC<
     const snoozeThreadId = useThreadListUIStore((state) => state.snoozeThreadId);
     const setSnoozeThreadId = useThreadListUIStore((state) => state.setSnoozeThreadId);
     const snoozeThread = useMemo(() => (snoozeThreadId === null ? undefined : findThreadNode(threadGroups, snoozeThreadId)), [snoozeThreadId, threadGroups]);
-    const listReference = useRef<HTMLDivElement>(null);
 
     // A dialog whose thread left the list is closed, so it cannot reopen when that thread comes back.
     useEffect(() => {
@@ -1096,6 +1106,38 @@ const HierarchicalThreadList: FC<
 
     // The target lives in the store, which outlives the list: leaving the list clears it, so it does not reopen on return.
     useEffect(() => () => setSnoozeThreadId(null), [setSnoozeThreadId]);
+
+    // The rename dialog and the open options menu live here, not in a row: a row can unmount while one is open
+    // (virtualization, a filter). Each closes with its thread: when the thread leaves the list, or a rename's thread is locked.
+    // The list root: rename returns focus here when the thread's row has unmounted.
+    const listRootReference = useRef<HTMLDivElement>(null);
+    const renameThreadId = useThreadListUIStore((state) => state.renameThreadId);
+    const setRenameThreadId = useThreadListUIStore((state) => state.setRenameThreadId);
+    const optionsMenuThreadId = useThreadListUIStore((state) => state.optionsMenuThreadId);
+    const setOptionsMenuThreadId = useThreadListUIStore((state) => state.setOptionsMenuThreadId);
+    const renameThread = renameThreadId === null ? undefined : flattenedThreads.find((node) => node.threadId === renameThreadId);
+    const optionsMenuThread = optionsMenuThreadId === null ? undefined : flattenedThreads.find((node) => node.threadId === optionsMenuThreadId);
+
+    useEffect(() => {
+        if (renameThreadId !== null && (renameThread === undefined || isThreadLocked(renameThread.lockedAt))) {
+            setRenameThreadId(null);
+        }
+    }, [renameThread, renameThreadId, setRenameThreadId]);
+
+    useEffect(() => {
+        if (optionsMenuThreadId !== null && (optionsMenuThread === undefined || isThreadLocked(optionsMenuThread.lockedAt))) {
+            setOptionsMenuThreadId(null);
+        }
+    }, [optionsMenuThread, optionsMenuThreadId, setOptionsMenuThreadId]);
+
+    // The targets live in the store, which outlives the list: leaving the list clears them, so neither reopens on return.
+    useEffect(
+        () => () => {
+            setRenameThreadId(null);
+            setOptionsMenuThreadId(null);
+        },
+        [setRenameThreadId, setOptionsMenuThreadId],
+    );
 
     // Show loading state if threads are still loading
     if (!threadsData) {
@@ -1289,8 +1331,14 @@ const HierarchicalThreadList: FC<
 
     // Regular rendering with groups
     return (
+        // The list root stays mounted while the list is, so it is the fallback focus target when a row unmounts during a rename.
+        // Focused as the fallback when a rename's row has unmounted: its ring is the only focus cue there, so it stays visible.
         <PullRequestCountsProvider threadIds={visibleThreadIds}>
-            <div className="relative flex flex-col gap-2" ref={listReference} tabIndex={-1}>
+            <div
+                className="focus-visible:ring-ring/50 relative flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2"
+                ref={listRootReference}
+                tabIndex={-1}
+            >
                 {isSelectionMode && (
                     <SelectionToolbar
                         isAllSelected={isAllSelected}
@@ -1334,8 +1382,21 @@ const HierarchicalThreadList: FC<
                         }}
                         open
                         previousUntil={snoozeThread.snoozedUntil}
-                        returnFocusTo={() => threadRowFocusTarget(listReference.current, snoozeThread.threadId)}
+                        returnFocusTo={() => threadRowFocusTarget(listRootReference.current, snoozeThread.threadId)}
                         threadId={snoozeThread.threadId}
+                    />
+                )}
+                {renameThread && !isThreadLocked(renameThread.lockedAt) && (
+                    <RenameThreadDialog
+                        onOpenChange={(open) => {
+                            if (!open) {
+                                setRenameThreadId(null);
+                            }
+                        }}
+                        open
+                        restoreFocus={() => renameFocusTarget(listRootReference.current, renameThread.threadId)}
+                        storedTitle={renameThread.storedTitle ?? renameThread.title}
+                        threadId={renameThread.threadId}
                     />
                 )}
             </div>

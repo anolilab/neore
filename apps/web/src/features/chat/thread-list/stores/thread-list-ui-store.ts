@@ -27,6 +27,10 @@ interface ThreadListUIState {
     // Selection mode
     isSelectionMode: boolean;
     lastSelectedIndex: number;
+    /** The thread whose options menu is open: its row's button, or the context-menu key. */
+    optionsMenuThreadId: string | null;
+    /** The thread the rename dialog is open for, opened by F2 or the options menu. */
+    renameThreadId: string | null;
     searchQuery: string;
 
     searchType: "threads" | "messages";
@@ -60,6 +64,8 @@ interface ThreadListUIActions {
 
     setEditingProject: (project: EditingProject | null) => void;
     setLastSelectedIndex: Dispatch<SetStateAction<number>>;
+    setOptionsMenuThreadId: (threadId: string | null) => void;
+    setRenameThreadId: (threadId: string | null) => void;
     setSearchQuery: (query: string) => void;
     setSearchType: (type: "threads" | "messages") => void;
 
@@ -90,6 +96,8 @@ const initialState: ThreadListUIState = {
     searchType: "threads",
     selectedCategory: undefined,
     selectedTagIds: [],
+    optionsMenuThreadId: null,
+    renameThreadId: null,
     selectedThreadIds: new Set(),
     showKeyboardHelp: false,
     snoozeThreadId: null,
@@ -130,6 +138,8 @@ export const useThreadListUIStore = create<ThreadListUIStore>()(
                 // Reset
                 reset: () => set(initialState),
                 setSnoozeThreadId: (threadId) => set({ snoozeThreadId: threadId }),
+                setOptionsMenuThreadId: (threadId) => set({ optionsMenuThreadId: threadId }),
+                setRenameThreadId: (threadId) => set({ renameThreadId: threadId }),
 
                 setEditingProject: (project) => set({ editingProject: project }),
                 setLastSelectedIndex: ((action: SetStateAction<number>) =>

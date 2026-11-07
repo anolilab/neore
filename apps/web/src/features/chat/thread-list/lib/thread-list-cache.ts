@@ -11,6 +11,8 @@
  * corrupt store reads as "no cache".
  */
 
+import { isThreadLocked } from "../thread-lock";
+
 const CACHE_PREFIX = "neore-thread-list:";
 const CACHE_VERSION = 2;
 
@@ -153,7 +155,7 @@ const pickAll = (source: unknown, fields: ReadonlyArray<string>): PersistedRecor
 const pickThread = (source: unknown): PersistedRecord | undefined => {
     const picked = pick(source, THREAD_FIELDS);
 
-    if (picked && picked.lockedAt !== undefined) {
+    if (picked && isThreadLocked(picked.lockedAt)) {
         delete picked.title;
     }
 

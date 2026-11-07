@@ -21,6 +21,8 @@ interface SortableThreadItemProperties {
     isKeyboardSelected: boolean;
     isSelected: boolean;
     isSelectionMode: boolean;
+    /** The keyboard-selected thread, so a child row can tell it is the one selected (the flat index means nothing inside a group). */
+    keyboardThreadId?: string;
     loadingStates: import("./types").LoadingStates;
     node: BranchNode;
     searchQuery: string;
@@ -42,6 +44,7 @@ const SortableThreadItem: FC<SortableThreadItemProperties> = ({
     handleUnpinThread,
     index,
     isKeyboardSelected,
+    keyboardThreadId,
     isSelected,
     isSelectionMode,
     loadingStates,
@@ -75,6 +78,7 @@ const SortableThreadItem: FC<SortableThreadItemProperties> = ({
                 isKeyboardSelected={isKeyboardSelected}
                 isSelected={isSelected}
                 isSelectionMode={isSelectionMode}
+                keyboardThreadId={keyboardThreadId}
                 loadingStates={loadingStates}
                 node={node}
                 searchQuery={searchQuery}

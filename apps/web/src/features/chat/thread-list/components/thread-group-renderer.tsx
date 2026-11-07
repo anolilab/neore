@@ -78,6 +78,9 @@ const ThreadGroupRenderer: FC<ThreadGroupRendererProps> = memo(
         toggleGroupCollapsed,
         updateThread,
     }) => {
+        // The keyboard-selected thread, by id: the index means nothing inside a group, and rows below the top level need the id too.
+        const keyboardThreadId = isKeyboardNavigating ? flattenedThreads[selectedThreadIndex]?.threadId : undefined;
+
         const { t } = useLingui();
 
         return (
@@ -117,7 +120,8 @@ const ThreadGroupRenderer: FC<ThreadGroupRendererProps> = memo(
                             <SortableContext items={group.threads.map((candidate) => candidate.threadId)} strategy={verticalListSortingStrategy}>
                                 {group.threads.map((thread) => {
                                     const threadIndexInFlattened = flattenedThreads.findIndex((candidate) => candidate.threadId === thread.threadId);
-                                    const isKeyboardSelected = isKeyboardNavigating && threadIndexInFlattened === selectedThreadIndex;
+                                    // Matched by id, as the virtualized list does: a child inside this group is selected by its id too.
+                                    const isKeyboardSelected = isKeyboardNavigating && thread.threadId === keyboardThreadId;
 
                                     return (
                                         <SortableThreadItem
@@ -136,6 +140,7 @@ const ThreadGroupRenderer: FC<ThreadGroupRendererProps> = memo(
                                             isSelected={selectedThreadIds.has(thread.threadId)}
                                             isSelectionMode={isSelectionMode}
                                             key={thread.threadId}
+                                            keyboardThreadId={keyboardThreadId}
                                             loadingStates={loadingStates}
                                             node={thread}
                                             searchQuery={searchQuery}

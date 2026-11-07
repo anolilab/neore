@@ -18327,10 +18327,10 @@
                         "const": "host",
                         "type": "string"
                       },
-                      "snoozedUntil": {
+                      "snoozeChosenAt": {
                         "type": "number"
                       },
-                      "snoozeChosenAt": {
+                      "snoozedUntil": {
                         "type": "number"
                       },
                       "status": {
