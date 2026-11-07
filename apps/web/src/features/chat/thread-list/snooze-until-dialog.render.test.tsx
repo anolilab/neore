@@ -6,6 +6,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SnoozeOutcome } from "./hooks/use-thread-state-actions";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
 
+const toasts = vi.hoisted(() => {
+    return { errors: [] as string[] };
+});
+
+vi.mock("@/lib/toast", () => {
+    return {
+        showError: (message: string) => {
+            toasts.errors.push(message);
+        },
+    };
+});
+
 const state = vi.hoisted(() => {
     return { snoozeAt: vi.fn<(threadId: string, until: number, previousUntil: number | undefined) => Promise<SnoozeOutcome>>() };
 });
@@ -123,6 +135,37 @@ describe("SnoozeUntilDialog when the send fails", () => {
 
         fireEvent.click(cancel);
 
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
+
+    it("a save cancelled while in flight that then comes back unconfirmed is reported on a toast", async () => {
+        // The save stays in flight until the test lets it finish, after the dialog has gone.
+        let released = false;
+
+        state.snoozeAt.mockImplementationOnce(async (): Promise<SnoozeOutcome> => {
+            await vi.waitFor(() => {
+                expect(released).toBe(true);
+            });
+
+            return "unconfirmed";
+        });
+        toasts.errors.length = 0;
+
+        const onOpenChange = vi.fn();
+        const { unmount } = render(<SnoozeUntilDialog onOpenChange={onOpenChange} open previousUntil={undefined} returnFocusTo={() => null} threadId="t1" />);
+
+        submit();
+        expect(await screen.findByText("Saving…")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+        // The list closes the dialog on Cancel, which unmounts it while the save is still in flight.
+        unmount();
+
+        released = true;
+
+        await vi.waitFor(() => {
+            expect(toasts.errors).toEqual(["Could not confirm the snooze. It may have saved; check the thread before saving again."]);
+        });
         expect(onOpenChange).toHaveBeenCalledWith(false);
     });
 });

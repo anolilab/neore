@@ -7,6 +7,8 @@ import type { FormEvent } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
+import { showError } from "@/lib/toast";
+
 import type { SnoozeOutcome } from "./hooks/use-thread-state-actions";
 import { useThreadStateActions } from "./hooks/use-thread-state-actions";
 import { customSnoozeCheck } from "./lib/thread-state-rules";
@@ -165,7 +167,11 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
             return;
         }
 
+        // The owner cancelled or escaped while the save was in flight, so the dialog is gone. The outcome is said on a toast instead:
+        // a save that may have landed must not vanish with the dialog.
         if (!opened.current) {
+            showError(failureMessage(outcome));
+
             return;
         }
 
