@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getClient } from "@/lib/lunora";
 import { settleQuietly } from "@/offline/quietly";
 
+import type { VoicePhase } from "./voice-input";
 import {
     MAX_CLIP_MS,
     MIC_BUSY_MESSAGE,
@@ -91,8 +92,6 @@ const leaveRecordingMode = async (owner: symbol | undefined, stopping?: Promise<
 
     await session.last;
 };
-
-export type VoicePhase = "idle" | "recording" | "transcribing";
 
 /**
  * The clip is a temporary file: it is deleted once it has been read, whatever happened. The audio is never kept.

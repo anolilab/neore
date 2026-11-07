@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { AccessibilityInfo, Platform, Pressable, Text } from "react-native";
 
-import type { VoicePhase } from "./use-voice-input";
+import type { VoicePhase } from "./voice-input";
 
 const STATUS: Record<VoicePhase, string | undefined> = {
     idle: undefined,

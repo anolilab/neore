@@ -1,0 +1,17 @@
+diff --git a/ios/ExpoSpeechRecognizer.swift b/ios/ExpoSpeechRecognizer.swift
+index b27842501f72e1a5a9382636397cbef30d5a2b30..315cc3dfd0eddb82a50dec4c944b78e8b1da7096 100644
+--- a/ios/ExpoSpeechRecognizer.swift
++++ b/ios/ExpoSpeechRecognizer.swift
+@@ -585,9 +585,9 @@ actor ExpoSpeechRecognizer: ObservableObject {
+     // These won't get emitted to the user, however
+     request.shouldReportPartialResults = options.interimResults || !options.continuous
+ 
+-    if recognizer.supportsOnDeviceRecognition {
+-      request.requiresOnDeviceRecognition = options.requiresOnDeviceRecognition
+-    }
++    // Always set: a request that requires on-device recognition must fail on a recognizer that cannot do it,
++    // never run on the network instead.
++    request.requiresOnDeviceRecognition = options.requiresOnDeviceRecognition
+ 
+     if let taskHint = options.iosTaskHint {
+       request.taskHint = taskHint.sfSpeechRecognitionTaskHint
