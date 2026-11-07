@@ -106,7 +106,9 @@ const attributionOfThread = async (ctx: ReadCtx, threadId: string | undefined): 
 const attributionForReplier = async (ctx: MutationCtx | QueryCtx, threadId: string, userId: string): Promise<Attribution> => {
     const attribution = await attributionOfThread(ctx, threadId);
 
-    if (attribution.projectKey === undefined || (await readableProject(ctx, attribution.projectKey as Id<"projects">, userId).catch(() => null))) {
+    // A failed read throws: the record is retried (or the side question refused before it is charged), never filed as
+    // if the replier could not open the project.
+    if (attribution.projectKey === undefined || (await readableProject(ctx, attribution.projectKey as Id<"projects">, userId))) {
         return attribution;
     }
 

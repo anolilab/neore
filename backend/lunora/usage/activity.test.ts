@@ -6,13 +6,32 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { getActivityHeatmap, getSkillBreakdown, recordReplyUsage } from "./activity";
+import { getActivityHeatmap, getSkillBreakdown, getThreadAttribution, recordReplyUsage } from "./activity";
 import { DEFAULT_SKILL_KEY } from "./activity-logic";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
             context.auth.userId ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, userId: context.auth.userId } : null,
+    };
+});
+
+const { projectReadFails } = vi.hoisted(() => {
+    return { projectReadFails: { value: false } };
+});
+
+vi.mock("../projects/functions", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../projects/functions")>();
+
+    return {
+        ...actual,
+        readableProject: async (...args: Parameters<typeof actual.readableProject>) => {
+            if (projectReadFails.value) {
+                throw new Error("project read failed");
+            }
+
+            return await actual.readableProject(...args);
+        },
     };
 });
 
@@ -230,6 +249,20 @@ describe("recording usage by project", () => {
         await record({ replyKey: "run-1", threadId: alpha.threadId });
 
         expect(await projectTotals(USER)).toStrictEqual({ [alpha.projectId!]: { costMicrodollars: 100, replies: 1, tokens: 10 } });
+    });
+
+    it("fails, rather than files no project, when the replier's access to the project cannot be read", async () => {
+        const alpha = await insertThread(USER, "Alpha");
+
+        projectReadFails.value = true;
+
+        try {
+            await expect(
+                harness.run(async (ctx: any) => await ctx.runQuery(getThreadAttribution, { threadId: alpha.threadId, userId: OTHER })),
+            ).rejects.toThrow("project read failed");
+        } finally {
+            projectReadFails.value = false;
+        }
     });
 
     it("writes no marker rows beyond the reply's own key when it records a reply first", async () => {
