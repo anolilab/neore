@@ -19,6 +19,10 @@ import type { MCPServerConfig, MCPServerOAuth } from "./mcp-tools";
 
 type Tool = ToolSet[string];
 
+/** The error a call gets when its server, reconnected after a 401, lists the tool with another definition. */
+export const RELISTED_TOOL_CHANGED =
+    "The call was not run: the server changed this tool's definition while reconnecting, and the inputs this reply has for it are the old ones. Do not call it again in this reply; tell the user it changed, so they can send the request again.";
+
 const UNAUTHORIZED_TEXT = /\b401\b|invalid_token|unauthori[sz]ed/iu;
 const MAX_CAUSE_DEPTH = 5;
 
@@ -130,6 +134,11 @@ export const createAuthRetrySession = (
     config: MCPServerConfig,
     tools: ToolSet,
     reconnect: (config: MCPServerConfig) => Promise<{ tools: ToolSet }>,
+    /**
+     * Whether the tool the reconnect listed is still the one first listed. The call's input was written for the first
+     * one, so a retry on a tool the server redefined in between is refused. Omitted, any relisted tool of the name runs.
+     */
+    sameTool?: (toolName: string, listed: Tool, relisted: Tool) => Promise<boolean>,
 ): { wrap: (toolName: string, tool: Tool) => Tool } => {
     const { oauth } = config;
     let current = tools;
@@ -178,10 +187,16 @@ export const createAuthRetrySession = (
                     oauth,
                     current,
                     async (set) => {
-                        const run = set[toolName]?.execute;
+                        const relisted = set[toolName];
+                        const run = relisted?.execute;
 
                         if (!run) {
                             throw new Error(oauth.reconnectHint);
+                        }
+
+                        // A check that fails counts as a change: the call is refused, never run unverified.
+                        if (relisted !== tool && sameTool && !(await sameTool(toolName, tool, relisted).catch(() => false))) {
+                            throw new Error(RELISTED_TOOL_CHANGED);
                         }
 
                         return await run(input, options);

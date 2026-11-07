@@ -28,7 +28,7 @@ import type { ToolProgressSink } from "./mcp-progress";
 import type { SearchMode } from "./tool-builder";
 import { ToolName } from "../tools";
 import { admittedKnowledgeSearchTool } from "../tools/knowledge-search";
-import { getToolsForModelAndMode, listBuiltInTools } from "./tool-builder";
+import { getToolsForModelAndMode, listBuiltInTools, PULL_REQUEST_TOOLS } from "./tool-builder";
 import type { ToolDescriptor, ToolPermissionOverrides } from "./tool-permissions";
 import type { RunOrigin } from "./tool-run-config";
 import { applyToolPermissions, toolPermissionKey } from "./tool-permissions";
@@ -104,6 +104,8 @@ export interface BuildAgentToolsResult {
     mcpLabels: McpToolLabels;
     /** Enabled MCP servers this run connected to — recorded in approval snapshots. */
     mcpServerNames: string[];
+    /** Runtime name -> fingerprint, for every MCP tool in `tools` (`mcp-tool-fingerprint.ts`). Recorded in approval snapshots. */
+    mcpToolFingerprints: Record<string, string>;
     /**
      * Runtime tool name -> stable permission key, for every tool in `tools`.
      * Recorded in approval snapshots so "Always allow" writes the right key
@@ -139,14 +141,11 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
     // skill's extra tool is not in the mode's set, and the narrowing below keeps
     // this from ever exceeding the snapshot). Unavailable tools are never added.
     const availableBuiltIns = new Set(listBuiltInTools().flatMap((tool) => (tool.available ? [tool.name as string] : [])));
-    const extraBuiltIns = (snapshot ? snapshot.toolNames : (skillTools?.additionalTools ?? [])).filter((name) => availableBuiltIns.has(name));
-
-    const builtInTools = withAdmittedBuiltIns(
-        getToolsForModelAndMode(model, searchMode, extraBuiltIns.length > 0 ? { additionalTools: extraBuiltIns } : undefined, { autoMediaEnrichment }),
-        admittedRun,
-    );
-
-    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers] = await Promise.all([
+    // A skill never adds the pull request tools: they join a run only through the link check below (a snapshot rebuild
+    // keeps the ones its run had, and each tool checks the thread again when it runs).
+    const baseExtraBuiltIns = snapshot ? snapshot.toolNames : (skillTools?.additionalTools ?? []).filter((name) => !PULL_REQUEST_TOOLS.includes(name));
+    const linkThreadId = threadId ?? deviceThreadId;
+    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers, pullRequestTools] = await Promise.all([
         ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),
         ctx.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId }),
         // A run nobody is at inherits no time-boxed allow, so it does not even read them.
@@ -168,7 +167,24 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
             return [];
         }),
+        // The pull request tools join only a thread with a linked pull request; a snapshot rebuild already names them.
+        snapshot || linkThreadId === undefined
+            ? []
+            : ctx
+                  .runQuery(internal.source_control.pr_agent.linkedPullRequestsOfThread, { threadId: linkThreadId, userId })
+                  .then((linked) => (linked && linked.links.length > 0 ? PULL_REQUEST_TOOLS : []))
+                  .catch((error: unknown) => {
+                      toolsLogger.warn("[TOOLS] Pull request links unavailable:", error);
+
+                      return [];
+                  }),
     ]);
+
+    const extraBuiltIns = [...baseExtraBuiltIns, ...pullRequestTools].filter((name) => availableBuiltIns.has(name));
+    const builtInTools = withAdmittedBuiltIns(
+        getToolsForModelAndMode(model, searchMode, extraBuiltIns.length > 0 ? { additionalTools: extraBuiltIns } : undefined, { autoMediaEnrichment }),
+        admittedRun,
+    );
 
     // Bearer tokens for servers the user signed in to. The FULL list, so a grant
     // whose server was removed is recognised as orphaned and revoked.
@@ -280,12 +296,17 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
     const permissionKeys = Object.fromEntries(Object.keys(tools).map((name) => [name, describe(name)?.key ?? toolPermissionKey("builtin", name)]));
     const mcpLabels: McpToolLabels = {};
+    const mcpToolFingerprints: Record<string, string> = {};
 
     for (const name of Object.keys(tools)) {
         const mcp = mcpResult.descriptors.get(name);
 
         if (mcp) {
             mcpLabels[name] = { serverName: mcp.serverName, toolName: mcp.toolName };
+
+            if (mcp.fingerprint !== undefined) {
+                mcpToolFingerprints[name] = mcp.fingerprint;
+            }
         }
 
         // Shown like an MCP call, with the device's name as the "server".
@@ -301,6 +322,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         mcpClients: mcpResult.clients,
         mcpLabels,
         mcpServerNames: selectedServers.map((s) => s.name),
+        mcpToolFingerprints,
         permissionKeys,
         repeatable: Object.keys(tools).filter((name) => isSafeToRepeat(name, describe(name))),
         tools,

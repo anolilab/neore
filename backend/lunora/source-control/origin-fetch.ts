@@ -67,6 +67,14 @@ export interface HostRequestOptions {
     /** `GET` unless a write says otherwise. */
     method?: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
     query?: Record<string, number | string>;
+    /**
+     * `return`: a redirect of this GET is answered as it is (status and `location`, body cancelled), not followed. For a
+     * host that hands a large download to another origin through a signed address: the caller fetches that address
+     * itself, without the token. Unset, a redirect is followed on the origin only.
+     */
+    redirect?: "return";
+    /** This request's deadline, when it must be shorter than the requester's own: a caller with a time budget of its own. */
+    timeoutMs?: number;
 }
 
 /** Resolves with an OK response, or throws {@link HostApiError}. */
@@ -82,7 +90,7 @@ export interface BoundRequesterConfig {
     via?: FetchWithDeadlineInit["via"];
 }
 
-const REDIRECT_STATUSES = new Set([301, 302, 307, 308]);
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 const isRateLimited = (response: Response, body: string | undefined): boolean =>
     response.status === 429 ||
@@ -128,6 +136,9 @@ export const createBoundRequester = ({
             url.searchParams.set(name, String(value));
         }
 
+        // A request's own deadline covers all of it, redirects included, not each hop afresh.
+        const until = options.timeoutMs === undefined ? undefined : Date.now() + options.timeoutMs;
+
         for (let hop = 0; ; hop += 1) {
             if (url.origin !== boundOrigin) {
                 throw new HostApiError("The request left the host's origin", 0);
@@ -144,7 +155,7 @@ export const createBoundRequester = ({
                 method,
                 // Followed by hand below, so a Location header cannot carry the token elsewhere.
                 redirect: "manual",
-                timeoutMs,
+                timeoutMs: until === undefined ? timeoutMs : Math.max(1, until - Date.now()),
                 via,
             }).catch(() => {
                 throw new HostApiError("The host could not be reached", 0, false, { unconfirmed: method !== "GET" });
@@ -171,6 +182,10 @@ export const createBoundRequester = ({
 
             // A body that fails to cancel is already gone: the redirect is judged on its headers alone.
             await response.body?.cancel().catch(() => undefined);
+
+            if (method === "GET" && options.redirect === "return") {
+                return new Response(null, { headers: location === null ? {} : { location }, status: response.status });
+            }
 
             if (method !== "GET") {
                 // The request reached the host, which may have acted before it redirected: the caller must not retry blind.
