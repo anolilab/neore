@@ -388,6 +388,13 @@ describe(beatWatchDecision, () => {
         });
     });
 
+    it("reads a loop that still saves rows as alive, though its beats do not land", () => {
+        expect(beatWatchDecision({ lastActivityAt: startedAt + 60_000, now: startedAt + RUN_STALE_MS, run: { startedAt, status: "running" } })).toStrictEqual({
+            delayMs: 60_000,
+            kind: "later",
+        });
+    });
+
     it("looks again when the beat would go stale, never sooner than a watch interval", () => {
         expect(beatWatchDecision({ now: startedAt + 10_000, run: { beatAt: startedAt + 10_000, startedAt, status: "running" } })).toStrictEqual({
             delayMs: RUN_STALE_MS,

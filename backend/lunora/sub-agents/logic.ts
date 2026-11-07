@@ -305,6 +305,8 @@ export const isLoopLive = (run: LoopState): boolean => run.status === "running" 
  * else would end it before {@link SUB_AGENT_STALE_MS}. A loop that is not live (ended, or a queued run) is left alone.
  */
 export const beatWatchDecision = (input: {
+    /** The newest row in the run's thread: a loop that still saves steps is alive, even if its beats do not land. */
+    lastActivityAt?: number;
     now: number;
     run: LoopState & { beatAt?: number };
 }): { kind: "dead" } | { delayMs: number; kind: "later" } | { kind: "skip" } => {
@@ -314,7 +316,7 @@ export const beatWatchDecision = (input: {
         return { kind: "skip" };
     }
 
-    const silentFor = input.now - Math.max(run.startedAt, run.beatAt ?? 0);
+    const silentFor = input.now - Math.max(run.startedAt, run.beatAt ?? 0, input.lastActivityAt ?? 0);
 
     return silentFor >= RUN_STALE_MS ? { kind: "dead" } : { delayMs: Math.max(RUN_STALE_MS - silentFor, RUN_WATCH_MS), kind: "later" };
 };

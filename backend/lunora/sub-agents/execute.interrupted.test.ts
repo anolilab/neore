@@ -147,6 +147,22 @@ describe("a sub-agent run whose worker died", () => {
         expect(posted).toContain(INTERRUPTED_RUN_MESSAGE);
     });
 
+    it("is left running while its loop saves steps, though its beats do not land", async () => {
+        const runId = await admit();
+        const claimedAt = await claimThenDie(runId);
+        const childThreadId = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "running", title: "Child", userId }))) as string;
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", runId, { childThreadId }));
+        // A step the loop saved two minutes after its claim, with no beat landing in between.
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(claimedAt + 120_000);
+        await harness.run(async (ctx: any) => await ctx.db.insert("messages", { order: 0, status: "success", stepOrder: 0, threadId: childThreadId, userId }));
+
+        await watch(runId, claimedAt, claimedAt + RUN_STALE_MS + 60_000);
+
+        expect(await runRow(runId)).toMatchObject({ status: "running" });
+    });
+
     it("is left running while its loop beats", async () => {
         const runId = await admit();
         const claimedAt = await claimThenDie(runId);

@@ -1440,7 +1440,8 @@ export const watchSubAgentRunBeat = async (ctx: MutationCtx, runId: Id<"subAgent
         return;
     }
 
-    const decision = beatWatchDecision({ now, run });
+    const activity = await workerActivity(ctx, run, "chunk");
+    const decision = beatWatchDecision({ lastActivityAt: activity.at, now, run });
 
     if (decision.kind === "later") {
         // A look that gave up would leave the run unwatched: nothing else restarts the chain.
