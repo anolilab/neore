@@ -1070,7 +1070,7 @@ export interface InternalApiTypes {
         };
         gdpr: {
             collectGuidesForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; guides: Array<{ createdAt: number; generatedAt: number; headSha: string; hostOrigin: string; instructions: string; number: number; proposals: Array<{ body: string; id: string; kind: "comment"; line: number; path: string; side: "new" | "old"; startLine: number | null; status: "applied" | "dismissed" | "proposed" } | { id: string; kind: "label"; name: string; reason: string; status: "applied" | "dismissed" | "proposed" }>; repository: string; source: "cloud" | "host"; status: "failed" | "generating" | "ready"; stops: Array<{ explanation: string; files: Array<{ path: string; ranges: Array<{ end: number; side: "new" | "old"; start: number }> }>; id: string; kind: "core" | "dependent" | "mechanical" | "uncovered"; title: string }>; summary: string }> }>;
-            collectPullRequestThreadsForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; links: Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }> }>;
+            collectPullRequestThreadsForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; links: Array<{ baseBranch?: string; createdAt: number; headBranch?: string; kind: "attached" | "linked" | "opened"; number: number; repository: string; threadId: string; title: string; url: string }> }>;
             collectReviewDraftsForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; drafts: Array<{ body: string; comments: Array<{ body: string; createdAt: number; id: string; line: number; path: string; side: "new" | "old"; startLine: number | null }>; commitId: string; createdAt: number; hostOrigin: string; number: number; repository: string; updatedAt: number; verdict: "approve" | "comment" | "request_changes" | null }> }>;
             collectWatchedRepositoriesForExport: FunctionReference<"query", { userId: string }, { watched: Array<{ createdAt: number; hostOrigin: string; lastStatus: "ok" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited"; repository: string; requested: Array<{ authorLogin: string; number: number; title: string; updatedAt: number; url: string }>; webhookEnabled: boolean }> }>;
             deleteUserGuides: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
@@ -1096,6 +1096,10 @@ export interface InternalApiTypes {
         };
         pr_link_retry: {
             retryOpenedPullRequestLink: FunctionReference<"action", { attempt: number; prUrl: string; threadId: string; userId: string }, null>;
+        };
+        pr_thread_attach: {
+            checkThreadForAttach: FunctionReference<"query", { threadId: string; userId: string }, { ok: true }>;
+            recordAttachedPullRequests: FunctionReference<"mutation", { links: Array<{ baseBranch?: string; headBranch?: string; number: number; repository: string }>; threadId: string; userId: string }, Array<{ number: number; repository: string; status: "attached" | "already_linked" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" | "pull_request_full" | "thread_full" }>>;
         };
         pr_threads: {
             recordOpenedPullRequest: FunctionReference<"mutation", { prUrl: string; threadId: string; userId: string }, { created: boolean; threadId: string }>;
@@ -2315,6 +2319,10 @@ export const internal: InternalApiTypes = {
         },
         pr_link_retry: {
             retryOpenedPullRequestLink: { __lunoraRef: "source_control_pr_link_retry:retryOpenedPullRequestLink" },
+        },
+        pr_thread_attach: {
+            checkThreadForAttach: { __lunoraRef: "source_control_pr_thread_attach:checkThreadForAttach" },
+            recordAttachedPullRequests: { __lunoraRef: "source_control_pr_thread_attach:recordAttachedPullRequests" },
         },
         pr_threads: {
             recordOpenedPullRequest: { __lunoraRef: "source_control_pr_threads:recordOpenedPullRequest" },
