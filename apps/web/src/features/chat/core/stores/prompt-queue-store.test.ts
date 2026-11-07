@@ -21,7 +21,7 @@ describe("prompt queue across a reload", () => {
         const uploading: PendingAttachment = { ...uploaded("", "late.png"), fileId: undefined, status: "uploading" };
 
         before.getState().enqueue("thread-1", { attachments: [uploaded("file-1", "cat.png"), uploading], id: "q1", text: "look at this" });
-        before.getState().enqueue("thread-1", { attachments: [uploaded("file-2", "dog.png")], id: "q2", text: "" });
+        before.getState().enqueue("thread-1", { attachments: [uploaded("file-2", "dog.png"), uploaded("file-2", "dog.png")], id: "q2", text: "" });
 
         expect(sessionStorage.getItem("neore:prompt-queue:thread-1")).not.toContain("secret bytes");
 
@@ -36,8 +36,10 @@ describe("prompt queue across a reload", () => {
             queue?.items.map((item) => [item.id, item.text, item.attachments.map((attachment) => attachment.fileId), item.droppedAttachments]),
         ).toStrictEqual([
             ["q1", "look at this", ["file-1"], 1],
-            ["q2", "", ["file-2"], undefined],
+            ["q2", "", ["file-2", "file-2"], undefined],
         ]);
+        // The same file attached twice comes back as two chips, removed one at a time.
+        expect(new Set(queue?.items[1]?.attachments.map((attachment) => attachment.id)).size).toBe(2);
         // The uploaded size comes back as a number, so the composer still counts it toward the context.
         expect(queue?.items[0]?.attachments[0]).toMatchObject({ name: "cat.png", restoredSize: 12, status: "complete", type: "image" });
 

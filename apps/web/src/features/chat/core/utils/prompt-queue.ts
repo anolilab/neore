@@ -356,7 +356,7 @@ export const takeNextToSend = async <A>({
  */
 export const restorePromptQueue = <A = never>(
     raw: string | null | undefined,
-    fromStored?: (attachment: StoredAttachment) => A,
+    fromStored?: (attachment: StoredAttachment, index: number) => A,
 ): PromptQueueState<A> | undefined => {
     if (!raw) {
         return undefined;
@@ -393,7 +393,7 @@ export const restorePromptQueue = <A = never>(
 
         const clean = stripHiddenText(text).text;
         const stored = Array.isArray(attachments) ? attachments.flatMap((entry: unknown) => readStoredAttachment(entry) ?? []) : [];
-        const kept = fromStored ? stored.map((entry) => fromStored(entry)) : [];
+        const kept = fromStored ? stored.map((entry, index) => fromStored(entry, index)) : [];
 
         // A text of nothing but hidden characters is empty once stripped: with no attachment either, sending it would be a blank prompt.
         if (!clean.trim() && kept.length === 0) {

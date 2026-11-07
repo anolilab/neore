@@ -79,11 +79,12 @@ export const toStoredAttachment = (attachment: PendingAttachment): StoredAttachm
         : undefined;
 
 /** An uploaded attachment again: the send reads only its file id, so its `File` is an empty stand-in. */
-export const fromStoredAttachment = (stored: StoredAttachment): PendingAttachment => {
+export const fromStoredAttachment = (stored: StoredAttachment, index: number): PendingAttachment => {
     return {
         file: new File([], stored.name, { type: stored.mediaType }),
         fileId: stored.fileId,
-        id: `restored-${stored.fileId}`,
+        // By position as well: the same uploaded file can be attached twice, and each chip is removed on its own.
+        id: `restored-${index}-${stored.fileId}`,
         name: stored.name,
         restoredSize: stored.size,
         status: "complete",
