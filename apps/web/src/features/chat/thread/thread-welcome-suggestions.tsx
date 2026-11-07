@@ -194,7 +194,7 @@ const ThreadWelcomeSuggestions: FC<{ className?: string }> = ({ className }) => 
 
                         return (
                             <TabsTrigger
-                                className="hover:text-foreground dark:hover:text-muted-foreground dark:data-active:text-muted-foreground flex items-center gap-1.5 px-3 py-2 text-sm after:bg-transparent dark:text-white dark:after:bg-transparent"
+                                className="hover:text-foreground dark:hover:text-muted-foreground dark:data-active:text-muted-foreground text-foreground flex items-center gap-1.5 px-3 py-2 text-sm after:bg-transparent dark:text-neutral-200 dark:after:bg-transparent"
                                 key={key}
                                 value={key}
                             >
