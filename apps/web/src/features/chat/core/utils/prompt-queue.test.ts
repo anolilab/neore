@@ -139,6 +139,10 @@ describe("prompt queue persistence", () => {
         expect(restorePromptQueue("{not json")).toBeUndefined();
         expect(restorePromptQueue(JSON.stringify({ items: "nope" }))).toBeUndefined();
         expect(restorePromptQueue(JSON.stringify({ items: [{ id: 1, text: "x" }, null] }))).toBeUndefined();
+        // One beside text is counted as removed, so the chip says so.
+        const beside = restorePromptQueue(JSON.stringify({ items: [{ attachments: [{ fileId: "", kind: "image", name: "a" }], id: "a", text: "x" }] }), String);
+
+        expect(beside?.items[0]?.droppedAttachments).toBe(1);
         // A stored attachment without a file id is no attachment, so a prompt made only of one restores as nothing.
         expect(
             restorePromptQueue(JSON.stringify({ items: [{ attachments: [{ fileId: "", kind: "image", name: "a" }], id: "a", text: "" }] }), String),

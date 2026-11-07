@@ -401,7 +401,8 @@ export const restorePromptQueue = <A = never>(
         }
 
         const stated = typeof droppedAttachments === "number" && droppedAttachments > 0 ? Math.floor(droppedAttachments) : 0;
-        const dropped = stated + stored.length - kept.length;
+        // Every stored entry not kept is lost, a malformed one too, so the chip says so.
+        const dropped = stated + (Array.isArray(attachments) ? attachments.length : 0) - kept.length;
         const restoredSteer = readSteer(steer);
 
         items.push({
