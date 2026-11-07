@@ -29,6 +29,9 @@ export class SessionLink {
 
     private opening = false;
 
+    /** The backend has answered an open with the thread: a later re-post only carries changed options. */
+    private confirmed = false;
+
     /** The info changed while an open was in flight: once it is answered, the open goes out again with the new info. */
     private stale = false;
 
@@ -147,6 +150,10 @@ export class SessionLink {
     }
 
     private async attempt(): Promise<void> {
+        // A re-post for a session the backend already opened (its options changed): a refusal of it drops the change only. A
+        // session the backend started knows its thread before its first open, so the thread alone does not say this.
+        const rebind = this.confirmed;
+
         try {
             const deviceId = this.poster.deviceId();
 
@@ -165,7 +172,7 @@ export class SessionLink {
 
             const result = await this.poster.request(payload);
 
-            if (result.kind === "refused" || (result.kind === "ok" && result.ended)) {
+            if ((result.kind === "refused" && !rebind) || (result.kind === "ok" && result.ended)) {
                 this.posted = false;
             }
 
@@ -179,10 +186,14 @@ export class SessionLink {
                     this.local();
                 } else {
                     this.threadId = result.threadId;
+                    this.confirmed = true;
                     this.poster.bound(this.sessionId, result.threadId);
                 }
             } else if (result.kind === "refused") {
-                this.local();
+                // A refused re-post leaves the session and its thread as they are: turns still post into it, and its close still goes out.
+                if (!rebind) {
+                    this.local();
+                }
             } else {
                 this.retryLater();
             }
@@ -203,6 +214,8 @@ export class SessionLink {
 
     private local(): void {
         this.threadId = null;
+        // A later open (after pairing) is a first open again.
+        this.confirmed = false;
         this.poster.released(this.sessionId);
     }
 

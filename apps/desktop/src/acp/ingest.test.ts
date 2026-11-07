@@ -413,6 +413,40 @@ describe("opening a session", () => {
         expect(backend.posts[2]?.post.events[0]).not.toHaveProperty("options");
     });
 
+    it("keeps the session on its thread when the backend refuses a re-post of its options", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext = [413];
+        host.sessionUpdated("s1", { ...INFO, options: { configOptions: [] } });
+        await settle();
+
+        // Turns still go to the thread, and the close still reaches the backend.
+        host.turnStarted("s1", "t1", "hello");
+        await settle(1000);
+        expect(backend.posts.some(({ post }) => post.turnId === "t1" && post.threadId === "thread-1")).toBe(true);
+
+        host.turnEnded("s1", "t1", "end_turn");
+        host.sessionEnded("s1");
+        await settle(1000);
+        expect(backend.posts.some(({ post }) => post.close === true)).toBe(true);
+    });
+
+    it("still sends a change made while a refused re-post was in flight", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext = [413];
+        host.sessionUpdated("s1", { ...INFO, options: { configOptions: [] } });
+        host.sessionUpdated("s1", { ...INFO, options: { modes: { available: [{ name: "Ask", value: "ask" }], current: "ask" } } });
+        await settle();
+
+        expect(backend.posts.at(-1)?.post.events[1]).toEqual({
+            kind: "session_options",
+            options: { modes: { available: [{ name: "Ask", value: "ask" }], current: "ask" } },
+        });
+    });
+
     it("sends no open for a change of a session that has ended", async () => {
         const host = poster();
 
@@ -467,16 +501,23 @@ describe("pairing after a session opened", () => {
 });
 
 describe("a session that never gets a thread", () => {
-    it("ends a turn that started during session_open when the backend refuses the open", async () => {
+    it.each([
+        ["it opened itself", undefined],
+        // The backend named the thread before the first open: a refusal of that open still leaves the session local.
+        ["the backend started it", "thread-1"],
+    ])("ends a turn that started during session_open when the backend refuses the open, when %s", async (_name, threadId) => {
         backend.respond = (post) => (post.threadId === undefined ? Response.json({ error: "no" }, { status: 403 }) : undefined);
 
         const host = poster();
 
-        host.sessionOpened("s1", INFO);
+        host.sessionOpened("s1", INFO, threadId);
+        await settle();
         host.turnStarted("s1", "t1", "hello");
         await settle(1000);
 
         expect(host.busy).toBe(false);
+        // The session went local: nothing of the turn is posted into a thread the backend refused to open.
+        expect(backend.posts.some(({ post }) => post.turnId === "t1")).toBe(false);
     });
 
     it("stops retrying session_open once the local session has ended", async () => {
