@@ -229,6 +229,7 @@ const useThreadGroups = (
                 order: threadOrderMap.get(threadId),
                 projectId: thread.projectId,
                 relevantMessages: thread.relevantMessages,
+                runner: thread.runner,
                 snoozedUntil: thread.snoozedUntil,
                 source: thread.source,
                 statelessMode: thread.statelessMode,

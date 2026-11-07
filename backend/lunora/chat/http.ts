@@ -28,6 +28,7 @@ import { vGoalRunConfig } from "./goals/validators";
 import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
+import { capTitlePrompt, fileOnlyPromptPart } from "./lib/first-user-prompt";
 import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
 import { documentTextPart } from "./lib/attached-text";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
@@ -573,7 +574,7 @@ const runChatStartOnShard = async (
     } else if (contentType === "image") {
         messageContent.push({ text: "Generate an image", type: "text" });
     } else {
-        messageContent.push({ text: "Please analyze the uploaded file.", type: "text" });
+        messageContent.push(fileOnlyPromptPart());
     }
 
     // Page context goes in front of the typed text, like extracted documents,
@@ -806,12 +807,29 @@ const runChatStartOnShard = async (
     // (`chat/lib/start-title-jobs.ts`).
     const titleJobs: (() => Promise<unknown>)[] = [];
     const scheduleTitleJobs = (titleThreadId: string, isNewThread: boolean): void => {
-        const prompt = body.prompt ?? " ";
+        // Capped where it is sent: the title is generated from the first characters of the prompt only.
+        const prompt = capTitlePrompt(body.prompt ?? " ");
 
         for (const job of startTitleJobs(contentType, isNewThread)) {
-            const reference = job === "title" ? internal.chat.functions.createTitleChat : internal.chat.functions.createCategoryChat;
+            if (job === "title") {
+                // A fresh id per scheduled title job: its retries carry the same id (and so the same billing key), a later message's job does not.
+                const jobId = crypto.randomUUID();
 
-            titleJobs.push(async () => await httpScheduler(context).runAfter(0, reference, { prompt, threadId: titleThreadId }));
+                // The prompt's id: the job refuses to title from a prompt deleted before it runs.
+                titleJobs.push(
+                    async () =>
+                        await httpScheduler(context).runAfter(0, internal.chat.functions.createTitleChat, {
+                            jobId,
+                            prompt,
+                            promptId: messageId,
+                            threadId: titleThreadId,
+                        }),
+                );
+            } else {
+                titleJobs.push(
+                    async () => await httpScheduler(context).runAfter(0, internal.chat.functions.createCategoryChat, { prompt, threadId: titleThreadId }),
+                );
+            }
         }
     };
 
