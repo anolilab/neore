@@ -40,15 +40,15 @@ export const signOutOnDevice = async ({ clearCache, forgetLastChat, revokeGrant,
  * Never blocks: a failure only warns, and the next signed-out start tries again.
  */
 export const emptyCacheWhileSignedOut = async ({ clearCache, forgetLastChat, warn }: Omit<SignOutSteps, "revokeGrant">): Promise<void> => {
-    try {
-        await clearCache();
-    } catch (error) {
-        warn("Could not empty the offline cache.", error);
+    // The forget is queued at once, not after the cache wipe: the sign-in screen is already up, and a chat saved by a
+    // quick sign-in must queue after this forget, or the forget would delete it.
+    const [cache, lastChat] = await Promise.allSettled([clearCache(), forgetLastChat()]);
+
+    if (cache.status === "rejected") {
+        warn("Could not empty the offline cache.", cache.reason);
     }
 
-    try {
-        await forgetLastChat();
-    } catch (error) {
-        warn("Could not forget the last viewed chat.", error);
+    if (lastChat.status === "rejected") {
+        warn("Could not forget the last viewed chat.", lastChat.reason);
     }
 };

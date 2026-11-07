@@ -84,6 +84,42 @@ describe("emptyCacheWhileSignedOut", () => {
         expect(forgetLastChat).toHaveBeenCalledTimes(1);
     });
 
+    it("asks to forget the saved chat before the cache wipe ends, so a chat saved by a quick sign-in is queued after it", async () => {
+        const calls: string[] = [];
+
+        await emptyCacheWhileSignedOut({
+            clearCache: async () => {
+                calls.push("wipe started");
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 0);
+                });
+                calls.push("wipe ended");
+            },
+            forgetLastChat: async () => {
+                calls.push("forget");
+            },
+            warn: vi.fn(),
+        });
+
+        expect(calls).toEqual(["wipe started", "forget", "wipe ended"]);
+    });
+
+    it("only warns when the saved chat cannot be forgotten", async () => {
+        const error = new Error("keychain locked");
+        const warn = vi.fn();
+
+        await expect(
+            emptyCacheWhileSignedOut({
+                clearCache: async () => undefined,
+                forgetLastChat: async () => {
+                    throw error;
+                },
+                warn,
+            }),
+        ).resolves.toBeUndefined();
+        expect(warn).toHaveBeenCalledWith("Could not forget the last viewed chat.", error);
+    });
+
     it("only warns when the cache cannot be emptied", async () => {
         const warn = vi.fn();
 
