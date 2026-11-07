@@ -91,7 +91,10 @@ describe("UsageProjectBreakdown", () => {
     it("shows a plain member their own breakdown, with No project, and never asks for the organization's", async () => {
         const { rerender } = render(<UsageProjectBreakdown backfilling days={30} />, { wrapper });
 
+        // While the figures load, the card says so to screen readers.
+        expect(screen.getByRole("status").textContent).toContain("Loading usage…");
         expect(await screen.findByText("Alpha")).toBeDefined();
+        expect(screen.queryByRole("status")).toBeNull();
         expect(screen.getByText("No project")).toBeDefined();
         expect(screen.queryByRole("group", { name: "Whose usage" })).toBeNull();
 

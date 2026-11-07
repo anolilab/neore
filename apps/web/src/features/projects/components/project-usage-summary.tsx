@@ -50,9 +50,14 @@ const ProjectUsageSummary = ({ projectId }: ProjectUsageSummaryProps) => {
                 <Label className="text-sm font-medium" id="project-usage-label">{t`Usage`}</Label>
                 <p className="text-muted-foreground text-xs">{t`Your replies, tokens and spend in this project over the last 30 days.`}</p>
             </div>
+            {isPending && (
+                <p className="sr-only" role="status">
+                    {t`Loading usage…`}
+                </p>
+            )}
             {isError && <p className="text-destructive text-sm">{t`Could not load this project's usage.`}</p>}
             {!isError && (
-                <dl className="grid grid-cols-3 gap-4">
+                <dl aria-busy={isPending} className="grid grid-cols-3 gap-4">
                     {stats.map((stat) => (
                         <div key={stat.label}>
                             <dt className="text-muted-foreground text-xs">{stat.label}</dt>

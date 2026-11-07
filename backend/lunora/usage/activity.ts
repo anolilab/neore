@@ -40,6 +40,7 @@ import {
     attributionRows,
     ORGANIZATION_SKILL_KEY,
     PROJECT_ROW_LIMIT,
+    organizationFiledKey,
     PROJECT_SKILL_KEY,
     projectFiledKey,
     remainderOf,
@@ -92,8 +93,34 @@ const attributionOfThread = async (ctx: DbCtx, threadId: string | undefined): Pr
     return await attributionOf(ctx, await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } }));
 };
 
-/** Whether an attribution files the reply anywhere. */
-const filesAnywhere = (attribution: Attribution): boolean => attribution.projectKey !== undefined || attribution.organizationId !== undefined;
+/**
+ * Files a recorded reply under its project and organization, each part once: the project walk may have filed the
+ * project row already (it marks `project:<key>`), but it never files an organization row, which is marked on its own.
+ */
+const fileAttribution = async (
+    ctx: DbCtx,
+    reply: { at: number; replyKey: string; userId: string },
+    attribution: Attribution,
+    date: string,
+    amounts: { costMicrodollars: number; tokens: number },
+): Promise<void> => {
+    const { at, replyKey, userId } = reply;
+    const fileProject = attribution.projectKey !== undefined && !(await isReplyRecorded(ctx, userId, projectFiledKey(replyKey)));
+    const fileOrganization = attribution.organizationId !== undefined && !(await isReplyRecorded(ctx, userId, organizationFiledKey(replyKey)));
+    const increments: AttributionIncrement[] = [];
+
+    if (fileProject) {
+        increments.push({ ...amounts, date, replies: 1, ...attribution, organizationRow: false });
+        await markReplyRecorded(ctx, userId, projectFiledKey(replyKey), at);
+    }
+
+    if (fileOrganization) {
+        increments.push({ ...amounts, date, organizationId: attribution.organizationId, replies: 1 });
+        await markReplyRecorded(ctx, userId, organizationFiledKey(replyKey), at);
+    }
+
+    await addToAttributionRollup(ctx, userId, increments, at);
+};
 
 /** Adds `increments` to the user's per-day project and organization rows. */
 export const addToAttributionRollup = async (ctx: DbCtx, userId: string, increments: ReadonlyArray<AttributionIncrement>, at: number): Promise<void> => {
@@ -214,16 +241,11 @@ export const recordReplyUsage = internalMutation
         const tokens = Math.max(0, Math.round(args.tokens));
         const recorded = await ctx.db.usageReplies.findFirst({ where: { replyKey: args.replyKey, userId: args.userId } });
 
-        // A redelivered job, or a reply the backfill reached first. The first walk files no project: when the
-        // project walk passed this reply while it was still running, its project is filed here, once.
+        // A redelivered job (already filed everywhere), or a reply the backfill reached first: the first walk files no
+        // project and no walk files an organization, so whatever is still missing is filed here, each part once.
         if (recorded) {
-            const attribution = recorded.projectFiled ? {} : await attributionOfThread(ctx, args.threadId);
-
-            if (filesAnywhere(attribution) && !(await isReplyRecorded(ctx, args.userId, projectFiledKey(args.replyKey)))) {
-                const date = await countedDayOf(ctx, args);
-
-                await markReplyRecorded(ctx, args.userId, projectFiledKey(args.replyKey), args.at);
-                await addToAttributionRollup(ctx, args.userId, [{ costMicrodollars, date, replies: 1, tokens, ...attribution }], args.at);
+            if (!recorded.projectFiled) {
+                await fileAttribution(ctx, args, await attributionOfThread(ctx, args.threadId), await countedDayOf(ctx, args), { costMicrodollars, tokens });
             }
 
             return null;
@@ -247,12 +269,7 @@ export const recordReplyUsage = internalMutation
             true,
         );
 
-        const attribution = await attributionOfThread(ctx, args.threadId);
-
-        // The project walk got there first: a reply that finished before it passed the thread.
-        if (filesAnywhere(attribution) && !(await isReplyRecorded(ctx, args.userId, projectFiledKey(args.replyKey)))) {
-            await addToAttributionRollup(ctx, args.userId, [{ costMicrodollars, date: args.date, replies: 1, tokens, ...attribution }], args.at);
-        }
+        await fileAttribution(ctx, args, await attributionOfThread(ctx, args.threadId), args.date, { costMicrodollars, tokens });
 
         return null;
     });

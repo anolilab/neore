@@ -825,4 +825,51 @@ describe("project backfill", () => {
         expect(rows.find((row) => row.skillKey === TOTAL_SKILL_KEY)?.date).toBe("2026-09-20");
         expect(rows.find((row) => row.skillKey === PROJECT_SKILL_KEY)?.date).toBe("2026-09-20");
     });
+
+    it("files a reply's organization row when its live record lands after the project walk filed its project", async () => {
+        const orgProject = await harness.run(
+            async (ctx: any) => await ctx.db.insert("projects", { createdAt: DAY_1, organizationId: "org_1", title: "Org", userId: USER }),
+        );
+        const thread = await insertThread(DAY_1, [[prompt(), reply(10, 100)]], "active", orgProject);
+        const key = thread.rowIds[0]![1]!;
+
+        vi.setSystemTime(STARTED);
+        await start();
+        await drain();
+
+        const lateRecord = async () =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(recordReplyUsage, {
+                        at: STARTED,
+                        costMicrodollars: 100,
+                        date: "2026-09-20",
+                        replyKey: key,
+                        skillKey: DEFAULT_SKILL_KEY,
+                        startedAt: DAY_1,
+                        threadId: thread.threadId,
+                        tokens: 10,
+                        userId: USER,
+                    }),
+            );
+
+        // Both walks reached the reply first; the late live record, delivered twice, adds the organization row once.
+        await lateRecord();
+        await lateRecord();
+
+        const rows = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.usageDaily.findMany({ where: { userId: USER } });
+
+            return page.filter((row: any) => row.skillKey !== TOTAL_SKILL_KEY && row.skillKey !== DEFAULT_SKILL_KEY);
+        });
+
+        expect(
+            rows
+                .map((row: any) => [row.skillKey, row.organizationId ?? null, row.costMicrodollars])
+                .toSorted((a: string[], b: string[]) => a[0]!.localeCompare(b[0]!)),
+        ).toStrictEqual([
+            ["__organization__", "org_1", 100],
+            ["__project__", null, 100],
+        ]);
+    });
 });

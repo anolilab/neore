@@ -154,9 +154,10 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                     )}
                 </div>
             </CardHeader>
-            <CardContent>
+            <CardContent aria-busy={active.isPending}>
                 {active.isPending && (
-                    <div className="space-y-2">
+                    <div className="space-y-2" role="status">
+                        <span className="sr-only">{t`Loading usage…`}</span>
                         {[1, 2, 3].map((index) => (
                             <Skeleton className="h-10 w-full" key={index} />
                         ))}

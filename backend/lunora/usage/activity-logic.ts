@@ -210,10 +210,15 @@ export interface Attribution {
     projectKey?: string;
 }
 
+/** The key `usageReplies` holds once a reply's organization row has been filed apart from its project row. */
+export const organizationFiledKey = (replyKey: string): string => `organization:${replyKey}`;
+
 /** What some replies of one day add to their project's and organization's rows. */
 export interface AttributionIncrement extends Attribution {
     costMicrodollars: number;
     date: string;
+    /** `false`: file the project row only (the organization row is filed, or will be, on its own). */
+    organizationRow?: boolean;
     replies: number;
     tokens: number;
 }
@@ -252,7 +257,7 @@ export const attributionRows = (increments: ReadonlyArray<AttributionIncrement>)
         }
     };
 
-    for (const { costMicrodollars, date, organizationId, projectInOrganization, projectKey, replies, tokens } of increments) {
+    for (const { costMicrodollars, date, organizationId, organizationRow, projectInOrganization, projectKey, replies, tokens } of increments) {
         const amounts = { costMicrodollars, date, replies, tokens };
 
         // A member's own project in an organization's thread stays theirs: its row carries no organization, so the
@@ -266,7 +271,7 @@ export const attributionRows = (increments: ReadonlyArray<AttributionIncrement>)
             });
         }
 
-        if (organizationId !== undefined) {
+        if (organizationId !== undefined && organizationRow !== false) {
             add({ ...amounts, organizationId, skillKey: ORGANIZATION_SKILL_KEY });
         }
     }
