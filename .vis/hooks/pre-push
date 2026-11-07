@@ -34,7 +34,7 @@ rm -f "$list"
 # checks. Git lists "<local ref> <local sha> <remote ref> <remote sha>" on stdin
 # for each pushed ref; an all-zero sha is a deletion.
 skip() {
-    echo "pre-push: type check skipped: $1; CI checks the pushed commit." >&2
+    printf 'pre-push: type check skipped: %s; CI checks the pushed commit.\n' "$1" >&2
     exit 0
 }
 head=$(git rev-parse HEAD)
@@ -51,6 +51,12 @@ done
 [ -n "$pushed" ] || skip "nothing but deletions is pushed"
 git diff --quiet HEAD -- || skip "the working tree has uncommitted changes"
 [ -z "$(git ls-files --others --exclude-standard -- '*.ts' '*.tsx' '*.mts' '*.cts')" ] || skip "there are untracked TypeScript files"
+# tsrs ships binaries for these platforms only (none for Windows on Arm). Decided by
+# platform, so a missing install or a broken binary still fails the push.
+case "$(node -p 'process.platform + "-" + process.arch')" in
+    darwin-arm64 | darwin-x64 | linux-arm64 | linux-x64 | win32-x64) ;;
+    *) skip "tsrs has no binary for this platform" ;;
+esac
 # Quiet: a failing task still prints its errors; cached ones (the backend codegen
 # replays its whole advisor report) do not.
 pnpm exec vis affected lint:types:fast --base="$base" --output-style=quiet || exit 1
