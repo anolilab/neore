@@ -417,11 +417,10 @@ describe(readThreadsWithin, () => {
 
     it("goes on from the next page when the page a cursor named has shrunk since", async () => {
         const read = await readThreadsWithin(
-            async (after) => {
-                return after === null
+            async (after) =>
+                after === null
                     ? { endCursor: "p2", hasMore: true, items: [thread("a", [comment(1)])], total: 2 }
-                    : { endCursor: null, hasMore: false, items: [thread("b", [comment(2)])], total: 2 };
-            },
+                    : { endCursor: null, hasMore: false, items: [thread("b", [comment(2)])], total: 2 },
             { page: null, skip: 8 },
         );
 
