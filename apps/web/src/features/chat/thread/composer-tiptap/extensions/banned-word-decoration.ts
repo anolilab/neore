@@ -8,9 +8,12 @@
  * Matches are communicated via a typed transaction meta key (not options
  * mutation) so the plugin state is always consistent with the document.
  */
-import { Extension } from "@tiptap/core";
+import { Extension, getTextSerializersFromSchema } from "@tiptap/core";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
+
+type TextSerializers = ReturnType<typeof getTextSerializersFromSchema>;
 
 export interface BannedWordMatch {
     endIndex: number;
@@ -44,58 +47,86 @@ declare module "@tiptap/core" {
     }
 }
 
+/** The separator the composer reads its draft with (`editor.getText({ blockSeparator: "\n" })`). */
+const BLOCK_SEPARATOR = "\n";
+
+/** A stretch of the draft text: editable text (a text node) or a serialised leaf such as a quote chip. */
+interface TextSegment {
+    docStart: number;
+    /** A leaf rendered as text (a chip): its text is in the draft, but the editor cannot mark it. */
+    opaque: boolean;
+    textEnd: number;
+    textStart: number;
+}
+
+/**
+ * Walks the document exactly as Tiptap's `getText` does (`getTextBetween`), so a match's offset in the draft lands on
+ * the same character in the editor: every block after the first adds a separator, a node with a text serialiser
+ * (`renderText`, a quote chip) contributes its serialised text and is not descended into, and text nodes contribute
+ * their text. The serialised text is what the original walk left out, which pushed later matches off their words.
+ */
+const buildSegments = (document_: ProseMirrorNode, serializers: TextSerializers): TextSegment[] => {
+    const segments: TextSegment[] = [];
+    const range = { from: 0, to: document_.content.size };
+    let textOffset = 0;
+
+    document_.nodesBetween(range.from, range.to, (node, pos, parent, index) => {
+        if (node.isBlock && pos > range.from) {
+            textOffset += BLOCK_SEPARATOR.length;
+        }
+
+        const serialize = serializers[node.type.name];
+
+        if (serialize) {
+            const text = parent ? serialize({ index, node, parent, pos, range }) : "";
+
+            segments.push({ docStart: pos, opaque: true, textEnd: textOffset + text.length, textStart: textOffset });
+            textOffset += text.length;
+
+            return false;
+        }
+
+        if (node.isText) {
+            const { length } = node.text ?? "";
+
+            segments.push({ docStart: pos, opaque: false, textEnd: textOffset + length, textStart: textOffset });
+            textOffset += length;
+        }
+
+        return true;
+    });
+
+    return segments;
+};
+
+/** The document position of a draft offset, or null when it falls in a chip or outside the text. */
+const positionOf = (segments: TextSegment[], index: number, isEnd: boolean): number | null => {
+    for (const segment of segments) {
+        const inside = isEnd ? index > segment.textStart && index <= segment.textEnd : index >= segment.textStart && index < segment.textEnd;
+
+        if (inside) {
+            return segment.opaque ? null : segment.docStart + (index - segment.textStart);
+        }
+    }
+
+    return null;
+};
+
 /**
  * Build a DecorationSet from banned word matches.
  * Maps character offsets (from the full text) to ProseMirror document positions.
  */
-const buildDecorations = (document_: any, matches: BannedWordMatch[]): DecorationSet => {
+const buildDecorations = (document_: ProseMirrorNode, matches: BannedWordMatch[], serializers: TextSerializers): DecorationSet => {
     if (matches.length === 0) {
         return DecorationSet.empty;
     }
 
+    const segments = buildSegments(document_, serializers);
     const decorations: Decoration[] = [];
 
-    // Build a mapping from text offset → doc position.
-    // Walk the document and track cumulative text length.
-    let textOffset = 0;
-    const posMap: { docStart: number; textEnd: number; textStart: number }[] = [];
-
-    document_.descendants((node: any, pos: number) => {
-        if (node.isText) {
-            posMap.push({
-                docStart: pos,
-                textEnd: textOffset + node.text.length,
-                textStart: textOffset,
-            });
-            textOffset += node.text.length;
-        } else if (node.isBlock && pos > 0) {
-            // Block boundaries add a newline in getText()
-            textOffset += 1; // newline separator
-        }
-
-        return true; // continue descending
-    });
-
     for (const match of matches) {
-        // Find the document positions for this match
-        let from: number | null = null;
-        let to: number | null = null;
-
-        for (const segment of posMap) {
-            // Check if match.startIndex falls in this segment
-            if (from === null && match.startIndex >= segment.textStart && match.startIndex < segment.textEnd) {
-                from = segment.docStart + (match.startIndex - segment.textStart);
-            }
-
-            // Check if match.endIndex falls in this segment
-            if (to === null && match.endIndex > segment.textStart && match.endIndex <= segment.textEnd) {
-                to = segment.docStart + (match.endIndex - segment.textStart);
-            }
-
-            if (from !== null && to !== null) {
-                break;
-            }
-        }
+        const from = positionOf(segments, match.startIndex, false);
+        const to = positionOf(segments, match.endIndex, true);
 
         if (from !== null && to !== null && from < to) {
             decorations.push(
@@ -134,6 +165,9 @@ const BannedWordDecoration = Extension.create<BannedWordDecorationOptions>({
     },
 
     addProseMirrorPlugins() {
+        // The serialisers `getText` uses, so the offsets computed from the draft text match the document.
+        const serializers = getTextSerializersFromSchema(this.editor.schema);
+
         return [
             new Plugin({
                 key: bannedWordPluginKey,
@@ -149,7 +183,7 @@ const BannedWordDecoration = Extension.create<BannedWordDecorationOptions>({
 
                         if (newMatches !== undefined) {
                             return {
-                                decorations: buildDecorations(newState.doc, newMatches),
+                                decorations: buildDecorations(newState.doc, newMatches, serializers),
                                 matches: newMatches,
                             };
                         }
@@ -159,7 +193,7 @@ const BannedWordDecoration = Extension.create<BannedWordDecorationOptions>({
                         // the caller dispatches setBannedWordMatches([]).
                         if (tr.docChanged && oldPluginState.matches.length > 0) {
                             return {
-                                decorations: buildDecorations(newState.doc, oldPluginState.matches),
+                                decorations: buildDecorations(newState.doc, oldPluginState.matches, serializers),
                                 matches: oldPluginState.matches,
                             };
                         }

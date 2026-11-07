@@ -40,6 +40,7 @@ import type { FileMentionMatch } from "./extensions/file-mention";
 import FileMention from "./extensions/file-mention";
 import GhostCompletion from "./extensions/ghost-completion";
 import PromptHistoryKeys from "./extensions/prompt-history-keys";
+import QuoteChip, { refreshQuoteChipLabels } from "./extensions/quote-chip";
 import type { SlashCommandMatch } from "./extensions/slash-command";
 import SlashCommand from "./extensions/slash-command";
 import SubmitOnEnter from "./extensions/submit-on-enter";
@@ -298,6 +299,11 @@ const ComposerTiptapEditor = ({
                 },
             }),
             BannedWordDecoration,
+            QuoteChip.configure({
+                labels: () => {
+                    return { goToReply: t`Go to reply`, notOnScreen: t`The quoted reply is not on screen` };
+                },
+            }),
             // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             SlashCommand.configure({
                 onStateChange: handleSlashStateChange,
@@ -415,6 +421,15 @@ const ComposerTiptapEditor = ({
             refreshVimMode(editor.view);
         }
     }, [isVimEnabled, editor]);
+
+    // A locale switch changes the labels of the quote chips already drawn; the editor itself is not recreated for it. The
+    // switch re-renders the composer, so the chips are repainted after each render. That is one small query, and a repaint
+    // only writes a label that changed.
+    useEffect(() => {
+        if (editor && !editor.isDestroyed) {
+            refreshQuoteChipLabels(editor.view.dom);
+        }
+    });
 
     // Update banned word decorations when matches change
     useEffect(() => {

@@ -17,7 +17,6 @@ import { createPortal } from "react-dom";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { requestComposerRestore } from "@/features/chat/core/utils/composer-restore";
-import { formatQuote } from "@/features/chat/core/utils/quote-selection";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
@@ -422,7 +421,7 @@ const TextSelectionMenu: FC<TextSelectionMenuProps> = ({ isTextModel = true, thr
             return;
         }
 
-        requestComposerRestore({ append: true, files: [], text: formatQuote(selection.text) });
+        requestComposerRestore({ append: true, files: [], quote: { messageId: selection.messageId, text: selection.text }, text: "" });
         setAnnouncement(t`Quoted in composer`);
         setSelection(null);
         globalThis.getSelection()?.removeAllRanges();
