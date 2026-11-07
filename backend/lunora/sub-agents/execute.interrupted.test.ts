@@ -8,31 +8,28 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
-import { RUN_STALE_MS } from "../chat/lib/interrupted-run";
+import { RUN_BEAT_MS, RUN_STALE_MS } from "../chat/lib/interrupted-run";
 import schema from "../schema";
 import { admitSubAgentRun, admitWorkerRun, beatSubAgentRun, claimRun, watchSubAgentRunBeat } from "./functions";
 import { INTERRUPTED_RUN_MESSAGE } from "./logic";
 
 const { agent, registry } = vi.hoisted(() => {
-    return { agent: { calls: 0, holdMs: 0 }, registry: new Map<string, unknown>() };
+    return { agent: { beats: 0, calls: 0 }, registry: new Map<string, unknown>() };
 });
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
 vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
-
-// A beat every few milliseconds, so a run held for a moment beats inside one test.
-vi.mock("../chat/lib/interrupted-run", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("../chat/lib/interrupted-run")>()), RUN_BEAT_MS: 5 };
-});
 
 vi.mock("../chat/lib/headless-run", () => {
     return {
         runHeadlessAgent: async () => {
             agent.calls += 1;
 
-            if (agent.holdMs > 0) {
+            // A run that lasts this many beat intervals, on the faked interval clock; the yield lets each beat's write land.
+            if (agent.beats > 0) {
+                vi.advanceTimersByTime(agent.beats * RUN_BEAT_MS);
                 await new Promise((resolve) => {
-                    setTimeout(resolve, agent.holdMs);
+                    setImmediate(resolve);
                 });
             }
 
@@ -65,8 +62,8 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+    agent.beats = 0;
     agent.calls = 0;
-    agent.holdMs = 0;
     harness = lunoraTest(schema as never);
     userId = (await harness.run(
         async (ctx: any) => await ctx.db.insert("user", { createdAt: 0, email: "u@example.com", emailVerified: true, name: "U", updatedAt: 0 }),
@@ -75,6 +72,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+    vi.useRealTimers();
     harness.close();
 });
 
@@ -188,7 +186,8 @@ describe("a sub-agent run whose worker died", () => {
 
 describe("a sub-agent run whose loop lives", () => {
     it("beats while it runs, and its late watch and beats leave the finished run alone", async () => {
-        agent.holdMs = 40;
+        vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+        agent.beats = 1;
 
         const runId = await admit();
 
