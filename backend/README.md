@@ -85,7 +85,7 @@ pnpm dev            # web app, backend and the standalone llm-gateway (:8787)
 pnpm --filter @neore/backend run test         # vitest run (harness in test/setup-harness.ts)
 pnpm --filter @neore/backend run lint:types   # tsc --noEmit
 pnpm --filter @neore/backend run lint:eslint
-pnpm --filter @neore/backend run lint:prettier
+pnpm --filter @neore/backend run lint:oxfmt
 ```
 
 Run `lint:types` to completion and trust its exit code, never a count of

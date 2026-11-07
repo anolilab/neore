@@ -1,0 +1,21 @@
+{
+    "$schema": "./node_modules/oxlint/configuration_schema.json",
+    "extends": ["./node_modules/@anolilab/oxlint-config/.oxlintrc.json"],
+    "ignorePatterns": [
+        "**/_generated/**",
+        "**/.lunora/**",
+        "**/.wrangler/**",
+        "**/.source/**",
+        "**/dist/**",
+        "**/coverage/**",
+        "**/*.gen.ts",
+        "**/routeTree.gen.ts",
+        "**/src/locales/*/messages.js",
+        "**/__fixtures__/**",
+        ".agents/**",
+        ".claude/**"
+    ],
+    "options": {
+        "typeAware": true
+    }
+}

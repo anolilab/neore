@@ -121,24 +121,9 @@ const ErrorContent: FC<{
                     </div>
 
                     <div className="text-muted-foreground space-y-1 text-center text-xs">
-                        {isNetwork && (
-                            <p>
-                                💡
-                                {t`Check your internet connection and try again.`}
-                            </p>
-                        )}
-                        {isAuth && (
-                            <p>
-                                💡
-                                {t`You'll be redirected back here after signing in.`}
-                            </p>
-                        )}
-                        {!isNetwork && !isAuth && (
-                            <p>
-                                💡
-                                {t`If this problem persists, please contact support.`}
-                            </p>
-                        )}
+                        {isNetwork && <p>💡{t`Check your internet connection and try again.`}</p>}
+                        {isAuth && <p>💡{t`You'll be redirected back here after signing in.`}</p>}
+                        {!isNetwork && !isAuth && <p>💡{t`If this problem persists, please contact support.`}</p>}
                         <p className="mt-2">
                             <Trans>
                                 Error ID: <code className="bg-muted rounded px-1 text-xs">{errorId}</code>

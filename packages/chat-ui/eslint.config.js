@@ -63,7 +63,7 @@ export default createConfig(
         files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
         rules: {
             /**
-             * Prettier owns formatting in this repo — it runs in `lint:prettier`
+             * oxfmt owns formatting in this repo — it runs in `lint:oxfmt`
              * and on commit, and it passes. These `@stylistic` rules disagree
              * with the output Prettier produces, so they are not findings anyone
              * can act on: "fixing" one means writing code Prettier immediately

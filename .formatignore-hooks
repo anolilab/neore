@@ -1,0 +1,8 @@
+# Read only by the commit and push hooks (the `oxfmt:hooks` and `prettier:hooks` scripts),
+# never by a project's `lint:oxfmt`. These projects have no `lint:oxfmt` task: CI never
+# checks their formatting, and the mobile ESLint style rules reject some formatter output,
+# so the hooks leave them alone. Remove a line here when its project gains a format check.
+apps/desktop/
+apps/mobile/
+packages/client-runtime/
+packages/device-core-node/

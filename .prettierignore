@@ -10,8 +10,8 @@
 **/.lunora/
 # Emitted by `lunora build --emit-bindings`; the generator rewrites it unformatted.
 backend/lunora-bindings.json
-# Codegen output. `backend/.prettierignore` covers it for `vis run lint:prettier`,
-# which runs prettier from `backend/` — but this file is what a root-level
+# Codegen output. `backend/.prettierignore` covers it for `vis run lint:oxfmt`,
+# which runs the formatters from `backend/` — but this file is what a root-level
 # `prettier --write .` reads, and that would REFORMAT generated sources. Anything
 # written there is discarded by the next `pnpm codegen`, and `lunora dev`
 # regenerates on any source change, so the reformat is both pointless and a
@@ -54,7 +54,7 @@ apps/web/worker-configuration.d.ts
 
 # `email-render.test.ts` asserts `expect(html).toBe(expected)` against these
 # fixtures — byte-identical, not parsed. Prettier reformatting them breaks all
-# seven cases, and `lint:prettier:fix` would do it silently. They are generated
+# seven cases, and `lint:oxfmt:fix` would do it silently. They are generated
 # by `render()`, so their formatting is react-email's to choose, not ours.
 backend/lunora/email/templates/__fixtures__/
 # MSW's service worker, copied in by `msw init`: a vendored script, so it is not reformatted.

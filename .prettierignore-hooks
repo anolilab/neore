@@ -1,9 +1,0 @@
-# Read only by the commit and push hooks (vis.config.ts `staged`, .vis/hooks/pre-push),
-# never by a project's `lint:prettier`. These projects have no `lint:prettier` task:
-# CI never checks their formatting, and the mobile ESLint style rules reject some of
-# Prettier's output, so the hooks leave them alone. Remove a line here when its project
-# gains a Prettier check.
-apps/desktop/
-apps/mobile/
-packages/client-runtime/
-packages/device-core-node/

@@ -9,8 +9,8 @@
         "clean": "rimraf node_modules dist .eslintcache",
         "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
-        "lint:prettier": "prettier .",
-        "lint:prettier:fix": "prettier --write .",
+        "lint:oxfmt": "oxfmt --check . && prettier --check \"**/*.{md,mdx,css,html}\" --no-error-on-unmatched-pattern",
+        "lint:oxfmt:fix": "oxfmt --write . && prettier --write \"**/*.{md,mdx,css,html}\" --no-error-on-unmatched-pattern",
         "lint:types": "tsc --noEmit"
     },
     "dependencies": {

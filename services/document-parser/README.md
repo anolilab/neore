@@ -92,7 +92,7 @@ pnpm --filter document-parser test:rust
 pnpm --filter document-parser test:worker
 pnpm --filter document-parser lint:types
 pnpm --filter document-parser lint:eslint
-pnpm --filter document-parser lint:prettier
+pnpm --filter document-parser lint:oxfmt
 ```
 
 `test:worker` runs `test/extract.test.ts` through wrangler's test harness against

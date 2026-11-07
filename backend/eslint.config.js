@@ -421,8 +421,8 @@ export default createConfig(
                 { format: ["camelCase", "PascalCase"], leadingUnderscore: "allow", selector: "function" },
             ],
             /**
-             * Conflicts with Prettier, which is the formatter of record here
-             * (`lint:prettier` is a separate gate and runs after `--fix`). The rule's
+             * Conflicts with the formatter of record here, oxfmt
+             * (`lint:oxfmt` is a separate gate and runs after `--fix`). The rule's
              * fix and Prettier's disagree, so `--fix` and `prettier --write` undo each
              * other indefinitely. The formatter wins.
              */

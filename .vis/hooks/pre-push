@@ -6,26 +6,29 @@
 # (docs/agents/review-checklist.md).
 pnpm exec sort-package-json --check packages/*/package.json apps/*/package.json backend/package.json services/*/package.json package.json || exit 1
 
-# Prettier on every file changed since the merge base with main, root files
-# included; Markdown is skipped, as in CI.
+# Formatting of every file changed since the merge base with main, root files
+# included: oxfmt on code and data, Prettier on CSS and HTML. Markdown is skipped,
+# as in CI.
 base=$(git merge-base HEAD origin/main 2>/dev/null) || {
     git fetch --quiet origin main && base=$(git merge-base HEAD origin/main)
 } || {
     echo "pre-push: cannot find the merge base with origin/main; fetch it, then push again." >&2
     exit 1
 }
-# NUL-separated through a temp file: keeps non-ASCII and space-containing paths
-# intact, and avoids GNU-only xargs flags.
-list=$(mktemp) || exit 1
-git diff -z --name-only --diff-filter=ACMR "$base" HEAD -- . ':!*.md' ':!*.mdx' >"$list" || { rm -f "$list"; exit 1; }
-if [ -s "$list" ]; then
-    xargs -0 pnpm run --silent prettier:hooks --check -- <"$list"
-    status=$?
-else
-    status=0
+# NUL-separated through temp files: keeps non-ASCII and space-containing paths
+# intact, and avoids GNU-only xargs flags. The trap removes them on every exit.
+code=$(mktemp) || exit 1
+styles=$(mktemp) || { rm -f "$code"; exit 1; }
+trap 'rm -f "$code" "$styles"' EXIT
+trap 'exit 130' INT TERM HUP
+git diff -z --name-only --diff-filter=ACMR "$base" HEAD -- '*.js' '*.jsx' '*.mjs' '*.cjs' '*.ts' '*.tsx' '*.mts' '*.cts' '*.json' '*.jsonc' '*.yml' '*.yaml' >"$code" || exit 1
+git diff -z --name-only --diff-filter=ACMR "$base" HEAD -- '*.css' '*.html' >"$styles" || exit 1
+if [ -s "$code" ]; then
+    xargs -0 pnpm run --silent oxfmt:hooks --check -- <"$code" || exit 1
 fi
-rm -f "$list"
-[ "$status" -eq 0 ] || exit "$status"
+if [ -s "$styles" ]; then
+    xargs -0 pnpm run --silent prettier:hooks --check -- <"$styles" || exit 1
+fi
 
 # Type check of the projects affected since the same base, with `tsrs` (TS 7.1
 # semantics, beta). CI still runs `tsc` 6; if the two disagree, CI decides.

@@ -51,7 +51,18 @@ export interface ThreadGroup {
 }
 
 export type GroupType =
-    "needsYou" | "working" | "snoozed" | "pinned" | "temporary" | "stateless" | "project" | "today" | "last7days" | "lastMonth" | "older" | "archived";
+    | "needsYou"
+    | "working"
+    | "snoozed"
+    | "pinned"
+    | "temporary"
+    | "stateless"
+    | "project"
+    | "today"
+    | "last7days"
+    | "lastMonth"
+    | "older"
+    | "archived";
 
 export interface LoadingStates {
     archiving: Set<string>;
