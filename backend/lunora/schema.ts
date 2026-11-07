@@ -3289,9 +3289,9 @@ export const schema = defineSchema({
         .triggers((t) => auditTriggersFor(t, "twoFactor", AUDIT_TABLES["twoFactor"]!)),
 
     // Per-day usage rollup behind the usage page's activity heatmap and skill
-    // breakdown (`usage/activity.ts`). Written by `afterRun` once per reply —
-    // one `__total__` row per day plus one row per (day, skill). New data only:
-    // there is no backfill from older messages.
+    // breakdown (`usage/activity.ts`). Written once per reply — one `__total__`
+    // row per day, one row per (day, skill), and one `__project__` row per
+    // (day, project) when the reply's thread is in a project.
     // One per user: the resumable walk that fills `usageDaily` from the replies
     // written before the rollup existed (`usage/backfill.ts`).
     usageBackfill: defineTable({
@@ -3300,6 +3300,24 @@ export const schema = defineSchema({
         lastOrder: v.optional(v.number()),
         // Past it the next step picks the job up again (a chain that died).
         leaseUntil: v.number(),
+        // The second walk, which files replies the rollup already counted under their thread's project
+        // (`usage/backfill.ts#runUsageProjectBackfillStep`). Same fields as the walk above; unset = not started.
+        projects: v.optional(
+            v.object({
+                finishedAt: v.optional(v.number()),
+                lastOrder: v.optional(v.number()),
+                leaseUntil: v.number(),
+                replies: v.number(),
+                runId: v.string(),
+                // Replies created from here on are the live path's, which files them itself.
+                startedAt: v.number(),
+                status: v.union(v.literal("running"), v.literal("done")),
+                threadCursor: v.optional(v.string()),
+                threadId: v.optional(v.string()),
+                // The project `threadId` was in when the walk began it, kept so a thread moved mid-walk is not split.
+                threadProjectKey: v.optional(v.string()),
+            }),
+        ),
         // Replies the walk added to the rollup.
         replies: v.number(),
         // Steps check it, so a restarted walk ends the chain it replaced.
@@ -3310,6 +3328,8 @@ export const schema = defineSchema({
         // Pagination cursor for the thread AFTER `threadId`.
         threadCursor: v.optional(v.string()),
         threadId: v.optional(v.string()),
+        // The user's time zone when the first walk started: both walks date replies in it.
+        timeZone: v.optional(v.string()),
         updatedAt: v.number(),
         userId: v.string(),
     })
@@ -3320,8 +3340,10 @@ export const schema = defineSchema({
         costMicrodollars: v.number(),
         // The user's calendar day (their time zone when the reply landed), YYYY-MM-DD.
         date: v.string(),
+        // The project the reply's thread was in when it was recorded; set only on `__project__` rows.
+        projectKey: v.optional(v.string()),
         replies: v.number(),
-        // `__total__`, `__assistant__`, a skill id, or `draft:<slug>`. See `usage/activity-logic.ts`.
+        // `__total__`, `__project__`, `__assistant__`, a skill id, or `draft:<slug>`. See `usage/activity-logic.ts`.
         skillKey: v.string(),
         skillName: v.optional(v.string()),
         tokens: v.number(),
@@ -3331,6 +3353,8 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_user_skill_date", ["userId", "skillKey", "date"])
         .index("by_user_date", ["userId", "date"])
+        // One project's rows (the project settings' totals, and the project rows' upsert).
+        .index("by_user_project_date", ["userId", "projectKey", "date"])
         // The retention sweep (`gdpr/retention.ts`), which serves a whole shard.
         .index("by_date", ["date"]),
 
@@ -3338,6 +3362,8 @@ export const schema = defineSchema({
     // what makes `recordReplyUsage` and the backfill count a reply once.
     // Pruned by `usage/backfill.ts#sweepUsageRollup` once the backfill is done.
     usageReplies: defineTable({
+        // Set when the reply's project was filed with it (the live path), so the project walk leaves it alone.
+        projectFiled: v.optional(v.boolean()),
         recordedAt: v.number(),
         replyKey: v.string(),
         userId: v.string(),
