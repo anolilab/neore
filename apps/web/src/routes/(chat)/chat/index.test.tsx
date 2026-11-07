@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { ModelId } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
+import { savePendingLinkDraft } from "@/features/chat/core/utils/pending-link-draft";
 import { buildPromptLink } from "@/features/chat/core/utils/prompt-link";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
 
@@ -351,30 +352,60 @@ describe("chat index route", () => {
         });
     });
 
-    describe("a linked draft across a sign-in", () => {
-        it("a link opened signed out keeps its text through a sign-in that empties the composer, and is applied once", async () => {
+    describe("a linked draft kept for a visit", () => {
+        it("a draft kept for account A is not applied to account B, and is removed", async () => {
+            savePendingLinkDraft({ prompt: "from the link" }, "account-a");
+            harness.sessionUser = { id: "account-b", isAnonymous: false };
+            openUrl("https://app.example.com/chat");
+
+            mountPage();
+            await settle();
+
+            expect(useChatUIStore.getState().composerText).toBe("");
+            expect(sessionStorage.getItem("neore.pendingLinkDraft")).toBeNull();
+        });
+
+        it("a draft that is sent is not restored again, not on a later visit and not after a sign-in", async () => {
             openUrl(buildPromptLink("https://app.example.com", { prompt: "from the link" }));
             mountPage();
 
             await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("from the link"));
 
-            // The sign-in leaves the page: the composer in memory is empty again, and the session storage is not.
+            // A reload while signed out puts the draft back, as the same visitor's.
             lastPage.unmount?.();
             useChatUIStore.getState().setComposerText("");
-            harness.sessionUser = { id: "account-1", isAnonymous: false };
             openUrl("https://app.example.com/chat");
             mountPage();
 
             await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("from the link"));
-            expect(harness.showWarning).not.toHaveBeenCalled();
 
-            // Applied once: a later visit with an empty composer does not draft the link again.
+            // The draft is sent: the composer is cleared, as a send does.
+            useChatUIStore.getState().clearComposer();
             lastPage.unmount?.();
             useChatUIStore.getState().setComposerText("");
             mountPage();
             await settle();
 
             expect(useChatUIStore.getState().composerText).toBe("");
+
+            // And a sign-in afterwards does not bring it back.
+            lastPage.unmount?.();
+            harness.sessionUser = { id: "account-a", isAnonymous: false };
+            mountPage();
+            await settle();
+
+            expect(useChatUIStore.getState().composerText).toBe("");
+        });
+
+        it("a stale draft is removed when a chat page with its own link mounts, and the link's own text is the draft", async () => {
+            savePendingLinkDraft({ prompt: "old text" }, "account-a", Date.now() - 31 * 60 * 1000);
+            harness.sessionUser = { id: "account-a", isAnonymous: false };
+            openUrl(buildPromptLink("https://app.example.com", { prompt: "from the link" }));
+
+            mountPage();
+
+            await waitFor(() => expect(useChatUIStore.getState().composerText).toBe("from the link"));
+            expect(sessionStorage.getItem("neore.pendingLinkDraft")).toBeNull();
         });
     });
 
@@ -625,6 +656,23 @@ describe("chat index route", () => {
 
             await waitFor(() => expect(fresh.chatUI.getState().composerText).toBe("from the link"));
             expect(resumes()).toBe(false);
+        });
+
+        it("a draft kept for this visitor is put back, and the chat still resumes its last thread", async () => {
+            savePendingLinkDraft({ prompt: "from the link" }, null);
+
+            const fresh = await loadFresh();
+
+            harness.locationSearch = "";
+            harness.search = (fresh.Route.options.validateSearch as unknown as ValidateSearch)(defaultParseSearch(""));
+
+            const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+            const Page = fresh.Route.options.component as ComponentType;
+
+            render(<Page />, { wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+
+            await waitFor(() => expect(resumes()).toBe(true));
+            expect(fresh.chatUI.getState().composerText).toBe("from the link");
         });
     });
 

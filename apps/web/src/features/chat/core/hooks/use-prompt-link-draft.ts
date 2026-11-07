@@ -65,8 +65,8 @@ export const usePromptLinkDraft = ({
      */
     linkableModels: ReadonlyMap<string, LinkableModel> | undefined;
     model?: string;
-    /** Called once the link's prompt has become the draft, with the link's own prompt and model (what a sign-in return re-applies). */
-    onApplied?: (applied: { model?: string; prompt: string }) => void;
+    /** Called once the link's prompt has become the draft, with that prompt (what a later visit by the same account may put back). */
+    onApplied?: (applied: { prompt: string }) => void;
     /** Called once the link can be decided (the caller's own ownership of the draft ends here, after this pass has read it). */
     onDecided?: () => void;
     /** A saved prompt or a message in the same URL already supplies this chat's draft: the link does not replace it. */
@@ -125,7 +125,7 @@ export const usePromptLinkDraft = ({
                 showWarning(t`Your draft is kept. The prompt from the link was not added.`);
             } else {
                 setComposerText(promptFromLink(prompt));
-                onApplied?.({ prompt, ...(model !== undefined && { model }) });
+                onApplied?.({ prompt });
             }
         }
 

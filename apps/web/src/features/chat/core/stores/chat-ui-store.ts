@@ -12,6 +12,7 @@ import { create } from "zustand";
 import { devtools, subscribeWithSelector } from "zustand/middleware";
 
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
+import { clearPendingLinkDraft } from "@/features/chat/core/utils/pending-link-draft";
 
 /**
  * Batching utility for high-frequency updates
@@ -247,6 +248,8 @@ export const useChatUIStore = create<ChatUIStore>()(
                 },
 
                 clearComposer: () => {
+                    // A draft that is sent or cleared is no longer one to restore on a later visit.
+                    clearPendingLinkDraft();
                     set({
                         attachedReferences: [],
                         composerAttachments: [],

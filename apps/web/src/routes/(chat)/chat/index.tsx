@@ -13,8 +13,8 @@ import Assistant from "@/features/chat/assistant";
 import { usePromptLinkDraft } from "@/features/chat/core/hooks/use-prompt-link-draft";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { PendingLinkDraft } from "@/features/chat/core/utils/pending-link-draft";
-import { savePendingLinkDraft, takePendingLinkDraft } from "@/features/chat/core/utils/pending-link-draft";
-import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
+import { prunePendingLinkDraft, savePendingLinkDraft, takePendingLinkDraft } from "@/features/chat/core/utils/pending-link-draft";
+import { promptFromLink, readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
 import { savedPromptDraft } from "@/features/prompts/lib/prompt-draft";
@@ -72,12 +72,10 @@ const ChatPage = () => {
     // parsed value only when there is no text.
     const linkRead = readPromptLinkSearch({ model: parsedLinkModel, prompt: rawPromptText(location.searchStr) ?? parsedLinkPrompt });
     const addressHasLink = linkRead.prompt !== undefined || linkRead.model !== undefined;
-    // A draft kept for a sign-in (`pending-link-draft.ts`), taken once by the first page that sees the signed-in account. It applies only
-    // when the address names no link of its own.
-    const [restoredLink, setRestoredLink] = useState<PendingLinkDraft | undefined>(undefined);
+    // The link's values are the address's own. A draft kept for this account (`pending-link-draft.ts`) is restored separately, as text only.
     const restoreChecked = useRef(false);
-    const linkPrompt = linkRead.prompt ?? restoredLink?.prompt;
-    const linkModel = linkRead.model ?? restoredLink?.model;
+    const linkPrompt = linkRead.prompt;
+    const linkModel = linkRead.model;
     // TanStack keys each history entry; a new navigation gets a new key.
     const navigationKey = location.state.__TSR_key;
     const { t } = useLingui();
@@ -112,25 +110,10 @@ const ChatPage = () => {
     const sessionUserId = sessionData?.user?.id ?? null;
     const signedInAccount = sessionData?.user !== undefined && sessionData.user.isAnonymous !== true;
 
-    // Checked once per mount, when the session is known. A link in the address is this page's own, so nothing is restored over it, and the
-    // address changing afterwards (the link is removed once it applies) does not start a check.
+    // A kept draft that has expired or cannot be read is removed as the chat page mounts, whether or not a restore reads it.
     useEffect(() => {
-        if (isSessionPending || restoreChecked.current) {
-            return;
-        }
-
-        restoreChecked.current = true;
-
-        if (addressHasLink) {
-            return;
-        }
-
-        const taken = takePendingLinkDraft(sessionUserId);
-
-        if (taken !== undefined) {
-            setRestoredLink(taken);
-        }
-    }, [addressHasLink, isSessionPending, sessionUserId]);
+        prunePendingLinkDraft();
+    }, []);
 
     // A link applied while no signed-in account is on the page is kept for the sign-in return.
     const keepForSignIn = useCallback(
@@ -165,6 +148,9 @@ const ChatPage = () => {
         }).trim() !== "" &&
         validatePromptSettings(savedPrompt.data.model, savedPrompt.data.reasoningEffort, savedPrompt.data.enabledFeatures, pickerModels).isValid;
 
+    // A handoff or a saved prompt already supplies this chat's draft: a link does not replace it.
+    const otherDraftSource = savedPromptApplies || (Boolean(hasInitialMessage) && (handoffWaiting || landingMessageWaiting()));
+
     usePromptLinkDraft({
         // Undefined until the list has loaded: the link waits for it (within the bound), and a list that never loads chooses no model.
         linkableModels,
@@ -173,12 +159,13 @@ const ChatPage = () => {
         model: linkModel,
         // A handoff owns the draft while it is pending: its flag is in the address and its message is either waiting in storage now (one
         // written after this page mounted, as a new handoff is) or was waiting at mount and not yet decided. Read now, so the link sees it.
-        otherDraftSource: savedPromptApplies || (Boolean(hasInitialMessage) && (handoffWaiting || landingMessageWaiting())),
+        otherDraftSource,
         prompt: linkPrompt,
         onApplied: keepForSignIn,
         onDecided: endHandoffOwnership,
         ready: (!isSessionPending || linkWaitOver) && (linkableModels !== undefined || linkWaitOver) && !savedPromptPending,
     });
+
     const { data: latestThreadId, isSuccess: latestResolved } = useQuery(
         // Not live, and skipped once decided: later visits to /chat must not re-run the scan.
         crpc.chat.resume.latestResumableThread.queryOptions(
@@ -242,6 +229,35 @@ const ChatPage = () => {
             void navigate({ params: { threadId: latestThreadId }, replace: true, search: { initialMessage: undefined }, to: "/chat/$threadId" });
         }
     }, [latestResolved, latestThreadId, navigationKey, navigate, resumeLastChat]);
+
+    // A draft kept for this account is put back once, when the session and any saved prompt have answered. Only its text is set: no model,
+    // mode or comparison, no navigation, and resumption does not wait for it. A draft already in the composer is kept, and a draft kept for
+    // another account is never applied (`takePendingLinkDraft` removes it).
+    useEffect(() => {
+        if (isSessionPending || savedPromptPending || restoreChecked.current) {
+            return;
+        }
+
+        // Resumption decides first (its effect is below this one in the same commit, and a draft already in the composer stops it), so
+        // the restore waits for that answer, bounded by the link wait. It never decides the resumption itself.
+        if (resumeLastChat && !latestResolved && !linkWaitOver) {
+            return;
+        }
+
+        restoreChecked.current = true;
+
+        if (addressHasLink) {
+            return;
+        }
+
+        const taken = takePendingLinkDraft(sessionUserId);
+        const { attachedReferences, composerAttachments, composerText, setComposerText } = useChatUIStore.getState();
+        const hasDraft = composerText.trim() !== "" || composerAttachments.length > 0 || attachedReferences.length > 0;
+
+        if (taken !== undefined && !otherDraftSource && !hasDraft) {
+            setComposerText(promptFromLink(taken.prompt));
+        }
+    }, [addressHasLink, isSessionPending, latestResolved, linkWaitOver, otherDraftSource, resumeLastChat, savedPromptPending, sessionUserId]);
 
     useEffect(() => {
         if (!redirectReason || shownNotificationRef.current === redirectReason) {
