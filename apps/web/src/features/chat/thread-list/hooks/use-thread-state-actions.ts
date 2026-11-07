@@ -68,7 +68,7 @@ interface ThreadStateActions {
 }
 
 export const useThreadStateActions = (): ThreadStateActions => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
     // The stamp of this hook's last choice. Each choice is stamped after the one before it, even within the same millisecond, so two
@@ -162,13 +162,13 @@ export const useThreadStateActions = (): ThreadStateActions => {
                 return "superseded";
             }
 
-            const when = new Date(until).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+            const when = i18n.date(new Date(until), { dateStyle: "medium", timeStyle: "short" });
 
             showSuccess(t`Snoozed until ${when}`, { action: { label: t`Undo`, onClick: () => restore(threadId, previousUntil) } });
 
             return "saved";
         },
-        [choiceTime, restore, t],
+        [choiceTime, i18n, restore, t],
     );
 
     const snoozeAt = useCallback(

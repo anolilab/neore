@@ -74,9 +74,13 @@ vi.mock("@lingui/react/macro", () => {
     const t = (strings: TemplateStringsArray | string, ...values: unknown[]) =>
         typeof strings === "string" ? strings : String.raw({ raw: strings }, ...values);
 
+    const i18n = {
+        date: (value: Date) => value.toISOString(),
+    };
+
     return {
         useLingui: () => {
-            return { t };
+            return { i18n, t };
         },
     };
 });

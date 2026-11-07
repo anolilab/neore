@@ -11,9 +11,13 @@ vi.mock("@lingui/react/macro", () => {
     const t = (strings: TemplateStringsArray | string, ...values: unknown[]) =>
         typeof strings === "string" ? strings : String.raw({ raw: strings }, ...values);
 
+    const i18n = {
+        date: (value: Date) => value.toISOString(),
+    };
+
     return {
         useLingui: () => {
-            return { t };
+            return { i18n, t };
         },
     };
 });
@@ -103,7 +107,13 @@ describe("useThreadStateActions", () => {
 
         const presets = seenOptions.filter((options) => options.fn === "snooze");
 
-        expect(presets.every((options) => options.networkMode === undefined)).toBe(true);
+        // The check only means something if a preset was recorded at all.
+        expect(presets.length).toBeGreaterThan(0);
+
+        for (const preset of presets) {
+            expect(preset.call).toBeUndefined();
+            expect(preset.networkMode).toBeUndefined();
+        }
     });
 
     it("snoozes, then undoes to a plain unsnooze when nothing was snoozed before", async () => {
