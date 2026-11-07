@@ -29,7 +29,7 @@ afterEach(() => {
     harness.close();
 });
 
-describe(getSessionOrganizationForCap, () => {
+describe("getSessionOrganizationForCap", () => {
     it("gives the personal space for a valid session with no active organization", async () => {
         expect(await read(await insertSession({ expiresAt: Date.now() + HOUR_MS }))).toStrictEqual({ organizationId: null });
     });
