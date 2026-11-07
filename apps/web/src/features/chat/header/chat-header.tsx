@@ -15,7 +15,7 @@ import { useValidatedThread } from "@/features/chat/core/hooks/use-validated-thr
 import { useThreadActions, useThreadMetadata } from "@/features/chat/core/stores/thread-store-hooks";
 import GroupParticipantBar from "@/features/chat/group/group-participant-bar";
 import ThreadShareButton from "@/features/chat/sharing/thread-share-button";
-import ThreadPullRequestLink from "@/features/develop/components/thread-pull-request-link";
+import ThreadPullRequests from "@/features/develop/components/thread-pull-requests";
 import SiteHeader from "@/features/layout/components/site-header";
 
 import KBAttachmentButton from "./kb-attachment-button";
@@ -156,7 +156,7 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
                     </Badge>
                 )}
                 <GroupParticipantBar isRunning={threadData?.status === "running"} threadId={validThreadId} />
-                <ThreadPullRequestLink threadId={validThreadId} />
+                <ThreadPullRequests key={validThreadId} threadId={validThreadId} />
             </div>
         </SiteHeader>
     );
