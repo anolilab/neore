@@ -159,6 +159,7 @@ describe("usage by project", () => {
 
     interface ProjectBreakdown {
         noProject: Totals;
+        unfiled?: { from: string; to: string };
         projects: (Totals & { projectKey: string; title?: string })[];
         total: Totals;
         truncated: boolean;
@@ -301,5 +302,27 @@ describe("usage by project", () => {
         expect(result.truncated).toBe(true);
         expect(result.projects[0]!.costMicrodollars).toBe(result.total.costMicrodollars);
         expect(result.noProject.costMicrodollars).toBe(0);
+    });
+
+    it("says which days were recorded before usage was filed by project", async () => {
+        const day = 24 * 60 * 60 * 1000;
+        const first = Date.UTC(2026, 8, 1, 12);
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("usageBackfill", {
+                leaseUntil: 0,
+                projects: { leaseUntil: 0, replies: 0, runId: "p", startedAt: first + 10 * day, status: "done" },
+                replies: 0,
+                runId: "r",
+                startedAt: first,
+                status: "done",
+                timeZone: "UTC",
+                updatedAt: 0,
+                userId: USER,
+            });
+        });
+
+        expect((await projectBreakdown(USER, "2026-09-05")).unfiled).toStrictEqual({ from: "2026-09-05", to: "2026-09-11" });
+        expect((await projectBreakdown(USER, "2026-09-12")).unfiled).toBeUndefined();
     });
 });

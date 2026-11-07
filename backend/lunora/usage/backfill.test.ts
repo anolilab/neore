@@ -833,6 +833,10 @@ describe("project backfill", () => {
         const thread = await insertThread(DAY_1, [[prompt(), reply(10, 100)]], "active", orgProject);
         const key = thread.rowIds[0]![1]!;
 
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org_1", role: "member", userId: USER });
+        });
+
         vi.setSystemTime(STARTED);
         await start();
         await drain();

@@ -23,12 +23,15 @@
 import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
+import { internal } from "../_generated/internal";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
+import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authQuery } from "../lib/crpc";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { projectOrganizationOf, readableProject } from "../projects/functions";
-import type { Attribution, AttributionIncrement, OrganizationRow, ProjectTotal, RollupIncrement } from "./activity-logic";
+import type { Attribution, AttributionIncrement, OrganizationRow, ProjectTotal, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
 import {
     addDays,
     BREAKDOWN_ROW_LIMIT,
@@ -128,10 +131,15 @@ const fileAttribution = async (
         await addToAttributionRollup(ctx, userId, [{ ...amounts, date, projectKey: attribution.projectKey, replies: 1 }], at);
     }
 
-    if (attribution.organizationId !== undefined && !organizationFiled) {
+    // Only a current member's spend is the organization's: a former member replying in an old thread files none.
+    if (attribution.organizationId !== undefined && !organizationFiled && (await isOrganizationMember(ctx, attribution.organizationId, userId))) {
         await addToOrganizationRollup(ctx, userId, attribution.organizationId, organizationRows(attribution, { ...amounts, date }), at);
     }
 };
+
+/** Whether `userId` is a member of the organization now (`member` is `.global()`, readable from any shard). */
+const isOrganizationMember = async (ctx: DbCtx, organizationId: string, userId: string): Promise<boolean> =>
+    (await getMemberByOrganizationAndUser(ctx as never, organizationId, userId)) !== null;
 
 /** Adds `increments` to the user's per-day project rows. */
 export const addToAttributionRollup = async (ctx: DbCtx, userId: string, increments: ReadonlyArray<AttributionIncrement>, at: number): Promise<void> => {
@@ -237,6 +245,10 @@ export const recordReplyUsage = internalMutation
         skillName: v.optional(v.string()),
         startedAt: v.optional(v.number()),
         threadId: v.optional(v.string()),
+        // Worked out on the thread's own shard when the reply ran in another user's thread (`forwardReplyUsage`).
+        threadAttribution: v.optional(
+            v.object({ organizationId: v.optional(v.string()), projectInOrganization: v.optional(v.boolean()), projectKey: v.optional(v.string()) }),
+        ),
         tokens: v.number(),
         userId: v.string(),
     })
@@ -262,7 +274,7 @@ export const recordReplyUsage = internalMutation
                 await fileAttribution(
                     ctx,
                     args,
-                    await attributionOfThread(ctx, args.threadId),
+                    args.threadAttribution ?? (await attributionOfThread(ctx, args.threadId)),
                     await countedDayOf(ctx, args),
                     { costMicrodollars, tokens },
                     true,
@@ -290,7 +302,42 @@ export const recordReplyUsage = internalMutation
             true,
         );
 
-        await fileAttribution(ctx, args, await attributionOfThread(ctx, args.threadId), args.date, { costMicrodollars, tokens }, false);
+        await fileAttribution(
+            ctx,
+            args,
+            args.threadAttribution ?? (await attributionOfThread(ctx, args.threadId)),
+            args.date,
+            { costMicrodollars, tokens },
+            false,
+        );
+
+        return null;
+    });
+
+/**
+ * A reply that ran in another user's thread (shared with the replier) is recorded on the replier's own shard, where the
+ * thread is not stored. This runs first on the thread's shard, works out the thread's project and organization, and
+ * forwards the record to the replier's shard with them.
+ */
+export const forwardReplyUsage = internalMutation
+    .input({
+        at: v.number(),
+        costMicrodollars: v.number(),
+        date: v.string(),
+        replyKey: v.string(),
+        skillKey: v.string(),
+        skillName: v.optional(v.string()),
+        startedAt: v.optional(v.number()),
+        threadId: v.string(),
+        tokens: v.number(),
+        userId: v.string(),
+    })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const threadAttribution = await attributionOfThread(ctx, args.threadId);
+        const record: ReplyUsageArgs & { threadAttribution: Attribution } = { ...args, threadAttribution };
+
+        await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...record }, args.userId);
 
         return null;
     });
@@ -363,6 +410,27 @@ export const getSkillBreakdown = authQuery
 
 const vTotals = { costMicrodollars: v.number(), replies: v.number(), tokens: v.number() };
 
+/** Days whose usage no project was filed for: from the first backfill walk's start until the project walk began. */
+const vUnfiled = v.optional(v.object({ from: v.string(), to: v.string() }));
+
+/**
+ * The days, from `fromDate` on, whose replies were recorded before replies were filed under projects: between the
+ * first backfill walk's start and the project walk's. They count under "No project"; a view says so rather than show
+ * them as project-less spend.
+ */
+const unfiledDays = async (ctx: Pick<QueryCtx, "db">, userId: string, fromDate: string): Promise<{ from: string; to: string } | undefined> => {
+    const state = await ctx.db.usageBackfill.findFirst({ where: { userId } });
+
+    if (!state?.projects || state.projects.startedAt <= state.startedAt) {
+        return undefined;
+    }
+
+    const from = usageDayOf(state.startedAt, state.timeZone);
+    const to = usageDayOf(state.projects.startedAt, state.timeZone);
+
+    return to < fromDate || from === to ? undefined : { from: from < fromDate ? fromDate : from, to };
+};
+
 /** Project title lookups one breakdown runs at once. */
 const TITLE_LOOKUPS_AT_ONCE = 16;
 
@@ -394,10 +462,12 @@ export const getProjectBreakdown = authQuery
             projects: v.array(v.object({ ...vTotals, projectKey: v.string(), title: v.optional(v.string()) })),
             total: v.object({ ...vTotals }),
             truncated: v.boolean(),
+            unfiled: vUnfiled,
         }),
     )
     .query(async ({ args, ctx }) => {
         const { userId } = ctx.user;
+        const unfiled = await unfiledDays(ctx, userId, args.fromDate);
         const [totals, rows] = await Promise.all([
             totalSince(ctx, userId, args.fromDate),
             ctx.db.usageDaily.findMany({
@@ -435,6 +505,7 @@ export const getProjectBreakdown = authQuery
             projects: titled,
             total,
             truncated: totals.truncated || rows.page.length >= PROJECT_ROW_LIMIT,
+            ...(unfiled && { unfiled }),
         };
     });
 
@@ -447,13 +518,14 @@ const PROJECT_USAGE_ROW_LIMIT = HEATMAP_DAYS * 2;
  */
 export const getProjectUsage = authQuery
     .input({ fromDate: vDayKey(), projectId: v.id("projects") })
-    .output(v.object({ ...vTotals, truncated: v.boolean() }))
+    .output(v.object({ ...vTotals, truncated: v.boolean(), unfiled: vUnfiled }))
     .query(async ({ args, ctx }) => {
+        const unfiled = await unfiledDays(ctx, ctx.user.userId, args.fromDate);
         const { page } = await ctx.db.usageDaily.findMany({
             limit: PROJECT_USAGE_ROW_LIMIT + 1,
             orderBy: [{ date: "desc" }],
             where: { date: { gte: args.fromDate }, projectKey: args.projectId as string, userId: ctx.user.userId },
         });
 
-        return { ...sumRows(page.slice(0, PROJECT_USAGE_ROW_LIMIT)), truncated: page.length > PROJECT_USAGE_ROW_LIMIT };
+        return { ...sumRows(page.slice(0, PROJECT_USAGE_ROW_LIMIT)), truncated: page.length > PROJECT_USAGE_ROW_LIMIT, ...(unfiled && { unfiled }) };
     });

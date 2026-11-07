@@ -37,9 +37,25 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     };
 });
 
+vi.mock("../lib/shard-scheduler", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/shard-scheduler")>()),
+        // Kept to be run after the forwarding mutation, as the target shard would.
+        runAfterOnShard: async (_scheduler: unknown, _delay: number, _target: unknown, args: Record<string, unknown>) => {
+            harnessRef.forwarded.push(args);
+
+            return "scheduled";
+        },
+    };
+});
+
+const harnessRef = vi.hoisted(() => {
+    return { forwarded: [] as Record<string, unknown>[] };
+});
+
 const { registerModule } = await import("../../test/registered-api");
 const { default: schema } = await import("../schema");
-const { recordReplyUsage } = await import("./activity");
+const { forwardReplyUsage, recordReplyUsage } = await import("./activity");
 const { DEFAULT_SKILL_KEY, ORGANIZATION_TOTAL_KEY } = await import("./activity-logic");
 const { getOrganizationProjectUsage, isOrganizationAdminRole, MAX_PROJECTS, ORGANIZATION_ROW_PAGE, pruneOrganizationUsage } = await import("./organization");
 const { eraseOrganizationUsage } = await import("./organization-erase");
@@ -95,6 +111,7 @@ const read = async (args: Record<string, unknown> = {}) =>
 
 beforeEach(async () => {
     harness = lunoraTest(schema as never);
+    harnessRef.forwarded.length = 0;
     await insert("member", { createdAt: 0, organizationId: ORG, role: "owner,member", userId: ADMIN });
 });
 
@@ -137,6 +154,7 @@ describe("organization usage", () => {
     });
 
     it("shows an admin only their own organization's usage, never another's", async () => {
+        await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
         const ours = await insert("projects", { createdAt: 0, organizationId: ORG, title: "Ours", userId: ADMIN });
         const theirs = await insert("projects", { createdAt: 0, organizationId: "org_2", title: "Theirs", userId: MEMBER });
 
@@ -152,6 +170,7 @@ describe("organization usage", () => {
     });
 
     it("counts a member's own project in an organization thread under No project, without its name or id", async () => {
+        await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
         const personal = await insert("projects", { createdAt: 0, title: "My diary", userId: MEMBER });
 
         await record(MEMBER, await insert("threads", { organizationId: ORG, projectId: personal, status: "active", title: "T", userId: MEMBER }), 50);
@@ -257,6 +276,7 @@ describe("organization usage rows", () => {
     });
 
     it("erases a member's share with their account, and exports it to them, a page at a time", async () => {
+        await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
         await record(MEMBER, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER }), 20);
 
         const exported = await collectUsageDailyPages(
@@ -273,6 +293,7 @@ describe("organization usage rows", () => {
     });
 
     it("erases a deleted organization's usage", async () => {
+        await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
         await record(MEMBER, await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER }), 20);
 
         expect(await harness.run(async (ctx: any) => await ctx.runMutation(eraseOrganizationUsage, { organizationId: ORG }))).toBe(1);
@@ -293,6 +314,55 @@ describe("organization usage rows", () => {
 
         expect(result.projectsCut).toBe(true);
         expect(result.truncated).toBe(false);
+    });
+});
+
+describe("organization usage of shared threads and former members", () => {
+    it("files a reply in a teammate's shared thread under that thread's project and organization", async () => {
+        const project = await insert("projects", { createdAt: 0, organizationId: ORG, title: "Org project", userId: ADMIN });
+        // The admin's thread; the member replies in it, and the record is forwarded from the thread's shard.
+        const thread = await insert("threads", { organizationId: ORG, projectId: project, status: "active", title: "T", userId: ADMIN });
+
+        await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(forwardReplyUsage, {
+                    at: 1,
+                    costMicrodollars: 40,
+                    date: "2026-09-20",
+                    replyKey: "shared-reply",
+                    skillKey: DEFAULT_SKILL_KEY,
+                    threadId: thread,
+                    tokens: 1,
+                    userId: MEMBER,
+                }),
+        );
+
+        // The member's shard records it, with what the thread's shard worked out.
+        expect(harnessRef.forwarded).toMatchObject([{ threadAttribution: { organizationId: ORG, projectInOrganization: true, projectKey: project } }]);
+
+        for (const forwarded of harnessRef.forwarded) {
+            await harness.run(async (ctx: any) => await ctx.runMutation(recordReplyUsage, forwarded));
+        }
+
+        const { result } = await read();
+
+        expect(result.total.costMicrodollars).toBe(40);
+        expect(result.projects).toMatchObject([{ costMicrodollars: 40, projectKey: project }]);
+    });
+
+    it("files nothing under an organization for someone who is no longer its member", async () => {
+        const membership = await insert("member", { createdAt: 0, organizationId: ORG, role: "member", userId: MEMBER });
+        const thread = await insert("threads", { organizationId: ORG, status: "active", title: "T", userId: MEMBER });
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.delete("member", membership);
+        });
+        await record(MEMBER, thread, 70);
+
+        const { result } = await read();
+
+        expect(result.total.costMicrodollars).toBe(0);
     });
 });
 
