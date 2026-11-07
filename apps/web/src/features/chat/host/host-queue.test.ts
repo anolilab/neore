@@ -247,6 +247,42 @@ describe("overlapping turns", () => {
     });
 });
 
+describe("an accepted send that names its turn", () => {
+    it("waits for that turn alone, and is not released by another turn's late end before it shows", () => {
+        const step = run(
+            [{ itemId: "a", type: "send" }, { itemId: "a", streamId: "stream-5", type: "accepted" }, observed(undefined, ["stream-4", "finished"])],
+            IDLE,
+        );
+
+        expect(step.state.phase).toEqual({ kind: "awaiting-turn-end", streamId: "stream-5" });
+        expect(waitDeadline(step.state.phase)).toBe(false);
+        expect(run([observed(undefined, ["stream-5", "finished"])], step.state).state.phase.kind).toBe("idle");
+    });
+
+    it("goes idle at once for a repeat whose earlier turn has already ended, rather than waiting and pausing", () => {
+        const step = run(
+            [
+                { itemId: "a", type: "send" },
+                { duplicate: true, itemId: "a", streamId: "stream-old", type: "accepted" },
+            ],
+            IDLE,
+        );
+
+        expect(step.state.phase.kind).toBe("idle");
+        expect(step.effects).toEqual([]);
+    });
+
+    it("waits for a repeat's turn when that turn is the one running", () => {
+        const running = run([observed("stream-1")], IDLE).state;
+        const step = run([{ duplicate: true, itemId: undefined, streamId: "stream-1", type: "accepted" }], {
+            ...running,
+            phase: { endedDuring: false, itemId: undefined, kind: "sending", seenLive: [] },
+        });
+
+        expect(step.state.phase).toEqual({ kind: "awaiting-turn-end", streamId: "stream-1" });
+    });
+});
+
 describe("a refused send", () => {
     it("reports why, for the composer to pause the queue behind it", () => {
         const step = run(

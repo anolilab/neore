@@ -420,7 +420,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
             }
 
             setQueueError(undefined);
-            dispatch({ itemId: queuedId, type: "accepted" });
+            dispatch({ duplicate: result.duplicate, itemId: queuedId, streamId: result.streamId, type: "accepted" });
 
             // Only a textarea send has a draft; Continue sends a fixed prompt and leaves the box alone. A draft typed while the
             // send was pending is not the one sent: the box and any refusal stay as they are.

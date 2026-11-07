@@ -84,6 +84,8 @@ export interface HostQueueState {
     lastEnd: string | undefined;
     /** The turn live now, as last observed. */
     live: string | undefined;
+    /** Streams either read has shown running. */
+    liveSeen: ReadonlyArray<string>;
     phase: HostQueuePhase;
     /** The interrupting message, allowed past a queue that stays paused for the messages behind it. */
     released: string | undefined;
@@ -104,6 +106,7 @@ export const INITIAL_HOST_QUEUE: HostQueueState = Object.freeze({
     retired: [],
     sent: [],
     sessionSeen: [],
+    liveSeen: [],
 }) as HostQueueState;
 
 export type HostQueueEffect =
@@ -126,7 +129,8 @@ export type HostQueueEvent =
      */
     | { end: HostTurnEnd | undefined; live: string | undefined; sessionLive?: string; starting: boolean; type: "observed" }
     | { itemId: string | undefined; type: "send" }
-    | { itemId: string | undefined; type: "accepted" }
+    /** `streamId` is the turn the send started (or, `duplicate`, the turn an earlier try of it started), when the answer names it. */
+    | { duplicate?: boolean; itemId: string | undefined; streamId?: string; type: "accepted" }
     /** `live` is the turn the backend reports running after a fresh read, for a `turn_running` refusal. */
     | { error: string; itemId: string | undefined; live: string | undefined; type: "refused" }
     | { itemId: string; streamId: string | undefined; type: "interrupt"; wasPaused: boolean }
@@ -214,7 +218,11 @@ const onEnd = (state: HostQueueState, end: HostTurnEnd): HostQueueStep => {
     if (
         phase.kind === "awaiting-turn-end" &&
         !wasRetired &&
-        (phase.streamId === undefined || phase.streamId === end.streamId || phase.streamId !== state.live)
+        (phase.streamId === undefined ||
+            phase.streamId === end.streamId ||
+            // Seen running and no longer running: only the newest end is reported, so this end covers it. A stream not yet
+            // seen running (named by a send's answer) has not started for the reads, and another turn's end says nothing of it.
+            (phase.streamId !== state.live && state.liveSeen.includes(phase.streamId)))
     ) {
         // The awaited turn ended (or the turn it waited for is no longer live, and only the newest end is reported).
         return { effects: pauses ? [{ type: "pause" }] : [], state: { ...next, phase: { kind: "idle" } } };
@@ -259,7 +267,13 @@ const onObserved = (state: HostQueueState, event: Extract<HostQueueEvent, { type
         // the baseline later ends are told from. A session that is starting is a new agent: the previous turn's end says nothing
         // about the messages queued for it. A direct send made before the reads answered keeps its phase, and like any other
         // phase it takes in a turn the arrival shows running.
-        const arrived: HostQueueState = { ...state, arrived: true, lastEnd: end?.streamId, sessionSeen: remember(state.sessionSeen, event.sessionLive) };
+        const arrived: HostQueueState = {
+            ...state,
+            arrived: true,
+            lastEnd: end?.streamId,
+            liveSeen: remember(state.liveSeen, event.live),
+            sessionSeen: remember(state.sessionSeen, event.sessionLive),
+        };
         const live = liveNow(arrived, event.live);
 
         return onLive(
@@ -276,7 +290,13 @@ const onObserved = (state: HostQueueState, event: Extract<HostQueueEvent, { type
     const settled = leftSession(ended.state, event.sessionLive);
     const live = liveNow(settled, event.live);
 
-    return onLive({ effects: ended.effects, state: { ...settled, live, sessionSeen: remember(settled.sessionSeen, event.sessionLive) } }, live);
+    return onLive(
+        {
+            effects: ended.effects,
+            state: { ...settled, live, liveSeen: remember(settled.liveSeen, live), sessionSeen: remember(settled.sessionSeen, event.sessionLive) },
+        },
+        live,
+    );
 };
 
 const onStopAnswered = (state: HostQueueState, outcome: HostStopOutcome): HostQueueStep => {
@@ -330,7 +350,17 @@ export const stepHostQueue = (state: HostQueueState, event: HostQueueEvent): Hos
             const live = liveNow(state, state.live);
             let next: HostQueuePhase;
 
-            if (live !== undefined) {
+            const ownTurnOver = event.streamId !== undefined && isOver(state, event.streamId);
+            // A repeat of an earlier try whose turn is not the one running: that turn ran and ended already, and nothing new
+            // starts, so waiting for it to show would wait for nothing.
+            const repeatOfEndedTurn = event.duplicate === true && event.streamId !== undefined && event.streamId !== live;
+
+            if (ownTurnOver || repeatOfEndedTurn) {
+                next = waitFor(live);
+            } else if (event.streamId !== undefined) {
+                // The answer names the turn: only that turn's end releases the queue, so no other turn's end is taken for it.
+                next = { kind: "awaiting-turn-end", streamId: event.streamId };
+            } else if (live !== undefined) {
                 next = waitFor(live);
             } else if (phase.endedDuring) {
                 // The turn started and ended while the answer was in flight; its end was decided when it was seen.
