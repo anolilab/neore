@@ -70,7 +70,9 @@
         "lint:types:deploy": "tsc -p tsconfig.deploy.json",
         "prettier:hooks": "prettier --config=.prettierrc.cjs --ignore-path=.gitignore --ignore-path=.prettierignore --ignore-path=.prettierignore-hooks --ignore-unknown",
         "sort-package-json": "sort-package-json packages/**/package.json apps/*/package.json backend/package.json services/*/package.json tools/*/package.json ./package.json",
+        "storybook": "pnpm --filter @neore/web run storybook",
         "test:e2e": "pnpm --filter=app test:e2e",
+        "test:storybook": "pnpm run build:packages && pnpm --filter @neore/web run test:storybook",
         "verify": "pnpm run lint && pnpm run lint:types && vis run test"
     },
     "devDependencies": {
