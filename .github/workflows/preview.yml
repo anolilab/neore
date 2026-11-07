@@ -130,7 +130,14 @@ jobs:
               run: |
                   output="$(pnpm exec alchemy deploy alchemy-storybook.run.ts --stage "$DEPLOY_ENV" --yes --log-level info 2>&1)" || { echo "$output"; exit 1; }
                   echo "$output"
-                  url="$(echo "$output" | grep -oE 'https://[^ '\''"}]*workers\.dev[^ '\''"}]*' | head -1 || true)"
+                  # alchemy does not print the URL, so ask Cloudflare for this stage's Storybook Worker and the
+                  # account's workers.dev subdomain, then build the URL from them.
+                  account_api="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}"
+                  subdomain="$(curl -fsS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "${account_api}/workers/subdomain" | jq -r '.result.subdomain')"
+                  worker="$(curl -fsS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "${account_api}/workers/scripts" | jq -r --arg name "neore-storybook-${DEPLOY_ENV}" '.result[].id | select(. == $name)' | head -1)"
+                  url=""
+                  if [[ -n "$worker" && -n "$subdomain" && "$subdomain" != "null" ]]; then url="https://${worker}.${subdomain}.workers.dev"; fi
+                  if [[ -z "$url" ]]; then echo "::warning::could not find the Storybook Worker's URL"; fi
                   echo "storybook-url=${url}" >> "$GITHUB_OUTPUT"
 
     comment:
