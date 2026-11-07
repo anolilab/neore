@@ -29,7 +29,7 @@ const allPushDevices = async (ctx: QueryCtx, userId: string) => {
     let cursor: string | undefined;
 
     do {
-        // eslint-disable-next-line no-await-in-loop -- each page starts where the previous one ended
+        // Each page starts where the previous one ended.
         const { continueCursor, isDone, page } = await ctx.db.pushDevices.findMany({
             consistency: "primary",
             cursor,

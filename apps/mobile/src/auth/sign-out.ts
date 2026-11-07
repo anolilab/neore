@@ -1,3 +1,10 @@
+/** The session token a failed credential clear carries (`StoredGrantNotClearedError`), if any. */
+const tokenOf = (error: unknown): string | undefined => {
+    const { token } = (error ?? {}) as { token?: unknown };
+
+    return typeof token === "string" ? token : undefined;
+};
+
 /** How long sign-out waits for the server to drop this phone's push token before it carries on without it. */
 export const RELEASE_PUSH_TIMEOUT_MS = 5000;
 
@@ -57,8 +64,10 @@ export const signOutOnDevice = async ({
     try {
         token = await takeCredential();
     } catch (error) {
-        // The stored grant could not be cleared. The user is still signed out in memory by the caller.
+        // The stored grant could not be cleared. The user is still signed out in memory by the caller, and the session
+        // is still revoked below with the token the failed clear carries, so the grant left behind stops working.
         warn("Could not clear the stored sign-in.", error);
+        token = tokenOf(error);
     }
 
     if (dismissNotifications) {
@@ -103,12 +112,14 @@ export const signOutOnDevice = async ({
  */
 export const emptyCacheWhileSignedOut = async ({
     clearCache,
+    dismissNotifications,
     forgetLastChat,
     warn,
-}: Pick<SignOutSteps, "clearCache" | "forgetLastChat" | "warn">): Promise<void> => {
+}: Pick<SignOutSteps, "clearCache" | "dismissNotifications" | "forgetLastChat" | "warn">): Promise<void> => {
     // The forget is queued at once, not after the cache wipe: the sign-in screen is already up, and a chat saved by a
-    // quick sign-in must queue after this forget, or the forget would delete it.
-    const [cache, lastChat] = await Promise.allSettled([clearCache(), forgetLastChat()]);
+    // quick sign-in must queue after this forget, or the forget would delete it. A session the SERVER ended (a refresh
+    // answered 401) never ran the sign-out above, so the previous account's alerts are removed here too.
+    const [cache, lastChat, alerts] = await Promise.allSettled([clearCache(), forgetLastChat(), dismissNotifications?.()]);
 
     if (cache.status === "rejected") {
         warn("Could not empty the offline cache.", cache.reason);
@@ -116,5 +127,9 @@ export const emptyCacheWhileSignedOut = async ({
 
     if (lastChat.status === "rejected") {
         warn("Could not forget the last viewed chat.", lastChat.reason);
+    }
+
+    if (alerts.status === "rejected") {
+        warn("Could not remove this account's notifications.", alerts.reason);
     }
 };

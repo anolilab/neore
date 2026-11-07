@@ -26,6 +26,12 @@ const TOKEN_RETRY_MS = 15_000;
 
 const nextTick = (tick: number): number => tick + 1;
 
+/** The alerts on the phone, and a chat held from a tap, belong to the account that is leaving: neither stays. */
+const dismissPreviousAccountAlerts = async (): Promise<void> => {
+    clearTapRoute();
+    await dismissAllNotificationsAsync();
+};
+
 /**
  * Keeps the Lunora client's bearer in step with the stored grant. The JWT lives in
  * memory only; it is re-minted when client-runtime says the current one is due.
@@ -80,7 +86,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUser(null);
                 setStatus("signed-out");
                 // Retries a cache wipe that failed at sign-out; the credential side never waits on it.
-                await emptyCacheWhileSignedOut({ clearCache: () => getOfflineCache().clear(), forgetLastChat: clearLastThread, warn: console.warn });
+                await emptyCacheWhileSignedOut({
+                    clearCache: () => getOfflineCache().clear(),
+                    dismissNotifications: dismissPreviousAccountAlerts,
+                    forgetLastChat: clearLastThread,
+                    warn: console.warn,
+                });
 
                 return;
             }
@@ -129,12 +140,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // hangs offline cannot leave them behind. Then the server is told and the stored grant cleared.
             await signOutOnDevice({
                 clearCache: () => getOfflineCache().clear(),
+                dismissNotifications: dismissPreviousAccountAlerts,
                 forgetLastChat: clearLastThread,
-                dismissNotifications: async () => {
-                    // The previous account's chat, held from a tap, is not where the next person should land.
-                    clearTapRoute();
-                    await dismissAllNotificationsAsync();
-                },
                 releasePush: async () => {
                     // No registration may send the token from here on; one already on its way finishes first, so it
                     // cannot land after the release and give the phone back to this account.

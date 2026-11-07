@@ -4,11 +4,12 @@ import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 
 import { useAuth } from "../auth/auth-state";
+import { sharedKeychainOps } from "../auth/secure-store";
 import { canClaimLaunchReopen } from "../chat/launch-reopen";
 import { getClient } from "../lib/lunora";
 import { canNavigateToTap, clearTapRoute, holdTapRoute, takeTapRoute } from "./pending-tap";
 import { backendPushServer, configurePhoneNotifications, devicePushPlatform, pushRegistrations } from "./phone-push";
-import { createRegistrationRetry, isAccountSwitch, pushIdsFromNotification, registerPhoneForPush, routeForPush } from "./push-registration";
+import { createRegistrationRetry, noteAccountOnPhone, pushIdsFromNotification, registerPhoneForPush, routeForPush } from "./push-registration";
 
 /** Push is best-effort: a failure is logged and never breaks the screen that asked. */
 const quietly = async (message: string, work: () => Promise<unknown>): Promise<void> => {
@@ -87,18 +88,20 @@ export const usePhonePush = (): void => {
         quietly("Could not set up notifications.", configurePhoneNotifications);
     }, []);
 
-    const previousUserId = useRef<string | undefined>(undefined);
-
     useEffect(() => {
-        // Another person signed in on this phone: the alerts still on it are the previous account's.
-        if (isAccountSwitch(previousUserId.current, userId)) {
-            clearTapRoute();
-            quietly("Could not remove the previous account's notifications.", dismissAllNotificationsAsync);
+        if (userId === undefined) {
+            return;
         }
 
-        if (userId !== undefined) {
-            previousUserId.current = userId;
-        }
+        // Another person signed in on this phone, now or before a relaunch: the alerts still on it are the previous account's.
+        quietly("Could not remove the previous account's notifications.", async () => {
+            if (!await noteAccountOnPhone(userId, sharedKeychainOps)) {
+                return;
+            }
+
+            clearTapRoute();
+            await dismissAllNotificationsAsync();
+        });
     }, [userId]);
 
     useEffect(() => {

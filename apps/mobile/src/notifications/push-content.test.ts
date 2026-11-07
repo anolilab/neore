@@ -125,6 +125,40 @@ describe("showDataOnlyPush", () => {
         expect(task.show).toHaveBeenCalledWith({ body: "You have a new notification", title: "Neore" }, { notificationId: "n1" });
     });
 
+    it("prepares the channel before the last session check, so nothing waits between the check and the post", async () => {
+        const order: string[] = [];
+        const task = steps({
+            prepare: vi.fn(async () => {
+                order.push("prepare");
+            }),
+            sessionUserId: vi.fn(async () => {
+                order.push("check");
+
+                return "u1";
+            }),
+            show: vi.fn(async () => {
+                order.push("show");
+            }),
+        });
+
+        await showDataOnlyPush({ notificationId: "n1" }, task);
+
+        expect(order).toEqual(["check", "prepare", "check", "show", "check"]);
+    });
+
+    it("takes the real text back when a sign-out lands between the last check and the post", async () => {
+        const retract = vi.fn(async () => undefined);
+        const task = steps({
+            retract,
+            sessionUserId: vi.fn<() => Promise<string | undefined>>().mockResolvedValueOnce("u1").mockResolvedValueOnce("u1").mockResolvedValueOnce(undefined),
+        });
+
+        await showDataOnlyPush({ notificationId: "n1", threadId: "t1" }, task);
+
+        expect(task.show).toHaveBeenCalledWith({ body: "Release run", title: "A tool call needs your approval" }, { notificationId: "n1", threadId: "t1" });
+        expect(retract).toHaveBeenCalledWith({ notificationId: "n1", threadId: "t1" });
+    });
+
     it("posts nothing, and keeps no ids, for a notification the server says is not the signed-in account's", async () => {
         const task = steps({ fetchContent: vi.fn(async () => NOT_THIS_ACCOUNT as typeof NOT_THIS_ACCOUNT) });
 
