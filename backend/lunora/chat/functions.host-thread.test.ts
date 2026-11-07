@@ -9,7 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 
 import { enableThreadLock } from "../agent/thread-lock";
-import { TITLE_CHARGE_SCOPE, TITLE_READ_WINDOW, titleDispatchInFlight } from "../agent/thread-title";
+import { TITLE_CHARGE_SCOPE, TITLE_DISPATCH_TTL_MS, TITLE_READ_WINDOW, titleDispatchInFlight } from "../agent/thread-title";
 import { claimFence } from "../lib/claim-once";
 import { MAX_LENGTH } from "../lib/validators";
 import schema from "../schema";
@@ -242,6 +242,42 @@ describe("the gateway a title's model call is sent through", () => {
         }
 
         expect(sent).toEqual([]);
+    });
+
+    it("sends nothing when the claim's result arrives too late for the claim to still hold, and releases it", async () => {
+        const cloud = await insertCloud();
+        const sent: string[] = [];
+
+        vi.useFakeTimers({ now: 1_800_000_000_000, toFake: ["Date"] });
+
+        try {
+            // The claim commits, but the action resumes only once it may have lapsed: a lock could have committed meanwhile.
+            const context = {
+                log: { event: () => undefined },
+                runMutation: async (reference: unknown, args: unknown) => {
+                    const result = await harness.run(async (inner: any) => await inner.runMutation(reference, args));
+
+                    if (typeof result === "number") {
+                        vi.setSystemTime(Date.now() + TITLE_DISPATCH_TTL_MS);
+                    }
+
+                    return result;
+                },
+            } as never;
+            const gateway = titleDispatchGateway(context, cloud, async (input) => {
+                sent.push(String(input));
+
+                return new Response("{}");
+            });
+
+            await expect(gateway.fetch("https://gateway/chat")).rejects.toMatchObject({ code: "CONFLICT" });
+            expect(gateway.refused()).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
+
+        expect(sent).toEqual([]);
+        await expect(harness.run(async (context: any) => await titleDispatchInFlight(context, cloud as never))).resolves.toBe(false);
     });
 
     it("releases its dispatch when the request fails, so the chat can still be locked", async () => {

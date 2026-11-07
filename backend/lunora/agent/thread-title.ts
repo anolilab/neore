@@ -20,7 +20,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx as MutationContext, type QueryCtx as QueryContext } from "../_generated/server";
 import { type ContextRow, firstUserPrompt } from "../chat/lib/first-user-prompt";
 import { threadGateOutcome } from "../chat/lib/thread-gate";
-import { claimFence, claimRow, hasClaimWithPrefix, recordClaimResult, releaseClaim } from "../lib/claim-once";
+import { claimFence, claimRow, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, recordClaimResult, releaseClaim } from "../lib/claim-once";
 import { sha256Hex } from "../lib/crypto";
 import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
@@ -43,6 +43,15 @@ export const TITLE_CHARGE_TTL_MS = 24 * 60 * 60 * 1000;
  */
 export const TITLE_DISPATCH_SCOPE = "title-dispatch";
 export const TITLE_DISPATCH_TTL_MS = 2 * 60 * 1000;
+
+/**
+ * How long before its claim lapses a request may still leave. A request whose claim was taken longer ago than
+ * `TITLE_DISPATCH_TTL_MS - TITLE_DISPATCH_MARGIN_MS` is not sent (`dispatchStillHeld`): the lock check no longer sees a lapsed claim.
+ */
+export const TITLE_DISPATCH_MARGIN_MS = 30 * 1000;
+
+/** Whether a request whose dispatch claim was taken at `claimedAt` may still leave at `now`: its claim holds well past the send. */
+export const dispatchStillHeld = (claimedAt: number, now: number = Date.now()): boolean => now < claimedAt + TITLE_DISPATCH_TTL_MS - TITLE_DISPATCH_MARGIN_MS;
 
 /** The row the thread view ends at: the stored leaf (or the path it falls back to when that row is gone), else the latest row. */
 const leafOf = async (context: Reader, thread: Doc<"threads">): Promise<Doc<"messages"> | null> =>
@@ -298,6 +307,9 @@ export const beginTitleDispatch = internalMutation
         if (closedToTitles(await ctx.db.get("threads", args.threadId))) {
             return null;
         }
+
+        // Dispatches whose release never landed are cleared here, so the lock's check reads a short range.
+        await dropExpiredClaimsWithPrefix(ctx, TITLE_DISPATCH_SCOPE, `${args.threadId}:`);
 
         return await claimFence(ctx, TITLE_DISPATCH_SCOPE, `${args.threadId}:${args.requestId}`, { ttlMs: TITLE_DISPATCH_TTL_MS });
     });

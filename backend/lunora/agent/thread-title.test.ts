@@ -16,8 +16,13 @@ import {
     beginTitleDispatch,
     readTitlePrompt,
     recordTitleAnswer,
+    dispatchStillHeld,
     TITLE_CHARGE_SCOPE,
+    TITLE_DISPATCH_MARGIN_MS,
+    TITLE_DISPATCH_SCOPE,
+    TITLE_DISPATCH_TTL_MS,
     TITLE_READ_WINDOW,
+    titleDispatchInFlight,
     titlePromptIn,
     writeTitleIfUnchanged,
 } from "./thread-title";
@@ -386,4 +391,47 @@ describe("letting a title's model request leave", () => {
         await expect(begin(locked)).resolves.toBeNull();
         await expect(begin(open)).resolves.toEqual(expect.any(Number));
     });
+});
+
+describe("a title request's dispatch claim", () => {
+    it("lets a request leave only while its claim still holds well past the send", () => {
+        const claimedAt = 1_000_000;
+
+        expect(dispatchStillHeld(claimedAt, claimedAt)).toBe(true);
+        expect(dispatchStillHeld(claimedAt, claimedAt + TITLE_DISPATCH_TTL_MS - TITLE_DISPATCH_MARGIN_MS - 1)).toBe(true);
+        expect(dispatchStillHeld(claimedAt, claimedAt + TITLE_DISPATCH_TTL_MS - TITLE_DISPATCH_MARGIN_MS)).toBe(false);
+    });
+
+    it("finds a request being sent behind more than a page of expired claims, and a new dispatch clears expired ones", async () => {
+        const threadId = await threadWith();
+
+        await harness.run(async (context: any) => {
+            // Expired claims whose releases never landed sort before the live one.
+            for (let index = 0; index < 120; index += 1) {
+                await context.db.insert("idempotencyClaims", {
+                    claimedAt: 1,
+                    expiresAt: 2,
+                    key: `${threadId}:a-${String(index).padStart(3, "0")}`,
+                    scope: TITLE_DISPATCH_SCOPE,
+                });
+            }
+
+            await context.db.insert("idempotencyClaims", {
+                claimedAt: Date.now(),
+                expiresAt: Date.now() + 60_000,
+                key: `${threadId}:z-live`,
+                scope: TITLE_DISPATCH_SCOPE,
+            });
+        });
+
+        await expect(harness.run(async (context: any) => await titleDispatchInFlight(context, threadId as Id<"threads">))).resolves.toBe(true);
+
+        await harness.run(async (context: any) => await context.runMutation(beginTitleDispatch as never, { requestId: "next", threadId }));
+
+        const keys = (await harness.run(async (context: any) => await context.db.query("idempotencyClaims").collect())) as { key: string }[];
+
+        // One page of the expired claims is gone; the live claim and the new one stay.
+        expect(keys.filter((claim) => claim.key.startsWith(`${threadId}:a-`))).toHaveLength(70);
+        expect(keys.map((claim) => claim.key)).toEqual(expect.arrayContaining([`${threadId}:z-live`, `${threadId}:next`]));
+    }, 60_000);
 });

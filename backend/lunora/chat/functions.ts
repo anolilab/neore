@@ -49,7 +49,7 @@ import type { UIMessage } from "../agent/ui-messages";
 import { docsToModelMessages, listMessagesByThreadIdHandler, storeFile, toUIMessages } from "../agent/client";
 import { autoRepairJsonMiddleware } from "../agent/client/middleware";
 import { listActivePathPage, withBranchInfo } from "../agent/branches";
-import { TITLE_CHARGE_SCOPE } from "../agent/thread-title";
+import { dispatchStillHeld, TITLE_CHARGE_SCOPE } from "../agent/thread-title";
 import { candidatesOnActivePath } from "../agent/branch-rows";
 import {
     redactThreadForPublicViewer,
@@ -1803,9 +1803,9 @@ const writeGeneratedTitle = async (
             // The call threw before it answered: nothing was generated, so the charge is given back and a retried run may ask again.
             await giveBackTitleCharge(context, arguments_.chargeKey, claimedAt);
 
-            // Locked as the request was leaving: nothing was sent, and the run ends here rather than being retried.
+            // Refused as the request was leaving (locked, or held too long to still count as held): nothing was sent, and the run ends here.
             if (gateway.refused()) {
-                context.log.event("chat.thread_title", { skipped: "locked-at-dispatch" });
+                context.log.event("chat.thread_title", { skipped: "refused-at-dispatch" });
 
                 return;
             }
@@ -1863,6 +1863,14 @@ export const titleDispatchGateway = (context: ActionContext, threadId: string, i
             }
 
             try {
+                // The claim must still be held when the request leaves: one taken so long ago that it may have lapsed no longer keeps a
+                // lock waiting, so the request is not sent.
+                if (!dispatchStillHeld(claimedAt)) {
+                    refused = true;
+
+                    throw new LunoraError("CONFLICT", "The title request was not sent in time; it was dropped.");
+                }
+
                 return await inner(input, init);
             } finally {
                 if (!(await tryTimes(3, () => context.runMutation(internal.agent.thread_title.endTitleDispatch, { ...dispatch, claimedAt })))) {

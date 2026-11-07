@@ -295,18 +295,52 @@ const prefixEnd = (prefix: string): string => {
     return `${prefix.slice(0, last)}${String.fromCodePoint(prefix.codePointAt(last)! + 1)}`;
 };
 
-/** Claims read per {@link hasClaimWithPrefix} call: expired rows the purge has not reached yet are skipped, up to this many. */
+/** Claims read per page by {@link hasClaimWithPrefix} and {@link dropExpiredClaimsWithPrefix}. */
 const PREFIX_PROBE_BATCH = 50;
 
-/** `true` while an unexpired claim of `scope` whose key starts with `prefix` exists. */
+/**
+ * `true` while an unexpired claim of `scope` whose key starts with `prefix` exists. Reads the range page by page until it finds one, so
+ * expired rows the purge has not reached yet cannot hide an unexpired claim behind them.
+ */
 export const hasClaimWithPrefix = async (ctx: Pick<QueryCtx, "db">, scope: string, prefix: string): Promise<boolean> => {
+    const now = Date.now();
+    const end = prefixEnd(prefix);
+    let after: string | undefined;
+
+    for (;;) {
+        const from = after;
+        const rows = await ctx.db
+            .query("idempotencyClaims")
+            .withIndex("by_scope_key", (q) =>
+                (from === undefined ? q.eq("scope", scope).gte("key", prefix) : q.eq("scope", scope).gt("key", from)).lt("key", end),
+            )
+            .take(PREFIX_PROBE_BATCH);
+
+        if (rows.some((row) => row.expiresAt > now)) {
+            return true;
+        }
+
+        if (rows.length < PREFIX_PROBE_BATCH) {
+            return false;
+        }
+
+        after = rows.at(-1)!.key;
+    }
+};
+
+/** Deletes up to one page of EXPIRED claims of `scope` whose key starts with `prefix`, so the range a {@link hasClaimWithPrefix} reads stays short. */
+export const dropExpiredClaimsWithPrefix = async (ctx: ClaimCtx, scope: string, prefix: string): Promise<void> => {
     const now = Date.now();
     const rows = await ctx.db
         .query("idempotencyClaims")
         .withIndex("by_scope_key", (q) => q.eq("scope", scope).gte("key", prefix).lt("key", prefixEnd(prefix)))
         .take(PREFIX_PROBE_BATCH);
 
-    return rows.some((row) => row.expiresAt > now);
+    for (const row of rows) {
+        if (row.expiresAt <= now) {
+            await ctx.db.delete("idempotencyClaims", row._id);
+        }
+    }
 };
 
 /** Rows deleted per {@link releaseClaimsWithPrefix} call. */
