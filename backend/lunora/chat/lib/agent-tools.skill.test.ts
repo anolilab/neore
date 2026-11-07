@@ -219,7 +219,7 @@ describe("buildAgentTools MCP fingerprints", () => {
     it("records the fingerprint of each MCP tool the run is offered, and only those, for its approval snapshot", async () => {
         overrides = { "mcp:docs:delete": "off" };
 
-        const { mcpToolFingerprints } = await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
+        const { mcpToolFingerprints } = await buildAgentTools(fakeCtx(), { model: "test-model", organizationId: null, searchMode: "web", userId: "user" });
 
         expect(mcpToolFingerprints).toStrictEqual({ mcp_docs__search: "aaa" });
     });

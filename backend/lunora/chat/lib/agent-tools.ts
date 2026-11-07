@@ -169,7 +169,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
     // Decided before the preferences are awaited: a failed preference read cannot take down a run that offers no tools.
     if (permissionCap === "off") {
-        return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, repeatable: [], tools: {} };
+        return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], mcpToolFingerprints: {}, permissionKeys: {}, repeatable: [], tools: {} };
     }
 
     const [allMcpServers, overrides, timedGrants] = await preferences;
