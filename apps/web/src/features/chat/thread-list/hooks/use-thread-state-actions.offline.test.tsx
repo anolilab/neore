@@ -11,14 +11,29 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const toasts = vi.hoisted(() => {
-    return { errors: [] as string[] };
+    return { errors: [] as string[], successes: [] as string[] };
 });
 
 const { server, write } = vi.hoisted(() => {
-    const fake = { loseResponse: false, online: true, queued: [] as (() => void)[], refuse: false, written: [] as unknown[] };
+    const fake = {
+        dropSnooze: false,
+        dropUnsnooze: false,
+        loseResponse: false,
+        // The error a write sent over the live connection fails with after the server committed it (set per test).
+        lostError: undefined as unknown,
+        online: true,
+        queued: [] as (() => void)[],
+        refuse: false,
+        written: [] as unknown[],
+    };
 
-    const send = (args: unknown, call?: { onlineOnly?: boolean }): Promise<unknown> => {
+    const send = (args: unknown, call?: { onlineOnly?: boolean }, isUnsnooze = false): Promise<unknown> => {
         if (fake.online) {
+            // The server keeps a newer choice and answers that this unsnooze did not apply.
+            if ((isUnsnooze && fake.dropUnsnooze) || (!isUnsnooze && fake.dropSnooze)) {
+                return Promise.resolve({ applied: false });
+            }
+
             // The server answers with a refusal, and applies nothing.
             if (fake.refuse) {
                 return Promise.reject(Object.assign(new Error("A snooze must end in the future, within a year"), { code: "BAD_REQUEST" }));
@@ -29,6 +44,10 @@ const { server, write } = vi.hoisted(() => {
             // The server committed the write, but the answer never reached the client: a network failure.
             if (fake.loseResponse) {
                 return Promise.reject(new TypeError("Failed to fetch"));
+            }
+
+            if (fake.lostError !== undefined) {
+                return Promise.reject(fake.lostError);
             }
 
             return Promise.resolve(null);
@@ -66,7 +85,9 @@ vi.mock("@/lib/toast", () => {
         showError: (message: string) => {
             toasts.errors.push(message);
         },
-        showSuccess: () => {},
+        showSuccess: (message: string) => {
+            toasts.successes.push(message);
+        },
     };
 });
 
@@ -83,7 +104,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                         },
                         unsnoozeThread: {
                             mutationOptions: (overrides?: Record<string, unknown>) => {
-                                return { ...overrides, mutationFn: async (args: unknown) => await write(args) };
+                                return { ...overrides, mutationFn: async (args: unknown) => await write(args, undefined, true) };
                             },
                         },
                     },
@@ -142,8 +163,12 @@ describe("snoozing while offline", () => {
     beforeEach(() => {
         server.online = true;
         server.loseResponse = false;
+        server.lostError = undefined;
         server.refuse = false;
         toasts.errors.length = 0;
+        toasts.successes.length = 0;
+        server.dropUnsnooze = false;
+        server.dropSnooze = false;
         server.queued.length = 0;
         server.written.length = 0;
         onlineManager.setOnline(true);
@@ -154,6 +179,28 @@ describe("snoozing while offline", () => {
         client.clear();
         refetchFails.clear();
         vi.restoreAllMocks();
+    });
+
+    it("an unsnooze the server drops shows the notice, and is not reported as done", async () => {
+        const { result } = renderHook(() => useThreadStateActions(), { wrapper });
+
+        server.dropUnsnooze = true;
+        act(() => {
+            result.current.unsnooze("t1", undefined);
+        });
+        await flush();
+
+        expect(toasts.errors).toEqual(["A newer change to this thread is already in place, so this did not apply."]);
+        expect(toasts.successes).toEqual([]);
+    });
+
+    it("a custom snooze the server drops is superseded: not reported as saved, and left to the dialog to show", async () => {
+        const { result } = renderHook(() => useThreadStateActions(), { wrapper });
+
+        server.dropSnooze = true;
+        await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe("superseded");
+        expect(toasts.successes).toEqual([]);
+        expect(toasts.errors).toEqual([]);
     });
 
     it("a custom snooze the server refuses is refused, not unconfirmed, and nothing is written", async () => {
@@ -173,6 +220,26 @@ describe("snoozing while offline", () => {
         await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe("unconfirmed");
 
         // The write did reach the server; the dialog must not invite a blind retry as if nothing happened.
+        expect(server.written).toHaveLength(1);
+    });
+
+    it("a custom snooze the client reports as not queued after a network failure is unconfirmed, not refused", async () => {
+        const { result } = renderHook(() => useThreadStateActions(), { wrapper });
+
+        // The socket dropped mid-write: the client reports OFFLINE_NOT_QUEUED, with the network failure as its cause.
+        server.lostError = Object.assign(new Error("'snoozeThread' was not queued", { cause: new TypeError("Failed to fetch") }), {
+            code: "OFFLINE_NOT_QUEUED",
+        });
+        await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe("unconfirmed");
+        expect(server.written).toHaveLength(1);
+        expect(toasts.errors).toEqual([]);
+    });
+
+    it("a custom snooze that times out after the server committed it is unconfirmed", async () => {
+        const { result } = renderHook(() => useThreadStateActions(), { wrapper });
+
+        server.lostError = new DOMException("The request timed out.", "TimeoutError");
+        await expect(result.current.snoozeAt("t1", UNTIL, undefined)).resolves.toBe("unconfirmed");
         expect(server.written).toHaveLength(1);
     });
 

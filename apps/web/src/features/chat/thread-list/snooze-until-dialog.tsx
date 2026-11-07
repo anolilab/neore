@@ -7,6 +7,7 @@ import type { FormEvent } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
+import type { SnoozeOutcome } from "./hooks/use-thread-state-actions";
 import { useThreadStateActions } from "./hooks/use-thread-state-actions";
 import { customSnoozeCheck } from "./lib/thread-state-rules";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
@@ -108,6 +109,19 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
         [returnFocus, threadId],
     );
 
+    // What the dialog says when a save did not go through. Each outcome has its own message, and the dialog stays open for all of them.
+    const failureMessage = (outcome: Exclude<SnoozeOutcome, "saved">): string => {
+        if (outcome === "unconfirmed") {
+            return t`Could not confirm the snooze. It may have saved; check the thread before saving again.`;
+        }
+
+        if (outcome === "superseded") {
+            return t`A newer change to this thread is already in place, so this did not apply.`;
+        }
+
+        return t`Could not snooze the thread. Please try again.`;
+    };
+
     // The dialog closes once the snooze is saved. A failure (offline included) keeps the chosen time here, with the error, and the
     // dialog stays cancellable: Cancel and Escape never wait on the save.
     const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -158,11 +172,7 @@ const SnoozeUntilDialog = ({ onOpenChange, open, previousUntil, returnFocusTo, t
         // The button was disabled while saving, so it lost focus: put focus back on it once it is enabled, so the user is not left on nothing.
         flushSync(() => {
             setSaving(false);
-            setError(
-                outcome === "unconfirmed"
-                    ? t`Could not confirm the snooze. It may have saved; check the thread before saving again.`
-                    : t`Could not snooze the thread. Please try again.`,
-            );
+            setError(failureMessage(outcome));
         });
         submitReference.current?.focus();
     };

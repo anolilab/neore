@@ -368,6 +368,18 @@ describe("the list's snooze dialog across threads", () => {
         expect(onOpenChange).not.toHaveBeenCalled();
     });
 
+    it("a snooze the server drops shows that a newer change applies instead, and keeps the dialog open", async () => {
+        const onOpenChange = mountDialog();
+
+        state.snoozeAt.mockResolvedValueOnce("superseded");
+        submit();
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("A newer change to this thread is already in place, so this did not apply.");
+        expect(onOpenChange).not.toHaveBeenCalled();
+    });
+
     it("shows that a save may have gone through when its answer was lost, and keeps the dialog open", async () => {
         const onOpenChange = mountDialog();
 

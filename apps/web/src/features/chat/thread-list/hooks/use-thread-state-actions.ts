@@ -17,20 +17,37 @@ interface SnoozeMutateVariables {
 
 type SnoozeMutate = (variables: SnoozeMutateVariables) => Promise<unknown>;
 
-/**
- * Whether a failed write got no answer at all: the request was sent (or may have been) and the reply never arrived. A network failure
- * is a `TypeError` from `fetch`; an aborted or timed-out request is a `DOMException`. A reply from the server, whatever its code, is
- * an answer, so the write did not save.
- */
-const answerWasLost = (error: unknown): boolean =>
+/** A failure of the request itself: a network failure (a `TypeError` from `fetch`), or an aborted or timed-out request (a `DOMException`). */
+const isTransportFailure = (error: unknown): boolean =>
     error instanceof TypeError ||
     (typeof DOMException !== "undefined" && error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError"));
 
 /**
- * What became of a snooze: `saved`; `refused` (the client refused it before sending, so nothing was saved); or `unconfirmed` (the write
- * was sent and its answer was lost, so the server may have committed it, and the owner should check before saving again).
+ * Whether a failed write got no answer at all: the request was sent (or may have been) and the reply never arrived. A reply from the
+ * server, whatever its code, is an answer, so the write did not save.
+ *
+ * The client reports a write that failed in transit as `OFFLINE_NOT_QUEUED` when its socket was down, and keeps the transport failure
+ * as the `cause`. A refusal before sending has no cause. So the cause tells a lost answer from a refusal.
  */
-export type SnoozeOutcome = "saved" | "refused" | "unconfirmed";
+const answerWasLost = (error: unknown): boolean => {
+    if (isTransportFailure(error)) {
+        return true;
+    }
+
+    const { cause, code } = (error ?? {}) as { cause?: unknown; code?: unknown };
+
+    return code === "OFFLINE_NOT_QUEUED" && isTransportFailure(cause);
+};
+
+/**
+ * What became of a snooze: `saved`; `refused` (the client refused it before sending, or the server refused it, so nothing was saved);
+ * `unconfirmed` (the write was sent and its answer was lost, so the server may have committed it, and the owner should check before
+ * saving again); or `superseded` (the server answered that a newer choice for the thread is already in place, so this one did not apply).
+ */
+export type SnoozeOutcome = "saved" | "refused" | "superseded" | "unconfirmed";
+
+/** The server answers a snooze or unsnooze with `applied: false` when it drops a choice that a newer one supersedes. */
+const superseded = (result: unknown): boolean => (result as { applied?: unknown } | null)?.applied === false;
 
 interface ThreadStateActions {
     /** Hides the thread until the choice's time; the toast offers an undo that restores the previous snooze, if any. */
@@ -77,10 +94,18 @@ export const useThreadStateActions = (): ThreadStateActions => {
                     ? snoozeMutation({ chosenAt, threadId: threadId as Id<"threads">, until: previousUntil })
                     : unsnoozeMutation({ chosenAt, threadId: threadId as Id<"threads"> });
 
-            request.catch((error) => {
-                console.error("Failed to restore the snooze:", error);
-                showError(t`Could not undo. Please try again.`);
-            });
+            request
+                .then((result) => {
+                    if (superseded(result)) {
+                        showError(t`A newer change to this thread is already in place, so this did not apply.`);
+                    }
+
+                    return undefined;
+                })
+                .catch((error) => {
+                    console.error("Failed to restore the snooze:", error);
+                    showError(t`Could not undo. Please try again.`);
+                });
         },
         [snoozeMutation, unsnoozeMutation, t],
     );
@@ -93,8 +118,10 @@ export const useThreadStateActions = (): ThreadStateActions => {
     // also toast it; a snooze with no dialog (a preset) reports it here.
     const save = useCallback(
         async (mutate: SnoozeMutate, threadId: string, until: number, previousUntil: number | undefined, reportFailure: boolean): Promise<SnoozeOutcome> => {
+            let result: unknown;
+
             try {
-                await mutate({ chosenAt: Date.now(), threadId: threadId as Id<"threads">, until });
+                result = await mutate({ chosenAt: Date.now(), threadId: threadId as Id<"threads">, until });
             } catch (error) {
                 console.error("Failed to snooze thread:", error);
 
@@ -111,6 +138,15 @@ export const useThreadStateActions = (): ThreadStateActions => {
                 }
 
                 return lost ? "unconfirmed" : "refused";
+            }
+
+            // The server kept a newer choice, so this one did not apply: it is not reported as saved.
+            if (superseded(result)) {
+                if (reportFailure) {
+                    showError(t`A newer change to this thread is already in place, so this did not apply.`);
+                }
+
+                return "superseded";
             }
 
             const when = new Date(until).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -137,7 +173,14 @@ export const useThreadStateActions = (): ThreadStateActions => {
     const unsnooze = useCallback(
         (threadId: string, previousUntil: number | undefined) => {
             unsnoozeMutation({ chosenAt: Date.now(), threadId: threadId as Id<"threads"> })
-                .then(() => {
+                .then((result) => {
+                    // A newer change kept the thread as it is: the unsnooze did not happen, so it is not reported as done.
+                    if (superseded(result)) {
+                        showError(t`A newer change to this thread is already in place, so this did not apply.`);
+
+                        return undefined;
+                    }
+
                     showSuccess(t`Thread unsnoozed`, { action: { label: t`Undo`, onClick: () => restore(threadId, previousUntil) } });
 
                     return undefined;
