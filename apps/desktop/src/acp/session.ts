@@ -427,6 +427,11 @@ export class AgentSession {
             try {
                 const forked = await forkSession(this.connection, source, folder);
 
+                // An answer naming the source is not a fork: prompting it would write into the session the fork must leave alone.
+                if (forked === source) {
+                    throw new Error("the agent did not fork the session");
+                }
+
                 this.fork = { forked: true };
 
                 return forked;

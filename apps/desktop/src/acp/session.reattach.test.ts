@@ -125,4 +125,12 @@ describe("a start that forks a session", () => {
         expect(methods()).toContain("session/new");
         expect(opened[0]).toMatchObject({ fork: { forked: false, reason: "fork_failed" }, nativeSessionId: "fake-session-1" });
     });
+
+    it("opens a new session when the agent answers with the source's own id, so nothing is sent into the source", async () => {
+        await startWith({ FAKE_AGENT_FORK_SAME: "1", FAKE_AGENT_SESSIONS: "fork" }, undefined, "s-new");
+
+        expect(methods()).toContain("session/fork");
+        expect(methods()).toContain("session/new");
+        expect(opened[0]).toMatchObject({ fork: { forked: false, reason: "fork_failed" }, nativeSessionId: "fake-session-1" });
+    });
 });

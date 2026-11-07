@@ -279,7 +279,7 @@ const handle = async (message) => {
         if (HISTORY[message.params.sessionId] === undefined) {
             return send({ id: message.id, error: { code: -32002, message: "Resource not found" } });
         }
-        state.sessionId = `${message.params.sessionId}-fork`;
+        state.sessionId = process.env.FAKE_AGENT_FORK_SAME === "1" ? message.params.sessionId : `${message.params.sessionId}-fork`;
         return send({ id: message.id, result: { sessionId: state.sessionId } });
     }
 
