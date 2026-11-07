@@ -967,28 +967,30 @@ describe("the coding-agent composer", () => {
 
     it("waits for another tab's running turn instead of pausing, when a refused head's turn is already running", async () => {
         harness.sendResults = [{ error: "turn_running", ok: false }];
-        // The other tab's turn is running on the stream this composer reads again after the refusal. That re-read is held for a
-        // while, so a drain that did not wait for it would post the head a second time in the meantime.
+        // The other tab's turn is running on the stream this composer reads again after the refusal. That re-read is held until
+        // the test lets it go, so a drain that did not wait for it would post the head a second time in the meantime.
+        const hold = gate();
+
         harness.onSend = () => {
             harness.onSend = undefined;
             harness.data = { ...harness.data, "chat.streaming.getActiveStreamForThread": { streamId: "stream-2" } };
-
-            const hold = gate();
-
             harness.hold = ["chat.streaming.getActiveStreamForThread"];
             harness.gate = hold.promise;
-            setTimeout(() => {
-                harness.hold = [];
-                hold.release();
-            }, 100);
         };
         usePromptQueueStore.getState().enqueue("thread-1", { attachments: [], text: "waits for the other tab's turn" });
         mount(session());
 
         await waitFor(() => expect(sendCalls()).toHaveLength(1));
+        // While the re-read is held, the head is not posted again.
         await new Promise((resolve) => {
-            setTimeout(resolve, 200);
+            setTimeout(resolve, 50);
         });
+        expect(sendCalls()).toHaveLength(1);
+
+        harness.hold = [];
+        hold.release();
+        // The re-read has landed once the composer shows the other tab's turn running.
+        expect(await screen.findByRole("button", { name: "Stop" })).toBeTruthy();
 
         expect(screen.queryByRole("alert")).toBeNull();
         expect(screen.queryByRole("button", { name: "Send next" })).toBeNull();
@@ -1528,6 +1530,10 @@ describe("the coding-agent composer", () => {
             setTimeout(resolve, 50);
         });
         expect(screen.queryByRole("button", { name: "Send next" })).toBeNull();
+        // The message behind it is still queued, unpaused, waiting for the interrupting text's turn rather than lost.
+        expect(usePromptQueueStore.getState().queues["thread-1"]?.items.map((item) => item.text)).toEqual(["behind"]);
+        expect(usePromptQueueStore.getState().queues["thread-1"]?.paused).toBe(false);
+        expect(screen.getByText("behind")).toBeTruthy();
     });
 
     it("does not send the interrupting text when the turn's end arrives before the stop's answer, and holds it when the stop did not reach the computer", async () => {
