@@ -721,7 +721,7 @@ msgid "{activeCount, plural, one {You have # messenger connected} other {You hav
 msgstr "{activeCount, plural, one {Tienes # mensajería conectada} other {Tienes # mensajerías conectadas}}"
 
 #. placeholder {0}: enabledServers.length
-#: src/features/chat/thread/composer-mcp-selector.tsx:123
+#: src/features/chat/thread/composer-mcp-selector.tsx:125
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{activeCount} de {0} servidores MCP activos"
 
@@ -3005,7 +3005,7 @@ msgstr "Todos los iconos"
 msgid "All installers"
 msgstr "Todos los instaladores"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:123
+#: src/features/chat/thread/composer-mcp-selector.tsx:125
 msgid "All MCP servers active"
 msgstr "Todos los servidores MCP activos"
 
@@ -3078,7 +3078,7 @@ msgstr "Todos los derechos reservados."
 msgid "All Roles"
 msgstr "Todos los roles"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:146
+#: src/features/chat/thread/composer-mcp-selector.tsx:148
 msgid "All Servers"
 msgstr "Todos los servidores"
 
@@ -18777,7 +18777,7 @@ msgstr "Número máximo de usuarios que se eliminan en cada ejecución de limpie
 msgid "Maximum reasoning depth for complex architectures"
 msgstr "Máxima profundidad de razonamiento para arquitecturas complejas"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:116
+#: src/features/chat/thread/composer-mcp-selector.tsx:117
 msgid "MCP"
 msgstr "MCP"
 
@@ -18816,7 +18816,7 @@ msgstr "Servidor MCP actualizado"
 msgid "MCP server: {0}"
 msgstr "Servidor MCP: {0}"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:140
+#: src/features/chat/thread/composer-mcp-selector.tsx:142
 #: src/features/layout/lib/dashboard-page-names.ts:27
 #: src/features/settings/components/chat/mcp-settings.tsx:407
 #: src/features/settings/lib/settings-navigation.ts:94
@@ -33988,7 +33988,7 @@ msgstr "Usa la sintaxis {VARIABLE_PLACEHOLDER} para añadir contenido dinámico.
 msgid "Use AI to optimize your prompt for better results. Optionally provide specific instructions for how you'd like it improved."
 msgstr "Usa la IA para optimizar tu prompt y obtener mejores resultados. Opcionalmente, da instrucciones concretas sobre cómo quieres mejorarlo."
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:147
+#: src/features/chat/thread/composer-mcp-selector.tsx:149
 msgid "Use all enabled MCP servers"
 msgstr "Usar todos los servidores MCP activados"
 

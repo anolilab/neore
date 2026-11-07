@@ -721,7 +721,7 @@ msgid "{activeCount, plural, one {You have # messenger connected} other {You hav
 msgstr "{activeCount, plural, other {# 件のメッセンジャーが接続されています}}"
 
 #. placeholder {0}: enabledServers.length
-#: src/features/chat/thread/composer-mcp-selector.tsx:123
+#: src/features/chat/thread/composer-mcp-selector.tsx:125
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{0} 個中 {activeCount} 個の MCP サーバーが有効"
 
@@ -3005,7 +3005,7 @@ msgstr "すべてのアイコン"
 msgid "All installers"
 msgstr "すべてのインストーラー"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:123
+#: src/features/chat/thread/composer-mcp-selector.tsx:125
 msgid "All MCP servers active"
 msgstr "すべての MCP サーバーが有効"
 
@@ -3078,7 +3078,7 @@ msgstr "All rights reserved."
 msgid "All Roles"
 msgstr "すべてのロール"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:146
+#: src/features/chat/thread/composer-mcp-selector.tsx:148
 msgid "All Servers"
 msgstr "すべてのサーバー"
 
@@ -18777,7 +18777,7 @@ msgstr "1 回のクリーンアップで削除するユーザーの最大数で�
 msgid "Maximum reasoning depth for complex architectures"
 msgstr "複雑なアーキテクチャ向けの最大の推論深度"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:116
+#: src/features/chat/thread/composer-mcp-selector.tsx:117
 msgid "MCP"
 msgstr "MCP"
 
@@ -18816,7 +18816,7 @@ msgstr "MCP サーバーを更新しました"
 msgid "MCP server: {0}"
 msgstr "MCP サーバー：{0}"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:140
+#: src/features/chat/thread/composer-mcp-selector.tsx:142
 #: src/features/layout/lib/dashboard-page-names.ts:27
 #: src/features/settings/components/chat/mcp-settings.tsx:407
 #: src/features/settings/lib/settings-navigation.ts:94
@@ -33988,7 +33988,7 @@ msgstr "動的な内容を追加するには {VARIABLE_PLACEHOLDER} 構文を使
 msgid "Use AI to optimize your prompt for better results. Optionally provide specific instructions for how you'd like it improved."
 msgstr "AI でプロンプトを最適化して、より良い結果を得ましょう。どのように改善したいか、具体的な指示を入力することもできます。"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:147
+#: src/features/chat/thread/composer-mcp-selector.tsx:149
 msgid "Use all enabled MCP servers"
 msgstr "有効なすべての MCP サーバーを使用"
 

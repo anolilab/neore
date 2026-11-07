@@ -721,7 +721,7 @@ msgid "{activeCount, plural, one {You have # messenger connected} other {You hav
 msgstr "{activeCount, plural, one {Du hast # Messenger verbunden} other {Du hast # Messenger verbunden}}"
 
 #. placeholder {0}: enabledServers.length
-#: src/features/chat/thread/composer-mcp-selector.tsx:123
+#: src/features/chat/thread/composer-mcp-selector.tsx:125
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{activeCount} von {0} MCP-Servern aktiv"
 
@@ -3005,7 +3005,7 @@ msgstr "Alle Icons"
 msgid "All installers"
 msgstr "Alle Installationsprogramme"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:123
+#: src/features/chat/thread/composer-mcp-selector.tsx:125
 msgid "All MCP servers active"
 msgstr "Alle MCP-Server aktiv"
 
@@ -3078,7 +3078,7 @@ msgstr "Alle Rechte vorbehalten."
 msgid "All Roles"
 msgstr "Alle Rollen"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:146
+#: src/features/chat/thread/composer-mcp-selector.tsx:148
 msgid "All Servers"
 msgstr "Alle Server"
 
@@ -18777,7 +18777,7 @@ msgstr "Maximale Anzahl von Benutzern, die pro Bereinigungslauf gelöscht werden
 msgid "Maximum reasoning depth for complex architectures"
 msgstr "Maximale Reasoning-Tiefe für komplexe Architekturen"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:116
+#: src/features/chat/thread/composer-mcp-selector.tsx:117
 msgid "MCP"
 msgstr "MCP"
 
@@ -18816,7 +18816,7 @@ msgstr "MCP-Server aktualisiert"
 msgid "MCP server: {0}"
 msgstr "MCP-Server: {0}"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:140
+#: src/features/chat/thread/composer-mcp-selector.tsx:142
 #: src/features/layout/lib/dashboard-page-names.ts:27
 #: src/features/settings/components/chat/mcp-settings.tsx:407
 #: src/features/settings/lib/settings-navigation.ts:94
@@ -33988,7 +33988,7 @@ msgstr "Nutze die Syntax {VARIABLE_PLACEHOLDER}, um dynamische Inhalte hinzuzuf�
 msgid "Use AI to optimize your prompt for better results. Optionally provide specific instructions for how you'd like it improved."
 msgstr "Verwende KI, um deinen Prompt für bessere Ergebnisse zu optimieren. Optional kannst du spezifische Anweisungen angeben, wie du ihn verbessert haben möchtest."
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:147
+#: src/features/chat/thread/composer-mcp-selector.tsx:149
 msgid "Use all enabled MCP servers"
 msgstr "Alle aktivierten MCP-Server verwenden"
 

@@ -733,7 +733,7 @@ msgid "{activeCount, plural, one {You have # messenger connected} other {You hav
 msgstr "{activeCount, plural, one {You have # messenger connected} other {You have # messengers connected}}"
 
 #. placeholder {0}: enabledServers.length
-#: src/features/chat/thread/composer-mcp-selector.tsx:123
+#: src/features/chat/thread/composer-mcp-selector.tsx:125
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{activeCount} of {0} MCP servers active"
 
@@ -3033,7 +3033,7 @@ msgstr "All Icons"
 msgid "All installers"
 msgstr "All installers"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:123
+#: src/features/chat/thread/composer-mcp-selector.tsx:125
 msgid "All MCP servers active"
 msgstr "All MCP servers active"
 
@@ -3106,7 +3106,7 @@ msgstr "All rights reserved."
 msgid "All Roles"
 msgstr "All Roles"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:146
+#: src/features/chat/thread/composer-mcp-selector.tsx:148
 msgid "All Servers"
 msgstr "All Servers"
 
@@ -18824,7 +18824,7 @@ msgstr "Maximum number of users to delete per cleanup run."
 msgid "Maximum reasoning depth for complex architectures"
 msgstr "Maximum reasoning depth for complex architectures"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:116
+#: src/features/chat/thread/composer-mcp-selector.tsx:117
 msgid "MCP"
 msgstr "MCP"
 
@@ -18863,7 +18863,7 @@ msgstr "MCP server updated"
 msgid "MCP server: {0}"
 msgstr "MCP server: {0}"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:140
+#: src/features/chat/thread/composer-mcp-selector.tsx:142
 #: src/features/layout/lib/dashboard-page-names.ts:27
 #: src/features/settings/components/chat/mcp-settings.tsx:407
 #: src/features/settings/lib/settings-navigation.ts:94
@@ -34112,7 +34112,7 @@ msgstr "Use {VARIABLE_PLACEHOLDER} syntax to add dynamic content. Example: \"Hel
 msgid "Use AI to optimize your prompt for better results. Optionally provide specific instructions for how you'd like it improved."
 msgstr "Use AI to optimize your prompt for better results. Optionally provide specific instructions for how you'd like it improved."
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:147
+#: src/features/chat/thread/composer-mcp-selector.tsx:149
 msgid "Use all enabled MCP servers"
 msgstr "Use all enabled MCP servers"
 

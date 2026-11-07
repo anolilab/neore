@@ -721,7 +721,7 @@ msgid "{activeCount, plural, one {You have # messenger connected} other {You hav
 msgstr "{activeCount, plural, other {你已连接 # 个即时通讯平台}}"
 
 #. placeholder {0}: enabledServers.length
-#: src/features/chat/thread/composer-mcp-selector.tsx:123
+#: src/features/chat/thread/composer-mcp-selector.tsx:125
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{activeCount}/{0} 个 MCP 服务器已启用"
 
@@ -3005,7 +3005,7 @@ msgstr "所有图标"
 msgid "All installers"
 msgstr "所有安装包"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:123
+#: src/features/chat/thread/composer-mcp-selector.tsx:125
 msgid "All MCP servers active"
 msgstr "所有 MCP 服务器已启用"
 
@@ -3078,7 +3078,7 @@ msgstr "保留所有权利。"
 msgid "All Roles"
 msgstr "所有角色"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:146
+#: src/features/chat/thread/composer-mcp-selector.tsx:148
 msgid "All Servers"
 msgstr "所有服务器"
 
@@ -18777,7 +18777,7 @@ msgstr "每次清理运行最多删除的用户数。"
 msgid "Maximum reasoning depth for complex architectures"
 msgstr "面向复杂架构的最大推理深度"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:116
+#: src/features/chat/thread/composer-mcp-selector.tsx:117
 msgid "MCP"
 msgstr "MCP"
 
@@ -18816,7 +18816,7 @@ msgstr "MCP 服务器已更新"
 msgid "MCP server: {0}"
 msgstr "MCP 服务器：{0}"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:140
+#: src/features/chat/thread/composer-mcp-selector.tsx:142
 #: src/features/layout/lib/dashboard-page-names.ts:27
 #: src/features/settings/components/chat/mcp-settings.tsx:407
 #: src/features/settings/lib/settings-navigation.ts:94
@@ -33988,7 +33988,7 @@ msgstr "使用 {VARIABLE_PLACEHOLDER} 语法添加动态内容。示例：“Hel
 msgid "Use AI to optimize your prompt for better results. Optionally provide specific instructions for how you'd like it improved."
 msgstr "使用 AI 优化你的提示词以获得更好的结果。你也可以提供具体的改进要求。"
 
-#: src/features/chat/thread/composer-mcp-selector.tsx:147
+#: src/features/chat/thread/composer-mcp-selector.tsx:149
 msgid "Use all enabled MCP servers"
 msgstr "使用所有已启用的 MCP 服务器"
 
