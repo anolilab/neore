@@ -80,7 +80,8 @@ export const toolPermissionKey = (source: ToolSource, toolName: string, owner?: 
  * Built-ins that default to `ask`. `delegateToCodingAgent` spends the user's
  * own provider key on a long sandbox run and can push to their GitHub;
  * `delegateToSubAgent` and `messageWorker` start a background run charged to their task quota —
- * so the user sees the task before anything starts. Headless callers lose them
+ * so the user sees the task before anything starts. `replyToReviewComment` and `rerunFailedChecks` act on a pull request
+ * as the user (`mergePullRequest` asks every time: it needs a person). Headless callers lose them
  * (`ask` degrades to `off`), which is intended — except a sub-agent's own
  * delegation, which inherits the consent its parent call was given
  * (`sub-agents/execute.ts`).
@@ -89,8 +90,11 @@ export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set([
     "askUser",
     "delegateToCodingAgent",
     "delegateToSubAgent",
+    "mergePullRequest",
     "messageWorker",
+    "replyToReviewComment",
     "requestSecret",
+    "rerunFailedChecks",
 ]);
 
 const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "messageWorker"]);

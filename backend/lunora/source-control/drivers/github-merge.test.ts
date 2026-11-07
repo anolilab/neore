@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { HostApiError } from "../origin-fetch";
 import type { HostRequest, HostRequestOptions } from "../origin-fetch";
 import { writeToHost } from "../write-host";
-import { githubDriver } from "./github";
+import { githubDriver, lastPageOf } from "./github";
 
 const REF = { number: 7, repository: "octo/hello" };
 const SHA = "a".repeat(40);
@@ -567,5 +567,151 @@ describe("what a person is told when the host's rules refuse", () => {
         );
 
         expect(outcome).toEqual({ status: "rate_limited" });
+    });
+});
+
+describe("the newest reviews", () => {
+    it("finds the last page a Link header names", () => {
+        expect(
+            lastPageOf(
+                '<https://api.github.com/repositories/1/pulls/7/reviews?page=2&per_page=100>; rel="next", <https://api.github.com/repositories/1/pulls/7/reviews?page=4&per_page=100>; rel="last"',
+            ),
+        ).toBe(4);
+        expect(lastPageOf(null)).toBeUndefined();
+        expect(lastPageOf('<https://api.github.com/x?page=2>; rel="next"')).toBeUndefined();
+    });
+});
+
+describe("reading past the first page", () => {
+    /** A host that answers by path and page: `pages[path][page - 1]` is that page's body, with an optional Link header. */
+    const paged =
+        (pages: Record<string, { body: unknown; link?: string }[]>): HostRequest =>
+        async (path, options: HostRequestOptions = {}) => {
+            const page = Number(options.query?.page ?? 1);
+            const answer = pages[path]?.[page - 1];
+
+            if (answer === undefined) {
+                throw new HostApiError(`no route ${path} page ${String(page)}`, 404);
+            }
+
+            return Response.json(answer.body, { headers: answer.link === undefined ? {} : { link: answer.link } });
+        };
+
+    it("lists every page of checks a reader asks for, so a failure on a later page is not missed", async () => {
+        const runs = (from: number, count: number, conclusion = "success") =>
+            Array.from({ length: count }, (_, index) => run(from + index, `job ${String(from + index)}`, conclusion));
+        const request = paged({
+            [`${REPO}/branches/main`]: [{ body: { protected: false } }],
+            [`${REPO}/commits/${SHA}/check-runs`]: [
+                { body: { check_runs: runs(1, 100), total_count: 150 } },
+                { body: { check_runs: runs(101, 50, "failure"), total_count: 150 } },
+            ],
+            [`${REPO}/commits/${SHA}/status`]: [{ body: { statuses: [], total_count: 0 } }],
+            [`${REPO}/pulls/7`]: [{ body: { base: { ref: "main" } } }],
+            [`${REPO}/rules/branches/main`]: [{ body: [] }],
+        });
+
+        const one = await githubDriver.listChecks(request, REF, SHA);
+        const all = await githubDriver.listChecks(request, REF, SHA, 10);
+
+        expect(one.checks).toHaveLength(100);
+        expect(all.checks).toHaveLength(150);
+        expect(all.checks.filter((check) => check.state === "failure")).toHaveLength(50);
+    });
+
+    it("reads the newest reviews from the last page and hands them over newest first, with the total", async () => {
+        const review = (id: number) => {
+            return {
+                body: `r${String(id)}`,
+                id,
+                state: "COMMENTED",
+                submitted_at: new Date(Date.UTC(2026, 0, 1, 0, 0, id)).toISOString(),
+                user: { login: "x" },
+            };
+        };
+        const link = `<https://api.github.com/repositories/1/pulls/7/reviews?page=2&per_page=100>; rel="next", <https://api.github.com/repositories/1/pulls/7/reviews?page=3&per_page=100>; rel="last"`;
+        const request = paged({
+            [`${REPO}/pulls/7/reviews`]: [
+                { body: Array.from({ length: 100 }, (_, index) => review(index + 1)), link },
+                { body: Array.from({ length: 100 }, (_, index) => review(index + 101)) },
+                { body: Array.from({ length: 20 }, (_, index) => review(index + 201)) },
+            ],
+        });
+
+        const reviews = await githubDriver.listReviews(request, REF);
+
+        expect(reviews.total).toBe(220);
+        expect(reviews.items[0]?.body).toBe("r220");
+        expect(reviews.items.at(-1)?.body).toBe("r101");
+    });
+});
+
+describe("the review count", () => {
+    it("leaves a draft out of the total as well as the list", async () => {
+        const request: HostRequest = async () =>
+            Response.json([
+                { body: "seen", id: 1, state: "APPROVED", submitted_at: "2026-01-01T00:00:00Z", user: { login: "a" } },
+                { body: "mine, not sent", id: 2, state: "PENDING", submitted_at: null, user: { login: "me" } },
+            ]);
+
+        const reviews = await githubDriver.listReviews(request, REF);
+
+        expect(reviews).toMatchObject({ items: [{ body: "seen" }], total: 1 });
+    });
+});
+
+describe("a check log read inside a time budget", () => {
+    it("gives every request of the read no more than the budget it was handed", async () => {
+        const timeouts: (number | undefined)[] = [];
+        const request: HostRequest = async (path, options: HostRequestOptions = {}) => {
+            timeouts.push(options.timeoutMs);
+
+            if (path.endsWith("/check-runs/11")) {
+                return Response.json({ app: { slug: "github-actions" }, output: { summary: "1 failed", title: "Tests" } });
+            }
+
+            // The log answer: refused, so the read falls back to the check's own output.
+            throw new HostApiError("Forbidden", 403);
+        };
+
+        const log = await githubDriver.readCheckLog(request, REF, "11", 1000, 3000);
+
+        expect(log.source).toBe("check_output");
+        expect(timeouts).toHaveLength(2);
+        expect(timeouts.every((timeout) => timeout !== undefined && timeout <= 3000)).toBe(true);
+    });
+});
+
+describe("a check log read that runs out of time", () => {
+    it("falls back to the check's own output when the log request times out", async () => {
+        const request: HostRequest = async (path) => {
+            if (path.endsWith("/check-runs/11")) {
+                return Response.json({ app: { slug: "github-actions" }, output: { summary: "1 failed", title: "Tests" } });
+            }
+
+            // The log request's deadline fired: the requester reports a request that did not complete.
+            throw new HostApiError("The host could not be reached", 0);
+        };
+
+        await expect(githubDriver.readCheckLog(request, REF, "11", 1000, 50)).resolves.toMatchObject({ source: "check_output" });
+    });
+
+    it("falls back to the check's own output when a log answered in place is cut off before its first byte", async () => {
+        const request: HostRequest = async (path) => {
+            if (path.endsWith("/check-runs/11")) {
+                return Response.json({ app: { slug: "github-actions" }, output: { summary: "1 failed", title: "Tests" } });
+            }
+
+            // The log answered in place, its body cut off by the deadline before a byte arrived.
+            return new Response(
+                new ReadableStream({
+                    pull(controller) {
+                        controller.error(new DOMException("The operation timed out", "TimeoutError"));
+                    },
+                }),
+            );
+        };
+
+        await expect(githubDriver.readCheckLog(request, REF, "11", 1000, 50)).resolves.toMatchObject({ source: "check_output" });
     });
 });

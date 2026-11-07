@@ -30,17 +30,27 @@ vi.mock("./tool-builder", () => {
         },
         listBuiltInTools: () => [
             { available: true, category: "search", name: "webSearch" },
+            { available: true, category: "pullRequest", name: "readPullRequest" },
+            { available: true, category: "pullRequest", name: "mergePullRequest" },
             { available: true, category: "code", name: "codeExecution" },
             { available: true, category: "code", name: "shellExecution" },
             { available: false, category: "utility", name: "wolframAlpha" },
         ],
+        PULL_REQUEST_TOOLS: ["readPullRequest", "mergePullRequest"],
     };
 });
 
 let mcpTools: {
     descriptors: Map<
         string,
-        { annotations?: { destructiveHint?: boolean; readOnlyHint?: boolean }; connectorSlug?: string; serverName: string; toolName: string; url?: string }
+        {
+            annotations?: { destructiveHint?: boolean; readOnlyHint?: boolean };
+            connectorSlug?: string;
+            fingerprint?: string;
+            serverName: string;
+            toolName: string;
+            url?: string;
+        }
     >;
     tools: ToolSet;
 };
@@ -185,6 +195,28 @@ describe("buildAgentTools MCP permission keys", () => {
     });
 });
 
+describe("buildAgentTools MCP fingerprints", () => {
+    beforeEach(() => {
+        mcpTools = {
+            descriptors: new Map([
+                ["mcp_docs__delete", { fingerprint: "bbb", serverName: "docs", toolName: "delete" }],
+                // Could not be hashed: offered, but not pinned.
+                ["mcp_docs__list", { serverName: "docs", toolName: "list" }],
+                ["mcp_docs__search", { fingerprint: "aaa", serverName: "docs", toolName: "search" }],
+            ]),
+            tools: { mcp_docs__delete: fakeTool("delete"), mcp_docs__list: fakeTool("list"), mcp_docs__search: fakeTool("search") },
+        };
+    });
+
+    it("records the fingerprint of each MCP tool the run is offered, and only those, for its approval snapshot", async () => {
+        overrides = { "mcp:docs:delete": "off" };
+
+        const { mcpToolFingerprints } = await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
+
+        expect(mcpToolFingerprints).toStrictEqual({ mcp_docs__search: "aaa" });
+    });
+});
+
 describe("buildAgentTools connector tools", () => {
     beforeEach(() => {
         connectorServers = [{ connectorSlug: "notion", enabled: true, name: "Notion", protocol: "http", url: "https://mcp.notion.com/mcp" }];
@@ -253,6 +285,8 @@ describe("buildAgentTools quick-check trust", () => {
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
             .mockResolvedValueOnce(true)
+            // No pull request is linked to the thread.
+            .mockResolvedValueOnce({ complete: true, links: [] })
             .mockResolvedValueOnce(trusted);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
@@ -297,6 +331,7 @@ describe("buildAgentTools quick-check trust", () => {
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
             .mockResolvedValueOnce(true)
+            .mockResolvedValueOnce({ complete: true, links: [] })
             .mockResolvedValueOnce([mcpTrustId("files", second)]);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
@@ -308,5 +343,64 @@ describe("buildAgentTools quick-check trust", () => {
 
         expect((tools["mcp_files__read_a"] as { needsApproval?: unknown }).needsApproval).toBe(true);
         expect(typeof (tools["mcp_files__read_b"] as { needsApproval?: unknown }).needsApproval).toBe("function");
+    });
+});
+
+describe("buildAgentTools pull request tools", () => {
+    const toolsFor = async (linked: unknown[]): Promise<Record<string, unknown>> => {
+        const runQuery = vi.fn();
+
+        // MCP servers, overrides, grants, the quick check's eligibility, then the thread's pull request links.
+        runQuery
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce(overrides)
+            .mockResolvedValueOnce({})
+            .mockResolvedValueOnce(false)
+            .mockResolvedValueOnce({ complete: true, links: linked });
+
+        const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+            model: "test-model",
+            searchMode: "web",
+            threadId: "thread",
+            userId: "user",
+        });
+
+        return tools;
+    };
+
+    it("are offered to a thread with a linked pull request, the merge asking", async () => {
+        const tools = await toolsFor([{ kind: "linked", number: 7, repository: "octo/hello" }]);
+
+        expect(Object.keys(tools)).toStrictEqual(expect.arrayContaining(["readPullRequest", "mergePullRequest"]));
+        expect((tools.mergePullRequest as { needsApproval?: unknown }).needsApproval).toBe(true);
+    });
+
+    it("cannot be added by a skill to a thread without a linked pull request", async () => {
+        const runQuery = vi.fn();
+
+        runQuery
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce(overrides)
+            .mockResolvedValueOnce({})
+            .mockResolvedValueOnce(false)
+            .mockResolvedValueOnce({ complete: true, links: [] });
+
+        const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+            model: "test-model",
+            searchMode: "web",
+            skillTools: { additionalTools: ["readPullRequest", "mergePullRequest"] },
+            threadId: "thread",
+            userId: "user",
+        });
+
+        expect(tools.readPullRequest).toBeUndefined();
+        expect(tools.mergePullRequest).toBeUndefined();
+    });
+
+    it("are not offered to a thread without one", async () => {
+        const tools = await toolsFor([]);
+
+        expect(tools.readPullRequest).toBeUndefined();
+        expect(tools.mergePullRequest).toBeUndefined();
     });
 });
